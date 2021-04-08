@@ -17,16 +17,16 @@ package com.amazon.opendistroforelasticsearch.alerting.util
 
 import com.amazon.opendistroforelasticsearch.alerting.alerts.AlertIndices
 import com.amazon.opendistroforelasticsearch.alerting.core.ScheduledJobIndices
-import org.elasticsearch.action.ActionListener
-import org.elasticsearch.action.admin.indices.mapping.put.PutMappingRequest
-import org.elasticsearch.action.support.master.AcknowledgedResponse
-import org.elasticsearch.client.IndicesAdminClient
-import org.elasticsearch.cluster.ClusterState
-import org.elasticsearch.cluster.metadata.IndexMetadata
-import org.elasticsearch.common.xcontent.LoggingDeprecationHandler
-import org.elasticsearch.common.xcontent.NamedXContentRegistry
-import org.elasticsearch.common.xcontent.XContentParser
-import org.elasticsearch.common.xcontent.XContentType
+import org.opensearch.action.ActionListener
+import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
+import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.client.IndicesAdminClient
+import org.opensearch.cluster.ClusterState
+import org.opensearch.cluster.metadata.IndexMetadata
+import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.common.xcontent.XContentParser
+import org.opensearch.common.xcontent.XContentType
 
 class IndexUtils {
 

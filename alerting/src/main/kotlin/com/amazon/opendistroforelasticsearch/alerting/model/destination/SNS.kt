@@ -15,10 +15,10 @@
 
 package com.amazon.opendistroforelasticsearch.alerting.model.destination
 
-import org.elasticsearch.common.xcontent.ToXContent
-import org.elasticsearch.common.xcontent.XContentBuilder
-import org.elasticsearch.common.xcontent.XContentParser
-import org.elasticsearch.common.xcontent.XContentParserUtils
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.common.xcontent.XContentParser
+import org.opensearch.common.xcontent.XContentParserUtils
 import java.io.IOException
 import java.lang.IllegalStateException
 import java.util.regex.Pattern

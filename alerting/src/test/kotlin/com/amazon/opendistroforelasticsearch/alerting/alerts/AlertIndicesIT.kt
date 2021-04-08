@@ -25,10 +25,10 @@ import com.amazon.opendistroforelasticsearch.alerting.settings.AlertingSettings
 import com.amazon.opendistroforelasticsearch.alerting.makeRequest
 import org.apache.http.entity.ContentType.APPLICATION_JSON
 import org.apache.http.entity.StringEntity
-import org.elasticsearch.action.search.SearchResponse
-import org.elasticsearch.common.xcontent.XContentType
-import org.elasticsearch.common.xcontent.json.JsonXContent.jsonXContent
-import org.elasticsearch.rest.RestStatus
+import org.opensearch.action.search.SearchResponse
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.common.xcontent.json.JsonXContent.jsonXContent
+import org.opensearch.rest.RestStatus
 
 class AlertIndicesIT : AlertingRestTestCase() {
 

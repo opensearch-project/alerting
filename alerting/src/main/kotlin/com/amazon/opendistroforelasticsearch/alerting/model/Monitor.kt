@@ -29,16 +29,16 @@ import com.amazon.opendistroforelasticsearch.alerting.util.IndexUtils.Companion.
 import com.amazon.opendistroforelasticsearch.alerting.util._ID
 import com.amazon.opendistroforelasticsearch.alerting.util._VERSION
 import com.amazon.opendistroforelasticsearch.commons.authuser.User
-import org.elasticsearch.common.CheckedFunction
-import org.elasticsearch.common.ParseField
-import org.elasticsearch.common.io.stream.StreamInput
-import org.elasticsearch.common.io.stream.StreamOutput
-import org.elasticsearch.common.xcontent.NamedXContentRegistry
-import org.elasticsearch.common.xcontent.ToXContent
-import org.elasticsearch.common.xcontent.XContentBuilder
-import org.elasticsearch.common.xcontent.XContentParser
-import org.elasticsearch.common.xcontent.XContentParser.Token
-import org.elasticsearch.common.xcontent.XContentParserUtils.ensureExpectedToken
+import org.opensearch.common.CheckedFunction
+import org.opensearch.common.ParseField
+import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.common.io.stream.StreamOutput
+import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.common.xcontent.XContentParser
+import org.opensearch.common.xcontent.XContentParser.Token
+import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
 import java.io.IOException
 import java.time.Instant
 

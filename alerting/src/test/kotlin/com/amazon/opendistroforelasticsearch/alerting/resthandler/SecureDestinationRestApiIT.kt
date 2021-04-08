@@ -23,9 +23,9 @@ import com.amazon.opendistroforelasticsearch.alerting.model.destination.Destinat
 import com.amazon.opendistroforelasticsearch.alerting.model.destination.Slack
 import com.amazon.opendistroforelasticsearch.alerting.randomUser
 import com.amazon.opendistroforelasticsearch.alerting.util.DestinationType
-import org.elasticsearch.client.ResponseException
-import org.elasticsearch.rest.RestStatus
-import org.elasticsearch.test.junit.annotations.TestLogging
+import org.opensearch.client.ResponseException
+import org.opensearch.rest.RestStatus
+import org.opensearch.test.junit.annotations.TestLogging
 import java.time.Instant
 
 @TestLogging("level:DEBUG", reason = "Debug for tests.")

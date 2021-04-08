@@ -35,11 +35,11 @@ import com.amazon.opendistroforelasticsearch.alerting.randomUser
 import com.amazon.opendistroforelasticsearch.alerting.randomUserEmpty
 import com.amazon.opendistroforelasticsearch.alerting.toJsonString
 import com.amazon.opendistroforelasticsearch.commons.authuser.User
-import org.elasticsearch.common.xcontent.ToXContent
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.test.OpenSearchTestCase
 import kotlin.test.assertFailsWith
 
-class XContentTests : ESTestCase() {
+class XContentTests : OpenSearchTestCase() {
 
     fun `test action parsing`() {
         val action = randomAction()

@@ -21,14 +21,14 @@ import com.amazon.opendistroforelasticsearch.alerting.model.Alert
 import com.amazon.opendistroforelasticsearch.alerting.util.REFRESH
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
-import org.elasticsearch.action.support.WriteRequest.RefreshPolicy
-import org.elasticsearch.client.node.NodeClient
-import org.elasticsearch.rest.BaseRestHandler
-import org.elasticsearch.rest.BaseRestHandler.RestChannelConsumer
-import org.elasticsearch.rest.RestHandler.Route
-import org.elasticsearch.rest.RestRequest
-import org.elasticsearch.rest.RestRequest.Method.DELETE
-import org.elasticsearch.rest.action.RestToXContentListener
+import org.opensearch.action.support.WriteRequest.RefreshPolicy
+import org.opensearch.client.node.NodeClient
+import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
+import org.opensearch.rest.RestHandler.Route
+import org.opensearch.rest.RestRequest
+import org.opensearch.rest.RestRequest.Method.DELETE
+import org.opensearch.rest.action.RestToXContentListener
 import java.io.IOException
 
 private val log: Logger = LogManager.getLogger(RestDeleteMonitorAction::class.java)

@@ -15,8 +15,8 @@
 
 package com.amazon.opendistroforelasticsearch.alerting.destination.message;
 
-import org.elasticsearch.common.Strings;
-import org.elasticsearch.common.settings.SecureString;
+import org.opensearch.common.Strings;
+import org.opensearch.common.settings.SecureString;
 
 import java.net.URI;
 import java.util.List;

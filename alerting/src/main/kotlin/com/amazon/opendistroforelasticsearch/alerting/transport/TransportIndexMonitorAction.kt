@@ -40,36 +40,36 @@ import com.amazon.opendistroforelasticsearch.alerting.util.isADMonitor
 import com.amazon.opendistroforelasticsearch.commons.ConfigConstants
 import com.amazon.opendistroforelasticsearch.commons.authuser.User
 import org.apache.logging.log4j.LogManager
-import org.elasticsearch.ElasticsearchSecurityException
-import org.elasticsearch.ElasticsearchStatusException
-import org.elasticsearch.action.ActionListener
-import org.elasticsearch.action.admin.indices.create.CreateIndexResponse
-import org.elasticsearch.action.get.GetRequest
-import org.elasticsearch.action.get.GetResponse
-import org.elasticsearch.action.index.IndexRequest
-import org.elasticsearch.action.index.IndexResponse
-import org.elasticsearch.action.search.SearchRequest
-import org.elasticsearch.action.search.SearchResponse
-import org.elasticsearch.action.support.ActionFilters
-import org.elasticsearch.action.support.HandledTransportAction
-import org.elasticsearch.action.support.master.AcknowledgedResponse
-import org.elasticsearch.client.Client
-import org.elasticsearch.cluster.service.ClusterService
-import org.elasticsearch.common.inject.Inject
-import org.elasticsearch.common.settings.Settings
-import org.elasticsearch.common.unit.TimeValue
-import org.elasticsearch.common.xcontent.LoggingDeprecationHandler
-import org.elasticsearch.common.xcontent.NamedXContentRegistry
-import org.elasticsearch.common.xcontent.ToXContent
-import org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder
-import org.elasticsearch.common.xcontent.XContentHelper
-import org.elasticsearch.common.xcontent.XContentType
-import org.elasticsearch.index.query.QueryBuilders
-import org.elasticsearch.rest.RestRequest
-import org.elasticsearch.rest.RestStatus
-import org.elasticsearch.search.builder.SearchSourceBuilder
-import org.elasticsearch.tasks.Task
-import org.elasticsearch.transport.TransportService
+import org.opensearch.OpenSearchSecurityException
+import org.opensearch.OpenSearchStatusException
+import org.opensearch.action.ActionListener
+import org.opensearch.action.admin.indices.create.CreateIndexResponse
+import org.opensearch.action.get.GetRequest
+import org.opensearch.action.get.GetResponse
+import org.opensearch.action.index.IndexRequest
+import org.opensearch.action.index.IndexResponse
+import org.opensearch.action.search.SearchRequest
+import org.opensearch.action.search.SearchResponse
+import org.opensearch.action.support.ActionFilters
+import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.client.Client
+import org.opensearch.cluster.service.ClusterService
+import org.opensearch.common.inject.Inject
+import org.opensearch.common.settings.Settings
+import org.opensearch.common.unit.TimeValue
+import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
+import org.opensearch.common.xcontent.XContentHelper
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.rest.RestRequest
+import org.opensearch.rest.RestStatus
+import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.tasks.Task
+import org.opensearch.transport.TransportService
 import java.io.IOException
 import java.time.Duration
 
@@ -151,8 +151,8 @@ class TransportIndexMonitorAction @Inject constructor(
             //  https://github.com/opendistro-for-elasticsearch/security/issues/718
             override fun onFailure(t: Exception) {
                 actionListener.onFailure(AlertingException.wrap(
-                    when (t is ElasticsearchSecurityException) {
-                        true -> ElasticsearchStatusException("User doesn't have read permissions for one or more configured index " +
+                    when (t is OpenSearchSecurityException) {
+                        true -> OpenSearchStatusException("User doesn't have read permissions for one or more configured index " +
                             "$indices", RestStatus.FORBIDDEN)
                         false -> t
                     }
@@ -219,7 +219,7 @@ class TransportIndexMonitorAction @Inject constructor(
                                 start()
                             } else {
                                 actionListener.onFailure(AlertingException.wrap(
-                                        ElasticsearchStatusException("User has no available detectors", RestStatus.NOT_FOUND)
+                                        OpenSearchStatusException("User has no available detectors", RestStatus.NOT_FOUND)
                                 ))
                             }
                         }
@@ -330,7 +330,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 IndexUtils.scheduledJobIndexUpdated()
             } else {
                 log.error("Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged.")
-                actionListener.onFailure(AlertingException.wrap(ElasticsearchStatusException(
+                actionListener.onFailure(AlertingException.wrap(OpenSearchStatusException(
                         "Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged", RestStatus.INTERNAL_SERVER_ERROR))
                 )
             }
@@ -343,7 +343,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 prepareMonitorIndexing()
             } else {
                 log.error("Update ${ScheduledJob.SCHEDULED_JOBS_INDEX} mappings call not acknowledged.")
-                actionListener.onFailure(AlertingException.wrap(ElasticsearchStatusException(
+                actionListener.onFailure(AlertingException.wrap(OpenSearchStatusException(
                                 "Updated ${ScheduledJob.SCHEDULED_JOBS_INDEX} mappings call not acknowledged.",
                                 RestStatus.INTERNAL_SERVER_ERROR))
                 )
@@ -363,7 +363,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     val failureReasons = checkShardsFailure(response)
                     if (failureReasons != null) {
                         actionListener.onFailure(
-                                AlertingException.wrap(ElasticsearchStatusException(failureReasons.toString(), response.status())))
+                                AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), response.status())))
                         return
                     }
                     actionListener.onResponse(IndexMonitorResponse(response.id, response.version, response.seqNo,
@@ -381,7 +381,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 override fun onResponse(response: GetResponse) {
                     if (!response.isExists) {
                         actionListener.onFailure(AlertingException.wrap(
-                            ElasticsearchStatusException("Monitor with ${request.monitorId} is not found", RestStatus.NOT_FOUND)))
+                            OpenSearchStatusException("Monitor with ${request.monitorId} is not found", RestStatus.NOT_FOUND)))
                         return
                     }
                     val xcp = XContentHelper.createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE,
@@ -419,7 +419,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     val failureReasons = checkShardsFailure(response)
                     if (failureReasons != null) {
                         actionListener.onFailure(
-                                AlertingException.wrap(ElasticsearchStatusException(failureReasons.toString(), response.status())))
+                                AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), response.status())))
                         return
                     }
                     actionListener.onResponse(

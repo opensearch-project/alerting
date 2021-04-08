@@ -19,9 +19,9 @@ import com.amazon.opendistroforelasticsearch.alerting.core.model.Input
 import com.amazon.opendistroforelasticsearch.alerting.core.model.SearchInput
 import com.amazon.opendistroforelasticsearch.alerting.core.model.XContentTestBase
 import com.amazon.opendistroforelasticsearch.alerting.elasticapi.string
-import org.elasticsearch.common.xcontent.ToXContent
-import org.elasticsearch.index.query.QueryBuilders
-import org.elasticsearch.search.builder.SearchSourceBuilder
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.search.builder.SearchSourceBuilder
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

@@ -26,38 +26,38 @@ import com.amazon.opendistroforelasticsearch.alerting.core.settings.ScheduledJob
 import com.amazon.opendistroforelasticsearch.alerting.elasticapi.firstFailureOrNull
 import com.amazon.opendistroforelasticsearch.alerting.elasticapi.retry
 import org.apache.logging.log4j.LogManager
-import org.elasticsearch.action.bulk.BackoffPolicy
-import org.elasticsearch.action.search.SearchRequest
-import org.elasticsearch.client.Client
-import org.elasticsearch.cluster.ClusterChangedEvent
-import org.elasticsearch.cluster.ClusterStateListener
-import org.elasticsearch.cluster.routing.IndexShardRoutingTable
-import org.elasticsearch.cluster.routing.Murmur3HashFunction
-import org.elasticsearch.cluster.service.ClusterService
-import org.elasticsearch.common.Strings
-import org.elasticsearch.common.bytes.BytesReference
-import org.elasticsearch.common.component.LifecycleListener
-import org.elasticsearch.common.logging.Loggers
-import org.elasticsearch.common.lucene.uid.Versions
-import org.elasticsearch.common.settings.Settings
-import org.elasticsearch.common.unit.TimeValue
-import org.elasticsearch.common.util.concurrent.EsExecutors
-import org.elasticsearch.common.xcontent.LoggingDeprecationHandler
-import org.elasticsearch.common.xcontent.NamedXContentRegistry
-import org.elasticsearch.common.xcontent.XContentHelper
-import org.elasticsearch.common.xcontent.XContentParser
-import org.elasticsearch.common.xcontent.XContentParserUtils
-import org.elasticsearch.common.xcontent.XContentType
-import org.elasticsearch.index.engine.Engine
-import org.elasticsearch.index.query.BoolQueryBuilder
-import org.elasticsearch.index.query.QueryBuilders
-import org.elasticsearch.index.shard.IndexingOperationListener
-import org.elasticsearch.index.shard.ShardId
-import org.elasticsearch.rest.RestStatus
-import org.elasticsearch.search.builder.SearchSourceBuilder
-import org.elasticsearch.search.sort.FieldSortBuilder
-import org.elasticsearch.threadpool.Scheduler
-import org.elasticsearch.threadpool.ThreadPool
+import org.opensearch.action.bulk.BackoffPolicy
+import org.opensearch.action.search.SearchRequest
+import org.opensearch.client.Client
+import org.opensearch.cluster.ClusterChangedEvent
+import org.opensearch.cluster.ClusterStateListener
+import org.opensearch.cluster.routing.IndexShardRoutingTable
+import org.opensearch.cluster.routing.Murmur3HashFunction
+import org.opensearch.cluster.service.ClusterService
+import org.opensearch.common.Strings
+import org.opensearch.common.bytes.BytesReference
+import org.opensearch.common.component.LifecycleListener
+import org.opensearch.common.logging.Loggers
+import org.opensearch.common.lucene.uid.Versions
+import org.opensearch.common.settings.Settings
+import org.opensearch.common.unit.TimeValue
+import org.opensearch.common.util.concurrent.OpenSearchExecutors
+import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.common.xcontent.XContentHelper
+import org.opensearch.common.xcontent.XContentParser
+import org.opensearch.common.xcontent.XContentParserUtils
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.index.engine.Engine
+import org.opensearch.index.query.BoolQueryBuilder
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.index.shard.IndexingOperationListener
+import org.opensearch.index.shard.ShardId
+import org.opensearch.rest.RestStatus
+import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.search.sort.FieldSortBuilder
+import org.opensearch.threadpool.Scheduler
+import org.opensearch.threadpool.ThreadPool
 import java.util.TreeMap
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -90,7 +90,7 @@ class JobSweeper(
 ) : ClusterStateListener, IndexingOperationListener, LifecycleListener() {
     private val logger = LogManager.getLogger(javaClass)
 
-    private val fullSweepExecutor = Executors.newSingleThreadExecutor(EsExecutors.daemonThreadFactory("opendistro_job_sweeper"))
+    private val fullSweepExecutor = Executors.newSingleThreadExecutor(OpenSearchExecutors.daemonThreadFactory("opendistro_job_sweeper"))
 
     private val sweptJobs = ConcurrentHashMap<ShardId, ConcurrentHashMap<JobId, JobVersion>>()
 
@@ -437,11 +437,11 @@ class JobSweeper(
 }
 
 /**
- * A group of nodes in the cluster that contain active instances of a single ES shard.  This uses a consistent hash to divide
+ * A group of nodes in the cluster that contain active instances of a single OpenSearch shard.  This uses a consistent hash to divide
  * the jobs indexed in that shard amongst the nodes such that each job is "owned" by exactly one of the nodes.
  * The local node must have an active instance of the shard.
  *
- * Implementation notes: This class is not thread safe. It uses the same [hash function][Murmur3HashFunction] that ES uses
+ * Implementation notes: This class is not thread safe. It uses the same [hash function][Murmur3HashFunction] that OpenSearch uses
  * for routing. For each real node `100` virtual nodes are added to provide a good distribution.
  */
 private class ShardNodes(val localNodeId: String, activeShardNodeIds: Collection<String>) {

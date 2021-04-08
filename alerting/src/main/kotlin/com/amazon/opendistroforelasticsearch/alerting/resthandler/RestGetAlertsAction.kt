@@ -20,13 +20,13 @@ import com.amazon.opendistroforelasticsearch.alerting.action.GetAlertsAction
 import com.amazon.opendistroforelasticsearch.alerting.action.GetAlertsRequest
 import com.amazon.opendistroforelasticsearch.alerting.model.Table
 import org.apache.logging.log4j.LogManager
-import org.elasticsearch.client.node.NodeClient
-import org.elasticsearch.rest.BaseRestHandler
-import org.elasticsearch.rest.BaseRestHandler.RestChannelConsumer
-import org.elasticsearch.rest.RestHandler.Route
-import org.elasticsearch.rest.RestRequest
-import org.elasticsearch.rest.RestRequest.Method.GET
-import org.elasticsearch.rest.action.RestToXContentListener
+import org.opensearch.client.node.NodeClient
+import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
+import org.opensearch.rest.RestHandler.Route
+import org.opensearch.rest.RestRequest
+import org.opensearch.rest.RestRequest.Method.GET
+import org.opensearch.rest.action.RestToXContentListener
 
 /**
  * This class consists of the REST handler to retrieve alerts .

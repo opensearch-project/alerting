@@ -22,16 +22,16 @@ import com.amazon.opendistroforelasticsearch.commons.ConfigConstants.OPENDISTRO_
 import com.amazon.opendistroforelasticsearch.commons.ConfigConstants.OPENDISTRO_SECURITY_SSL_HTTP_PEMCERT_FILEPATH
 import com.amazon.opendistroforelasticsearch.commons.rest.SecureRestClientBuilder
 import org.apache.http.HttpHost
-import org.elasticsearch.client.Request
-import org.elasticsearch.client.RequestOptions
-import org.elasticsearch.client.RestClient
-import org.elasticsearch.client.WarningsHandler
-import org.elasticsearch.common.io.PathUtils
-import org.elasticsearch.common.settings.Settings
-import org.elasticsearch.common.xcontent.DeprecationHandler
-import org.elasticsearch.common.xcontent.NamedXContentRegistry
-import org.elasticsearch.common.xcontent.XContentType
-import org.elasticsearch.test.rest.ESRestTestCase
+import org.opensearch.client.Request
+import org.opensearch.client.RequestOptions
+import org.opensearch.client.RestClient
+import org.opensearch.client.WarningsHandler
+import org.opensearch.common.io.PathUtils
+import org.opensearch.common.settings.Settings
+import org.opensearch.common.xcontent.DeprecationHandler
+import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.test.rest.OpenSearchRestTestCase
 import org.junit.After
 import java.io.IOException
 
@@ -45,7 +45,7 @@ import java.io.IOException
  * adminClient() -> adminDN/super-admin user
  */
 
-abstract class ODFERestTestCase : ESRestTestCase() {
+abstract class ODFERestTestCase : OpenSearchRestTestCase() {
 
     fun isHttps(): Boolean {
         return System.getProperty("https", "false")!!.toBoolean()

@@ -15,7 +15,7 @@
 
 package com.amazon.opendistroforelasticsearch.alerting.action
 
-import org.elasticsearch.action.ActionType
+import org.opensearch.action.ActionType
 
 class GetMonitorAction private constructor() : ActionType<GetMonitorResponse>(NAME, ::GetMonitorResponse) {
     companion object {

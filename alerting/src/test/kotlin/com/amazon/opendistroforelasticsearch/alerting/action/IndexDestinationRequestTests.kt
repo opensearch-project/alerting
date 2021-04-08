@@ -19,14 +19,14 @@ import com.amazon.opendistroforelasticsearch.alerting.model.destination.Chime
 import com.amazon.opendistroforelasticsearch.alerting.model.destination.Destination
 import com.amazon.opendistroforelasticsearch.alerting.randomUser
 import com.amazon.opendistroforelasticsearch.alerting.util.DestinationType
-import org.elasticsearch.action.support.WriteRequest
-import org.elasticsearch.common.io.stream.BytesStreamOutput
-import org.elasticsearch.common.io.stream.StreamInput
-import org.elasticsearch.rest.RestRequest
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.action.support.WriteRequest
+import org.opensearch.common.io.stream.BytesStreamOutput
+import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.rest.RestRequest
+import org.opensearch.test.OpenSearchTestCase
 import java.time.Instant
 
-class IndexDestinationRequestTests : ESTestCase() {
+class IndexDestinationRequestTests : OpenSearchTestCase() {
 
     fun `test index destination post request`() {
 

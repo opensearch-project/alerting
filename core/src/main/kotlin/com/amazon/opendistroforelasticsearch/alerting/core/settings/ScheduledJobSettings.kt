@@ -16,8 +16,8 @@
 package com.amazon.opendistroforelasticsearch.alerting.core.settings
 
 import com.amazon.opendistroforelasticsearch.alerting.core.model.ScheduledJob
-import org.elasticsearch.common.settings.Setting
-import org.elasticsearch.common.unit.TimeValue
+import org.opensearch.common.settings.Setting
+import org.opensearch.common.unit.TimeValue
 
 /**
  * settings used for [ScheduledJob]'s. These include back off settings, retry counts, timeouts etc...

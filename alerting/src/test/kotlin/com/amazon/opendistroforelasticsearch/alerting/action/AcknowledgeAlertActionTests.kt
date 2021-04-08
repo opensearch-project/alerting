@@ -14,10 +14,10 @@
  */
 package com.amazon.opendistroforelasticsearch.alerting.action
 
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.test.OpenSearchTestCase
 import org.junit.Assert
 
-class AcknowledgeAlertActionTests : ESTestCase() {
+class AcknowledgeAlertActionTests : OpenSearchTestCase() {
 
     fun `test ack alert action name`() {
         Assert.assertNotNull(AcknowledgeAlertAction.INSTANCE.name())

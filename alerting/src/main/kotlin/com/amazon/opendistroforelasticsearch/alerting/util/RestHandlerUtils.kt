@@ -16,9 +16,9 @@
 package com.amazon.opendistroforelasticsearch.alerting.util
 
 import com.amazon.opendistroforelasticsearch.alerting.AlertingPlugin
-import org.elasticsearch.common.Strings
-import org.elasticsearch.rest.RestRequest
-import org.elasticsearch.search.fetch.subphase.FetchSourceContext
+import org.opensearch.common.Strings
+import org.opensearch.rest.RestRequest
+import org.opensearch.search.fetch.subphase.FetchSourceContext
 
 /**
  * Checks to see if the request came from Kibana, if so we want to return the UI Metadata from the document.

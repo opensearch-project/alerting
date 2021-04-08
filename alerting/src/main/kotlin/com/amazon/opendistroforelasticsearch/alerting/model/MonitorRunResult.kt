@@ -18,13 +18,13 @@ package com.amazon.opendistroforelasticsearch.alerting.model
 import com.amazon.opendistroforelasticsearch.alerting.alerts.AlertError
 import com.amazon.opendistroforelasticsearch.alerting.elasticapi.optionalTimeField
 import org.apache.logging.log4j.LogManager
-import org.elasticsearch.ElasticsearchException
-import org.elasticsearch.common.io.stream.StreamInput
-import org.elasticsearch.common.io.stream.StreamOutput
-import org.elasticsearch.common.io.stream.Writeable
-import org.elasticsearch.common.xcontent.ToXContent
-import org.elasticsearch.common.xcontent.XContentBuilder
-import org.elasticsearch.script.ScriptException
+import org.opensearch.OpenSearchException
+import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.common.io.stream.StreamOutput
+import org.opensearch.common.io.stream.Writeable
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.script.ScriptException
 import java.io.IOException
 import java.time.Instant
 
@@ -256,14 +256,14 @@ private val logger = LogManager.getLogger(MonitorRunResult::class.java)
 private fun Throwable.userErrorMessage(): String {
     return when {
         this is ScriptException -> this.scriptStack.joinToString(separator = "\n", limit = 100)
-        this is ElasticsearchException -> this.detailedMessage
+        this is OpenSearchException -> this.detailedMessage
         this.message != null -> {
-            logger.info("Internal error: ${this.message}. See the Elasticsearch.log for details", this)
+            logger.info("Internal error: ${this.message}. See the opensearch.log for details", this)
             this.message!!
         }
         else -> {
-            logger.info("Unknown Internal error. See the Elasticsearch log for details.", this)
-            "Unknown Internal error. See the Elasticsearch log for details."
+            logger.info("Unknown Internal error. See the OpenSearch log for details.", this)
+            "Unknown Internal error. See the OpenSearch log for details."
         }
     }
 }

@@ -19,9 +19,9 @@ import com.amazon.opendistroforelasticsearch.alerting.destination.message.BaseMe
 import com.amazon.opendistroforelasticsearch.alerting.model.destination.Destination
 import com.amazon.opendistroforelasticsearch.alerting.settings.DestinationSettings
 import com.amazon.opendistroforelasticsearch.commons.authuser.User
-import org.elasticsearch.ElasticsearchStatusException
-import org.elasticsearch.action.ActionListener
-import org.elasticsearch.rest.RestStatus
+import org.opensearch.OpenSearchStatusException
+import org.opensearch.action.ActionListener
+import org.opensearch.rest.RestStatus
 import inet.ipaddr.IPAddressString
 
 /**
@@ -71,14 +71,14 @@ fun <T : Any> checkFilterByUserBackendRoles(filterByEnabled: Boolean, user: User
     if (filterByEnabled) {
         if (user == null) {
             actionListener.onFailure(AlertingException.wrap(
-                    ElasticsearchStatusException(
+                    OpenSearchStatusException(
                             "Filter by user backend roles is not enabled with security disabled.", RestStatus.FORBIDDEN
                     )
             ))
             return false
         } else if (user.backendRoles.isNullOrEmpty()) {
             actionListener.onFailure(AlertingException.wrap(
-                    ElasticsearchStatusException("User doesn't have backend roles configured. Contact administrator.", RestStatus.FORBIDDEN)
+                    OpenSearchStatusException("User doesn't have backend roles configured. Contact administrator.", RestStatus.FORBIDDEN)
             ))
             return false
         }
@@ -108,7 +108,7 @@ fun <T : Any> checkUserFilterByPermissions(
 
     if (resourceBackendRoles == null || requesterBackendRoles == null || resourceBackendRoles.intersect(requesterBackendRoles).isEmpty()) {
         actionListener.onFailure(AlertingException.wrap(
-            ElasticsearchStatusException("Do not have permissions to resource, $resourceType, with id, $resourceId",
+            OpenSearchStatusException("Do not have permissions to resource, $resourceType, with id, $resourceId",
                 RestStatus.FORBIDDEN)
         ))
         return false

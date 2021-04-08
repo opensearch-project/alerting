@@ -35,9 +35,9 @@ import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.elasticsearch.common.Strings;
-import org.elasticsearch.common.unit.TimeValue;
-import org.elasticsearch.rest.RestStatus;
+import org.opensearch.common.Strings;
+import org.opensearch.common.unit.TimeValue;
+import org.opensearch.rest.RestStatus;
 
 import java.io.IOException;
 import java.net.URI;

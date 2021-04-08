@@ -16,10 +16,10 @@
 package com.amazon.opendistroforelasticsearch.alerting.action
 
 import com.amazon.opendistroforelasticsearch.alerting.model.Table
-import org.elasticsearch.action.ActionRequest
-import org.elasticsearch.action.ActionRequestValidationException
-import org.elasticsearch.common.io.stream.StreamInput
-import org.elasticsearch.common.io.stream.StreamOutput
+import org.opensearch.action.ActionRequest
+import org.opensearch.action.ActionRequestValidationException
+import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.common.io.stream.StreamOutput
 import java.io.IOException
 
 class GetAlertsRequest : ActionRequest {

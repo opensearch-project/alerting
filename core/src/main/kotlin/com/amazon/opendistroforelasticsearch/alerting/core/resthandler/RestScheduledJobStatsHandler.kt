@@ -17,14 +17,14 @@ package com.amazon.opendistroforelasticsearch.alerting.core.resthandler
 
 import com.amazon.opendistroforelasticsearch.alerting.core.action.node.ScheduledJobsStatsAction
 import com.amazon.opendistroforelasticsearch.alerting.core.action.node.ScheduledJobsStatsRequest
-import org.elasticsearch.client.node.NodeClient
-import org.elasticsearch.common.Strings
-import org.elasticsearch.rest.BaseRestHandler
-import org.elasticsearch.rest.RestHandler.Route
-import org.elasticsearch.rest.RestRequest
+import org.opensearch.client.node.NodeClient
+import org.opensearch.common.Strings
+import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.RestHandler.Route
+import org.opensearch.rest.RestRequest
 
-import org.elasticsearch.rest.RestRequest.Method.GET
-import org.elasticsearch.rest.action.RestActions
+import org.opensearch.rest.RestRequest.Method.GET
+import org.opensearch.rest.action.RestActions
 import java.util.Locale
 import java.util.TreeSet
 

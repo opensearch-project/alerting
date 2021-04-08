@@ -16,12 +16,12 @@
 package com.amazon.opendistroforelasticsearch.alerting.util
 
 import com.amazon.opendistroforelasticsearch.alerting.parser
-import org.elasticsearch.cluster.metadata.IndexMetadata
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.cluster.metadata.IndexMetadata
+import org.opensearch.test.OpenSearchTestCase
 import java.lang.NumberFormatException
 import kotlin.test.assertFailsWith
 
-class IndexUtilsTests : ESTestCase() {
+class IndexUtilsTests : OpenSearchTestCase() {
 
     fun `test get schema version`() {
         val message = "{\"user\":{ \"name\":\"test\"},\"_meta\":{\"schema_version\": 1}}"

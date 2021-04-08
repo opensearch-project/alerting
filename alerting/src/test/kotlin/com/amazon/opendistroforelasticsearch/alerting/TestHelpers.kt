@@ -35,38 +35,38 @@ import com.amazon.opendistroforelasticsearch.alerting.model.destination.email.Em
 import com.amazon.opendistroforelasticsearch.commons.authuser.User
 import org.apache.http.Header
 import org.apache.http.HttpEntity
-import org.elasticsearch.client.Request
-import org.elasticsearch.client.RequestOptions
-import org.elasticsearch.client.Response
-import org.elasticsearch.client.RestClient
-import org.elasticsearch.client.WarningsHandler
-import org.elasticsearch.common.UUIDs
-import org.elasticsearch.common.settings.SecureString
-import org.elasticsearch.common.settings.Settings
-import org.elasticsearch.common.xcontent.LoggingDeprecationHandler
-import org.elasticsearch.common.xcontent.NamedXContentRegistry
-import org.elasticsearch.common.xcontent.XContentBuilder
-import org.elasticsearch.common.xcontent.XContentFactory
-import org.elasticsearch.common.xcontent.XContentParser
-import org.elasticsearch.common.xcontent.XContentType
-import org.elasticsearch.index.query.QueryBuilders
-import org.elasticsearch.script.Script
-import org.elasticsearch.script.ScriptType
-import org.elasticsearch.search.SearchModule
-import org.elasticsearch.search.builder.SearchSourceBuilder
-import org.elasticsearch.test.ESTestCase
-import org.elasticsearch.test.ESTestCase.randomInt
-import org.elasticsearch.test.ESTestCase.randomIntBetween
-import org.elasticsearch.test.rest.ESRestTestCase
+import org.opensearch.client.Request
+import org.opensearch.client.RequestOptions
+import org.opensearch.client.Response
+import org.opensearch.client.RestClient
+import org.opensearch.client.WarningsHandler
+import org.opensearch.common.UUIDs
+import org.opensearch.common.settings.SecureString
+import org.opensearch.common.settings.Settings
+import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.common.xcontent.XContentFactory
+import org.opensearch.common.xcontent.XContentParser
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.script.Script
+import org.opensearch.script.ScriptType
+import org.opensearch.search.SearchModule
+import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.test.OpenSearchTestCase
+import org.opensearch.test.OpenSearchTestCase.randomInt
+import org.opensearch.test.OpenSearchTestCase.randomIntBetween
+import org.opensearch.test.rest.OpenSearchRestTestCase
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 fun randomMonitor(
-    name: String = ESRestTestCase.randomAlphaOfLength(10),
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     user: User = randomUser(),
     inputs: List<Input> = listOf(SearchInput(emptyList(), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
-    enabled: Boolean = ESTestCase.randomBoolean(),
+    enabled: Boolean = OpenSearchTestCase.randomBoolean(),
     triggers: List<Trigger> = (1..randomInt(10)).map { randomTrigger() },
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
@@ -79,10 +79,10 @@ fun randomMonitor(
 
 // Monitor of older versions without security.
 fun randomMonitorWithoutUser(
-    name: String = ESRestTestCase.randomAlphaOfLength(10),
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     inputs: List<Input> = listOf(SearchInput(emptyList(), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
-    enabled: Boolean = ESTestCase.randomBoolean(),
+    enabled: Boolean = OpenSearchTestCase.randomBoolean(),
     triggers: List<Trigger> = (1..randomInt(10)).map { randomTrigger() },
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
@@ -95,7 +95,7 @@ fun randomMonitorWithoutUser(
 
 fun randomTrigger(
     id: String = UUIDs.base64UUID(),
-    name: String = ESRestTestCase.randomAlphaOfLength(10),
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     severity: String = "1",
     condition: Script = randomScript(),
     actions: List<Action> = mutableListOf(),
@@ -110,9 +110,9 @@ fun randomTrigger(
 }
 
 fun randomEmailAccount(
-    name: String = ESRestTestCase.randomAlphaOfLength(10),
-    email: String = ESRestTestCase.randomAlphaOfLength(5) + "@email.com",
-    host: String = ESRestTestCase.randomAlphaOfLength(10),
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    email: String = OpenSearchRestTestCase.randomAlphaOfLength(5) + "@email.com",
+    host: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     port: Int = randomIntBetween(1, 100),
     method: EmailAccount.MethodType = randomEmailAccountMethod(),
     username: SecureString? = null,
@@ -130,13 +130,13 @@ fun randomEmailAccount(
 }
 
 fun randomEmailGroup(
-    name: String = ESRestTestCase.randomAlphaOfLength(10),
-    emails: List<EmailEntry> = (1..randomInt(10)).map { EmailEntry(email = ESRestTestCase.randomAlphaOfLength(5) + "@email.com") }
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    emails: List<EmailEntry> = (1..randomInt(10)).map { EmailEntry(email = OpenSearchRestTestCase.randomAlphaOfLength(5) + "@email.com") }
 ): EmailGroup {
     return EmailGroup(name = name, emails = emails)
 }
 
-fun randomScript(source: String = "return " + ESRestTestCase.randomBoolean().toString()): Script = Script(source)
+fun randomScript(source: String = "return " + OpenSearchRestTestCase.randomBoolean().toString()): Script = Script(source)
 
 val ALERTING_BASE_URI = "/_opendistro/_alerting/monitors"
 val DESTINATION_BASE_URI = "/_opendistro/_alerting/destinations"
@@ -150,7 +150,7 @@ fun randomTemplateScript(
 ): Script = Script(ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG, source, params)
 
 fun randomAction(
-    name: String = ESRestTestCase.randomUnicodeOfLength(10),
+    name: String = OpenSearchRestTestCase.randomUnicodeOfLength(10),
     template: Script = randomTemplateScript("Hello World"),
     destinationId: String = "",
     throttleEnabled: Boolean = false,
@@ -221,8 +221,9 @@ fun Monitor.toJsonString(): String {
 }
 
 fun randomUser(): User {
-    return User(ESRestTestCase.randomAlphaOfLength(10), listOf(ESRestTestCase.randomAlphaOfLength(10),
-            ESRestTestCase.randomAlphaOfLength(10)), listOf(ESRestTestCase.randomAlphaOfLength(10), "all_access"), listOf("test_attr=test"))
+    return User(OpenSearchRestTestCase.randomAlphaOfLength(10), listOf(OpenSearchRestTestCase.randomAlphaOfLength(10),
+        OpenSearchRestTestCase.randomAlphaOfLength(10)), listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), "all_access"),
+        listOf("test_attr=test"))
 }
 
 fun randomUserEmpty(): User {

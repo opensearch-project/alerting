@@ -16,7 +16,7 @@
 package com.amazon.opendistroforelasticsearch.alerting.destination.message;
 
 import org.apache.http.client.utils.URIBuilder;
-import org.elasticsearch.common.Strings;
+import org.opensearch.common.Strings;
 
 import java.net.URI;
 import java.net.URISyntaxException;

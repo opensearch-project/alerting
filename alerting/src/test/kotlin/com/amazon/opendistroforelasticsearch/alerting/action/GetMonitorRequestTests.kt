@@ -15,13 +15,13 @@
 
 package com.amazon.opendistroforelasticsearch.alerting.action
 
-import org.elasticsearch.common.io.stream.BytesStreamOutput
-import org.elasticsearch.common.io.stream.StreamInput
-import org.elasticsearch.rest.RestRequest
-import org.elasticsearch.search.fetch.subphase.FetchSourceContext
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.common.io.stream.BytesStreamOutput
+import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.rest.RestRequest
+import org.opensearch.search.fetch.subphase.FetchSourceContext
+import org.opensearch.test.OpenSearchTestCase
 
-class GetMonitorRequestTests : ESTestCase() {
+class GetMonitorRequestTests : OpenSearchTestCase() {
 
     fun `test get monitor request`() {
 

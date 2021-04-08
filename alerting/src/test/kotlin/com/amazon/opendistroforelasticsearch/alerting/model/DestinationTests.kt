@@ -24,12 +24,12 @@ import com.amazon.opendistroforelasticsearch.alerting.parser
 import com.amazon.opendistroforelasticsearch.alerting.randomUser
 import com.amazon.opendistroforelasticsearch.alerting.model.destination.email.Recipient
 import com.amazon.opendistroforelasticsearch.alerting.util.DestinationType
-import org.elasticsearch.common.io.stream.BytesStreamOutput
-import org.elasticsearch.common.io.stream.StreamInput
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.common.io.stream.BytesStreamOutput
+import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.test.OpenSearchTestCase
 import java.time.Instant
 
-class DestinationTests : ESTestCase() {
+class DestinationTests : OpenSearchTestCase() {
 
     fun `test chime destination`() {
         val chime = Chime("http://abc.com")

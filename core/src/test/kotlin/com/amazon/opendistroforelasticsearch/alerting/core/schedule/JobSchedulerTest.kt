@@ -18,8 +18,8 @@ package com.amazon.opendistroforelasticsearch.alerting.core.schedule
 import com.amazon.opendistroforelasticsearch.alerting.core.model.CronSchedule
 import com.amazon.opendistroforelasticsearch.alerting.core.model.IntervalSchedule
 import com.amazon.opendistroforelasticsearch.alerting.core.model.MockScheduledJob
-import org.elasticsearch.common.settings.Settings
-import org.elasticsearch.threadpool.ThreadPool
+import org.opensearch.common.settings.Settings
+import org.opensearch.threadpool.ThreadPool
 import org.junit.Before
 import java.time.Instant
 import java.time.ZoneId

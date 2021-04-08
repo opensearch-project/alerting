@@ -18,9 +18,9 @@ package com.amazon.opendistroforelasticsearch.alerting.core.schedule
 import com.amazon.opendistroforelasticsearch.alerting.core.JobRunner
 import com.amazon.opendistroforelasticsearch.alerting.core.model.ScheduledJob
 import org.apache.logging.log4j.LogManager
-import org.elasticsearch.common.unit.TimeValue
-import org.elasticsearch.threadpool.Scheduler
-import org.elasticsearch.threadpool.ThreadPool
+import org.opensearch.common.unit.TimeValue
+import org.opensearch.threadpool.Scheduler
+import org.opensearch.threadpool.ThreadPool
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap

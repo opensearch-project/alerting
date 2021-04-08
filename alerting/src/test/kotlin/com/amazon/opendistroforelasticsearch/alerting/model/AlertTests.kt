@@ -16,9 +16,9 @@
 package com.amazon.opendistroforelasticsearch.alerting.model
 
 import com.amazon.opendistroforelasticsearch.alerting.randomAlert
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.test.OpenSearchTestCase
 
-class AlertTests : ESTestCase() {
+class AlertTests : OpenSearchTestCase() {
     fun `test alert as template args`() {
         val alert = randomAlert().copy(acknowledgedTime = null, lastNotificationTime = null)
 

@@ -21,19 +21,19 @@ import com.amazon.opendistroforelasticsearch.alerting.core.model.ScheduledJob
 import com.amazon.opendistroforelasticsearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import com.amazon.opendistroforelasticsearch.alerting.util.AlertingException
 import com.amazon.opendistroforelasticsearch.alerting.util.DestinationType
-import org.elasticsearch.ElasticsearchStatusException
-import org.elasticsearch.action.ActionListener
-import org.elasticsearch.action.delete.DeleteRequest
-import org.elasticsearch.action.delete.DeleteResponse
-import org.elasticsearch.action.support.ActionFilters
-import org.elasticsearch.action.support.HandledTransportAction
-import org.elasticsearch.client.Client
-import org.elasticsearch.cluster.service.ClusterService
-import org.elasticsearch.common.inject.Inject
-import org.elasticsearch.common.settings.Settings
-import org.elasticsearch.rest.RestStatus
-import org.elasticsearch.tasks.Task
-import org.elasticsearch.transport.TransportService
+import org.opensearch.OpenSearchStatusException
+import org.opensearch.action.ActionListener
+import org.opensearch.action.delete.DeleteRequest
+import org.opensearch.action.delete.DeleteResponse
+import org.opensearch.action.support.ActionFilters
+import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.client.Client
+import org.opensearch.cluster.service.ClusterService
+import org.opensearch.common.inject.Inject
+import org.opensearch.common.settings.Settings
+import org.opensearch.rest.RestStatus
+import org.opensearch.tasks.Task
+import org.opensearch.transport.TransportService
 
 class TransportDeleteEmailGroupAction @Inject constructor(
     transportService: TransportService,
@@ -55,7 +55,7 @@ class TransportDeleteEmailGroupAction @Inject constructor(
 
         if (!allowList.contains(DestinationType.EMAIL.value)) {
             actionListener.onFailure(
-                AlertingException.wrap(ElasticsearchStatusException(
+                AlertingException.wrap(OpenSearchStatusException(
                     "This API is blocked since Destination type [${DestinationType.EMAIL}] is not allowed",
                     RestStatus.FORBIDDEN
                 ))

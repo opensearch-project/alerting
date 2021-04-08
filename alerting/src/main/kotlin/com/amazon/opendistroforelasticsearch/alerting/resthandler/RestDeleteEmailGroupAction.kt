@@ -21,12 +21,12 @@ import com.amazon.opendistroforelasticsearch.alerting.action.DeleteEmailGroupReq
 import com.amazon.opendistroforelasticsearch.alerting.util.REFRESH
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
-import org.elasticsearch.action.support.WriteRequest
-import org.elasticsearch.client.node.NodeClient
-import org.elasticsearch.rest.BaseRestHandler
-import org.elasticsearch.rest.RestHandler.Route
-import org.elasticsearch.rest.RestRequest
-import org.elasticsearch.rest.action.RestToXContentListener
+import org.opensearch.action.support.WriteRequest
+import org.opensearch.client.node.NodeClient
+import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.RestHandler.Route
+import org.opensearch.rest.RestRequest
+import org.opensearch.rest.action.RestToXContentListener
 import java.io.IOException
 
 private val log: Logger = LogManager.getLogger(RestDeleteEmailGroupAction::class.java)

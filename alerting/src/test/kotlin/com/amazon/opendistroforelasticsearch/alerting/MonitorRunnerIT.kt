@@ -33,13 +33,13 @@ import com.amazon.opendistroforelasticsearch.alerting.model.destination.email.Em
 import com.amazon.opendistroforelasticsearch.alerting.model.destination.email.Recipient
 import com.amazon.opendistroforelasticsearch.alerting.util.DestinationType
 import com.amazon.opendistroforelasticsearch.commons.authuser.User
-import org.elasticsearch.client.ResponseException
-import org.elasticsearch.client.WarningFailureException
-import org.elasticsearch.common.settings.Settings
-import org.elasticsearch.index.query.QueryBuilders
-import org.elasticsearch.rest.RestStatus
-import org.elasticsearch.script.Script
-import org.elasticsearch.search.builder.SearchSourceBuilder
+import org.opensearch.client.ResponseException
+import org.opensearch.client.WarningFailureException
+import org.opensearch.common.settings.Settings
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.rest.RestStatus
+import org.opensearch.script.Script
+import org.opensearch.search.builder.SearchSourceBuilder
 import org.junit.Assert
 import java.time.Instant
 import java.time.ZonedDateTime
@@ -317,7 +317,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
         // Queries that use period_start/end should expect these values to always be formatted as 'epoch_millis'. Either
         // the query should specify the format (like below) or the mapping for the index/field being queried should allow
-        // epoch_millis as an alternative (ES's default mapping for date fields "strict_date_optional_time||epoch_millis")
+        // epoch_millis as an alternative (OpenSearch's default mapping for date fields "strict_date_optional_time||epoch_millis")
         val query = QueryBuilders.rangeQuery("test_strict_date_time")
                 .gt("{{period_end}}||-10d")
                 .lte("{{period_end}}")

@@ -16,11 +16,11 @@
 package com.amazon.opendistroforelasticsearch.alerting
 
 import com.amazon.opendistroforelasticsearch.alerting.model.Trigger
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.test.OpenSearchTestCase
 import java.lang.IllegalArgumentException
 import java.time.Instant
 
-class MonitorTests : ESTestCase() {
+class MonitorTests : OpenSearchTestCase() {
 
     fun `test enabled time`() {
         val monitor = randomMonitor()

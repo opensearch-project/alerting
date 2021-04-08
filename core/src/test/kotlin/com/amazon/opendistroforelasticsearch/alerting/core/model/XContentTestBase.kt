@@ -15,13 +15,13 @@
 
 package com.amazon.opendistroforelasticsearch.alerting.core.model
 
-import org.elasticsearch.common.settings.Settings
-import org.elasticsearch.common.xcontent.LoggingDeprecationHandler
-import org.elasticsearch.common.xcontent.NamedXContentRegistry
-import org.elasticsearch.common.xcontent.XContentBuilder
-import org.elasticsearch.common.xcontent.XContentParser
-import org.elasticsearch.common.xcontent.XContentType
-import org.elasticsearch.search.SearchModule
+import org.opensearch.common.settings.Settings
+import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.common.xcontent.XContentParser
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.search.SearchModule
 
 interface XContentTestBase {
     fun builder(): XContentBuilder {
