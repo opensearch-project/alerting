@@ -15,8 +15,8 @@
 
 package com.amazon.opendistroforelasticsearch.alerting.action
 
-import org.elasticsearch.action.ActionType
-import org.elasticsearch.action.delete.DeleteResponse
+import org.opensearch.action.ActionType
+import org.opensearch.action.delete.DeleteResponse
 
 class DeleteDestinationAction private constructor() : ActionType<DeleteResponse>(NAME, ::DeleteResponse) {
     companion object {

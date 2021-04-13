@@ -15,8 +15,8 @@
 
 package com.amazon.opendistroforelasticsearch.alerting.core.action.node
 
-import org.elasticsearch.action.ActionType
-import org.elasticsearch.common.io.stream.Writeable
+import org.opensearch.action.ActionType
+import org.opensearch.common.io.stream.Writeable
 
 class ScheduledJobsStatsAction : ActionType<ScheduledJobsStatsResponse>(NAME, reader) {
     companion object {

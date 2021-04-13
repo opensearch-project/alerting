@@ -20,26 +20,26 @@ import com.amazon.opendistroforelasticsearch.alerting.alerts.AlertIndices.Compan
 import com.amazon.opendistroforelasticsearch.alerting.model.Alert
 import com.amazon.opendistroforelasticsearch.alerting.model.Monitor
 import com.amazon.opendistroforelasticsearch.alerting.elasticapi.suspendUntil
-import org.elasticsearch.action.bulk.BulkRequest
-import org.elasticsearch.action.bulk.BulkResponse
-import org.elasticsearch.action.delete.DeleteRequest
-import org.elasticsearch.action.index.IndexRequest
-import org.elasticsearch.action.search.SearchRequest
-import org.elasticsearch.action.search.SearchResponse
-import org.elasticsearch.client.Client
-import org.elasticsearch.common.bytes.BytesReference
-import org.elasticsearch.common.xcontent.LoggingDeprecationHandler
-import org.elasticsearch.common.xcontent.NamedXContentRegistry
-import org.elasticsearch.common.xcontent.ToXContent
-import org.elasticsearch.common.xcontent.XContentFactory
-import org.elasticsearch.common.xcontent.XContentHelper
-import org.elasticsearch.common.xcontent.XContentParser
-import org.elasticsearch.common.xcontent.XContentParserUtils
-import org.elasticsearch.common.xcontent.XContentType
-import org.elasticsearch.index.VersionType
-import org.elasticsearch.index.query.QueryBuilders
-import org.elasticsearch.rest.RestStatus
-import org.elasticsearch.search.builder.SearchSourceBuilder
+import org.opensearch.action.bulk.BulkRequest
+import org.opensearch.action.bulk.BulkResponse
+import org.opensearch.action.delete.DeleteRequest
+import org.opensearch.action.index.IndexRequest
+import org.opensearch.action.search.SearchRequest
+import org.opensearch.action.search.SearchResponse
+import org.opensearch.client.Client
+import org.opensearch.common.bytes.BytesReference
+import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentFactory
+import org.opensearch.common.xcontent.XContentHelper
+import org.opensearch.common.xcontent.XContentParser
+import org.opensearch.common.xcontent.XContentParserUtils
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.index.VersionType
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.rest.RestStatus
+import org.opensearch.search.builder.SearchSourceBuilder
 
 /**
  * Moves defunct active alerts to the alert history index when the corresponding monitor or trigger is deleted.

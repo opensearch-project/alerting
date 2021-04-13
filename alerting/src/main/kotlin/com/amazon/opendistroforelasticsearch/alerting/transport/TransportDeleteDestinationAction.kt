@@ -26,27 +26,27 @@ import com.amazon.opendistroforelasticsearch.alerting.util.checkUserFilterByPerm
 import com.amazon.opendistroforelasticsearch.commons.ConfigConstants
 import com.amazon.opendistroforelasticsearch.commons.authuser.User
 import org.apache.logging.log4j.LogManager
-import org.elasticsearch.ElasticsearchStatusException
-import org.elasticsearch.action.ActionListener
-import org.elasticsearch.action.delete.DeleteRequest
-import org.elasticsearch.action.delete.DeleteResponse
-import org.elasticsearch.action.get.GetRequest
-import org.elasticsearch.action.get.GetResponse
-import org.elasticsearch.action.support.ActionFilters
-import org.elasticsearch.action.support.HandledTransportAction
-import org.elasticsearch.client.Client
-import org.elasticsearch.cluster.service.ClusterService
-import org.elasticsearch.common.inject.Inject
-import org.elasticsearch.common.settings.Settings
-import org.elasticsearch.common.xcontent.LoggingDeprecationHandler
-import org.elasticsearch.common.xcontent.NamedXContentRegistry
-import org.elasticsearch.common.xcontent.XContentFactory
-import org.elasticsearch.common.xcontent.XContentParser
-import org.elasticsearch.common.xcontent.XContentParserUtils
-import org.elasticsearch.common.xcontent.XContentType
-import org.elasticsearch.rest.RestStatus
-import org.elasticsearch.tasks.Task
-import org.elasticsearch.transport.TransportService
+import org.opensearch.OpenSearchStatusException
+import org.opensearch.action.ActionListener
+import org.opensearch.action.delete.DeleteRequest
+import org.opensearch.action.delete.DeleteResponse
+import org.opensearch.action.get.GetRequest
+import org.opensearch.action.get.GetResponse
+import org.opensearch.action.support.ActionFilters
+import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.client.Client
+import org.opensearch.cluster.service.ClusterService
+import org.opensearch.common.inject.Inject
+import org.opensearch.common.settings.Settings
+import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.common.xcontent.XContentFactory
+import org.opensearch.common.xcontent.XContentParser
+import org.opensearch.common.xcontent.XContentParserUtils
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.rest.RestStatus
+import org.opensearch.tasks.Task
+import org.opensearch.transport.TransportService
 import java.io.IOException
 
 private val log = LogManager.getLogger(TransportDeleteDestinationAction::class.java)
@@ -114,7 +114,7 @@ class TransportDeleteDestinationAction @Inject constructor(
                 override fun onResponse(response: GetResponse) {
                     if (!response.isExists) {
                         actionListener.onFailure(AlertingException.wrap(
-                            ElasticsearchStatusException("Destination with $destinationId is not found", RestStatus.NOT_FOUND)))
+                            OpenSearchStatusException("Destination with $destinationId is not found", RestStatus.NOT_FOUND)))
                         return
                     }
                     val id = response.id

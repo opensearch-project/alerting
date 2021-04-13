@@ -14,10 +14,10 @@
  */
 package com.amazon.opendistroforelasticsearch.alerting.action
 
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.test.OpenSearchTestCase
 import org.junit.Assert
 
-class SearchMonitorActionTests : ESTestCase() {
+class SearchMonitorActionTests : OpenSearchTestCase() {
 
     fun `test search monitor action name`() {
         Assert.assertNotNull(SearchMonitorAction.INSTANCE.name())

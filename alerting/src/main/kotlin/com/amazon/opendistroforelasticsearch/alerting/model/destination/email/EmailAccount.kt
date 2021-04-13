@@ -17,15 +17,15 @@ package com.amazon.opendistroforelasticsearch.alerting.model.destination.email
 
 import com.amazon.opendistroforelasticsearch.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
 import com.amazon.opendistroforelasticsearch.alerting.util.isValidEmail
-import org.elasticsearch.common.io.stream.StreamInput
-import org.elasticsearch.common.io.stream.StreamOutput
-import org.elasticsearch.common.io.stream.Writeable
-import org.elasticsearch.common.settings.SecureString
-import org.elasticsearch.common.xcontent.ToXContent
-import org.elasticsearch.common.xcontent.XContentBuilder
-import org.elasticsearch.common.xcontent.XContentParser
-import org.elasticsearch.common.xcontent.XContentParser.Token
-import org.elasticsearch.common.xcontent.XContentParserUtils.ensureExpectedToken
+import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.common.io.stream.StreamOutput
+import org.opensearch.common.io.stream.Writeable
+import org.opensearch.common.settings.SecureString
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.common.xcontent.XContentParser
+import org.opensearch.common.xcontent.XContentParser.Token
+import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
 import java.io.IOException
 
 /**
@@ -47,7 +47,7 @@ data class EmailAccount(
 
     init {
         // Excluding dashes (-) from valid names for EmailAccount since the name is used
-        // to namespace the associated Elasticsearch keystore settings and dashes do not work for those settings.
+        // to namespace the associated OpenSearch keystore settings and dashes do not work for those settings.
         val validNamePattern = Regex("[A-Z0-9_]+", RegexOption.IGNORE_CASE)
         require(validNamePattern.matches(name)) {
             "Invalid email account name. Valid characters are upper and lowercase a-z, 0-9, and _ (underscore)."

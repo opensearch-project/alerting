@@ -16,7 +16,7 @@
 package com.amazon.opendistroforelasticsearch.alerting.core.model
 
 import com.amazon.opendistroforelasticsearch.alerting.elasticapi.string
-import org.elasticsearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.ToXContent
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime

@@ -20,16 +20,16 @@ import com.amazon.opendistroforelasticsearch.alerting.action.ExecuteMonitorActio
 import com.amazon.opendistroforelasticsearch.alerting.action.ExecuteMonitorRequest
 import com.amazon.opendistroforelasticsearch.alerting.model.Monitor
 import org.apache.logging.log4j.LogManager
-import org.elasticsearch.client.node.NodeClient
-import org.elasticsearch.common.unit.TimeValue
-import org.elasticsearch.common.xcontent.XContentParser.Token.START_OBJECT
-import org.elasticsearch.common.xcontent.XContentParserUtils.ensureExpectedToken
-import org.elasticsearch.rest.BaseRestHandler
-import org.elasticsearch.rest.BaseRestHandler.RestChannelConsumer
-import org.elasticsearch.rest.RestHandler.Route
-import org.elasticsearch.rest.RestRequest
-import org.elasticsearch.rest.RestRequest.Method.POST
-import org.elasticsearch.rest.action.RestToXContentListener
+import org.opensearch.client.node.NodeClient
+import org.opensearch.common.unit.TimeValue
+import org.opensearch.common.xcontent.XContentParser.Token.START_OBJECT
+import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
+import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
+import org.opensearch.rest.RestHandler.Route
+import org.opensearch.rest.RestRequest
+import org.opensearch.rest.RestRequest.Method.POST
+import org.opensearch.rest.action.RestToXContentListener
 import java.time.Instant
 
 private val log = LogManager.getLogger(RestExecuteMonitorAction::class.java)

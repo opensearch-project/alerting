@@ -22,13 +22,13 @@ import com.amazon.opendistroforelasticsearch.alerting.model.destination.email.Em
 import com.amazon.opendistroforelasticsearch.alerting.randomEmailAccount
 import org.apache.http.entity.ContentType
 import org.apache.http.nio.entity.NStringEntity
-import org.elasticsearch.client.ResponseException
-import org.elasticsearch.common.xcontent.XContentType
-import org.elasticsearch.index.query.QueryBuilders
-import org.elasticsearch.rest.RestStatus
-import org.elasticsearch.search.builder.SearchSourceBuilder
-import org.elasticsearch.test.ESTestCase
-import org.elasticsearch.test.junit.annotations.TestLogging
+import org.opensearch.client.ResponseException
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.rest.RestStatus
+import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.test.OpenSearchTestCase
+import org.opensearch.test.junit.annotations.TestLogging
 
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
@@ -239,8 +239,8 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
         createRandomEmailAccount()
         val search = SearchSourceBuilder()
             .query(QueryBuilders.termQuery(
-                ESTestCase.randomAlphaOfLength(5),
-                ESTestCase.randomAlphaOfLength(5)
+                OpenSearchTestCase.randomAlphaOfLength(5),
+                OpenSearchTestCase.randomAlphaOfLength(5)
             )).toString()
 
         val searchResponse = client().makeRequest(

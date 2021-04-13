@@ -24,23 +24,23 @@ import com.amazon.opendistroforelasticsearch.alerting.settings.DestinationSettin
 import com.amazon.opendistroforelasticsearch.alerting.util.AlertingException
 import com.amazon.opendistroforelasticsearch.alerting.util.DestinationType
 import org.apache.logging.log4j.LogManager
-import org.elasticsearch.ElasticsearchStatusException
-import org.elasticsearch.action.ActionListener
-import org.elasticsearch.action.get.GetRequest
-import org.elasticsearch.action.get.GetResponse
-import org.elasticsearch.action.support.ActionFilters
-import org.elasticsearch.action.support.HandledTransportAction
-import org.elasticsearch.client.Client
-import org.elasticsearch.cluster.service.ClusterService
-import org.elasticsearch.common.inject.Inject
-import org.elasticsearch.common.settings.Settings
-import org.elasticsearch.common.xcontent.LoggingDeprecationHandler
-import org.elasticsearch.common.xcontent.NamedXContentRegistry
-import org.elasticsearch.common.xcontent.XContentHelper
-import org.elasticsearch.common.xcontent.XContentType
-import org.elasticsearch.rest.RestStatus
-import org.elasticsearch.tasks.Task
-import org.elasticsearch.transport.TransportService
+import org.opensearch.OpenSearchStatusException
+import org.opensearch.action.ActionListener
+import org.opensearch.action.get.GetRequest
+import org.opensearch.action.get.GetResponse
+import org.opensearch.action.support.ActionFilters
+import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.client.Client
+import org.opensearch.cluster.service.ClusterService
+import org.opensearch.common.inject.Inject
+import org.opensearch.common.settings.Settings
+import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.common.xcontent.XContentHelper
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.rest.RestStatus
+import org.opensearch.tasks.Task
+import org.opensearch.transport.TransportService
 
 private val log = LogManager.getLogger(TransportGetEmailAccountAction::class.java)
 
@@ -69,7 +69,7 @@ class TransportGetEmailAccountAction @Inject constructor(
 
         if (!allowList.contains(DestinationType.EMAIL.value)) {
             actionListener.onFailure(
-                AlertingException.wrap(ElasticsearchStatusException(
+                AlertingException.wrap(OpenSearchStatusException(
                     "This API is blocked since Destination type [${DestinationType.EMAIL}] is not allowed",
                     RestStatus.FORBIDDEN
                 ))
@@ -85,7 +85,7 @@ class TransportGetEmailAccountAction @Inject constructor(
                 override fun onResponse(response: GetResponse) {
                     if (!response.isExists) {
                         actionListener.onFailure(AlertingException.wrap(
-                            ElasticsearchStatusException("Email Account not found.", RestStatus.NOT_FOUND)
+                            OpenSearchStatusException("Email Account not found.", RestStatus.NOT_FOUND)
                         ))
                         return
                     }

@@ -23,7 +23,7 @@ import com.amazon.opendistroforelasticsearch.alerting.destination.message.EmailM
 import com.amazon.opendistroforelasticsearch.alerting.destination.client.DestinationEmailClient;
 import com.amazon.opendistroforelasticsearch.alerting.destination.response.DestinationResponse;
 import org.easymock.EasyMock;
-import org.elasticsearch.common.settings.SecureString;
+import org.opensearch.common.settings.SecureString;
 import org.junit.Assert;
 import org.junit.Test;
 import javax.mail.Message;

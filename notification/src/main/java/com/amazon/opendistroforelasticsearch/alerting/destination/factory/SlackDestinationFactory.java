@@ -21,7 +21,7 @@ import com.amazon.opendistroforelasticsearch.alerting.destination.message.SlackM
 import com.amazon.opendistroforelasticsearch.alerting.destination.response.DestinationResponse;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.elasticsearch.rest.RestStatus;
+import org.opensearch.rest.RestStatus;
 
 /**
  * This class handles the client responsible for submitting the messages to Slack destination.

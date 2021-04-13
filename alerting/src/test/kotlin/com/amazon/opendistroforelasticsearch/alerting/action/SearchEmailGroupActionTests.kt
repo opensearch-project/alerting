@@ -15,9 +15,9 @@
 
 package com.amazon.opendistroforelasticsearch.alerting.action
 
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.test.OpenSearchTestCase
 
-class SearchEmailGroupActionTests : ESTestCase() {
+class SearchEmailGroupActionTests : OpenSearchTestCase() {
 
     fun `test search email group action name`() {
         assertNotNull(SearchEmailGroupAction.INSTANCE.name())

@@ -21,14 +21,14 @@ import com.amazon.opendistroforelasticsearch.alerting.action.GetDestinationsRequ
 import com.amazon.opendistroforelasticsearch.alerting.model.Table
 import com.amazon.opendistroforelasticsearch.alerting.util.context
 import org.apache.logging.log4j.LogManager
-import org.elasticsearch.client.node.NodeClient
-import org.elasticsearch.rest.BaseRestHandler
-import org.elasticsearch.rest.BaseRestHandler.RestChannelConsumer
-import org.elasticsearch.rest.RestHandler
-import org.elasticsearch.rest.RestRequest
-import org.elasticsearch.rest.action.RestActions
-import org.elasticsearch.rest.action.RestToXContentListener
-import org.elasticsearch.search.fetch.subphase.FetchSourceContext
+import org.opensearch.client.node.NodeClient
+import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
+import org.opensearch.rest.RestHandler
+import org.opensearch.rest.RestRequest
+import org.opensearch.rest.action.RestActions
+import org.opensearch.rest.action.RestToXContentListener
+import org.opensearch.search.fetch.subphase.FetchSourceContext
 
 /**
  * This class consists of the REST handler to retrieve destinations .

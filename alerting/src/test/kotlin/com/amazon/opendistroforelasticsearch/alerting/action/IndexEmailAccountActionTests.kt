@@ -15,9 +15,9 @@
 
 package com.amazon.opendistroforelasticsearch.alerting.action
 
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.test.OpenSearchTestCase
 
-class IndexEmailAccountActionTests : ESTestCase() {
+class IndexEmailAccountActionTests : OpenSearchTestCase() {
 
     fun `test index email account action name`() {
         assertNotNull(IndexEmailAccountAction.INSTANCE.name())

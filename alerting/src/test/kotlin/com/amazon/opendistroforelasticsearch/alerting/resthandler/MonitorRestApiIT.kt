@@ -40,20 +40,20 @@ import org.apache.http.HttpHeaders
 import org.apache.http.entity.ContentType
 import org.apache.http.message.BasicHeader
 import org.apache.http.nio.entity.NStringEntity
-import org.elasticsearch.client.ResponseException
-import org.elasticsearch.client.WarningFailureException
-import org.elasticsearch.common.bytes.BytesReference
-import org.elasticsearch.common.unit.TimeValue
-import org.elasticsearch.common.xcontent.ToXContent
-import org.elasticsearch.common.xcontent.XContentBuilder
-import org.elasticsearch.common.xcontent.XContentType
-import org.elasticsearch.index.query.QueryBuilders
-import org.elasticsearch.rest.RestStatus
-import org.elasticsearch.script.Script
-import org.elasticsearch.search.builder.SearchSourceBuilder
-import org.elasticsearch.test.ESTestCase
-import org.elasticsearch.test.junit.annotations.TestLogging
-import org.elasticsearch.test.rest.ESRestTestCase
+import org.opensearch.client.ResponseException
+import org.opensearch.client.WarningFailureException
+import org.opensearch.common.bytes.BytesReference
+import org.opensearch.common.unit.TimeValue
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.rest.RestStatus
+import org.opensearch.script.Script
+import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.test.OpenSearchTestCase
+import org.opensearch.test.junit.annotations.TestLogging
+import org.opensearch.test.rest.OpenSearchRestTestCase
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
@@ -65,7 +65,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
     @Throws(Exception::class)
     fun `test plugin is loaded`() {
-        val response = entityAsMap(ESRestTestCase.client().makeRequest("GET", "_nodes/plugins"))
+        val response = entityAsMap(OpenSearchRestTestCase.client().makeRequest("GET", "_nodes/plugins"))
         val nodesInfo = response["nodes"] as Map<String, Map<String, Any>>
         for (nodeInfo in nodesInfo.values) {
             val plugins = nodeInfo["plugins"] as List<Map<String, Any>>
@@ -412,8 +412,8 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     fun `test query a monitor that doesn't exist`() {
         // Create a random monitor to create the ScheduledJob index. Otherwise we test will fail with 404 index not found.
         createRandomMonitor(refresh = true)
-        val search = SearchSourceBuilder().query(QueryBuilders.termQuery(ESTestCase.randomAlphaOfLength(5),
-                ESTestCase.randomAlphaOfLength(5))).toString()
+        val search = SearchSourceBuilder().query(QueryBuilders.termQuery(OpenSearchTestCase.randomAlphaOfLength(5),
+                OpenSearchTestCase.randomAlphaOfLength(5))).toString()
 
         val searchResponse = client().makeRequest(
                 "GET",

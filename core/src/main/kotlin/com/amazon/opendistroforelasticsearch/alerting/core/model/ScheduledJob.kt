@@ -18,13 +18,13 @@ package com.amazon.opendistroforelasticsearch.alerting.core.model
 import com.amazon.opendistroforelasticsearch.alerting.core.model.ScheduledJob.Companion.NO_ID
 import com.amazon.opendistroforelasticsearch.alerting.core.model.ScheduledJob.Companion.NO_VERSION
 import com.amazon.opendistroforelasticsearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
-import org.elasticsearch.common.io.stream.Writeable
-import org.elasticsearch.common.xcontent.ToXContent
-import org.elasticsearch.common.xcontent.ToXContentObject
-import org.elasticsearch.common.xcontent.XContentBuilder
-import org.elasticsearch.common.xcontent.XContentParser
-import org.elasticsearch.common.xcontent.XContentParser.Token
-import org.elasticsearch.common.xcontent.XContentParserUtils.ensureExpectedToken
+import org.opensearch.common.io.stream.Writeable
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.ToXContentObject
+import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.common.xcontent.XContentParser
+import org.opensearch.common.xcontent.XContentParser.Token
+import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
 import java.io.IOException
 import java.time.Instant
 
@@ -36,7 +36,7 @@ import java.time.Instant
  * updating and deleting instances of that job type into the [SCHEDULED_JOBS_INDEX] index. The index is periodically
  * scanned for updates which are then scheduled or unscheduled with the Scheduler.
  *
- * Like all documents in Elasticsearch [ScheduledJob]s also have an [id] and a [version].  Jobs that have not been
+ * Like all documents in OpenSearch [ScheduledJob]s also have an [id] and a [version].  Jobs that have not been
  * persisted in the cluster should use the special sentinel values [NO_ID] and [NO_VERSION] for these fields.
  */
 interface ScheduledJob : Writeable, ToXContentObject {
@@ -48,7 +48,7 @@ interface ScheduledJob : Writeable, ToXContentObject {
         const val SCHEDULED_JOBS_INDEX = ".opendistro-alerting-config"
 
         /**
-         * The mapping type of [ScheduledJob]s in the ES index. Unrelated to [ScheduledJob.type].
+         * The mapping type of [ScheduledJob]s in the OpenSearch index. Unrelated to [ScheduledJob.type].
          *
          * This should go away starting ES 7. We use "_doc" for future compatibility as described here:
          * https://www.elastic.co/guide/en/elasticsearch/reference/6.x/removal-of-types.html#_schedule_for_removal_of_mapping_types
@@ -67,7 +67,7 @@ interface ScheduledJob : Writeable, ToXContentObject {
          * The Job's json representation is expected to be of the form:
          *     { "<job_type>" : { <job fields> } }
          *
-         * If the job comes from an Elasticsearch index it's [id] and [version] can also be supplied.
+         * If the job comes from an OpenSearch index it's [id] and [version] can also be supplied.
          */
         @Throws(IOException::class)
         fun parse(xcp: XContentParser, id: String = NO_ID, version: Long = NO_VERSION): ScheduledJob {

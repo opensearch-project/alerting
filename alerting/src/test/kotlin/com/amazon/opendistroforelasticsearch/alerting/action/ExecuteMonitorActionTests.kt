@@ -14,9 +14,9 @@
  */
 package com.amazon.opendistroforelasticsearch.alerting.action
 
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.test.OpenSearchTestCase
 
-class ExecuteMonitorActionTests : ESTestCase() {
+class ExecuteMonitorActionTests : OpenSearchTestCase() {
 
     fun `test execute monitor action name`() {
         assertNotNull(ExecuteMonitorAction.INSTANCE.name())

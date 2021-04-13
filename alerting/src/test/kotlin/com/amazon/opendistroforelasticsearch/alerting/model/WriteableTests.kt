@@ -33,12 +33,12 @@ import com.amazon.opendistroforelasticsearch.alerting.randomTriggerRunResult
 import com.amazon.opendistroforelasticsearch.alerting.randomUser
 import com.amazon.opendistroforelasticsearch.alerting.randomUserEmpty
 import com.amazon.opendistroforelasticsearch.commons.authuser.User
-import org.elasticsearch.common.io.stream.BytesStreamOutput
-import org.elasticsearch.common.io.stream.StreamInput
-import org.elasticsearch.search.builder.SearchSourceBuilder
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.common.io.stream.BytesStreamOutput
+import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.test.OpenSearchTestCase
 
-class WriteableTests : ESTestCase() {
+class WriteableTests : OpenSearchTestCase() {
 
     fun `test throttle as stream`() {
         val throttle = randomThrottle()

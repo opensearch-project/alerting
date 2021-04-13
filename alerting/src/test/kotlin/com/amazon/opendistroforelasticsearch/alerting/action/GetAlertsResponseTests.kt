@@ -20,15 +20,15 @@ import com.amazon.opendistroforelasticsearch.alerting.elasticapi.string
 import com.amazon.opendistroforelasticsearch.alerting.model.Alert
 import com.amazon.opendistroforelasticsearch.alerting.randomUser
 import com.amazon.opendistroforelasticsearch.commons.authuser.User
-import org.elasticsearch.common.io.stream.BytesStreamOutput
-import org.elasticsearch.common.io.stream.StreamInput
-import org.elasticsearch.common.xcontent.ToXContent
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.common.io.stream.BytesStreamOutput
+import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.test.OpenSearchTestCase
 import org.junit.Assert
 import java.time.Instant
 import java.util.Collections
 
-class GetAlertsResponseTests : ESTestCase() {
+class GetAlertsResponseTests : OpenSearchTestCase() {
 
     fun `test get alerts response with no alerts`() {
         val req = GetAlertsResponse(Collections.emptyList(), 0)

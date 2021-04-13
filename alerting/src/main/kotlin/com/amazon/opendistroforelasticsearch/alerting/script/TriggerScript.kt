@@ -15,8 +15,8 @@
 
 package com.amazon.opendistroforelasticsearch.alerting.script
 
-import org.elasticsearch.script.Script
-import org.elasticsearch.script.ScriptContext
+import org.opensearch.script.Script
+import org.opensearch.script.ScriptContext
 
 abstract class TriggerScript(_scriptParams: Map<String, Any>) {
 

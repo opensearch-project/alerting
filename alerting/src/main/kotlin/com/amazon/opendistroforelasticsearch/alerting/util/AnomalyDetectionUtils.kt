@@ -19,11 +19,11 @@ import com.amazon.opendistroforelasticsearch.alerting.core.model.SearchInput
 import com.amazon.opendistroforelasticsearch.alerting.model.Monitor
 import com.amazon.opendistroforelasticsearch.commons.authuser.User
 import org.apache.lucene.search.join.ScoreMode
-import org.elasticsearch.index.query.BoolQueryBuilder
-import org.elasticsearch.index.query.NestedQueryBuilder
-import org.elasticsearch.index.query.QueryBuilders
-import org.elasticsearch.search.builder.SearchSourceBuilder
-import org.elasticsearch.common.Strings
+import org.opensearch.index.query.BoolQueryBuilder
+import org.opensearch.index.query.NestedQueryBuilder
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.common.Strings
 
 /**
  * AD monitor is search input monitor on top of anomaly result index. This method will return

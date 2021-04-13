@@ -15,12 +15,12 @@
 
 package com.amazon.opendistroforelasticsearch.alerting.action
 
-import org.elasticsearch.action.support.WriteRequest
-import org.elasticsearch.common.io.stream.BytesStreamOutput
-import org.elasticsearch.common.io.stream.StreamInput
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.action.support.WriteRequest
+import org.opensearch.common.io.stream.BytesStreamOutput
+import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.test.OpenSearchTestCase
 
-class DeleteEmailAccountRequestTests : ESTestCase() {
+class DeleteEmailAccountRequestTests : OpenSearchTestCase() {
 
     fun `test delete email account request`() {
         val req = DeleteEmailAccountRequest("1234", WriteRequest.RefreshPolicy.IMMEDIATE)

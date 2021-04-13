@@ -15,7 +15,7 @@
 
 package com.amazon.opendistroforelasticsearch.alerting.destination.message;
 
-import org.elasticsearch.common.Strings;
+import org.opensearch.common.Strings;
 
 /**
  * This class holds the content of an Slack message

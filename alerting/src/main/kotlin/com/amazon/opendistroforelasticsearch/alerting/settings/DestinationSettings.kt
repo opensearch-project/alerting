@@ -16,10 +16,10 @@
 package com.amazon.opendistroforelasticsearch.alerting.settings
 
 import com.amazon.opendistroforelasticsearch.alerting.util.DestinationType
-import org.elasticsearch.common.settings.SecureSetting
-import org.elasticsearch.common.settings.SecureString
-import org.elasticsearch.common.settings.Setting
-import org.elasticsearch.common.settings.Settings
+import org.opensearch.common.settings.SecureSetting
+import org.opensearch.common.settings.SecureString
+import org.opensearch.common.settings.Setting
+import org.opensearch.common.settings.Settings
 import java.util.function.Function
 
 /**

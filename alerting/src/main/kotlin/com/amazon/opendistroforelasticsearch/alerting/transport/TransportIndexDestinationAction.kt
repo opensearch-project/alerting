@@ -15,32 +15,32 @@ import com.amazon.opendistroforelasticsearch.alerting.util.checkUserFilterByPerm
 import com.amazon.opendistroforelasticsearch.commons.ConfigConstants
 import com.amazon.opendistroforelasticsearch.commons.authuser.User
 import org.apache.logging.log4j.LogManager
-import org.elasticsearch.ElasticsearchStatusException
-import org.elasticsearch.action.ActionListener
-import org.elasticsearch.action.admin.indices.create.CreateIndexResponse
-import org.elasticsearch.action.get.GetRequest
-import org.elasticsearch.action.get.GetResponse
-import org.elasticsearch.action.index.IndexRequest
-import org.elasticsearch.action.index.IndexResponse
-import org.elasticsearch.action.support.ActionFilters
-import org.elasticsearch.action.support.HandledTransportAction
-import org.elasticsearch.action.support.master.AcknowledgedResponse
-import org.elasticsearch.client.Client
-import org.elasticsearch.cluster.service.ClusterService
-import org.elasticsearch.common.inject.Inject
-import org.elasticsearch.common.settings.Settings
-import org.elasticsearch.common.xcontent.LoggingDeprecationHandler
-import org.elasticsearch.common.xcontent.NamedXContentRegistry
-import org.elasticsearch.common.xcontent.ToXContent
-import org.elasticsearch.common.xcontent.XContentFactory
-import org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder
-import org.elasticsearch.common.xcontent.XContentParser
-import org.elasticsearch.common.xcontent.XContentParserUtils
-import org.elasticsearch.common.xcontent.XContentType
-import org.elasticsearch.rest.RestRequest
-import org.elasticsearch.rest.RestStatus
-import org.elasticsearch.tasks.Task
-import org.elasticsearch.transport.TransportService
+import org.opensearch.OpenSearchStatusException
+import org.opensearch.action.ActionListener
+import org.opensearch.action.admin.indices.create.CreateIndexResponse
+import org.opensearch.action.get.GetRequest
+import org.opensearch.action.get.GetResponse
+import org.opensearch.action.index.IndexRequest
+import org.opensearch.action.index.IndexResponse
+import org.opensearch.action.support.ActionFilters
+import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.client.Client
+import org.opensearch.cluster.service.ClusterService
+import org.opensearch.common.inject.Inject
+import org.opensearch.common.settings.Settings
+import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentFactory
+import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
+import org.opensearch.common.xcontent.XContentParser
+import org.opensearch.common.xcontent.XContentParserUtils
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.rest.RestRequest
+import org.opensearch.rest.RestStatus
+import org.opensearch.tasks.Task
+import org.opensearch.transport.TransportService
 import java.io.IOException
 
 private val log = LogManager.getLogger(TransportIndexDestinationAction::class.java)
@@ -136,7 +136,7 @@ class TransportIndexDestinationAction @Inject constructor(
             val destinationType = request.destination.type.value
             if (!allowList.contains(destinationType)) {
                 actionListener.onFailure(
-                    AlertingException.wrap(ElasticsearchStatusException(
+                    AlertingException.wrap(OpenSearchStatusException(
                         "Destination type is not allowed: $destinationType",
                         RestStatus.FORBIDDEN
                     ))
@@ -159,7 +159,7 @@ class TransportIndexDestinationAction @Inject constructor(
                         val failureReasons = checkShardsFailure(response)
                         if (failureReasons != null) {
                             actionListener.onFailure(
-                                    AlertingException.wrap(ElasticsearchStatusException(failureReasons.toString(), response.status())))
+                                    AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), response.status())))
                             return
                         }
                         actionListener.onResponse(IndexDestinationResponse(response.id, response.version, response.seqNo,
@@ -179,7 +179,7 @@ class TransportIndexDestinationAction @Inject constructor(
             } else {
                 log.error("Create ${ScheduledJob.SCHEDULED_JOBS_INDEX} mappings call not acknowledged.")
                 actionListener.onFailure(AlertingException.wrap(
-                    ElasticsearchStatusException(
+                    OpenSearchStatusException(
                             "Create ${ScheduledJob.SCHEDULED_JOBS_INDEX} mappings call not acknowledged",
                             RestStatus.INTERNAL_SERVER_ERROR
                     ))
@@ -194,7 +194,7 @@ class TransportIndexDestinationAction @Inject constructor(
                 prepareDestinationIndexing()
             } else {
                 log.error("Update ${ScheduledJob.SCHEDULED_JOBS_INDEX} mappings call not acknowledged.")
-                actionListener.onFailure(AlertingException.wrap(ElasticsearchStatusException(
+                actionListener.onFailure(AlertingException.wrap(OpenSearchStatusException(
                         "Updated ${ScheduledJob.SCHEDULED_JOBS_INDEX} mappings call not acknowledged.",
                         RestStatus.INTERNAL_SERVER_ERROR
                     ))
@@ -208,7 +208,7 @@ class TransportIndexDestinationAction @Inject constructor(
                 override fun onResponse(response: GetResponse) {
                     if (!response.isExists) {
                         actionListener.onFailure(AlertingException.wrap(
-                            ElasticsearchStatusException("Destination with ${request.destinationId} is not found", RestStatus.NOT_FOUND)))
+                            OpenSearchStatusException("Destination with ${request.destinationId} is not found", RestStatus.NOT_FOUND)))
                         return
                     }
                     val id = response.id
@@ -254,7 +254,7 @@ class TransportIndexDestinationAction @Inject constructor(
                     val failureReasons = checkShardsFailure(response)
                     if (failureReasons != null) {
                         actionListener.onFailure(
-                                AlertingException.wrap(ElasticsearchStatusException(failureReasons.toString(), response.status())))
+                                AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), response.status())))
                         return
                     }
                     actionListener.onResponse(IndexDestinationResponse(response.id, response.version, response.seqNo,

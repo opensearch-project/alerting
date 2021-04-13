@@ -17,10 +17,10 @@ package com.amazon.opendistroforelasticsearch.alerting.util
 
 import com.amazon.opendistroforelasticsearch.alerting.destination.message.BaseMessage
 import com.amazon.opendistroforelasticsearch.alerting.destination.message.CustomWebhookMessage
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.test.OpenSearchTestCase
 import java.util.HashMap
 
-class AlertingUtilsTests : ESTestCase() {
+class AlertingUtilsTests : OpenSearchTestCase() {
 
     private val HOST_DENY_LIST = listOf(
             "127.0.0.0/8",

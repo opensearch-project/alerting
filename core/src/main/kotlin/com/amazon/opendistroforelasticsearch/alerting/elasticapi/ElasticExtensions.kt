@@ -20,29 +20,29 @@ import com.amazon.opendistroforelasticsearch.commons.authuser.User
 import kotlinx.coroutines.ThreadContextElement
 import kotlinx.coroutines.delay
 import org.apache.logging.log4j.Logger
-import org.elasticsearch.ElasticsearchException
-import org.elasticsearch.action.ActionListener
-import org.elasticsearch.action.bulk.BackoffPolicy
-import org.elasticsearch.action.search.SearchResponse
-import org.elasticsearch.action.search.ShardSearchFailure
-import org.elasticsearch.client.ElasticsearchClient
-import org.elasticsearch.common.bytes.BytesReference
-import org.elasticsearch.common.settings.Settings
-import org.elasticsearch.common.util.concurrent.ThreadContext
-import org.elasticsearch.common.util.concurrent.ThreadContext.StoredContext
-import org.elasticsearch.common.xcontent.ToXContent
-import org.elasticsearch.common.xcontent.XContentBuilder
-import org.elasticsearch.common.xcontent.XContentHelper
-import org.elasticsearch.common.xcontent.XContentParser
-import org.elasticsearch.common.xcontent.XContentParserUtils
-import org.elasticsearch.common.xcontent.XContentType
-import org.elasticsearch.index.query.BoolQueryBuilder
-import org.elasticsearch.index.query.QueryBuilders
-import org.elasticsearch.rest.RestStatus
-import org.elasticsearch.rest.RestStatus.BAD_GATEWAY
-import org.elasticsearch.rest.RestStatus.GATEWAY_TIMEOUT
-import org.elasticsearch.rest.RestStatus.SERVICE_UNAVAILABLE
-import org.elasticsearch.search.builder.SearchSourceBuilder
+import org.opensearch.OpenSearchException
+import org.opensearch.action.ActionListener
+import org.opensearch.action.bulk.BackoffPolicy
+import org.opensearch.action.search.SearchResponse
+import org.opensearch.action.search.ShardSearchFailure
+import org.opensearch.client.OpenSearchClient
+import org.opensearch.common.bytes.BytesReference
+import org.opensearch.common.settings.Settings
+import org.opensearch.common.util.concurrent.ThreadContext
+import org.opensearch.common.util.concurrent.ThreadContext.StoredContext
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.common.xcontent.XContentHelper
+import org.opensearch.common.xcontent.XContentParser
+import org.opensearch.common.xcontent.XContentParserUtils
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.index.query.BoolQueryBuilder
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.rest.RestStatus
+import org.opensearch.rest.RestStatus.BAD_GATEWAY
+import org.opensearch.rest.RestStatus.GATEWAY_TIMEOUT
+import org.opensearch.rest.RestStatus.SERVICE_UNAVAILABLE
+import org.opensearch.search.builder.SearchSourceBuilder
 import java.time.Instant
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
@@ -64,7 +64,7 @@ fun <T> BackoffPolicy.retry(block: () -> T): T {
     do {
         try {
             return block()
-        } catch (e: ElasticsearchException) {
+        } catch (e: OpenSearchException) {
             if (iter.hasNext() && e.isRetriable()) {
                 Thread.sleep(iter.next().millis)
             } else {
@@ -75,11 +75,11 @@ fun <T> BackoffPolicy.retry(block: () -> T): T {
 }
 
 /**
- * Retries the given [block] of code as specified by the receiver [BackoffPolicy], if [block] throws an [ElasticsearchException]
+ * Retries the given [block] of code as specified by the receiver [BackoffPolicy], if [block] throws an [OpenSearchException]
  * that is retriable (502, 503, 504).
  *
  * If all retries fail the final exception will be rethrown. Exceptions caught during intermediate retries are
- * logged as warnings to [logger]. Similar to [org.elasticsearch.action.bulk.Retry], except this retries on
+ * logged as warnings to [logger]. Similar to [org.opensearch.action.bulk.Retry], except this retries on
  * 502, 503, 504 error codes as well as 429.
  *
  * @param logger - logger used to log intermediate failures
@@ -95,7 +95,7 @@ suspend fun <T> BackoffPolicy.retry(
     do {
         try {
             return block()
-        } catch (e: ElasticsearchException) {
+        } catch (e: OpenSearchException) {
             if (iter.hasNext() && (e.isRetriable() || retryOn.contains(e.status()))) {
                 val backoff = iter.next()
                 logger.warn("Operation failed. Retrying in $backoff.", e)
@@ -111,7 +111,7 @@ suspend fun <T> BackoffPolicy.retry(
  * Retries on 502, 503 and 504 per elastic client's behavior: https://github.com/elastic/elasticsearch-net/issues/2061
  * 429 must be retried manually as it's not clear if it's ok to retry for requests other than Bulk requests.
  */
-fun ElasticsearchException.isRetriable(): Boolean {
+fun OpenSearchException.isRetriable(): Boolean {
     return (status() in listOf(BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT))
 }
 
@@ -157,11 +157,11 @@ fun addFilter(user: User, searchSourceBuilder: SearchSourceBuilder, fieldName: S
 fun XContentBuilder.string(): String = BytesReference.bytes(this).utf8ToString()
 
 /**
- * Converts [ElasticsearchClient] methods that take a callback into a kotlin suspending function.
+ * Converts [OpenSearchClient] methods that take a callback into a kotlin suspending function.
  *
- * @param block - a block of code that is passed an [ActionListener] that should be passed to the ES client API.
+ * @param block - a block of code that is passed an [ActionListener] that should be passed to the OpenSearch client API.
  */
-suspend fun <C : ElasticsearchClient, T> C.suspendUntil(block: C.(ActionListener<T>) -> Unit): T =
+suspend fun <C : OpenSearchClient, T> C.suspendUntil(block: C.(ActionListener<T>) -> Unit): T =
     suspendCoroutine { cont ->
         block(object : ActionListener<T> {
             override fun onResponse(response: T) = cont.resume(response)

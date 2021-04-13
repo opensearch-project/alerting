@@ -15,9 +15,9 @@
 
 package com.amazon.opendistroforelasticsearch.alerting.action
 
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.test.OpenSearchTestCase
 
-class DeleteEmailGroupActionTests : ESTestCase() {
+class DeleteEmailGroupActionTests : OpenSearchTestCase() {
 
     fun `test delete email group action name`() {
         assertNotNull(DeleteEmailGroupAction.INSTANCE.name())

@@ -16,17 +16,17 @@
 package com.amazon.opendistroforelasticsearch.alerting.core
 
 import com.amazon.opendistroforelasticsearch.alerting.core.model.ScheduledJob
-import org.elasticsearch.action.ActionListener
-import org.elasticsearch.action.admin.indices.create.CreateIndexRequest
-import org.elasticsearch.action.admin.indices.create.CreateIndexResponse
-import org.elasticsearch.client.AdminClient
-import org.elasticsearch.cluster.health.ClusterIndexHealth
-import org.elasticsearch.cluster.service.ClusterService
-import org.elasticsearch.common.settings.Settings
-import org.elasticsearch.common.xcontent.XContentType
+import org.opensearch.action.ActionListener
+import org.opensearch.action.admin.indices.create.CreateIndexRequest
+import org.opensearch.action.admin.indices.create.CreateIndexResponse
+import org.opensearch.client.AdminClient
+import org.opensearch.cluster.health.ClusterIndexHealth
+import org.opensearch.cluster.service.ClusterService
+import org.opensearch.common.settings.Settings
+import org.opensearch.common.xcontent.XContentType
 
 /**
- * Initialize the Elasticsearch components required to run [ScheduledJobs].
+ * Initialize the OpenSearch components required to run [ScheduledJobs].
  *
  * [initScheduledJobIndex] is called before indexing a new scheduled job. It verifies that the index exists before
  * allowing the index to go through. This is to ensure the correct mappings exist for [ScheduledJob].

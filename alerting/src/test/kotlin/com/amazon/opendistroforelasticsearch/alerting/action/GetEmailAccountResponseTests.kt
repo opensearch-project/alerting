@@ -16,12 +16,12 @@
 package com.amazon.opendistroforelasticsearch.alerting.action
 
 import com.amazon.opendistroforelasticsearch.alerting.randomEmailAccount
-import org.elasticsearch.common.io.stream.BytesStreamOutput
-import org.elasticsearch.common.io.stream.StreamInput
-import org.elasticsearch.rest.RestStatus
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.common.io.stream.BytesStreamOutput
+import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.rest.RestStatus
+import org.opensearch.test.OpenSearchTestCase
 
-class GetEmailAccountResponseTests : ESTestCase() {
+class GetEmailAccountResponseTests : OpenSearchTestCase() {
 
     fun `test get email account response`() {
 

@@ -14,10 +14,10 @@
  */
 package com.amazon.opendistroforelasticsearch.alerting.action
 
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.test.OpenSearchTestCase
 import org.junit.Assert
 
-class IndexDestinationActionTests : ESTestCase() {
+class IndexDestinationActionTests : OpenSearchTestCase() {
 
     fun `test delete destination action name`() {
         Assert.assertNotNull(IndexDestinationAction.INSTANCE.name())

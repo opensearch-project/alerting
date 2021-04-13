@@ -15,8 +15,8 @@
 
 package com.amazon.opendistroforelasticsearch.alerting.action
 
-import org.elasticsearch.action.ActionType
-import org.elasticsearch.action.search.SearchResponse
+import org.opensearch.action.ActionType
+import org.opensearch.action.search.SearchResponse
 
 class SearchEmailGroupAction private constructor() : ActionType<SearchResponse>(NAME, ::SearchResponse) {
     companion object {

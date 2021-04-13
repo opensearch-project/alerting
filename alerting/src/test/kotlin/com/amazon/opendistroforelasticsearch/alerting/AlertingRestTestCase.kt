@@ -36,25 +36,25 @@ import org.apache.http.entity.ContentType
 import org.apache.http.entity.ContentType.APPLICATION_JSON
 import org.apache.http.entity.StringEntity
 import org.apache.http.message.BasicHeader
-import org.elasticsearch.action.search.SearchResponse
-import org.elasticsearch.client.Request
-import org.elasticsearch.client.Response
-import org.elasticsearch.client.RestClient
-import org.elasticsearch.client.WarningFailureException
-import org.elasticsearch.common.settings.Settings
-import org.elasticsearch.common.unit.TimeValue
-import org.elasticsearch.common.xcontent.LoggingDeprecationHandler
-import org.elasticsearch.common.xcontent.NamedXContentRegistry
-import org.elasticsearch.common.xcontent.ToXContent
-import org.elasticsearch.common.xcontent.XContentFactory
-import org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder
-import org.elasticsearch.common.xcontent.XContentParser
-import org.elasticsearch.common.xcontent.XContentParserUtils
-import org.elasticsearch.common.xcontent.XContentType
-import org.elasticsearch.common.xcontent.json.JsonXContent
-import org.elasticsearch.common.xcontent.json.JsonXContent.jsonXContent
-import org.elasticsearch.rest.RestStatus
-import org.elasticsearch.search.SearchModule
+import org.opensearch.action.search.SearchResponse
+import org.opensearch.client.Request
+import org.opensearch.client.Response
+import org.opensearch.client.RestClient
+import org.opensearch.client.WarningFailureException
+import org.opensearch.common.settings.Settings
+import org.opensearch.common.unit.TimeValue
+import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentFactory
+import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
+import org.opensearch.common.xcontent.XContentParser
+import org.opensearch.common.xcontent.XContentParserUtils
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.common.xcontent.json.JsonXContent
+import org.opensearch.common.xcontent.json.JsonXContent.jsonXContent
+import org.opensearch.rest.RestStatus
+import org.opensearch.search.SearchModule
 import org.junit.AfterClass
 import org.junit.rules.DisableOnDebug
 import java.net.URLEncoder
@@ -759,7 +759,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         @JvmStatic
         @AfterClass
         fun dumpCoverage() {
-            // jacoco.dir set in esplugin-coverage.gradle, if it doesn't exist we don't
+            // jacoco.dir set in opensearchplugin-coverage.gradle, if it doesn't exist we don't
             // want to collect coverage, so we can return early
             val jacocoBuildPath = System.getProperty("jacoco.dir") ?: return
             val serverUrl = "service:jmx:rmi:///jndi/rmi://127.0.0.1:7777/jmxrmi"

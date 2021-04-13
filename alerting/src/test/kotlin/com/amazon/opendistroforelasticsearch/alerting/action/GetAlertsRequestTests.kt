@@ -16,11 +16,11 @@
 package com.amazon.opendistroforelasticsearch.alerting.action
 
 import com.amazon.opendistroforelasticsearch.alerting.model.Table
-import org.elasticsearch.common.io.stream.BytesStreamOutput
-import org.elasticsearch.common.io.stream.StreamInput
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.common.io.stream.BytesStreamOutput
+import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.test.OpenSearchTestCase
 
-class GetAlertsRequestTests : ESTestCase() {
+class GetAlertsRequestTests : OpenSearchTestCase() {
 
     fun `test get alerts request`() {
 

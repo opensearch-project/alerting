@@ -21,13 +21,13 @@ import com.amazon.opendistroforelasticsearch.alerting.core.model.SearchInput
 import com.amazon.opendistroforelasticsearch.alerting.model.Monitor
 import com.amazon.opendistroforelasticsearch.alerting.model.Trigger
 import com.amazon.opendistroforelasticsearch.commons.authuser.User
-import org.elasticsearch.index.query.BoolQueryBuilder
-import org.elasticsearch.index.query.QueryBuilders
-import org.elasticsearch.script.Script
-import org.elasticsearch.search.aggregations.AggregationBuilders
-import org.elasticsearch.search.builder.SearchSourceBuilder
-import org.elasticsearch.test.ESTestCase
-import org.elasticsearch.test.rest.ESRestTestCase
+import org.opensearch.index.query.BoolQueryBuilder
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.script.Script
+import org.opensearch.search.aggregations.AggregationBuilders
+import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.test.OpenSearchTestCase
+import org.opensearch.test.rest.OpenSearchRestTestCase
 import java.time.Instant
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
@@ -289,11 +289,11 @@ fun anomalyResultIndexMapping(): String {
 
 fun randomAnomalyDetector(): String {
     return """{
-    "name" : "${ESTestCase.randomAlphaOfLength(10)}",
-    "description" : "${ESTestCase.randomAlphaOfLength(10)}",
+    "name" : "${OpenSearchTestCase.randomAlphaOfLength(10)}",
+    "description" : "${OpenSearchTestCase.randomAlphaOfLength(10)}",
     "time_field" : "timestamp",
     "indices" : [
-      "${ESTestCase.randomAlphaOfLength(5)}"
+      "${OpenSearchTestCase.randomAlphaOfLength(5)}"
     ],
     "filter_query" : {
       "match_all" : {
@@ -332,11 +332,11 @@ fun randomAnomalyDetector(): String {
 
 fun randomAnomalyDetectorWithUser(backendRole: String): String {
     return """{
-    "name" : "${ESTestCase.randomAlphaOfLength(5)}",
-    "description" : "${ESTestCase.randomAlphaOfLength(10)}",
+    "name" : "${OpenSearchTestCase.randomAlphaOfLength(5)}",
+    "description" : "${OpenSearchTestCase.randomAlphaOfLength(10)}",
     "time_field" : "timestamp",
     "indices" : [
-      "${ESTestCase.randomAlphaOfLength(5)}"
+      "${OpenSearchTestCase.randomAlphaOfLength(5)}"
     ],
     "filter_query" : {
       "match_all" : {
@@ -370,10 +370,10 @@ fun randomAnomalyDetectorWithUser(backendRole: String): String {
       }
     ],
     "user" : {
-      "name" : "${ESTestCase.randomAlphaOfLength(5)}",
+      "name" : "${OpenSearchTestCase.randomAlphaOfLength(5)}",
       "backend_roles" : [ "$backendRole" ],
       "roles" : [
-        "${ESTestCase.randomAlphaOfLength(5)}"
+        "${OpenSearchTestCase.randomAlphaOfLength(5)}"
       ],
       "custom_attribute_names" : [ ]
     }
@@ -382,17 +382,17 @@ fun randomAnomalyDetectorWithUser(backendRole: String): String {
 }
 
 fun randomAnomalyResult(
-    detectorId: String = ESTestCase.randomAlphaOfLength(10),
+    detectorId: String = OpenSearchTestCase.randomAlphaOfLength(10),
     dataStartTime: Long = ZonedDateTime.now().minus(2, ChronoUnit.MINUTES).toInstant().toEpochMilli(),
     dataEndTime: Long = ZonedDateTime.now().toInstant().toEpochMilli(),
-    featureId: String = ESTestCase.randomAlphaOfLength(5),
-    featureName: String = ESTestCase.randomAlphaOfLength(5),
-    featureData: Double = ESTestCase.randomDouble(),
+    featureId: String = OpenSearchTestCase.randomAlphaOfLength(5),
+    featureName: String = OpenSearchTestCase.randomAlphaOfLength(5),
+    featureData: Double = OpenSearchTestCase.randomDouble(),
     executionStartTime: Long = ZonedDateTime.now().minus(10, ChronoUnit.SECONDS).toInstant().toEpochMilli(),
     executionEndTime: Long = ZonedDateTime.now().toInstant().toEpochMilli(),
-    anomalyScore: Double = ESTestCase.randomDouble(),
-    anomalyGrade: Double = ESTestCase.randomDouble(),
-    confidence: Double = ESTestCase.randomDouble(),
+    anomalyScore: Double = OpenSearchTestCase.randomDouble(),
+    anomalyGrade: Double = OpenSearchTestCase.randomDouble(),
+    confidence: Double = OpenSearchTestCase.randomDouble(),
     user: User = randomUser()
 ): String {
     return """{
@@ -428,17 +428,17 @@ fun randomAnomalyResult(
 }
 
 fun randomAnomalyResultWithoutUser(
-    detectorId: String = ESTestCase.randomAlphaOfLength(10),
+    detectorId: String = OpenSearchTestCase.randomAlphaOfLength(10),
     dataStartTime: Long = ZonedDateTime.now().minus(2, ChronoUnit.MINUTES).toInstant().toEpochMilli(),
     dataEndTime: Long = ZonedDateTime.now().toInstant().toEpochMilli(),
-    featureId: String = ESTestCase.randomAlphaOfLength(5),
-    featureName: String = ESTestCase.randomAlphaOfLength(5),
-    featureData: Double = ESTestCase.randomDouble(),
+    featureId: String = OpenSearchTestCase.randomAlphaOfLength(5),
+    featureName: String = OpenSearchTestCase.randomAlphaOfLength(5),
+    featureData: Double = OpenSearchTestCase.randomDouble(),
     executionStartTime: Long = ZonedDateTime.now().minus(10, ChronoUnit.SECONDS).toInstant().toEpochMilli(),
     executionEndTime: Long = ZonedDateTime.now().toInstant().toEpochMilli(),
-    anomalyScore: Double = ESTestCase.randomDouble(),
-    anomalyGrade: Double = ESTestCase.randomDouble(),
-    confidence: Double = ESTestCase.randomDouble()
+    anomalyScore: Double = OpenSearchTestCase.randomDouble(),
+    anomalyGrade: Double = OpenSearchTestCase.randomDouble(),
+    confidence: Double = OpenSearchTestCase.randomDouble()
 ): String {
     return """{
           "detector_id" : "$detectorId",
@@ -462,7 +462,7 @@ fun randomAnomalyResultWithoutUser(
 
 fun maxAnomalyGradeSearchInput(
     adResultIndex: String = ".opendistro-anomaly-results-history",
-    detectorId: String = ESTestCase.randomAlphaOfLength(10),
+    detectorId: String = OpenSearchTestCase.randomAlphaOfLength(10),
     size: Int = 1
 ): SearchInput {
     val rangeQuery = QueryBuilders.rangeQuery("execution_end_time")
@@ -492,12 +492,12 @@ fun adSearchInput(detectorId: String): SearchInput {
 }
 
 fun randomADMonitor(
-    name: String = ESRestTestCase.randomAlphaOfLength(10),
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     user: User? = randomUser(),
     inputs: List<Input> = listOf(adSearchInput("test_detector_id")),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
-    enabled: Boolean = ESTestCase.randomBoolean(),
-    triggers: List<Trigger> = (1..ESTestCase.randomInt(10)).map { randomTrigger() },
+    enabled: Boolean = OpenSearchTestCase.randomBoolean(),
+    triggers: List<Trigger> = (1..OpenSearchTestCase.randomInt(10)).map { randomTrigger() },
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     withMetadata: Boolean = false
@@ -507,7 +507,7 @@ fun randomADMonitor(
             user = user, uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf())
 }
 
-fun randomADUser(backendRole: String = ESRestTestCase.randomAlphaOfLength(10)): User {
-    return User(ESRestTestCase.randomAlphaOfLength(10), listOf(backendRole),
-            listOf(ESRestTestCase.randomAlphaOfLength(10), "all_access"), listOf("test_attr=test"))
+fun randomADUser(backendRole: String = OpenSearchRestTestCase.randomAlphaOfLength(10)): User {
+    return User(OpenSearchRestTestCase.randomAlphaOfLength(10), listOf(backendRole),
+            listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), "all_access"), listOf("test_attr=test"))
 }

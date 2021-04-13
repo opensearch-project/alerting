@@ -16,9 +16,9 @@
 package com.amazon.opendistroforelasticsearch.alerting.model
 
 import com.amazon.opendistroforelasticsearch.alerting.model.destination.email.EmailAccount
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.test.OpenSearchTestCase
 
-class EmailAccountTests : ESTestCase() {
+class EmailAccountTests : OpenSearchTestCase() {
 
     fun `test email account`() {
         val emailAccount = EmailAccount(

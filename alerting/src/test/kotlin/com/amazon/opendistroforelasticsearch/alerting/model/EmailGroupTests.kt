@@ -17,9 +17,9 @@ package com.amazon.opendistroforelasticsearch.alerting.model
 
 import com.amazon.opendistroforelasticsearch.alerting.model.destination.email.EmailEntry
 import com.amazon.opendistroforelasticsearch.alerting.model.destination.email.EmailGroup
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.test.OpenSearchTestCase
 
-class EmailGroupTests : ESTestCase() {
+class EmailGroupTests : OpenSearchTestCase() {
 
     fun `test email group`() {
         val emailGroup = EmailGroup(

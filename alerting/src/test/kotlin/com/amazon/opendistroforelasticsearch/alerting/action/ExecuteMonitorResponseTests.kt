@@ -16,12 +16,12 @@
 package com.amazon.opendistroforelasticsearch.alerting.action
 
 import com.amazon.opendistroforelasticsearch.alerting.randomMonitorRunResult
-import org.elasticsearch.common.io.stream.BytesStreamOutput
-import org.elasticsearch.common.io.stream.StreamInput
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.common.io.stream.BytesStreamOutput
+import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.test.OpenSearchTestCase
 import org.junit.Assert
 
-class ExecuteMonitorResponseTests : ESTestCase() {
+class ExecuteMonitorResponseTests : OpenSearchTestCase() {
 
     fun `test exec monitor response`() {
         val req = ExecuteMonitorResponse(randomMonitorRunResult())

@@ -19,13 +19,13 @@ import com.amazon.opendistroforelasticsearch.alerting.alerts.AlertError
 import com.amazon.opendistroforelasticsearch.alerting.model.ActionExecutionResult
 import com.amazon.opendistroforelasticsearch.alerting.model.Alert
 import com.amazon.opendistroforelasticsearch.alerting.randomUser
-import org.elasticsearch.common.io.stream.BytesStreamOutput
-import org.elasticsearch.common.io.stream.StreamInput
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.common.io.stream.BytesStreamOutput
+import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.test.OpenSearchTestCase
 import org.junit.Assert
 import java.time.Instant
 
-class AcknowledgeAlertResponseTests : ESTestCase() {
+class AcknowledgeAlertResponseTests : OpenSearchTestCase() {
 
     fun `test acknowledge alert response`() {
 

@@ -16,9 +16,9 @@
 package com.amazon.opendistroforelasticsearch.alerting.core
 
 import com.amazon.opendistroforelasticsearch.alerting.core.schedule.JobSchedulerMetrics
-import org.elasticsearch.common.io.stream.BytesStreamOutput
-import org.elasticsearch.common.io.stream.StreamInput
-import org.elasticsearch.test.ESTestCase.assertEquals
+import org.opensearch.common.io.stream.BytesStreamOutput
+import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.test.OpenSearchTestCase.assertEquals
 import org.joda.time.DateTime
 import org.junit.Test
 

@@ -16,12 +16,12 @@
 package com.amazon.opendistroforelasticsearch.alerting.action
 
 import com.amazon.opendistroforelasticsearch.alerting.randomEmailGroup
-import org.elasticsearch.common.io.stream.BytesStreamOutput
-import org.elasticsearch.common.io.stream.StreamInput
-import org.elasticsearch.rest.RestStatus
-import org.elasticsearch.test.ESTestCase
+import org.opensearch.common.io.stream.BytesStreamOutput
+import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.rest.RestStatus
+import org.opensearch.test.OpenSearchTestCase
 
-class GetEmailGroupResponseTests : ESTestCase() {
+class GetEmailGroupResponseTests : OpenSearchTestCase() {
 
     fun `test get email group response`() {
 

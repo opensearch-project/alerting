@@ -21,9 +21,9 @@ import com.amazon.opendistroforelasticsearch.alerting.model.destination.email.Em
 import com.amazon.opendistroforelasticsearch.alerting.model.destination.email.Recipient
 import com.amazon.opendistroforelasticsearch.alerting.settings.DestinationSettings.Companion.SecureDestinationSettings
 import com.amazon.opendistroforelasticsearch.alerting.util.DestinationType
-import org.elasticsearch.client.Client
-import org.elasticsearch.common.settings.SecureString
-import org.elasticsearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.client.Client
+import org.opensearch.common.settings.SecureString
+import org.opensearch.common.xcontent.NamedXContentRegistry
 
 /**
  * This class is responsible for generating [DestinationContext].

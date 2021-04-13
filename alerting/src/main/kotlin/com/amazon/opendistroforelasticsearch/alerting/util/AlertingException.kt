@@ -16,21 +16,21 @@
 package com.amazon.opendistroforelasticsearch.alerting.util
 
 import org.apache.logging.log4j.LogManager
-import org.elasticsearch.ElasticsearchException
-import org.elasticsearch.ElasticsearchSecurityException
-import org.elasticsearch.ElasticsearchStatusException
-import org.elasticsearch.common.Strings
-import org.elasticsearch.index.IndexNotFoundException
-import org.elasticsearch.index.engine.VersionConflictEngineException
-import org.elasticsearch.indices.InvalidIndexNameException
-import org.elasticsearch.rest.RestStatus
+import org.opensearch.OpenSearchException
+import org.opensearch.OpenSearchSecurityException
+import org.opensearch.OpenSearchStatusException
+import org.opensearch.common.Strings
+import org.opensearch.index.IndexNotFoundException
+import org.opensearch.index.engine.VersionConflictEngineException
+import org.opensearch.indices.InvalidIndexNameException
+import org.opensearch.rest.RestStatus
 
 private val log = LogManager.getLogger(AlertingException::class.java)
 
 /**
  * Converts into a user friendly message.
  */
-class AlertingException(message: String, val status: RestStatus, ex: Exception) : ElasticsearchException(message, ex) {
+class AlertingException(message: String, val status: RestStatus, ex: Exception) : OpenSearchException(message, ex) {
 
     override fun status(): RestStatus {
         return status
@@ -38,7 +38,7 @@ class AlertingException(message: String, val status: RestStatus, ex: Exception) 
 
     companion object {
         @JvmStatic
-        fun wrap(ex: Exception): ElasticsearchException {
+        fun wrap(ex: Exception): OpenSearchException {
             log.error("Alerting error: $ex")
 
             var friendlyMsg = "Unknown error"
@@ -48,11 +48,11 @@ class AlertingException(message: String, val status: RestStatus, ex: Exception) 
                     status = ex.status()
                     friendlyMsg = "Configured indices are not found: ${ex.index}"
                 }
-                is ElasticsearchSecurityException -> {
+                is OpenSearchSecurityException -> {
                     status = ex.status()
                     friendlyMsg = "User doesn't have permissions to execute this action. Contact administrator."
                 }
-                is ElasticsearchStatusException -> {
+                is OpenSearchStatusException -> {
                     status = ex.status()
                     friendlyMsg = ex.message as String
                 }

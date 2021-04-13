@@ -16,8 +16,8 @@
 package com.amazon.opendistroforelasticsearch.alerting.settings
 
 import com.amazon.opendistroforelasticsearch.alerting.AlertingPlugin
-import org.elasticsearch.common.settings.Setting
-import org.elasticsearch.common.unit.TimeValue
+import org.opensearch.common.settings.Setting
+import org.opensearch.common.unit.TimeValue
 import java.util.concurrent.TimeUnit
 
 /**
