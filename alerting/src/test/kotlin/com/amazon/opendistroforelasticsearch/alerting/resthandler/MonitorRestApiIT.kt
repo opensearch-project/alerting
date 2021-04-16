@@ -376,7 +376,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test getting UI metadata monitor from Kibana`() {
         val monitor = createRandomMonitor(refresh = true, withMetadata = true)
-        val header = BasicHeader(HttpHeaders.USER_AGENT, "Kibana")
+        val header = BasicHeader(HttpHeaders.USER_AGENT, "OpenSearch-Dashboards")
         val getMonitor = getMonitor(monitorId = monitor.id, header = header)
         assertEquals("", monitor.uiMetadata, getMonitor.uiMetadata)
     }
@@ -430,7 +430,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     fun `test query a monitor with UI metadata from OpenSearchDashboards`() {
         val monitor = createRandomMonitor(refresh = true, withMetadata = true)
         val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", monitor.id)).toString()
-        val header = BasicHeader(HttpHeaders.USER_AGENT, "OpenSearchDashboards")
+        val header = BasicHeader(HttpHeaders.USER_AGENT, "OpenSearch-Dashboards")
         val searchResponse = client().makeRequest(
                 "GET",
                 "$ALERTING_BASE_URI/_search",
