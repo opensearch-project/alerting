@@ -128,7 +128,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     }
 
     companion object {
-        @JvmField val KIBANA_USER_AGENT = "Kibana"
+        @JvmField val OPEN_SEARCH_DASHBOARDS_USER_AGENT = "OpenSearch-Dashboards"
         @JvmField val UI_METADATA_EXCLUDE = arrayOf("monitor.${Monitor.UI_METADATA_FIELD}")
         @JvmField val MONITOR_BASE_URI = "/_opendistro/_alerting/monitors"
         @JvmField val DESTINATION_BASE_URI = "/_opendistro/_alerting/destinations"

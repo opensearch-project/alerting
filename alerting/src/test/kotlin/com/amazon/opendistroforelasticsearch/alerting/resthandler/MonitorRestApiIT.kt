@@ -376,7 +376,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test getting UI metadata monitor from Kibana`() {
         val monitor = createRandomMonitor(refresh = true, withMetadata = true)
-        val header = BasicHeader(HttpHeaders.USER_AGENT, "Kibana")
+        val header = BasicHeader(HttpHeaders.USER_AGENT, "OpenSearch-Dashboards")
         val getMonitor = getMonitor(monitorId = monitor.id, header = header)
         assertEquals("", monitor.uiMetadata, getMonitor.uiMetadata)
     }
@@ -427,10 +427,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Monitor found during search when no document present.", 0, numberDocsFound)
     }
 
-    fun `test query a monitor with UI metadata from Kibana`() {
+    fun `test query a monitor with UI metadata from OpenSearchDashboards`() {
         val monitor = createRandomMonitor(refresh = true, withMetadata = true)
         val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", monitor.id)).toString()
-        val header = BasicHeader(HttpHeaders.USER_AGENT, "Kibana")
+        val header = BasicHeader(HttpHeaders.USER_AGENT, "OpenSearch-Dashboards")
         val searchResponse = client().makeRequest(
                 "GET",
                 "$ALERTING_BASE_URI/_search",
@@ -447,7 +447,8 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val searchHits = hits["hits"] as List<Any>
         val hit = searchHits[0] as Map<String, Any>
         val monitorHit = hit["_source"] as Map<String, Any>
-        assertNotNull("UI Metadata returned from search but request did not come from Kibana", monitorHit[Monitor.UI_METADATA_FIELD])
+        assertNotNull("UI Metadata returned from search but request did not come from OpenSearchDashboards",
+            monitorHit[Monitor.UI_METADATA_FIELD])
     }
 
     fun `test query a monitor with UI metadata as user`() {
@@ -468,7 +469,8 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val searchHits = hits["hits"] as List<Any>
         val hit = searchHits[0] as Map<String, Any>
         val monitorHit = hit["_source"] as Map<String, Any>
-        assertNull("UI Metadata returned from search but request did not come from Kibana", monitorHit[Monitor.UI_METADATA_FIELD])
+        assertNull("UI Metadata returned from search but request did not come from OpenSearchDashboards",
+            monitorHit[Monitor.UI_METADATA_FIELD])
     }
 
     fun `test acknowledge all alert states`() {
