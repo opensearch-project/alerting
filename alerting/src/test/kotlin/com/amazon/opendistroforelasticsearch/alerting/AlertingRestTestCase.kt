@@ -351,7 +351,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val monitor = randomMonitor(withMetadata = withMetadata)
         val monitorId = createMonitor(monitor, refresh).id
         if (withMetadata) {
-            return getMonitor(monitorId = monitorId, header = BasicHeader(HttpHeaders.USER_AGENT, "Kibana"))
+            return getMonitor(monitorId = monitorId, header = BasicHeader(HttpHeaders.USER_AGENT, "OpenSearch-Dashboards"))
         }
         return getMonitor(monitorId = monitorId)
     }

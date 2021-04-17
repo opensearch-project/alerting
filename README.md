@@ -1,13 +1,13 @@
-[![Test Workflow](https://github.com/opendistro-for-elasticsearch/alerting/workflows/Test%20Workflow/badge.svg)](https://github.com/opendistro-for-elasticsearch/alerting/actions)
-[![codecov](https://codecov.io/gh/opendistro-for-elasticsearch/alerting/branch/main/graph/badge.svg)](https://codecov.io/gh/opendistro-for-elasticsearch/alerting)
+[![Test Workflow](https://github.com/opensearch-project/alerting/workflows/Test%20Workflow/badge.svg)](https://github.com/opendistro-for-elasticsearch/alerting/actions)
+[![codecov](https://codecov.io/gh/opensearch-project/alerting/branch/main/graph/badge.svg)](https://codecov.io/gh/opensearch-project/alerting)
 [![Documentation](https://img.shields.io/badge/api-reference-blue.svg)](https://opendistro.github.io/for-elasticsearch-docs/docs/alerting/api/)
 [![Chat](https://img.shields.io/badge/chat-on%20forums-blue)](https://discuss.opendistrocommunity.dev/c/alerting/)
 ![PRs welcome!](https://img.shields.io/badge/PRs-welcome!-success)
 
 
-# Open Distro for Elasticsearch Alerting
+# OpenSearch Alerting
 
-The Open Distro for Elasticsearch Alerting enables you to monitor your data and send alert notifications automatically to your stakeholders. With an intuitive Kibana interface and a powerful API, it is easy to set up, manage, and monitor your alerts. Craft highly specific alert conditions using Elasticsearch's full query language and scripting capabilities.
+The OpenSearch Alerting enables you to monitor your data and send alert notifications automatically to your stakeholders. With an intuitive OpenSearch Dashboards interface and a powerful API, it is easy to set up, manage, and monitor your alerts. Craft highly specific alert conditions using Elasticsearch's full query language and scripting capabilities.
 
 
 ## Highlights
@@ -62,7 +62,7 @@ When launching a cluster using one of the above commands, logs are placed in `al
 
 #### Run integration tests with Security enabled 
 
-1. Setup a local odfe cluster with security plugin.
+1. Setup a local opensearch cluster with security plugin.
 
    - `./gradlew :alerting:integTestRunner -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=es-integrationtest -Dhttps=true -Dsecurity=true -Duser=admin -Dpassword=admin`
 
@@ -85,7 +85,7 @@ OR
 ./gradlew :alerting:run --debug-jvm # to just start a cluster that can be debugged
 ```
 
-The Elasticsearch server JVM will launch suspended and wait for a debugger to attach to `localhost:5005` before starting the Elasticsearch server. The IDE needs to listen for the remote JVM. If using Intellij you must set your debug configuration to "Listen to remote JVM" and make sure "Auto Restart" is checked. You must start your debugger to listen for remote JVM before running the commands.
+The Opensearch server JVM will launch suspended and wait for a debugger to attach to `localhost:5005` before starting the Opensearch server. The IDE needs to listen for the remote JVM. If using Intellij you must set your debug configuration to "Listen to remote JVM" and make sure "Auto Restart" is checked. You must start your debugger to listen for remote JVM before running the commands.
 
 To debug code running in an integ test (which exercises the server from a separate JVM), run:
 
@@ -102,7 +102,7 @@ Additionally, it is possible to attach one debugger to the cluster JVM and anoth
 
 ### Advanced: Launching multi-node clusters locally
 
-Sometimes you need to launch a cluster with more than one Elasticsearch server process.
+Sometimes you need to launch a cluster with more than one Opensearch server process.
 
 You can do this by running `./gradlew :alerting:run -PnumNodes=<numberOfNodesYouWant>`
 
