@@ -368,13 +368,14 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test getting UI metadata monitor not from Kibana`() {
+    fun `test getting UI metadata monitor not from OpenSearch Dashboards`() {
         val monitor = createRandomMonitor(withMetadata = true)
         val getMonitor = getMonitor(monitorId = monitor.id)
-        assertEquals("UI Metadata returned but request did not come from Kibana.", getMonitor.uiMetadata, mapOf<String, Any>())
+        assertEquals("UI Metadata returned but request did not come from OpenSearch Dashboards.",
+            getMonitor.uiMetadata, mapOf<String, Any>())
     }
 
-    fun `test getting UI metadata monitor from Kibana`() {
+    fun `test getting UI metadata monitor from OpenSearch Dashboards`() {
         val monitor = createRandomMonitor(refresh = true, withMetadata = true)
         val header = BasicHeader(HttpHeaders.USER_AGENT, "OpenSearch-Dashboards")
         val getMonitor = getMonitor(monitorId = monitor.id, header = header)
@@ -427,7 +428,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Monitor found during search when no document present.", 0, numberDocsFound)
     }
 
-    fun `test query a monitor with UI metadata from OpenSearchDashboards`() {
+    fun `test query a monitor with UI metadata from OpenSearch Dashboards`() {
         val monitor = createRandomMonitor(refresh = true, withMetadata = true)
         val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", monitor.id)).toString()
         val header = BasicHeader(HttpHeaders.USER_AGENT, "OpenSearch-Dashboards")
