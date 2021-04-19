@@ -1,5 +1,5 @@
 [![Test Workflow](https://github.com/opensearch-project/alerting/workflows/Test%20Workflow/badge.svg)](https://github.com/opendistro-for-elasticsearch/alerting/actions)
-[![codecov](https://codecov.io/gh/opensearch-project/alerting/branch/main/graph/badge.svg)](https://codecov.io/gh/opensearch-project/alerting)
+[![codecov](https://codecov.io/gh/opendistro-for-elasticsearch/alerting/branch/main/graph/badge.svg)](https://codecov.io/gh/opendistro-for-elasticsearch/alerting)
 [![Documentation](https://img.shields.io/badge/api-reference-blue.svg)](https://opendistro.github.io/for-elasticsearch-docs/docs/alerting/api/)
 [![Chat](https://img.shields.io/badge/chat-on%20forums-blue)](https://discuss.opendistrocommunity.dev/c/alerting/)
 ![PRs welcome!](https://img.shields.io/badge/PRs-welcome!-success)
@@ -70,7 +70,7 @@ When launching a cluster using one of the above commands, logs are placed in `al
 
 ### Debugging
 
-Sometimes it's useful to attach a debugger to either the Elasticsearch cluster or the integ tests to see what's going on. When running unit tests, hit **Debug** from the IDE's gutter to debug the tests.
+Sometimes it's useful to attach a debugger to either the Opensearch cluster or the integ tests to see what's going on. When running unit tests, hit **Debug** from the IDE's gutter to debug the tests.
 You must start your debugger to listen for remote JVM before running the below commands.
 
 To debug code running in an actual server, run:
