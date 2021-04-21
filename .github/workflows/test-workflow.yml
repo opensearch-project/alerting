@@ -28,6 +28,17 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: ${{ matrix.java }}
+
+      # dependencies: common-utils
+      - name: Checkout common-utils
+        uses: actions/checkout@v2
+        with:
+          repository: 'opensearch-project/common-utils'
+          path: common-utils
+      - name: Build common-utils
+        working-directory: ./common-utils
+        run: ./gradlew publishToMavenLocal
+
       - name: Build with Gradle
         run: ./gradlew build
       - name: Create Artifact Path
