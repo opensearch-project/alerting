@@ -28,24 +28,18 @@ buildscript {
     apply from: 'build-tools/repositories.gradle'
 
     ext {
-        es_version = '7.10.3'
+        opensearch_version = '1.0.0'
         kotlin_version = '1.3.72'
     }
 
     repositories {
+        mavenLocal()
         mavenCentral()
         maven { url "https://plugins.gradle.org/m2/" }
-        maven {
-            url = 's3://search-vemsarat/'
-            credentials(AwsCredentials) {
-                accessKey = System.env.AWS_ACCESS_KEY_ID ?: findProperty('aws_access_key_id')
-                secretKey = System.env.AWS_SECRET_ACCESS_KEY ?: findProperty('aws_secret_access_key')
-            }
-        }
         jcenter()
     }
     dependencies {
-        classpath "org.opensearch.gradle:build-tools:${es_version}-SNAPSHOT"
+        classpath "org.opensearch.gradle:build-tools:${opensearch_version}-SNAPSHOT"
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlin_version}"
     }
 }

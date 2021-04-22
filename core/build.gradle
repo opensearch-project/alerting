@@ -29,16 +29,16 @@ apply plugin: 'org.jetbrains.kotlin.jvm'
 apply plugin: 'jacoco'
 
 dependencies {
-    compileOnly "org.opensearch:opensearch:${es_version}-SNAPSHOT"
+    compileOnly "org.opensearch:opensearch:${opensearch_version}-SNAPSHOT"
     compile "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
     compile 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.1.1'
     compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlin_version}"
     compile "com.cronutils:cron-utils:9.1.3"
-    compile "org.opensearch.client:opensearch-rest-client:${es_version}-SNAPSHOT"
+    compile "org.opensearch.client:opensearch-rest-client:${opensearch_version}-SNAPSHOT"
     compile 'com.google.googlejavaformat:google-java-format:1.3'
-    compile "com.amazon.opendistroforelasticsearch:common-utils:1.15.0.0"
+    compile "com.amazon.opendistroforelasticsearch:common-utils:${opensearch_version}.0"
 
-    testImplementation "org.opensearch.test:framework:${es_version}-SNAPSHOT"
+    testImplementation "org.opensearch.test:framework:${opensearch_version}-SNAPSHOT"
     testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlin_version}"
     testImplementation "org.jetbrains.kotlin:kotlin-test-junit:${kotlin_version}"
 }

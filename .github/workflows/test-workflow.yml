@@ -28,20 +28,45 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: ${{ matrix.java }}
-      - name: Build with Gradle
-        run: ./gradlew build
-      - name: Create Artifact Path
-        run: |
-          mkdir -p alerting-artifacts
-          cp ./alerting/build/distributions/*.zip alerting-artifacts
+
+      # dependencies: OpenSearch
+      - name: Checkout OpenSearch
+        uses: actions/checkout@v2
+        with:
+          repository: 'opensearch-project/OpenSearch'
+          path: OpenSearch
+      - name: Build OpenSearch
+        working-directory: ./OpenSearch
+        run: ./gradlew publishToMavenLocal
+
+      # dependencies: common-utils
+      - name: Checkout common-utils
+        uses: actions/checkout@v2
+        with:
+          repository: 'opensearch-project/common-utils'
+          path: common-utils
+      - name: Build common-utils
+        working-directory: ./common-utils
+        run: ./gradlew publishToMavenLocal
+
+      - name: Run with Gradle
+        run: ./gradlew test
+
+#      - name: Create Artifact Path
+#        run: |
+#          mkdir -p alerting-artifacts
+#          cp ./alerting/build/distributions/*.zip alerting-artifacts
       # This step uses the codecov-action Github action: https://github.com/codecov/codecov-action
       - name: Upload Coverage Report
         uses: codecov/codecov-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-      # This step uses the upload-artifact Github action: https://github.com/actions/upload-artifact
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v1
-        with:
-          name: alerting-plugin
-          path: alerting-artifacts
+#      # This step uses the upload-artifact Github action: https://github.com/actions/upload-artifact
+#      - name: Upload Artifacts
+#        uses: actions/upload-artifact@v1
+#        with:
+#          name: alerting-plugin
+#          path: alerting-artifacts
+      # Publish to local maven
+      - name: Publish to Maven Local
+        run: ./gradlew publishToMavenLocal
