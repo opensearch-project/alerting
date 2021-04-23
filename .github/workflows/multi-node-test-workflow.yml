@@ -10,11 +10,38 @@ on:
 
 jobs:
   build:
+    strategy:
+      matrix:
+        java: [ 14 ]
     # Job name
     name: Build Alerting
     # This job runs on Linux
     runs-on: ubuntu-latest
     steps:
+      # This step uses the setup-java Github action: https://github.com/actions/setup-java
+      - name: Set Up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v1
+        with:
+          java-version: ${{ matrix.java }}
+      # This step adds dependency, OpenSearch
+      - name: Checkout OpenSearch
+        uses: actions/checkout@v2
+        with:
+          repository: 'opensearch-project/OpenSearch'
+          path: OpenSearch
+          ref: '1.0.0-alpha1'
+      - name: Build OpenSearch
+        working-directory: ./OpenSearch
+        run: ./gradlew publishToMavenLocal -Dbuild.version_qualifier=alpha1 -Dbuild.snapshot=false
+      # This step adds dependency, common-utils
+      - name: Checkout common-utils
+        uses: actions/checkout@v2
+        with:
+          repository: 'opensearch-project/common-utils'
+          path: common-utils
+      - name: Build common-utils
+        working-directory: ./common-utils
+        run: ./gradlew publishToMavenLocal -Dopensearch.version=1.0.0-alpha1
       # This step uses the checkout Github action: https://github.com/actions/checkout
       - name: Checkout Branch
         uses: actions/checkout@v2
@@ -24,4 +51,4 @@ jobs:
         with:
           java-version: 14
       - name: Run integration tests with multi node config
-        run: ./gradlew integTest -PnumNodes=3
+        run: ./gradlew integTest -PnumNodes=3 -Dopensearch.version=1.0.0-alpha1

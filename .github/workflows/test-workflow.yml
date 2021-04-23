@@ -35,9 +35,10 @@ jobs:
         with:
           repository: 'opensearch-project/OpenSearch'
           path: OpenSearch
+          ref: '1.0.0-alpha1'
       - name: Build OpenSearch
         working-directory: ./OpenSearch
-        run: ./gradlew publishToMavenLocal
+        run: ./gradlew publishToMavenLocal -Dbuild.version_qualifier=alpha1 -Dbuild.snapshot=false
 
       # dependencies: common-utils
       - name: Checkout common-utils
@@ -47,10 +48,10 @@ jobs:
           path: common-utils
       - name: Build common-utils
         working-directory: ./common-utils
-        run: ./gradlew publishToMavenLocal
+        run: ./gradlew publishToMavenLocal -Dopensearch.version=1.0.0-alpha1
 
-      - name: Run with Gradle
-        run: ./gradlew test
+      - name: Build and run with Gradle
+        run: ./gradlew build -Dopensearch.version=1.0.0-alpha1
 
 #      - name: Create Artifact Path
 #        run: |
@@ -69,4 +70,4 @@ jobs:
 #          path: alerting-artifacts
       # Publish to local maven
       - name: Publish to Maven Local
-        run: ./gradlew publishToMavenLocal
+        run: ./gradlew publishToMavenLocal -Dopensearch.version=1.0.0-alpha1
