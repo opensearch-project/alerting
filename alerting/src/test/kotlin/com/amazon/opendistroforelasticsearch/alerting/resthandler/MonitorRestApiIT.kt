@@ -81,7 +81,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         for (nodeInfo in nodesInfo.values) {
             val plugins = nodeInfo["plugins"] as List<Map<String, Any>>
             for (plugin in plugins) {
-                if (plugin["name"] == "opendistro-alerting") {
+                if (plugin["name"] == "opensearch-alerting") {
                     return
                 }
             }

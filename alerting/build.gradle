@@ -47,8 +47,8 @@ if (isSnapshot) {
 }
 
 opensearchplugin {
-    name 'opendistro-alerting'
-    description 'Amazon OpenDistro alerting plugin'
+    name 'opensearch-alerting'
+    description 'Amazon OpenSearch alerting plugin'
     classname 'com.amazon.opendistroforelasticsearch.alerting.AlertingPlugin'
     extendedPlugins = ['lang-painless']
 }

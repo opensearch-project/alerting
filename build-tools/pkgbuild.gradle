@@ -3,7 +3,7 @@ apply plugin: 'nebula.ospackage'
 // This is afterEvaluate because the bundlePlugin ZIP task is updated afterEvaluate and changes the ZIP name to match the plugin name
 afterEvaluate {
     ospackage {
-        packageName = "opendistro-${name}"
+        packageName = "opensearch-${name}"
         release = isSnapshot ? "0.1" : '1'
         version = "${project.version}" - "-SNAPSHOT"
 
@@ -27,7 +27,7 @@ afterEvaluate {
         maintainer 'OpenDistro for Elasticsearch Team <opendistro@amazon.com>'
         url 'https://opendistro.github.io/for-elasticsearch/downloads.html'
         summary '''
-         Open Distro for Elasticsearch Alerting. 
+         OpenSearch Alerting. 
          Reference documentation can be found at https://opendistro.github.io/for-elasticsearch-docs/.
     '''.stripIndent().replace('\n', ' ').trim()
     }
