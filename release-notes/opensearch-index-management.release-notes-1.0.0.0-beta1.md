@@ -16,3 +16,4 @@ Compatible with OpenSearch 1.0.0
   * Change Kibana UserAgent to OpenSearchDashboards ([#3](https://github.com/opensearch-project/alerting/pull/3))
   * Migrate Alerting to OpenSearch ([#1](https://github.com/opensearch-project/alerting/pull/1))
   * Update version to alpha2 ([#10](https://github.com/opensearch-project/alerting/pull/10))
+  * Update version to 1.0.0.0-beta1 ([#11](https://github.com/opensearch-project/alerting/pull/11))
