@@ -11,7 +11,7 @@ searchExp = re.compile("([\(\[]).*?([\)\]])")
 
 current_date = raw_input("what day is today (e.g. 2020-06-29): ")
 file_path = raw_input("Path to raw note file (e.g., note.md): ")
-plugin_name = "index-management"
+plugin_name = "alerting"
 plugin_version = raw_input('Plugin version (x.x.x.x): ')
 
 app = 'OpenSearch'
