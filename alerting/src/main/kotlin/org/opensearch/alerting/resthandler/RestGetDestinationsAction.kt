@@ -55,8 +55,8 @@ class RestGetDestinationsAction : BaseRestHandler() {
     override fun routes(): List<RestHandler.Route> {
         return listOf(
                 // Get a specific destination
-                RestHandler.Route(RestRequest.Method.GET, "${org.opensearch.alerting.AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}"),
-                RestHandler.Route(RestRequest.Method.GET, "${org.opensearch.alerting.AlertingPlugin.DESTINATION_BASE_URI}")
+                RestHandler.Route(RestRequest.Method.GET, "${AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}"),
+                RestHandler.Route(RestRequest.Method.GET, "${AlertingPlugin.DESTINATION_BASE_URI}")
         )
     }
 

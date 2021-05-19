@@ -143,12 +143,12 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         @JvmField val UI_METADATA_EXCLUDE = arrayOf("monitor.${Monitor.UI_METADATA_FIELD}")
         @JvmField val MONITOR_BASE_URI = "/_opendistro/_alerting/monitors"
         @JvmField val DESTINATION_BASE_URI = "/_opendistro/_alerting/destinations"
-        @JvmField val EMAIL_ACCOUNT_BASE_URI = "${org.opensearch.alerting.AlertingPlugin.Companion.DESTINATION_BASE_URI}/email_accounts"
-        @JvmField val EMAIL_GROUP_BASE_URI = "${org.opensearch.alerting.AlertingPlugin.Companion.DESTINATION_BASE_URI}/email_groups"
+        @JvmField val EMAIL_ACCOUNT_BASE_URI = "${DESTINATION_BASE_URI}/email_accounts"
+        @JvmField val EMAIL_GROUP_BASE_URI = "${DESTINATION_BASE_URI}/email_groups"
         @JvmField val ALERTING_JOB_TYPES = listOf("monitor")
     }
 
-    lateinit var runner: org.opensearch.alerting.MonitorRunner
+    lateinit var runner: MonitorRunner
     lateinit var scheduler: JobScheduler
     lateinit var sweeper: JobSweeper
     lateinit var scheduledJobIndices: ScheduledJobIndices
@@ -231,20 +231,10 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         // Need to figure out how to use the OpenSearch DI classes rather than handwiring things here.
         val settings = environment.settings()
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
-        runner = org.opensearch.alerting.MonitorRunner(
-            settings,
-            client,
-            threadPool,
-            scriptService,
-            xContentRegistry,
-            alertIndices,
-            clusterService
-        )
+        runner = MonitorRunner(settings, client, threadPool, scriptService, xContentRegistry, alertIndices, clusterService)
         scheduledJobIndices = ScheduledJobIndices(client.admin(), clusterService)
         scheduler = JobScheduler(threadPool, runner)
-        sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler,
-            org.opensearch.alerting.AlertingPlugin.Companion.ALERTING_JOB_TYPES
-        )
+        sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
         this.threadPool = threadPool
         this.clusterService = clusterService
         return listOf(sweeper, scheduler, runner, scheduledJobIndices)

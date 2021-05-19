@@ -29,7 +29,6 @@ package org.opensearch.alerting.destination.factory;
 import org.opensearch.alerting.destination.message.BaseMessage;
 import org.opensearch.alerting.destination.message.DestinationType;
 import org.opensearch.alerting.destination.response.BaseResponse;
-import org.opensearch.alerting.destination.response.BaseResponse;
 
 /**
  * Interface which enables to plug in multiple notification Channel Factories.

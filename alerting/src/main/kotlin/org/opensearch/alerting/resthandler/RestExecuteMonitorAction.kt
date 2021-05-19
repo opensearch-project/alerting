@@ -51,13 +51,13 @@ class RestExecuteMonitorAction : BaseRestHandler() {
 
     override fun routes(): List<Route> {
         return listOf(
-                Route(POST, "${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_execute"),
-                Route(POST, "${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}/_execute")
+                Route(POST, "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_execute"),
+                Route(POST, "${AlertingPlugin.MONITOR_BASE_URI}/_execute")
         )
     }
 
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        log.debug("${request.method()} ${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}/_execute")
+        log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/_execute")
 
         return RestChannelConsumer { channel ->
             val dryrun = request.paramAsBoolean("dryrun", false)

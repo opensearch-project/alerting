@@ -65,14 +65,14 @@ class RestIndexDestinationAction : BaseRestHandler() {
 
     override fun routes(): List<Route> {
         return listOf(
-                Route(RestRequest.Method.POST, org.opensearch.alerting.AlertingPlugin.DESTINATION_BASE_URI), // Creates new destination
-                Route(RestRequest.Method.PUT, "${org.opensearch.alerting.AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}")
+                Route(RestRequest.Method.POST, AlertingPlugin.DESTINATION_BASE_URI), // Creates new destination
+                Route(RestRequest.Method.PUT, "${AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}")
         )
     }
 
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): BaseRestHandler.RestChannelConsumer {
-        log.debug("${request.method()} ${org.opensearch.alerting.AlertingPlugin.DESTINATION_BASE_URI}")
+        log.debug("${request.method()} ${AlertingPlugin.DESTINATION_BASE_URI}")
 
         val id = request.param("destinationID", Destination.NO_ID)
         if (request.method() == RestRequest.Method.PUT && Destination.NO_ID == id) {
@@ -108,7 +108,7 @@ class RestIndexDestinationAction : BaseRestHandler() {
 
                 val restResponse = BytesRestResponse(returnStatus, response.toXContent(channel.newBuilder(), ToXContent.EMPTY_PARAMS))
                 if (returnStatus == RestStatus.CREATED) {
-                    val location = "${org.opensearch.alerting.AlertingPlugin.DESTINATION_BASE_URI}/${response.id}"
+                    val location = "${AlertingPlugin.DESTINATION_BASE_URI}/${response.id}"
                     restResponse.addHeader("Location", location)
                 }
                 return restResponse

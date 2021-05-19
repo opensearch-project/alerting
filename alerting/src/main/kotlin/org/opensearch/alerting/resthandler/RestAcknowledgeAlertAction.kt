@@ -60,13 +60,13 @@ class RestAcknowledgeAlertAction : BaseRestHandler() {
     override fun routes(): List<Route> {
         return listOf(
                 // Acknowledge alerts
-                Route(POST, "${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts")
+                Route(POST, "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts")
         )
     }
 
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        log.debug("${request.method()} ${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts")
+        log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts")
 
         val monitorId = request.param("monitorID")
         require(!monitorId.isNullOrEmpty()) { "Missing monitor id." }

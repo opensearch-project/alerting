@@ -40,8 +40,8 @@ import org.opensearch.search.fetch.subphase.FetchSourceContext
  */
 fun context(request: RestRequest): FetchSourceContext? {
     val userAgent = Strings.coalesceToEmpty(request.header("User-Agent"))
-    return if (!userAgent.contains(org.opensearch.alerting.AlertingPlugin.OPEN_SEARCH_DASHBOARDS_USER_AGENT)) {
-        FetchSourceContext(true, Strings.EMPTY_ARRAY, org.opensearch.alerting.AlertingPlugin.UI_METADATA_EXCLUDE)
+    return if (!userAgent.contains(AlertingPlugin.OPEN_SEARCH_DASHBOARDS_USER_AGENT)) {
+        FetchSourceContext(true, Strings.EMPTY_ARRAY, AlertingPlugin.UI_METADATA_EXCLUDE)
     } else null
 }
 

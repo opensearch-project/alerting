@@ -53,14 +53,14 @@ class RestDeleteEmailGroupAction : BaseRestHandler() {
 
     override fun routes(): List<Route> {
         return listOf(
-                Route(RestRequest.Method.DELETE, "${org.opensearch.alerting.AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}")
+                Route(RestRequest.Method.DELETE, "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}")
         )
     }
 
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
         val emailGroupID = request.param("emailGroupID")
-        log.debug("${request.method()} ${org.opensearch.alerting.AlertingPlugin.EMAIL_GROUP_BASE_URI}/$emailGroupID")
+        log.debug("${request.method()} ${AlertingPlugin.EMAIL_GROUP_BASE_URI}/$emailGroupID")
 
         val refreshPolicy = WriteRequest.RefreshPolicy.parse(request.param(REFRESH, WriteRequest.RefreshPolicy.IMMEDIATE.value))
         val deleteEmailGroupRequest = DeleteEmailGroupRequest(emailGroupID, refreshPolicy)

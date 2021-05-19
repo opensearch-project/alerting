@@ -56,16 +56,16 @@ class RestDeleteMonitorAction : BaseRestHandler() {
 
     override fun routes(): List<Route> {
         return listOf(
-                Route(DELETE, "${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}/{monitorID}") // Delete a monitor
+                Route(DELETE, "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}") // Delete a monitor
         )
     }
 
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        log.debug("${request.method()} ${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}/{monitorID}")
+        log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}")
 
         val monitorId = request.param("monitorID")
-        log.debug("${request.method()} ${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}/$monitorId")
+        log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/$monitorId")
 
         val refreshPolicy = RefreshPolicy.parse(request.param(REFRESH, RefreshPolicy.IMMEDIATE.value))
         val deleteMonitorRequest = DeleteMonitorRequest(monitorId, refreshPolicy)

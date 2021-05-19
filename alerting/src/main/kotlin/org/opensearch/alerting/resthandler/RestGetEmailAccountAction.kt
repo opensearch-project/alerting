@@ -50,8 +50,8 @@ class RestGetEmailAccountAction : BaseRestHandler() {
 
     override fun routes(): List<Route> {
         return listOf(
-                Route(RestRequest.Method.GET, "${org.opensearch.alerting.AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}"),
-                Route(RestRequest.Method.HEAD, "${org.opensearch.alerting.AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}")
+                Route(RestRequest.Method.GET, "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}"),
+                Route(RestRequest.Method.HEAD, "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}")
         )
     }
 

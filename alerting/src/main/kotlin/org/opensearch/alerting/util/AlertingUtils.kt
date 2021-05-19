@@ -54,7 +54,7 @@ fun isValidEmail(email: String): Boolean {
 /** Allowed Destinations are ones that are specified in the [DestinationSettings.ALLOW_LIST] setting. */
 fun Destination.isAllowed(allowList: List<String>): Boolean = allowList.contains(this.type.value)
 
-fun org.opensearch.alerting.destination.message.BaseMessage.isHostInDenylist(networks: List<String>): Boolean {
+fun BaseMessage.isHostInDenylist(networks: List<String>): Boolean {
     val ipStr = IPAddressString(this.uri.host)
     for (network in networks) {
         val netStr = IPAddressString(network)

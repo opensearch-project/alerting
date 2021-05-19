@@ -82,14 +82,14 @@ class RestSearchMonitorAction(
     override fun routes(): List<Route> {
         return listOf(
                 // Search for monitors
-                Route(POST, "${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}/_search"),
-                Route(GET, "${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}/_search")
+                Route(POST, "${AlertingPlugin.MONITOR_BASE_URI}/_search"),
+                Route(GET, "${AlertingPlugin.MONITOR_BASE_URI}/_search")
         )
     }
 
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        log.debug("${request.method()} ${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}/_search")
+        log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/_search")
 
         val index = request.param("index", SCHEDULED_JOBS_INDEX)
         val searchSourceBuilder = SearchSourceBuilder()

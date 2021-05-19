@@ -67,14 +67,14 @@ class RestIndexMonitorAction : BaseRestHandler() {
 
     override fun routes(): List<Route> {
         return listOf(
-                Route(POST, org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI), // Create a new monitor
-                Route(PUT, "${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}/{monitorID}")
+                Route(POST, AlertingPlugin.MONITOR_BASE_URI), // Create a new monitor
+                Route(PUT, "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}")
         )
     }
 
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        log.debug("${request.method()} ${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}")
+        log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}")
 
         val id = request.param("monitorID", Monitor.NO_ID)
         if (request.method() == PUT && Monitor.NO_ID == id) {
@@ -110,7 +110,7 @@ class RestIndexMonitorAction : BaseRestHandler() {
 
                 val restResponse = BytesRestResponse(returnStatus, response.toXContent(channel.newBuilder(), ToXContent.EMPTY_PARAMS))
                 if (returnStatus == RestStatus.CREATED) {
-                    val location = "${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}/${response.id}"
+                    val location = "${AlertingPlugin.MONITOR_BASE_URI}/${response.id}"
                     restResponse.addHeader("Location", location)
                 }
                 return restResponse

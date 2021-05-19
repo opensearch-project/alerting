@@ -53,14 +53,14 @@ class RestDeleteEmailAccountAction : BaseRestHandler() {
 
     override fun routes(): List<Route> {
         return listOf(
-                Route(RestRequest.Method.DELETE, "${org.opensearch.alerting.AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}")
+                Route(RestRequest.Method.DELETE, "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}")
         )
     }
 
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
         val emailAccountID = request.param("emailAccountID")
-        log.debug("${request.method()} ${org.opensearch.alerting.AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/$emailAccountID")
+        log.debug("${request.method()} ${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/$emailAccountID")
 
         val refreshPolicy = WriteRequest.RefreshPolicy.parse(request.param(REFRESH, WriteRequest.RefreshPolicy.IMMEDIATE.value))
         val deleteEmailAccountRequest = DeleteEmailAccountRequest(emailAccountID, refreshPolicy)

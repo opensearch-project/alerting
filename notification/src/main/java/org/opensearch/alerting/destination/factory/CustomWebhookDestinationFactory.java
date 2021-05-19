@@ -32,10 +32,6 @@ import org.opensearch.alerting.destination.message.CustomWebhookMessage;
 import org.opensearch.alerting.destination.response.DestinationResponse;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.opensearch.alerting.destination.client.DestinationHttpClient;
-import org.opensearch.alerting.destination.client.DestinationHttpClientPool;
-import org.opensearch.alerting.destination.message.CustomWebhookMessage;
-import org.opensearch.alerting.destination.response.DestinationResponse;
 import org.opensearch.rest.RestStatus;
 
 /**

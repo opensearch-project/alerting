@@ -52,12 +52,12 @@ class RestGetAlertsAction : BaseRestHandler() {
 
     override fun routes(): List<Route> {
         return listOf(
-                Route(GET, "${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}/alerts")
+                Route(GET, "${AlertingPlugin.MONITOR_BASE_URI}/alerts")
         )
     }
 
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        log.debug("${request.method()} ${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}/alerts")
+        log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/alerts")
 
         val sortString = request.param("sortString", "monitor_name.keyword")
         val sortOrder = request.param("sortOrder", "asc")

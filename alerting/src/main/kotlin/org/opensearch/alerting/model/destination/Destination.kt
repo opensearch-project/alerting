@@ -256,26 +256,26 @@ data class Destination(
         denyHostRanges: List<String>
     ): String {
 
-        val destinationMessage: org.opensearch.alerting.destination.message.BaseMessage
+        val destinationMessage: BaseMessage
         val responseContent: String
         val responseStatusCode: Int
         when (type) {
             DestinationType.CHIME -> {
                 val messageContent = chime?.constructMessageContent(compiledSubject, compiledMessage)
-                destinationMessage = org.opensearch.alerting.destination.message.ChimeMessage.Builder(name)
+                destinationMessage = ChimeMessage.Builder(name)
                         .withUrl(chime?.url)
                         .withMessage(messageContent)
                         .build()
             }
             DestinationType.SLACK -> {
                 val messageContent = slack?.constructMessageContent(compiledSubject, compiledMessage)
-                destinationMessage = org.opensearch.alerting.destination.message.SlackMessage.Builder(name)
+                destinationMessage = SlackMessage.Builder(name)
                         .withUrl(slack?.url)
                         .withMessage(messageContent)
                         .build()
             }
             DestinationType.CUSTOM_WEBHOOK -> {
-                destinationMessage = org.opensearch.alerting.destination.message.CustomWebhookMessage.Builder(name)
+                destinationMessage = CustomWebhookMessage.Builder(name)
                         .withUrl(customWebhook?.url)
                         .withScheme(customWebhook?.scheme)
                         .withHost(customWebhook?.host)
@@ -288,7 +288,7 @@ data class Destination(
             }
             DestinationType.EMAIL -> {
                 val emailAccount = destinationCtx.emailAccount
-                destinationMessage = org.opensearch.alerting.destination.message.EmailMessage.Builder(name)
+                destinationMessage = EmailMessage.Builder(name)
                         .withHost(emailAccount?.host)
                         .withPort(emailAccount?.port)
                         .withMethod(emailAccount?.method?.value)
@@ -305,7 +305,7 @@ data class Destination(
         }
 
         validateDestinationUri(destinationMessage, denyHostRanges)
-        val response = org.opensearch.alerting.destination.Notification.publish(destinationMessage) as org.opensearch.alerting.destination.response.DestinationResponse
+        val response = Notification.publish(destinationMessage) as org.opensearch.alerting.destination.response.DestinationResponse
         responseContent = response.responseContent
         responseStatusCode = response.statusCode
 
@@ -328,7 +328,7 @@ data class Destination(
         return content
     }
 
-    private fun validateDestinationUri(destinationMessage: org.opensearch.alerting.destination.message.BaseMessage, denyHostRanges: List<String>) {
+    private fun validateDestinationUri(destinationMessage: BaseMessage, denyHostRanges: List<String>) {
         if (destinationMessage.isHostInDenylist(denyHostRanges)) {
             logger.error("Host: {} resolves to: {} which is in denylist: {}.", destinationMessage.uri.host,
                     InetAddress.getByName(destinationMessage.uri.host), denyHostRanges)

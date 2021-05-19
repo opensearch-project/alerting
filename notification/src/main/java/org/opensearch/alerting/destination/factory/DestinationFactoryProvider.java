@@ -30,7 +30,6 @@ import org.opensearch.alerting.destination.message.DestinationType;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.opensearch.alerting.destination.message.DestinationType;
 
 /*
  * This class helps in fetching the right Channel Factory based on the

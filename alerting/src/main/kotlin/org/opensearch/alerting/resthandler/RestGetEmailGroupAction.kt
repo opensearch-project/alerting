@@ -50,8 +50,8 @@ class RestGetEmailGroupAction : BaseRestHandler() {
 
     override fun routes(): List<Route> {
         return listOf(
-                Route(RestRequest.Method.GET, "${org.opensearch.alerting.AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}"),
-                Route(RestRequest.Method.HEAD, "${org.opensearch.alerting.AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}")
+                Route(RestRequest.Method.GET, "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}"),
+                Route(RestRequest.Method.HEAD, "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}")
         )
     }
 

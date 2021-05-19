@@ -55,13 +55,13 @@ class RestGetMonitorAction : BaseRestHandler() {
     override fun routes(): List<Route> {
         return listOf(
                 // Get a specific monitor
-                Route(GET, "${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}/{monitorID}"),
-                Route(HEAD, "${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}/{monitorID}")
+                Route(GET, "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}"),
+                Route(HEAD, "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}")
         )
     }
 
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        log.debug("${request.method()} ${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}/{monitorID}")
+        log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}")
 
         val monitorId = request.param("monitorID")
         if (monitorId == null || monitorId.isEmpty()) {

@@ -64,8 +64,8 @@ class RestIndexEmailGroupAction : BaseRestHandler() {
 
     override fun routes(): List<Route> {
         return listOf(
-                Route(RestRequest.Method.POST, org.opensearch.alerting.AlertingPlugin.EMAIL_GROUP_BASE_URI), // Creates new email group
-                Route(RestRequest.Method.PUT, "${org.opensearch.alerting.AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}")
+                Route(RestRequest.Method.POST, AlertingPlugin.EMAIL_GROUP_BASE_URI), // Creates new email group
+                Route(RestRequest.Method.PUT, "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}")
         )
     }
 
@@ -106,7 +106,7 @@ class RestIndexEmailGroupAction : BaseRestHandler() {
 
                 val restResponse = BytesRestResponse(returnStatus, response.toXContent(channel.newBuilder(), ToXContent.EMPTY_PARAMS))
                 if (returnStatus == RestStatus.CREATED) {
-                    val location = "${org.opensearch.alerting.AlertingPlugin.EMAIL_GROUP_BASE_URI}/${response.id}"
+                    val location = "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/${response.id}"
                     restResponse.addHeader("Location", location)
                 }
 

@@ -54,16 +54,16 @@ class RestDeleteDestinationAction : BaseRestHandler() {
 
     override fun routes(): List<Route> {
         return listOf(
-                Route(RestRequest.Method.DELETE, "${org.opensearch.alerting.AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}")
+                Route(RestRequest.Method.DELETE, "${AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}")
         )
     }
 
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        log.debug("${request.method()} ${org.opensearch.alerting.AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}")
+        log.debug("${request.method()} ${AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}")
 
         val destinationId = request.param("destinationID")
-        log.debug("${request.method()} ${org.opensearch.alerting.AlertingPlugin.MONITOR_BASE_URI}/$destinationId")
+        log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/$destinationId")
 
         val refreshPolicy = WriteRequest.RefreshPolicy.parse(request.param(REFRESH, WriteRequest.RefreshPolicy.IMMEDIATE.value))
         val deleteDestinationRequest = DeleteDestinationRequest(destinationId, refreshPolicy)

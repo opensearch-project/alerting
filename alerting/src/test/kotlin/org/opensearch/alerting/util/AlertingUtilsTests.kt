@@ -66,8 +66,8 @@ class AlertingUtilsTests : OpenSearchTestCase() {
         }
     }
 
-    private fun createMessageWithHost(host: String): org.opensearch.alerting.destination.message.BaseMessage {
-        return org.opensearch.alerting.destination.message.CustomWebhookMessage.Builder("abc")
+    private fun createMessageWithHost(host: String): BaseMessage {
+        return CustomWebhookMessage.Builder("abc")
                 .withHost(host)
                 .withPath("incomingwebhooks/383c0e2b-d028-44f4-8d38-696754bc4574")
                 .withMessage("{\"Content\":\"Message test\"}")
@@ -75,8 +75,8 @@ class AlertingUtilsTests : OpenSearchTestCase() {
                 .withQueryParams(HashMap<String, String>()).build()
     }
 
-    private fun createMessageWithURl(url: String): org.opensearch.alerting.destination.message.BaseMessage {
-        return org.opensearch.alerting.destination.message.CustomWebhookMessage.Builder("abc")
+    private fun createMessageWithURl(url: String): BaseMessage {
+        return CustomWebhookMessage.Builder("abc")
                 .withUrl(url)
                 .withPath("incomingwebhooks/383c0e2b-d028-44f4-8d38-696754bc4574")
                 .withMessage("{\"Content\":\"Message test\"}")

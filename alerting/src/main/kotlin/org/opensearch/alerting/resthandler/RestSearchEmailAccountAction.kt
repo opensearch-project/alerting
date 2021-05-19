@@ -62,8 +62,8 @@ class RestSearchEmailAccountAction : BaseRestHandler() {
 
     override fun routes(): List<Route> {
         return listOf(
-                Route(RestRequest.Method.POST, "${org.opensearch.alerting.AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/_search"),
-                Route(RestRequest.Method.GET, "${org.opensearch.alerting.AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/_search")
+                Route(RestRequest.Method.POST, "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/_search"),
+                Route(RestRequest.Method.GET, "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/_search")
         )
     }
 
