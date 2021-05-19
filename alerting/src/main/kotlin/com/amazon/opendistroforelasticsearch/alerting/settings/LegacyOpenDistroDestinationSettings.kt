@@ -1,78 +1,46 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- *
- * The OpenSearch Contributors require contributions made to
- * this file be licensed under the Apache-2.0 license or a
- * compatible open source license.
- *
- * Modifications Copyright OpenSearch Contributors. See
- * GitHub history for details.
- */
+package com.amazon.opendistroforelasticsearch.alerting.settings
 
-/*
- *   Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- *   Licensed under the Apache License, Version 2.0 (the "License").
- *   You may not use this file except in compliance with the License.
- *   A copy of the License is located at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *   or in the "license" file accompanying this file. This file is distributed
- *   on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- *   express or implied. See the License for the specific language governing
- *   permissions and limitations under the License.
- */
-
-package org.opensearch.alerting.settings
-
-import org.opensearch.alerting.util.DestinationType
+import com.amazon.opendistroforelasticsearch.alerting.util.DestinationType
 import org.opensearch.common.settings.SecureSetting
 import org.opensearch.common.settings.SecureString
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
-import java.util.function.Function
 
-/**
- * Settings specific to Destinations. This class is separated from the general AlertingSettings since some Destination
- * types require SecureSettings and need additional logic for retrieving and loading them.
- */
-class DestinationSettings {
-
+class LegacyOpenDistroDestinationSettings {
     companion object {
 
-        const val DESTINATION_SETTING_PREFIX = "plugins.alerting.destination."
+        const val DESTINATION_SETTING_PREFIX = "opendistro.alerting.destination."
         const val EMAIL_DESTINATION_SETTING_PREFIX = DESTINATION_SETTING_PREFIX + "email."
         val ALLOW_LIST_ALL = DestinationType.values().toList().map { it.value }
         val ALLOW_LIST_NONE = emptyList<String>()
 
         val ALLOW_LIST: Setting<List<String>> = Setting.listSetting(
             DESTINATION_SETTING_PREFIX + "allow_list",
-            LegacyOpenDistroDestinationSettings.ALLOW_LIST,
             ALLOW_LIST_ALL,
-            Function.identity(),
+            java.util.function.Function.identity(),
             Setting.Property.NodeScope,
-            Setting.Property.Dynamic
+            Setting.Property.Dynamic,
+            Setting.Property.Deprecated
         )
 
         val EMAIL_USERNAME: Setting.AffixSetting<SecureString> = Setting.affixKeySetting(
             EMAIL_DESTINATION_SETTING_PREFIX,
             "username",
             // Needed to coerce lambda to Function type for some reason to avoid argument mismatch compile error
-            Function { key: String -> SecureSetting.secureString(key, LegacyOpenDistroDestinationSettings.EMAIL_USERNAME) }
+            Function { key: String -> SecureSetting.secureString(key, null) }
         )
 
         val EMAIL_PASSWORD: Setting.AffixSetting<SecureString> = Setting.affixKeySetting(
             EMAIL_DESTINATION_SETTING_PREFIX,
             "password",
             // Needed to coerce lambda to Function type for some reason to avoid argument mismatch compile error
-            Function { key: String -> SecureSetting.secureString(key, LegacyOpenDistroDestinationSettings.EMAIL_PASSWORD) }
+            Function { key: String -> SecureSetting.secureString(key, null) }
         )
 
         val HOST_DENY_LIST: Setting<List<String>> = Setting.listSetting(
             "opendistro.destination.host.deny_list",
             emptyList<String>(),
-            Function.identity(),
+            java.util.function.Function.identity(),
             Setting.Property.NodeScope,
             Setting.Property.Final
         )
@@ -112,4 +80,6 @@ class DestinationSettings {
 
         data class SecureDestinationSettings(val emailUsername: SecureString, val emailPassword: SecureString)
     }
+
+
 }
