@@ -41,9 +41,9 @@ dependencies {
 }
 
 shadowJar {
-    relocate 'org.apache.http', 'com.amazon.opendistroforelasticsearch.notification.repackage.org.apache.http'
-    relocate 'org.apache.commons.logging', 'com.amazon.opendistroforelasticsearch.notification.repackage.org.apache.commons.logging'
-    relocate 'org.apache.commons.codec', 'com.amazon.opendistroforelasticsearch.notification.repackage.org.apache.commons.codec'
+    relocate 'org.apache.http', 'org.opensearch.notification.repackage.org.apache.http'
+    relocate 'org.apache.commons.logging', 'org.opensearch.notification.repackage.org.apache.commons.logging'
+    relocate 'org.apache.commons.codec', 'org.opensearch.notification.repackage.org.apache.commons.codec'
     classifier = null
 }
 
@@ -61,7 +61,7 @@ publishing {
     publications {
         shadow(MavenPublication) {
             project.shadow.component(it)
-            groupId = 'com.amazon.opendistroforelasticsearch'
+            groupId = 'org.opensearch'
             artifactId = 'notification'
 
             artifact sourcesJar

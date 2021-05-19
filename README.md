@@ -66,7 +66,7 @@ When launching a cluster using one of the above commands, logs are placed in `al
 
    - `./gradlew :alerting:integTestRunner -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=es-integrationtest -Dhttps=true -Dsecurity=true -Duser=admin -Dpassword=admin`
 
-   - `./gradlew :alerting:integTestRunner -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=es-integrationtest -Dhttps=true -Dsecurity=true -Duser=admin -Dpassword=admin --tests "com.amazon.opendistroforelasticsearch.alerting.MonitorRunnerIT.test execute monitor returns search result"`
+   - `./gradlew :alerting:integTestRunner -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=es-integrationtest -Dhttps=true -Dsecurity=true -Duser=admin -Dpassword=admin --tests "org.opensearch.alerting.MonitorRunnerIT.test execute monitor returns search result"`
 
 ### Debugging
 

@@ -1,0 +1,47 @@
+# Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+# Painless definition of classes used by alerting plugin
+
+class org.opensearch.alerting.script.TriggerScript {
+    Map getParams()
+    boolean execute(TriggerExecutionContext)
+    String[] PARAMETERS
+}
+
+class org.opensearch.alerting.script.TriggerScript$Factory {
+    TriggerScript newInstance(Map)
+}
+
+class org.opensearch.alerting.script.TriggerExecutionContext {
+    Monitor getMonitor()
+    Trigger getTrigger()
+    List getResults()
+    java.time.Instant getPeriodStart()
+    java.time.Instant getPeriodEnd()
+    Alert getAlert()
+    Exception getError()
+}
+
+class org.opensearch.alerting.model.Monitor {
+    String getId()
+    long getVersion()
+    String getName()
+    boolean getEnabled()
+}
+
+class org.opensearch.alerting.model.Trigger {
+    String getId()
+    String getName()
+    String getSeverity()
+    List getActions()
+}
+
+class org.opensearch.alerting.model.action.Action {
+    String getName()
+}
+
+class org.opensearch.alerting.model.Alert {
+    String getId()
+    long getVersion()
+    boolean isAcknowledged()
+}

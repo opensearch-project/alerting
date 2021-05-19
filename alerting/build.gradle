@@ -49,7 +49,7 @@ if (isSnapshot) {
 opensearchplugin {
     name 'opensearch-alerting'
     description 'Amazon OpenSearch alerting plugin'
-    classname 'com.amazon.opendistroforelasticsearch.alerting.AlertingPlugin'
+    classname 'org.opensearch.alerting.AlertingPlugin'
     extendedPlugins = ['lang-painless']
 }
 
