@@ -54,9 +54,7 @@ class RestDeleteDestinationAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(RestRequest.Method.DELETE, "${AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}")
-        )
+        return listOf()
     }
 
     override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {

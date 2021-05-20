@@ -51,10 +51,7 @@ class RestExecuteMonitorAction : BaseRestHandler() {
     override fun getName(): String = "execute_monitor_action"
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(POST, "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_execute"),
-                Route(POST, "${AlertingPlugin.MONITOR_BASE_URI}/_execute")
-        )
+        return listOf()
     }
 
     override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {

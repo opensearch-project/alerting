@@ -59,10 +59,7 @@ class RestIndexDestinationAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(RestRequest.Method.POST, AlertingPlugin.DESTINATION_BASE_URI), // Creates new destination
-                Route(RestRequest.Method.PUT, "${AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}")
-        )
+        return listOf()
     }
 
     override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {

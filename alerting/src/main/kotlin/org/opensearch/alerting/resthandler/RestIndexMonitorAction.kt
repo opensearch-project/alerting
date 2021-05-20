@@ -61,10 +61,7 @@ class RestIndexMonitorAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(POST, AlertingPlugin.MONITOR_BASE_URI), // Create a new monitor
-                Route(PUT, "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}")
-        )
+        return listOf()
     }
 
     override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {

@@ -56,9 +56,7 @@ class RestDeleteMonitorAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(DELETE, "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}") // Delete a monitor
-        )
+        return listOf()
     }
 
     override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {

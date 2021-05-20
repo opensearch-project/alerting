@@ -54,15 +54,12 @@ class RestGetMonitorAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                // Get a specific monitor
-                Route(GET, "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}"),
-                Route(HEAD, "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}")
-        )
+        return listOf()
     }
 
     override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
         return mutableListOf(
+            // Get a specific monitor
             RestHandler.ReplacedRoute(
                 GET,
                 "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}",

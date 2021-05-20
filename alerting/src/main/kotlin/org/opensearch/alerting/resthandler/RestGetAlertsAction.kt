@@ -52,9 +52,7 @@ class RestGetAlertsAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(GET, "${AlertingPlugin.MONITOR_BASE_URI}/alerts")
-        )
+        return listOf()
     }
 
     override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {

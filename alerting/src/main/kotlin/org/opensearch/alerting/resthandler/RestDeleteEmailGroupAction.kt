@@ -53,9 +53,7 @@ class RestDeleteEmailGroupAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(RestRequest.Method.DELETE, "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}")
-        )
+        return listOf()
     }
 
     override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {

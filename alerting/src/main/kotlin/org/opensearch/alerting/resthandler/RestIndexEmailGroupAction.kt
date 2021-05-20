@@ -58,10 +58,7 @@ class RestIndexEmailGroupAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(RestRequest.Method.POST, AlertingPlugin.EMAIL_GROUP_BASE_URI), // Creates new email group
-                Route(RestRequest.Method.PUT, "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}")
-        )
+        return listOf()
     }
 
     override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {

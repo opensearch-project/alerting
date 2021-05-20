@@ -59,12 +59,7 @@ class RestScheduledJobStatsHandler(private val path: String) : BaseRestHandler()
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(GET, "/_plugins/$path/{nodeId}/stats/"),
-                Route(GET, "/_plugins/$path/{nodeId}/stats/{metric}"),
-                Route(GET, "/_plugins/$path/stats/"),
-                Route(GET, "/_plugins/$path/stats/{metric}")
-        )
+        return listOf()
     }
 
     override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {

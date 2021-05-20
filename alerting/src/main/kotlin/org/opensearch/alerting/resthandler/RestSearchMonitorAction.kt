@@ -75,15 +75,12 @@ class RestSearchMonitorAction(
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                // Search for monitors
-                Route(POST, "${AlertingPlugin.MONITOR_BASE_URI}/_search"),
-                Route(GET, "${AlertingPlugin.MONITOR_BASE_URI}/_search")
-        )
+        return listOf()
     }
 
     override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
         return mutableListOf(
+            // Search for monitors
             RestHandler.ReplacedRoute(
                 POST,
                 "${AlertingPlugin.MONITOR_BASE_URI}/_search",

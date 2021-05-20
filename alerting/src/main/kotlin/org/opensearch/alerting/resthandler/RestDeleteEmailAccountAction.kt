@@ -53,9 +53,7 @@ class RestDeleteEmailAccountAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(RestRequest.Method.DELETE, "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}")
-        )
+        return listOf()
     }
 
     override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {

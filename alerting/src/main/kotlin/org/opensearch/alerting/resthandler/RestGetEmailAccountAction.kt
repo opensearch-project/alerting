@@ -50,10 +50,7 @@ class RestGetEmailAccountAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(RestRequest.Method.GET, "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}"),
-                Route(RestRequest.Method.HEAD, "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}")
-        )
+        return listOf()
     }
 
     override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {

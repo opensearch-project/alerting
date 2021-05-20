@@ -58,10 +58,7 @@ class RestIndexEmailAccountAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(RestRequest.Method.POST, AlertingPlugin.EMAIL_ACCOUNT_BASE_URI), // Creates new email account
-                Route(RestRequest.Method.PUT, "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}")
-        )
+        return listOf()
     }
 
     override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {

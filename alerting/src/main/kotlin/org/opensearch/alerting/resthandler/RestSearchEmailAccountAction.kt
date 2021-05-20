@@ -56,10 +56,7 @@ class RestSearchEmailAccountAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(RestRequest.Method.POST, "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/_search"),
-                Route(RestRequest.Method.GET, "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/_search")
-        )
+        return listOf()
     }
 
     override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
