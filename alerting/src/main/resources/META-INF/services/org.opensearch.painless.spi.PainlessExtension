@@ -13,4 +13,4 @@
 #   permissions and limitations under the License.
 #
 
-com.amazon.opendistroforelasticsearch.alerting.AlertingPlugin
+org.opensearch.alerting.AlertingPlugin
