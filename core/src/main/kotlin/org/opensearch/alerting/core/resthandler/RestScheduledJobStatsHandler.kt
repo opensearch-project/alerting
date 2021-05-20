@@ -71,27 +71,27 @@ class RestScheduledJobStatsHandler(private val path: String) : BaseRestHandler()
         return mutableListOf(
             RestHandler.ReplacedRoute(
                 GET,
-                "/_opendistro/$path/{nodeId}/stats/",
+                "/_plugins/$path/{nodeId}/stats/",
                 GET,
-                "/_plugins/$path/{nodeId}/stats/"
+                "/_opendistro/$path/{nodeId}/stats/"
             ),
             RestHandler.ReplacedRoute(
                 GET,
-                "/_opendistro/$path/{nodeId}/stats/{metric}",
+                "/_plugins/$path/{nodeId}/stats/{metric}",
                 GET,
-                "/_plugins/$path/{nodeId}/stats/{metric}"
+                "/_opendistro/$path/{nodeId}/stats/{metric}"
             ),
             RestHandler.ReplacedRoute(
                 GET,
-                "/_opendistro/$path/stats/",
+                "/_plugins/$path/stats/",
                 GET,
-                "/_plugins/$path/stats/"
+                "/_opendistro/$path/stats/"
             ),
             RestHandler.ReplacedRoute(
                 GET,
-                "/_opendistro/$path/stats/{metric}",
+                "/_plugins/$path/stats/{metric}",
                 GET,
-                "/_plugins/$path/stats/{metric}"
+                "/_opendistro/$path/stats/{metric}"
             )
         )
     }
