@@ -33,6 +33,7 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.client.node.NodeClient
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
+import org.opensearch.rest.RestHandler
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestRequest.Method.GET
@@ -57,6 +58,23 @@ class RestGetMonitorAction : BaseRestHandler() {
                 // Get a specific monitor
                 Route(GET, "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}"),
                 Route(HEAD, "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}")
+        )
+    }
+
+    override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
+        return mutableListOf(
+            RestHandler.ReplacedRoute(
+                GET,
+                "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}",
+                GET,
+                "${AlertingPlugin.LEGACY_MONITOR_BASE_URI}/{monitorID}"
+            ),
+            RestHandler.ReplacedRoute(
+                HEAD,
+                "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}",
+                HEAD,
+                "${AlertingPlugin.LEGACY_MONITOR_BASE_URI}/{monitorID}"
+            )
         )
     }
 

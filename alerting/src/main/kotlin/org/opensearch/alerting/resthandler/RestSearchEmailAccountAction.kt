@@ -40,13 +40,8 @@ import org.opensearch.common.xcontent.ToXContent.EMPTY_PARAMS
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.index.query.QueryBuilders
-import org.opensearch.rest.BaseRestHandler
-import org.opensearch.rest.BytesRestResponse
-import org.opensearch.rest.RestChannel
+import org.opensearch.rest.*
 import org.opensearch.rest.RestHandler.Route
-import org.opensearch.rest.RestRequest
-import org.opensearch.rest.RestResponse
-import org.opensearch.rest.RestStatus
 import org.opensearch.rest.action.RestResponseListener
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.io.IOException
@@ -64,6 +59,23 @@ class RestSearchEmailAccountAction : BaseRestHandler() {
         return listOf(
                 Route(RestRequest.Method.POST, "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/_search"),
                 Route(RestRequest.Method.GET, "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/_search")
+        )
+    }
+
+    override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
+        return mutableListOf(
+            RestHandler.ReplacedRoute(
+                RestRequest.Method.POST,
+                "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/_search",
+                RestRequest.Method.POST,
+                "${AlertingPlugin.LEGACY_EMAIL_ACCOUNT_BASE_URI}/_search"
+            ),
+            RestHandler.ReplacedRoute(
+                RestRequest.Method.GET,
+                "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/_search",
+                RestRequest.Method.GET,
+                "${AlertingPlugin.LEGACY_EMAIL_ACCOUNT_BASE_URI}/_search"
+            )
         )
     }
 

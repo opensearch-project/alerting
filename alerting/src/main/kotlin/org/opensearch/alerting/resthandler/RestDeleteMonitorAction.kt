@@ -36,6 +36,7 @@ import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.client.node.NodeClient
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
+import org.opensearch.rest.RestHandler
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestRequest.Method.DELETE
@@ -57,6 +58,17 @@ class RestDeleteMonitorAction : BaseRestHandler() {
     override fun routes(): List<Route> {
         return listOf(
                 Route(DELETE, "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}") // Delete a monitor
+        )
+    }
+
+    override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
+        return mutableListOf(
+            RestHandler.ReplacedRoute(
+                DELETE,
+                "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}",
+                DELETE,
+                "${AlertingPlugin.LEGACY_MONITOR_BASE_URI}/{monitorID}"
+            )
         )
     }
 

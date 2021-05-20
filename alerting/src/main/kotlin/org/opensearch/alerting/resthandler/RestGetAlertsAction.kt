@@ -34,6 +34,7 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.client.node.NodeClient
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
+import org.opensearch.rest.RestHandler
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestRequest.Method.GET
@@ -53,6 +54,17 @@ class RestGetAlertsAction : BaseRestHandler() {
     override fun routes(): List<Route> {
         return listOf(
                 Route(GET, "${AlertingPlugin.MONITOR_BASE_URI}/alerts")
+        )
+    }
+
+    override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
+        return mutableListOf(
+            RestHandler.ReplacedRoute(
+                GET,
+                "${AlertingPlugin.MONITOR_BASE_URI}/alerts",
+                GET,
+                "${AlertingPlugin.LEGACY_MONITOR_BASE_URI}/alerts"
+            )
         )
     }
 

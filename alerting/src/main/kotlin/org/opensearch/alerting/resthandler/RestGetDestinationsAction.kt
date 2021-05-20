@@ -56,7 +56,24 @@ class RestGetDestinationsAction : BaseRestHandler() {
         return listOf(
                 // Get a specific destination
                 RestHandler.Route(RestRequest.Method.GET, "${AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}"),
-                RestHandler.Route(RestRequest.Method.GET, "${AlertingPlugin.DESTINATION_BASE_URI}")
+                RestHandler.Route(RestRequest.Method.GET, AlertingPlugin.DESTINATION_BASE_URI)
+        )
+    }
+
+    override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
+        return mutableListOf(
+            RestHandler.ReplacedRoute(
+                RestRequest.Method.GET,
+                "${AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}",
+                RestRequest.Method.GET,
+                "${AlertingPlugin.LEGACY_DESTINATION_BASE_URI}/{destinationID}"
+            ),
+            RestHandler.ReplacedRoute(
+                RestRequest.Method.GET,
+                AlertingPlugin.DESTINATION_BASE_URI,
+                RestRequest.Method.GET,
+                AlertingPlugin.LEGACY_DESTINATION_BASE_URI
+            )
         )
     }
 

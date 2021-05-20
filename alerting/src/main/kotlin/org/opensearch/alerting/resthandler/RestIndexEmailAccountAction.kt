@@ -41,13 +41,8 @@ import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.index.seqno.SequenceNumbers
-import org.opensearch.rest.BaseRestHandler
-import org.opensearch.rest.BytesRestResponse
-import org.opensearch.rest.RestChannel
+import org.opensearch.rest.*
 import org.opensearch.rest.RestHandler.Route
-import org.opensearch.rest.RestRequest
-import org.opensearch.rest.RestResponse
-import org.opensearch.rest.RestStatus
 import org.opensearch.rest.action.RestResponseListener
 import java.io.IOException
 
@@ -66,6 +61,23 @@ class RestIndexEmailAccountAction : BaseRestHandler() {
         return listOf(
                 Route(RestRequest.Method.POST, AlertingPlugin.EMAIL_ACCOUNT_BASE_URI), // Creates new email account
                 Route(RestRequest.Method.PUT, "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}")
+        )
+    }
+
+    override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
+        return mutableListOf(
+            RestHandler.ReplacedRoute(
+                RestRequest.Method.POST,
+                AlertingPlugin.EMAIL_ACCOUNT_BASE_URI,
+                RestRequest.Method.POST,
+                AlertingPlugin.LEGACY_EMAIL_ACCOUNT_BASE_URI
+            ),
+            RestHandler.ReplacedRoute(
+                RestRequest.Method.PUT,
+                "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}",
+                RestRequest.Method.PUT,
+                "${AlertingPlugin.LEGACY_EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}"
+            )
         )
     }
 

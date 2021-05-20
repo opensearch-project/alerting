@@ -43,6 +43,7 @@ import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BytesRestResponse
 import org.opensearch.rest.RestChannel
+import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestResponse
@@ -64,6 +65,21 @@ class RestSearchEmailGroupAction : BaseRestHandler() {
         return listOf(
                 Route(RestRequest.Method.POST, "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/_search"),
                 Route(RestRequest.Method.GET, "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/_search")
+        )
+    }
+
+    override fun replacedRoutes(): MutableList<ReplacedRoute> {
+        return mutableListOf(
+            ReplacedRoute(
+                RestRequest.Method.POST,
+                "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/_search",
+                RestRequest.Method.POST,
+                "${AlertingPlugin.LEGACY_EMAIL_GROUP_BASE_URI}/_search"),
+            ReplacedRoute(
+                RestRequest.Method.GET,
+                "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/_search",
+                RestRequest.Method.GET,
+                "${AlertingPlugin.LEGACY_EMAIL_GROUP_BASE_URI}/_search")
         )
     }
 

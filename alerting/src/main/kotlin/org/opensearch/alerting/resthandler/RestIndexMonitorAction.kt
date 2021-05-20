@@ -40,16 +40,11 @@ import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentParser.Token
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
 import org.opensearch.index.seqno.SequenceNumbers
-import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.*
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
-import org.opensearch.rest.BytesRestResponse
-import org.opensearch.rest.RestChannel
 import org.opensearch.rest.RestHandler.Route
-import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestRequest.Method.POST
 import org.opensearch.rest.RestRequest.Method.PUT
-import org.opensearch.rest.RestResponse
-import org.opensearch.rest.RestStatus
 import org.opensearch.rest.action.RestResponseListener
 import java.io.IOException
 import java.time.Instant
@@ -69,6 +64,23 @@ class RestIndexMonitorAction : BaseRestHandler() {
         return listOf(
                 Route(POST, AlertingPlugin.MONITOR_BASE_URI), // Create a new monitor
                 Route(PUT, "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}")
+        )
+    }
+
+    override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
+        return mutableListOf(
+            RestHandler.ReplacedRoute(
+                POST,
+                AlertingPlugin.MONITOR_BASE_URI,
+                POST,
+                AlertingPlugin.LEGACY_MONITOR_BASE_URI
+            ),
+            RestHandler.ReplacedRoute(
+                PUT,
+                "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}",
+                PUT,
+                "${AlertingPlugin.LEGACY_MONITOR_BASE_URI}/{monitorID}"
+            )
         )
     }
 

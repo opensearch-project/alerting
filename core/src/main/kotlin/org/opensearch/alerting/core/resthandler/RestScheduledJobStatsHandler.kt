@@ -31,6 +31,7 @@ import org.opensearch.alerting.core.action.node.ScheduledJobsStatsRequest
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.Strings
 import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.RestHandler
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 
@@ -63,6 +64,35 @@ class RestScheduledJobStatsHandler(private val path: String) : BaseRestHandler()
                 Route(GET, "/_plugins/$path/{nodeId}/stats/{metric}"),
                 Route(GET, "/_plugins/$path/stats/"),
                 Route(GET, "/_plugins/$path/stats/{metric}")
+        )
+    }
+
+    override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
+        return mutableListOf(
+            RestHandler.ReplacedRoute(
+                GET,
+                "/_opendistro/$path/{nodeId}/stats/",
+                GET,
+                "/_plugins/$path/{nodeId}/stats/"
+            ),
+            RestHandler.ReplacedRoute(
+                GET,
+                "/_opendistro/$path/{nodeId}/stats/{metric}",
+                GET,
+                "/_plugins/$path/{nodeId}/stats/{metric}"
+            ),
+            RestHandler.ReplacedRoute(
+                GET,
+                "/_opendistro/$path/stats/",
+                GET,
+                "/_plugins/$path/stats/"
+            ),
+            RestHandler.ReplacedRoute(
+                GET,
+                "/_opendistro/$path/stats/{metric}",
+                GET,
+                "/_plugins/$path/stats/{metric}"
+            )
         )
     }
 

@@ -38,6 +38,7 @@ import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
+import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestRequest.Method.POST
@@ -61,6 +62,16 @@ class RestAcknowledgeAlertAction : BaseRestHandler() {
         return listOf(
                 // Acknowledge alerts
                 Route(POST, "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts")
+        )
+    }
+
+    override fun replacedRoutes(): MutableList<ReplacedRoute> {
+        return mutableListOf(
+            ReplacedRoute(
+                POST,
+                "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts",
+                POST,
+                "${AlertingPlugin.LEGACY_MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts")
         )
     }
 

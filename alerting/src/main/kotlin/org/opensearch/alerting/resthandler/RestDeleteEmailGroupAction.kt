@@ -35,6 +35,7 @@ import org.apache.logging.log4j.Logger
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.client.node.NodeClient
 import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.RestHandler
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.action.RestToXContentListener
@@ -54,6 +55,17 @@ class RestDeleteEmailGroupAction : BaseRestHandler() {
     override fun routes(): List<Route> {
         return listOf(
                 Route(RestRequest.Method.DELETE, "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}")
+        )
+    }
+
+    override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
+        return mutableListOf(
+            RestHandler.ReplacedRoute(
+                RestRequest.Method.DELETE,
+                "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}",
+                RestRequest.Method.DELETE,
+                "${AlertingPlugin.LEGACY_EMAIL_GROUP_BASE_URI}/{emailGroupID}"
+            )
         )
     }
 
