@@ -634,7 +634,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     fun getAlertingStats(metrics: String = ""): Map<String, Any> {
-        val monitorStatsResponse = client().makeRequest("GET", "/_opendistro/_alerting/stats$metrics")
+        val monitorStatsResponse = client().makeRequest("GET", "/_plugins/_alerting/stats$metrics")
         val responseMap = createParser(XContentType.JSON.xContent(), monitorStatsResponse.entity.content).map()
         return responseMap
     }
@@ -683,7 +683,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     fun createUser(name: String, passwd: String, backendRoles: Array<String>) {
-        val request = Request("PUT", "/_opendistro/_security/api/internalusers/$name")
+        val request = Request("PUT", "/_plugins/_security/api/internalusers/$name")
         val broles = backendRoles.joinToString { it -> "\"$it\"" }
         var entity = " {\n" +
                 "\"password\": \"$passwd\",\n" +
@@ -695,7 +695,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     fun createIndexRole(name: String, index: String) {
-        val request = Request("PUT", "/_opendistro/_security/api/roles/$name")
+        val request = Request("PUT", "/_plugins/_security/api/roles/$name")
         var entity = "{\n" +
                 "\"cluster_permissions\": [\n" +
                 "],\n" +
@@ -719,7 +719,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     fun createUserRolesMapping(role: String, users: Array<String>) {
-        val request = Request("PUT", "/_opendistro/_security/api/rolesmapping/$role")
+        val request = Request("PUT", "/_plugins/_security/api/rolesmapping/$role")
         val usersStr = users.joinToString { it -> "\"$it\"" }
         var entity = "{                                  \n" +
                 "  \"backend_roles\" : [  ],\n" +
@@ -731,15 +731,15 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     fun deleteUser(name: String) {
-        client().makeRequest("DELETE", "/_opendistro/_security/api/internalusers/$name")
+        client().makeRequest("DELETE", "/_plugins/_security/api/internalusers/$name")
     }
 
     fun deleteRole(name: String) {
-        client().makeRequest("DELETE", "/_opendistro/_security/api/roles/$name")
+        client().makeRequest("DELETE", "/_plugins/_security/api/roles/$name")
     }
 
     fun deleteRoleMapping(name: String) {
-        client().makeRequest("DELETE", "/_opendistro/_security/api/rolesmapping/$name")
+        client().makeRequest("DELETE", "/_plugins/_security/api/rolesmapping/$name")
     }
 
     fun createUserWithTestData(user: String, index: String, role: String, backendRole: String) {

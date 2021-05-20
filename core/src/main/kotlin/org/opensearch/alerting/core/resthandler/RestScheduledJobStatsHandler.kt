@@ -59,10 +59,10 @@ class RestScheduledJobStatsHandler(private val path: String) : BaseRestHandler()
 
     override fun routes(): List<Route> {
         return listOf(
-                Route(GET, "/_opendistro/$path/{nodeId}/stats/"),
-                Route(GET, "/_opendistro/$path/{nodeId}/stats/{metric}"),
-                Route(GET, "/_opendistro/$path/stats/"),
-                Route(GET, "/_opendistro/$path/stats/{metric}")
+                Route(GET, "/_plugins/$path/{nodeId}/stats/"),
+                Route(GET, "/_plugins/$path/{nodeId}/stats/{metric}"),
+                Route(GET, "/_plugins/$path/stats/"),
+                Route(GET, "/_plugins/$path/stats/{metric}")
         )
     }
 

@@ -149,8 +149,8 @@ fun randomEmailGroup(
 
 fun randomScript(source: String = "return " + OpenSearchRestTestCase.randomBoolean().toString()): Script = Script(source)
 
-val ALERTING_BASE_URI = "/_opendistro/_alerting/monitors"
-val DESTINATION_BASE_URI = "/_opendistro/_alerting/destinations"
+val ALERTING_BASE_URI = "/_plugins/_alerting/monitors"
+val DESTINATION_BASE_URI = "/_plugins/_alerting/destinations"
 val ALWAYS_RUN = Script("return true")
 val NEVER_RUN = Script("return false")
 val DRYRUN_MONITOR = mapOf("dryrun" to "true")
