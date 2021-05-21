@@ -15,6 +15,7 @@ class LegacyOpenDistroScheduledJobSettings {
             true,
             Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
         )
+
         val REQUEST_TIMEOUT = Setting.positiveTimeSetting(
             "opendistro.scheduled_jobs.request_timeout",
             TimeValue.timeValueSeconds(10),
