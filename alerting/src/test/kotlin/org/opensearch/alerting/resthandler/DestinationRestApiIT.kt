@@ -26,8 +26,6 @@
 
 package org.opensearch.alerting.resthandler
 
-import org.apache.logging.log4j.LogManager
-import org.apache.logging.log4j.Logger
 import org.junit.Assert
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.DESTINATION_BASE_URI
@@ -47,7 +45,6 @@ import org.opensearch.rest.RestStatus
 import org.opensearch.test.junit.annotations.TestLogging
 import java.time.Instant
 
-private val log: Logger = LogManager.getLogger(RestDeleteDestinationAction::class.java)
 @TestLogging("level:INFO", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
 class DestinationRestApiIT : AlertingRestTestCase() {
@@ -70,29 +67,28 @@ class DestinationRestApiIT : AlertingRestTestCase() {
         Assert.assertNotNull("chime object should not be null", createdDestination.chime)
     }
 
-    fun `test creating a chime destination with legacy ODFE`() {
-        val chime = Chime("http://abc.com")
-        val destination = Destination(
-            type = DestinationType.CHIME,
-            name = "test",
-            user = randomUser(),
-            lastUpdateTime = Instant.now(),
-            chime = chime,
-            slack = null,
-            customWebhook = null,
-            email = null
-        )
-        val createdDestination = client().makeRequest(
-            "POST",
-            "$LEGACY_DESTINATION_BASE_URI",
-            emptyMap(),
-            destination.toHttpEntity())
-        val responseBody = createdDestination.asMap()
-        log.info(createdDestination)
-        assertEquals("Incorrect destination name", responseBody["name"] as String, "test")
-        assertEquals("Incorrect destination type", responseBody["type"] as String, DestinationType.CHIME)
-        Assert.assertNotNull("chime object should not be null", responseBody["type"] as String)
-    }
+//    fun `test creating a chime destination with legacy ODFE`() {
+//        val chime = Chime("http://abc.com")
+//        val destination = Destination(
+//            type = DestinationType.CHIME,
+//            name = "test",
+//            user = randomUser(),
+//            lastUpdateTime = Instant.now(),
+//            chime = chime,
+//            slack = null,
+//            customWebhook = null,
+//            email = null
+//        )
+//        val createdDestination = client().makeRequest(
+//            "POST",
+//            LEGACY_DESTINATION_BASE_URI,
+//            emptyMap(),
+//            destination.toHttpEntity())
+//        val responseBody = createdDestination.asMap()
+//        assertEquals("Incorrect destination name", responseBody["name"] as String, "test")
+//        assertEquals("Incorrect destination type", responseBody["type"] as String, DestinationType.CHIME)
+//        Assert.assertNotNull("chime object should not be null", responseBody["type"] as String)
+//    }
 
     fun `test updating a chime destination`() {
         val destination = createDestination()
