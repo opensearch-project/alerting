@@ -32,6 +32,7 @@ import org.apache.http.nio.entity.NStringEntity
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ANOMALY_DETECTOR_INDEX
 import org.opensearch.alerting.AlertingRestTestCase
+import org.opensearch.alerting.LEGACY_ALERTING_BASE_URI
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.anomalyDetectorIndexMapping
 import org.opensearch.alerting.core.model.CronSchedule
@@ -112,6 +113,18 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertNotEquals("response is missing Id", Monitor.NO_ID, createdId)
         assertTrue("incorrect version", createdVersion > 0)
         assertEquals("Incorrect Location header", "$ALERTING_BASE_URI/$createdId", createResponse.getHeader("Location"))
+    }
+
+    fun `test creating a monitor with legacy ODFE`() {
+        val monitor = randomMonitor()
+        val createResponse = client().makeRequest("POST", LEGACY_ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+        assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
+        val responseBody = createResponse.asMap()
+        val createdId = responseBody["_id"] as String
+        val createdVersion = responseBody["_version"] as Int
+        assertNotEquals("response is missing Id", Monitor.NO_ID, createdId)
+        assertTrue("incorrect version", createdVersion > 0)
+        assertEquals("Incorrect Location header", "$LEGACY_ALERTING_BASE_URI/$createdId", createResponse.getHeader("Location"))
     }
 
     fun `test creating a monitor with action threshold greater than max threshold`() {

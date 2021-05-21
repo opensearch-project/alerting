@@ -29,6 +29,7 @@ package org.opensearch.alerting.resthandler
 import org.junit.Assert
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.DESTINATION_BASE_URI
+import org.opensearch.alerting.LEGACY_DESTINATION_BASE_URI
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.CustomWebhook
@@ -64,6 +65,29 @@ class DestinationRestApiIT : AlertingRestTestCase() {
         assertEquals("Incorrect destination name", createdDestination.name, "test")
         assertEquals("Incorrect destination type", createdDestination.type, DestinationType.CHIME)
         Assert.assertNotNull("chime object should not be null", createdDestination.chime)
+    }
+
+    fun `test creating a chime destination with legacy ODFE`() {
+        val chime = Chime("http://abc.com")
+        val destination = Destination(
+            type = DestinationType.CHIME,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = chime,
+            slack = null,
+            customWebhook = null,
+            email = null
+        )
+        val createdDestination = client().makeRequest(
+            "POST",
+            "$LEGACY_DESTINATION_BASE_URI",
+            emptyMap(),
+            destination.toHttpEntity())
+        val responseBody = createdDestination.asMap()
+        assertEquals("Incorrect destination name", responseBody["name"] as String , "test")
+        assertEquals("Incorrect destination type", responseBody["type"] as String, DestinationType.CHIME)
+        Assert.assertNotNull("chime object should not be null", responseBody["type"] as String)
     }
 
     fun `test updating a chime destination`() {
