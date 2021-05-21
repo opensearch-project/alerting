@@ -38,7 +38,6 @@ import java.util.function.Function
  * types require SecureSettings and need additional logic for retrieving and loading them.
  */
 class DestinationSettings {
-
     companion object {
 
         const val DESTINATION_SETTING_PREFIX = "plugins.alerting.destination."

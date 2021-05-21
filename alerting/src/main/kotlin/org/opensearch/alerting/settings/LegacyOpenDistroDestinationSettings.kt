@@ -1,12 +1,29 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
 package org.opensearch.alerting.settings
 
-import org.opensearch.alerting.destination.message.DestinationType
+import org.opensearch.alerting.util.DestinationType
 import org.opensearch.common.settings.SecureSetting
 import org.opensearch.common.settings.SecureString
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
+import java.util.function.Function
 
+/**
+ * Settings specific to Destinations. This class is separated from the general AlertingSettings since some Destination
+ * types require SecureSettings and need additional logic for retrieving and loading them.
+ */
 class LegacyOpenDistroDestinationSettings {
+
     companion object {
 
         const val DESTINATION_SETTING_PREFIX = "opendistro.alerting.destination."
@@ -17,7 +34,7 @@ class LegacyOpenDistroDestinationSettings {
         val ALLOW_LIST: Setting<List<String>> = Setting.listSetting(
             DESTINATION_SETTING_PREFIX + "allow_list",
             ALLOW_LIST_ALL,
-            java.util.function.Function.identity(),
+            Function.identity(),
             Setting.Property.NodeScope,
             Setting.Property.Dynamic,
             Setting.Property.Deprecated
@@ -40,12 +57,13 @@ class LegacyOpenDistroDestinationSettings {
         val HOST_DENY_LIST: Setting<List<String>> = Setting.listSetting(
             "opendistro.destination.host.deny_list",
             emptyList<String>(),
-            java.util.function.Function.identity(),
+            Function.identity(),
             Setting.Property.NodeScope,
-            Setting.Property.Final
+            Setting.Property.Final,
+            Setting.Property.Deprecated
         )
 
-        fun loadLegacyOpenDistroDestinationSettings(settings: Settings): Map<String, SecureDestinationSettings> {
+        fun loadLegacyDestinationSettings(settings: Settings): Map<String, SecureDestinationSettings> {
             // Only loading Email Destination settings for now since those are the only secure settings needed.
             // If this logic needs to be expanded to support other Destinations, different groups can be retrieved similar
             // to emailAccountNames based on the setting namespace and SecureDestinationSettings should be expanded to support
@@ -54,7 +72,7 @@ class LegacyOpenDistroDestinationSettings {
             val emailAccounts: MutableMap<String, SecureDestinationSettings> = mutableMapOf()
             for (emailAccountName in emailAccountNames) {
                 // Only adding the settings if they exist
-                getLegacyOpenDistroSecureDestinationSettings(settings, emailAccountName)?.let {
+                getLegacySecureDestinationSettings(settings, emailAccountName)?.let {
                     emailAccounts[emailAccountName] = it
                 }
             }
@@ -62,18 +80,18 @@ class LegacyOpenDistroDestinationSettings {
             return emailAccounts
         }
 
-        private fun getLegacyOpenDistroSecureDestinationSettings(settings: Settings, emailAccountName: String): SecureDestinationSettings? {
+        private fun getLegacySecureDestinationSettings(settings: Settings, emailAccountName: String): SecureDestinationSettings? {
             // Using 'use' to emulate Java's try-with-resources on multiple closeable resources.
             // Values are cloned so that we maintain a SecureString, the original SecureStrings will be closed after
             // they have left the scope of this function.
-            return getLegacyOpenDistroEmailSettingValue(settings, emailAccountName, EMAIL_USERNAME)?.use { emailUsername ->
-                getLegacyOpenDistroEmailSettingValue(settings, emailAccountName, EMAIL_PASSWORD)?.use { emailPassword ->
+            return getLegacyEmailSettingValue(settings, emailAccountName, EMAIL_USERNAME)?.use { emailUsername ->
+                getLegacyEmailSettingValue(settings, emailAccountName, EMAIL_PASSWORD)?.use { emailPassword ->
                     SecureDestinationSettings(emailUsername = emailUsername.clone(), emailPassword = emailPassword.clone())
                 }
             }
         }
 
-        private fun <T> getLegacyOpenDistroEmailSettingValue(settings: Settings, emailAccountName: String, emailSetting: Setting.AffixSetting<T>): T? {
+        private fun <T> getLegacyEmailSettingValue(settings: Settings, emailAccountName: String, emailSetting: Setting.AffixSetting<T>): T? {
             val concreteSetting = emailSetting.getConcreteSettingForNamespace(emailAccountName)
             return concreteSetting.get(settings)
         }
