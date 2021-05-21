@@ -122,6 +122,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val responseBody = createResponse.asMap()
         val createdId = responseBody["_id"] as String
         val createdVersion = responseBody["_version"] as Int
+        println(createResponse)
         assertNotEquals("response is missing Id", Monitor.NO_ID, createdId)
         assertTrue("incorrect version", createdVersion > 0)
         assertEquals("Incorrect Location header", "$LEGACY_ALERTING_BASE_URI/$createdId", createResponse.getHeader("Location"))

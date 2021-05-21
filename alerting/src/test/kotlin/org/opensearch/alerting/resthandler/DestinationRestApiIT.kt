@@ -85,6 +85,7 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             emptyMap(),
             destination.toHttpEntity())
         val responseBody = createdDestination.asMap()
+        println(createdDestination)
         assertEquals("Incorrect destination name", responseBody["name"] as String, "test")
         assertEquals("Incorrect destination type", responseBody["type"] as String, DestinationType.CHIME)
         Assert.assertNotNull("chime object should not be null", responseBody["type"] as String)
