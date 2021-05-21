@@ -26,6 +26,8 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
 import org.junit.Assert
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.DESTINATION_BASE_URI
@@ -45,7 +47,8 @@ import org.opensearch.rest.RestStatus
 import org.opensearch.test.junit.annotations.TestLogging
 import java.time.Instant
 
-@TestLogging("level:DEBUG", reason = "Debug for tests.")
+private val log: Logger = LogManager.getLogger(RestDeleteDestinationAction::class.java)
+@TestLogging("level:INFO", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
 class DestinationRestApiIT : AlertingRestTestCase() {
 
@@ -85,7 +88,7 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             emptyMap(),
             destination.toHttpEntity())
         val responseBody = createdDestination.asMap()
-        println(createdDestination)
+        log.info(createdDestination)
         assertEquals("Incorrect destination name", responseBody["name"] as String, "test")
         assertEquals("Incorrect destination type", responseBody["type"] as String, DestinationType.CHIME)
         Assert.assertNotNull("chime object should not be null", responseBody["type"] as String)

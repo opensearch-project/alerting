@@ -29,6 +29,8 @@ import org.apache.http.HttpHeaders
 import org.apache.http.entity.ContentType
 import org.apache.http.message.BasicHeader
 import org.apache.http.nio.entity.NStringEntity
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ANOMALY_DETECTOR_INDEX
 import org.opensearch.alerting.AlertingRestTestCase
@@ -69,6 +71,7 @@ import org.opensearch.test.rest.OpenSearchRestTestCase
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
+private val log: Logger = LogManager.getLogger(RestDeleteDestinationAction::class.java)
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
 class MonitorRestApiIT : AlertingRestTestCase() {
@@ -122,7 +125,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val responseBody = createResponse.asMap()
         val createdId = responseBody["_id"] as String
         val createdVersion = responseBody["_version"] as Int
-        println(createResponse)
+        log.info(createResponse)
         assertNotEquals("response is missing Id", Monitor.NO_ID, createdId)
         assertTrue("incorrect version", createdVersion > 0)
         assertEquals("Incorrect Location header", "$LEGACY_ALERTING_BASE_URI/$createdId", createResponse.getHeader("Location"))
