@@ -83,26 +83,32 @@ class LegacyOpenDistroAlertingSettings {
 
         val ALERT_HISTORY_MAX_DOCS = Setting.longSetting(
             "opendistro.alerting.alert_history_max_docs",
+            1000L,
+            0L,
             Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
         )
 
         val ALERT_HISTORY_RETENTION_PERIOD = Setting.positiveTimeSetting(
             "opendistro.alerting.alert_history_retention_period",
+            TimeValue(60, TimeUnit.DAYS),
             Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
         )
 
         val REQUEST_TIMEOUT = Setting.positiveTimeSetting(
             "opendistro.alerting.request_timeout",
+            TimeValue.timeValueSeconds(10),
             Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
         )
 
         val MAX_ACTION_THROTTLE_VALUE = Setting.positiveTimeSetting(
             "opendistro.alerting.action_throttle_max_value",
+            TimeValue.timeValueHours(24),
             Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
         )
 
         val FILTER_BY_BACKEND_ROLES = Setting.boolSetting(
             "opendistro.alerting.filter_by_backend_roles",
+            false,
             Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
         )
     }
