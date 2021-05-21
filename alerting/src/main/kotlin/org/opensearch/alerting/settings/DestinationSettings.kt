@@ -49,7 +49,6 @@ class DestinationSettings {
         val ALLOW_LIST: Setting<List<String>> = Setting.listSetting(
             DESTINATION_SETTING_PREFIX + "allow_list",
             LegacyOpenDistroDestinationSettings.ALLOW_LIST,
-            ALLOW_LIST_ALL,
             Function.identity(),
             Setting.Property.NodeScope,
             Setting.Property.Dynamic
