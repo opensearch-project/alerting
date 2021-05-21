@@ -11,6 +11,10 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.apache.http.entity.ContentType
+import org.apache.http.nio.entity.NStringEntity
+import org.junit.After
+import org.junit.Before
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.AlertingRestTestCase
@@ -23,20 +27,16 @@ import org.opensearch.alerting.randomAlert
 import org.opensearch.alerting.randomMonitor
 import org.opensearch.alerting.randomTemplateScript
 import org.opensearch.alerting.randomTrigger
-import org.opensearch.commons.authuser.User
-import org.opensearch.commons.rest.SecureRestClientBuilder
-import org.apache.http.entity.ContentType
-import org.apache.http.nio.entity.NStringEntity
 import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
 import org.opensearch.client.RestClient
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.authuser.User
+import org.opensearch.commons.rest.SecureRestClientBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.junit.annotations.TestLogging
-import org.junit.After
-import org.junit.Before
 
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
@@ -73,8 +73,12 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         try {
             // randomMonitor has a dummy user, api ignores the User passed as part of monitor, it picks user info from the logged-in user.
             val monitor = randomMonitor().copy(
-                    inputs = listOf(SearchInput(
-                            indices = listOf("hr_data"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))))
+                inputs = listOf(
+                    SearchInput(
+                        indices = listOf("hr_data"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                    )
+                )
+            )
             val createResponse = userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             assertEquals("Create monitor failed", RestStatus.CREATED, createResponse?.restStatus())
 
@@ -103,8 +107,12 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         createUserWithTestData(user, "hr_data", "hr_role", "HR")
         try {
             val monitor = randomMonitor().copy(
-                    inputs = listOf(SearchInput(
-                            indices = listOf("hr_data"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))))
+                inputs = listOf(
+                    SearchInput(
+                        indices = listOf("hr_data"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                    )
+                )
+            )
             userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             fail("Expected 403 Method FORBIDDEN response")
         } catch (e: ResponseException) {
@@ -122,8 +130,12 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         createUserRolesMapping("alerting_full_access", arrayOf(user))
         try {
             val monitor = randomMonitor().copy(
-                    inputs = listOf(SearchInput(
-                            indices = listOf("not_hr_data"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))))
+                inputs = listOf(
+                    SearchInput(
+                        indices = listOf("not_hr_data"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                    )
+                )
+            )
             val createResponse = userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             assertEquals("Create monitor failed", RestStatus.CREATED, createResponse?.restStatus())
             fail("Expected 403 Method FORBIDDEN response")
@@ -163,8 +175,10 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun getDocs(response: Response?): Any? {
-        val hits = createParser(XContentType.JSON.xContent(),
-                response?.entity?.content).map()["hits"]!! as Map<String, Map<String, Any>>
+        val hits = createParser(
+            XContentType.JSON.xContent(),
+            response?.entity?.content
+        ).map()["hits"]!! as Map<String, Map<String, Any>>
         return hits["total"]?.get("value")
     }
 
@@ -217,14 +231,18 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", createdMonitor.id)).toString()
         // search as "admin" - must get 0 docs
-        val adminSearchResponse = client().makeRequest("POST",
+        val adminSearchResponse = client().makeRequest(
+            "POST",
             "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON))
+            NStringEntity(search, ContentType.APPLICATION_JSON)
+        )
         assertEquals("Search monitor failed", RestStatus.OK, adminSearchResponse.restStatus())
 
-        val adminHits = createParser(XContentType.JSON.xContent(),
-            adminSearchResponse.entity.content).map()["hits"]!! as Map<String, Map<String, Any>>
+        val adminHits = createParser(
+            XContentType.JSON.xContent(),
+            adminSearchResponse.entity.content
+        ).map()["hits"]!! as Map<String, Map<String, Any>>
         val adminDocsFound = adminHits["total"]?.get("value")
         assertEquals("Monitor found during search", 0, adminDocsFound)
     }
@@ -247,14 +265,18 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", createdMonitor.id)).toString()
         // search as "admin" - must get 0 docs
-        val adminSearchResponse = client().makeRequest("POST",
+        val adminSearchResponse = client().makeRequest(
+            "POST",
             "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON))
+            NStringEntity(search, ContentType.APPLICATION_JSON)
+        )
         assertEquals("Search monitor failed", RestStatus.OK, adminSearchResponse.restStatus())
 
-        val adminHits = createParser(XContentType.JSON.xContent(),
-            adminSearchResponse.entity.content).map()["hits"]!! as Map<String, Map<String, Any>>
+        val adminHits = createParser(
+            XContentType.JSON.xContent(),
+            adminSearchResponse.entity.content
+        ).map()["hits"]!! as Map<String, Map<String, Any>>
         val adminDocsFound = adminHits["total"]?.get("value")
         assertEquals("Monitor found during search", 0, adminDocsFound)
     }
@@ -269,18 +291,22 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", monitor.id)).toString()
 
         // search as "admin" - must get 1 docs
-        val adminSearchResponse = client().makeRequest("POST",
-                "$ALERTING_BASE_URI/_search",
-                emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON))
+        val adminSearchResponse = client().makeRequest(
+            "POST",
+            "$ALERTING_BASE_URI/_search",
+            emptyMap(),
+            NStringEntity(search, ContentType.APPLICATION_JSON)
+        )
         assertEquals("Search monitor failed", RestStatus.OK, adminSearchResponse.restStatus())
         assertEquals("Monitor not found during search", 1, getDocs(adminSearchResponse))
 
         // search as userOne without alerting roles - must return 403 Forbidden
         try {
-            userClient?.makeRequest("POST", "$ALERTING_BASE_URI/_search",
-                    emptyMap(),
-                    NStringEntity(search, ContentType.APPLICATION_JSON))
+            userClient?.makeRequest(
+                "POST", "$ALERTING_BASE_URI/_search",
+                emptyMap(),
+                NStringEntity(search, ContentType.APPLICATION_JSON)
+            )
             fail("Expected 403 FORBIDDEN response")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
@@ -289,10 +315,12 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         // add alerting roles and search as userOne - must return 1 docs
         createUserRolesMapping("alerting_full_access", arrayOf(user))
         try {
-            val userOneSearchResponse = userClient?.makeRequest("POST",
-                    "$ALERTING_BASE_URI/_search",
-                    emptyMap(),
-                    NStringEntity(search, ContentType.APPLICATION_JSON))
+            val userOneSearchResponse = userClient?.makeRequest(
+                "POST",
+                "$ALERTING_BASE_URI/_search",
+                emptyMap(),
+                NStringEntity(search, ContentType.APPLICATION_JSON)
+            )
             assertEquals("Search monitor failed", RestStatus.OK, userOneSearchResponse?.restStatus())
             assertEquals("Monitor not found during search", 1, getDocs(userOneSearchResponse))
         } finally {
@@ -310,18 +338,22 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", monitor.id)).toString()
 
         // search as "admin" - must get 1 docs
-        val adminSearchResponse = client().makeRequest("POST",
-                "$ALERTING_BASE_URI/_search",
-                emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON))
+        val adminSearchResponse = client().makeRequest(
+            "POST",
+            "$ALERTING_BASE_URI/_search",
+            emptyMap(),
+            NStringEntity(search, ContentType.APPLICATION_JSON)
+        )
         assertEquals("Search monitor failed", RestStatus.OK, adminSearchResponse.restStatus())
         assertEquals("Monitor not found during search", 1, getDocs(adminSearchResponse))
 
         // search as userOne without alerting roles - must return 403 Forbidden
         try {
-            userClient?.makeRequest("POST", "$ALERTING_BASE_URI/_search",
-                    emptyMap(),
-                    NStringEntity(search, ContentType.APPLICATION_JSON))
+            userClient?.makeRequest(
+                "POST", "$ALERTING_BASE_URI/_search",
+                emptyMap(),
+                NStringEntity(search, ContentType.APPLICATION_JSON)
+            )
             fail("Expected 403 FORBIDDEN response")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
@@ -330,10 +362,12 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         // add alerting roles and search as userOne - must return 0 docs
         createUserRolesMapping("alerting_full_access", arrayOf(user))
         try {
-            val userOneSearchResponse = userClient?.makeRequest("POST",
-                    "$ALERTING_BASE_URI/_search",
-                    emptyMap(),
-                    NStringEntity(search, ContentType.APPLICATION_JSON))
+            val userOneSearchResponse = userClient?.makeRequest(
+                "POST",
+                "$ALERTING_BASE_URI/_search",
+                emptyMap(),
+                NStringEntity(search, ContentType.APPLICATION_JSON)
+            )
             assertEquals("Search monitor failed", RestStatus.OK, userOneSearchResponse?.restStatus())
             assertEquals("Monitor not found during search", 0, getDocs(userOneSearchResponse))
         } finally {
@@ -424,10 +458,10 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
         val inputs = listOf(
-                SearchInput(
-                        indices = kotlin.collections.listOf("not_hr_data"),
-                        query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
-                )
+            SearchInput(
+                indices = kotlin.collections.listOf("not_hr_data"),
+                query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+            )
         )
         val monitor = randomMonitor(triggers = listOf(randomTrigger(condition = ALWAYS_RUN, actions = listOf(action))), inputs = inputs)
 

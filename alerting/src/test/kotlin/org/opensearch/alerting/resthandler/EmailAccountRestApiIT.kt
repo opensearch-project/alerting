@@ -26,13 +26,13 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.apache.http.entity.ContentType
+import org.apache.http.nio.entity.NStringEntity
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.randomEmailAccount
-import org.apache.http.entity.ContentType
-import org.apache.http.nio.entity.NStringEntity
 import org.opensearch.client.ResponseException
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.index.query.QueryBuilders
@@ -47,13 +47,13 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
 
     fun `test creating an email account`() {
         val emailAccount = EmailAccount(
-                name = "test",
-                email = "test@email.com",
-                host = "smtp.com",
-                port = 25,
-                method = EmailAccount.MethodType.NONE,
-                username = null,
-                password = null
+            name = "test",
+            email = "test@email.com",
+            host = "smtp.com",
+            port = 25,
+            method = EmailAccount.MethodType.NONE,
+            username = null,
+            password = null
         )
         val createdEmailAccount = createEmailAccount(emailAccount = emailAccount)
         assertEquals("Incorrect email account name", createdEmailAccount.name, "test")
@@ -97,11 +97,11 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
     fun `test updating an email account`() {
         val emailAccount = createEmailAccount()
         val updatedEmailAccount = updateEmailAccount(
-                emailAccount.copy(
-                        name = "updatedName",
-                        port = 465,
-                        method = EmailAccount.MethodType.SSL
-                )
+            emailAccount.copy(
+                name = "updatedName",
+                port = 465,
+                method = EmailAccount.MethodType.SSL
+            )
         )
         assertEquals("Incorrect email account name after update", updatedEmailAccount.name, "updatedName")
         assertEquals("Incorrect email account port after update", updatedEmailAccount.port, 465)
@@ -118,7 +118,8 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
                 "PUT",
                 "$EMAIL_ACCOUNT_BASE_URI/${emailAccount1.id}",
                 emptyMap(),
-                updatedEmailAccount.toHttpEntity())
+                updatedEmailAccount.toHttpEntity()
+            )
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())
         }
@@ -221,7 +222,8 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
             "GET",
             "$EMAIL_ACCOUNT_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON))
+            NStringEntity(search, ContentType.APPLICATION_JSON)
+        )
         assertEquals("Search email account failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
@@ -237,7 +239,8 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
             "POST",
             "$EMAIL_ACCOUNT_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON))
+            NStringEntity(search, ContentType.APPLICATION_JSON)
+        )
         assertEquals("Search email account failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
@@ -249,16 +252,19 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
         // Create a random email account to create the ScheduledJob index. Otherwise the test will fail with a 404 index not found error.
         createRandomEmailAccount()
         val search = SearchSourceBuilder()
-            .query(QueryBuilders.termQuery(
-                OpenSearchTestCase.randomAlphaOfLength(5),
-                OpenSearchTestCase.randomAlphaOfLength(5)
-            )).toString()
+            .query(
+                QueryBuilders.termQuery(
+                    OpenSearchTestCase.randomAlphaOfLength(5),
+                    OpenSearchTestCase.randomAlphaOfLength(5)
+                )
+            ).toString()
 
         val searchResponse = client().makeRequest(
             "GET",
             "$EMAIL_ACCOUNT_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON))
+            NStringEntity(search, ContentType.APPLICATION_JSON)
+        )
         assertEquals("Search email account failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
@@ -276,7 +282,8 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
                 "GET",
                 "$EMAIL_ACCOUNT_BASE_URI/_search",
                 emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON))
+                NStringEntity(search, ContentType.APPLICATION_JSON)
+            )
             fail("Expected 403 Method FORBIDDEN response")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())

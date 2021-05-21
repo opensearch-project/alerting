@@ -48,14 +48,15 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
 
         val chime = Chime("http://abc.com")
         val destination = Destination(
-                type = DestinationType.CHIME,
-                name = "test",
-                user = randomUser(),
-                lastUpdateTime = Instant.now(),
-                chime = chime,
-                slack = null,
-                customWebhook = null,
-                email = null)
+            type = DestinationType.CHIME,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = chime,
+            slack = null,
+            customWebhook = null,
+            email = null
+        )
         val createdDestination = createDestination(destination = destination)
         assertEquals("Incorrect destination name", createdDestination.name, "test")
         assertEquals("Incorrect destination type", createdDestination.type, DestinationType.CHIME)
@@ -65,31 +66,34 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
         enableFilterBy()
         val chime = Chime("http://abc.com")
         val destination = Destination(
-                type = DestinationType.CHIME,
-                name = "test",
-                user = randomUser(),
-                lastUpdateTime = Instant.now(),
-                chime = chime,
-                slack = null,
-                customWebhook = null,
-                email = null)
+            type = DestinationType.CHIME,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = chime,
+            slack = null,
+            customWebhook = null,
+            email = null
+        )
 
         if (securityEnabled()) {
             // when security is enabled. No errors, must succeed.
             val response = client().makeRequest(
-                    "POST",
-                    "$DESTINATION_BASE_URI?refresh=true",
-                    emptyMap(),
-                    destination.toHttpEntity())
+                "POST",
+                "$DESTINATION_BASE_URI?refresh=true",
+                emptyMap(),
+                destination.toHttpEntity()
+            )
             assertEquals("Create monitor failed", RestStatus.CREATED, response.restStatus())
         } else {
             // when security is disable. Must return Forbidden.
             try {
                 client().makeRequest(
-                        "POST",
-                        "$DESTINATION_BASE_URI?refresh=true",
-                        emptyMap(),
-                        destination.toHttpEntity())
+                    "POST",
+                    "$DESTINATION_BASE_URI?refresh=true",
+                    emptyMap(),
+                    destination.toHttpEntity()
+                )
                 fail("Expected 403 FORBIDDEN response")
             } catch (e: ResponseException) {
                 assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
@@ -109,7 +113,8 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
             chime = chime,
             slack = null,
             customWebhook = null,
-            email = null)
+            email = null
+        )
         val createdDestination = createDestination(destination = destination)
 
         assertEquals("Incorrect destination name", createdDestination.name, "test")
@@ -140,7 +145,8 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
             chime = chime,
             slack = null,
             customWebhook = null,
-            email = null)
+            email = null
+        )
 
         // 1. create a destination as admin user
         val createdDestination = createDestination(destination, true)
@@ -168,7 +174,8 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
             chime = chime,
             slack = null,
             customWebhook = null,
-            email = null)
+            email = null
+        )
         val createdDestination = createDestination(destination = destination)
 
         assertEquals("Incorrect destination name", createdDestination.name, "test")
@@ -202,7 +209,8 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
             chime = chime,
             slack = null,
             customWebhook = null,
-            email = null)
+            email = null
+        )
 
         // 1. create a destination as admin user
         val createdDestination = createDestination(destination, true)
@@ -225,14 +233,15 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
         disableFilterBy()
         val slack = Slack("url")
         val destination = Destination(
-                type = DestinationType.SLACK,
-                name = "testSlack",
-                user = randomUser(),
-                lastUpdateTime = Instant.now(),
-                chime = null,
-                slack = slack,
-                customWebhook = null,
-                email = null)
+            type = DestinationType.SLACK,
+            name = "testSlack",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = null,
+            slack = slack,
+            customWebhook = null,
+            email = null
+        )
 
         // 1. create a destination as admin user
         createDestination(destination, true)
@@ -255,14 +264,15 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
         }
         val slack = Slack("url")
         val destination = Destination(
-                type = DestinationType.SLACK,
-                name = "testSlack",
-                user = randomUser(),
-                lastUpdateTime = Instant.now(),
-                chime = null,
-                slack = slack,
-                customWebhook = null,
-                email = null)
+            type = DestinationType.SLACK,
+            name = "testSlack",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = null,
+            slack = slack,
+            customWebhook = null,
+            email = null
+        )
 
         // 1. create a destination as admin user
         createDestination(destination, true)

@@ -26,14 +26,14 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.apache.http.entity.ContentType
+import org.apache.http.nio.entity.NStringEntity
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.destination.email.EmailEntry
 import org.opensearch.alerting.model.destination.email.EmailGroup
 import org.opensearch.alerting.randomEmailGroup
-import org.apache.http.entity.ContentType
-import org.apache.http.nio.entity.NStringEntity
 import org.opensearch.client.ResponseException
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.index.query.QueryBuilders
@@ -48,8 +48,8 @@ class EmailGroupRestApiIT : AlertingRestTestCase() {
 
     fun `test creating an email group`() {
         val emailGroup = EmailGroup(
-                name = "test",
-                emails = listOf(EmailEntry("test@email.com"))
+            name = "test",
+            emails = listOf(EmailEntry("test@email.com"))
         )
         val createdEmailGroup = createEmailGroup(emailGroup = emailGroup)
         assertEquals("Incorrect email group name", createdEmailGroup.name, "test")
@@ -79,10 +79,10 @@ class EmailGroupRestApiIT : AlertingRestTestCase() {
     fun `test updating an email group`() {
         val emailGroup = createEmailGroup()
         val updatedEmailGroup = updateEmailGroup(
-                emailGroup.copy(
-                        name = "updatedName",
-                        emails = listOf(EmailEntry("test@email.com"))
-                )
+            emailGroup.copy(
+                name = "updatedName",
+                emails = listOf(EmailEntry("test@email.com"))
+            )
         )
         assertEquals("Incorrect email group name after update", updatedEmailGroup.name, "updatedName")
         assertEquals("Incorrect email group email entry after update", updatedEmailGroup.emails[0].email, "test@email.com")
@@ -184,7 +184,8 @@ class EmailGroupRestApiIT : AlertingRestTestCase() {
             "GET",
             "$EMAIL_GROUP_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON))
+            NStringEntity(search, ContentType.APPLICATION_JSON)
+        )
         assertEquals("Search email group failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
@@ -200,7 +201,8 @@ class EmailGroupRestApiIT : AlertingRestTestCase() {
             "POST",
             "$EMAIL_GROUP_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON))
+            NStringEntity(search, ContentType.APPLICATION_JSON)
+        )
         assertEquals("Search email group failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
@@ -212,16 +214,19 @@ class EmailGroupRestApiIT : AlertingRestTestCase() {
         // Create a random email group to create the ScheduledJob index. Otherwise the test will fail with a 404 index not found error.
         createRandomEmailGroup()
         val search = SearchSourceBuilder()
-            .query(QueryBuilders.termQuery(
-                OpenSearchTestCase.randomAlphaOfLength(5),
-                OpenSearchTestCase.randomAlphaOfLength(5)
-            )).toString()
+            .query(
+                QueryBuilders.termQuery(
+                    OpenSearchTestCase.randomAlphaOfLength(5),
+                    OpenSearchTestCase.randomAlphaOfLength(5)
+                )
+            ).toString()
 
         val searchResponse = client().makeRequest(
             "GET",
             "$EMAIL_GROUP_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON))
+            NStringEntity(search, ContentType.APPLICATION_JSON)
+        )
         assertEquals("Search email group failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
@@ -239,7 +244,8 @@ class EmailGroupRestApiIT : AlertingRestTestCase() {
                 "GET",
                 "$EMAIL_GROUP_BASE_URI/_search",
                 emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON))
+                NStringEntity(search, ContentType.APPLICATION_JSON)
+            )
             fail("Expected 403 Method FORBIDDEN response")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
