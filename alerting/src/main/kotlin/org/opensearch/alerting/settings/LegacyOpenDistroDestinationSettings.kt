@@ -45,7 +45,7 @@ class LegacyOpenDistroDestinationSettings {
             Setting.Property.Final
         )
 
-        fun loadDestinationSettings(settings: Settings): Map<String, SecureDestinationSettings> {
+        fun loadLegacyOpenDistroDestinationSettings(settings: Settings): Map<String, SecureDestinationSettings> {
             // Only loading Email Destination settings for now since those are the only secure settings needed.
             // If this logic needs to be expanded to support other Destinations, different groups can be retrieved similar
             // to emailAccountNames based on the setting namespace and SecureDestinationSettings should be expanded to support
@@ -54,7 +54,7 @@ class LegacyOpenDistroDestinationSettings {
             val emailAccounts: MutableMap<String, SecureDestinationSettings> = mutableMapOf()
             for (emailAccountName in emailAccountNames) {
                 // Only adding the settings if they exist
-                getSecureDestinationSettings(settings, emailAccountName)?.let {
+                getLegacyOpenDistroSecureDestinationSettings(settings, emailAccountName)?.let {
                     emailAccounts[emailAccountName] = it
                 }
             }
@@ -62,18 +62,18 @@ class LegacyOpenDistroDestinationSettings {
             return emailAccounts
         }
 
-        private fun getSecureDestinationSettings(settings: Settings, emailAccountName: String): SecureDestinationSettings? {
+        private fun getLegacyOpenDistroSecureDestinationSettings(settings: Settings, emailAccountName: String): SecureDestinationSettings? {
             // Using 'use' to emulate Java's try-with-resources on multiple closeable resources.
             // Values are cloned so that we maintain a SecureString, the original SecureStrings will be closed after
             // they have left the scope of this function.
-            return getEmailSettingValue(settings, emailAccountName, EMAIL_USERNAME)?.use { emailUsername ->
-                getEmailSettingValue(settings, emailAccountName, EMAIL_PASSWORD)?.use { emailPassword ->
+            return getLegacyOpenDistroEmailSettingValue(settings, emailAccountName, EMAIL_USERNAME)?.use { emailUsername ->
+                getLegacyOpenDistroEmailSettingValue(settings, emailAccountName, EMAIL_PASSWORD)?.use { emailPassword ->
                     SecureDestinationSettings(emailUsername = emailUsername.clone(), emailPassword = emailPassword.clone())
                 }
             }
         }
 
-        private fun <T> getEmailSettingValue(settings: Settings, emailAccountName: String, emailSetting: Setting.AffixSetting<T>): T? {
+        private fun <T> getLegacyOpenDistroEmailSettingValue(settings: Settings, emailAccountName: String, emailSetting: Setting.AffixSetting<T>): T? {
             val concreteSetting = emailSetting.getConcreteSettingForNamespace(emailAccountName)
             return concreteSetting.get(settings)
         }
