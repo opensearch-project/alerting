@@ -26,16 +26,17 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetDestinationsRequest
 import org.opensearch.alerting.model.Table
 import org.opensearch.alerting.util.context
-import org.apache.logging.log4j.LogManager
 import org.opensearch.client.node.NodeClient
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
-import org.opensearch.rest.RestHandler
+import org.opensearch.rest.RestHandler.ReplacedRoute
+import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.action.RestActions
 import org.opensearch.rest.action.RestToXContentListener
@@ -52,11 +53,25 @@ class RestGetDestinationsAction : BaseRestHandler() {
         return "get_destinations_action"
     }
 
-    override fun routes(): List<RestHandler.Route> {
-        return listOf(
-                // Get a specific destination
-                RestHandler.Route(RestRequest.Method.GET, "${AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}"),
-                RestHandler.Route(RestRequest.Method.GET, "${AlertingPlugin.DESTINATION_BASE_URI}")
+    override fun routes(): List<Route> {
+        return listOf()
+    }
+
+    override fun replacedRoutes(): MutableList<ReplacedRoute> {
+        return mutableListOf(
+            // Get a specific destination
+            ReplacedRoute(
+                RestRequest.Method.GET,
+                "${AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}",
+                RestRequest.Method.GET,
+                "${AlertingPlugin.LEGACY_OPENDISTRO_DESTINATION_BASE_URI}/{destinationID}"
+            ),
+            ReplacedRoute(
+                RestRequest.Method.GET,
+                AlertingPlugin.DESTINATION_BASE_URI,
+                RestRequest.Method.GET,
+                AlertingPlugin.LEGACY_OPENDISTRO_DESTINATION_BASE_URI
+            )
         )
     }
 
@@ -79,23 +94,24 @@ class RestGetDestinationsAction : BaseRestHandler() {
         val destinationType = request.param("destinationType", "ALL")
 
         val table = Table(
-                sortOrder,
-                sortString,
-                missing,
-                size,
-                startIndex,
-                searchString
+            sortOrder,
+            sortString,
+            missing,
+            size,
+            startIndex,
+            searchString
         )
 
         val getDestinationsRequest = GetDestinationsRequest(
-                destinationId,
-                RestActions.parseVersion(request),
-                srcContext,
-                table,
-                destinationType
+            destinationId,
+            RestActions.parseVersion(request),
+            srcContext,
+            table,
+            destinationType
         )
         return RestChannelConsumer {
-            channel -> client.execute(GetDestinationsAction.INSTANCE, getDestinationsRequest, RestToXContentListener(channel))
+            channel ->
+            client.execute(GetDestinationsAction.INSTANCE, getDestinationsRequest, RestToXContentListener(channel))
         }
     }
 }

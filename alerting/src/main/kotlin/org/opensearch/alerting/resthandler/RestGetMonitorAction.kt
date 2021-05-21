@@ -25,14 +25,15 @@
  */
 package org.opensearch.alerting.resthandler
 
+import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.GetMonitorAction
 import org.opensearch.alerting.action.GetMonitorRequest
 import org.opensearch.alerting.util.context
-import org.apache.logging.log4j.LogManager
 import org.opensearch.client.node.NodeClient
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
+import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestRequest.Method.GET
@@ -53,10 +54,24 @@ class RestGetMonitorAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                // Get a specific monitor
-                Route(GET, "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}"),
-                Route(HEAD, "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}")
+        return listOf()
+    }
+
+    override fun replacedRoutes(): MutableList<ReplacedRoute> {
+        return mutableListOf(
+            // Get a specific monitor
+            ReplacedRoute(
+                GET,
+                "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}",
+                GET,
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/{monitorID}"
+            ),
+            ReplacedRoute(
+                HEAD,
+                "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}",
+                HEAD,
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/{monitorID}"
+            )
         )
     }
 
@@ -74,7 +89,8 @@ class RestGetMonitorAction : BaseRestHandler() {
         }
         val getMonitorRequest = GetMonitorRequest(monitorId, RestActions.parseVersion(request), request.method(), srcContext)
         return RestChannelConsumer {
-            channel -> client.execute(GetMonitorAction.INSTANCE, getMonitorRequest, RestToXContentListener(channel))
+            channel ->
+            client.execute(GetMonitorAction.INSTANCE, getMonitorRequest, RestToXContentListener(channel))
         }
     }
 }

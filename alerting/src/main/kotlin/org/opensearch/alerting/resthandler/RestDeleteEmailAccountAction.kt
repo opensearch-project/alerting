@@ -26,15 +26,16 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
+import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.DeleteEmailAccountAction
 import org.opensearch.alerting.action.DeleteEmailAccountRequest
 import org.opensearch.alerting.util.REFRESH
-import org.apache.logging.log4j.LogManager
-import org.apache.logging.log4j.Logger
-import org.opensearch.action.support.WriteRequest
 import org.opensearch.client.node.NodeClient
 import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.action.RestToXContentListener
@@ -52,8 +53,17 @@ class RestDeleteEmailAccountAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(RestRequest.Method.DELETE, "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}")
+        return listOf()
+    }
+
+    override fun replacedRoutes(): MutableList<ReplacedRoute> {
+        return mutableListOf(
+            ReplacedRoute(
+                RestRequest.Method.DELETE,
+                "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}",
+                RestRequest.Method.DELETE,
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}"
+            )
         )
     }
 

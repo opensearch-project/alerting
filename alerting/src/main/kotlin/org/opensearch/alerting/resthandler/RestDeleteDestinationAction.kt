@@ -26,16 +26,17 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
+import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.DeleteDestinationAction
 import org.opensearch.alerting.action.DeleteDestinationRequest
 import org.opensearch.alerting.util.REFRESH
-import org.apache.logging.log4j.LogManager
-import org.apache.logging.log4j.Logger
-import org.opensearch.action.support.WriteRequest
 import org.opensearch.client.node.NodeClient
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
+import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.action.RestToXContentListener
@@ -53,8 +54,17 @@ class RestDeleteDestinationAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(RestRequest.Method.DELETE, "${AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}")
+        return listOf()
+    }
+
+    override fun replacedRoutes(): MutableList<ReplacedRoute> {
+        return mutableListOf(
+            ReplacedRoute(
+                RestRequest.Method.DELETE,
+                "${AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}",
+                RestRequest.Method.DELETE,
+                "${AlertingPlugin.LEGACY_OPENDISTRO_DESTINATION_BASE_URI}/{destinationID}"
+            )
         )
     }
 

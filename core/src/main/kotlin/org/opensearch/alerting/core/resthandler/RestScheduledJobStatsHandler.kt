@@ -31,9 +31,9 @@ import org.opensearch.alerting.core.action.node.ScheduledJobsStatsRequest
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.Strings
 import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.RestHandler
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
-
 import org.opensearch.rest.RestRequest.Method.GET
 import org.opensearch.rest.action.RestActions
 import java.util.Locale
@@ -48,8 +48,8 @@ class RestScheduledJobStatsHandler(private val path: String) : BaseRestHandler()
         const val JOB_SCHEDULING_METRICS: String = "job_scheduling_metrics"
         const val JOBS_INFO: String = "jobs_info"
         private val METRICS = mapOf<String, (ScheduledJobsStatsRequest) -> Unit>(
-                JOB_SCHEDULING_METRICS to { it -> it.jobSchedulingMetrics = true },
-                JOBS_INFO to { it -> it.jobsInfo = true }
+            JOB_SCHEDULING_METRICS to { it -> it.jobSchedulingMetrics = true },
+            JOBS_INFO to { it -> it.jobsInfo = true }
         )
     }
 
@@ -58,11 +58,35 @@ class RestScheduledJobStatsHandler(private val path: String) : BaseRestHandler()
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(GET, "/_opendistro/$path/{nodeId}/stats/"),
-                Route(GET, "/_opendistro/$path/{nodeId}/stats/{metric}"),
-                Route(GET, "/_opendistro/$path/stats/"),
-                Route(GET, "/_opendistro/$path/stats/{metric}")
+        return listOf()
+    }
+
+    override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
+        return mutableListOf(
+            RestHandler.ReplacedRoute(
+                GET,
+                "/_plugins/$path/{nodeId}/stats/",
+                GET,
+                "/_opendistro/$path/{nodeId}/stats/"
+            ),
+            RestHandler.ReplacedRoute(
+                GET,
+                "/_plugins/$path/{nodeId}/stats/{metric}",
+                GET,
+                "/_opendistro/$path/{nodeId}/stats/{metric}"
+            ),
+            RestHandler.ReplacedRoute(
+                GET,
+                "/_plugins/$path/stats/",
+                GET,
+                "/_opendistro/$path/stats/"
+            ),
+            RestHandler.ReplacedRoute(
+                GET,
+                "/_plugins/$path/stats/{metric}",
+                GET,
+                "/_opendistro/$path/stats/{metric}"
+            )
         )
     }
 
@@ -70,9 +94,9 @@ class RestScheduledJobStatsHandler(private val path: String) : BaseRestHandler()
         val scheduledJobNodesStatsRequest = getRequest(request)
         return RestChannelConsumer { channel ->
             client.execute(
-                    ScheduledJobsStatsAction.INSTANCE,
-                    scheduledJobNodesStatsRequest,
-                    RestActions.NodesResponseRestListener(channel)
+                ScheduledJobsStatsAction.INSTANCE,
+                scheduledJobNodesStatsRequest,
+                RestActions.NodesResponseRestListener(channel)
             )
         }
     }
@@ -89,10 +113,13 @@ class RestScheduledJobStatsHandler(private val path: String) : BaseRestHandler()
             scheduledJobsStatsRequest.all()
         } else if (metrics.contains("_all")) {
             throw IllegalArgumentException(
-                    String.format(Locale.ROOT,
-                            "request [%s] contains _all and individual metrics [%s]",
-                            request.path(),
-                            request.param("metric")))
+                String.format(
+                    Locale.ROOT,
+                    "request [%s] contains _all and individual metrics [%s]",
+                    request.path(),
+                    request.param("metric")
+                )
+            )
         } else {
             // use a sorted set so the unrecognized parameters appear in a reliable sorted order
             scheduledJobsStatsRequest.clear()

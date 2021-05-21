@@ -32,6 +32,7 @@ import org.opensearch.alerting.action.GetEmailGroupRequest
 import org.opensearch.alerting.util.context
 import org.opensearch.client.node.NodeClient
 import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.action.RestActions
@@ -49,9 +50,23 @@ class RestGetEmailGroupAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(RestRequest.Method.GET, "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}"),
-                Route(RestRequest.Method.HEAD, "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}")
+        return listOf()
+    }
+
+    override fun replacedRoutes(): MutableList<ReplacedRoute> {
+        return mutableListOf(
+            ReplacedRoute(
+                RestRequest.Method.GET,
+                "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}",
+                RestRequest.Method.GET,
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_GROUP_BASE_URI}/{emailGroupID}"
+            ),
+            ReplacedRoute(
+                RestRequest.Method.HEAD,
+                "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}",
+                RestRequest.Method.HEAD,
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_GROUP_BASE_URI}/{emailGroupID}"
+            )
         )
     }
 

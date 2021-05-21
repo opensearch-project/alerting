@@ -26,14 +26,15 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.GetAlertsAction
 import org.opensearch.alerting.action.GetAlertsRequest
 import org.opensearch.alerting.model.Table
-import org.apache.logging.log4j.LogManager
 import org.opensearch.client.node.NodeClient
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
+import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestRequest.Method.GET
@@ -51,8 +52,17 @@ class RestGetAlertsAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(GET, "${AlertingPlugin.MONITOR_BASE_URI}/alerts")
+        return listOf()
+    }
+
+    override fun replacedRoutes(): MutableList<ReplacedRoute> {
+        return mutableListOf(
+            ReplacedRoute(
+                GET,
+                "${AlertingPlugin.MONITOR_BASE_URI}/alerts",
+                GET,
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/alerts"
+            )
         )
     }
 
@@ -69,17 +79,18 @@ class RestGetAlertsAction : BaseRestHandler() {
         val alertState = request.param("alertState", "ALL")
         val monitorId: String? = request.param("monitorId")
         val table = Table(
-                sortOrder,
-                sortString,
-                missing,
-                size,
-                startIndex,
-                searchString
+            sortOrder,
+            sortString,
+            missing,
+            size,
+            startIndex,
+            searchString
         )
 
         val getAlertsRequest = GetAlertsRequest(table, severityLevel, alertState, monitorId)
         return RestChannelConsumer {
-            channel -> client.execute(GetAlertsAction.INSTANCE, getAlertsRequest, RestToXContentListener(channel))
+            channel ->
+            client.execute(GetAlertsAction.INSTANCE, getAlertsRequest, RestToXContentListener(channel))
         }
     }
 }

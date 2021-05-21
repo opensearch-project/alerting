@@ -32,6 +32,7 @@ import org.opensearch.alerting.action.GetEmailAccountRequest
 import org.opensearch.alerting.util.context
 import org.opensearch.client.node.NodeClient
 import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.action.RestActions
@@ -49,9 +50,23 @@ class RestGetEmailAccountAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(RestRequest.Method.GET, "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}"),
-                Route(RestRequest.Method.HEAD, "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}")
+        return listOf()
+    }
+
+    override fun replacedRoutes(): MutableList<ReplacedRoute> {
+        return mutableListOf(
+            ReplacedRoute(
+                RestRequest.Method.GET,
+                "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}",
+                RestRequest.Method.GET,
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}"
+            ),
+            ReplacedRoute(
+                RestRequest.Method.HEAD,
+                "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}",
+                RestRequest.Method.HEAD,
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}"
+            )
         )
     }
 

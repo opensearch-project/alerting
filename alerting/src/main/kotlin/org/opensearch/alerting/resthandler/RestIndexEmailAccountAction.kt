@@ -26,6 +26,8 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.apache.logging.log4j.LogManager
+import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.IndexEmailAccountAction
 import org.opensearch.alerting.action.IndexEmailAccountRequest
@@ -34,8 +36,6 @@ import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.util.IF_PRIMARY_TERM
 import org.opensearch.alerting.util.IF_SEQ_NO
 import org.opensearch.alerting.util.REFRESH
-import org.apache.logging.log4j.LogManager
-import org.opensearch.action.support.WriteRequest
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentParser
@@ -44,6 +44,7 @@ import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BytesRestResponse
 import org.opensearch.rest.RestChannel
+import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestResponse
@@ -63,9 +64,23 @@ class RestIndexEmailAccountAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf(
-                Route(RestRequest.Method.POST, AlertingPlugin.EMAIL_ACCOUNT_BASE_URI), // Creates new email account
-                Route(RestRequest.Method.PUT, "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}")
+        return listOf()
+    }
+
+    override fun replacedRoutes(): MutableList<ReplacedRoute> {
+        return mutableListOf(
+            ReplacedRoute(
+                RestRequest.Method.POST,
+                AlertingPlugin.EMAIL_ACCOUNT_BASE_URI,
+                RestRequest.Method.POST,
+                AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI
+            ),
+            ReplacedRoute(
+                RestRequest.Method.PUT,
+                "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}",
+                RestRequest.Method.PUT,
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}"
+            )
         )
     }
 
@@ -96,7 +111,7 @@ class RestIndexEmailAccountAction : BaseRestHandler() {
     }
 
     private fun indexEmailAccountResponse(channel: RestChannel, restMethod: RestRequest.Method):
-            RestResponseListener<IndexEmailAccountResponse> {
+        RestResponseListener<IndexEmailAccountResponse> {
         return object : RestResponseListener<IndexEmailAccountResponse>(channel) {
             @Throws(Exception::class)
             override fun buildResponse(response: IndexEmailAccountResponse): RestResponse {
