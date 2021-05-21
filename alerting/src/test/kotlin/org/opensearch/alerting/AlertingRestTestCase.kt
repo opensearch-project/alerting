@@ -67,7 +67,6 @@ import org.opensearch.common.xcontent.json.JsonXContent.jsonXContent
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.SearchModule
 import org.junit.AfterClass
-import org.junit.Assert
 import org.junit.rules.DisableOnDebug
 import java.net.URLEncoder
 import java.nio.file.Files

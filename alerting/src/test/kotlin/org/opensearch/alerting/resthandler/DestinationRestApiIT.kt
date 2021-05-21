@@ -67,28 +67,26 @@ class DestinationRestApiIT : AlertingRestTestCase() {
         Assert.assertNotNull("chime object should not be null", createdDestination.chime)
     }
 
-//    fun `test creating a chime destination with legacy ODFE`() {
-//        val chime = Chime("http://abc.com")
-//        val destination = Destination(
-//            type = DestinationType.CHIME,
-//            name = "test",
-//            user = randomUser(),
-//            lastUpdateTime = Instant.now(),
-//            chime = chime,
-//            slack = null,
-//            customWebhook = null,
-//            email = null
-//        )
-//        val createdDestination = client().makeRequest(
-//            "POST",
-//            LEGACY_DESTINATION_BASE_URI,
-//            emptyMap(),
-//            destination.toHttpEntity())
-//        val responseBody = createdDestination.asMap()
-//        assertEquals("Incorrect destination name", responseBody["name"] as String, "test")
-//        assertEquals("Incorrect destination type", responseBody["type"] as String, DestinationType.CHIME)
-//        Assert.assertNotNull("chime object should not be null", responseBody["type"] as String)
-//    }
+    fun `test creating a chime destination with legacy ODFE`() {
+        val chime = Chime("http://abc.com")
+        val destination = Destination(
+            type = DestinationType.CHIME,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = chime,
+            slack = null,
+            customWebhook = null,
+            email = null
+        )
+        val response = client().makeRequest(
+            "POST",
+            LEGACY_DESTINATION_BASE_URI,
+            emptyMap(),
+            destination.toHttpEntity()
+        )
+        assertEquals("Unable to create a new destination", RestStatus.CREATED, response.restStatus())
+    }
 
     fun `test updating a chime destination`() {
         val destination = createDestination()
