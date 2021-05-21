@@ -1,15 +1,12 @@
-package com.amazon.opendistroforelasticsearch.alerting.settings
+package org.opensearch.alerting.settings
 
-import com.amazon.opendistroforelasticsearch.alerting.AlertingPlugin
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.unit.TimeValue
 import java.util.concurrent.TimeUnit
 
-
 /**
  * Legacy Opendistro settings specific to [AlertingPlugin]. These settings include things like history index max age, request timeout, etc...
  */
-
 
 class LegacyOpenDistroAlertingSettings {
 
@@ -101,10 +98,12 @@ class LegacyOpenDistroAlertingSettings {
 
         val MAX_ACTION_THROTTLE_VALUE = Setting.positiveTimeSetting(
             "opendistro.alerting.action_throttle_max_value",
-            Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated)
+            Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
+        )
 
         val FILTER_BY_BACKEND_ROLES = Setting.boolSetting(
             "opendistro.alerting.filter_by_backend_roles",
-            Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated)
+            Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
+        )
     }
 }

@@ -1,6 +1,6 @@
-package com.amazon.opendistroforelasticsearch.alerting.settings
+package org.opensearch.alerting.settings
 
-import com.amazon.opendistroforelasticsearch.alerting.util.DestinationType
+import org.opensearch.alerting.destination.message.DestinationType
 import org.opensearch.common.settings.SecureSetting
 import org.opensearch.common.settings.SecureString
 import org.opensearch.common.settings.Setting
@@ -80,6 +80,4 @@ class LegacyOpenDistroDestinationSettings {
 
         data class SecureDestinationSettings(val emailUsername: SecureString, val emailPassword: SecureString)
     }
-
-
 }
