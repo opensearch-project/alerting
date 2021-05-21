@@ -44,7 +44,7 @@ import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BytesRestResponse
 import org.opensearch.rest.RestChannel
-import org.opensearch.rest.RestHandler
+import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestResponse
@@ -67,15 +67,15 @@ class RestIndexEmailGroupAction : BaseRestHandler() {
         return listOf()
     }
 
-    override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
+    override fun replacedRoutes(): MutableList<ReplacedRoute> {
         return mutableListOf(
-            RestHandler.ReplacedRoute(
+            ReplacedRoute(
                 RestRequest.Method.POST,
                 AlertingPlugin.EMAIL_GROUP_BASE_URI,
                 RestRequest.Method.POST,
                 AlertingPlugin.LEGACY_EMAIL_GROUP_BASE_URI
             ),
-            RestHandler.ReplacedRoute(
+            ReplacedRoute(
                 RestRequest.Method.PUT,
                 "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}",
                 RestRequest.Method.PUT,

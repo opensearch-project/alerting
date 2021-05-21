@@ -43,7 +43,7 @@ import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BytesRestResponse
 import org.opensearch.rest.RestChannel
-import org.opensearch.rest.RestHandler
+import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestResponse
@@ -65,15 +65,15 @@ class RestSearchEmailAccountAction : BaseRestHandler() {
         return listOf()
     }
 
-    override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
+    override fun replacedRoutes(): MutableList<ReplacedRoute> {
         return mutableListOf(
-            RestHandler.ReplacedRoute(
+            ReplacedRoute(
                 RestRequest.Method.POST,
                 "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/_search",
                 RestRequest.Method.POST,
                 "${AlertingPlugin.LEGACY_EMAIL_ACCOUNT_BASE_URI}/_search"
             ),
-            RestHandler.ReplacedRoute(
+            ReplacedRoute(
                 RestRequest.Method.GET,
                 "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/_search",
                 RestRequest.Method.GET,

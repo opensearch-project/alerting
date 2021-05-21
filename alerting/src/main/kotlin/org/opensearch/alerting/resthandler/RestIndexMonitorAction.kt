@@ -44,7 +44,7 @@ import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.BytesRestResponse
 import org.opensearch.rest.RestChannel
-import org.opensearch.rest.RestHandler
+import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestRequest.Method.POST
@@ -70,15 +70,15 @@ class RestIndexMonitorAction : BaseRestHandler() {
         return listOf()
     }
 
-    override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
+    override fun replacedRoutes(): MutableList<ReplacedRoute> {
         return mutableListOf(
-            RestHandler.ReplacedRoute(
+            ReplacedRoute(
                 POST,
                 AlertingPlugin.MONITOR_BASE_URI,
                 POST,
                 AlertingPlugin.LEGACY_MONITOR_BASE_URI
             ),
-            RestHandler.ReplacedRoute(
+            ReplacedRoute(
                 PUT,
                 "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}",
                 PUT,

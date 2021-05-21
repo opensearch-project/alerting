@@ -37,7 +37,7 @@ import org.opensearch.common.xcontent.XContentParser.Token.START_OBJECT
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
-import org.opensearch.rest.RestHandler
+import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestRequest.Method.POST
@@ -54,15 +54,15 @@ class RestExecuteMonitorAction : BaseRestHandler() {
         return listOf()
     }
 
-    override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
+    override fun replacedRoutes(): MutableList<ReplacedRoute> {
         return mutableListOf(
-            RestHandler.ReplacedRoute(
+            ReplacedRoute(
                 POST,
                 "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_execute",
                 POST,
                 "${AlertingPlugin.LEGACY_MONITOR_BASE_URI}/{monitorID}/_execute"
             ),
-            RestHandler.ReplacedRoute(
+            ReplacedRoute(
                 POST,
                 "${AlertingPlugin.MONITOR_BASE_URI}/_execute",
                 POST,

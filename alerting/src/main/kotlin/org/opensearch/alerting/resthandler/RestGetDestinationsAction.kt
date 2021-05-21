@@ -35,7 +35,8 @@ import org.opensearch.alerting.util.context
 import org.opensearch.client.node.NodeClient
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
-import org.opensearch.rest.RestHandler
+import org.opensearch.rest.RestHandler.ReplacedRoute
+import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.action.RestActions
 import org.opensearch.rest.action.RestToXContentListener
@@ -52,20 +53,20 @@ class RestGetDestinationsAction : BaseRestHandler() {
         return "get_destinations_action"
     }
 
-    override fun routes(): List<RestHandler.Route> {
+    override fun routes(): List<Route> {
         return listOf()
     }
 
-    override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
+    override fun replacedRoutes(): MutableList<ReplacedRoute> {
         return mutableListOf(
             // Get a specific destination
-            RestHandler.ReplacedRoute(
+            ReplacedRoute(
                 RestRequest.Method.GET,
                 "${AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}",
                 RestRequest.Method.GET,
                 "${AlertingPlugin.LEGACY_DESTINATION_BASE_URI}/{destinationID}"
             ),
-            RestHandler.ReplacedRoute(
+            ReplacedRoute(
                 RestRequest.Method.GET,
                 AlertingPlugin.DESTINATION_BASE_URI,
                 RestRequest.Method.GET,
