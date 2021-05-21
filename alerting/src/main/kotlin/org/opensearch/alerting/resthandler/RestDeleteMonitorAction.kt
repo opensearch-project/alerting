@@ -65,7 +65,7 @@ class RestDeleteMonitorAction : BaseRestHandler() {
                 DELETE,
                 "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}",
                 DELETE,
-                "${AlertingPlugin.LEGACY_MONITOR_BASE_URI}/{monitorID}"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/{monitorID}"
             )
         )
     }

@@ -62,7 +62,7 @@ class RestDeleteEmailAccountAction : BaseRestHandler() {
                 RestRequest.Method.DELETE,
                 "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}",
                 RestRequest.Method.DELETE,
-                "${AlertingPlugin.LEGACY_EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}"
             )
         )
     }

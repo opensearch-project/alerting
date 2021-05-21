@@ -59,13 +59,13 @@ class RestGetEmailGroupAction : BaseRestHandler() {
                 RestRequest.Method.GET,
                 "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}",
                 RestRequest.Method.GET,
-                "${AlertingPlugin.LEGACY_EMAIL_GROUP_BASE_URI}/{emailGroupID}"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_GROUP_BASE_URI}/{emailGroupID}"
             ),
             ReplacedRoute(
                 RestRequest.Method.HEAD,
                 "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}",
                 RestRequest.Method.HEAD,
-                "${AlertingPlugin.LEGACY_EMAIL_GROUP_BASE_URI}/{emailGroupID}"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_GROUP_BASE_URI}/{emailGroupID}"
             )
         )
     }

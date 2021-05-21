@@ -73,13 +73,13 @@ class RestIndexEmailAccountAction : BaseRestHandler() {
                 RestRequest.Method.POST,
                 AlertingPlugin.EMAIL_ACCOUNT_BASE_URI,
                 RestRequest.Method.POST,
-                AlertingPlugin.LEGACY_EMAIL_ACCOUNT_BASE_URI
+                AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI
             ),
             ReplacedRoute(
                 RestRequest.Method.PUT,
                 "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}",
                 RestRequest.Method.PUT,
-                "${AlertingPlugin.LEGACY_EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}"
             )
         )
     }

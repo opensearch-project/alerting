@@ -76,13 +76,13 @@ class RestIndexMonitorAction : BaseRestHandler() {
                 POST,
                 AlertingPlugin.MONITOR_BASE_URI,
                 POST,
-                AlertingPlugin.LEGACY_MONITOR_BASE_URI
+                AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI
             ),
             ReplacedRoute(
                 PUT,
                 "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}",
                 PUT,
-                "${AlertingPlugin.LEGACY_MONITOR_BASE_URI}/{monitorID}"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/{monitorID}"
             )
         )
     }

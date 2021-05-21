@@ -71,13 +71,13 @@ class RestSearchEmailGroupAction : BaseRestHandler() {
                 RestRequest.Method.POST,
                 "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/_search",
                 RestRequest.Method.POST,
-                "${AlertingPlugin.LEGACY_EMAIL_GROUP_BASE_URI}/_search"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_GROUP_BASE_URI}/_search"
             ),
             ReplacedRoute(
                 RestRequest.Method.GET,
                 "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/_search",
                 RestRequest.Method.GET,
-                "${AlertingPlugin.LEGACY_EMAIL_GROUP_BASE_URI}/_search"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_GROUP_BASE_URI}/_search"
             )
         )
     }

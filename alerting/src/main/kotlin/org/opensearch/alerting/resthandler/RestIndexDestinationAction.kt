@@ -74,13 +74,13 @@ class RestIndexDestinationAction : BaseRestHandler() {
                 RestRequest.Method.POST,
                 AlertingPlugin.DESTINATION_BASE_URI,
                 RestRequest.Method.POST,
-                AlertingPlugin.LEGACY_DESTINATION_BASE_URI
+                AlertingPlugin.LEGACY_OPENDISTRO_DESTINATION_BASE_URI
             ),
             ReplacedRoute(
                 RestRequest.Method.PUT,
                 "${AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}",
                 RestRequest.Method.PUT,
-                "${AlertingPlugin.LEGACY_DESTINATION_BASE_URI}/{destinationID}"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_DESTINATION_BASE_URI}/{destinationID}"
             )
         )
     }

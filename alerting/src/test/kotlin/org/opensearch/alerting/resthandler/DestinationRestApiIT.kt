@@ -29,7 +29,7 @@ package org.opensearch.alerting.resthandler
 import org.junit.Assert
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.DESTINATION_BASE_URI
-import org.opensearch.alerting.LEGACY_DESTINATION_BASE_URI
+import org.opensearch.alerting.LEGACY_OPENDISTRO_DESTINATION_BASE_URI
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.CustomWebhook
@@ -81,7 +81,7 @@ class DestinationRestApiIT : AlertingRestTestCase() {
         )
         val response = client().makeRequest(
             "POST",
-            LEGACY_DESTINATION_BASE_URI,
+            LEGACY_OPENDISTRO_DESTINATION_BASE_URI,
             emptyMap(),
             destination.toHttpEntity()
         )

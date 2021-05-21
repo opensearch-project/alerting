@@ -69,7 +69,7 @@ class RestAcknowledgeAlertAction : BaseRestHandler() {
                 POST,
                 "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts",
                 POST,
-                "${AlertingPlugin.LEGACY_MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts"
             )
         )
     }

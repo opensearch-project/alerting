@@ -62,7 +62,7 @@ class RestDeleteEmailGroupAction : BaseRestHandler() {
                 RestRequest.Method.DELETE,
                 "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}",
                 RestRequest.Method.DELETE,
-                "${AlertingPlugin.LEGACY_EMAIL_GROUP_BASE_URI}/{emailGroupID}"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_GROUP_BASE_URI}/{emailGroupID}"
             )
         )
     }

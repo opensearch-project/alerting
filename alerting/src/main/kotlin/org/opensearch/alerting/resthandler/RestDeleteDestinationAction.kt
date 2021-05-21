@@ -63,7 +63,7 @@ class RestDeleteDestinationAction : BaseRestHandler() {
                 RestRequest.Method.DELETE,
                 "${AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}",
                 RestRequest.Method.DELETE,
-                "${AlertingPlugin.LEGACY_DESTINATION_BASE_URI}/{destinationID}"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_DESTINATION_BASE_URI}/{destinationID}"
             )
         )
     }

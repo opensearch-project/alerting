@@ -91,13 +91,13 @@ class RestSearchMonitorAction(
                 POST,
                 "${AlertingPlugin.MONITOR_BASE_URI}/_search",
                 POST,
-                "${AlertingPlugin.LEGACY_MONITOR_BASE_URI}/_search"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/_search"
             ),
             ReplacedRoute(
                 GET,
                 "${AlertingPlugin.MONITOR_BASE_URI}/_search",
                 GET,
-                "${AlertingPlugin.LEGACY_MONITOR_BASE_URI}/_search"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/_search"
             )
         )
     }

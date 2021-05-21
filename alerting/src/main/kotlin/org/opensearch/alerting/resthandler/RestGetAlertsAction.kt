@@ -61,7 +61,7 @@ class RestGetAlertsAction : BaseRestHandler() {
                 GET,
                 "${AlertingPlugin.MONITOR_BASE_URI}/alerts",
                 GET,
-                "${AlertingPlugin.LEGACY_MONITOR_BASE_URI}/alerts"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/alerts"
             )
         )
     }

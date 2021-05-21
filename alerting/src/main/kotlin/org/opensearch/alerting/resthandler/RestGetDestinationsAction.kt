@@ -64,13 +64,13 @@ class RestGetDestinationsAction : BaseRestHandler() {
                 RestRequest.Method.GET,
                 "${AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}",
                 RestRequest.Method.GET,
-                "${AlertingPlugin.LEGACY_DESTINATION_BASE_URI}/{destinationID}"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_DESTINATION_BASE_URI}/{destinationID}"
             ),
             ReplacedRoute(
                 RestRequest.Method.GET,
                 AlertingPlugin.DESTINATION_BASE_URI,
                 RestRequest.Method.GET,
-                AlertingPlugin.LEGACY_DESTINATION_BASE_URI
+                AlertingPlugin.LEGACY_OPENDISTRO_DESTINATION_BASE_URI
             )
         )
     }

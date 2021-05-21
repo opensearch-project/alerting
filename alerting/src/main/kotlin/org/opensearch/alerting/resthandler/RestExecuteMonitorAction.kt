@@ -60,13 +60,13 @@ class RestExecuteMonitorAction : BaseRestHandler() {
                 POST,
                 "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_execute",
                 POST,
-                "${AlertingPlugin.LEGACY_MONITOR_BASE_URI}/{monitorID}/_execute"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/{monitorID}/_execute"
             ),
             ReplacedRoute(
                 POST,
                 "${AlertingPlugin.MONITOR_BASE_URI}/_execute",
                 POST,
-                "${AlertingPlugin.LEGACY_MONITOR_BASE_URI}/_execute"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/_execute"
             )
         )
     }

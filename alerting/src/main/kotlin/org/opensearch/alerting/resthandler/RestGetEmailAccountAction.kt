@@ -59,13 +59,13 @@ class RestGetEmailAccountAction : BaseRestHandler() {
                 RestRequest.Method.GET,
                 "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}",
                 RestRequest.Method.GET,
-                "${AlertingPlugin.LEGACY_EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}"
             ),
             ReplacedRoute(
                 RestRequest.Method.HEAD,
                 "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}",
                 RestRequest.Method.HEAD,
-                "${AlertingPlugin.LEGACY_EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}"
             )
         )
     }

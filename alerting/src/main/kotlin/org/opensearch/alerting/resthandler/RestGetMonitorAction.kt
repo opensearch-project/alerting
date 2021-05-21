@@ -64,13 +64,13 @@ class RestGetMonitorAction : BaseRestHandler() {
                 GET,
                 "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}",
                 GET,
-                "${AlertingPlugin.LEGACY_MONITOR_BASE_URI}/{monitorID}"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/{monitorID}"
             ),
             ReplacedRoute(
                 HEAD,
                 "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}",
                 HEAD,
-                "${AlertingPlugin.LEGACY_MONITOR_BASE_URI}/{monitorID}"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/{monitorID}"
             )
         )
     }

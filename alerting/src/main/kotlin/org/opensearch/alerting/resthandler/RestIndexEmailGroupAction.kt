@@ -73,13 +73,13 @@ class RestIndexEmailGroupAction : BaseRestHandler() {
                 RestRequest.Method.POST,
                 AlertingPlugin.EMAIL_GROUP_BASE_URI,
                 RestRequest.Method.POST,
-                AlertingPlugin.LEGACY_EMAIL_GROUP_BASE_URI
+                AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_GROUP_BASE_URI
             ),
             ReplacedRoute(
                 RestRequest.Method.PUT,
                 "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}",
                 RestRequest.Method.PUT,
-                "${AlertingPlugin.LEGACY_EMAIL_GROUP_BASE_URI}/{emailGroupID}"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_GROUP_BASE_URI}/{emailGroupID}"
             )
         )
     }
