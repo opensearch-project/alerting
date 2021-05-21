@@ -45,7 +45,7 @@ import org.opensearch.rest.RestStatus
 import org.opensearch.test.junit.annotations.TestLogging
 import java.time.Instant
 
-@TestLogging("level:INFO", reason = "Debug for tests.")
+@TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
 class DestinationRestApiIT : AlertingRestTestCase() {
 
