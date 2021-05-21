@@ -26,6 +26,8 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.apache.logging.log4j.LogManager
+import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.IndexDestinationAction
 import org.opensearch.alerting.action.IndexDestinationRequest
@@ -34,16 +36,20 @@ import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.util.IF_PRIMARY_TERM
 import org.opensearch.alerting.util.IF_SEQ_NO
 import org.opensearch.alerting.util.REFRESH
-import org.apache.logging.log4j.LogManager
-import org.opensearch.action.support.WriteRequest
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.index.seqno.SequenceNumbers
-import org.opensearch.rest.*
+import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
+import org.opensearch.rest.BytesRestResponse
+import org.opensearch.rest.RestChannel
+import org.opensearch.rest.RestHandler
 import org.opensearch.rest.RestHandler.Route
+import org.opensearch.rest.RestRequest
+import org.opensearch.rest.RestResponse
+import org.opensearch.rest.RestStatus
 import org.opensearch.rest.action.RestResponseListener
 import java.io.IOException
 
@@ -101,13 +107,16 @@ class RestIndexDestinationAction : BaseRestHandler() {
         }
         val indexDestinationRequest = IndexDestinationRequest(id, seqNo, primaryTerm, refreshPolicy, request.method(), destination)
         return RestChannelConsumer {
-            channel -> client.execute(IndexDestinationAction.INSTANCE, indexDestinationRequest,
-                indexDestinationResponse(channel, request.method()))
+            channel ->
+            client.execute(
+                IndexDestinationAction.INSTANCE, indexDestinationRequest,
+                indexDestinationResponse(channel, request.method())
+            )
         }
     }
 
     private fun indexDestinationResponse(channel: RestChannel, restMethod: RestRequest.Method):
-            RestResponseListener<IndexDestinationResponse> {
+        RestResponseListener<IndexDestinationResponse> {
         return object : RestResponseListener<IndexDestinationResponse>(channel) {
             @Throws(Exception::class)
             override fun buildResponse(response: IndexDestinationResponse): RestResponse {

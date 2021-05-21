@@ -26,13 +26,13 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
+import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.AcknowledgeAlertAction
 import org.opensearch.alerting.action.AcknowledgeAlertRequest
 import org.opensearch.alerting.util.REFRESH
-import org.apache.logging.log4j.LogManager
-import org.apache.logging.log4j.Logger
-import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
@@ -69,7 +69,8 @@ class RestAcknowledgeAlertAction : BaseRestHandler() {
                 POST,
                 "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts",
                 POST,
-                "${AlertingPlugin.LEGACY_MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts")
+                "${AlertingPlugin.LEGACY_MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts"
+            )
         )
     }
 

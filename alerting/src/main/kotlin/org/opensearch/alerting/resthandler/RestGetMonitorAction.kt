@@ -25,11 +25,11 @@
  */
 package org.opensearch.alerting.resthandler
 
+import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.GetMonitorAction
 import org.opensearch.alerting.action.GetMonitorRequest
 import org.opensearch.alerting.util.context
-import org.apache.logging.log4j.LogManager
 import org.opensearch.client.node.NodeClient
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
@@ -89,7 +89,8 @@ class RestGetMonitorAction : BaseRestHandler() {
         }
         val getMonitorRequest = GetMonitorRequest(monitorId, RestActions.parseVersion(request), request.method(), srcContext)
         return RestChannelConsumer {
-            channel -> client.execute(GetMonitorAction.INSTANCE, getMonitorRequest, RestToXContentListener(channel))
+            channel ->
+            client.execute(GetMonitorAction.INSTANCE, getMonitorRequest, RestToXContentListener(channel))
         }
     }
 }

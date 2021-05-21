@@ -26,12 +26,12 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetDestinationsRequest
 import org.opensearch.alerting.model.Table
 import org.opensearch.alerting.util.context
-import org.apache.logging.log4j.LogManager
 import org.opensearch.client.node.NodeClient
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
@@ -93,23 +93,24 @@ class RestGetDestinationsAction : BaseRestHandler() {
         val destinationType = request.param("destinationType", "ALL")
 
         val table = Table(
-                sortOrder,
-                sortString,
-                missing,
-                size,
-                startIndex,
-                searchString
+            sortOrder,
+            sortString,
+            missing,
+            size,
+            startIndex,
+            searchString
         )
 
         val getDestinationsRequest = GetDestinationsRequest(
-                destinationId,
-                RestActions.parseVersion(request),
-                srcContext,
-                table,
-                destinationType
+            destinationId,
+            RestActions.parseVersion(request),
+            srcContext,
+            table,
+            destinationType
         )
         return RestChannelConsumer {
-            channel -> client.execute(GetDestinationsAction.INSTANCE, getDestinationsRequest, RestToXContentListener(channel))
+            channel ->
+            client.execute(GetDestinationsAction.INSTANCE, getDestinationsRequest, RestToXContentListener(channel))
         }
     }
 }

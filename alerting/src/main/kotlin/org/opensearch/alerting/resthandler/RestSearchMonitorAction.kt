@@ -25,6 +25,9 @@
  */
 package org.opensearch.alerting.resthandler
 
+import org.apache.logging.log4j.LogManager
+import org.opensearch.action.search.SearchRequest
+import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.SearchMonitorAction
 import org.opensearch.alerting.action.SearchMonitorRequest
@@ -32,9 +35,6 @@ import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.context
-import org.apache.logging.log4j.LogManager
-import org.opensearch.action.search.SearchRequest
-import org.opensearch.action.search.SearchResponse
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.bytes.BytesReference
@@ -44,11 +44,17 @@ import org.opensearch.common.xcontent.ToXContent.EMPTY_PARAMS
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.index.query.QueryBuilders
-import org.opensearch.rest.*
+import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
+import org.opensearch.rest.BytesRestResponse
+import org.opensearch.rest.RestChannel
+import org.opensearch.rest.RestHandler
 import org.opensearch.rest.RestHandler.Route
+import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestRequest.Method.GET
 import org.opensearch.rest.RestRequest.Method.POST
+import org.opensearch.rest.RestResponse
+import org.opensearch.rest.RestStatus
 import org.opensearch.rest.action.RestResponseListener
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.io.IOException
@@ -108,11 +114,11 @@ class RestSearchMonitorAction(
         val queryBuilder = QueryBuilders.boolQuery().must(searchSourceBuilder.query())
 
         searchSourceBuilder.query(queryBuilder)
-                .seqNoAndPrimaryTerm(true)
-                .version(true)
+            .seqNoAndPrimaryTerm(true)
+            .version(true)
         val searchRequest = SearchRequest()
-                .source(searchSourceBuilder)
-                .indices(index)
+            .source(searchSourceBuilder)
+            .indices(index)
 
         val searchMonitorRequest = SearchMonitorRequest(searchRequest)
         return RestChannelConsumer { channel ->
@@ -131,8 +137,10 @@ class RestSearchMonitorAction(
                 // Swallow exception and return response as is
                 try {
                     for (hit in response.hits) {
-                        XContentType.JSON.xContent().createParser(channel.request().xContentRegistry,
-                            LoggingDeprecationHandler.INSTANCE, hit.sourceAsString).use { hitsParser ->
+                        XContentType.JSON.xContent().createParser(
+                            channel.request().xContentRegistry,
+                            LoggingDeprecationHandler.INSTANCE, hit.sourceAsString
+                        ).use { hitsParser ->
                             val monitor = ScheduledJob.parse(hitsParser, hit.id, hit.version)
                             val xcb = monitor.toXContent(jsonBuilder(), EMPTY_PARAMS)
                             hit.sourceRef(BytesReference.bytes(xcb))
