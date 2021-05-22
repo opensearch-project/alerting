@@ -304,7 +304,8 @@ fun RestClient.makeRequest(
     method: String,
     endpoint: String,
     entity: HttpEntity? = null,
-    vararg headers: Header
+    vararg headers: Header,
+    strictDeprecationMode: Boolean = false
 ): Response {
     val request = Request(method, endpoint)
     val options = RequestOptions.DEFAULT.toBuilder()
