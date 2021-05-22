@@ -22,8 +22,6 @@ class AlertingSettingsTests : OpenSearchTestCase() {
             "Legacy Settings are not returned",
             settings.containsAll(
                 listOf<Any>(
-                    LegacyOpenDistroDestinationSettings.ALLOW_LIST,
-                    LegacyOpenDistroDestinationSettings.HOST_DENY_LIST,
                     LegacyOpenDistroAlertingSettings.ALERTING_MAX_MONITORS,
                     LegacyOpenDistroAlertingSettings.INPUT_TIMEOUT,
                     LegacyOpenDistroAlertingSettings.INDEX_TIMEOUT,

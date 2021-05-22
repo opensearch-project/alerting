@@ -42,8 +42,6 @@ class DestinationSettings {
 
         const val DESTINATION_SETTING_PREFIX = "plugins.alerting.destination."
         const val EMAIL_DESTINATION_SETTING_PREFIX = DESTINATION_SETTING_PREFIX + "email."
-        val ALLOW_LIST_ALL = DestinationType.values().toList().map { it.value }
-        val ALLOW_LIST_NONE = emptyList<String>()
 
         val ALLOW_LIST: Setting<List<String>> = Setting.listSetting(
             DESTINATION_SETTING_PREFIX + "allow_list",
