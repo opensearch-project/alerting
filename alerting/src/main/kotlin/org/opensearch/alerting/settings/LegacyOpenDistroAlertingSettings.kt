@@ -51,7 +51,7 @@ class LegacyOpenDistroAlertingSettings {
         )
 
         val ALERT_BACKOFF_MILLIS = Setting.positiveTimeSetting(
-            "opensearch.alerting.alert_backoff_millis",
+            "opendistro.alerting.alert_backoff_millis",
             TimeValue.timeValueMillis(50),
             Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
         )
