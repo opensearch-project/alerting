@@ -84,7 +84,7 @@ configurations {
 }
 
 dependencies {
-    ktlint "com.pinterest:ktlint:0.41.0"
+    ktlint "com.pinterest:ktlint:0.41.0:runtimeElements"
 }
 
 task ktlint(type: JavaExec, group: "verification") {
