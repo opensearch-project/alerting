@@ -93,7 +93,7 @@ class AlertingSettingsTests : OpenSearchTestCase() {
             .put("opendistro.alerting.input_timeout", TimeValue.timeValueSeconds(30))
             .put("opendistro.alerting.index_timeout", TimeValue.timeValueSeconds(60))
             .put("opendistro.alerting.bulk_timeout", TimeValue.timeValueSeconds(120))
-            .put("opensearch.alerting.alert_backoff_millis", TimeValue.timeValueMillis(50))
+            .put("opendistro.alerting.alert_backoff_millis", TimeValue.timeValueMillis(50))
             .put("opendistro.alerting.alert_backoff_count", 2)
             .put("opendistro.alerting.move_alerts_backoff_millis", TimeValue.timeValueMillis(250))
             .put("opendistro.alerting.move_alerts_backoff_count", 3)
