@@ -9,7 +9,7 @@
  * GitHub history for details.
  */
 
-rootProject.name = 'opendistro-for-elasticsearch-alerting'
+rootProject.name = 'opensearch-alerting'
 include 'alerting'
 include 'core'
 include 'notification'

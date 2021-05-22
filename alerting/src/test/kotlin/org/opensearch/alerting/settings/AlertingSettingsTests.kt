@@ -1,7 +1,10 @@
 package org.opensearch.alerting.settings
 
+import org.junit.Assert
 import org.junit.Before
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSettings
+import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.test.OpenSearchTestCase
@@ -37,7 +40,13 @@ class AlertingSettingsTests : OpenSearchTestCase() {
                     LegacyOpenDistroAlertingSettings.ALERT_HISTORY_RETENTION_PERIOD,
                     LegacyOpenDistroAlertingSettings.REQUEST_TIMEOUT,
                     LegacyOpenDistroAlertingSettings.MAX_ACTION_THROTTLE_VALUE,
-                    LegacyOpenDistroAlertingSettings.FILTER_BY_BACKEND_ROLES
+                    LegacyOpenDistroAlertingSettings.FILTER_BY_BACKEND_ROLES,
+                    LegacyOpenDistroScheduledJobSettings.SWEEP_PERIOD,
+                    LegacyOpenDistroScheduledJobSettings.SWEEP_PAGE_SIZE,
+                    LegacyOpenDistroScheduledJobSettings.SWEEP_BACKOFF_RETRY_COUNT,
+                    LegacyOpenDistroScheduledJobSettings.SWEEP_BACKOFF_MILLIS,
+                    LegacyOpenDistroScheduledJobSettings.SWEEPER_ENABLED,
+                    LegacyOpenDistroScheduledJobSettings.REQUEST_TIMEOUT
                 )
             )
         )
@@ -66,7 +75,13 @@ class AlertingSettingsTests : OpenSearchTestCase() {
                     AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD,
                     AlertingSettings.REQUEST_TIMEOUT,
                     AlertingSettings.MAX_ACTION_THROTTLE_VALUE,
-                    AlertingSettings.FILTER_BY_BACKEND_ROLES
+                    AlertingSettings.FILTER_BY_BACKEND_ROLES,
+                    ScheduledJobSettings.SWEEP_PERIOD,
+                    ScheduledJobSettings.SWEEP_PAGE_SIZE,
+                    ScheduledJobSettings.SWEEP_BACKOFF_RETRY_COUNT,
+                    ScheduledJobSettings.SWEEP_BACKOFF_MILLIS,
+                    ScheduledJobSettings.SWEEPER_ENABLED,
+                    ScheduledJobSettings.REQUEST_TIMEOUT
                 )
             )
         )
@@ -77,12 +92,19 @@ class AlertingSettingsTests : OpenSearchTestCase() {
             AlertingSettings.MOVE_ALERTS_BACKOFF_COUNT.get(Settings.EMPTY),
             LegacyOpenDistroAlertingSettings.MOVE_ALERTS_BACKOFF_COUNT.get(Settings.EMPTY)
         )
+        assertEquals(
+            ScheduledJobSettings.REQUEST_TIMEOUT.get(Settings.EMPTY),
+            LegacyOpenDistroScheduledJobSettings.REQUEST_TIMEOUT.get(Settings.EMPTY)
+        )
     }
 
     fun `test settings get Value`() {
         val settings = Settings.builder().put("plugins.alerting.move_alerts_backoff_count", 1).build()
         assertEquals(AlertingSettings.MOVE_ALERTS_BACKOFF_COUNT.get(settings), 1)
         assertEquals(LegacyOpenDistroAlertingSettings.MOVE_ALERTS_BACKOFF_COUNT.get(settings), 3)
+        val scheduledJobSettings = Settings.builder().put("plugins.scheduled_jobs.enabled", false).build()
+        assertEquals(ScheduledJobSettings.SWEEPER_ENABLED.get(scheduledJobSettings), false)
+        assertEquals(LegacyOpenDistroScheduledJobSettings.SWEEPER_ENABLED.get(scheduledJobSettings), true)
     }
 
     fun `test settings get value with legacy Fallback`() {
@@ -102,7 +124,13 @@ class AlertingSettingsTests : OpenSearchTestCase() {
             .put("opendistro.alerting.alert_history_retention_period", TimeValue(60, TimeUnit.DAYS))
             .put("opendistro.alerting.request_timeout", TimeValue.timeValueSeconds(10))
             .put("opendistro.alerting.action_throttle_max_value", TimeValue.timeValueHours(24))
-            .put("opendistro.alerting.filter_by_backend_roles", false).build()
+            .put("opendistro.alerting.filter_by_backend_roles", false)
+            .put("opendistro.scheduled_jobs.enabled", false)
+            .put("opendistro.scheduled_jobs.request_timeout", TimeValue.timeValueSeconds(10))
+            .put("opendistro.scheduled_jobs.sweeper.backoff_millis", TimeValue.timeValueMillis(50))
+            .put("opendistro.scheduled_jobs.retry_count", 3)
+            .put("opendistro.scheduled_jobs.sweeper.period", TimeValue.timeValueMinutes(5))
+            .put("opendistro.scheduled_jobs.sweeper.page_size", 100).build()
 
         assertEquals(AlertingSettings.ALERTING_MAX_MONITORS.get(settings), 1000)
         assertEquals(AlertingSettings.INPUT_TIMEOUT.get(settings), TimeValue.timeValueSeconds(30))
@@ -120,6 +148,12 @@ class AlertingSettingsTests : OpenSearchTestCase() {
         assertEquals(AlertingSettings.REQUEST_TIMEOUT.get(settings), TimeValue.timeValueSeconds(10))
         assertEquals(AlertingSettings.MAX_ACTION_THROTTLE_VALUE.get(settings), TimeValue.timeValueHours(24))
         assertEquals(AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings), false)
+        assertEquals(ScheduledJobSettings.SWEEPER_ENABLED.get(settings), false)
+        assertEquals(ScheduledJobSettings.REQUEST_TIMEOUT.get(settings), TimeValue.timeValueSeconds(10))
+        assertEquals(ScheduledJobSettings.SWEEP_BACKOFF_MILLIS.get(settings), TimeValue.timeValueMillis(50))
+        assertEquals(ScheduledJobSettings.SWEEP_BACKOFF_RETRY_COUNT.get(settings), 3)
+        assertEquals(ScheduledJobSettings.SWEEP_PERIOD.get(settings), TimeValue.timeValueMinutes(5))
+        assertEquals(ScheduledJobSettings.SWEEP_PAGE_SIZE.get(settings), 100)
 
         assertSettingDeprecationsAndWarnings(
             arrayOf(
@@ -138,7 +172,13 @@ class AlertingSettingsTests : OpenSearchTestCase() {
                 LegacyOpenDistroAlertingSettings.ALERT_HISTORY_RETENTION_PERIOD,
                 LegacyOpenDistroAlertingSettings.REQUEST_TIMEOUT,
                 LegacyOpenDistroAlertingSettings.MAX_ACTION_THROTTLE_VALUE,
-                LegacyOpenDistroAlertingSettings.FILTER_BY_BACKEND_ROLES
+                LegacyOpenDistroAlertingSettings.FILTER_BY_BACKEND_ROLES,
+                LegacyOpenDistroScheduledJobSettings.SWEEPER_ENABLED,
+                LegacyOpenDistroScheduledJobSettings.REQUEST_TIMEOUT,
+                LegacyOpenDistroScheduledJobSettings.SWEEP_BACKOFF_MILLIS,
+                LegacyOpenDistroScheduledJobSettings.SWEEP_BACKOFF_RETRY_COUNT,
+                LegacyOpenDistroScheduledJobSettings.SWEEP_PAGE_SIZE,
+                LegacyOpenDistroScheduledJobSettings.SWEEP_PERIOD
             )
         )
     }

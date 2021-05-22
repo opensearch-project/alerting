@@ -26,7 +26,6 @@
 
 package org.opensearch.alerting.settings
 
-import org.opensearch.alerting.util.DestinationType
 import org.opensearch.common.settings.SecureSetting
 import org.opensearch.common.settings.SecureString
 import org.opensearch.common.settings.Setting
