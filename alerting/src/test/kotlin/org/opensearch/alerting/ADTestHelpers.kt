@@ -338,7 +338,7 @@ fun randomAnomalyDetector(): String {
       }
     ]
   }
-        """.trimIndent()
+    """.trimIndent()
 }
 
 fun randomAnomalyDetectorWithUser(backendRole: String): String {
@@ -389,7 +389,7 @@ fun randomAnomalyDetectorWithUser(backendRole: String): String {
       "custom_attribute_names" : [ ]
     }
   }
-        """.trimIndent()
+    """.trimIndent()
 }
 
 fun randomAnomalyResult(
@@ -435,7 +435,7 @@ fun randomAnomalyResult(
             ]
           }
         }
-        """.trimIndent()
+    """.trimIndent()
 }
 
 fun randomAnomalyResultWithoutUser(
@@ -468,7 +468,7 @@ fun randomAnomalyResultWithoutUser(
           "anomaly_grade" : $anomalyGrade,
           "confidence" : $confidence
         }
-        """.trimIndent()
+    """.trimIndent()
 }
 
 fun maxAnomalyGradeSearchInput(
@@ -477,9 +477,9 @@ fun maxAnomalyGradeSearchInput(
     size: Int = 1
 ): SearchInput {
     val rangeQuery = QueryBuilders.rangeQuery("execution_end_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
+        .gt("{{period_end}}||-10d")
+        .lte("{{period_end}}")
+        .format("epoch_millis")
     val termQuery = QueryBuilders.termQuery("detector_id", detectorId)
 
     var boolQueryBuilder = BoolQueryBuilder()
@@ -494,7 +494,7 @@ fun adMonitorTrigger(): Trigger {
     val triggerScript = """
             return ctx.results[0].aggregations.max_anomaly_grade.value != null && 
                    ctx.results[0].aggregations.max_anomaly_grade.value > 0.7
-        """.trimIndent()
+    """.trimIndent()
     return randomTrigger(condition = Script(triggerScript))
 }
 
@@ -513,12 +513,16 @@ fun randomADMonitor(
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     withMetadata: Boolean = false
 ): Monitor {
-    return Monitor(name = name, enabled = enabled, inputs = inputs, schedule = schedule, triggers = triggers,
-            enabledTime = enabledTime, lastUpdateTime = lastUpdateTime,
-            user = user, uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf())
+    return Monitor(
+        name = name, enabled = enabled, inputs = inputs, schedule = schedule, triggers = triggers,
+        enabledTime = enabledTime, lastUpdateTime = lastUpdateTime,
+        user = user, uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+    )
 }
 
 fun randomADUser(backendRole: String = OpenSearchRestTestCase.randomAlphaOfLength(10)): User {
-    return User(OpenSearchRestTestCase.randomAlphaOfLength(10), listOf(backendRole),
-            listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), "all_access"), listOf("test_attr=test"))
+    return User(
+        OpenSearchRestTestCase.randomAlphaOfLength(10), listOf(backendRole),
+        listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), "all_access"), listOf("test_attr=test")
+    )
 }

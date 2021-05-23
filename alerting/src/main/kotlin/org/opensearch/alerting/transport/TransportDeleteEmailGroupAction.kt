@@ -26,18 +26,18 @@
 
 package org.opensearch.alerting.transport
 
-import org.opensearch.alerting.action.DeleteEmailGroupAction
-import org.opensearch.alerting.action.DeleteEmailGroupRequest
-import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
-import org.opensearch.alerting.util.AlertingException
-import org.opensearch.alerting.util.DestinationType
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
 import org.opensearch.action.delete.DeleteRequest
 import org.opensearch.action.delete.DeleteResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.action.DeleteEmailGroupAction
+import org.opensearch.alerting.action.DeleteEmailGroupRequest
+import org.opensearch.alerting.core.model.ScheduledJob
+import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
+import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.DestinationType
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -66,10 +66,12 @@ class TransportDeleteEmailGroupAction @Inject constructor(
 
         if (!allowList.contains(DestinationType.EMAIL.value)) {
             actionListener.onFailure(
-                AlertingException.wrap(OpenSearchStatusException(
-                    "This API is blocked since Destination type [${DestinationType.EMAIL}] is not allowed",
-                    RestStatus.FORBIDDEN
-                ))
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "This API is blocked since Destination type [${DestinationType.EMAIL}] is not allowed",
+                        RestStatus.FORBIDDEN
+                    )
+                )
             )
             return
         }
@@ -77,15 +79,18 @@ class TransportDeleteEmailGroupAction @Inject constructor(
         val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, request.emailGroupID)
             .setRefreshPolicy(request.refreshPolicy)
         client.threadPool().threadContext.stashContext().use {
-            client.delete(deleteRequest, object : ActionListener<DeleteResponse> {
-                override fun onResponse(response: DeleteResponse) {
-                    actionListener.onResponse(response)
-                }
+            client.delete(
+                deleteRequest,
+                object : ActionListener<DeleteResponse> {
+                    override fun onResponse(response: DeleteResponse) {
+                        actionListener.onResponse(response)
+                    }
 
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(t)
+                    override fun onFailure(t: Exception) {
+                        actionListener.onFailure(t)
+                    }
                 }
-            })
+            )
         }
     }
 }

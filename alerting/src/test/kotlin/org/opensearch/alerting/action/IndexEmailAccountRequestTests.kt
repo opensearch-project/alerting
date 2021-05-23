@@ -26,8 +26,8 @@
 
 package org.opensearch.alerting.action
 
-import org.opensearch.alerting.randomEmailAccount
 import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.randomEmailAccount
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.rest.RestRequest
@@ -37,8 +37,10 @@ class IndexEmailAccountRequestTests : OpenSearchTestCase() {
 
     fun `test index email account post request`() {
 
-        val req = IndexEmailAccountRequest("1234", 1L, 2L, WriteRequest.RefreshPolicy.IMMEDIATE, RestRequest.Method.POST,
-            randomEmailAccount())
+        val req = IndexEmailAccountRequest(
+            "1234", 1L, 2L, WriteRequest.RefreshPolicy.IMMEDIATE, RestRequest.Method.POST,
+            randomEmailAccount()
+        )
         assertNotNull(req)
 
         val out = BytesStreamOutput()
@@ -54,8 +56,10 @@ class IndexEmailAccountRequestTests : OpenSearchTestCase() {
 
     fun `test index email account put request`() {
 
-        val req = IndexEmailAccountRequest("1234", 1L, 2L, WriteRequest.RefreshPolicy.IMMEDIATE, RestRequest.Method.PUT,
-            randomEmailAccount())
+        val req = IndexEmailAccountRequest(
+            "1234", 1L, 2L, WriteRequest.RefreshPolicy.IMMEDIATE, RestRequest.Method.PUT,
+            randomEmailAccount()
+        )
         assertNotNull(req)
 
         val out = BytesStreamOutput()

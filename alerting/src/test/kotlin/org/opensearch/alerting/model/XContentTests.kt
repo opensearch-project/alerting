@@ -45,8 +45,8 @@ import org.opensearch.alerting.randomTrigger
 import org.opensearch.alerting.randomUser
 import org.opensearch.alerting.randomUserEmpty
 import org.opensearch.alerting.toJsonString
-import org.opensearch.commons.authuser.User
 import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.commons.authuser.User
 import org.opensearch.test.OpenSearchTestCase
 import kotlin.test.assertFailsWith
 
@@ -77,7 +77,8 @@ class XContentTests : OpenSearchTestCase() {
         val action = randomAction().copy(throttle = null).copy(throttleEnabled = true)
         val actionString = action.toXContent(builder(), ToXContent.EMPTY_PARAMS).string()
         assertFailsWith<IllegalArgumentException>("Action throttle enabled but not set throttle value") {
-            Action.parse(parser(actionString)) }
+            Action.parse(parser(actionString))
+        }
     }
 
     fun `test throttle parsing`() {
@@ -130,11 +131,11 @@ class XContentTests : OpenSearchTestCase() {
 
     fun `test alert parsing without user`() {
         val alertStr = "{\"id\":\"\",\"version\":-1,\"monitor_id\":\"\",\"schema_version\":0,\"monitor_version\":1," +
-                "\"monitor_name\":\"ARahqfRaJG\",\"trigger_id\":\"fhe1-XQBySl0wQKDBkOG\",\"trigger_name\":\"ffELMuhlro\"," +
-                "\"state\":\"ACTIVE\",\"error_message\":null,\"alert_history\":[],\"severity\":\"1\",\"action_execution_results\"" +
-                ":[{\"action_id\":\"ghe1-XQBySl0wQKDBkOG\",\"last_execution_time\":1601917224583,\"throttled_count\":-1478015168}," +
-                "{\"action_id\":\"gxe1-XQBySl0wQKDBkOH\",\"last_execution_time\":1601917224583,\"throttled_count\":-768533744}]," +
-                "\"start_time\":1601917224599,\"last_notification_time\":null,\"end_time\":null,\"acknowledged_time\":null}"
+            "\"monitor_name\":\"ARahqfRaJG\",\"trigger_id\":\"fhe1-XQBySl0wQKDBkOG\",\"trigger_name\":\"ffELMuhlro\"," +
+            "\"state\":\"ACTIVE\",\"error_message\":null,\"alert_history\":[],\"severity\":\"1\",\"action_execution_results\"" +
+            ":[{\"action_id\":\"ghe1-XQBySl0wQKDBkOG\",\"last_execution_time\":1601917224583,\"throttled_count\":-1478015168}," +
+            "{\"action_id\":\"gxe1-XQBySl0wQKDBkOH\",\"last_execution_time\":1601917224583,\"throttled_count\":-768533744}]," +
+            "\"start_time\":1601917224599,\"last_notification_time\":null,\"end_time\":null,\"acknowledged_time\":null}"
         val parsedAlert = Alert.parse(parser(alertStr))
         assertNull(parsedAlert.monitorUser)
     }

@@ -26,16 +26,16 @@
 
 package org.opensearch.alerting.core.action.node
 
-import org.opensearch.alerting.core.JobSweeper
-import org.opensearch.alerting.core.JobSweeperMetrics
-import org.opensearch.alerting.core.ScheduledJobIndices
-import org.opensearch.alerting.core.schedule.JobScheduler
-import org.opensearch.alerting.core.schedule.JobSchedulerMetrics
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.FailedNodeException
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.nodes.BaseNodeRequest
 import org.opensearch.action.support.nodes.TransportNodesAction
+import org.opensearch.alerting.core.JobSweeper
+import org.opensearch.alerting.core.JobSweeperMetrics
+import org.opensearch.alerting.core.ScheduledJobIndices
+import org.opensearch.alerting.core.schedule.JobScheduler
+import org.opensearch.alerting.core.schedule.JobSchedulerMetrics
 import org.opensearch.cluster.health.ClusterIndexHealth
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -97,12 +97,13 @@ class ScheduledJobsStatsTransportAction : TransportNodesAction<ScheduledJobsStat
         val indexHealth: ClusterIndexHealth? = if (scheduledJobIndexExist) scheduledJobIndices.scheduledJobIndexHealth() else null
 
         return ScheduledJobsStatsResponse(
-                clusterService.clusterName,
-                responses,
-                failures,
-                scheduledJobEnabled,
-                scheduledJobIndexExist,
-                indexHealth)
+            clusterService.clusterName,
+            responses,
+            failures,
+            scheduledJobEnabled,
+            scheduledJobIndexExist,
+            indexHealth
+        )
     }
 
     override fun nodeOperation(request: ScheduledJobStatusRequest): ScheduledJobStats {
@@ -116,10 +117,12 @@ class ScheduledJobsStatsTransportAction : TransportNodesAction<ScheduledJobsStat
         val jobSchedulerMetrics = jobScheduler.getJobSchedulerMetric()
 
         val status: ScheduledJobStats.ScheduleStatus = evaluateStatus(jobSchedulerMetrics, jobSweeperMetrics)
-        return ScheduledJobStats(this.transportService.localNode,
-                status,
-                if (scheduledJobsStatusRequest.jobSchedulingMetrics) jobSweeperMetrics else null,
-                if (scheduledJobsStatusRequest.jobsInfo) jobSchedulerMetrics.toTypedArray() else null)
+        return ScheduledJobStats(
+            this.transportService.localNode,
+            status,
+            if (scheduledJobsStatusRequest.jobSchedulingMetrics) jobSweeperMetrics else null,
+            if (scheduledJobsStatusRequest.jobsInfo) jobSchedulerMetrics.toTypedArray() else null
+        )
     }
 
     private fun evaluateStatus(
@@ -140,7 +143,7 @@ class ScheduledJobsStatsTransportAction : TransportNodesAction<ScheduledJobsStat
 
         constructor() : super()
 
-        constructor(si: StreamInput): super(si) {
+        constructor(si: StreamInput) : super(si) {
             request = ScheduledJobsStatsRequest(si)
         }
 

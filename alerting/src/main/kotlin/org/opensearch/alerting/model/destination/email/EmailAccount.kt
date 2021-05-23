@@ -71,11 +71,11 @@ data class EmailAccount(
         builder.startObject()
         if (params.paramAsBoolean("with_type", false)) builder.startObject(EMAIL_ACCOUNT_TYPE)
         builder.field(SCHEMA_VERSION, schemaVersion)
-                .field(NAME_FIELD, name)
-                .field(EMAIL_FIELD, email)
-                .field(HOST_FIELD, host)
-                .field(PORT_FIELD, port)
-                .field(METHOD_FIELD, method.value)
+            .field(NAME_FIELD, name)
+            .field(EMAIL_FIELD, email)
+            .field(HOST_FIELD, host)
+            .field(PORT_FIELD, port)
+            .field(METHOD_FIELD, method.value)
         if (params.paramAsBoolean("with_type", false)) builder.endObject()
         return builder.endObject()
     }
@@ -152,14 +152,15 @@ data class EmailAccount(
                 }
             }
 
-            return EmailAccount(id,
-                    version,
-                    schemaVersion,
-                    name,
-                    email,
-                    host,
-                    port,
-                    requireNotNull(MethodType.getByValue(method)) { "Method type was null" }
+            return EmailAccount(
+                id,
+                version,
+                schemaVersion,
+                name,
+                email,
+                host,
+                port,
+                requireNotNull(MethodType.getByValue(method)) { "Method type was null" }
             )
         }
 

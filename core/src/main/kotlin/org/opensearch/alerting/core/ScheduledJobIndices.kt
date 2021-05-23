@@ -26,10 +26,10 @@
 
 package org.opensearch.alerting.core
 
-import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.action.ActionListener
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
+import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.client.AdminClient
 import org.opensearch.cluster.health.ClusterIndexHealth
 import org.opensearch.cluster.service.ClusterService
@@ -59,8 +59,8 @@ class ScheduledJobIndices(private val client: AdminClient, private val clusterSe
     fun initScheduledJobIndex(actionListener: ActionListener<CreateIndexResponse>) {
         if (!scheduledJobIndexExists()) {
             var indexRequest = CreateIndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
-                    .mapping(ScheduledJob.SCHEDULED_JOB_TYPE, scheduledJobMappings(), XContentType.JSON)
-                    .settings(Settings.builder().put("index.hidden", true).build())
+                .mapping(ScheduledJob.SCHEDULED_JOB_TYPE, scheduledJobMappings(), XContentType.JSON)
+                .settings(Settings.builder().put("index.hidden", true).build())
             client.indices().create(indexRequest, actionListener)
         }
     }

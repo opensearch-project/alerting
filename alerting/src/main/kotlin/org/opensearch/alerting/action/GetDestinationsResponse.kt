@@ -26,8 +26,8 @@
 
 package org.opensearch.alerting.action
 
-import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.action.ActionResponse
+import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.ToXContent
@@ -78,8 +78,8 @@ class GetDestinationsResponse : ActionResponse, ToXContentObject {
     @Throws(IOException::class)
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         builder.startObject()
-                .field("totalDestinations", totalDestinations)
-                .field("destinations", destinations)
+            .field("totalDestinations", totalDestinations)
+            .field("destinations", destinations)
 
         return builder.endObject()
     }

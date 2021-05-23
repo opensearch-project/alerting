@@ -26,6 +26,20 @@
 
 package org.opensearch.alerting.transport
 
+import org.apache.logging.log4j.LogManager
+import org.opensearch.OpenSearchSecurityException
+import org.opensearch.OpenSearchStatusException
+import org.opensearch.action.ActionListener
+import org.opensearch.action.admin.indices.create.CreateIndexResponse
+import org.opensearch.action.get.GetRequest
+import org.opensearch.action.get.GetResponse
+import org.opensearch.action.index.IndexRequest
+import org.opensearch.action.index.IndexResponse
+import org.opensearch.action.search.SearchRequest
+import org.opensearch.action.search.SearchResponse
+import org.opensearch.action.support.ActionFilters
+import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.action.IndexMonitorAction
 import org.opensearch.alerting.action.IndexMonitorRequest
 import org.opensearch.alerting.action.IndexMonitorResponse
@@ -48,22 +62,6 @@ import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.checkFilterByUserBackendRoles
 import org.opensearch.alerting.util.checkUserFilterByPermissions
 import org.opensearch.alerting.util.isADMonitor
-import org.opensearch.commons.ConfigConstants
-import org.opensearch.commons.authuser.User
-import org.apache.logging.log4j.LogManager
-import org.opensearch.OpenSearchSecurityException
-import org.opensearch.OpenSearchStatusException
-import org.opensearch.action.ActionListener
-import org.opensearch.action.admin.indices.create.CreateIndexResponse
-import org.opensearch.action.get.GetRequest
-import org.opensearch.action.get.GetResponse
-import org.opensearch.action.index.IndexRequest
-import org.opensearch.action.index.IndexResponse
-import org.opensearch.action.search.SearchRequest
-import org.opensearch.action.search.SearchResponse
-import org.opensearch.action.support.ActionFilters
-import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -75,6 +73,8 @@ import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.ConfigConstants
+import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestStatus
@@ -95,7 +95,7 @@ class TransportIndexMonitorAction @Inject constructor(
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<IndexMonitorRequest, IndexMonitorResponse>(
-        IndexMonitorAction.NAME, transportService, actionFilters, ::IndexMonitorRequest
+    IndexMonitorAction.NAME, transportService, actionFilters, ::IndexMonitorRequest
 ) {
 
     @Volatile private var maxMonitors = ALERTING_MAX_MONITORS.get(settings)
@@ -149,27 +149,35 @@ class TransportIndexMonitorAction @Inject constructor(
             indices.addAll(searchInput.indices)
         }
         val searchRequest = SearchRequest().indices(*indices.toTypedArray())
-                .source(SearchSourceBuilder.searchSource().size(1).query(QueryBuilders.matchAllQuery()))
-        client.search(searchRequest, object : ActionListener<SearchResponse> {
-            override fun onResponse(searchResponse: SearchResponse) {
-                // User has read access to configured indices in the monitor, now create monitor with out user context.
-                client.threadPool().threadContext.stashContext().use {
-                    IndexMonitorHandler(client, actionListener, request, user).resolveUserAndStart()
+            .source(SearchSourceBuilder.searchSource().size(1).query(QueryBuilders.matchAllQuery()))
+        client.search(
+            searchRequest,
+            object : ActionListener<SearchResponse> {
+                override fun onResponse(searchResponse: SearchResponse) {
+                    // User has read access to configured indices in the monitor, now create monitor with out user context.
+                    client.threadPool().threadContext.stashContext().use {
+                        IndexMonitorHandler(client, actionListener, request, user).resolveUserAndStart()
+                    }
+                }
+
+                //  Due to below issue with security plugin, we get security_exception when invalid index name is mentioned.
+                //  https://github.com/opendistro-for-elasticsearch/security/issues/718
+                override fun onFailure(t: Exception) {
+                    actionListener.onFailure(
+                        AlertingException.wrap(
+                            when (t is OpenSearchSecurityException) {
+                                true -> OpenSearchStatusException(
+                                    "User doesn't have read permissions for one or more configured index " +
+                                        "$indices",
+                                    RestStatus.FORBIDDEN
+                                )
+                                false -> t
+                            }
+                        )
+                    )
                 }
             }
-
-            //  Due to below issue with security plugin, we get security_exception when invalid index name is mentioned.
-            //  https://github.com/opendistro-for-elasticsearch/security/issues/718
-            override fun onFailure(t: Exception) {
-                actionListener.onFailure(AlertingException.wrap(
-                    when (t is OpenSearchSecurityException) {
-                        true -> OpenSearchStatusException("User doesn't have read permissions for one or more configured index " +
-                            "$indices", RestStatus.FORBIDDEN)
-                        false -> t
-                    }
-                ))
-            }
-        })
+        )
     }
 
     /**
@@ -201,11 +209,11 @@ class TransportIndexMonitorAction @Inject constructor(
             if (user == null) {
                 // Security is disabled, add empty user to Monitor. user is null for older versions.
                 request.monitor = request.monitor
-                        .copy(user = User("", listOf(), listOf(), listOf()))
+                    .copy(user = User("", listOf(), listOf(), listOf()))
                 start()
             } else {
                 request.monitor = request.monitor
-                        .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttNames))
+                    .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttNames))
                 start()
             }
         }
@@ -214,31 +222,36 @@ class TransportIndexMonitorAction @Inject constructor(
             if (user == null) {
                 // Security is disabled, add empty user to Monitor. user is null for older versions.
                 request.monitor = request.monitor
-                        .copy(user = User("", listOf(), listOf(), listOf()))
+                    .copy(user = User("", listOf(), listOf(), listOf()))
                 start()
             } else {
                 try {
                     request.monitor = request.monitor
-                            .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttNames))
+                        .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttNames))
                     val searchSourceBuilder = SearchSourceBuilder().size(0)
                     addUserBackendRolesFilter(user, searchSourceBuilder)
                     val searchRequest = SearchRequest().indices(".opendistro-anomaly-detectors").source(searchSourceBuilder)
-                    client.search(searchRequest, object : ActionListener<SearchResponse> {
-                        override fun onResponse(response: SearchResponse?) {
-                            val totalHits = response?.hits?.totalHits?.value
-                            if (totalHits != null && totalHits > 0L) {
-                                start()
-                            } else {
-                                actionListener.onFailure(AlertingException.wrap(
-                                        OpenSearchStatusException("User has no available detectors", RestStatus.NOT_FOUND)
-                                ))
+                    client.search(
+                        searchRequest,
+                        object : ActionListener<SearchResponse> {
+                            override fun onResponse(response: SearchResponse?) {
+                                val totalHits = response?.hits?.totalHits?.value
+                                if (totalHits != null && totalHits > 0L) {
+                                    start()
+                                } else {
+                                    actionListener.onFailure(
+                                        AlertingException.wrap(
+                                            OpenSearchStatusException("User has no available detectors", RestStatus.NOT_FOUND)
+                                        )
+                                    )
+                                }
+                            }
+
+                            override fun onFailure(t: Exception) {
+                                actionListener.onFailure(AlertingException.wrap(t))
                             }
                         }
-
-                        override fun onFailure(t: Exception) {
-                            actionListener.onFailure(AlertingException.wrap(t))
-                        }
-                    })
+                    )
                 } catch (ex: IOException) {
                     actionListener.onFailure(AlertingException.wrap(ex))
                 }
@@ -256,16 +269,18 @@ class TransportIndexMonitorAction @Inject constructor(
                     }
                 })
             } else if (!IndexUtils.scheduledJobIndexUpdated) {
-                IndexUtils.updateIndexMapping(SCHEDULED_JOBS_INDEX, SCHEDULED_JOB_TYPE,
-                        ScheduledJobIndices.scheduledJobMappings(), clusterService.state(), client.admin().indices(),
-                        object : ActionListener<AcknowledgedResponse> {
-                            override fun onResponse(response: AcknowledgedResponse) {
-                                onUpdateMappingsResponse(response)
-                            }
-                            override fun onFailure(t: Exception) {
-                                actionListener.onFailure(AlertingException.wrap(t))
-                            }
-                        })
+                IndexUtils.updateIndexMapping(
+                    SCHEDULED_JOBS_INDEX, SCHEDULED_JOB_TYPE,
+                    ScheduledJobIndices.scheduledJobMappings(), clusterService.state(), client.admin().indices(),
+                    object : ActionListener<AcknowledgedResponse> {
+                        override fun onResponse(response: AcknowledgedResponse) {
+                            onUpdateMappingsResponse(response)
+                        }
+                        override fun onFailure(t: Exception) {
+                            actionListener.onFailure(AlertingException.wrap(t))
+                        }
+                    }
+                )
             } else {
                 prepareMonitorIndexing()
             }
@@ -293,25 +308,34 @@ class TransportIndexMonitorAction @Inject constructor(
             val query = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery("${Monitor.MONITOR_TYPE}.type", Monitor.MONITOR_TYPE))
             val searchSource = SearchSourceBuilder().query(query).timeout(requestTimeout)
             val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
-            client.search(searchRequest, object : ActionListener<SearchResponse> {
-                override fun onResponse(searchResponse: SearchResponse) {
-                    onSearchResponse(searchResponse)
-                }
+            client.search(
+                searchRequest,
+                object : ActionListener<SearchResponse> {
+                    override fun onResponse(searchResponse: SearchResponse) {
+                        onSearchResponse(searchResponse)
+                    }
 
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
+                    override fun onFailure(t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                    }
                 }
-            })
+            )
         }
 
         private fun validateActionThrottle(monitor: Monitor, maxValue: TimeValue, minValue: TimeValue) {
             monitor.triggers.forEach { trigger ->
                 trigger.actions.forEach { action ->
                     if (action.throttle != null) {
-                        require(TimeValue(Duration.of(action.throttle.value.toLong(), action.throttle.unit).toMillis())
-                                .compareTo(maxValue) <= 0, { "Can only set throttle period less than or equal to $maxValue" })
-                        require(TimeValue(Duration.of(action.throttle.value.toLong(), action.throttle.unit).toMillis())
-                                .compareTo(minValue) >= 0, { "Can only set throttle period greater than or equal to $minValue" })
+                        require(
+                            TimeValue(Duration.of(action.throttle.value.toLong(), action.throttle.unit).toMillis())
+                                .compareTo(maxValue) <= 0,
+                            { "Can only set throttle period less than or equal to $maxValue" }
+                        )
+                        require(
+                            TimeValue(Duration.of(action.throttle.value.toLong(), action.throttle.unit).toMillis())
+                                .compareTo(minValue) >= 0,
+                            { "Can only set throttle period greater than or equal to $minValue" }
+                        )
                     }
                 }
             }
@@ -325,8 +349,11 @@ class TransportIndexMonitorAction @Inject constructor(
             if (totalHits != null && totalHits >= maxMonitors) {
                 log.error("This request would create more than the allowed monitors [$maxMonitors].")
                 actionListener.onFailure(
-                    AlertingException.wrap(IllegalArgumentException(
-                            "This request would create more than the allowed monitors [$maxMonitors]."))
+                    AlertingException.wrap(
+                        IllegalArgumentException(
+                            "This request would create more than the allowed monitors [$maxMonitors]."
+                        )
+                    )
                 )
             } else {
 
@@ -341,8 +368,12 @@ class TransportIndexMonitorAction @Inject constructor(
                 IndexUtils.scheduledJobIndexUpdated()
             } else {
                 log.error("Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged.")
-                actionListener.onFailure(AlertingException.wrap(OpenSearchStatusException(
-                        "Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged", RestStatus.INTERNAL_SERVER_ERROR))
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged", RestStatus.INTERNAL_SERVER_ERROR
+                        )
+                    )
                 )
             }
         }
@@ -354,9 +385,13 @@ class TransportIndexMonitorAction @Inject constructor(
                 prepareMonitorIndexing()
             } else {
                 log.error("Update ${ScheduledJob.SCHEDULED_JOBS_INDEX} mappings call not acknowledged.")
-                actionListener.onFailure(AlertingException.wrap(OpenSearchStatusException(
-                                "Updated ${ScheduledJob.SCHEDULED_JOBS_INDEX} mappings call not acknowledged.",
-                                RestStatus.INTERNAL_SERVER_ERROR))
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "Updated ${ScheduledJob.SCHEDULED_JOBS_INDEX} mappings call not acknowledged.",
+                            RestStatus.INTERNAL_SERVER_ERROR
+                        )
+                    )
                 )
             }
         }
@@ -364,46 +399,62 @@ class TransportIndexMonitorAction @Inject constructor(
         private fun indexMonitor() {
             request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
             val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
-                    .setRefreshPolicy(request.refreshPolicy)
-                    .source(request.monitor.toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-                    .setIfSeqNo(request.seqNo)
-                    .setIfPrimaryTerm(request.primaryTerm)
-                    .timeout(indexTimeout)
-            client.index(indexRequest, object : ActionListener<IndexResponse> {
-                override fun onResponse(response: IndexResponse) {
-                    val failureReasons = checkShardsFailure(response)
-                    if (failureReasons != null) {
-                        actionListener.onFailure(
-                                AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), response.status())))
-                        return
+                .setRefreshPolicy(request.refreshPolicy)
+                .source(request.monitor.toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+                .setIfSeqNo(request.seqNo)
+                .setIfPrimaryTerm(request.primaryTerm)
+                .timeout(indexTimeout)
+            client.index(
+                indexRequest,
+                object : ActionListener<IndexResponse> {
+                    override fun onResponse(response: IndexResponse) {
+                        val failureReasons = checkShardsFailure(response)
+                        if (failureReasons != null) {
+                            actionListener.onFailure(
+                                AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), response.status()))
+                            )
+                            return
+                        }
+                        actionListener.onResponse(
+                            IndexMonitorResponse(
+                                response.id, response.version, response.seqNo,
+                                response.primaryTerm, RestStatus.CREATED, request.monitor
+                            )
+                        )
                     }
-                    actionListener.onResponse(IndexMonitorResponse(response.id, response.version, response.seqNo,
-                            response.primaryTerm, RestStatus.CREATED, request.monitor))
+                    override fun onFailure(t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                    }
                 }
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
-                }
-            })
+            )
         }
 
         private fun updateMonitor() {
             val getRequest = GetRequest(SCHEDULED_JOBS_INDEX, request.monitorId)
-            client.get(getRequest, object : ActionListener<GetResponse> {
-                override fun onResponse(response: GetResponse) {
-                    if (!response.isExists) {
-                        actionListener.onFailure(AlertingException.wrap(
-                            OpenSearchStatusException("Monitor with ${request.monitorId} is not found", RestStatus.NOT_FOUND)))
-                        return
+            client.get(
+                getRequest,
+                object : ActionListener<GetResponse> {
+                    override fun onResponse(response: GetResponse) {
+                        if (!response.isExists) {
+                            actionListener.onFailure(
+                                AlertingException.wrap(
+                                    OpenSearchStatusException("Monitor with ${request.monitorId} is not found", RestStatus.NOT_FOUND)
+                                )
+                            )
+                            return
+                        }
+                        val xcp = XContentHelper.createParser(
+                            xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                            response.sourceAsBytesRef, XContentType.JSON
+                        )
+                        val monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
+                        onGetResponse(monitor)
                     }
-                    val xcp = XContentHelper.createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                        response.sourceAsBytesRef, XContentType.JSON)
-                    val monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
-                    onGetResponse(monitor)
+                    override fun onFailure(t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                    }
                 }
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
-                }
-            })
+            )
         }
 
         private fun onGetResponse(currentMonitor: Monitor) {
@@ -418,37 +469,44 @@ class TransportIndexMonitorAction @Inject constructor(
 
             request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
             val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
-                    .setRefreshPolicy(request.refreshPolicy)
-                    .source(request.monitor.toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-                    .id(request.monitorId)
-                    .setIfSeqNo(request.seqNo)
-                    .setIfPrimaryTerm(request.primaryTerm)
-                    .timeout(indexTimeout)
+                .setRefreshPolicy(request.refreshPolicy)
+                .source(request.monitor.toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+                .id(request.monitorId)
+                .setIfSeqNo(request.seqNo)
+                .setIfPrimaryTerm(request.primaryTerm)
+                .timeout(indexTimeout)
 
-            client.index(indexRequest, object : ActionListener<IndexResponse> {
-                override fun onResponse(response: IndexResponse) {
-                    val failureReasons = checkShardsFailure(response)
-                    if (failureReasons != null) {
-                        actionListener.onFailure(
-                                AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), response.status())))
-                        return
+            client.index(
+                indexRequest,
+                object : ActionListener<IndexResponse> {
+                    override fun onResponse(response: IndexResponse) {
+                        val failureReasons = checkShardsFailure(response)
+                        if (failureReasons != null) {
+                            actionListener.onFailure(
+                                AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), response.status()))
+                            )
+                            return
+                        }
+                        actionListener.onResponse(
+                            IndexMonitorResponse(
+                                response.id, response.version, response.seqNo,
+                                response.primaryTerm, RestStatus.CREATED, request.monitor
+                            )
+                        )
                     }
-                    actionListener.onResponse(
-                        IndexMonitorResponse(response.id, response.version, response.seqNo,
-                                response.primaryTerm, RestStatus.CREATED, request.monitor)
-                    )
+                    override fun onFailure(t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                    }
                 }
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
-                }
-            })
+            )
         }
 
         private fun checkShardsFailure(response: IndexResponse): String? {
             val failureReasons = StringBuilder()
             if (response.shardInfo.failed > 0) {
                 response.shardInfo.failures.forEach {
-                    entry -> failureReasons.append(entry.reason())
+                    entry ->
+                    failureReasons.append(entry.reason())
                 }
                 return failureReasons.toString()
             }

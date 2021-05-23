@@ -26,16 +26,6 @@
 
 package org.opensearch.alerting.transport
 
-import org.opensearch.alerting.action.DeleteMonitorAction
-import org.opensearch.alerting.action.DeleteMonitorRequest
-import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.util.AlertingException
-import org.opensearch.alerting.util.checkFilterByUserBackendRoles
-import org.opensearch.alerting.util.checkUserFilterByPermissions
-import org.opensearch.commons.ConfigConstants
-import org.opensearch.commons.authuser.User
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
@@ -45,6 +35,14 @@ import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.action.DeleteMonitorAction
+import org.opensearch.alerting.action.DeleteMonitorRequest
+import org.opensearch.alerting.core.model.ScheduledJob
+import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.checkFilterByUserBackendRoles
+import org.opensearch.alerting.util.checkUserFilterByPermissions
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -53,6 +51,8 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.ConfigConstants
+import org.opensearch.commons.authuser.User
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -68,7 +68,7 @@ class TransportDeleteMonitorAction @Inject constructor(
     settings: Settings,
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<DeleteMonitorRequest, DeleteResponse>(
-        DeleteMonitorAction.NAME, transportService, actionFilters, ::DeleteMonitorRequest
+    DeleteMonitorAction.NAME, transportService, actionFilters, ::DeleteMonitorRequest
 ) {
 
     @Volatile private var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
@@ -82,7 +82,7 @@ class TransportDeleteMonitorAction @Inject constructor(
         log.debug("User and roles string from thread context: $userStr")
         val user: User? = User.parse(userStr)
         val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, request.monitorId)
-                .setRefreshPolicy(request.refreshPolicy)
+            .setRefreshPolicy(request.refreshPolicy)
 
         if (!checkFilterByUserBackendRoles(filterByEnabled, user, actionListener)) {
             return
@@ -118,22 +118,30 @@ class TransportDeleteMonitorAction @Inject constructor(
 
         fun start() {
             val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, monitorId)
-            client.get(getRequest, object : ActionListener<GetResponse> {
-                override fun onResponse(response: GetResponse) {
-                    if (!response.isExists) {
-                        actionListener.onFailure(AlertingException.wrap(
-                            OpenSearchStatusException("Monitor with $monitorId is not found", RestStatus.NOT_FOUND)))
-                        return
+            client.get(
+                getRequest,
+                object : ActionListener<GetResponse> {
+                    override fun onResponse(response: GetResponse) {
+                        if (!response.isExists) {
+                            actionListener.onFailure(
+                                AlertingException.wrap(
+                                    OpenSearchStatusException("Monitor with $monitorId is not found", RestStatus.NOT_FOUND)
+                                )
+                            )
+                            return
+                        }
+                        val xcp = XContentHelper.createParser(
+                            xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                            response.sourceAsBytesRef, XContentType.JSON
+                        )
+                        val monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
+                        onGetResponse(monitor)
                     }
-                    val xcp = XContentHelper.createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                        response.sourceAsBytesRef, XContentType.JSON)
-                    val monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
-                    onGetResponse(monitor)
+                    override fun onFailure(t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                    }
                 }
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
-                }
-            })
+            )
         }
 
         private fun onGetResponse(monitor: Monitor) {
@@ -145,15 +153,18 @@ class TransportDeleteMonitorAction @Inject constructor(
         }
 
         private fun deleteMonitor() {
-            client.delete(deleteRequest, object : ActionListener<DeleteResponse> {
-                override fun onResponse(response: DeleteResponse) {
-                    actionListener.onResponse(response)
-                }
+            client.delete(
+                deleteRequest,
+                object : ActionListener<DeleteResponse> {
+                    override fun onResponse(response: DeleteResponse) {
+                        actionListener.onResponse(response)
+                    }
 
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
+                    override fun onFailure(t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                    }
                 }
-            })
+            )
         }
     }
 }

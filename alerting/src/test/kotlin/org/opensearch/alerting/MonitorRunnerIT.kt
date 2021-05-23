@@ -26,32 +26,32 @@
 
 package org.opensearch.alerting
 
+import org.junit.Assert
 import org.opensearch.alerting.alerts.AlertError
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.model.IntervalSchedule
+import org.opensearch.alerting.core.model.SearchInput
+import org.opensearch.alerting.model.ActionExecutionResult
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.Alert.State.ACKNOWLEDGED
 import org.opensearch.alerting.model.Alert.State.ACTIVE
 import org.opensearch.alerting.model.Alert.State.COMPLETED
 import org.opensearch.alerting.model.Alert.State.ERROR
 import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.core.model.SearchInput
-import org.opensearch.alerting.model.ActionExecutionResult
 import org.opensearch.alerting.model.action.Throttle
 import org.opensearch.alerting.model.destination.CustomWebhook
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.email.Email
 import org.opensearch.alerting.model.destination.email.Recipient
 import org.opensearch.alerting.util.DestinationType
-import org.opensearch.commons.authuser.User
 import org.opensearch.client.ResponseException
 import org.opensearch.client.WarningFailureException
 import org.opensearch.common.settings.Settings
+import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
 import org.opensearch.search.builder.SearchSourceBuilder
-import org.junit.Assert
 import java.time.Instant
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -90,9 +90,9 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         indexDoc(testIndex, "1", testDoc)
 
         val query = QueryBuilders.rangeQuery("test_strict_date_time")
-                .gt("{{period_end}}||-10d")
-                .lte("{{period_end}}")
-                .format("epoch_millis")
+            .gt("{{period_end}}||-10d")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
         val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().query(query))
         val triggerScript = """
             // make sure there is exactly one hit
@@ -130,7 +130,8 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
     fun `test active alert is updated on each run`() {
         val monitor = createMonitor(
-                randomMonitor(triggers = listOf(randomTrigger(condition = ALWAYS_RUN, destinationId = createDestination().id))))
+            randomMonitor(triggers = listOf(randomTrigger(condition = ALWAYS_RUN, destinationId = createDestination().id)))
+        )
 
         executeMonitor(monitor.id)
         val firstRunAlert = searchAlerts(monitor).single()
@@ -144,16 +145,22 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
         assertEquals("New alert was created, instead of updating existing alert.", firstRunAlert.id, secondRunAlert.id)
         assertEquals("Start time shouldn't change", firstRunAlert.startTime, secondRunAlert.startTime)
-        assertNotEquals("Last notification should be different.",
-                firstRunAlert.lastNotificationTime, secondRunAlert.lastNotificationTime)
+        assertNotEquals(
+            "Last notification should be different.",
+            firstRunAlert.lastNotificationTime, secondRunAlert.lastNotificationTime
+        )
     }
 
     fun `test execute monitor input error`() {
         // use a non-existent index to trigger an input error
         createIndex("foo", Settings.EMPTY)
         val input = SearchInput(indices = listOf("foo"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
-        val monitor = createMonitor(randomMonitor(inputs = listOf(input),
-                triggers = listOf(randomTrigger(condition = NEVER_RUN))))
+        val monitor = createMonitor(
+            randomMonitor(
+                inputs = listOf(input),
+                triggers = listOf(randomTrigger(condition = NEVER_RUN))
+            )
+        )
 
         deleteIndex("foo")
         val response = executeMonitor(monitor.id)
@@ -173,8 +180,12 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         // use a non-existent monitoid to trigger a 404.
         createIndex("foo", Settings.EMPTY)
         val input = SearchInput(indices = listOf("foo"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
-        val monitor = createMonitor(randomMonitor(inputs = listOf(input),
-                triggers = listOf(randomTrigger(condition = NEVER_RUN))))
+        val monitor = createMonitor(
+            randomMonitor(
+                inputs = listOf(input),
+                triggers = listOf(randomTrigger(condition = NEVER_RUN))
+            )
+        )
 
         var exception: ResponseException? = null
         try {
@@ -191,8 +202,11 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         createIndex("foo", Settings.EMPTY)
         val input = SearchInput(indices = listOf("foo"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
         val monitor = createMonitor(
-                randomMonitor(inputs = listOf(input),
-                triggers = listOf(randomTrigger(condition = ALWAYS_RUN, destinationId = destinationId))))
+            randomMonitor(
+                inputs = listOf(input),
+                triggers = listOf(randomTrigger(condition = ALWAYS_RUN, destinationId = destinationId))
+            )
+        )
 
         var response = executeMonitor(monitor.id)
 
@@ -215,7 +229,8 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
     fun `test acknowledged alert is not updated unnecessarily`() {
         val monitor = createMonitor(
-                randomMonitor(triggers = listOf(randomTrigger(condition = ALWAYS_RUN, destinationId = createDestination().id))))
+            randomMonitor(triggers = listOf(randomTrigger(condition = ALWAYS_RUN, destinationId = createDestination().id)))
+        )
         executeMonitor(monitor.id)
         acknowledgeAlerts(monitor, searchAlerts(monitor).single())
         val acknowledgedAlert = searchAlerts(monitor).single()
@@ -294,9 +309,9 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         indexDoc(testIndex, "1", testDoc)
 
         val query = QueryBuilders.rangeQuery("test_strict_date_time")
-                .gt("{{period_end}}||-10d")
-                .lte("{{period_end}}")
-                .format("epoch_millis")
+            .gt("{{period_end}}||-10d")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
         val input = SearchInput(indices = listOf(".*"), query = SearchSourceBuilder().query(query))
         val triggerScript = """
             // make sure there is at least one monitor
@@ -330,9 +345,9 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         // the query should specify the format (like below) or the mapping for the index/field being queried should allow
         // epoch_millis as an alternative (OpenSearch's default mapping for date fields "strict_date_optional_time||epoch_millis")
         val query = QueryBuilders.rangeQuery("test_strict_date_time")
-                .gt("{{period_end}}||-10d")
-                .lte("{{period_end}}")
-                .format("epoch_millis")
+            .gt("{{period_end}}||-10d")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
         val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().query(query))
         val triggerScript = """
             // make sure there is exactly one hit
@@ -358,9 +373,10 @@ class MonitorRunnerIT : AlertingRestTestCase() {
     fun `test monitor with one bad action and one good action`() {
         val goodAction = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
         val syntaxErrorAction = randomAction(
-                name = "bad syntax",
-                template = randomTemplateScript("{{foo"),
-                destinationId = createDestination().id)
+            name = "bad syntax",
+            template = randomTemplateScript("{{foo"),
+            destinationId = createDestination().id
+        )
         val actions = listOf(goodAction, syntaxErrorAction)
         val monitor = createMonitor(randomMonitor(triggers = listOf(randomTrigger(condition = ALWAYS_RUN, actions = actions))))
 
@@ -392,8 +408,12 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         val trigger = randomTrigger(condition = ALWAYS_RUN, actions = listOf(action))
         val monitor = createMonitor(randomMonitor(triggers = listOf(trigger)))
         val listOfFiveErrorMessages = (1..5).map { i -> AlertError(timestamp = Instant.now(), message = "error message $i") }
-        val activeAlert = createAlert(randomAlert(monitor).copy(state = ACTIVE, errorHistory = listOfFiveErrorMessages,
-                triggerId = trigger.id, triggerName = trigger.name, severity = trigger.severity))
+        val activeAlert = createAlert(
+            randomAlert(monitor).copy(
+                state = ACTIVE, errorHistory = listOfFiveErrorMessages,
+                triggerId = trigger.id, triggerName = trigger.name, severity = trigger.severity
+            )
+        )
 
         val response = executeMonitor(monitor.id)
 
@@ -411,13 +431,17 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
     fun `test latest error is not lost when alert is completed`() {
         // Creates an active alert the first time it's run and completes it the second time the monitor is run.
-        val trigger = randomTrigger(condition = Script("""
+        val trigger = randomTrigger(
+            condition = Script(
+                """
             if (ctx.alert == null) {
                 throw new RuntimeException("foo");
             } else {
                 return false;
             }
-        """.trimIndent()))
+                """.trimIndent()
+            )
+        )
         val monitor = createMonitor(randomMonitor(triggers = listOf(trigger)))
 
         executeMonitor(monitor.id)
@@ -435,17 +459,23 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
     fun `test throw script exception`() {
         // Creates an active alert the first time it's run and completes it the second time the monitor is run.
-        val trigger = randomTrigger(condition = Script("""
+        val trigger = randomTrigger(
+            condition = Script(
+                """
             param[0]; return true
-        """.trimIndent()))
+                """.trimIndent()
+            )
+        )
         val monitor = createMonitor(randomMonitor(triggers = listOf(trigger)))
 
         executeMonitor(monitor.id)
         val errorAlert = searchAlerts(monitor).single()
         verifyAlert(errorAlert, monitor, ERROR)
         executeMonitor(monitor.id)
-        assertEquals("Error does not match",
-                "Failed evaluating trigger:\nparam[0]; return true\n     ^---- HERE", errorAlert.errorMessage)
+        assertEquals(
+            "Error does not match",
+            "Failed evaluating trigger:\nparam[0]; return true\n     ^---- HERE", errorAlert.errorMessage
+        )
     }
 
     fun `test execute monitor limits alert error history to 10 error messages`() {
@@ -455,8 +485,12 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         val trigger = randomTrigger(condition = ALWAYS_RUN, actions = listOf(action))
         val monitor = createMonitor(randomMonitor(triggers = listOf(trigger)))
         val listOfTenErrorMessages = (1..10).map { i -> AlertError(timestamp = Instant.now(), message = "error message $i") }
-        val activeAlert = createAlert(randomAlert(monitor).copy(state = ACTIVE, errorHistory = listOfTenErrorMessages,
-                triggerId = trigger.id, triggerName = trigger.name, severity = trigger.severity))
+        val activeAlert = createAlert(
+            randomAlert(monitor).copy(
+                state = ACTIVE, errorHistory = listOfTenErrorMessages,
+                triggerId = trigger.id, triggerName = trigger.name, severity = trigger.severity
+            )
+        )
 
         val response = executeMonitor(monitor.id)
 
@@ -487,9 +521,15 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
     fun `test execute monitor non-dryrun`() {
         val monitor = createMonitor(
-                randomMonitor(triggers = listOf(randomTrigger(
+            randomMonitor(
+                triggers = listOf(
+                    randomTrigger(
                         condition = ALWAYS_RUN,
-                        actions = listOf(randomAction(destinationId = createDestination().id))))))
+                        actions = listOf(randomAction(destinationId = createDestination().id))
+                    )
+                )
+            )
+        )
 
         val response = executeMonitor(monitor.id, mapOf("dryrun" to "false"))
 
@@ -501,9 +541,15 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
     fun `test execute monitor with already active alert`() {
         val monitor = createMonitor(
-                randomMonitor(triggers = listOf(randomTrigger(
+            randomMonitor(
+                triggers = listOf(
+                    randomTrigger(
                         condition = ALWAYS_RUN,
-                        actions = listOf(randomAction(destinationId = createDestination().id))))))
+                        actions = listOf(randomAction(destinationId = createDestination().id))
+                    )
+                )
+            )
+        )
 
         val firstExecuteResponse = executeMonitor(monitor.id, mapOf("dryrun" to "false"))
 
@@ -524,7 +570,8 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         putAlertMappings()
 
         val newMonitor = createMonitor(
-                randomMonitor(triggers = listOf(randomTrigger(condition = NEVER_RUN, actions = listOf(randomAction())))))
+            randomMonitor(triggers = listOf(randomTrigger(condition = NEVER_RUN, actions = listOf(randomAction()))))
+        )
         val deleteNewMonitorResponse = client().makeRequest("DELETE", "$ALERTING_BASE_URI/${newMonitor.id}")
 
         assertEquals("Delete request not successful", RestStatus.OK, deleteNewMonitorResponse.restStatus())
@@ -560,50 +607,80 @@ class MonitorRunnerIT : AlertingRestTestCase() {
     }
 
     fun `test monitor with throttled action for same alert`() {
-        val actionThrottleEnabled = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
-                destinationId = createDestination().id,
-                throttleEnabled = true, throttle = Throttle(value = 5, unit = MINUTES))
-        val actionThrottleNotEnabled = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
-                destinationId = createDestination().id,
-                throttleEnabled = false, throttle = Throttle(value = 5, unit = MINUTES))
+        val actionThrottleEnabled = randomAction(
+            template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+            destinationId = createDestination().id,
+            throttleEnabled = true, throttle = Throttle(value = 5, unit = MINUTES)
+        )
+        val actionThrottleNotEnabled = randomAction(
+            template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+            destinationId = createDestination().id,
+            throttleEnabled = false, throttle = Throttle(value = 5, unit = MINUTES)
+        )
         val actions = listOf(actionThrottleEnabled, actionThrottleNotEnabled)
-        val monitor = createMonitor(randomMonitor(triggers = listOf(randomTrigger(condition = ALWAYS_RUN, actions = actions)),
-                schedule = IntervalSchedule(interval = 1, unit = ChronoUnit.MINUTES)))
+        val monitor = createMonitor(
+            randomMonitor(
+                triggers = listOf(randomTrigger(condition = ALWAYS_RUN, actions = actions)),
+                schedule = IntervalSchedule(interval = 1, unit = ChronoUnit.MINUTES)
+            )
+        )
         val monitorRunResultNotThrottled = entityAsMap(executeMonitor(monitor.id))
-        verifyActionThrottleResults(monitorRunResultNotThrottled, mutableMapOf(Pair(actionThrottleEnabled.id, false),
-                Pair(actionThrottleNotEnabled.id, false)))
+        verifyActionThrottleResults(
+            monitorRunResultNotThrottled,
+            mutableMapOf(
+                Pair(actionThrottleEnabled.id, false),
+                Pair(actionThrottleNotEnabled.id, false)
+            )
+        )
 
         val notThrottledAlert = searchAlerts(monitor)
         assertEquals("1 alert should be returned", 1, notThrottledAlert.size)
         verifyAlert(notThrottledAlert.single(), monitor, ACTIVE)
-        val notThrottledActionResults = verifyActionExecutionResultInAlert(notThrottledAlert[0],
-                mutableMapOf(Pair(actionThrottleEnabled.id, 0), Pair(actionThrottleNotEnabled.id, 0)))
+        val notThrottledActionResults = verifyActionExecutionResultInAlert(
+            notThrottledAlert[0],
+            mutableMapOf(Pair(actionThrottleEnabled.id, 0), Pair(actionThrottleNotEnabled.id, 0))
+        )
 
         assertEquals(notThrottledActionResults.size, 2)
         val monitorRunResultThrottled = entityAsMap(executeMonitor(monitor.id))
-        verifyActionThrottleResults(monitorRunResultThrottled, mutableMapOf(Pair(actionThrottleEnabled.id, true),
-                Pair(actionThrottleNotEnabled.id, false)))
+        verifyActionThrottleResults(
+            monitorRunResultThrottled,
+            mutableMapOf(
+                Pair(actionThrottleEnabled.id, true),
+                Pair(actionThrottleNotEnabled.id, false)
+            )
+        )
 
         val throttledAlert = searchAlerts(monitor)
         assertEquals("1 alert should be returned", 1, throttledAlert.size)
         verifyAlert(throttledAlert.single(), monitor, ACTIVE)
-        val throttledActionResults = verifyActionExecutionResultInAlert(throttledAlert[0],
-                mutableMapOf(Pair(actionThrottleEnabled.id, 1), Pair(actionThrottleNotEnabled.id, 0)))
+        val throttledActionResults = verifyActionExecutionResultInAlert(
+            throttledAlert[0],
+            mutableMapOf(Pair(actionThrottleEnabled.id, 1), Pair(actionThrottleNotEnabled.id, 0))
+        )
 
         assertEquals(notThrottledActionResults.size, 2)
 
-        assertEquals(notThrottledActionResults[actionThrottleEnabled.id]!!.lastExecutionTime,
-                throttledActionResults[actionThrottleEnabled.id]!!.lastExecutionTime)
+        assertEquals(
+            notThrottledActionResults[actionThrottleEnabled.id]!!.lastExecutionTime,
+            throttledActionResults[actionThrottleEnabled.id]!!.lastExecutionTime
+        )
     }
 
     fun `test monitor with throttled action for different alerts`() {
-        val actionThrottleEnabled = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
-                destinationId = createDestination().id,
-                throttleEnabled = true, throttle = Throttle(value = 5, unit = MINUTES))
+        val actionThrottleEnabled = randomAction(
+            template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+            destinationId = createDestination().id,
+            throttleEnabled = true, throttle = Throttle(value = 5, unit = MINUTES)
+        )
         val actions = listOf(actionThrottleEnabled)
         val trigger = randomTrigger(condition = ALWAYS_RUN, actions = actions)
-        val monitor = createMonitor(randomMonitor(triggers = listOf(trigger),
-                schedule = IntervalSchedule(interval = 1, unit = ChronoUnit.MINUTES)))
+        val monitor = createMonitor(
+            randomMonitor(
+                triggers = listOf(trigger),
+                schedule = IntervalSchedule(interval = 1, unit = ChronoUnit.MINUTES)
+            )
+        )
         val monitorRunResult1 = entityAsMap(executeMonitor(monitor.id))
         verifyActionThrottleResults(monitorRunResult1, mutableMapOf(Pair(actionThrottleEnabled.id, false)))
 
@@ -626,8 +703,10 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         assertNotEquals(activeAlert1[0].id, activeAlert2[0].id)
 
         val actionResults2 = verifyActionExecutionResultInAlert(activeAlert2[0], mutableMapOf(Pair(actionThrottleEnabled.id, 0)))
-        assertNotEquals(actionResults1[actionThrottleEnabled.id]!!.lastExecutionTime,
-                actionResults2[actionThrottleEnabled.id]!!.lastExecutionTime)
+        assertNotEquals(
+            actionResults1[actionThrottleEnabled.id]!!.lastExecutionTime,
+            actionResults2[actionThrottleEnabled.id]!!.lastExecutionTime
+        )
     }
 
     fun `test execute monitor with email destination creates alert`() {
@@ -653,7 +732,8 @@ class MonitorRunnerIT : AlertingRestTestCase() {
                 slack = null,
                 customWebhook = null,
                 email = email
-        ))
+            )
+        )
         val action = randomAction(destinationId = destination.id)
         val trigger = randomTrigger(condition = ALWAYS_RUN, actions = listOf(action))
         val monitor = createMonitor(randomMonitor(triggers = listOf(trigger)))
@@ -668,16 +748,17 @@ class MonitorRunnerIT : AlertingRestTestCase() {
     fun `test execute monitor with custom webhook destination`() {
         val customWebhook = CustomWebhook("http://15.16.17.18", null, null, 80, null, "PUT", emptyMap(), emptyMap(), null, null)
         val destination = createDestination(
-                Destination(
-                        type = DestinationType.CUSTOM_WEBHOOK,
-                        name = "testDesination",
-                        user = randomUser(),
-                        lastUpdateTime = Instant.now(),
-                        chime = null,
-                        slack = null,
-                        customWebhook = customWebhook,
-                        email = null
-                ))
+            Destination(
+                type = DestinationType.CUSTOM_WEBHOOK,
+                name = "testDesination",
+                user = randomUser(),
+                lastUpdateTime = Instant.now(),
+                chime = null,
+                slack = null,
+                customWebhook = customWebhook,
+                email = null
+            )
+        )
         val action = randomAction(destinationId = destination.id)
         val trigger = randomTrigger(condition = ALWAYS_RUN, actions = listOf(action))
         val monitor = createMonitor(randomMonitor(triggers = listOf(trigger)))
@@ -694,16 +775,17 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         listOf("http://10.1.1.1", "127.0.0.1").forEach {
             val customWebhook = CustomWebhook(it, null, null, 80, null, "PUT", emptyMap(), emptyMap(), null, null)
             val destination = createDestination(
-                    Destination(
-                            type = DestinationType.CUSTOM_WEBHOOK,
-                            name = "testDesination",
-                            user = randomUser(),
-                            lastUpdateTime = Instant.now(),
-                            chime = null,
-                            slack = null,
-                            customWebhook = customWebhook,
-                            email = null
-                    ))
+                Destination(
+                    type = DestinationType.CUSTOM_WEBHOOK,
+                    name = "testDesination",
+                    user = randomUser(),
+                    lastUpdateTime = Instant.now(),
+                    chime = null,
+                    slack = null,
+                    customWebhook = customWebhook,
+                    email = null
+                )
+            )
             val action = randomAction(destinationId = destination.id)
             val trigger = randomTrigger(condition = ALWAYS_RUN, actions = listOf(action))
             val monitor = createMonitor(randomMonitor(triggers = listOf(trigger)))
@@ -729,7 +811,8 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
             (output["trigger_results"] as HashMap<String, Any>).forEach {
-                _, v -> assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
+                _, v ->
+                assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             assertEquals(monitor.name, output["monitor_name"])
             @Suppress("UNCHECKED_CAST")
@@ -750,13 +833,16 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             val detectorId = randomAlphaOfLength(5)
             prepareTestAnomalyResult(detectorId, user)
             // for old monitor before enable FGAC, the user field is empty
-            val monitor = randomADMonitor(inputs = listOf(adSearchInput(detectorId)), triggers = listOf(adMonitorTrigger()),
-                    user = User(user.name, listOf(), user.roles, user.customAttNames))
+            val monitor = randomADMonitor(
+                inputs = listOf(adSearchInput(detectorId)), triggers = listOf(adMonitorTrigger()),
+                user = User(user.name, listOf(), user.roles, user.customAttNames)
+            )
             val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
             (output["trigger_results"] as HashMap<String, Any>).forEach {
-                _, v -> assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
+                _, v ->
+                assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             assertEquals(monitor.name, output["monitor_name"])
             @Suppress("UNCHECKED_CAST")
@@ -782,7 +868,8 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
             (output["trigger_results"] as HashMap<String, Any>).forEach {
-                _, v -> assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
+                _, v ->
+                assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             @Suppress("UNCHECKED_CAST")
             val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
@@ -802,13 +889,16 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             val user = randomUser()
             prepareTestAnomalyResult(detectorId, user)
             // Test monitor with different user
-            val monitor = randomADMonitor(inputs = listOf(adSearchInput(detectorId)),
-                    triggers = listOf(adMonitorTrigger()), user = randomUser())
+            val monitor = randomADMonitor(
+                inputs = listOf(adSearchInput(detectorId)),
+                triggers = listOf(adMonitorTrigger()), user = randomUser()
+            )
             val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
             (output["trigger_results"] as HashMap<String, Any>).forEach {
-                _, v -> assertFalse((v as HashMap<String, Boolean>)["triggered"] as Boolean)
+                _, v ->
+                assertFalse((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             @Suppress("UNCHECKED_CAST")
             val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
@@ -829,27 +919,37 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
         val twoMinsAgo = ZonedDateTime.now().minus(2, MINUTES).truncatedTo(MILLIS)
         val testTime = twoMinsAgo.toEpochSecond() * 1000
-        val testResult1 = randomAnomalyResult(detectorId = detectorId, executionEndTime = testTime, user = user,
-                anomalyGrade = 0.1)
+        val testResult1 = randomAnomalyResult(
+            detectorId = detectorId, executionEndTime = testTime, user = user,
+            anomalyGrade = 0.1
+        )
         indexDoc(adResultIndex, "1", testResult1)
-        val testResult2 = randomAnomalyResult(detectorId = detectorId, executionEndTime = testTime, user = user,
-                anomalyGrade = 0.8)
+        val testResult2 = randomAnomalyResult(
+            detectorId = detectorId, executionEndTime = testTime, user = user,
+            anomalyGrade = 0.8
+        )
         indexDoc(adResultIndex, "2", testResult2)
-        val testResult3 = randomAnomalyResult(detectorId = detectorId, executionEndTime = testTime, user = user,
-                anomalyGrade = 0.5)
+        val testResult3 = randomAnomalyResult(
+            detectorId = detectorId, executionEndTime = testTime, user = user,
+            anomalyGrade = 0.5
+        )
         indexDoc(adResultIndex, "3", testResult3)
-        val testResult4 = randomAnomalyResult(detectorId = detectorId, executionEndTime = testTime,
-                user = User(user.name, listOf(), user.roles, user.customAttNames),
-                anomalyGrade = 0.9)
+        val testResult4 = randomAnomalyResult(
+            detectorId = detectorId, executionEndTime = testTime,
+            user = User(user.name, listOf(), user.roles, user.customAttNames),
+            anomalyGrade = 0.9
+        )
         indexDoc(adResultIndex, "4", testResult4)
         // User is null
-        val testResult5 = randomAnomalyResultWithoutUser(detectorId = detectorId, executionEndTime = testTime,
-                anomalyGrade = 0.75)
+        val testResult5 = randomAnomalyResultWithoutUser(
+            detectorId = detectorId, executionEndTime = testTime,
+            anomalyGrade = 0.75
+        )
         indexDoc(adResultIndex, "5", testResult5)
     }
 
     private fun verifyActionExecutionResultInAlert(alert: Alert, expectedResult: Map<String, Int>):
-            MutableMap<String, ActionExecutionResult> {
+        MutableMap<String, ActionExecutionResult> {
         val actionResult = mutableMapOf<String, ActionExecutionResult>()
         for (result in alert.actionExecutionResults) {
             val expected = expectedResult[result.actionId]

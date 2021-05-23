@@ -34,8 +34,8 @@ class EmailGroupTests : OpenSearchTestCase() {
 
     fun `test email group`() {
         val emailGroup = EmailGroup(
-                name = "test",
-                emails = listOf(EmailEntry("test@email.com"))
+            name = "test",
+            emails = listOf(EmailEntry("test@email.com"))
         )
         assertEquals("Email group name was changed", emailGroup.name, "test")
         assertEquals("Email group emails count was changed", emailGroup.emails.size, 1)
@@ -51,7 +51,8 @@ class EmailGroupTests : OpenSearchTestCase() {
             )
         )
 
-        assertEquals("List of email strings does not match email entries",
+        assertEquals(
+            "List of email strings does not match email entries",
             listOf("test@email.com", "test2@email.com"), emailGroup.getEmailsAsListOfString()
         )
     }

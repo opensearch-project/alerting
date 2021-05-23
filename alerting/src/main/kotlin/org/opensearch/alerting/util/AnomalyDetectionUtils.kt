@@ -26,15 +26,15 @@
 
 package org.opensearch.alerting.util
 
+import org.apache.lucene.search.join.ScoreMode
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.common.Strings
 import org.opensearch.commons.authuser.User
-import org.apache.lucene.search.join.ScoreMode
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.NestedQueryBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
-import org.opensearch.common.Strings
 
 /**
  * AD monitor is search input monitor on top of anomaly result index. This method will return

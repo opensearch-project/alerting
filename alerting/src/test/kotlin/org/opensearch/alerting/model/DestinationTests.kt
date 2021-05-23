@@ -29,11 +29,11 @@ package org.opensearch.alerting.model
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.CustomWebhook
 import org.opensearch.alerting.model.destination.Destination
-import org.opensearch.alerting.model.destination.email.Email
 import org.opensearch.alerting.model.destination.Slack
+import org.opensearch.alerting.model.destination.email.Email
+import org.opensearch.alerting.model.destination.email.Recipient
 import org.opensearch.alerting.parser
 import org.opensearch.alerting.randomUser
-import org.opensearch.alerting.model.destination.email.Recipient
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.StreamInput
@@ -124,8 +124,10 @@ class DestinationTests : OpenSearchTestCase() {
     }
 
     fun `test chime destination create using stream`() {
-        val chimeDest = Destination("1234", 0L, 1, 1, 1, DestinationType.CHIME, "TestChimeDest",
-        randomUser(), Instant.now(), Chime("test.com"), null, null, null)
+        val chimeDest = Destination(
+            "1234", 0L, 1, 1, 1, DestinationType.CHIME, "TestChimeDest",
+            randomUser(), Instant.now(), Chime("test.com"), null, null, null
+        )
 
         val out = BytesStreamOutput()
         chimeDest.writeTo(out)
@@ -146,8 +148,10 @@ class DestinationTests : OpenSearchTestCase() {
     }
 
     fun `test slack destination create using stream`() {
-        val slackDest = Destination("2345", 1L, 2, 1, 1, DestinationType.SLACK, "TestSlackDest",
-                randomUser(), Instant.now(), null, Slack("mytest.com"), null, null)
+        val slackDest = Destination(
+            "2345", 1L, 2, 1, 1, DestinationType.SLACK, "TestSlackDest",
+            randomUser(), Instant.now(), null, Slack("mytest.com"), null, null
+        )
 
         val out = BytesStreamOutput()
         slackDest.writeTo(out)
@@ -169,30 +173,30 @@ class DestinationTests : OpenSearchTestCase() {
 
     fun `test customwebhook destination create using stream`() {
         val customWebhookDest = Destination(
-                "2345",
-                1L,
-                2,
-                1,
-                1,
-                DestinationType.SLACK,
-                "TestSlackDest",
-                randomUser(),
-                Instant.now(),
-                null,
-                null,
-                CustomWebhook(
-                    "test.com",
-                    "schema",
-                    "localhost",
-                    162,
-                    "/tmp/",
-                    "POST",
-                    mutableMapOf(),
-                    mutableMapOf(),
-                    "admin",
-                    "admin"
-                ),
-                null
+            "2345",
+            1L,
+            2,
+            1,
+            1,
+            DestinationType.SLACK,
+            "TestSlackDest",
+            randomUser(),
+            Instant.now(),
+            null,
+            null,
+            CustomWebhook(
+                "test.com",
+                "schema",
+                "localhost",
+                162,
+                "/tmp/",
+                "POST",
+                mutableMapOf(),
+                mutableMapOf(),
+                "admin",
+                "admin"
+            ),
+            null
         )
         val out = BytesStreamOutput()
         customWebhookDest.writeTo(out)
@@ -214,30 +218,30 @@ class DestinationTests : OpenSearchTestCase() {
 
     fun `test customwebhook destination create using stream with optionals`() {
         val customWebhookDest = Destination(
-                "2345",
-                1L,
-                2,
-                1,
-                1,
-                DestinationType.SLACK,
-                "TestSlackDest",
-                randomUser(),
-                Instant.now(),
+            "2345",
+            1L,
+            2,
+            1,
+            1,
+            DestinationType.SLACK,
+            "TestSlackDest",
+            randomUser(),
+            Instant.now(),
+            null,
+            null,
+            CustomWebhook(
+                "test.com",
                 null,
+                "localhost",
+                162,
                 null,
-                CustomWebhook(
-                        "test.com",
-                        null,
-                        "localhost",
-                        162,
-                        null,
-                        "POST",
-                        mutableMapOf(),
-                        mutableMapOf(),
-                        null,
-                        null
-                ),
+                "POST",
+                mutableMapOf(),
+                mutableMapOf(),
+                null,
                 null
+            ),
+            null
         )
         val out = BytesStreamOutput()
         customWebhookDest.writeTo(out)
@@ -259,26 +263,26 @@ class DestinationTests : OpenSearchTestCase() {
 
     fun `test email destination create using stream`() {
         val recipients = listOf(
-                Recipient(
-                    Recipient.RecipientType.EMAIL,
-                    null,
-                    "test@email.com"
-                )
+            Recipient(
+                Recipient.RecipientType.EMAIL,
+                null,
+                "test@email.com"
+            )
         )
         val mailDest = Destination(
-                "2345",
-                1L,
-                2,
-                1,
-                1,
-                DestinationType.EMAIL,
-                "TestEmailDest",
-                randomUser(),
-                Instant.now(),
-                null,
-                null,
-                null,
-                Email("3456", recipients)
+            "2345",
+            1L,
+            2,
+            1,
+            1,
+            DestinationType.EMAIL,
+            "TestEmailDest",
+            randomUser(),
+            Instant.now(),
+            null,
+            null,
+            null,
+            Email("3456", recipients)
         )
 
         val out = BytesStreamOutput()
@@ -304,15 +308,15 @@ class DestinationTests : OpenSearchTestCase() {
 
     fun `test chime destination without user`() {
         val userString = "{\"type\":\"chime\",\"name\":\"TestChimeDest\",\"schema_version\":1," +
-                "\"last_update_time\":1600063313658,\"chime\":{\"url\":\"test.com\"}}"
+            "\"last_update_time\":1600063313658,\"chime\":{\"url\":\"test.com\"}}"
         val parsedDest = Destination.parse(parser(userString))
         assertNull(parsedDest.user)
     }
 
     fun `test chime destination with user`() {
         val userString = "{\"type\":\"chime\",\"name\":\"TestChimeDest\",\"user\":{\"name\":\"joe\",\"backend_roles\"" +
-                ":[\"ops\",\"backup\"],\"roles\":[\"ops_role, backup_role\"],\"custom_attribute_names\":[\"test_attr=test\"]}," +
-                "\"schema_version\":1,\"last_update_time\":1600063313658,\"chime\":{\"url\":\"test.com\"}}"
+            ":[\"ops\",\"backup\"],\"roles\":[\"ops_role, backup_role\"],\"custom_attribute_names\":[\"test_attr=test\"]}," +
+            "\"schema_version\":1,\"last_update_time\":1600063313658,\"chime\":{\"url\":\"test.com\"}}"
         val parsedDest = Destination.parse(parser(userString))
         assertNotNull(parsedDest.user)
     }

@@ -26,6 +26,12 @@
 
 package org.opensearch.alerting.transport
 
+import org.apache.logging.log4j.LogManager
+import org.opensearch.action.ActionListener
+import org.opensearch.action.search.SearchRequest
+import org.opensearch.action.search.SearchResponse
+import org.opensearch.action.support.ActionFilters
+import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetDestinationsRequest
 import org.opensearch.alerting.action.GetDestinationsResponse
@@ -34,14 +40,6 @@ import org.opensearch.alerting.elasticapi.addFilter
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
-import org.opensearch.commons.ConfigConstants
-import org.opensearch.commons.authuser.User
-import org.apache.logging.log4j.LogManager
-import org.opensearch.action.ActionListener
-import org.opensearch.action.search.SearchRequest
-import org.opensearch.action.search.SearchResponse
-import org.opensearch.action.support.ActionFilters
-import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.Strings
@@ -53,6 +51,8 @@ import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.ConfigConstants
+import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
@@ -74,7 +74,7 @@ class TransportGetDestinationsAction @Inject constructor(
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<GetDestinationsRequest, GetDestinationsResponse> (
-        GetDestinationsAction.NAME, transportService, actionFilters, ::GetDestinationsRequest
+    GetDestinationsAction.NAME, transportService, actionFilters, ::GetDestinationsRequest
 ) {
 
     @Volatile private var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
@@ -88,50 +88,52 @@ class TransportGetDestinationsAction @Inject constructor(
         getDestinationsRequest: GetDestinationsRequest,
         actionListener: ActionListener<GetDestinationsResponse>
     ) {
-            val userStr = client.threadPool().threadContext.getTransient<String>(
-                    ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT
-            )
-            log.debug("User and roles string from thread context: $userStr")
-            val user: User? = User.parse(userStr)
+        val userStr = client.threadPool().threadContext.getTransient<String>(
+            ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT
+        )
+        log.debug("User and roles string from thread context: $userStr")
+        val user: User? = User.parse(userStr)
 
-            val tableProp = getDestinationsRequest.table
+        val tableProp = getDestinationsRequest.table
 
-            val sortBuilder = SortBuilders
-                    .fieldSort(tableProp.sortString)
-                    .order(SortOrder.fromString(tableProp.sortOrder))
-            if (!tableProp.missing.isNullOrBlank()) {
-                sortBuilder.missing(tableProp.missing)
-            }
+        val sortBuilder = SortBuilders
+            .fieldSort(tableProp.sortString)
+            .order(SortOrder.fromString(tableProp.sortOrder))
+        if (!tableProp.missing.isNullOrBlank()) {
+            sortBuilder.missing(tableProp.missing)
+        }
 
-            val searchSourceBuilder = SearchSourceBuilder()
-                    .sort(sortBuilder)
-                    .size(tableProp.size)
-                    .from(tableProp.startIndex)
-                    .fetchSource(FetchSourceContext(true, Strings.EMPTY_ARRAY, Strings.EMPTY_ARRAY))
-                    .seqNoAndPrimaryTerm(true)
-                    .version(true)
-            val queryBuilder = QueryBuilders.boolQuery()
-                    .must(QueryBuilders.existsQuery("destination"))
+        val searchSourceBuilder = SearchSourceBuilder()
+            .sort(sortBuilder)
+            .size(tableProp.size)
+            .from(tableProp.startIndex)
+            .fetchSource(FetchSourceContext(true, Strings.EMPTY_ARRAY, Strings.EMPTY_ARRAY))
+            .seqNoAndPrimaryTerm(true)
+            .version(true)
+        val queryBuilder = QueryBuilders.boolQuery()
+            .must(QueryBuilders.existsQuery("destination"))
 
-            if (!getDestinationsRequest.destinationId.isNullOrBlank())
-                queryBuilder.filter(QueryBuilders.termQuery("_id", getDestinationsRequest.destinationId))
+        if (!getDestinationsRequest.destinationId.isNullOrBlank())
+            queryBuilder.filter(QueryBuilders.termQuery("_id", getDestinationsRequest.destinationId))
 
-            if (getDestinationsRequest.destinationType != "ALL")
-                queryBuilder.filter(QueryBuilders.termQuery("destination.type", getDestinationsRequest.destinationType))
+        if (getDestinationsRequest.destinationType != "ALL")
+            queryBuilder.filter(QueryBuilders.termQuery("destination.type", getDestinationsRequest.destinationType))
 
-            if (!tableProp.searchString.isNullOrBlank()) {
-                queryBuilder
-                        .must(QueryBuilders
-                                .queryStringQuery(tableProp.searchString)
-                                .defaultOperator(Operator.AND)
-                                .field("destination.type")
-                                .field("destination.name"))
-            }
-            searchSourceBuilder.query(queryBuilder)
+        if (!tableProp.searchString.isNullOrBlank()) {
+            queryBuilder
+                .must(
+                    QueryBuilders
+                        .queryStringQuery(tableProp.searchString)
+                        .defaultOperator(Operator.AND)
+                        .field("destination.type")
+                        .field("destination.name")
+                )
+        }
+        searchSourceBuilder.query(queryBuilder)
 
-            client.threadPool().threadContext.stashContext().use {
-                resolve(searchSourceBuilder, actionListener, user)
-            }
+        client.threadPool().threadContext.stashContext().use {
+            resolve(searchSourceBuilder, actionListener, user)
+        }
     }
 
     fun resolve(
@@ -159,30 +161,33 @@ class TransportGetDestinationsAction @Inject constructor(
 
     fun search(searchSourceBuilder: SearchSourceBuilder, actionListener: ActionListener<GetDestinationsResponse>) {
         val searchRequest = SearchRequest()
-                .source(searchSourceBuilder)
-                .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
-        client.search(searchRequest, object : ActionListener<SearchResponse> {
-            override fun onResponse(response: SearchResponse) {
-                val totalDestinationCount = response.hits.totalHits?.value?.toInt()
-                val destinations = mutableListOf<Destination>()
-                for (hit in response.hits) {
-                    val id = hit.id
-                    val version = hit.version
-                    val seqNo = hit.seqNo.toInt()
-                    val primaryTerm = hit.primaryTerm.toInt()
-                    val xcp = XContentFactory.xContent(XContentType.JSON)
+            .source(searchSourceBuilder)
+            .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
+        client.search(
+            searchRequest,
+            object : ActionListener<SearchResponse> {
+                override fun onResponse(response: SearchResponse) {
+                    val totalDestinationCount = response.hits.totalHits?.value?.toInt()
+                    val destinations = mutableListOf<Destination>()
+                    for (hit in response.hits) {
+                        val id = hit.id
+                        val version = hit.version
+                        val seqNo = hit.seqNo.toInt()
+                        val primaryTerm = hit.primaryTerm.toInt()
+                        val xcp = XContentFactory.xContent(XContentType.JSON)
                             .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
-                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
-                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                    destinations.add(Destination.parse(xcp, id, version, seqNo, primaryTerm))
+                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
+                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                        destinations.add(Destination.parse(xcp, id, version, seqNo, primaryTerm))
+                    }
+                    actionListener.onResponse(GetDestinationsResponse(RestStatus.OK, totalDestinationCount, destinations))
                 }
-                actionListener.onResponse(GetDestinationsResponse(RestStatus.OK, totalDestinationCount, destinations))
-            }
 
-            override fun onFailure(t: Exception) {
-                actionListener.onFailure(AlertingException.wrap(t))
+                override fun onFailure(t: Exception) {
+                    actionListener.onFailure(AlertingException.wrap(t))
+                }
             }
-        })
+        )
     }
 }

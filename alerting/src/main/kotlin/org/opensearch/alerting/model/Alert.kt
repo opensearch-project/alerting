@@ -31,7 +31,6 @@ import org.opensearch.alerting.elasticapi.instant
 import org.opensearch.alerting.elasticapi.optionalTimeField
 import org.opensearch.alerting.elasticapi.optionalUserField
 import org.opensearch.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
-import org.opensearch.commons.authuser.User
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.io.stream.Writeable
@@ -40,6 +39,7 @@ import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
+import org.opensearch.commons.authuser.User
 import java.io.IOException
 import java.time.Instant
 
@@ -80,37 +80,39 @@ data class Alert(
         errorHistory: List<AlertError> = mutableListOf(),
         actionExecutionResults: List<ActionExecutionResult> = mutableListOf(),
         schemaVersion: Int = NO_SCHEMA_VERSION
-    ) : this(monitorId = monitor.id, monitorName = monitor.name, monitorVersion = monitor.version, monitorUser = monitor.user,
-            triggerId = trigger.id, triggerName = trigger.name, state = state, startTime = startTime,
-            lastNotificationTime = lastNotificationTime, errorMessage = errorMessage, errorHistory = errorHistory,
-            severity = trigger.severity, actionExecutionResults = actionExecutionResults, schemaVersion = schemaVersion)
+    ) : this(
+        monitorId = monitor.id, monitorName = monitor.name, monitorVersion = monitor.version, monitorUser = monitor.user,
+        triggerId = trigger.id, triggerName = trigger.name, state = state, startTime = startTime,
+        lastNotificationTime = lastNotificationTime, errorMessage = errorMessage, errorHistory = errorHistory,
+        severity = trigger.severity, actionExecutionResults = actionExecutionResults, schemaVersion = schemaVersion
+    )
 
     enum class State {
         ACTIVE, ACKNOWLEDGED, COMPLETED, ERROR, DELETED
     }
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
-            id = sin.readString(),
-            version = sin.readLong(),
-            schemaVersion = sin.readInt(),
-            monitorId = sin.readString(),
-            monitorName = sin.readString(),
-            monitorVersion = sin.readLong(),
-            monitorUser = if (sin.readBoolean()) {
-                User(sin)
-            } else null,
-            triggerId = sin.readString(),
-            triggerName = sin.readString(),
-            state = sin.readEnum(State::class.java),
-            startTime = sin.readInstant(),
-            endTime = sin.readOptionalInstant(),
-            lastNotificationTime = sin.readOptionalInstant(),
-            acknowledgedTime = sin.readOptionalInstant(),
-            errorMessage = sin.readOptionalString(),
-            errorHistory = sin.readList(::AlertError),
-            severity = sin.readString(),
-            actionExecutionResults = sin.readList(::ActionExecutionResult)
+    constructor(sin: StreamInput) : this(
+        id = sin.readString(),
+        version = sin.readLong(),
+        schemaVersion = sin.readInt(),
+        monitorId = sin.readString(),
+        monitorName = sin.readString(),
+        monitorVersion = sin.readLong(),
+        monitorUser = if (sin.readBoolean()) {
+            User(sin)
+        } else null,
+        triggerId = sin.readString(),
+        triggerName = sin.readString(),
+        state = sin.readEnum(State::class.java),
+        startTime = sin.readInstant(),
+        endTime = sin.readOptionalInstant(),
+        lastNotificationTime = sin.readOptionalInstant(),
+        acknowledgedTime = sin.readOptionalInstant(),
+        errorMessage = sin.readOptionalString(),
+        errorHistory = sin.readList(::AlertError),
+        severity = sin.readString(),
+        actionExecutionResults = sin.readList(::ActionExecutionResult)
     )
 
     fun isAcknowledged(): Boolean = (state == State.ACKNOWLEDGED)
@@ -218,13 +220,15 @@ data class Alert(
                 }
             }
 
-            return Alert(id = id, version = version, schemaVersion = schemaVersion, monitorId = requireNotNull(monitorId),
-                    monitorName = requireNotNull(monitorName), monitorVersion = monitorVersion, monitorUser = monitorUser,
-                    triggerId = requireNotNull(triggerId), triggerName = requireNotNull(triggerName),
-                    state = requireNotNull(state), startTime = requireNotNull(startTime), endTime = endTime,
-                    lastNotificationTime = lastNotificationTime, acknowledgedTime = acknowledgedTime,
-                    errorMessage = errorMessage, errorHistory = errorHistory, severity = severity,
-                    actionExecutionResults = actionExecutionResults)
+            return Alert(
+                id = id, version = version, schemaVersion = schemaVersion, monitorId = requireNotNull(monitorId),
+                monitorName = requireNotNull(monitorName), monitorVersion = monitorVersion, monitorUser = monitorUser,
+                triggerId = requireNotNull(triggerId), triggerName = requireNotNull(triggerName),
+                state = requireNotNull(state), startTime = requireNotNull(startTime), endTime = endTime,
+                lastNotificationTime = lastNotificationTime, acknowledgedTime = acknowledgedTime,
+                errorMessage = errorMessage, errorHistory = errorHistory, severity = severity,
+                actionExecutionResults = actionExecutionResults
+            )
         }
 
         @JvmStatic
@@ -236,36 +240,38 @@ data class Alert(
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         return builder.startObject()
-                .field(ALERT_ID_FIELD, id)
-                .field(ALERT_VERSION_FIELD, version)
-                .field(MONITOR_ID_FIELD, monitorId)
-                .field(SCHEMA_VERSION_FIELD, schemaVersion)
-                .field(MONITOR_VERSION_FIELD, monitorVersion)
-                .field(MONITOR_NAME_FIELD, monitorName)
-                .optionalUserField(MONITOR_USER_FIELD, monitorUser)
-                .field(TRIGGER_ID_FIELD, triggerId)
-                .field(TRIGGER_NAME_FIELD, triggerName)
-                .field(STATE_FIELD, state)
-                .field(ERROR_MESSAGE_FIELD, errorMessage)
-                .field(ALERT_HISTORY_FIELD, errorHistory.toTypedArray())
-                .field(SEVERITY_FIELD, severity)
-                .field(ACTION_EXECUTION_RESULTS_FIELD, actionExecutionResults.toTypedArray())
-                .optionalTimeField(START_TIME_FIELD, startTime)
-                .optionalTimeField(LAST_NOTIFICATION_TIME_FIELD, lastNotificationTime)
-                .optionalTimeField(END_TIME_FIELD, endTime)
-                .optionalTimeField(ACKNOWLEDGED_TIME_FIELD, acknowledgedTime)
-                .endObject()
+            .field(ALERT_ID_FIELD, id)
+            .field(ALERT_VERSION_FIELD, version)
+            .field(MONITOR_ID_FIELD, monitorId)
+            .field(SCHEMA_VERSION_FIELD, schemaVersion)
+            .field(MONITOR_VERSION_FIELD, monitorVersion)
+            .field(MONITOR_NAME_FIELD, monitorName)
+            .optionalUserField(MONITOR_USER_FIELD, monitorUser)
+            .field(TRIGGER_ID_FIELD, triggerId)
+            .field(TRIGGER_NAME_FIELD, triggerName)
+            .field(STATE_FIELD, state)
+            .field(ERROR_MESSAGE_FIELD, errorMessage)
+            .field(ALERT_HISTORY_FIELD, errorHistory.toTypedArray())
+            .field(SEVERITY_FIELD, severity)
+            .field(ACTION_EXECUTION_RESULTS_FIELD, actionExecutionResults.toTypedArray())
+            .optionalTimeField(START_TIME_FIELD, startTime)
+            .optionalTimeField(LAST_NOTIFICATION_TIME_FIELD, lastNotificationTime)
+            .optionalTimeField(END_TIME_FIELD, endTime)
+            .optionalTimeField(ACKNOWLEDGED_TIME_FIELD, acknowledgedTime)
+            .endObject()
     }
 
     fun asTemplateArg(): Map<String, Any?> {
-        return mapOf(ACKNOWLEDGED_TIME_FIELD to acknowledgedTime?.toEpochMilli(),
-                ALERT_ID_FIELD to id,
-                ALERT_VERSION_FIELD to version,
-                END_TIME_FIELD to endTime?.toEpochMilli(),
-                ERROR_MESSAGE_FIELD to errorMessage,
-                LAST_NOTIFICATION_TIME_FIELD to lastNotificationTime?.toEpochMilli(),
-                SEVERITY_FIELD to severity,
-                START_TIME_FIELD to startTime.toEpochMilli(),
-                STATE_FIELD to state.toString())
+        return mapOf(
+            ACKNOWLEDGED_TIME_FIELD to acknowledgedTime?.toEpochMilli(),
+            ALERT_ID_FIELD to id,
+            ALERT_VERSION_FIELD to version,
+            END_TIME_FIELD to endTime?.toEpochMilli(),
+            ERROR_MESSAGE_FIELD to errorMessage,
+            LAST_NOTIFICATION_TIME_FIELD to lastNotificationTime?.toEpochMilli(),
+            SEVERITY_FIELD to severity,
+            START_TIME_FIELD to startTime.toEpochMilli(),
+            STATE_FIELD to state.toString()
+        )
     }
 }

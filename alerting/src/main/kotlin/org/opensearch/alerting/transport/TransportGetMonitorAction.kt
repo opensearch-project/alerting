@@ -26,6 +26,13 @@
 
 package org.opensearch.alerting.transport
 
+import org.apache.logging.log4j.LogManager
+import org.opensearch.OpenSearchStatusException
+import org.opensearch.action.ActionListener
+import org.opensearch.action.get.GetRequest
+import org.opensearch.action.get.GetResponse
+import org.opensearch.action.support.ActionFilters
+import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.GetMonitorAction
 import org.opensearch.alerting.action.GetMonitorRequest
 import org.opensearch.alerting.action.GetMonitorResponse
@@ -35,15 +42,6 @@ import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.checkFilterByUserBackendRoles
 import org.opensearch.alerting.util.checkUserFilterByPermissions
-import org.opensearch.commons.ConfigConstants
-import org.opensearch.commons.authuser.User
-import org.apache.logging.log4j.LogManager
-import org.opensearch.OpenSearchStatusException
-import org.opensearch.action.ActionListener
-import org.opensearch.action.get.GetRequest
-import org.opensearch.action.get.GetResponse
-import org.opensearch.action.support.ActionFilters
-import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -52,6 +50,8 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.ConfigConstants
+import org.opensearch.commons.authuser.User
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -66,7 +66,7 @@ class TransportGetMonitorAction @Inject constructor(
     val clusterService: ClusterService,
     settings: Settings
 ) : HandledTransportAction<GetMonitorRequest, GetMonitorResponse> (
-        GetMonitorAction.NAME, transportService, actionFilters, ::GetMonitorRequest
+    GetMonitorAction.NAME, transportService, actionFilters, ::GetMonitorRequest
 ) {
 
     @Volatile private var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
@@ -81,8 +81,8 @@ class TransportGetMonitorAction @Inject constructor(
         val user: User? = User.parse(userStr)
 
         val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, getMonitorRequest.monitorId)
-                .version(getMonitorRequest.version)
-                .fetchSourceContext(getMonitorRequest.srcContext)
+            .version(getMonitorRequest.version)
+            .fetchSourceContext(getMonitorRequest.srcContext)
 
         if (!checkFilterByUserBackendRoles(filterByEnabled, user, actionListener)) {
             return
@@ -95,42 +95,50 @@ class TransportGetMonitorAction @Inject constructor(
          * might further improve this logic. Also change try to kotlin-use for auto-closable.
          */
         client.threadPool().threadContext.stashContext().use {
-            client.get(getRequest, object : ActionListener<GetResponse> {
-                override fun onResponse(response: GetResponse) {
-                    if (!response.isExists) {
-                        actionListener.onFailure(
-                            AlertingException.wrap(OpenSearchStatusException("Monitor not found.", RestStatus.NOT_FOUND)))
-                        return
-                    }
+            client.get(
+                getRequest,
+                object : ActionListener<GetResponse> {
+                    override fun onResponse(response: GetResponse) {
+                        if (!response.isExists) {
+                            actionListener.onFailure(
+                                AlertingException.wrap(OpenSearchStatusException("Monitor not found.", RestStatus.NOT_FOUND))
+                            )
+                            return
+                        }
 
-                    var monitor: Monitor? = null
-                    if (!response.isSourceEmpty) {
-                        XContentHelper.createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                            response.sourceAsBytesRef, XContentType.JSON).use { xcp ->
-                            monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
+                        var monitor: Monitor? = null
+                        if (!response.isSourceEmpty) {
+                            XContentHelper.createParser(
+                                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                                response.sourceAsBytesRef, XContentType.JSON
+                            ).use { xcp ->
+                                monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
 
-                            // security is enabled and filterby is enabled
-                            if (!checkUserFilterByPermissions(
-                                    filterByEnabled,
-                                    user,
-                                    monitor?.user,
-                                    actionListener,
-                                    "monitor",
-                                    getMonitorRequest.monitorId)) {
-                                return
+                                // security is enabled and filterby is enabled
+                                if (!checkUserFilterByPermissions(
+                                        filterByEnabled,
+                                        user,
+                                        monitor?.user,
+                                        actionListener,
+                                        "monitor",
+                                        getMonitorRequest.monitorId
+                                    )
+                                ) {
+                                    return
+                                }
                             }
                         }
+
+                        actionListener.onResponse(
+                            GetMonitorResponse(response.id, response.version, response.seqNo, response.primaryTerm, RestStatus.OK, monitor)
+                        )
                     }
 
-                    actionListener.onResponse(
-                        GetMonitorResponse(response.id, response.version, response.seqNo, response.primaryTerm, RestStatus.OK, monitor)
-                    )
+                    override fun onFailure(t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                    }
                 }
-
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
-                }
-            })
+            )
         }
     }
 }

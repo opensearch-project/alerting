@@ -41,13 +41,13 @@ data class Table(
 ) : Writeable {
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
-            sortOrder = sin.readString(),
-            sortString = sin.readString(),
-            missing = sin.readOptionalString(),
-            size = sin.readInt(),
-            startIndex = sin.readInt(),
-            searchString = sin.readOptionalString()
+    constructor(sin: StreamInput) : this(
+        sortOrder = sin.readString(),
+        sortString = sin.readString(),
+        missing = sin.readOptionalString(),
+        size = sin.readInt(),
+        startIndex = sin.readInt(),
+        searchString = sin.readOptionalString()
     )
 
     @Throws(IOException::class)

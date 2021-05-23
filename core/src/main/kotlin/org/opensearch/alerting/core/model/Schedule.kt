@@ -104,11 +104,15 @@ sealed class Schedule : Writeable, ToXContentObject {
                 }
             }
             if (type == TYPE.CRON) {
-                schedule = CronSchedule(requireNotNull(expression) { "Expression in cron schedule is null." },
-                        requireNotNull(timezone) { "Timezone in cron schedule is null." })
+                schedule = CronSchedule(
+                    requireNotNull(expression) { "Expression in cron schedule is null." },
+                    requireNotNull(timezone) { "Timezone in cron schedule is null." }
+                )
             } else if (type == TYPE.INTERVAL) {
-                schedule = IntervalSchedule(requireNotNull(interval) { "Interval in period schedule is null." },
-                        requireNotNull(unit) { "Unit in period schedule is null." })
+                schedule = IntervalSchedule(
+                    requireNotNull(interval) { "Interval in period schedule is null." },
+                    requireNotNull(unit) { "Unit in period schedule is null." }
+                )
             }
             return requireNotNull(schedule) { "Schedule is null." }
         }
@@ -180,7 +184,7 @@ data class CronSchedule(
     val executionTime: ExecutionTime = ExecutionTime.forCron(cronParser.parse(expression))
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         sin.readString(), // expression
         sin.readZoneId() // timezone
     )
@@ -263,11 +267,11 @@ data class CronSchedule(
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         builder.startObject()
-                .startObject(CRON_FIELD)
-                .field(EXPRESSION_FIELD, expression)
-                .field(TIMEZONE_FIELD, timezone.id)
-                .endObject()
-                .endObject()
+            .startObject(CRON_FIELD)
+            .field(EXPRESSION_FIELD, expression)
+            .field(TIMEZONE_FIELD, timezone.id)
+            .endObject()
+            .endObject()
         return builder
     }
 
@@ -285,7 +289,7 @@ data class IntervalSchedule(
     @Transient val testInstant: Instant? = null
 ) : Schedule() {
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         sin.readInt(), // interval
         sin.readEnum(ChronoUnit::class.java) // unit
     )
@@ -360,11 +364,11 @@ data class IntervalSchedule(
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         builder.startObject()
-                .startObject(PERIOD_FIELD)
-                .field(INTERVAL_FIELD, interval)
-                .field(UNIT_FIELD, unit.name)
-                .endObject()
-                .endObject()
+            .startObject(PERIOD_FIELD)
+            .field(INTERVAL_FIELD, interval)
+            .field(UNIT_FIELD, unit.name)
+            .endObject()
+            .endObject()
         return builder
     }
 

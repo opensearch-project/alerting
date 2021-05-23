@@ -49,7 +49,9 @@ class XContentTests : XContentTestBase {
     }
 
     private fun randomInput(): Input {
-        return SearchInput(indices = listOf("foo", "bar"),
-                query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
+        return SearchInput(
+            indices = listOf("foo", "bar"),
+            query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+        )
     }
 }

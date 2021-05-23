@@ -26,6 +26,9 @@
 
 package org.opensearch.alerting.core
 
+import org.apache.logging.log4j.LogManager
+import org.opensearch.action.bulk.BackoffPolicy
+import org.opensearch.action.search.SearchRequest
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.schedule.JobScheduler
 import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.REQUEST_TIMEOUT
@@ -36,9 +39,6 @@ import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEE
 import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEEP_PERIOD
 import org.opensearch.alerting.elasticapi.firstFailureOrNull
 import org.opensearch.alerting.elasticapi.retry
-import org.apache.logging.log4j.LogManager
-import org.opensearch.action.bulk.BackoffPolicy
-import org.opensearch.action.search.SearchRequest
 import org.opensearch.client.Client
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
@@ -283,12 +283,12 @@ class JobSweeper(
         // Find all shards that are currently assigned to this node.
         val localNodeId = clusterState.nodes.localNodeId
         val localShards = clusterState.routingTable.allShards(ScheduledJob.SCHEDULED_JOBS_INDEX)
-                // Find all active shards
-                .filter { it.active() }
-                // group by shardId
-                .groupBy { it.shardId() }
-                // assigned to local node
-                .filter { (_, shards) -> shards.any { it.currentNodeId() == localNodeId } }
+            // Find all active shards
+            .filter { it.active() }
+            // group by shardId
+            .groupBy { it.shardId() }
+            // assigned to local node
+            .filter { (_, shards) -> shards.any { it.currentNodeId() == localNodeId } }
 
         // Remove all jobs on shards that are no longer assigned to this node.
         val removedShards = sweptJobs.keys - localShards.keys
@@ -327,16 +327,20 @@ class JobSweeper(
             val boolQueryBuilder = BoolQueryBuilder()
             sweepableJobTypes.forEach { boolQueryBuilder.should(QueryBuilders.existsQuery(it)) }
             val jobSearchRequest = SearchRequest()
-                    .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
-                    .preference("_shards:${shardId.id}|_only_local")
-                    .source(SearchSourceBuilder.searchSource()
-                            .version(true)
-                            .sort(FieldSortBuilder("_id")
-                            .unmappedType("keyword")
-                            .missing("_last"))
-                            .searchAfter(arrayOf(searchAfter))
-                            .size(sweepPageSize)
-                            .query(boolQueryBuilder))
+                .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
+                .preference("_shards:${shardId.id}|_only_local")
+                .source(
+                    SearchSourceBuilder.searchSource()
+                        .version(true)
+                        .sort(
+                            FieldSortBuilder("_id")
+                                .unmappedType("keyword")
+                                .missing("_last")
+                        )
+                        .searchAfter(arrayOf(searchAfter))
+                        .size(sweepPageSize)
+                        .query(boolQueryBuilder)
+                )
 
             val response = sweepSearchBackoff.retry {
                 client.search(jobSearchRequest).actionGet(requestTimeout)
@@ -347,8 +351,10 @@ class JobSweeper(
             }
             for (hit in response.hits) {
                 if (shardNodes.isOwningNode(hit.id)) {
-                    val xcp = XContentHelper.createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                            hit.sourceRef, XContentType.JSON)
+                    val xcp = XContentHelper.createParser(
+                        xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                        hit.sourceRef, XContentType.JSON
+                    )
                     parseAndSweepJob(xcp, shardId, hit.id, hit.version, hit.sourceRef)
                 }
             }
@@ -403,8 +409,10 @@ class JobSweeper(
             sweep(shardId, jobId, jobVersion, job)
             job
         } catch (e: Exception) {
-            logger.warn("Unable to parse ScheduledJob source: {}",
-                    Strings.cleanTruncate(jobSource.utf8ToString(), 1000))
+            logger.warn(
+                "Unable to parse ScheduledJob source: {}",
+                Strings.cleanTruncate(jobSource.utf8ToString(), 1000)
+            )
             sweep(shardId, jobId, jobVersion, null, true)
             null
         }
@@ -440,8 +448,8 @@ class JobSweeper(
     private fun isOwningNode(shardId: ShardId, jobId: JobId): Boolean {
         val localNodeId = clusterService.localNode().id
         val shardNodeIds = clusterService.state().routingTable.shardRoutingTable(shardId)
-                .filter { it.active() }
-                .map { it.currentNodeId() }
+            .filter { it.active() }
+            .map { it.currentNodeId() }
         val shardNodes = ShardNodes(localNodeId, shardNodeIds)
         return shardNodes.isOwningNode(jobId)
     }

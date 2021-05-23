@@ -26,17 +26,6 @@
 
 package org.opensearch.alerting.transport
 
-import org.opensearch.alerting.action.IndexEmailGroupAction
-import org.opensearch.alerting.action.IndexEmailGroupRequest
-import org.opensearch.alerting.action.IndexEmailGroupResponse
-import org.opensearch.alerting.core.ScheduledJobIndices
-import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
-import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOB_TYPE
-import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
-import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
-import org.opensearch.alerting.util.AlertingException
-import org.opensearch.alerting.util.DestinationType
-import org.opensearch.alerting.util.IndexUtils
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
@@ -48,6 +37,17 @@ import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.alerting.action.IndexEmailGroupAction
+import org.opensearch.alerting.action.IndexEmailGroupRequest
+import org.opensearch.alerting.action.IndexEmailGroupResponse
+import org.opensearch.alerting.core.ScheduledJobIndices
+import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
+import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOB_TYPE
+import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
+import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
+import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.DestinationType
+import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -106,7 +106,8 @@ class TransportIndexEmailGroupAction @Inject constructor(
                     }
                 })
             } else if (!IndexUtils.scheduledJobIndexUpdated) {
-                IndexUtils.updateIndexMapping(SCHEDULED_JOBS_INDEX, SCHEDULED_JOB_TYPE,
+                IndexUtils.updateIndexMapping(
+                    SCHEDULED_JOBS_INDEX, SCHEDULED_JOB_TYPE,
                     ScheduledJobIndices.scheduledJobMappings(), clusterService.state(), client.admin().indices(),
                     object : ActionListener<AcknowledgedResponse> {
                         override fun onResponse(response: AcknowledgedResponse) {
@@ -116,7 +117,8 @@ class TransportIndexEmailGroupAction @Inject constructor(
                         override fun onFailure(e: Exception) {
                             actionListener.onFailure(e)
                         }
-                    })
+                    }
+                )
             } else {
                 prepareEmailGroupIndexing()
             }
@@ -126,10 +128,12 @@ class TransportIndexEmailGroupAction @Inject constructor(
 
             if (!allowList.contains(DestinationType.EMAIL.value)) {
                 actionListener.onFailure(
-                    AlertingException.wrap(OpenSearchStatusException(
-                        "This API is blocked since Destination type [${DestinationType.EMAIL}] is not allowed",
-                        RestStatus.FORBIDDEN
-                    ))
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "This API is blocked since Destination type [${DestinationType.EMAIL}] is not allowed",
+                            RestStatus.FORBIDDEN
+                        )
+                    )
                 )
                 return
             }
@@ -149,10 +153,12 @@ class TransportIndexEmailGroupAction @Inject constructor(
             } else {
                 log.error("Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged.")
                 actionListener.onFailure(
-                    AlertingException.wrap(OpenSearchStatusException(
-                        "Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged.",
-                        RestStatus.INTERNAL_SERVER_ERROR
-                    ))
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged.",
+                            RestStatus.INTERNAL_SERVER_ERROR
+                        )
+                    )
                 )
             }
         }
@@ -165,10 +171,12 @@ class TransportIndexEmailGroupAction @Inject constructor(
             } else {
                 log.error("Update $SCHEDULED_JOBS_INDEX mappings call not acknowledged.")
                 actionListener.onFailure(
-                    AlertingException.wrap(OpenSearchStatusException(
-                        "Update $SCHEDULED_JOBS_INDEX mappings call not acknowledged.",
-                        RestStatus.INTERNAL_SERVER_ERROR
-                    ))
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "Update $SCHEDULED_JOBS_INDEX mappings call not acknowledged.",
+                            RestStatus.INTERNAL_SERVER_ERROR
+                        )
+                    )
                 )
             }
         }
@@ -185,45 +193,57 @@ class TransportIndexEmailGroupAction @Inject constructor(
             // If request is to update, then add id to index request
             if (update) indexRequest = indexRequest.id(request.emailGroupID)
 
-            client.index(indexRequest, object : ActionListener<IndexResponse> {
-                override fun onResponse(response: IndexResponse) {
-                    val failureReasons = checkShardsFailure(response)
-                    if (failureReasons != null) {
-                        actionListener.onFailure(
-                            AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), response.status())
-                        ))
-                        return
+            client.index(
+                indexRequest,
+                object : ActionListener<IndexResponse> {
+                    override fun onResponse(response: IndexResponse) {
+                        val failureReasons = checkShardsFailure(response)
+                        if (failureReasons != null) {
+                            actionListener.onFailure(
+                                AlertingException.wrap(
+                                    OpenSearchStatusException(failureReasons.toString(), response.status())
+                                )
+                            )
+                            return
+                        }
+                        actionListener.onResponse(
+                            IndexEmailGroupResponse(
+                                response.id, response.version, response.seqNo, response.primaryTerm,
+                                RestStatus.CREATED, request.emailGroup
+                            )
+                        )
                     }
-                    actionListener.onResponse(
-                        IndexEmailGroupResponse(response.id, response.version, response.seqNo, response.primaryTerm,
-                            RestStatus.CREATED, request.emailGroup)
-                    )
-                }
 
-                override fun onFailure(e: Exception) {
-                    actionListener.onFailure(e)
+                    override fun onFailure(e: Exception) {
+                        actionListener.onFailure(e)
+                    }
                 }
-            })
+            )
         }
 
         private fun updateEmailGroup() {
             val getRequest = GetRequest(SCHEDULED_JOBS_INDEX, request.emailGroupID)
-            client.get(getRequest, object : ActionListener<GetResponse> {
-                override fun onResponse(response: GetResponse) {
-                    onGetResponse(response)
-                }
+            client.get(
+                getRequest,
+                object : ActionListener<GetResponse> {
+                    override fun onResponse(response: GetResponse) {
+                        onGetResponse(response)
+                    }
 
-                override fun onFailure(e: Exception) {
-                    actionListener.onFailure(e)
+                    override fun onFailure(e: Exception) {
+                        actionListener.onFailure(e)
+                    }
                 }
-            })
+            )
         }
 
         private fun onGetResponse(response: GetResponse) {
             if (!response.isExists) {
-                actionListener.onFailure(AlertingException.wrap(
-                    OpenSearchStatusException("EmailGroup with ${request.emailGroupID} was not found", RestStatus.NOT_FOUND)
-                ))
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException("EmailGroup with ${request.emailGroupID} was not found", RestStatus.NOT_FOUND)
+                    )
+                )
                 return
             }
 
@@ -234,7 +254,8 @@ class TransportIndexEmailGroupAction @Inject constructor(
             val failureReasons = StringBuilder()
             if (response.shardInfo.failed > 0) {
                 response.shardInfo.failures.forEach {
-                    entry -> failureReasons.append(entry.reason())
+                    entry ->
+                    failureReasons.append(entry.reason())
                 }
 
                 return failureReasons.toString()

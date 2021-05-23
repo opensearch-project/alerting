@@ -52,9 +52,9 @@ data class Throttle(
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         return builder.startObject()
-                .field(VALUE_FIELD, value)
-                .field(UNIT_FIELD, unit.name)
-                .endObject()
+            .field(VALUE_FIELD, value)
+            .field(UNIT_FIELD, unit.name)
+            .endObject()
     }
 
     @Throws(IOException::class)

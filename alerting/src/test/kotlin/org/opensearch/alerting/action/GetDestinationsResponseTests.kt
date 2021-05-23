@@ -54,19 +54,20 @@ class GetDestinationsResponseTests : OpenSearchTestCase() {
     fun `test get destination response with a destination`() {
         val slack = Slack("url")
         val destination = Destination(
-                "id",
-                0L,
-                0,
-                0,
-                0,
-                DestinationType.SLACK,
-                "name",
-                null,
-                Instant.MIN,
-                null,
-                slack,
-                null,
-                null)
+            "id",
+            0L,
+            0,
+            0,
+            0,
+            DestinationType.SLACK,
+            "name",
+            null,
+            Instant.MIN,
+            null,
+            slack,
+            null,
+            null
+        )
 
         val req = GetDestinationsResponse(RestStatus.OK, 1, listOf(destination))
         assertNotNull(req)

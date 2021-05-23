@@ -26,8 +26,8 @@
 
 package org.opensearch.alerting.action
 
-import org.opensearch.alerting.randomEmailGroup
 import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.randomEmailGroup
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.rest.RestRequest
@@ -37,8 +37,10 @@ class IndexEmailGroupRequestTests : OpenSearchTestCase() {
 
     fun `test index email group post request`() {
 
-        val req = IndexEmailGroupRequest("1234", 1L, 2L, WriteRequest.RefreshPolicy.IMMEDIATE, RestRequest.Method.POST,
-            randomEmailGroup())
+        val req = IndexEmailGroupRequest(
+            "1234", 1L, 2L, WriteRequest.RefreshPolicy.IMMEDIATE, RestRequest.Method.POST,
+            randomEmailGroup()
+        )
         assertNotNull(req)
 
         val out = BytesStreamOutput()
@@ -54,8 +56,10 @@ class IndexEmailGroupRequestTests : OpenSearchTestCase() {
 
     fun `test index email group put request`() {
 
-        val req = IndexEmailGroupRequest("1234", 1L, 2L, WriteRequest.RefreshPolicy.IMMEDIATE, RestRequest.Method.PUT,
-            randomEmailGroup())
+        val req = IndexEmailGroupRequest(
+            "1234", 1L, 2L, WriteRequest.RefreshPolicy.IMMEDIATE, RestRequest.Method.PUT,
+            randomEmailGroup()
+        )
         assertNotNull(req)
 
         val out = BytesStreamOutput()

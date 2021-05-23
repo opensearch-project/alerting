@@ -26,17 +26,7 @@
 
 package org.opensearch.alerting.alerts
 
-import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
-import org.opensearch.alerting.alerts.AlertIndices.Companion.HISTORY_WRITE_INDEX
-import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_HISTORY_INDEX_MAX_AGE
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_HISTORY_MAX_DOCS
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_HISTORY_ROLLOVER_PERIOD
-import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.apache.logging.log4j.LogManager
-import org.opensearch.alerting.elasticapi.suspendUntil
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_HISTORY_ENABLED
-import org.opensearch.alerting.util.IndexUtils
 import org.apache.lucene.index.IndexNotFoundException
 import org.opensearch.ResourceAlreadyExistsException
 import org.opensearch.action.admin.cluster.state.ClusterStateRequest
@@ -50,6 +40,16 @@ import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.admin.indices.rollover.RolloverRequest
 import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
+import org.opensearch.alerting.alerts.AlertIndices.Companion.HISTORY_WRITE_INDEX
+import org.opensearch.alerting.elasticapi.suspendUntil
+import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_HISTORY_ENABLED
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_HISTORY_INDEX_MAX_AGE
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_HISTORY_MAX_DOCS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_HISTORY_ROLLOVER_PERIOD
+import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
+import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.client.Client
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
@@ -115,7 +115,7 @@ class AlertIndices(
 
         @JvmStatic
         fun alertMapping() =
-                AlertIndices::class.java.getResource("alert_mapping.json").readText()
+            AlertIndices::class.java.getResource("alert_mapping.json").readText()
 
         private val logger = LogManager.getLogger(AlertIndices::class.java)
     }
@@ -150,11 +150,14 @@ class AlertIndices(
             rolloverHistoryIndex()
             // schedule the next rollover for approx MAX_AGE later
             scheduledRollover = threadPool
-                    .scheduleWithFixedDelay({ rolloverAndDeleteHistoryIndices() }, historyRolloverPeriod, executorName())
+                .scheduleWithFixedDelay({ rolloverAndDeleteHistoryIndices() }, historyRolloverPeriod, executorName())
         } catch (e: Exception) {
             // This should be run on cluster startup
-            logger.error("Error creating alert indices. " +
-                    "Alerts can't be recorded until master node is restarted.", e)
+            logger.error(
+                "Error creating alert indices. " +
+                    "Alerts can't be recorded until master node is restarted.",
+                e
+            )
         }
     }
 
@@ -188,7 +191,7 @@ class AlertIndices(
         if (clusterService.state().nodes.isLocalNodeElectedMaster) {
             scheduledRollover?.cancel()
             scheduledRollover = threadPool
-                    .scheduleWithFixedDelay({ rolloverAndDeleteHistoryIndices() }, historyRolloverPeriod, executorName())
+                .scheduleWithFixedDelay({ rolloverAndDeleteHistoryIndices() }, historyRolloverPeriod, executorName())
         }
     }
 
@@ -229,8 +232,8 @@ class AlertIndices(
         if (existsResponse.isExists) return true
 
         val request = CreateIndexRequest(index)
-                .mapping(MAPPING_TYPE, alertMapping(), XContentType.JSON)
-                .settings(Settings.builder().put("index.hidden", true).build())
+            .mapping(MAPPING_TYPE, alertMapping(), XContentType.JSON)
+            .settings(Settings.builder().put("index.hidden", true).build())
 
         if (alias != null) request.alias(Alias(alias))
         return try {
@@ -254,7 +257,7 @@ class AlertIndices(
         }
 
         var putMappingRequest: PutMappingRequest = PutMappingRequest(targetIndex).type(MAPPING_TYPE)
-                .source(mapping, XContentType.JSON)
+            .source(mapping, XContentType.JSON)
         val updateResponse: AcknowledgedResponse = client.admin().indices().suspendUntil { putMapping(putMappingRequest, it) }
         if (updateResponse.isAcknowledged) {
             logger.info("Index mapping of $targetIndex is updated")
@@ -284,8 +287,8 @@ class AlertIndices(
         // We have to pass null for newIndexName in order to get Elastic to increment the index count.
         val request = RolloverRequest(HISTORY_WRITE_INDEX, null)
         request.createIndexRequest.index(HISTORY_INDEX_PATTERN)
-                .mapping(MAPPING_TYPE, alertMapping(), XContentType.JSON)
-                .settings(Settings.builder().put("index.hidden", true).build())
+            .mapping(MAPPING_TYPE, alertMapping(), XContentType.JSON)
+            .settings(Settings.builder().put("index.hidden", true).build())
         request.addMaxIndexDocsCondition(historyMaxDocs)
         request.addMaxIndexAgeCondition(historyMaxAge)
         val response = client.admin().indices().rolloverIndex(request).actionGet(requestTimeout)
@@ -301,11 +304,11 @@ class AlertIndices(
         val indicesToDelete = mutableListOf<String>()
 
         val clusterStateRequest = ClusterStateRequest()
-                .clear()
-                .indices(HISTORY_ALL)
-                .metadata(true)
-                .local(true)
-                .indicesOptions(IndicesOptions.strictExpand())
+            .clear()
+            .indices(HISTORY_ALL)
+            .metadata(true)
+            .local(true)
+            .indicesOptions(IndicesOptions.strictExpand())
 
         val clusterStateResponse = client.admin().cluster().state(clusterStateRequest).actionGet()
 

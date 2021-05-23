@@ -26,11 +26,11 @@
 
 package org.opensearch.alerting.action
 
+import org.junit.Assert
 import org.opensearch.alerting.randomMonitorRunResult
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.test.OpenSearchTestCase
-import org.junit.Assert
 
 class ExecuteMonitorResponseTests : OpenSearchTestCase() {
 

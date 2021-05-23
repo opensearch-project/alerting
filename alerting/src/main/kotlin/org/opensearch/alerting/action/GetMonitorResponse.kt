@@ -26,12 +26,12 @@
 
 package org.opensearch.alerting.action
 
+import org.opensearch.action.ActionResponse
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.util._ID
 import org.opensearch.alerting.util._PRIMARY_TERM
 import org.opensearch.alerting.util._SEQ_NO
 import org.opensearch.alerting.util._VERSION
-import org.opensearch.action.ActionResponse
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.ToXContent
@@ -94,10 +94,10 @@ class GetMonitorResponse : ActionResponse, ToXContentObject {
     @Throws(IOException::class)
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         builder.startObject()
-                .field(_ID, id)
-                .field(_VERSION, version)
-                .field(_SEQ_NO, seqNo)
-                .field(_PRIMARY_TERM, primaryTerm)
+            .field(_ID, id)
+            .field(_VERSION, version)
+            .field(_SEQ_NO, seqNo)
+            .field(_PRIMARY_TERM, primaryTerm)
         if (monitor != null)
             builder.field("monitor", monitor)
 

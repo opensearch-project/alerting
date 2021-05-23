@@ -26,8 +26,8 @@
 
 package org.opensearch.alerting.action
 
-import org.opensearch.alerting.model.Alert
 import org.opensearch.action.ActionResponse
+import org.opensearch.alerting.model.Alert
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.ToXContent
@@ -65,8 +65,8 @@ class GetAlertsResponse : ActionResponse, ToXContentObject {
     @Throws(IOException::class)
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         builder.startObject()
-                .field("alerts", alerts)
-                .field("totalAlerts", totalAlerts)
+            .field("alerts", alerts)
+            .field("totalAlerts", totalAlerts)
 
         return builder.endObject()
     }

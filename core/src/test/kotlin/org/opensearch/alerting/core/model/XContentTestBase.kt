@@ -46,7 +46,9 @@ interface XContentTestBase {
     }
 
     fun xContentRegistry(): NamedXContentRegistry {
-        return NamedXContentRegistry(listOf(SearchInput.XCONTENT_REGISTRY) +
-                SearchModule(Settings.EMPTY, false, emptyList()).namedXContents)
+        return NamedXContentRegistry(
+            listOf(SearchInput.XCONTENT_REGISTRY) +
+                SearchModule(Settings.EMPTY, false, emptyList()).namedXContents
+        )
     }
 }

@@ -26,6 +26,23 @@
 
 package org.opensearch.alerting
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import org.apache.logging.log4j.LogManager
+import org.opensearch.ExceptionsHelper
+import org.opensearch.action.DocWriteRequest
+import org.opensearch.action.bulk.BackoffPolicy
+import org.opensearch.action.bulk.BulkRequest
+import org.opensearch.action.bulk.BulkResponse
+import org.opensearch.action.delete.DeleteRequest
+import org.opensearch.action.index.IndexRequest
+import org.opensearch.action.search.SearchRequest
+import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.alerts.AlertError
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.moveAlerts
@@ -69,23 +86,6 @@ import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.isAllowed
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
-import org.apache.logging.log4j.LogManager
-import org.opensearch.ExceptionsHelper
-import org.opensearch.action.DocWriteRequest
-import org.opensearch.action.bulk.BackoffPolicy
-import org.opensearch.action.bulk.BulkRequest
-import org.opensearch.action.bulk.BulkResponse
-import org.opensearch.action.delete.DeleteRequest
-import org.opensearch.action.index.IndexRequest
-import org.opensearch.action.search.SearchRequest
-import org.opensearch.action.search.SearchResponse
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.Strings
@@ -140,10 +140,12 @@ class MonitorRunner(
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERT_BACKOFF_MILLIS, ALERT_BACKOFF_COUNT) {
-            millis, count -> retryPolicy = BackoffPolicy.constantBackoff(millis, count)
+            millis, count ->
+            retryPolicy = BackoffPolicy.constantBackoff(millis, count)
         }
         clusterService.clusterSettings.addSettingsUpdateConsumer(MOVE_ALERTS_BACKOFF_MILLIS, MOVE_ALERTS_BACKOFF_COUNT) {
-            millis, count -> moveAlertsRetryPolicy = BackoffPolicy.exponentialBackoff(millis, count)
+            millis, count ->
+            moveAlertsRetryPolicy = BackoffPolicy.exponentialBackoff(millis, count)
         }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALLOW_LIST) {
             allowList = it
@@ -291,38 +293,55 @@ class MonitorRunner(
                 when {
                     actionRunResult == null -> updatedActionExecutionResults.add(actionExecutionResult)
                     actionRunResult.throttled ->
-                        updatedActionExecutionResults.add(actionExecutionResult.copy(
-                                throttledCount = actionExecutionResult.throttledCount + 1))
+                        updatedActionExecutionResults.add(
+                            actionExecutionResult.copy(
+                                throttledCount = actionExecutionResult.throttledCount + 1
+                            )
+                        )
                     else -> updatedActionExecutionResults.add(actionExecutionResult.copy(lastExecutionTime = actionRunResult.executionTime))
                 }
             }
             // add action execution results which not exist in current alert
-            updatedActionExecutionResults.addAll(result.actionResults.filter { it -> !currentActionIds.contains(it.key) }
-                    .map { it -> ActionExecutionResult(it.key, it.value.executionTime, if (it.value.throttled) 1 else 0) })
+            updatedActionExecutionResults.addAll(
+                result.actionResults.filter { it -> !currentActionIds.contains(it.key) }
+                    .map { it -> ActionExecutionResult(it.key, it.value.executionTime, if (it.value.throttled) 1 else 0) }
+            )
         } else {
-            updatedActionExecutionResults.addAll(result.actionResults.map { it -> ActionExecutionResult(it.key, it.value.executionTime,
-                    if (it.value.throttled) 1 else 0) })
+            updatedActionExecutionResults.addAll(
+                result.actionResults.map { it ->
+                    ActionExecutionResult(
+                        it.key, it.value.executionTime,
+                        if (it.value.throttled) 1 else 0
+                    )
+                }
+            )
         }
 
         // Merge the alert's error message to the current alert's history
         val updatedHistory = currentAlert?.errorHistory.update(alertError)
         return if (alertError == null && !result.triggered) {
-            currentAlert?.copy(state = COMPLETED, endTime = currentTime, errorMessage = null,
-                    errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
-                    schemaVersion = IndexUtils.alertIndexSchemaVersion)
+            currentAlert?.copy(
+                state = COMPLETED, endTime = currentTime, errorMessage = null,
+                errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
+                schemaVersion = IndexUtils.alertIndexSchemaVersion
+            )
         } else if (alertError == null && currentAlert?.isAcknowledged() == true) {
             null
         } else if (currentAlert != null) {
             val alertState = if (alertError == null) ACTIVE else ERROR
-            currentAlert.copy(state = alertState, lastNotificationTime = currentTime, errorMessage = alertError?.message,
-                    errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
-                    schemaVersion = IndexUtils.alertIndexSchemaVersion)
+            currentAlert.copy(
+                state = alertState, lastNotificationTime = currentTime, errorMessage = alertError?.message,
+                errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
+                schemaVersion = IndexUtils.alertIndexSchemaVersion
+            )
         } else {
             val alertState = if (alertError == null) ACTIVE else ERROR
-            Alert(monitor = ctx.monitor, trigger = ctx.trigger, startTime = currentTime,
-                    lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
-                    errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
-                    schemaVersion = IndexUtils.alertIndexSchemaVersion)
+            Alert(
+                monitor = ctx.monitor, trigger = ctx.trigger, startTime = currentTime,
+                lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
+                errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
+                schemaVersion = IndexUtils.alertIndexSchemaVersion
+            )
         }
     }
 
@@ -333,12 +352,19 @@ class MonitorRunner(
                 when (input) {
                     is SearchInput -> {
                         // TODO: Figure out a way to use SearchTemplateRequest without bringing in the entire TransportClient
-                        val searchParams = mapOf("period_start" to periodStart.toEpochMilli(),
-                                "period_end" to periodEnd.toEpochMilli())
-                        val searchSource = scriptService.compile(Script(ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
-                                input.query.toString(), searchParams), TemplateScript.CONTEXT)
-                                .newInstance(searchParams)
-                                .execute()
+                        val searchParams = mapOf(
+                            "period_start" to periodStart.toEpochMilli(),
+                            "period_end" to periodEnd.toEpochMilli()
+                        )
+                        val searchSource = scriptService.compile(
+                            Script(
+                                ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
+                                input.query.toString(), searchParams
+                            ),
+                            TemplateScript.CONTEXT
+                        )
+                            .newInstance(searchParams)
+                            .execute()
 
                         val searchRequest = SearchRequest().indices(*input.indices.toTypedArray())
                         XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource).use {
@@ -376,10 +402,15 @@ class MonitorRunner(
             val input = monitor.inputs[0] as SearchInput
 
             val searchParams = mapOf("period_start" to periodStart.toEpochMilli(), "period_end" to periodEnd.toEpochMilli())
-            val searchSource = scriptService.compile(Script(ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
-                    input.query.toString(), searchParams), TemplateScript.CONTEXT)
-                    .newInstance(searchParams)
-                    .execute()
+            val searchSource = scriptService.compile(
+                Script(
+                    ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
+                    input.query.toString(), searchParams
+                ),
+                TemplateScript.CONTEXT
+            )
+                .newInstance(searchParams)
+                .execute()
 
             val searchRequest = SearchRequest().indices(*input.indices.toTypedArray())
             XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource).use {
@@ -417,8 +448,8 @@ class MonitorRunner(
     private fun runTrigger(monitor: Monitor, trigger: Trigger, ctx: TriggerExecutionContext): TriggerRunResult {
         return try {
             val triggered = scriptService.compile(trigger.condition, TriggerScript.CONTEXT)
-                    .newInstance(trigger.condition.params)
-                    .execute(ctx)
+                .newInstance(trigger.condition.params)
+                .execute(ctx)
             TriggerRunResult(trigger.name, triggered, null)
         } catch (e: Exception) {
             logger.info("Error running script for monitor ${monitor.id}, trigger: ${trigger.id}", e)
@@ -429,15 +460,15 @@ class MonitorRunner(
 
     private suspend fun loadCurrentAlerts(monitor: Monitor): Map<Trigger, Alert?> {
         val request = SearchRequest(AlertIndices.ALERT_INDEX)
-                .routing(monitor.id)
-                .source(alertQuery(monitor))
+            .routing(monitor.id)
+            .source(alertQuery(monitor))
         val response: SearchResponse = client.suspendUntil { client.search(request, it) }
         if (response.status() != RestStatus.OK) {
             throw (response.firstFailureOrNull()?.cause ?: RuntimeException("Unknown error loading alerts"))
         }
 
         val foundAlerts = response.hits.map { Alert.parse(contentParser(it.sourceRef), it.id, it.version) }
-                .groupBy { it.triggerId }
+            .groupBy { it.triggerId }
         foundAlerts.values.forEach { alerts ->
             if (alerts.size > 1) {
                 logger.warn("Found multiple alerts for same trigger: $alerts")
@@ -450,16 +481,18 @@ class MonitorRunner(
     }
 
     private fun contentParser(bytesReference: BytesReference): XContentParser {
-        val xcp = XContentHelper.createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                bytesReference, XContentType.JSON)
+        val xcp = XContentHelper.createParser(
+            xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+            bytesReference, XContentType.JSON
+        )
         ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
         return xcp
     }
 
     private fun alertQuery(monitor: Monitor): SearchSourceBuilder {
         return SearchSourceBuilder.searchSource()
-                .size(monitor.triggers.size * 2) // We expect there to be only a single in-progress alert so fetch 2 to check
-                .query(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, monitor.id))
+            .size(monitor.triggers.size * 2) // We expect there to be only a single in-progress alert so fetch 2 to check
+            .query(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, monitor.id))
     }
 
     private suspend fun saveAlerts(alerts: List<Alert>) {
@@ -470,25 +503,27 @@ class MonitorRunner(
             // spend time reloading the alert and writing it back.
             when (alert.state) {
                 ACTIVE, ERROR -> {
-                    listOf<DocWriteRequest<*>>(IndexRequest(AlertIndices.ALERT_INDEX)
+                    listOf<DocWriteRequest<*>>(
+                        IndexRequest(AlertIndices.ALERT_INDEX)
                             .routing(alert.monitorId)
                             .source(alert.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
-                            .id(if (alert.id != Alert.NO_ID) alert.id else null))
+                            .id(if (alert.id != Alert.NO_ID) alert.id else null)
+                    )
                 }
                 ACKNOWLEDGED, DELETED -> {
                     throw IllegalStateException("Unexpected attempt to save ${alert.state} alert: $alert")
                 }
                 COMPLETED -> {
                     listOfNotNull<DocWriteRequest<*>>(
-                            DeleteRequest(AlertIndices.ALERT_INDEX, alert.id)
-                                    .routing(alert.monitorId),
-                            // Only add completed alert to history index if history is enabled
-                            if (alertIndices.isHistoryEnabled()) {
-                                IndexRequest(AlertIndices.HISTORY_WRITE_INDEX)
-                                        .routing(alert.monitorId)
-                                        .source(alert.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
-                                        .id(alert.id)
-                            } else null
+                        DeleteRequest(AlertIndices.ALERT_INDEX, alert.id)
+                            .routing(alert.monitorId),
+                        // Only add completed alert to history index if history is enabled
+                        if (alertIndices.isHistoryEnabled()) {
+                            IndexRequest(AlertIndices.HISTORY_WRITE_INDEX)
+                                .routing(alert.monitorId)
+                                .source(alert.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
+                                .id(alert.id)
+                        } else null
                     )
                 }
             }
@@ -564,8 +599,8 @@ class MonitorRunner(
 
     private fun compileTemplate(template: Script, ctx: TriggerExecutionContext): String {
         return scriptService.compile(template, TemplateScript.CONTEXT)
-                .newInstance(template.params + mapOf("ctx" to ctx.asTemplateArg()))
-                .execute()
+            .newInstance(template.params + mapOf("ctx" to ctx.asTemplateArg()))
+            .execute()
     }
 
     private fun List<AlertError>?.update(alertError: AlertError?): List<AlertError> {

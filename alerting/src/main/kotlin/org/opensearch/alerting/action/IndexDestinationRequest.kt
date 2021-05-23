@@ -26,10 +26,10 @@
 
 package org.opensearch.alerting.action
 
-import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionRequestValidationException
 import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.rest.RestRequest
@@ -50,7 +50,7 @@ class IndexDestinationRequest : ActionRequest {
         refreshPolicy: WriteRequest.RefreshPolicy,
         method: RestRequest.Method,
         destination: Destination
-    ): super() {
+    ) : super() {
         this.destinationId = destinationId
         this.seqNo = seqNo
         this.primaryTerm = primaryTerm
@@ -60,7 +60,7 @@ class IndexDestinationRequest : ActionRequest {
     }
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): super() {
+    constructor(sin: StreamInput) : super() {
         this.destinationId = sin.readString()
         this.seqNo = sin.readLong()
         this.primaryTerm = sin.readLong()

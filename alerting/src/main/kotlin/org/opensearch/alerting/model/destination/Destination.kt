@@ -26,6 +26,7 @@
 
 package org.opensearch.alerting.model.destination
 
+import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.destination.Notification
 import org.opensearch.alerting.destination.message.BaseMessage
 import org.opensearch.alerting.destination.message.ChimeMessage
@@ -41,14 +42,13 @@ import org.opensearch.alerting.model.destination.email.Email
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
 import org.opensearch.alerting.util.isHostInDenylist
-import org.opensearch.commons.authuser.User
-import org.apache.logging.log4j.LogManager
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
+import org.opensearch.commons.authuser.User
 import java.io.IOException
 import java.net.InetAddress
 import java.time.Instant
@@ -77,14 +77,14 @@ data class Destination(
         builder.startObject()
         if (params.paramAsBoolean("with_type", false)) builder.startObject(DESTINATION)
         builder.field(ID_FIELD, id)
-                .field(TYPE_FIELD, type.value)
-                .field(NAME_FIELD, name)
-                .optionalUserField(USER_FIELD, user)
-                .field(SCHEMA_VERSION, schemaVersion)
-                .field(SEQ_NO_FIELD, seqNo)
-                .field(PRIMARY_TERM_FIELD, primaryTerm)
-                .optionalTimeField(LAST_UPDATE_TIME_FIELD, lastUpdateTime)
-                .field(type.value, constructResponseForDestinationType(type))
+            .field(TYPE_FIELD, type.value)
+            .field(NAME_FIELD, name)
+            .optionalUserField(USER_FIELD, user)
+            .field(SCHEMA_VERSION, schemaVersion)
+            .field(SEQ_NO_FIELD, seqNo)
+            .field(PRIMARY_TERM_FIELD, primaryTerm)
+            .optionalTimeField(LAST_UPDATE_TIME_FIELD, lastUpdateTime)
+            .field(type.value, constructResponseForDestinationType(type))
         if (params.paramAsBoolean("with_type", false)) builder.endObject()
         return builder.endObject()
     }
@@ -199,19 +199,21 @@ data class Destination(
                     }
                 }
             }
-            return Destination(id,
-                    version,
-                    schemaVersion,
-                    seqNo,
-                    primaryTerm,
-                    DestinationType.valueOf(type.toUpperCase(Locale.ROOT)),
-                    requireNotNull(name) { "Destination name is null" },
-                    user,
-                    lastUpdateTime ?: Instant.now(),
-                    chime,
-                    slack,
-                    customWebhook,
-                    email)
+            return Destination(
+                id,
+                version,
+                schemaVersion,
+                seqNo,
+                primaryTerm,
+                DestinationType.valueOf(type.toUpperCase(Locale.ROOT)),
+                requireNotNull(name) { "Destination name is null" },
+                user,
+                lastUpdateTime ?: Instant.now(),
+                chime,
+                slack,
+                customWebhook,
+                email
+            )
         }
 
         @JvmStatic
@@ -263,41 +265,41 @@ data class Destination(
             DestinationType.CHIME -> {
                 val messageContent = chime?.constructMessageContent(compiledSubject, compiledMessage)
                 destinationMessage = ChimeMessage.Builder(name)
-                        .withUrl(chime?.url)
-                        .withMessage(messageContent)
-                        .build()
+                    .withUrl(chime?.url)
+                    .withMessage(messageContent)
+                    .build()
             }
             DestinationType.SLACK -> {
                 val messageContent = slack?.constructMessageContent(compiledSubject, compiledMessage)
                 destinationMessage = SlackMessage.Builder(name)
-                        .withUrl(slack?.url)
-                        .withMessage(messageContent)
-                        .build()
+                    .withUrl(slack?.url)
+                    .withMessage(messageContent)
+                    .build()
             }
             DestinationType.CUSTOM_WEBHOOK -> {
                 destinationMessage = CustomWebhookMessage.Builder(name)
-                        .withUrl(customWebhook?.url)
-                        .withScheme(customWebhook?.scheme)
-                        .withHost(customWebhook?.host)
-                        .withPort(customWebhook?.port)
-                        .withPath(customWebhook?.path)
-                        .withMethod(customWebhook?.method)
-                        .withQueryParams(customWebhook?.queryParams)
-                        .withHeaderParams(customWebhook?.headerParams)
-                        .withMessage(compiledMessage).build()
+                    .withUrl(customWebhook?.url)
+                    .withScheme(customWebhook?.scheme)
+                    .withHost(customWebhook?.host)
+                    .withPort(customWebhook?.port)
+                    .withPath(customWebhook?.path)
+                    .withMethod(customWebhook?.method)
+                    .withQueryParams(customWebhook?.queryParams)
+                    .withHeaderParams(customWebhook?.headerParams)
+                    .withMessage(compiledMessage).build()
             }
             DestinationType.EMAIL -> {
                 val emailAccount = destinationCtx.emailAccount
                 destinationMessage = EmailMessage.Builder(name)
-                        .withHost(emailAccount?.host)
-                        .withPort(emailAccount?.port)
-                        .withMethod(emailAccount?.method?.value)
-                        .withUserName(emailAccount?.username)
-                        .withPassword(emailAccount?.password)
-                        .withFrom(emailAccount?.email)
-                        .withRecipients(destinationCtx.recipients)
-                        .withSubject(compiledSubject)
-                        .withMessage(compiledMessage).build()
+                    .withHost(emailAccount?.host)
+                    .withPort(emailAccount?.port)
+                    .withMethod(emailAccount?.method?.value)
+                    .withUserName(emailAccount?.username)
+                    .withPassword(emailAccount?.password)
+                    .withFrom(emailAccount?.email)
+                    .withRecipients(destinationCtx.recipients)
+                    .withSubject(compiledSubject)
+                    .withMessage(compiledMessage).build()
             }
             DestinationType.TEST_ACTION -> {
                 return "test action"
@@ -330,8 +332,10 @@ data class Destination(
 
     private fun validateDestinationUri(destinationMessage: BaseMessage, denyHostRanges: List<String>) {
         if (destinationMessage.isHostInDenylist(denyHostRanges)) {
-            logger.error("Host: {} resolves to: {} which is in denylist: {}.", destinationMessage.uri.host,
-                    InetAddress.getByName(destinationMessage.uri.host), denyHostRanges)
+            logger.error(
+                "Host: {} resolves to: {} which is in denylist: {}.", destinationMessage.uri.host,
+                InetAddress.getByName(destinationMessage.uri.host), denyHostRanges
+            )
             throw IOException("The destination address is invalid.")
         }
     }

@@ -33,13 +33,13 @@ class EmailAccountTests : OpenSearchTestCase() {
 
     fun `test email account`() {
         val emailAccount = EmailAccount(
-                name = "test",
-                email = "test@email.com",
-                host = "smtp.com",
-                port = 25,
-                method = EmailAccount.MethodType.NONE,
-                username = null,
-                password = null
+            name = "test",
+            email = "test@email.com",
+            host = "smtp.com",
+            port = 25,
+            method = EmailAccount.MethodType.NONE,
+            username = null,
+            password = null
         )
         assertEquals("Email account name was changed", emailAccount.name, "test")
         assertEquals("Email account email was changed", emailAccount.email, "test@email.com")

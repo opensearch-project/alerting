@@ -43,9 +43,9 @@ import org.opensearch.alerting.randomTrigger
 import org.opensearch.alerting.randomTriggerRunResult
 import org.opensearch.alerting.randomUser
 import org.opensearch.alerting.randomUserEmpty
-import org.opensearch.commons.authuser.User
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.commons.authuser.User
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase
 

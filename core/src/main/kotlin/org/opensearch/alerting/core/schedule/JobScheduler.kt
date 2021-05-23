@@ -26,9 +26,9 @@
 
 package org.opensearch.alerting.core.schedule
 
+import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.core.JobRunner
 import org.opensearch.alerting.core.model.ScheduledJob
-import org.apache.logging.log4j.LogManager
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.threadpool.Scheduler
 import org.opensearch.threadpool.ThreadPool
@@ -169,7 +169,8 @@ class JobScheduler(private val threadPool: ThreadPool, private val jobRunner: Jo
             return false
         }
         scheduledJobInfo.expectedNextExecutionTime = scheduleJob.schedule.getExpectedNextExecutionTime(
-                scheduleJob.enabledTime!!, scheduledJobInfo.expectedNextExecutionTime)
+            scheduleJob.enabledTime!!, scheduledJobInfo.expectedNextExecutionTime
+        )
 
         // Validate if there is next execution that needs to happen.
         // e.g cron job that is expected to run in 30th of Feb (which doesn't exist). "0/5 * 30 2 *"
@@ -213,12 +214,14 @@ class JobScheduler(private val threadPool: ThreadPool, private val jobRunner: Jo
 
     fun getJobSchedulerMetric(): List<JobSchedulerMetrics> {
         return scheduledJobIdToInfo.entries.stream()
-                .map { entry ->
-                    JobSchedulerMetrics(entry.value.scheduledJobId,
-                            entry.value.actualPreviousExecutionTime?.toEpochMilli(),
-                            entry.value.scheduledJob.schedule.runningOnTime(entry.value.actualPreviousExecutionTime))
-                }
-                .collect(Collectors.toList())
+            .map { entry ->
+                JobSchedulerMetrics(
+                    entry.value.scheduledJobId,
+                    entry.value.actualPreviousExecutionTime?.toEpochMilli(),
+                    entry.value.scheduledJob.schedule.runningOnTime(entry.value.actualPreviousExecutionTime)
+                )
+            }
+            .collect(Collectors.toList())
     }
 
     fun postIndex(job: ScheduledJob) {

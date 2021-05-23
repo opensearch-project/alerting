@@ -26,19 +26,6 @@
 
 package org.opensearch.alerting.transport
 
-import org.opensearch.alerting.action.IndexEmailAccountAction
-import org.opensearch.alerting.action.IndexEmailAccountRequest
-import org.opensearch.alerting.action.IndexEmailAccountResponse
-import org.opensearch.alerting.core.ScheduledJobIndices
-import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
-import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOB_TYPE
-import org.opensearch.alerting.model.destination.email.EmailAccount
-import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
-import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
-import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
-import org.opensearch.alerting.util.AlertingException
-import org.opensearch.alerting.util.DestinationType
-import org.opensearch.alerting.util.IndexUtils
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
@@ -52,6 +39,19 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.alerting.action.IndexEmailAccountAction
+import org.opensearch.alerting.action.IndexEmailAccountRequest
+import org.opensearch.alerting.action.IndexEmailAccountResponse
+import org.opensearch.alerting.core.ScheduledJobIndices
+import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
+import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOB_TYPE
+import org.opensearch.alerting.model.destination.email.EmailAccount
+import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
+import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
+import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
+import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.DestinationType
+import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -114,17 +114,19 @@ class TransportIndexEmailAccountAction @Inject constructor(
                     }
                 })
             } else if (!IndexUtils.scheduledJobIndexUpdated) {
-                IndexUtils.updateIndexMapping(SCHEDULED_JOBS_INDEX, SCHEDULED_JOB_TYPE,
-                        ScheduledJobIndices.scheduledJobMappings(), clusterService.state(), client.admin().indices(),
-                        object : ActionListener<AcknowledgedResponse> {
-                            override fun onResponse(response: AcknowledgedResponse) {
-                                onUpdateMappingsResponse(response)
-                            }
+                IndexUtils.updateIndexMapping(
+                    SCHEDULED_JOBS_INDEX, SCHEDULED_JOB_TYPE,
+                    ScheduledJobIndices.scheduledJobMappings(), clusterService.state(), client.admin().indices(),
+                    object : ActionListener<AcknowledgedResponse> {
+                        override fun onResponse(response: AcknowledgedResponse) {
+                            onUpdateMappingsResponse(response)
+                        }
 
-                            override fun onFailure(e: Exception) {
-                                actionListener.onFailure(e)
-                            }
-                        })
+                        override fun onFailure(e: Exception) {
+                            actionListener.onFailure(e)
+                        }
+                    }
+                )
             } else {
                 prepareEmailAccountIndexing()
             }
@@ -134,30 +136,37 @@ class TransportIndexEmailAccountAction @Inject constructor(
 
             if (!allowList.contains(DestinationType.EMAIL.value)) {
                 actionListener.onFailure(
-                    AlertingException.wrap(OpenSearchStatusException(
-                        "This API is blocked since Destination type [${DestinationType.EMAIL}] is not allowed",
-                        RestStatus.FORBIDDEN
-                    ))
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "This API is blocked since Destination type [${DestinationType.EMAIL}] is not allowed",
+                            RestStatus.FORBIDDEN
+                        )
+                    )
                 )
                 return
             }
 
             val query = QueryBuilders.boolQuery()
-                .must(QueryBuilders.termQuery(
-                    "${EmailAccount.EMAIL_ACCOUNT_TYPE}.${EmailAccount.NAME_FIELD}.keyword", request.emailAccount.name)
+                .must(
+                    QueryBuilders.termQuery(
+                        "${EmailAccount.EMAIL_ACCOUNT_TYPE}.${EmailAccount.NAME_FIELD}.keyword", request.emailAccount.name
+                    )
                 )
                 .filter(QueryBuilders.existsQuery(EmailAccount.EMAIL_ACCOUNT_TYPE))
             val searchSource = SearchSourceBuilder().query(query).timeout(requestTimeout)
             val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
-            client.search(searchRequest, object : ActionListener<SearchResponse> {
-                override fun onResponse(searchResponse: SearchResponse) {
-                    onSearchResponse(searchResponse)
-                }
+            client.search(
+                searchRequest,
+                object : ActionListener<SearchResponse> {
+                    override fun onResponse(searchResponse: SearchResponse) {
+                        onSearchResponse(searchResponse)
+                    }
 
-                override fun onFailure(e: Exception) {
-                    actionListener.onFailure(e)
+                    override fun onFailure(e: Exception) {
+                        actionListener.onFailure(e)
+                    }
                 }
-            })
+            )
         }
 
         /**
@@ -207,10 +216,12 @@ class TransportIndexEmailAccountAction @Inject constructor(
             } else {
                 log.error("Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged.")
                 actionListener.onFailure(
-                    AlertingException.wrap(OpenSearchStatusException(
-                        "Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged.",
-                        RestStatus.INTERNAL_SERVER_ERROR
-                    ))
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged.",
+                            RestStatus.INTERNAL_SERVER_ERROR
+                        )
+                    )
                 )
             }
         }
@@ -223,10 +234,12 @@ class TransportIndexEmailAccountAction @Inject constructor(
             } else {
                 log.error("Update $SCHEDULED_JOBS_INDEX mappings call not acknowledged.")
                 actionListener.onFailure(
-                    AlertingException.wrap(OpenSearchStatusException(
-                        "Update $SCHEDULED_JOBS_INDEX mappings call not acknowledged.",
-                        RestStatus.INTERNAL_SERVER_ERROR
-                    ))
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "Update $SCHEDULED_JOBS_INDEX mappings call not acknowledged.",
+                            RestStatus.INTERNAL_SERVER_ERROR
+                        )
+                    )
                 )
             }
         }
@@ -234,57 +247,70 @@ class TransportIndexEmailAccountAction @Inject constructor(
         private fun indexEmailAccount(update: Boolean = false) {
             request.emailAccount = request.emailAccount.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
             var indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
-                    .setRefreshPolicy(request.refreshPolicy)
-                    .source(request.emailAccount.toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-                    .setIfSeqNo(request.seqNo)
-                    .setIfPrimaryTerm(request.primaryTerm)
-                    .timeout(indexTimeout)
+                .setRefreshPolicy(request.refreshPolicy)
+                .source(request.emailAccount.toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+                .setIfSeqNo(request.seqNo)
+                .setIfPrimaryTerm(request.primaryTerm)
+                .timeout(indexTimeout)
 
             // If request is to update, then add id to index request
             if (update) indexRequest = indexRequest.id(request.emailAccountID)
 
-            client.index(indexRequest, object : ActionListener<IndexResponse> {
-                override fun onResponse(response: IndexResponse) {
-                    val failureReasons = checkShardsFailure(response)
-                    if (failureReasons != null) {
-                        actionListener.onFailure(
-                            AlertingException.wrap(OpenSearchStatusException(
-                                failureReasons.toString(), response.status())
-                            ))
-                        return
+            client.index(
+                indexRequest,
+                object : ActionListener<IndexResponse> {
+                    override fun onResponse(response: IndexResponse) {
+                        val failureReasons = checkShardsFailure(response)
+                        if (failureReasons != null) {
+                            actionListener.onFailure(
+                                AlertingException.wrap(
+                                    OpenSearchStatusException(
+                                        failureReasons.toString(), response.status()
+                                    )
+                                )
+                            )
+                            return
+                        }
+                        actionListener.onResponse(
+                            IndexEmailAccountResponse(
+                                response.id, response.version, response.seqNo, response.primaryTerm,
+                                RestStatus.CREATED, request.emailAccount
+                            )
+                        )
                     }
-                    actionListener.onResponse(
-                        IndexEmailAccountResponse(response.id, response.version, response.seqNo, response.primaryTerm,
-                            RestStatus.CREATED, request.emailAccount)
-                    )
-                }
 
-                override fun onFailure(e: Exception) {
-                    actionListener.onFailure(e)
+                    override fun onFailure(e: Exception) {
+                        actionListener.onFailure(e)
+                    }
                 }
-            })
+            )
         }
 
         private fun updateEmailAccount() {
             val getRequest = GetRequest(SCHEDULED_JOBS_INDEX, request.emailAccountID)
-            client.get(getRequest, object : ActionListener<GetResponse> {
-                override fun onResponse(response: GetResponse) {
-                    onGetResponse(response)
-                }
+            client.get(
+                getRequest,
+                object : ActionListener<GetResponse> {
+                    override fun onResponse(response: GetResponse) {
+                        onGetResponse(response)
+                    }
 
-                override fun onFailure(e: Exception) {
-                    actionListener.onFailure(e)
+                    override fun onFailure(e: Exception) {
+                        actionListener.onFailure(e)
+                    }
                 }
-            })
+            )
         }
 
         private fun onGetResponse(response: GetResponse) {
             if (!response.isExists) {
                 actionListener.onFailure(
-                    AlertingException.wrap(OpenSearchStatusException(
-                        "EmailAccount with ${request.emailAccountID} was not found",
-                        RestStatus.NOT_FOUND
-                    ))
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "EmailAccount with ${request.emailAccountID} was not found",
+                            RestStatus.NOT_FOUND
+                        )
+                    )
                 )
                 return
             }
@@ -296,7 +322,8 @@ class TransportIndexEmailAccountAction @Inject constructor(
             val failureReasons = StringBuilder()
             if (response.shardInfo.failed > 0) {
                 response.shardInfo.failures.forEach {
-                    entry -> failureReasons.append(entry.reason())
+                    entry ->
+                    failureReasons.append(entry.reason())
                 }
 
                 return failureReasons.toString()

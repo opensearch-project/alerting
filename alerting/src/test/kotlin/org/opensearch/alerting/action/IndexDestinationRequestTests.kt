@@ -26,11 +26,11 @@
 
 package org.opensearch.alerting.action
 
+import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.randomUser
 import org.opensearch.alerting.util.DestinationType
-import org.opensearch.action.support.WriteRequest
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.rest.RestRequest
@@ -42,26 +42,26 @@ class IndexDestinationRequestTests : OpenSearchTestCase() {
     fun `test index destination post request`() {
 
         val req = IndexDestinationRequest(
+            "1234",
+            0L,
+            1L,
+            WriteRequest.RefreshPolicy.IMMEDIATE,
+            RestRequest.Method.POST,
+            Destination(
                 "1234",
                 0L,
-                1L,
-                WriteRequest.RefreshPolicy.IMMEDIATE,
-                RestRequest.Method.POST,
-                Destination(
-                        "1234",
-                        0L,
-                        1,
-                        1,
-                        1,
-                        DestinationType.CHIME,
-                        "TestChimeDest",
-                        randomUser(),
-                        Instant.now(),
-                        Chime("test.com"),
-                        null,
-                        null,
-                        null
-                )
+                1,
+                1,
+                1,
+                DestinationType.CHIME,
+                "TestChimeDest",
+                randomUser(),
+                Instant.now(),
+                Chime("test.com"),
+                null,
+                null,
+                null
+            )
         )
         assertNotNull(req)
 
@@ -81,26 +81,26 @@ class IndexDestinationRequestTests : OpenSearchTestCase() {
     fun `test index destination put request`() {
 
         val req = IndexDestinationRequest(
+            "1234",
+            0L,
+            1L,
+            WriteRequest.RefreshPolicy.IMMEDIATE,
+            RestRequest.Method.PUT,
+            Destination(
                 "1234",
                 0L,
-                1L,
-                WriteRequest.RefreshPolicy.IMMEDIATE,
-                RestRequest.Method.PUT,
-                Destination(
-                        "1234",
-                        0L,
-                        1,
-                        1,
-                        1,
-                        DestinationType.CHIME,
-                        "TestChimeDest",
-                        randomUser(),
-                        Instant.now(),
-                        Chime("test.com"),
-                        null,
-                        null,
-                        null
-                )
+                1,
+                1,
+                1,
+                DestinationType.CHIME,
+                "TestChimeDest",
+                randomUser(),
+                Instant.now(),
+                Chime("test.com"),
+                null,
+                null,
+                null
+            )
         )
         assertNotNull(req)
 
