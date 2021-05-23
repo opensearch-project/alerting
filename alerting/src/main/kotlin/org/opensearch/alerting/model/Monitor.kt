@@ -39,7 +39,6 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.MONITOR_MAX_T
 import org.opensearch.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
 import org.opensearch.alerting.util._ID
 import org.opensearch.alerting.util._VERSION
-import org.opensearch.commons.authuser.User
 import org.opensearch.common.CheckedFunction
 import org.opensearch.common.ParseField
 import org.opensearch.common.io.stream.StreamInput
@@ -50,6 +49,7 @@ import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParser.Token
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
+import org.opensearch.commons.authuser.User
 import java.io.IOException
 import java.time.Instant
 
@@ -90,7 +90,7 @@ data class Monitor(
     }
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         id = sin.readString(),
         version = sin.readLong(),
         name = sin.readString(),
@@ -119,15 +119,15 @@ data class Monitor(
         builder.startObject()
         if (params.paramAsBoolean("with_type", false)) builder.startObject(type)
         builder.field(TYPE_FIELD, type)
-                .field(SCHEMA_VERSION_FIELD, schemaVersion)
-                .field(NAME_FIELD, name)
-                .optionalUserField(USER_FIELD, user)
-                .field(ENABLED_FIELD, enabled)
-                .optionalTimeField(ENABLED_TIME_FIELD, enabledTime)
-                .field(SCHEDULE_FIELD, schedule)
-                .field(INPUTS_FIELD, inputs.toTypedArray())
-                .field(TRIGGERS_FIELD, triggers.toTypedArray())
-                .optionalTimeField(LAST_UPDATE_TIME_FIELD, lastUpdateTime)
+            .field(SCHEMA_VERSION_FIELD, schemaVersion)
+            .field(NAME_FIELD, name)
+            .optionalUserField(USER_FIELD, user)
+            .field(ENABLED_FIELD, enabled)
+            .optionalTimeField(ENABLED_TIME_FIELD, enabledTime)
+            .field(SCHEDULE_FIELD, schedule)
+            .field(INPUTS_FIELD, inputs.toTypedArray())
+            .field(TRIGGERS_FIELD, triggers.toTypedArray())
+            .optionalTimeField(LAST_UPDATE_TIME_FIELD, lastUpdateTime)
         if (uiMetadata.isNotEmpty()) builder.field(UI_METADATA_FIELD, uiMetadata)
         if (params.paramAsBoolean("with_type", false)) builder.endObject()
         return builder.endObject()
@@ -175,9 +175,11 @@ data class Monitor(
 
         // This is defined here instead of in ScheduledJob to avoid having the ScheduledJob class know about all
         // the different subclasses and creating circular dependencies
-        val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(ScheduledJob::class.java,
-                ParseField(MONITOR_TYPE),
-                CheckedFunction { parse(it) })
+        val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(
+            ScheduledJob::class.java,
+            ParseField(MONITOR_TYPE),
+            CheckedFunction { parse(it) }
+        )
 
         @JvmStatic
         @JvmOverloads
@@ -231,18 +233,20 @@ data class Monitor(
             } else if (!enabled) {
                 enabledTime = null
             }
-            return Monitor(id,
-                    version,
-                    requireNotNull(name) { "Monitor name is null" },
-                    enabled,
-                    requireNotNull(schedule) { "Monitor schedule is null" },
-                    lastUpdateTime ?: Instant.now(),
-                    enabledTime,
-                    user,
-                    schemaVersion,
-                    inputs.toList(),
-                    triggers.toList(),
-                    uiMetadata)
+            return Monitor(
+                id,
+                version,
+                requireNotNull(name) { "Monitor name is null" },
+                enabled,
+                requireNotNull(schedule) { "Monitor schedule is null" },
+                lastUpdateTime ?: Instant.now(),
+                enabledTime,
+                user,
+                schemaVersion,
+                inputs.toList(),
+                triggers.toList(),
+                uiMetadata
+            )
         }
 
         @JvmStatic

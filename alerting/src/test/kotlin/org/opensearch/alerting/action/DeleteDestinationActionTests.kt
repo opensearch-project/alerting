@@ -26,8 +26,8 @@
 
 package org.opensearch.alerting.action
 
-import org.opensearch.test.OpenSearchTestCase
 import org.junit.Assert
+import org.opensearch.test.OpenSearchTestCase
 
 class DeleteDestinationActionTests : OpenSearchTestCase() {
 

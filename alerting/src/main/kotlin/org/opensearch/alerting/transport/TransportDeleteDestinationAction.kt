@@ -26,16 +26,6 @@
 
 package org.opensearch.alerting.transport
 
-import org.opensearch.alerting.action.DeleteDestinationAction
-import org.opensearch.alerting.action.DeleteDestinationRequest
-import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.model.destination.Destination
-import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.util.AlertingException
-import org.opensearch.alerting.util.checkFilterByUserBackendRoles
-import org.opensearch.alerting.util.checkUserFilterByPermissions
-import org.opensearch.commons.ConfigConstants
-import org.opensearch.commons.authuser.User
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
@@ -45,6 +35,14 @@ import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.action.DeleteDestinationAction
+import org.opensearch.alerting.action.DeleteDestinationRequest
+import org.opensearch.alerting.core.model.ScheduledJob
+import org.opensearch.alerting.model.destination.Destination
+import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.checkFilterByUserBackendRoles
+import org.opensearch.alerting.util.checkUserFilterByPermissions
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -55,6 +53,8 @@ import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.ConfigConstants
+import org.opensearch.commons.authuser.User
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -70,8 +70,8 @@ class TransportDeleteDestinationAction @Inject constructor(
     settings: Settings,
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<DeleteDestinationRequest, DeleteResponse>(
-        DeleteDestinationAction.NAME, transportService, actionFilters, ::DeleteDestinationRequest
-    ) {
+    DeleteDestinationAction.NAME, transportService, actionFilters, ::DeleteDestinationRequest
+) {
 
     @Volatile private var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
@@ -84,7 +84,7 @@ class TransportDeleteDestinationAction @Inject constructor(
         log.debug("User and roles string from thread context: $userStr")
         val user: User? = User.parse(userStr)
         val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, request.destinationId)
-                .setRefreshPolicy(request.refreshPolicy)
+            .setRefreshPolicy(request.refreshPolicy)
 
         if (!checkFilterByUserBackendRoles(filterByEnabled, user, actionListener)) {
             return
@@ -121,29 +121,35 @@ class TransportDeleteDestinationAction @Inject constructor(
 
         fun start() {
             val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, destinationId)
-            client.get(getRequest, object : ActionListener<GetResponse> {
-                override fun onResponse(response: GetResponse) {
-                    if (!response.isExists) {
-                        actionListener.onFailure(AlertingException.wrap(
-                            OpenSearchStatusException("Destination with $destinationId is not found", RestStatus.NOT_FOUND)))
-                        return
+            client.get(
+                getRequest,
+                object : ActionListener<GetResponse> {
+                    override fun onResponse(response: GetResponse) {
+                        if (!response.isExists) {
+                            actionListener.onFailure(
+                                AlertingException.wrap(
+                                    OpenSearchStatusException("Destination with $destinationId is not found", RestStatus.NOT_FOUND)
+                                )
+                            )
+                            return
+                        }
+                        val id = response.id
+                        val version = response.version
+                        val seqNo = response.seqNo.toInt()
+                        val primaryTerm = response.primaryTerm.toInt()
+                        val xcp = XContentFactory.xContent(XContentType.JSON)
+                            .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, response.sourceAsString)
+                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
+                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                        val dest = Destination.parse(xcp, id, version, seqNo, primaryTerm)
+                        onGetResponse(dest)
                     }
-                    val id = response.id
-                    val version = response.version
-                    val seqNo = response.seqNo.toInt()
-                    val primaryTerm = response.primaryTerm.toInt()
-                    val xcp = XContentFactory.xContent(XContentType.JSON)
-                        .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, response.sourceAsString)
-                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
-                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                    val dest = Destination.parse(xcp, id, version, seqNo, primaryTerm)
-                    onGetResponse(dest)
+                    override fun onFailure(t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                    }
                 }
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
-                }
-            })
+            )
         }
 
         private fun onGetResponse(destination: Destination) {
@@ -155,15 +161,18 @@ class TransportDeleteDestinationAction @Inject constructor(
         }
 
         private fun deleteDestination() {
-            client.delete(deleteRequest, object : ActionListener<DeleteResponse> {
-                override fun onResponse(response: DeleteResponse) {
-                    actionListener.onResponse(response)
-                }
+            client.delete(
+                deleteRequest,
+                object : ActionListener<DeleteResponse> {
+                    override fun onResponse(response: DeleteResponse) {
+                        actionListener.onResponse(response)
+                    }
 
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
+                    override fun onFailure(t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                    }
                 }
-            })
+            )
         }
     }
 }

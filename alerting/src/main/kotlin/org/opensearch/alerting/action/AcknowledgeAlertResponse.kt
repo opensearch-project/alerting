@@ -26,8 +26,8 @@
 
 package org.opensearch.alerting.action
 
-import org.opensearch.alerting.model.Alert
 import org.opensearch.action.ActionResponse
+import org.opensearch.alerting.model.Alert
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.ToXContent
@@ -79,7 +79,7 @@ class AcknowledgeAlertResponse : ActionResponse, ToXContentObject {
 
     private fun buildFailedAlertAcknowledgeObject(builder: XContentBuilder, failedAlert: Alert) {
         builder.startObject()
-                .startObject(failedAlert.id)
+            .startObject(failedAlert.id)
         val reason = when (failedAlert.state) {
             Alert.State.ERROR -> "Alert is in an error state and can not be acknowledged."
             Alert.State.COMPLETED -> "Alert has already completed and can not be acknowledged."
@@ -87,15 +87,15 @@ class AcknowledgeAlertResponse : ActionResponse, ToXContentObject {
             else -> "Alert state unknown and can not be acknowledged"
         }
         builder.field("failed_reason", reason)
-                .endObject()
-                .endObject()
+            .endObject()
+            .endObject()
     }
 
     private fun buildMissingAlertAcknowledgeObject(builder: XContentBuilder, alertID: String) {
         builder.startObject()
-                .startObject(alertID)
-                .field("failed_reason", "Alert: $alertID does not exist (it may have already completed).")
-                .endObject()
-                .endObject()
+            .startObject(alertID)
+            .field("failed_reason", "Alert: $alertID does not exist (it may have already completed).")
+            .endObject()
+            .endObject()
     }
 }

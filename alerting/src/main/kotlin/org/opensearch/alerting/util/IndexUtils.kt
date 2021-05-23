@@ -26,11 +26,11 @@
 
 package org.opensearch.alerting.util
 
-import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.action.ActionListener
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.client.IndicesAdminClient
 import org.opensearch.cluster.ClusterState
 import org.opensearch.cluster.metadata.IndexMetadata
@@ -74,8 +74,10 @@ class IndexUtils {
 
         @JvmStatic
         fun getSchemaVersion(mapping: String): Int {
-            val xcp = XContentType.JSON.xContent().createParser(NamedXContentRegistry.EMPTY,
-                    LoggingDeprecationHandler.INSTANCE, mapping)
+            val xcp = XContentType.JSON.xContent().createParser(
+                NamedXContentRegistry.EMPTY,
+                LoggingDeprecationHandler.INSTANCE, mapping
+            )
 
             while (!xcp.isClosed) {
                 val token = xcp.currentToken()

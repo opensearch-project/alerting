@@ -26,16 +26,16 @@
 
 package org.opensearch.alerting.action
 
+import org.junit.Assert
 import org.opensearch.alerting.builder
 import org.opensearch.alerting.elasticapi.string
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.randomUser
-import org.opensearch.commons.authuser.User
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.commons.authuser.User
 import org.opensearch.test.OpenSearchTestCase
-import org.junit.Assert
 import java.time.Instant
 import java.util.Collections
 
@@ -55,24 +55,24 @@ class GetAlertsResponseTests : OpenSearchTestCase() {
 
     fun `test get alerts response with alerts`() {
         val alert = Alert(
-                "id",
-                0L,
-                0,
-                "monitorId",
-                "monitorName",
-                0L,
-                randomUser(),
-                "triggerId",
-                "triggerName",
-                Alert.State.ACKNOWLEDGED,
-                Instant.MIN,
-                null,
-                null,
-                null,
-                null,
-                Collections.emptyList(),
-                "severity",
-                Collections.emptyList()
+            "id",
+            0L,
+            0,
+            "monitorId",
+            "monitorName",
+            0L,
+            randomUser(),
+            "triggerId",
+            "triggerName",
+            Alert.State.ACKNOWLEDGED,
+            Instant.MIN,
+            null,
+            null,
+            null,
+            null,
+            Collections.emptyList(),
+            "severity",
+            Collections.emptyList()
         )
         val req = GetAlertsResponse(listOf(alert), 1)
         assertNotNull(req)
@@ -90,34 +90,34 @@ class GetAlertsResponseTests : OpenSearchTestCase() {
         val now = Instant.now()
 
         val alert = Alert(
-                "id",
-                0L,
-                0,
-                "monitorId",
-                "monitorName",
-                0L,
-                User("admin", listOf(), listOf(), listOf()),
-                "triggerId",
-                "triggerName",
-                Alert.State.ACKNOWLEDGED,
-                now,
-                null,
-                null,
-                null,
-                null,
-                Collections.emptyList(),
-                "severity",
-                Collections.emptyList()
+            "id",
+            0L,
+            0,
+            "monitorId",
+            "monitorName",
+            0L,
+            User("admin", listOf(), listOf(), listOf()),
+            "triggerId",
+            "triggerName",
+            Alert.State.ACKNOWLEDGED,
+            now,
+            null,
+            null,
+            null,
+            null,
+            Collections.emptyList(),
+            "severity",
+            Collections.emptyList()
         )
         val req = GetAlertsResponse(listOf(alert), 1)
         var actualXContentString = req.toXContent(builder(), ToXContent.EMPTY_PARAMS).string()
         val expectedXContentString = "{\"alerts\":[{\"id\":\"id\",\"version\":0,\"monitor_id\":\"monitorId\"," +
-                "\"schema_version\":0,\"monitor_version\":0,\"monitor_name\":\"monitorName\"," +
-                "\"monitor_user\":{\"name\":\"admin\",\"backend_roles\":[],\"roles\":[]," +
-                "\"custom_attribute_names\":[],\"user_requested_tenant\":null},\"trigger_id\":\"triggerId\"," +
-                "\"trigger_name\":\"triggerName\",\"state\":\"ACKNOWLEDGED\",\"error_message\":null,\"alert_history\":[]," +
-                "\"severity\":\"severity\",\"action_execution_results\":[],\"start_time\":" + now.toEpochMilli() +
-                ",\"last_notification_time\":null,\"end_time\":null,\"acknowledged_time\":null}],\"totalAlerts\":1}"
+            "\"schema_version\":0,\"monitor_version\":0,\"monitor_name\":\"monitorName\"," +
+            "\"monitor_user\":{\"name\":\"admin\",\"backend_roles\":[],\"roles\":[]," +
+            "\"custom_attribute_names\":[],\"user_requested_tenant\":null},\"trigger_id\":\"triggerId\"," +
+            "\"trigger_name\":\"triggerName\",\"state\":\"ACKNOWLEDGED\",\"error_message\":null,\"alert_history\":[]," +
+            "\"severity\":\"severity\",\"action_execution_results\":[],\"start_time\":" + now.toEpochMilli() +
+            ",\"last_notification_time\":null,\"end_time\":null,\"acknowledged_time\":null}],\"totalAlerts\":1}"
         assertEquals(expectedXContentString, actualXContentString)
     }
 }

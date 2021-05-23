@@ -25,6 +25,8 @@
  */
 package org.opensearch.alerting
 
+import org.apache.http.Header
+import org.apache.http.HttpEntity
 import org.opensearch.alerting.core.model.Input
 import org.opensearch.alerting.core.model.IntervalSchedule
 import org.opensearch.alerting.core.model.Schedule
@@ -43,9 +45,6 @@ import org.opensearch.alerting.model.action.Throttle
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailEntry
 import org.opensearch.alerting.model.destination.email.EmailGroup
-import org.opensearch.commons.authuser.User
-import org.apache.http.Header
-import org.apache.http.HttpEntity
 import org.opensearch.client.Request
 import org.opensearch.client.RequestOptions
 import org.opensearch.client.Response
@@ -60,6 +59,7 @@ import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptType
@@ -83,9 +83,11 @@ fun randomMonitor(
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     withMetadata: Boolean = false
 ): Monitor {
-    return Monitor(name = name, enabled = enabled, inputs = inputs, schedule = schedule, triggers = triggers,
-            enabledTime = enabledTime, lastUpdateTime = lastUpdateTime,
-            user = user, uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf())
+    return Monitor(
+        name = name, enabled = enabled, inputs = inputs, schedule = schedule, triggers = triggers,
+        enabledTime = enabledTime, lastUpdateTime = lastUpdateTime,
+        user = user, uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+    )
 }
 
 // Monitor of older versions without security.
@@ -99,9 +101,11 @@ fun randomMonitorWithoutUser(
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     withMetadata: Boolean = false
 ): Monitor {
-    return Monitor(name = name, enabled = enabled, inputs = inputs, schedule = schedule, triggers = triggers,
-            enabledTime = enabledTime, lastUpdateTime = lastUpdateTime,
-            user = null, uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf())
+    return Monitor(
+        name = name, enabled = enabled, inputs = inputs, schedule = schedule, triggers = triggers,
+        enabledTime = enabledTime, lastUpdateTime = lastUpdateTime,
+        user = null, uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+    )
 }
 
 fun randomTrigger(
@@ -117,7 +121,8 @@ fun randomTrigger(
         name = name,
         severity = severity,
         condition = condition,
-        actions = if (actions.isEmpty()) (0..randomInt(10)).map { randomAction(destinationId = destinationId) } else actions)
+        actions = if (actions.isEmpty()) (0..randomInt(10)).map { randomAction(destinationId = destinationId) } else actions
+    )
 }
 
 fun randomEmailAccount(
@@ -178,8 +183,10 @@ fun randomThrottle(
 fun randomAlert(monitor: Monitor = randomMonitor()): Alert {
     val trigger = randomTrigger()
     val actionExecutionResults = mutableListOf(randomActionExecutionResult(), randomActionExecutionResult())
-    return Alert(monitor, trigger, Instant.now().truncatedTo(ChronoUnit.MILLIS), null,
-            actionExecutionResults = actionExecutionResults)
+    return Alert(
+        monitor, trigger, Instant.now().truncatedTo(ChronoUnit.MILLIS), null,
+        actionExecutionResults = actionExecutionResults
+    )
 }
 
 fun randomEmailAccountMethod(): EmailAccount.MethodType {
@@ -224,8 +231,10 @@ fun randomActionRunResult(): ActionRunResult {
     val map = mutableMapOf<String, String>()
     map.plus(Pair("key1", "val1"))
     map.plus(Pair("key2", "val2"))
-    return ActionRunResult("1234", "test-action", map,
-            false, Instant.now(), null)
+    return ActionRunResult(
+        "1234", "test-action", map,
+        false, Instant.now(), null
+    )
 }
 
 fun Monitor.toJsonString(): String {
@@ -234,9 +243,15 @@ fun Monitor.toJsonString(): String {
 }
 
 fun randomUser(): User {
-    return User(OpenSearchRestTestCase.randomAlphaOfLength(10), listOf(OpenSearchRestTestCase.randomAlphaOfLength(10),
-        OpenSearchRestTestCase.randomAlphaOfLength(10)), listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), "all_access"),
-        listOf("test_attr=test"))
+    return User(
+        OpenSearchRestTestCase.randomAlphaOfLength(10),
+        listOf(
+            OpenSearchRestTestCase.randomAlphaOfLength(10),
+            OpenSearchRestTestCase.randomAlphaOfLength(10)
+        ),
+        listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), "all_access"),
+        listOf("test_attr=test")
+    )
 }
 
 fun randomUserEmpty(): User {
@@ -314,7 +329,10 @@ fun parser(xc: String): XContentParser {
 }
 
 fun xContentRegistry(): NamedXContentRegistry {
-    return NamedXContentRegistry(listOf(
-            SearchInput.XCONTENT_REGISTRY) +
-            SearchModule(Settings.EMPTY, false, emptyList()).namedXContents)
+    return NamedXContentRegistry(
+        listOf(
+            SearchInput.XCONTENT_REGISTRY
+        ) +
+            SearchModule(Settings.EMPTY, false, emptyList()).namedXContents
+    )
 }

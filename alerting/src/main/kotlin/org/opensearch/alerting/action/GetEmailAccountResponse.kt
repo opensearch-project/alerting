@@ -26,12 +26,12 @@
 
 package org.opensearch.alerting.action
 
+import org.opensearch.action.ActionResponse
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.util._ID
 import org.opensearch.alerting.util._PRIMARY_TERM
 import org.opensearch.alerting.util._SEQ_NO
 import org.opensearch.alerting.util._VERSION
-import org.opensearch.action.ActionResponse
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.ToXContent
@@ -55,7 +55,7 @@ class GetEmailAccountResponse : ActionResponse, ToXContentObject {
         primaryTerm: Long,
         status: RestStatus,
         emailAccount: EmailAccount?
-    ): super() {
+    ) : super() {
         this.id = id
         this.version = version
         this.seqNo = seqNo
@@ -65,7 +65,7 @@ class GetEmailAccountResponse : ActionResponse, ToXContentObject {
     }
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         sin.readString(), // id
         sin.readLong(), // version
         sin.readLong(), // seqNo

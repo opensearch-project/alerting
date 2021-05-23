@@ -26,9 +26,9 @@
 
 package org.opensearch.alerting.core.action.node
 
-import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.action.FailedNodeException
 import org.opensearch.action.support.nodes.BaseNodesResponse
+import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.cluster.ClusterName
 import org.opensearch.cluster.health.ClusterIndexHealth
 import org.opensearch.common.io.stream.StreamInput
@@ -46,7 +46,7 @@ class ScheduledJobsStatsResponse : BaseNodesResponse<ScheduledJobStats>, ToXCont
     private var indexExists: Boolean? = null
     private var indexHealth: ClusterIndexHealth? = null
 
-    constructor(si: StreamInput): super(si) {
+    constructor(si: StreamInput) : super(si) {
         this.scheduledJobEnabled = si.readBoolean()
         this.indexExists = si.readBoolean()
         this.indexHealth = si.readOptionalWriteable { ClusterIndexHealth(si) }

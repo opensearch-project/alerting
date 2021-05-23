@@ -42,21 +42,25 @@ data class TriggerExecutionContext(
     val error: Exception? = null
 ) {
 
-    constructor(monitor: Monitor, trigger: Trigger, monitorRunResult: MonitorRunResult, alert: Alert? = null):
-            this(monitor, trigger, monitorRunResult.inputResults.results, monitorRunResult.periodStart,
-            monitorRunResult.periodEnd, alert, monitorRunResult.scriptContextError(trigger))
+    constructor(monitor: Monitor, trigger: Trigger, monitorRunResult: MonitorRunResult, alert: Alert? = null) :
+        this(
+            monitor, trigger, monitorRunResult.inputResults.results, monitorRunResult.periodStart,
+            monitorRunResult.periodEnd, alert, monitorRunResult.scriptContextError(trigger)
+        )
 
     /**
      * Mustache templates need special permissions to reflectively introspect field names. To avoid doing this we
      * translate the context to a Map of Strings to primitive types, which can be accessed without reflection.
      */
     fun asTemplateArg(): Map<String, Any?> {
-        return mapOf("monitor" to monitor.asTemplateArg(),
-                "trigger" to trigger.asTemplateArg(),
-                "results" to results,
-                "periodStart" to periodStart,
-                "periodEnd" to periodEnd,
-                "alert" to alert?.asTemplateArg(),
-                "error" to error)
+        return mapOf(
+            "monitor" to monitor.asTemplateArg(),
+            "trigger" to trigger.asTemplateArg(),
+            "results" to results,
+            "periodStart" to periodStart,
+            "periodEnd" to periodEnd,
+            "alert" to alert?.asTemplateArg(),
+            "error" to error
+        )
     }
 }

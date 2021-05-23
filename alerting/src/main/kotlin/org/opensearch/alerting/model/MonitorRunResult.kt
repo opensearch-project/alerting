@@ -26,10 +26,10 @@
 
 package org.opensearch.alerting.model
 
-import org.opensearch.alerting.alerts.AlertError
-import org.opensearch.alerting.elasticapi.optionalTimeField
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchException
+import org.opensearch.alerting.alerts.AlertError
+import org.opensearch.alerting.elasticapi.optionalTimeField
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.io.stream.Writeable
@@ -49,7 +49,7 @@ data class MonitorRunResult(
 ) : Writeable, ToXContent {
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         sin.readString(), // monitorName
         sin.readInstant(), // periodStart
         sin.readInstant(), // periodEnd
@@ -60,13 +60,13 @@ data class MonitorRunResult(
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         return builder.startObject()
-                .field("monitor_name", monitorName)
-                .optionalTimeField("period_start", periodStart)
-                .optionalTimeField("period_end", periodEnd)
-                .field("error", error?.message)
-                .field("input_results", inputResults)
-                .field("trigger_results", triggerResults)
-                .endObject()
+            .field("monitor_name", monitorName)
+            .optionalTimeField("period_start", periodStart)
+            .optionalTimeField("period_end", periodEnd)
+            .field("error", error?.message)
+            .field("input_results", inputResults)
+            .field("trigger_results", triggerResults)
+            .endObject()
     }
 
     /** Returns error information to store in the Alert. Currently it's just the stack trace but it can be more */
@@ -113,9 +113,9 @@ data class InputRunResults(val results: List<Map<String, Any>> = listOf(), val e
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         return builder.startObject()
-                .field("results", results)
-                .field("error", error?.message)
-                .endObject()
+            .field("results", results)
+            .field("error", error?.message)
+            .endObject()
     }
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {
@@ -154,7 +154,7 @@ data class TriggerRunResult(
 ) : Writeable, ToXContent {
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         sin.readString(), // triggerName
         sin.readBoolean(), // triggered
         sin.readException(), // error
@@ -165,11 +165,11 @@ data class TriggerRunResult(
         var msg = error?.message
         if (error is ScriptException) msg = error.toJsonString()
         return builder.startObject()
-                .field("name", triggerName)
-                .field("triggered", triggered)
-                .field("error", msg)
-                .field("action_results", actionResults as Map<String, ActionRunResult>)
-                .endObject()
+            .field("name", triggerName)
+            .field("triggered", triggered)
+            .field("error", msg)
+            .field("action_results", actionResults as Map<String, ActionRunResult>)
+            .endObject()
     }
 
     /** Returns error information to store in the Alert. Currently it's just the stack trace but it can be more */
@@ -217,7 +217,7 @@ data class ActionRunResult(
 ) : Writeable, ToXContent {
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         sin.readString(), // actionId
         sin.readString(), // actionName
         suppressWarning(sin.readMap()), // output
@@ -228,13 +228,13 @@ data class ActionRunResult(
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         return builder.startObject()
-                .field("id", actionId)
-                .field("name", actionName)
-                .field("output", output)
-                .field("throttled", throttled)
-                .optionalTimeField("executionTime", executionTime)
-                .field("error", error?.message)
-                .endObject()
+            .field("id", actionId)
+            .field("name", actionName)
+            .field("output", output)
+            .field("throttled", throttled)
+            .optionalTimeField("executionTime", executionTime)
+            .field("error", error?.message)
+            .endObject()
     }
 
     @Throws(IOException::class)

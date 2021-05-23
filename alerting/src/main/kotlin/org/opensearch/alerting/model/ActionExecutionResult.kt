@@ -50,7 +50,7 @@ data class ActionExecutionResult(
 ) : Writeable, ToXContentObject {
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         sin.readString(), // actionId
         sin.readOptionalInstant(), // lastExecutionTime
         sin.readInt() // throttledCount
@@ -58,10 +58,10 @@ data class ActionExecutionResult(
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         return builder.startObject()
-                .field(ACTION_ID_FIELD, actionId)
-                .optionalTimeField(LAST_EXECUTION_TIME_FIELD, lastExecutionTime)
-                .field(THROTTLED_COUNT_FIELD, throttledCount)
-                .endObject()
+            .field(ACTION_ID_FIELD, actionId)
+            .optionalTimeField(LAST_EXECUTION_TIME_FIELD, lastExecutionTime)
+            .field(THROTTLED_COUNT_FIELD, throttledCount)
+            .endObject()
     }
 
     @Throws(IOException::class)

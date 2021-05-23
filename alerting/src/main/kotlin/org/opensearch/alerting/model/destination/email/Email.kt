@@ -54,9 +54,9 @@ data class Email(
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         return builder.startObject(TYPE)
-                .field(EMAIL_ACCOUNT_ID_FIELD, emailAccountID)
-                .field(RECIPIENTS_FIELD, recipients.toTypedArray())
-                .endObject()
+            .field(EMAIL_ACCOUNT_ID_FIELD, emailAccountID)
+            .field(RECIPIENTS_FIELD, recipients.toTypedArray())
+            .endObject()
     }
 
     @Throws(IOException::class)
@@ -96,8 +96,8 @@ data class Email(
             }
 
             return Email(
-                    requireNotNull(emailAccountID) { "Email account ID is null" },
-                    recipients
+                requireNotNull(emailAccountID) { "Email account ID is null" },
+                recipients
             )
         }
 
@@ -134,7 +134,7 @@ data class Recipient(
     }
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         sin.readEnum(Recipient.RecipientType::class.java), // type
         sin.readOptionalString(), // emailGroupId
         sin.readOptionalString() // email
@@ -194,9 +194,9 @@ data class Recipient(
             }
 
             return Recipient(
-                    RecipientType.valueOf(type.toUpperCase(Locale.ROOT)),
-                    emailGroupID,
-                    email
+                RecipientType.valueOf(type.toUpperCase(Locale.ROOT)),
+                emailGroupID,
+                email
             )
         }
 

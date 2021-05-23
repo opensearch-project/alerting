@@ -41,7 +41,7 @@ import java.time.Instant
 data class AlertError(val timestamp: Instant, val message: String) : Writeable, ToXContent {
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         sin.readInstant(), // timestamp
         sin.readString() // message
     )
@@ -85,8 +85,8 @@ data class AlertError(val timestamp: Instant, val message: String) : Writeable, 
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         return builder.startObject()
-                .optionalTimeField(TIMESTAMP_FIELD, timestamp)
-                .field(MESSAGE_FIELD, message)
-                .endObject()
+            .optionalTimeField(TIMESTAMP_FIELD, timestamp)
+            .field(MESSAGE_FIELD, message)
+            .endObject()
     }
 }

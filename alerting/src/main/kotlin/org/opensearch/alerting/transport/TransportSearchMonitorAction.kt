@@ -26,23 +26,23 @@
 
 package org.opensearch.alerting.transport
 
-import org.opensearch.alerting.action.SearchMonitorAction
-import org.opensearch.alerting.action.SearchMonitorRequest
-import org.opensearch.alerting.elasticapi.addFilter
-import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.util.AlertingException
-import org.opensearch.commons.ConfigConstants
-import org.opensearch.commons.authuser.User
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionListener
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.action.SearchMonitorAction
+import org.opensearch.alerting.action.SearchMonitorRequest
+import org.opensearch.alerting.elasticapi.addFilter
+import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
+import org.opensearch.commons.ConfigConstants
+import org.opensearch.commons.authuser.User
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 
@@ -55,7 +55,7 @@ class TransportSearchMonitorAction @Inject constructor(
     clusterService: ClusterService,
     actionFilters: ActionFilters
 ) : HandledTransportAction<SearchMonitorRequest, SearchResponse>(
-        SearchMonitorAction.NAME, transportService, actionFilters, ::SearchMonitorRequest
+    SearchMonitorAction.NAME, transportService, actionFilters, ::SearchMonitorRequest
 ) {
     @Volatile private var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
@@ -89,14 +89,17 @@ class TransportSearchMonitorAction @Inject constructor(
     }
 
     fun search(searchRequest: SearchRequest, actionListener: ActionListener<SearchResponse>) {
-        client.search(searchRequest, object : ActionListener<SearchResponse> {
-            override fun onResponse(response: SearchResponse) {
-                actionListener.onResponse(response)
-            }
+        client.search(
+            searchRequest,
+            object : ActionListener<SearchResponse> {
+                override fun onResponse(response: SearchResponse) {
+                    actionListener.onResponse(response)
+                }
 
-            override fun onFailure(t: Exception) {
-                actionListener.onFailure(AlertingException.wrap(t))
+                override fun onFailure(t: Exception) {
+                    actionListener.onFailure(AlertingException.wrap(t))
+                }
             }
-        })
+        )
     }
 }

@@ -43,9 +43,9 @@ data class SNS(val topicARN: String, val roleARN: String) : ToXContent {
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         return builder.startObject(SNS_TYPE)
-                .field(TOPIC_ARN_FIELD, topicARN)
-                .field(ROLE_ARN_FIELD, roleARN)
-                .endObject()
+            .field(TOPIC_ARN_FIELD, topicARN)
+            .field(ROLE_ARN_FIELD, roleARN)
+            .endObject()
     }
 
     companion object {
@@ -75,8 +75,10 @@ data class SNS(val topicARN: String, val roleARN: String) : ToXContent {
                     }
                 }
             }
-            return SNS(requireNotNull(topicARN) { "SNS Action topic_arn is null" },
-                    requireNotNull(roleARN) { "SNS Action role_arn is null" })
+            return SNS(
+                requireNotNull(topicARN) { "SNS Action topic_arn is null" },
+                requireNotNull(roleARN) { "SNS Action role_arn is null" }
+            )
         }
     }
 }

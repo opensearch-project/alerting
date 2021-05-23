@@ -26,9 +26,9 @@
 
 package org.opensearch.alerting.action
 
+import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.randomMonitor
-import org.opensearch.action.support.WriteRequest
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.rest.RestRequest
@@ -39,8 +39,10 @@ class IndexMonitorRequestTests : OpenSearchTestCase() {
 
     fun `test index monitor post request`() {
 
-        val req = IndexMonitorRequest("1234", 1L, 2L, WriteRequest.RefreshPolicy.IMMEDIATE, RestRequest.Method.POST,
-                randomMonitor().copy(inputs = listOf(SearchInput(emptyList(), SearchSourceBuilder()))))
+        val req = IndexMonitorRequest(
+            "1234", 1L, 2L, WriteRequest.RefreshPolicy.IMMEDIATE, RestRequest.Method.POST,
+            randomMonitor().copy(inputs = listOf(SearchInput(emptyList(), SearchSourceBuilder())))
+        )
         assertNotNull(req)
 
         val out = BytesStreamOutput()
@@ -56,8 +58,10 @@ class IndexMonitorRequestTests : OpenSearchTestCase() {
 
     fun `test index monitor put request`() {
 
-        val req = IndexMonitorRequest("1234", 1L, 2L, WriteRequest.RefreshPolicy.IMMEDIATE, RestRequest.Method.PUT,
-                randomMonitor().copy(inputs = listOf(SearchInput(emptyList(), SearchSourceBuilder()))))
+        val req = IndexMonitorRequest(
+            "1234", 1L, 2L, WriteRequest.RefreshPolicy.IMMEDIATE, RestRequest.Method.PUT,
+            randomMonitor().copy(inputs = listOf(SearchInput(emptyList(), SearchSourceBuilder())))
+        )
         assertNotNull(req)
 
         val out = BytesStreamOutput()

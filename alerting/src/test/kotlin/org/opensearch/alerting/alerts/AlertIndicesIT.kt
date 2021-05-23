@@ -26,17 +26,17 @@
 
 package org.opensearch.alerting.alerts
 
+import org.apache.http.entity.ContentType.APPLICATION_JSON
+import org.apache.http.entity.StringEntity
+import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.NEVER_RUN
 import org.opensearch.alerting.core.model.ScheduledJob
+import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.randomMonitor
 import org.opensearch.alerting.randomTrigger
 import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.makeRequest
-import org.apache.http.entity.ContentType.APPLICATION_JSON
-import org.apache.http.entity.StringEntity
-import org.opensearch.action.search.SearchResponse
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent.jsonXContent
 import org.opensearch.rest.RestStatus
@@ -55,8 +55,10 @@ class AlertIndicesIT : AlertingRestTestCase() {
         assertIndexDoesNotExist(AlertIndices.ALERT_INDEX)
         assertIndexDoesNotExist(AlertIndices.HISTORY_WRITE_INDEX)
 
-        putAlertMappings(AlertIndices.alertMapping().trimStart('{').trimEnd('}')
-                .replace("\"schema_version\": 2", "\"schema_version\": 0"))
+        putAlertMappings(
+            AlertIndices.alertMapping().trimStart('{').trimEnd('}')
+                .replace("\"schema_version\": 2", "\"schema_version\": 0")
+        )
         assertIndexExists(AlertIndices.ALERT_INDEX)
         assertIndexExists(AlertIndices.HISTORY_WRITE_INDEX)
         verifyIndexSchemaVersion(AlertIndices.ALERT_INDEX, 0)
@@ -219,8 +221,10 @@ class AlertIndicesIT : AlertingRestTestCase() {
                 }
             }
         """.trimIndent()
-        val response = adminClient().makeRequest("POST", "${AlertIndices.HISTORY_ALL}/_search", emptyMap(),
-                StringEntity(request, APPLICATION_JSON))
+        val response = adminClient().makeRequest(
+            "POST", "${AlertIndices.HISTORY_ALL}/_search", emptyMap(),
+            StringEntity(request, APPLICATION_JSON)
+        )
         assertEquals("Request to get history failed", RestStatus.OK, response.restStatus())
         return SearchResponse.fromXContent(createParser(jsonXContent, response.entity.content)).hits.totalHits!!.value
     }

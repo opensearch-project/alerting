@@ -61,8 +61,8 @@ data class EmailGroup(
         builder.startObject()
         if (params.paramAsBoolean("with_type", false)) builder.startObject(EMAIL_GROUP_TYPE)
         builder.field(SCHEMA_VERSION, schemaVersion)
-                .field(NAME_FIELD, name)
-                .field(EMAILS_FIELD, emails.toTypedArray())
+            .field(NAME_FIELD, name)
+            .field(EMAILS_FIELD, emails.toTypedArray())
         if (params.paramAsBoolean("with_type", false)) builder.endObject()
         return builder.endObject()
     }
@@ -121,11 +121,12 @@ data class EmailGroup(
                 }
             }
 
-            return EmailGroup(id,
-                    version,
-                    schemaVersion,
-                    requireNotNull(name) { "Email group name is null" },
-                    emails
+            return EmailGroup(
+                id,
+                version,
+                schemaVersion,
+                requireNotNull(name) { "Email group name is null" },
+                emails
             )
         }
 
@@ -162,14 +163,14 @@ data class EmailEntry(val email: String) : Writeable, ToXContent {
     }
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         sin.readString() // email
     )
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         return builder.startObject()
-                .field(EMAIL_FIELD, email)
-                .endObject()
+            .field(EMAIL_FIELD, email)
+            .endObject()
     }
 
     @Throws(IOException::class)

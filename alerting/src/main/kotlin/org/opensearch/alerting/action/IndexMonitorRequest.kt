@@ -26,10 +26,10 @@
 
 package org.opensearch.alerting.action
 
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionRequestValidationException
 import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.model.Monitor
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.rest.RestRequest
@@ -50,7 +50,7 @@ class IndexMonitorRequest : ActionRequest {
         refreshPolicy: WriteRequest.RefreshPolicy,
         method: RestRequest.Method,
         monitor: Monitor
-    ): super() {
+    ) : super() {
         this.monitorId = monitorId
         this.seqNo = seqNo
         this.primaryTerm = primaryTerm
@@ -60,7 +60,7 @@ class IndexMonitorRequest : ActionRequest {
     }
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         monitorId = sin.readString(),
         seqNo = sin.readLong(),
         primaryTerm = sin.readLong(),

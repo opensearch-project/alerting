@@ -25,6 +25,8 @@
  */
 package org.opensearch.alerting
 
+import org.opensearch.action.ActionRequest
+import org.opensearch.action.ActionResponse
 import org.opensearch.alerting.action.AcknowledgeAlertAction
 import org.opensearch.alerting.action.DeleteDestinationAction
 import org.opensearch.alerting.action.DeleteEmailAccountAction
@@ -93,8 +95,6 @@ import org.opensearch.alerting.transport.TransportIndexMonitorAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
-import org.opensearch.action.ActionRequest
-import org.opensearch.action.ActionResponse
 import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.node.DiscoveryNodes
@@ -169,25 +169,26 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         indexNameExpressionResolver: IndexNameExpressionResolver?,
         nodesInCluster: Supplier<DiscoveryNodes>
     ): List<RestHandler> {
-        return listOf(RestGetMonitorAction(),
-                RestDeleteMonitorAction(),
-                RestIndexMonitorAction(),
-                RestSearchMonitorAction(settings, clusterService),
-                RestExecuteMonitorAction(),
-                RestAcknowledgeAlertAction(),
-                RestScheduledJobStatsHandler("_alerting"),
-                RestIndexDestinationAction(),
-                RestDeleteDestinationAction(),
-                RestIndexEmailAccountAction(),
-                RestDeleteEmailAccountAction(),
-                RestSearchEmailAccountAction(),
-                RestGetEmailAccountAction(),
-                RestIndexEmailGroupAction(),
-                RestDeleteEmailGroupAction(),
-                RestSearchEmailGroupAction(),
-                RestGetEmailGroupAction(),
-                RestGetDestinationsAction(),
-                RestGetAlertsAction()
+        return listOf(
+            RestGetMonitorAction(),
+            RestDeleteMonitorAction(),
+            RestIndexMonitorAction(),
+            RestSearchMonitorAction(settings, clusterService),
+            RestExecuteMonitorAction(),
+            RestAcknowledgeAlertAction(),
+            RestScheduledJobStatsHandler("_alerting"),
+            RestIndexDestinationAction(),
+            RestDeleteDestinationAction(),
+            RestIndexEmailAccountAction(),
+            RestDeleteEmailAccountAction(),
+            RestSearchEmailAccountAction(),
+            RestGetEmailAccountAction(),
+            RestIndexEmailGroupAction(),
+            RestDeleteEmailGroupAction(),
+            RestSearchEmailGroupAction(),
+            RestGetEmailGroupAction(),
+            RestGetDestinationsAction(),
+            RestGetAlertsAction()
         )
     }
 
@@ -246,33 +247,33 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
 
     override fun getSettings(): List<Setting<*>> {
         return listOf(
-                ScheduledJobSettings.REQUEST_TIMEOUT,
-                ScheduledJobSettings.SWEEP_BACKOFF_MILLIS,
-                ScheduledJobSettings.SWEEP_BACKOFF_RETRY_COUNT,
-                ScheduledJobSettings.SWEEP_PERIOD,
-                ScheduledJobSettings.SWEEP_PAGE_SIZE,
-                ScheduledJobSettings.SWEEPER_ENABLED,
-                AlertingSettings.INPUT_TIMEOUT,
-                AlertingSettings.INDEX_TIMEOUT,
-                AlertingSettings.BULK_TIMEOUT,
-                AlertingSettings.ALERT_BACKOFF_MILLIS,
-                AlertingSettings.ALERT_BACKOFF_COUNT,
-                AlertingSettings.MOVE_ALERTS_BACKOFF_MILLIS,
-                AlertingSettings.MOVE_ALERTS_BACKOFF_COUNT,
-                AlertingSettings.ALERT_HISTORY_ENABLED,
-                AlertingSettings.ALERT_HISTORY_ROLLOVER_PERIOD,
-                AlertingSettings.ALERT_HISTORY_INDEX_MAX_AGE,
-                AlertingSettings.ALERT_HISTORY_MAX_DOCS,
-                AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD,
-                AlertingSettings.ALERTING_MAX_MONITORS,
-                AlertingSettings.REQUEST_TIMEOUT,
-                AlertingSettings.MAX_ACTION_THROTTLE_VALUE,
-                AlertingSettings.FILTER_BY_BACKEND_ROLES,
-                DestinationSettings.EMAIL_USERNAME,
-                DestinationSettings.EMAIL_PASSWORD,
-                DestinationSettings.ALLOW_LIST,
-                DestinationSettings.HOST_DENY_LIST
-            )
+            ScheduledJobSettings.REQUEST_TIMEOUT,
+            ScheduledJobSettings.SWEEP_BACKOFF_MILLIS,
+            ScheduledJobSettings.SWEEP_BACKOFF_RETRY_COUNT,
+            ScheduledJobSettings.SWEEP_PERIOD,
+            ScheduledJobSettings.SWEEP_PAGE_SIZE,
+            ScheduledJobSettings.SWEEPER_ENABLED,
+            AlertingSettings.INPUT_TIMEOUT,
+            AlertingSettings.INDEX_TIMEOUT,
+            AlertingSettings.BULK_TIMEOUT,
+            AlertingSettings.ALERT_BACKOFF_MILLIS,
+            AlertingSettings.ALERT_BACKOFF_COUNT,
+            AlertingSettings.MOVE_ALERTS_BACKOFF_MILLIS,
+            AlertingSettings.MOVE_ALERTS_BACKOFF_COUNT,
+            AlertingSettings.ALERT_HISTORY_ENABLED,
+            AlertingSettings.ALERT_HISTORY_ROLLOVER_PERIOD,
+            AlertingSettings.ALERT_HISTORY_INDEX_MAX_AGE,
+            AlertingSettings.ALERT_HISTORY_MAX_DOCS,
+            AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD,
+            AlertingSettings.ALERTING_MAX_MONITORS,
+            AlertingSettings.REQUEST_TIMEOUT,
+            AlertingSettings.MAX_ACTION_THROTTLE_VALUE,
+            AlertingSettings.FILTER_BY_BACKEND_ROLES,
+            DestinationSettings.EMAIL_USERNAME,
+            DestinationSettings.EMAIL_PASSWORD,
+            DestinationSettings.ALLOW_LIST,
+            DestinationSettings.HOST_DENY_LIST
+        )
     }
 
     override fun onIndexModule(indexModule: IndexModule) {

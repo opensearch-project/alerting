@@ -26,6 +26,15 @@
 
 package org.opensearch.alerting
 
+import org.apache.http.HttpEntity
+import org.apache.http.HttpHeaders
+import org.apache.http.entity.ContentType
+import org.apache.http.entity.ContentType.APPLICATION_JSON
+import org.apache.http.entity.StringEntity
+import org.apache.http.message.BasicHeader
+import org.junit.AfterClass
+import org.junit.rules.DisableOnDebug
+import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
 import org.opensearch.alerting.alerts.AlertIndices
@@ -41,13 +50,6 @@ import org.opensearch.alerting.model.destination.email.EmailGroup
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.DestinationType
-import org.apache.http.HttpEntity
-import org.apache.http.HttpHeaders
-import org.apache.http.entity.ContentType
-import org.apache.http.entity.ContentType.APPLICATION_JSON
-import org.apache.http.entity.StringEntity
-import org.apache.http.message.BasicHeader
-import org.opensearch.action.search.SearchResponse
 import org.opensearch.client.Request
 import org.opensearch.client.Response
 import org.opensearch.client.RestClient
@@ -66,8 +68,6 @@ import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.common.xcontent.json.JsonXContent.jsonXContent
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.SearchModule
-import org.junit.AfterClass
-import org.junit.rules.DisableOnDebug
 import java.net.URLEncoder
 import java.nio.file.Files
 import java.nio.file.Path
@@ -85,9 +85,13 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     val numberOfNodes = System.getProperty("cluster.number_of_nodes", "1")!!.toInt()
 
     override fun xContentRegistry(): NamedXContentRegistry {
-        return NamedXContentRegistry(mutableListOf(Monitor.XCONTENT_REGISTRY,
-                SearchInput.XCONTENT_REGISTRY) +
-                SearchModule(Settings.EMPTY, false, emptyList()).namedXContents)
+        return NamedXContentRegistry(
+            mutableListOf(
+                Monitor.XCONTENT_REGISTRY,
+                SearchInput.XCONTENT_REGISTRY
+            ) +
+                SearchModule(Settings.EMPTY, false, emptyList()).namedXContents
+        )
     }
 
     fun Response.asMap(): Map<String, Any> {
@@ -95,18 +99,24 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun createMonitor(monitor: Monitor, refresh: Boolean = true): Monitor {
-        val response = client().makeRequest("POST", "$ALERTING_BASE_URI?refresh=$refresh", emptyMap(),
-                monitor.toHttpEntity())
+        val response = client().makeRequest(
+            "POST", "$ALERTING_BASE_URI?refresh=$refresh", emptyMap(),
+            monitor.toHttpEntity()
+        )
         assertEquals("Unable to create a new monitor", RestStatus.CREATED, response.restStatus())
 
-        val monitorJson = jsonXContent.createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-                response.entity.content).map()
+        val monitorJson = jsonXContent.createParser(
+            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            response.entity.content
+        ).map()
         return monitor.copy(id = monitorJson["_id"] as String, version = (monitorJson["_version"] as Int).toLong())
     }
 
     protected fun deleteMonitor(monitor: Monitor, refresh: Boolean = true): Response {
-        val response = client().makeRequest("DELETE", "$ALERTING_BASE_URI/${monitor.id}?refresh=$refresh", emptyMap(),
-            monitor.toHttpEntity())
+        val response = client().makeRequest(
+            "DELETE", "$ALERTING_BASE_URI/${monitor.id}?refresh=$refresh", emptyMap(),
+            monitor.toHttpEntity()
+        )
         assertEquals("Unable to delete a monitor", RestStatus.OK, response.restStatus())
 
         return response
@@ -114,17 +124,20 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun createDestination(destination: Destination = getTestDestination(), refresh: Boolean = true): Destination {
         val response = client().makeRequest(
-                "POST",
-                "$DESTINATION_BASE_URI?refresh=$refresh",
-                emptyMap(),
-                destination.toHttpEntity())
+            "POST",
+            "$DESTINATION_BASE_URI?refresh=$refresh",
+            emptyMap(),
+            destination.toHttpEntity()
+        )
         assertEquals("Unable to create a new destination", RestStatus.CREATED, response.restStatus())
-        val destinationJson = jsonXContent.createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-                response.entity.content).map()
+        val destinationJson = jsonXContent.createParser(
+            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            response.entity.content
+        ).map()
         return destination.copy(
-                id = destinationJson["_id"] as String,
-                version = (destinationJson["_version"] as Int).toLong(),
-                primaryTerm = destinationJson["_primary_term"] as Int
+            id = destinationJson["_id"] as String,
+            version = (destinationJson["_version"] as Int).toLong(),
+            primaryTerm = destinationJson["_primary_term"] as Int
         )
     }
 
@@ -133,7 +146,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             "DELETE",
             "$DESTINATION_BASE_URI/${destination.id}?refresh=$refresh",
             emptyMap(),
-            destination.toHttpEntity())
+            destination.toHttpEntity()
+        )
         assertEquals("Unable to create a new destination", RestStatus.OK, response.restStatus())
 
         return response
@@ -141,13 +155,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun updateDestination(destination: Destination, refresh: Boolean = true): Destination {
         val response = client().makeRequest(
-                "PUT",
-                "$DESTINATION_BASE_URI/${destination.id}?refresh=$refresh",
-                emptyMap(),
-                destination.toHttpEntity())
+            "PUT",
+            "$DESTINATION_BASE_URI/${destination.id}?refresh=$refresh",
+            emptyMap(),
+            destination.toHttpEntity()
+        )
         assertEquals("Unable to update a destination", RestStatus.OK, response.restStatus())
-        val destinationJson = jsonXContent.createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-                response.entity.content).map()
+        val destinationJson = jsonXContent.createParser(
+            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            response.entity.content
+        ).map()
         return destination.copy(id = destinationJson["_id"] as String, version = (destinationJson["_version"] as Int).toLong())
     }
 
@@ -180,13 +197,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun createEmailAccount(emailAccount: EmailAccount = getTestEmailAccount(), refresh: Boolean = true): EmailAccount {
         val response = client().makeRequest(
-                "POST",
-                "$EMAIL_ACCOUNT_BASE_URI?refresh=$refresh",
-                emptyMap(),
-                emailAccount.toHttpEntity())
+            "POST",
+            "$EMAIL_ACCOUNT_BASE_URI?refresh=$refresh",
+            emptyMap(),
+            emailAccount.toHttpEntity()
+        )
         assertEquals("Unable to create a new email account", RestStatus.CREATED, response.restStatus())
-        val emailAccountJson = jsonXContent.createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-                response.entity.content).map()
+        val emailAccountJson = jsonXContent.createParser(
+            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            response.entity.content
+        ).map()
         return emailAccount.copy(id = emailAccountJson["_id"] as String)
     }
 
@@ -198,13 +218,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun updateEmailAccount(emailAccount: EmailAccount, refresh: Boolean = true): EmailAccount {
         val response = client().makeRequest(
-                "PUT",
-                "$EMAIL_ACCOUNT_BASE_URI/${emailAccount.id}?refresh=$refresh",
-                emptyMap(),
-                emailAccount.toHttpEntity())
+            "PUT",
+            "$EMAIL_ACCOUNT_BASE_URI/${emailAccount.id}?refresh=$refresh",
+            emptyMap(),
+            emailAccount.toHttpEntity()
+        )
         assertEquals("Unable to update email account", RestStatus.OK, response.restStatus())
-        val emailAccountJson = jsonXContent.createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-                response.entity.content).map()
+        val emailAccountJson = jsonXContent.createParser(
+            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            response.entity.content
+        ).map()
         return emailAccount.copy(id = emailAccountJson["_id"] as String)
     }
 
@@ -237,13 +260,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun createEmailGroup(emailGroup: EmailGroup = getTestEmailGroup(), refresh: Boolean = true): EmailGroup {
         val response = client().makeRequest(
-                "POST",
-                "$EMAIL_GROUP_BASE_URI?refresh=$refresh",
-                emptyMap(),
-                emailGroup.toHttpEntity())
+            "POST",
+            "$EMAIL_GROUP_BASE_URI?refresh=$refresh",
+            emptyMap(),
+            emailGroup.toHttpEntity()
+        )
         assertEquals("Unable to create a new email group", RestStatus.CREATED, response.restStatus())
-        val emailGroupJson = jsonXContent.createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-                response.entity.content).map()
+        val emailGroupJson = jsonXContent.createParser(
+            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            response.entity.content
+        ).map()
         return emailGroup.copy(id = emailGroupJson["_id"] as String)
     }
 
@@ -255,24 +281,30 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun updateEmailGroup(emailGroup: EmailGroup, refresh: Boolean = true): EmailGroup {
         val response = client().makeRequest(
-                "PUT",
-                "$EMAIL_GROUP_BASE_URI/${emailGroup.id}?refresh=$refresh",
-                emptyMap(),
-                emailGroup.toHttpEntity())
+            "PUT",
+            "$EMAIL_GROUP_BASE_URI/${emailGroup.id}?refresh=$refresh",
+            emptyMap(),
+            emailGroup.toHttpEntity()
+        )
         assertEquals("Unable to update email group", RestStatus.OK, response.restStatus())
-        val emailGroupJson = jsonXContent.createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-                response.entity.content).map()
+        val emailGroupJson = jsonXContent.createParser(
+            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            response.entity.content
+        ).map()
         return emailGroup.copy(id = emailGroupJson["_id"] as String)
     }
 
     @Suppress("UNCHECKED_CAST")
     protected fun getDestination(destination: Destination): Map<String, Any> {
         val response = client().makeRequest(
-                "GET",
-                "$DESTINATION_BASE_URI/${destination.id}")
+            "GET",
+            "$DESTINATION_BASE_URI/${destination.id}"
+        )
         assertEquals("Unable to update a destination", RestStatus.OK, response.restStatus())
-        val destinationJson = jsonXContent.createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-                response.entity.content).map()
+        val destinationJson = jsonXContent.createParser(
+            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            response.entity.content
+        ).map()
         return (destinationJson["destinations"] as List<Any?>)[0] as Map<String, Any>
     }
 
@@ -294,45 +326,48 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         }
 
         val response = client.makeRequest(
-                "GET",
-                baseEndpoint,
-                null,
-                header
+            "GET",
+            baseEndpoint,
+            null,
+            header
         )
         assertEquals("Unable to update a destination", RestStatus.OK, response.restStatus())
-        val destinationJson = jsonXContent.createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-                response.entity.content).map()
+        val destinationJson = jsonXContent.createParser(
+            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            response.entity.content
+        ).map()
         return destinationJson["destinations"] as List<Map<String, Any>>
     }
 
     private fun getTestDestination(): Destination {
         return Destination(
-                type = DestinationType.TEST_ACTION,
-                name = "test",
-                user = randomUser(),
-                lastUpdateTime = Instant.now(),
-                chime = null,
-                slack = null,
-                customWebhook = null,
-                email = null)
+            type = DestinationType.TEST_ACTION,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = null,
+            slack = null,
+            customWebhook = null,
+            email = null
+        )
     }
 
     private fun getTestEmailAccount(): EmailAccount {
         return EmailAccount(
-                name = "test",
-                email = "test@email.com",
-                host = "smtp.com",
-                port = 25,
-                method = EmailAccount.MethodType.NONE,
-                username = null,
-                password = null
+            name = "test",
+            email = "test@email.com",
+            host = "smtp.com",
+            port = 25,
+            method = EmailAccount.MethodType.NONE,
+            username = null,
+            password = null
         )
     }
 
     private fun getTestEmailGroup(): EmailGroup {
         return EmailGroup(
-                name = "test",
-                emails = listOf()
+            name = "test",
+            emails = listOf()
         )
     }
 
@@ -349,12 +384,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun createAlert(alert: Alert): Alert {
-        val response = adminClient().makeRequest("POST", "/${AlertIndices.ALERT_INDEX}/_doc?refresh=true&routing=${alert.monitorId}",
-                emptyMap(), alert.toHttpEntity())
+        val response = adminClient().makeRequest(
+            "POST", "/${AlertIndices.ALERT_INDEX}/_doc?refresh=true&routing=${alert.monitorId}",
+            emptyMap(), alert.toHttpEntity()
+        )
         assertEquals("Unable to create a new alert", RestStatus.CREATED, response.restStatus())
 
-        val alertJson = jsonXContent.createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-                response.entity.content).map()
+        val alertJson = jsonXContent.createParser(
+            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            response.entity.content
+        ).map()
         return alert.copy(id = alertJson["_id"] as String, version = (alertJson["_version"] as Int).toLong())
     }
 
@@ -368,8 +407,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun updateMonitor(monitor: Monitor, refresh: Boolean = false): Monitor {
-        val response = client().makeRequest("PUT", "${monitor.relativeUrl()}?refresh=$refresh",
-                emptyMap(), monitor.toHttpEntity())
+        val response = client().makeRequest(
+            "PUT", "${monitor.relativeUrl()}?refresh=$refresh",
+            emptyMap(), monitor.toHttpEntity()
+        )
         assertEquals("Unable to update a monitor", RestStatus.OK, response.restStatus())
         return getMonitor(monitorId = monitor.id)
     }
@@ -406,7 +447,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                 { "version" : true,
                   "query" : { "term" : { "${Alert.MONITOR_ID_FIELD}" : "${monitor.id}" } }
                 }
-                """.trimIndent()
+        """.trimIndent()
         val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", searchParams, StringEntity(request, APPLICATION_JSON))
         assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
 
@@ -419,13 +460,15 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun acknowledgeAlerts(monitor: Monitor, vararg alerts: Alert): Response {
         val request = XContentFactory.jsonBuilder().startObject()
-                .array("alerts", *alerts.map { it.id }.toTypedArray())
-                .endObject()
-                .string()
-                .let { StringEntity(it, APPLICATION_JSON) }
+            .array("alerts", *alerts.map { it.id }.toTypedArray())
+            .endObject()
+            .string()
+            .let { StringEntity(it, APPLICATION_JSON) }
 
-        val response = client().makeRequest("POST", "${monitor.relativeUrl()}/_acknowledge/alerts?refresh=true",
-                emptyMap(), request)
+        val response = client().makeRequest(
+            "POST", "${monitor.relativeUrl()}/_acknowledge/alerts?refresh=true",
+            emptyMap(), request
+        )
         assertEquals("Acknowledge call failed.", RestStatus.OK, response.restStatus())
         return response
     }
@@ -477,24 +520,29 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun executeMonitor(client: RestClient, monitor: Monitor, params: Map<String, String> = mapOf()): Response =
-            client.makeRequest("POST", "$ALERTING_BASE_URI/_execute", params, monitor.toHttpEntity())
+        client.makeRequest("POST", "$ALERTING_BASE_URI/_execute", params, monitor.toHttpEntity())
 
     protected fun indexDoc(index: String, id: String, doc: String, refresh: Boolean = true): Response {
         val requestBody = StringEntity(doc, APPLICATION_JSON)
         val params = if (refresh) mapOf("refresh" to "true") else mapOf()
         val response = client().makeRequest("PUT", "$index/_doc/$id", params, requestBody)
-        assertTrue("Unable to index doc: '${doc.take(15)}...' to index: '$index'",
-                listOf(RestStatus.OK, RestStatus.CREATED).contains(response.restStatus()))
+        assertTrue(
+            "Unable to index doc: '${doc.take(15)}...' to index: '$index'",
+            listOf(RestStatus.OK, RestStatus.CREATED).contains(response.restStatus())
+        )
         return response
     }
 
     /** A test index that can be used across tests. Feel free to add new fields but don't remove any. */
     protected fun createTestIndex(index: String = randomAlphaOfLength(10).toLowerCase(Locale.ROOT)): String {
-        createIndex(index, Settings.EMPTY, """
+        createIndex(
+            index, Settings.EMPTY,
+            """
           "properties" : {
              "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" }
           }
-        """.trimIndent())
+            """.trimIndent()
+        )
         return index
     }
 
@@ -505,11 +553,14 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun createTestConfigIndex(index: String = "." + randomAlphaOfLength(10).toLowerCase(Locale.ROOT)): String {
         try {
-            createIndex(index, Settings.builder().build(), """
+            createIndex(
+                index, Settings.builder().build(),
+                """
           "properties" : {
              "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" }
           }
-        """.trimIndent())
+                """.trimIndent()
+            )
         } catch (ex: WarningFailureException) {
             // ignore
         }
@@ -589,8 +640,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     override fun restClientSettings(): Settings {
         return if (isDebuggingTest || isDebuggingRemoteCluster) {
             Settings.builder()
-                    .put(CLIENT_SOCKET_TIMEOUT, TimeValue.timeValueMinutes(10))
-                    .build()
+                .put(CLIENT_SOCKET_TIMEOUT, TimeValue.timeValueMinutes(10))
+                .build()
         } else {
             super.restClientSettings()
         }
@@ -610,12 +661,12 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     fun RestClient.updateSettings(setting: String, value: Any): Map<String, Any> {
         val settings = jsonBuilder()
-                .startObject()
-                .startObject("persistent")
-                .field(setting, value)
-                .endObject()
-                .endObject()
-                .string()
+            .startObject()
+            .startObject("persistent")
+            .field(setting, value)
+            .endObject()
+            .endObject()
+            .string()
         val response = this.makeRequest("PUT", "_cluster/settings", StringEntity(settings, APPLICATION_JSON))
         assertEquals(RestStatus.OK, response.restStatus())
         return response.asMap()
@@ -640,38 +691,58 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     fun enableScheduledJob(): Response {
-        val updateResponse = client().makeRequest("PUT", "_cluster/settings",
-                emptyMap(),
-                StringEntity(XContentFactory.jsonBuilder().startObject().field("persistent")
-                        .startObject().field(ScheduledJobSettings.SWEEPER_ENABLED.key, true).endObject()
-                        .endObject().string(), ContentType.APPLICATION_JSON))
+        val updateResponse = client().makeRequest(
+            "PUT", "_cluster/settings",
+            emptyMap(),
+            StringEntity(
+                XContentFactory.jsonBuilder().startObject().field("persistent")
+                    .startObject().field(ScheduledJobSettings.SWEEPER_ENABLED.key, true).endObject()
+                    .endObject().string(),
+                ContentType.APPLICATION_JSON
+            )
+        )
         return updateResponse
     }
 
     fun disableScheduledJob(): Response {
-        val updateResponse = client().makeRequest("PUT", "_cluster/settings",
-                emptyMap(),
-                StringEntity(XContentFactory.jsonBuilder().startObject().field("persistent")
-                        .startObject().field(ScheduledJobSettings.SWEEPER_ENABLED.key, false).endObject()
-                        .endObject().string(), ContentType.APPLICATION_JSON))
+        val updateResponse = client().makeRequest(
+            "PUT", "_cluster/settings",
+            emptyMap(),
+            StringEntity(
+                XContentFactory.jsonBuilder().startObject().field("persistent")
+                    .startObject().field(ScheduledJobSettings.SWEEPER_ENABLED.key, false).endObject()
+                    .endObject().string(),
+                ContentType.APPLICATION_JSON
+            )
+        )
         return updateResponse
     }
 
     fun enableFilterBy() {
-        val updateResponse = client().makeRequest("PUT", "_cluster/settings",
-                emptyMap(),
-                StringEntity(XContentFactory.jsonBuilder().startObject().field("persistent")
-                        .startObject().field(AlertingSettings.FILTER_BY_BACKEND_ROLES.key, true).endObject()
-                        .endObject().string(), ContentType.APPLICATION_JSON))
+        val updateResponse = client().makeRequest(
+            "PUT", "_cluster/settings",
+            emptyMap(),
+            StringEntity(
+                XContentFactory.jsonBuilder().startObject().field("persistent")
+                    .startObject().field(AlertingSettings.FILTER_BY_BACKEND_ROLES.key, true).endObject()
+                    .endObject().string(),
+                ContentType.APPLICATION_JSON
+            )
+        )
         assertEquals(updateResponse.statusLine.toString(), 200, updateResponse.statusLine.statusCode)
     }
 
     fun disableFilterBy() {
-        val updateResponse = client().makeRequest("PUT", "_cluster/settings",
-                emptyMap(),
-                StringEntity(XContentFactory.jsonBuilder().startObject().field("persistent")
-                        .startObject().field(AlertingSettings.FILTER_BY_BACKEND_ROLES.key, false).endObject()
-                        .endObject().string(), ContentType.APPLICATION_JSON))
+        val updateResponse = client().makeRequest(
+            "PUT", "_cluster/settings",
+            emptyMap(),
+            StringEntity(
+                XContentFactory.jsonBuilder().startObject().field("persistent")
+                    .startObject().field(AlertingSettings.FILTER_BY_BACKEND_ROLES.key, false).endObject()
+                    .endObject().string(),
+                ContentType.APPLICATION_JSON
+            )
+        )
         assertEquals(updateResponse.statusLine.toString(), 200, updateResponse.statusLine.statusCode)
     }
 
@@ -686,10 +757,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val request = Request("PUT", "/_plugins/_security/api/internalusers/$name")
         val broles = backendRoles.joinToString { it -> "\"$it\"" }
         var entity = " {\n" +
-                "\"password\": \"$passwd\",\n" +
-                "\"backend_roles\": [$broles],\n" +
-                "\"attributes\": {\n" +
-                "}} "
+            "\"password\": \"$passwd\",\n" +
+            "\"backend_roles\": [$broles],\n" +
+            "\"attributes\": {\n" +
+            "}} "
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
@@ -697,23 +768,23 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     fun createIndexRole(name: String, index: String) {
         val request = Request("PUT", "/_plugins/_security/api/roles/$name")
         var entity = "{\n" +
-                "\"cluster_permissions\": [\n" +
-                "],\n" +
-                "\"index_permissions\": [\n" +
-                "{\n" +
-                "\"index_patterns\": [\n" +
-                "\"$index\"\n" +
-                "],\n" +
-                "\"dls\": \"\",\n" +
-                "\"fls\": [],\n" +
-                "\"masked_fields\": [],\n" +
-                "\"allowed_actions\": [\n" +
-                "\"crud\"\n" +
-                "]\n" +
-                "}\n" +
-                "],\n" +
-                "\"tenant_permissions\": []\n" +
-                "}"
+            "\"cluster_permissions\": [\n" +
+            "],\n" +
+            "\"index_permissions\": [\n" +
+            "{\n" +
+            "\"index_patterns\": [\n" +
+            "\"$index\"\n" +
+            "],\n" +
+            "\"dls\": \"\",\n" +
+            "\"fls\": [],\n" +
+            "\"masked_fields\": [],\n" +
+            "\"allowed_actions\": [\n" +
+            "\"crud\"\n" +
+            "]\n" +
+            "}\n" +
+            "],\n" +
+            "\"tenant_permissions\": []\n" +
+            "}"
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
@@ -722,10 +793,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val request = Request("PUT", "/_plugins/_security/api/rolesmapping/$role")
         val usersStr = users.joinToString { it -> "\"$it\"" }
         var entity = "{                                  \n" +
-                "  \"backend_roles\" : [  ],\n" +
-                "  \"hosts\" : [  ],\n" +
-                "  \"users\" : [$usersStr]\n" +
-                "}"
+            "  \"backend_roles\" : [  ],\n" +
+            "  \"hosts\" : [  ],\n" +
+            "  \"users\" : [$usersStr]\n" +
+            "}"
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
@@ -776,10 +847,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             val serverUrl = "service:jmx:rmi:///jndi/rmi://127.0.0.1:7777/jmxrmi"
             JMXConnectorFactory.connect(JMXServiceURL(serverUrl)).use { connector ->
                 val proxy = MBeanServerInvocationHandler.newProxyInstance(
-                        connector.mBeanServerConnection,
-                        ObjectName("org.jacoco:type=Runtime"),
-                        IProxy::class.java,
-                        false
+                    connector.mBeanServerConnection,
+                    ObjectName("org.jacoco:type=Runtime"),
+                    IProxy::class.java,
+                    false
                 )
                 proxy.getExecutionData(false)?.let {
                     val path = Path.of("$jacocoBuildPath/integTest.exec")

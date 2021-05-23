@@ -26,10 +26,10 @@
 
 package org.opensearch.alerting.action
 
-import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionRequestValidationException
 import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.rest.RestRequest
@@ -50,7 +50,7 @@ class IndexEmailAccountRequest : ActionRequest {
         refreshPolicy: WriteRequest.RefreshPolicy,
         method: RestRequest.Method,
         emailAccount: EmailAccount
-    ): super() {
+    ) : super() {
         this.emailAccountID = emailAccountID
         this.seqNo = seqNo
         this.primaryTerm = primaryTerm
@@ -60,7 +60,7 @@ class IndexEmailAccountRequest : ActionRequest {
     }
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         sin.readString(), // emailAccountID
         sin.readLong(), // seqNo
         sin.readLong(), // primaryTerm

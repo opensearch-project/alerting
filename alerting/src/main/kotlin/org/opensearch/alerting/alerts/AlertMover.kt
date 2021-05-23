@@ -26,17 +26,17 @@
 
 package org.opensearch.alerting.alerts
 
-import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
-import org.opensearch.alerting.alerts.AlertIndices.Companion.HISTORY_WRITE_INDEX
-import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.elasticapi.suspendUntil
 import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.delete.DeleteRequest
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
+import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
+import org.opensearch.alerting.alerts.AlertIndices.Companion.HISTORY_WRITE_INDEX
+import org.opensearch.alerting.elasticapi.suspendUntil
+import org.opensearch.alerting.model.Alert
+import org.opensearch.alerting.model.Monitor
 import org.opensearch.client.Client
 import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
@@ -85,9 +85,11 @@ suspend fun moveAlerts(client: Client, monitorId: String, monitor: Monitor? = nu
     val indexRequests = response.hits.map { hit ->
         IndexRequest(AlertIndices.HISTORY_WRITE_INDEX)
             .routing(monitorId)
-            .source(Alert.parse(alertContentParser(hit.sourceRef), hit.id, hit.version)
-                .copy(state = Alert.State.DELETED)
-                .toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
+            .source(
+                Alert.parse(alertContentParser(hit.sourceRef), hit.id, hit.version)
+                    .copy(state = Alert.State.DELETED)
+                    .toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS)
+            )
             .version(hit.version)
             .versionType(VersionType.EXTERNAL_GTE)
             .id(hit.id)
@@ -107,21 +109,29 @@ suspend fun moveAlerts(client: Client, monitorId: String, monitor: Monitor? = nu
         val retryCause = copyResponse.items.filter { it.isFailed }
             .firstOrNull { it.status() == RestStatus.TOO_MANY_REQUESTS }
             ?.failure?.cause
-        throw RuntimeException("Failed to copy alerts for [$monitorId, ${monitor?.triggers?.map { it.id }}]: " +
-            copyResponse.buildFailureMessage(), retryCause)
+        throw RuntimeException(
+            "Failed to copy alerts for [$monitorId, ${monitor?.triggers?.map { it.id }}]: " +
+                copyResponse.buildFailureMessage(),
+            retryCause
+        )
     }
     if (deleteResponse.hasFailures()) {
         val retryCause = deleteResponse.items.filter { it.isFailed }
             .firstOrNull { it.status() == RestStatus.TOO_MANY_REQUESTS }
             ?.failure?.cause
-        throw RuntimeException("Failed to delete alerts for [$monitorId, ${monitor?.triggers?.map { it.id }}]: " +
-            deleteResponse.buildFailureMessage(), retryCause)
+        throw RuntimeException(
+            "Failed to delete alerts for [$monitorId, ${monitor?.triggers?.map { it.id }}]: " +
+                deleteResponse.buildFailureMessage(),
+            retryCause
+        )
     }
 }
 
 private fun alertContentParser(bytesReference: BytesReference): XContentParser {
-    val xcp = XContentHelper.createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-                bytesReference, XContentType.JSON)
+    val xcp = XContentHelper.createParser(
+        NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+        bytesReference, XContentType.JSON
+    )
     XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
     return xcp
 }

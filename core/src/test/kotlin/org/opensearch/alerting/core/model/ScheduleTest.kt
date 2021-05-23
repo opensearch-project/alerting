@@ -76,8 +76,10 @@ class ScheduleTest : XContentTestBase {
         // The nextTimeToExecute should be the minute after the test instance, not enabledTimeInstance, replicating a cluster restart
         val nextTimeToExecute = cronSchedule.getExpectedNextExecutionTime(enabledTimeInstance, null)
         assertNotNull(nextTimeToExecute, "There should be next execute time")
-        assertEquals(testInstance.plusSeconds(2L), nextTimeToExecute,
-                "nextTimeToExecute should be 2 seconds after test instance")
+        assertEquals(
+            testInstance.plusSeconds(2L), nextTimeToExecute,
+            "nextTimeToExecute should be 2 seconds after test instance"
+        )
     }
 
     @Test
@@ -92,8 +94,10 @@ class ScheduleTest : XContentTestBase {
         // The nextTimeToExecute should be the minute after the previous execution time instance, not enabledTimeInstance
         val nextTimeToExecute = cronSchedule.getExpectedNextExecutionTime(enabledTimeInstance, previousExecutionTimeInstance)
         assertNotNull(nextTimeToExecute, "There should be next execute time")
-        assertEquals(previousExecutionTimeInstance.plusSeconds(2L), nextTimeToExecute,
-                "nextTimeToExecute should be 2 seconds after test instance")
+        assertEquals(
+            previousExecutionTimeInstance.plusSeconds(2L), nextTimeToExecute,
+            "nextTimeToExecute should be 2 seconds after test instance"
+        )
     }
 
     @Test
@@ -108,8 +112,10 @@ class ScheduleTest : XContentTestBase {
         // The nextTimeToExecute should be 120 seconds after the enabled time
         val nextTimeToExecute = intervalSchedule.getExpectedNextExecutionTime(enabledTimeInstance, null)
         assertNotNull(nextTimeToExecute, "There should be next execute time")
-        assertEquals(enabledTimeInstance.plusSeconds(120L), nextTimeToExecute,
-                "nextTimeToExecute should be 120 seconds seconds after enabled time")
+        assertEquals(
+            enabledTimeInstance.plusSeconds(120L), nextTimeToExecute,
+            "nextTimeToExecute should be 120 seconds seconds after enabled time"
+        )
     }
 
     @Test
@@ -126,8 +132,10 @@ class ScheduleTest : XContentTestBase {
         // The nextTimeToExecute should be the minute after the previous execution time instance
         val nextTimeToExecute = intervalSchedule.getExpectedNextExecutionTime(enabledTimeInstance, previousExecutionTimeInstance)
         assertNotNull(nextTimeToExecute, "There should be next execute time")
-        assertEquals(previousExecutionTimeInstance.plusSeconds(60L), nextTimeToExecute,
-                "nextTimeToExecute should be 60 seconds after previous execution time")
+        assertEquals(
+            previousExecutionTimeInstance.plusSeconds(60L), nextTimeToExecute,
+            "nextTimeToExecute should be 60 seconds after previous execution time"
+        )
     }
 
     @Test
@@ -187,7 +195,7 @@ class ScheduleTest : XContentTestBase {
     @Test
     fun `test two types`() {
         val scheduleString = "{\"cron\":{\"expression\":\"0 * * * *\",\"timezone\":\"Asia/Tokyo\"}, " +
-                "\"period\":{\"interval\":\"1\",\"unit\":\"Minutes\"}}"
+            "\"period\":{\"interval\":\"1\",\"unit\":\"Minutes\"}}"
         assertFailsWith(IllegalArgumentException::class, "Expected IllegalArgumentException") {
             Schedule.parse(parser(scheduleString))
         }

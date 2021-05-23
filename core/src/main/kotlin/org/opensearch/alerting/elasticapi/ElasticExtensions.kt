@@ -26,8 +26,6 @@
 
 package org.opensearch.alerting.elasticapi
 
-import org.opensearch.commons.InjectSecurity
-import org.opensearch.commons.authuser.User
 import kotlinx.coroutines.ThreadContextElement
 import kotlinx.coroutines.delay
 import org.apache.logging.log4j.Logger
@@ -47,6 +45,8 @@ import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.InjectSecurity
+import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
@@ -201,8 +201,8 @@ class ElasticThreadContextElement(private val threadContext: ThreadContext) : Th
     override fun updateThreadContext(context: CoroutineContext) = this.context.close()
 }
 
-class InjectorContextElement(id: String, settings: Settings, threadContext: ThreadContext, private val roles: List<String>?)
-    : ThreadContextElement<Unit> {
+class InjectorContextElement(id: String, settings: Settings, threadContext: ThreadContext, private val roles: List<String>?) :
+    ThreadContextElement<Unit> {
 
     companion object Key : CoroutineContext.Key<InjectorContextElement>
     override val key: CoroutineContext.Key<*>

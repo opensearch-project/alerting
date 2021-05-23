@@ -61,17 +61,17 @@ data class CustomWebhook(
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         return builder.startObject(TYPE)
-                .field(URL, url)
-                .field(SCHEME_FIELD, scheme)
-                .field(HOST_FIELD, host)
-                .field(PORT_FIELD, port)
-                .field(PATH_FIELD, path)
-                .field(METHOD_FIELD, method)
-                .field(QUERY_PARAMS_FIELD, queryParams)
-                .field(HEADER_PARAMS_FIELD, headerParams)
-                .field(USERNAME_FIELD, username)
-                .field(PASSWORD_FIELD, password)
-                .endObject()
+            .field(URL, url)
+            .field(SCHEME_FIELD, scheme)
+            .field(HOST_FIELD, host)
+            .field(PORT_FIELD, port)
+            .field(PATH_FIELD, path)
+            .field(METHOD_FIELD, method)
+            .field(QUERY_PARAMS_FIELD, queryParams)
+            .field(HEADER_PARAMS_FIELD, headerParams)
+            .field(USERNAME_FIELD, username)
+            .field(PASSWORD_FIELD, password)
+            .endObject()
     }
 
     @Throws(IOException::class)

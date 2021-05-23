@@ -26,10 +26,10 @@
 
 package org.opensearch.alerting.core.action.node
 
+import org.opensearch.action.support.nodes.BaseNodeResponse
 import org.opensearch.alerting.core.JobSweeperMetrics
 import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler
 import org.opensearch.alerting.core.schedule.JobSchedulerMetrics
-import org.opensearch.action.support.nodes.BaseNodeResponse
 import org.opensearch.cluster.node.DiscoveryNode
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
@@ -55,7 +55,7 @@ class ScheduledJobStats : BaseNodeResponse, ToXContentFragment {
     var jobSweeperMetrics: JobSweeperMetrics? = null
     var jobInfos: Array<JobSchedulerMetrics>? = null
 
-    constructor(si: StreamInput): super(si) {
+    constructor(si: StreamInput) : super(si) {
         this.status = si.readEnum(ScheduleStatus::class.java)
         this.jobSweeperMetrics = si.readOptionalWriteable { JobSweeperMetrics(it) }
         this.jobInfos = si.readOptionalArray({ sti: StreamInput -> JobSchedulerMetrics(sti) }, { size -> arrayOfNulls(size) })

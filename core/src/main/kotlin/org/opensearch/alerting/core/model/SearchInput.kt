@@ -42,18 +42,18 @@ import java.io.IOException
 data class SearchInput(val indices: List<String>, val query: SearchSourceBuilder) : Input {
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         sin.readStringList(), // indices
         SearchSourceBuilder(sin) // query
     )
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         return builder.startObject()
-                .startObject(SEARCH_FIELD)
-                .field(INDICES_FIELD, indices.toTypedArray())
-                .field(QUERY_FIELD, query)
-                .endObject()
-                .endObject()
+            .startObject(SEARCH_FIELD)
+            .field(INDICES_FIELD, indices.toTypedArray())
+            .field(QUERY_FIELD, query)
+            .endObject()
+            .endObject()
     }
 
     override fun name(): String {
@@ -95,8 +95,10 @@ data class SearchInput(val indices: List<String>, val query: SearchSourceBuilder
                 }
             }
 
-            return SearchInput(indices,
-                    requireNotNull(searchSourceBuilder) { "SearchInput query is null" })
+            return SearchInput(
+                indices,
+                requireNotNull(searchSourceBuilder) { "SearchInput query is null" }
+            )
         }
 
         @JvmStatic

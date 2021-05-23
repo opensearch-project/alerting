@@ -26,15 +26,15 @@
 
 package org.opensearch.alerting.model
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.opensearch.action.get.GetRequest
+import org.opensearch.action.get.GetResponse
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.elasticapi.suspendUntil
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.opensearch.action.get.GetRequest
-import org.opensearch.action.get.GetResponse
 import org.opensearch.client.Client
 import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
@@ -50,8 +50,10 @@ class AlertingConfigAccessor {
         suspend fun getDestinationInfo(client: Client, xContentRegistry: NamedXContentRegistry, destinationId: String): Destination {
             val jobSource = getAlertingConfigDocumentSource(client, "Destination", destinationId)
             return withContext(Dispatchers.IO) {
-                val xcp = XContentHelper.createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                    jobSource, XContentType.JSON)
+                val xcp = XContentHelper.createParser(
+                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                    jobSource, XContentType.JSON
+                )
                 val destination = Destination.parseWithType(xcp)
                 destination
             }

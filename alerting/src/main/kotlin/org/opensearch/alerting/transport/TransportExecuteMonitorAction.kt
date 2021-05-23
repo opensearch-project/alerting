@@ -11,15 +11,6 @@
 
 package org.opensearch.alerting.transport
 
-import org.opensearch.alerting.MonitorRunner
-import org.opensearch.alerting.action.ExecuteMonitorAction
-import org.opensearch.alerting.action.ExecuteMonitorRequest
-import org.opensearch.alerting.action.ExecuteMonitorResponse
-import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.util.AlertingException
-import org.opensearch.commons.ConfigConstants
-import org.opensearch.commons.authuser.User
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -30,12 +21,21 @@ import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.MonitorRunner
+import org.opensearch.alerting.action.ExecuteMonitorAction
+import org.opensearch.alerting.action.ExecuteMonitorRequest
+import org.opensearch.alerting.action.ExecuteMonitorResponse
+import org.opensearch.alerting.core.model.ScheduledJob
+import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.ConfigConstants
+import org.opensearch.commons.authuser.User
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -50,7 +50,8 @@ class TransportExecuteMonitorAction @Inject constructor(
     actionFilters: ActionFilters,
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<ExecuteMonitorRequest, ExecuteMonitorResponse> (
-        ExecuteMonitorAction.NAME, transportService, actionFilters, ::ExecuteMonitorRequest) {
+    ExecuteMonitorAction.NAME, transportService, actionFilters, ::ExecuteMonitorRequest
+) {
 
     override fun doExecute(task: Task, execMonitorRequest: ExecuteMonitorRequest, actionListener: ActionListener<ExecuteMonitorResponse>) {
 
@@ -65,7 +66,7 @@ class TransportExecuteMonitorAction @Inject constructor(
                 // runner.launch(ElasticThreadContextElement(client.threadPool().threadContext)) {
                 runner.launch {
                     val (periodStart, periodEnd) =
-                            monitor.schedule.getPeriodEndingAt(Instant.ofEpochMilli(execMonitorRequest.requestEnd.millis))
+                        monitor.schedule.getPeriodEndingAt(Instant.ofEpochMilli(execMonitorRequest.requestEnd.millis))
                     try {
                         val monitorRunResult = runner.runMonitor(monitor, periodStart, periodEnd, execMonitorRequest.dryrun)
                         withContext(Dispatchers.IO) {
@@ -82,27 +83,34 @@ class TransportExecuteMonitorAction @Inject constructor(
 
             if (execMonitorRequest.monitorId != null) {
                 val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX).id(execMonitorRequest.monitorId)
-                client.get(getRequest, object : ActionListener<GetResponse> {
-                    override fun onResponse(response: GetResponse) {
-                        if (!response.isExists) {
-                            actionListener.onFailure(AlertingException.wrap(
-                                    OpenSearchStatusException("Can't find monitor with id: ${response.id}", RestStatus.NOT_FOUND)
-                            ))
-                            return
-                        }
-                        if (!response.isSourceEmpty) {
-                            XContentHelper.createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                                    response.sourceAsBytesRef, XContentType.JSON).use { xcp ->
-                                val monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
-                                executeMonitor(monitor)
+                client.get(
+                    getRequest,
+                    object : ActionListener<GetResponse> {
+                        override fun onResponse(response: GetResponse) {
+                            if (!response.isExists) {
+                                actionListener.onFailure(
+                                    AlertingException.wrap(
+                                        OpenSearchStatusException("Can't find monitor with id: ${response.id}", RestStatus.NOT_FOUND)
+                                    )
+                                )
+                                return
+                            }
+                            if (!response.isSourceEmpty) {
+                                XContentHelper.createParser(
+                                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                                    response.sourceAsBytesRef, XContentType.JSON
+                                ).use { xcp ->
+                                    val monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
+                                    executeMonitor(monitor)
+                                }
                             }
                         }
-                    }
 
-                    override fun onFailure(t: Exception) {
-                        actionListener.onFailure(AlertingException.wrap(t))
+                        override fun onFailure(t: Exception) {
+                            actionListener.onFailure(AlertingException.wrap(t))
+                        }
                     }
-                })
+                )
             } else {
                 val monitor = when (user?.name.isNullOrEmpty()) {
                     true -> execMonitorRequest.monitor as Monitor

@@ -11,13 +11,6 @@
 
 package org.opensearch.alerting.transport
 
-import org.opensearch.alerting.action.AcknowledgeAlertAction
-import org.opensearch.alerting.action.AcknowledgeAlertRequest
-import org.opensearch.alerting.action.AcknowledgeAlertResponse
-import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.elasticapi.optionalTimeField
-import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.util.AlertingException
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionListener
 import org.opensearch.action.bulk.BulkRequest
@@ -27,6 +20,13 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.update.UpdateRequest
+import org.opensearch.alerting.action.AcknowledgeAlertAction
+import org.opensearch.alerting.action.AcknowledgeAlertRequest
+import org.opensearch.alerting.action.AcknowledgeAlertResponse
+import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.elasticapi.optionalTimeField
+import org.opensearch.alerting.model.Alert
+import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
@@ -50,7 +50,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
     actionFilters: ActionFilters,
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<AcknowledgeAlertRequest, AcknowledgeAlertResponse>(
-        AcknowledgeAlertAction.NAME, transportService, actionFilters, ::AcknowledgeAlertRequest
+    AcknowledgeAlertAction.NAME, transportService, actionFilters, ::AcknowledgeAlertRequest
 ) {
 
     override fun doExecute(task: Task, request: AcknowledgeAlertRequest, actionListener: ActionListener<AcknowledgeAlertResponse>) {
@@ -70,40 +70,49 @@ class TransportAcknowledgeAlertAction @Inject constructor(
 
         private fun findActiveAlerts() {
             val queryBuilder = QueryBuilders.boolQuery()
-                    .filter(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, request.monitorId))
-                    .filter(QueryBuilders.termsQuery("_id", request.alertIds))
+                .filter(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, request.monitorId))
+                .filter(QueryBuilders.termsQuery("_id", request.alertIds))
             val searchRequest = SearchRequest()
-                    .indices(AlertIndices.ALERT_INDEX)
-                    .routing(request.monitorId)
-                    .source(SearchSourceBuilder().query(queryBuilder).version(true).seqNoAndPrimaryTerm(true))
+                .indices(AlertIndices.ALERT_INDEX)
+                .routing(request.monitorId)
+                .source(SearchSourceBuilder().query(queryBuilder).version(true).seqNoAndPrimaryTerm(true))
 
-            client.search(searchRequest, object : ActionListener<SearchResponse> {
-                override fun onResponse(response: SearchResponse) {
-                    onSearchResponse(response)
-                }
+            client.search(
+                searchRequest,
+                object : ActionListener<SearchResponse> {
+                    override fun onResponse(response: SearchResponse) {
+                        onSearchResponse(response)
+                    }
 
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
+                    override fun onFailure(t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                    }
                 }
-            })
+            )
         }
 
         private fun onSearchResponse(response: SearchResponse) {
             val updateRequests = response.hits.flatMap { hit ->
-                val xcp = XContentHelper.createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                        hit.sourceRef, XContentType.JSON)
+                val xcp = XContentHelper.createParser(
+                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                    hit.sourceRef, XContentType.JSON
+                )
                 XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
                 val alert = Alert.parse(xcp, hit.id, hit.version)
                 alerts[alert.id] = alert
                 if (alert.state == Alert.State.ACTIVE) {
-                    listOf(UpdateRequest(AlertIndices.ALERT_INDEX, hit.id)
+                    listOf(
+                        UpdateRequest(AlertIndices.ALERT_INDEX, hit.id)
                             .routing(request.monitorId)
                             .setIfSeqNo(hit.seqNo)
                             .setIfPrimaryTerm(hit.primaryTerm)
-                            .doc(XContentFactory.jsonBuilder().startObject()
+                            .doc(
+                                XContentFactory.jsonBuilder().startObject()
                                     .field(Alert.STATE_FIELD, Alert.State.ACKNOWLEDGED.toString())
                                     .optionalTimeField(Alert.ACKNOWLEDGED_TIME_FIELD, Instant.now())
-                                    .endObject()))
+                                    .endObject()
+                            )
+                    )
                 } else {
                     emptyList()
                 }
@@ -111,15 +120,18 @@ class TransportAcknowledgeAlertAction @Inject constructor(
 
             log.info("Acknowledging monitor: $request.monitorId, alerts: ${updateRequests.map { it.id() }}")
             val bulkRequest = BulkRequest().add(updateRequests).setRefreshPolicy(request.refreshPolicy)
-            client.bulk(bulkRequest, object : ActionListener<BulkResponse> {
-                override fun onResponse(response: BulkResponse) {
-                    onBulkResponse(response)
-                }
+            client.bulk(
+                bulkRequest,
+                object : ActionListener<BulkResponse> {
+                    override fun onResponse(response: BulkResponse) {
+                        onBulkResponse(response)
+                    }
 
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
+                    override fun onFailure(t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                    }
                 }
-            })
+            )
         }
 
         private fun onBulkResponse(response: BulkResponse) {

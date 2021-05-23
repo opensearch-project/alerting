@@ -26,11 +26,11 @@
 
 package org.opensearch.alerting.action
 
+import org.junit.Assert
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.test.OpenSearchTestCase
-import org.junit.Assert
 
 class DeleteDestinationRequestTests : OpenSearchTestCase() {
 

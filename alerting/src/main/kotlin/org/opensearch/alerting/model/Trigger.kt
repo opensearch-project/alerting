@@ -48,30 +48,32 @@ data class Trigger(
 ) : Writeable, ToXContent {
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
-            sin.readString(), // name
-            sin.readString(), // severity
-            Script(sin), // condition
-            sin.readList(::Action), // actions
-            sin.readString() // id
+    constructor(sin: StreamInput) : this(
+        sin.readString(), // name
+        sin.readString(), // severity
+        Script(sin), // condition
+        sin.readList(::Action), // actions
+        sin.readString() // id
     )
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         builder.startObject()
-                .field(ID_FIELD, id)
-                .field(NAME_FIELD, name)
-                .field(SEVERITY_FIELD, severity)
-                .startObject(CONDITION_FIELD)
-                .field(SCRIPT_FIELD, condition)
-                .endObject()
-                .field(ACTIONS_FIELD, actions.toTypedArray())
-                .endObject()
+            .field(ID_FIELD, id)
+            .field(NAME_FIELD, name)
+            .field(SEVERITY_FIELD, severity)
+            .startObject(CONDITION_FIELD)
+            .field(SCRIPT_FIELD, condition)
+            .endObject()
+            .field(ACTIONS_FIELD, actions.toTypedArray())
+            .endObject()
         return builder
     }
 
     /** Returns a representation of the trigger suitable for passing into painless and mustache scripts. */
     fun asTemplateArg(): Map<String, Any> {
-        return mapOf(ID_FIELD to id, NAME_FIELD to name, SEVERITY_FIELD to severity,
-                ACTIONS_FIELD to actions.map { it.asTemplateArg() })
+        return mapOf(
+            ID_FIELD to id, NAME_FIELD to name, SEVERITY_FIELD to severity,
+            ACTIONS_FIELD to actions.map { it.asTemplateArg() }
+        )
     }
 
     @Throws(IOException::class)
@@ -126,11 +128,12 @@ data class Trigger(
             }
 
             return Trigger(
-                    name = requireNotNull(name) { "Trigger name is null" },
-                    severity = requireNotNull(severity) { "Trigger severity is null" },
-                    condition = requireNotNull(condition) { "Trigger is null" },
-                    actions = requireNotNull(actions) { "Trigger actions are null" },
-                    id = requireNotNull(id) { "Trigger id is null." })
+                name = requireNotNull(name) { "Trigger name is null" },
+                severity = requireNotNull(severity) { "Trigger severity is null" },
+                condition = requireNotNull(condition) { "Trigger is null" },
+                actions = requireNotNull(actions) { "Trigger actions are null" },
+                id = requireNotNull(id) { "Trigger id is null." }
+            )
         }
 
         @JvmStatic

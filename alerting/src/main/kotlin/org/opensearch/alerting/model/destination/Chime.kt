@@ -51,8 +51,8 @@ data class Chime(val url: String) : ToXContent {
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         return builder.startObject(TYPE)
-                .field(URL, url)
-                .endObject()
+            .field(URL, url)
+            .endObject()
     }
 
     @Throws(IOException::class)
@@ -96,8 +96,8 @@ data class Chime(val url: String) : ToXContent {
         val messageContent: String? = if (Strings.isNullOrEmpty(subject)) message else "$subject \n\n $message"
         val builder = XContentFactory.contentBuilder(XContentType.JSON)
         builder.startObject()
-                .field("Content", messageContent)
-                .endObject()
+            .field("Content", messageContent)
+            .endObject()
         return builder.string()
     }
 }

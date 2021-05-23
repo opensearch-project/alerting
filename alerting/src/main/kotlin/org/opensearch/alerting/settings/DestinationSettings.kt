@@ -69,11 +69,11 @@ class DestinationSettings {
         )
 
         val HOST_DENY_LIST: Setting<List<String>> = Setting.listSetting(
-                "opendistro.destination.host.deny_list",
-                emptyList<String>(),
-                Function.identity(),
-                Setting.Property.NodeScope,
-                Setting.Property.Final
+            "opendistro.destination.host.deny_list",
+            emptyList<String>(),
+            Function.identity(),
+            Setting.Property.NodeScope,
+            Setting.Property.Final
         )
 
         fun loadDestinationSettings(settings: Settings): Map<String, SecureDestinationSettings> {

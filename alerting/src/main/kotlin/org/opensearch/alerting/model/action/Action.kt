@@ -59,7 +59,7 @@ data class Action(
     }
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         sin.readString(), // name
         sin.readString(), // destinationId
         sin.readOptionalWriteable(::Script), // subjectTemplate
@@ -71,11 +71,11 @@ data class Action(
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         val xContentBuilder = builder.startObject()
-                .field(ID_FIELD, id)
-                .field(NAME_FIELD, name)
-                .field(DESTINATION_ID_FIELD, destinationId)
-                .field(MESSAGE_TEMPLATE_FIELD, messageTemplate)
-                .field(THROTTLE_ENABLED_FIELD, throttleEnabled)
+            .field(ID_FIELD, id)
+            .field(NAME_FIELD, name)
+            .field(DESTINATION_ID_FIELD, destinationId)
+            .field(MESSAGE_TEMPLATE_FIELD, messageTemplate)
+            .field(THROTTLE_ENABLED_FIELD, throttleEnabled)
         if (subjectTemplate != null) {
             xContentBuilder.field(SUBJECT_TEMPLATE_FIELD, subjectTemplate)
         }
@@ -164,13 +164,15 @@ data class Action(
                 requireNotNull(throttle, { "Action throttle enabled but not set throttle value" })
             }
 
-            return Action(requireNotNull(name) { "Action name is null" },
-                    requireNotNull(destinationId) { "Destination id is null" },
-                    subjectTemplate,
-                    requireNotNull(messageTemplate) { "Action message template is null" },
-                    throttleEnabled,
-                    throttle,
-                    id = requireNotNull(id))
+            return Action(
+                requireNotNull(name) { "Action name is null" },
+                requireNotNull(destinationId) { "Destination id is null" },
+                subjectTemplate,
+                requireNotNull(messageTemplate) { "Action message template is null" },
+                throttleEnabled,
+                throttle,
+                id = requireNotNull(id)
+            )
         }
 
         @JvmStatic
