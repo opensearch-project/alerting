@@ -91,7 +91,11 @@ class LegacyOpenDistroDestinationSettings {
             }
         }
 
-        private fun <T> getLegacyEmailSettingValue(settings: Settings, emailAccountName: String, emailSetting: Setting.AffixSetting<T>): T? {
+        private fun <T> getLegacyEmailSettingValue(
+            settings: Settings,
+            emailAccountName: String,
+            emailSetting: Setting.AffixSetting<T>
+        ): T? {
             val concreteSetting = emailSetting.getConcreteSettingForNamespace(emailAccountName)
             return concreteSetting.get(settings)
         }

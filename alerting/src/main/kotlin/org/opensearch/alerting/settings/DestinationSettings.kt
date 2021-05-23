@@ -65,8 +65,8 @@ class DestinationSettings {
         )
 
         val HOST_DENY_LIST: Setting<List<String>> = Setting.listSetting(
-            "opendistro.destination.host.deny_list",
-            emptyList<String>(),
+            "plugins.destination.host.deny_list",
+            LegacyOpenDistroDestinationSettings.HOST_DENY_LIST,
             Function.identity(),
             Setting.Property.NodeScope,
             Setting.Property.Final
