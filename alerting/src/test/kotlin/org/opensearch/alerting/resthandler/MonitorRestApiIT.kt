@@ -147,7 +147,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test creating a monitor with updating action threshold`() {
-        adminClient().updateSettings("opendistro.alerting.action_throttle_max_value", TimeValue.timeValueHours(1))
+        adminClient().updateSettings("plugins.alerting.action_throttle_max_value", TimeValue.timeValueHours(1))
 
         val monitor = randomMonitorWithThrottle(2, ChronoUnit.HOURS)
 
@@ -156,7 +156,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())
         }
-        adminClient().updateSettings("opendistro.alerting.action_throttle_max_value", TimeValue.timeValueHours(24))
+        adminClient().updateSettings("plugins.alerting.action_throttle_max_value", TimeValue.timeValueHours(24))
     }
 
     fun `test creating a monitor with PUT fails`() {
