@@ -60,26 +60,6 @@ ext {
     isSnapshot = "true" == System.getProperty("build.snapshot", "true")
 }
 
-allprojects {
-    group = "org.opensearch"
-    // Increment the final digit when there's a new plugin versions for the same opendistro version
-    // Reset the final digit to 0 when upgrading to a new opendistro version
-    version = "${opendistroVersion}.0-rc1"
-
-    apply from: "$rootDir/build-tools/repositories.gradle"
-
-    plugins.withId('java') {
-        sourceCompatibility = targetCompatibility = "1.8"
-    }
-    plugins.withId('org.jetbrains.kotlin.jvm') {
-        compileKotlin.kotlinOptions.jvmTarget = compileTestKotlin.kotlinOptions.jvmTarget = "1.8"
-    }
-}
-
-evaluationDependsOnChildren()
-
-check.dependsOn subprojects*.check
-
 configurations {
     ktlint
 }
@@ -107,3 +87,26 @@ task ktlintFormat(type: JavaExec, group: "formatting") {
 }
 
 check.dependsOn ktlint
+
+
+allprojects {
+    group = "org.opensearch"
+    // Increment the final digit when there's a new plugin versions for the same opendistro version
+    // Reset the final digit to 0 when upgrading to a new opendistro version
+    version = "${opendistroVersion}.0-rc1"
+
+    apply from: "$rootDir/build-tools/repositories.gradle"
+
+    plugins.withId('java') {
+        sourceCompatibility = targetCompatibility = "1.8"
+    }
+    plugins.withId('org.jetbrains.kotlin.jvm') {
+        compileKotlin.kotlinOptions.jvmTarget = compileTestKotlin.kotlinOptions.jvmTarget = "1.8"
+        compileKotlin.dependsOn ktlint
+    }
+
+}
+
+evaluationDependsOnChildren()
+
+check.dependsOn subprojects*.check
