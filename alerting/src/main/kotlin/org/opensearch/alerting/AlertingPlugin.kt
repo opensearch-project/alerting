@@ -54,6 +54,7 @@ import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler
 import org.opensearch.alerting.core.schedule.JobScheduler
+import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSettings
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.resthandler.RestAcknowledgeAlertAction
@@ -77,6 +78,8 @@ import org.opensearch.alerting.resthandler.RestSearchMonitorAction
 import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
+import org.opensearch.alerting.settings.LegacyOpenDistroAlertingSettings
+import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings
 import org.opensearch.alerting.transport.TransportAcknowledgeAlertAction
 import org.opensearch.alerting.transport.TransportDeleteDestinationAction
 import org.opensearch.alerting.transport.TransportDeleteEmailAccountAction
@@ -253,6 +256,12 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ScheduledJobSettings.SWEEP_PERIOD,
             ScheduledJobSettings.SWEEP_PAGE_SIZE,
             ScheduledJobSettings.SWEEPER_ENABLED,
+            LegacyOpenDistroScheduledJobSettings.REQUEST_TIMEOUT,
+            LegacyOpenDistroScheduledJobSettings.SWEEP_BACKOFF_MILLIS,
+            LegacyOpenDistroScheduledJobSettings.SWEEP_BACKOFF_RETRY_COUNT,
+            LegacyOpenDistroScheduledJobSettings.SWEEP_PERIOD,
+            LegacyOpenDistroScheduledJobSettings.SWEEP_PAGE_SIZE,
+            LegacyOpenDistroScheduledJobSettings.SWEEPER_ENABLED,
             AlertingSettings.INPUT_TIMEOUT,
             AlertingSettings.INDEX_TIMEOUT,
             AlertingSettings.BULK_TIMEOUT,
@@ -269,10 +278,30 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.REQUEST_TIMEOUT,
             AlertingSettings.MAX_ACTION_THROTTLE_VALUE,
             AlertingSettings.FILTER_BY_BACKEND_ROLES,
+            LegacyOpenDistroAlertingSettings.INPUT_TIMEOUT,
+            LegacyOpenDistroAlertingSettings.INDEX_TIMEOUT,
+            LegacyOpenDistroAlertingSettings.BULK_TIMEOUT,
+            LegacyOpenDistroAlertingSettings.ALERT_BACKOFF_MILLIS,
+            LegacyOpenDistroAlertingSettings.ALERT_BACKOFF_COUNT,
+            LegacyOpenDistroAlertingSettings.MOVE_ALERTS_BACKOFF_MILLIS,
+            LegacyOpenDistroAlertingSettings.MOVE_ALERTS_BACKOFF_COUNT,
+            LegacyOpenDistroAlertingSettings.ALERT_HISTORY_ENABLED,
+            LegacyOpenDistroAlertingSettings.ALERT_HISTORY_ROLLOVER_PERIOD,
+            LegacyOpenDistroAlertingSettings.ALERT_HISTORY_INDEX_MAX_AGE,
+            LegacyOpenDistroAlertingSettings.ALERT_HISTORY_MAX_DOCS,
+            LegacyOpenDistroAlertingSettings.ALERT_HISTORY_RETENTION_PERIOD,
+            LegacyOpenDistroAlertingSettings.ALERTING_MAX_MONITORS,
+            LegacyOpenDistroAlertingSettings.REQUEST_TIMEOUT,
+            LegacyOpenDistroAlertingSettings.MAX_ACTION_THROTTLE_VALUE,
+            LegacyOpenDistroAlertingSettings.FILTER_BY_BACKEND_ROLES,
             DestinationSettings.EMAIL_USERNAME,
             DestinationSettings.EMAIL_PASSWORD,
             DestinationSettings.ALLOW_LIST,
-            DestinationSettings.HOST_DENY_LIST
+            DestinationSettings.HOST_DENY_LIST,
+            LegacyOpenDistroDestinationSettings.EMAIL_USERNAME,
+            LegacyOpenDistroDestinationSettings.EMAIL_PASSWORD,
+            LegacyOpenDistroDestinationSettings.ALLOW_LIST,
+            LegacyOpenDistroDestinationSettings.HOST_DENY_LIST
         )
     }
 
