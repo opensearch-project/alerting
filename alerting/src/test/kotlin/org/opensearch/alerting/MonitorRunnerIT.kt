@@ -772,30 +772,33 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
     fun `test execute monitor with custom webhook destination and denied host`() {
 
-        listOf("http://10.1.1.1", "127.0.0.1").forEach {
-            val customWebhook = CustomWebhook(it, null, null, 80, null, "PUT", emptyMap(), emptyMap(), null, null)
-            val destination = createDestination(
-                Destination(
-                    type = DestinationType.CUSTOM_WEBHOOK,
-                    name = "testDesination",
-                    user = randomUser(),
-                    lastUpdateTime = Instant.now(),
-                    chime = null,
-                    slack = null,
-                    customWebhook = customWebhook,
-                    email = null
+        // TODO: change to REST API call to test security enabled case
+        if (!securityEnabled()) {
+            listOf("http://10.1.1.1", "127.0.0.1").forEach {
+                val customWebhook = CustomWebhook(it, null, null, 80, null, "PUT", emptyMap(), emptyMap(), null, null)
+                val destination = createDestination(
+                    Destination(
+                        type = DestinationType.CUSTOM_WEBHOOK,
+                        name = "testDesination",
+                        user = randomUser(),
+                        lastUpdateTime = Instant.now(),
+                        chime = null,
+                        slack = null,
+                        customWebhook = customWebhook,
+                        email = null
+                    )
                 )
-            )
-            val action = randomAction(destinationId = destination.id)
-            val trigger = randomTrigger(condition = ALWAYS_RUN, actions = listOf(action))
-            val monitor = createMonitor(randomMonitor(triggers = listOf(trigger)))
-            executeMonitor(adminClient(), monitor.id)
+                val action = randomAction(destinationId = destination.id)
+                val trigger = randomTrigger(condition = ALWAYS_RUN, actions = listOf(action))
+                val monitor = createMonitor(randomMonitor(triggers = listOf(trigger)))
+                executeMonitor(adminClient(), monitor.id)
 
-            val alerts = searchAlerts(monitor)
-            assertEquals("Alert not saved", 1, alerts.size)
-            verifyAlert(alerts.single(), monitor, ERROR)
+                val alerts = searchAlerts(monitor)
+                assertEquals("Alert not saved", 1, alerts.size)
+                verifyAlert(alerts.single(), monitor, ERROR)
 
-            Assert.assertTrue(alerts.single().errorMessage?.contains("The destination address is invalid") as Boolean)
+                Assert.assertTrue(alerts.single().errorMessage?.contains("The destination address is invalid") as Boolean)
+            }
         }
     }
 
