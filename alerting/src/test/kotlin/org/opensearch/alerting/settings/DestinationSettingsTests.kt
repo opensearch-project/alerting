@@ -44,10 +44,25 @@ class DestinationSettingsTests : OpenSearchTestCase() {
             DestinationSettings.ALLOW_LIST.get(Settings.EMPTY),
             LegacyOpenDistroDestinationSettings.ALLOW_LIST.get(Settings.EMPTY)
         )
+        assertEquals(
+            DestinationSettings.HOST_DENY_LIST.get(Settings.EMPTY),
+            LegacyOpenDistroDestinationSettings.HOST_DENY_LIST.get(Settings.EMPTY)
+        )
     }
 
-    fun `test settings get Value`() {
-        val settings = Settings.builder().put("plugins.alerting.destination.allow_list", "1").build()
-        assertNotNull(DestinationSettings.ALLOW_LIST.get(settings))
+    fun `test settings get Value with legacy fallback`() {
+        val settings = Settings.builder()
+            .putList("opendistro.alerting.destination.allow_list", listOf<String>("1"))
+            .putList("opendistro.destination.host.deny_list", emptyList<String>()).build()
+
+        assertEquals(DestinationSettings.ALLOW_LIST.get(settings), listOf<String>("1"))
+        assertEquals(DestinationSettings.HOST_DENY_LIST.get(settings), emptyList<String>())
+
+        assertSettingDeprecationsAndWarnings(
+            arrayOf(
+                LegacyOpenDistroDestinationSettings.ALLOW_LIST,
+                LegacyOpenDistroDestinationSettings.HOST_DENY_LIST
+            )
+        )
     }
 }
