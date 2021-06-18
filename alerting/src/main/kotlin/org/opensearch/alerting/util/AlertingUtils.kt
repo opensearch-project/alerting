@@ -65,9 +65,9 @@ fun BaseMessage.isHostInDenylist(networks: List<String>): Boolean {
                 return true
             }
         }
-    } else {
-        return false
     }
+
+    return false
 }
 
 /**
