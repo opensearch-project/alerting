@@ -117,7 +117,7 @@ public class EmailDestinationTest {
         assertEquals(expectedEmailResponse.getStatusCode(), actualEmailResponse.getStatusCode());
     }
 
-    @Test
+    @Test(expected = IllegalStateException.class)
     public void testFailingMailMessage() throws Exception {
 
         DestinationResponse expectedEmailResponse = new DestinationResponse.Builder()
