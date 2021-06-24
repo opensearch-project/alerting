@@ -38,7 +38,7 @@ Messages can be static strings, or you can use the [Mustache](https://mustache.g
 
 ## Documentation
 
-Please see our [documentation](https://opendistro.github.io/for-elasticsearch-docs/docs/alerting/).
+Please see our [documentation](https://docs-beta.opensearch.org/monitoring-plugins/alerting/index/).
 
 ## Contributing
 
