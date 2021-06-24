@@ -4,7 +4,7 @@ import org.opensearch.alerting.action.GetDestinationsRequest
 import org.opensearch.commons.notifications.action.GetNotificationConfigRequest
 import org.opensearch.search.sort.SortOrder
 
-class GetDestinationsConverter {
+class GetEmailGroupConverter {
 
     companion object {
         fun convertAlertRequestToNotificationRequest(request: GetDestinationsRequest): GetNotificationConfigRequest {

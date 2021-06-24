@@ -1,13 +1,13 @@
 package org.opensearch.alerting.actionconverter
 
-import org.opensearch.alerting.action.GetDestinationsRequest
+import org.opensearch.alerting.action.GetEmailAccountRequest
 import org.opensearch.commons.notifications.action.GetNotificationConfigRequest
 import org.opensearch.search.sort.SortOrder
 
-class GetDestinationsConverter {
+class GetEmailAccountConverter {
 
     companion object {
-        fun convertAlertRequestToNotificationRequest(request: GetDestinationsRequest): GetNotificationConfigRequest {
+        fun convertEmailAccountRequestToNotificationRequest(request: GetEmailAccountRequest): GetNotificationConfigRequest {
             val configIds: Set<String> = if(request.destinationId != null) setOf(request.destinationId) else emptySet()
             val table = request.table
             val fromIndex = table.startIndex
