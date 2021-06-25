@@ -97,7 +97,6 @@ validateNebulaPom.enabled = false
 thirdPartyAudit.enabled = false
 
 loggerUsageCheck.enabled = false
-licenseHeaders.enabled = false
 
 def opensearch_tmp_dir = rootProject.file('build/private/opensearch_tmp').absoluteFile
 opensearch_tmp_dir.mkdirs()
