@@ -68,7 +68,7 @@ class AlertingUtilsTests : OpenSearchTestCase() {
 
     private fun createMessageWithHost(host: String): BaseMessage {
         return CustomWebhookMessage.Builder("abc")
-            .withUrl(host)
+            .withHost(host)
             .withPath("incomingwebhooks/383c0e2b-d028-44f4-8d38-696754bc4574")
             .withMessage("{\"Content\":\"Message test\"}")
             .withMethod("POST")

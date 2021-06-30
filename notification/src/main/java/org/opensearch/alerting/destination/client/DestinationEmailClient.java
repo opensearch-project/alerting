@@ -97,7 +97,7 @@ public class DestinationEmailClient {
 
                 SendMessage(mailmsg);
             } catch (MessagingException e) {
-                return e.getMessage();
+                throw new MessagingException(e.getMessage());
             }
         }
         return "Sent";
