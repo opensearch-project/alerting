@@ -32,17 +32,17 @@ jobs:
           ref: '1.0'
       - name: Build OpenSearch
         working-directory: ./OpenSearch
-        run: ./gradlew publishToMavenLocal -Dbuild.version_qualifier=rc1 -Dbuild.snapshot=false
+        run: ./gradlew publishToMavenLocal -Dbuild.snapshot=false
       # This step adds dependency, common-utils
       - name: Checkout common-utils
         uses: actions/checkout@v2
         with:
           repository: 'opensearch-project/common-utils'
           path: common-utils
-          ref: 'main'
+          ref: '1.0'
       - name: Build common-utils
         working-directory: ./common-utils
-        run: ./gradlew publishToMavenLocal -Dopensearch.version=1.0.0-rc1
+        run: ./gradlew publishToMavenLocal -Dopensearch.version=1.0.0
       # This step uses the checkout Github action: https://github.com/actions/checkout
       - name: Checkout Branch
         uses: actions/checkout@v2
@@ -52,7 +52,7 @@ jobs:
         with:
           java-version: 14
       - name: Run integration tests with multi node config
-        run: ./gradlew integTest -PnumNodes=3 -Dopensearch.version=1.0.0-rc1 -Dbuild.snapshot=false
+        run: ./gradlew integTest -PnumNodes=3 -Dopensearch.version=1.0.0 -Dbuild.snapshot=false
       - name: Pull and Run Docker
         run: |
           plugin=`ls alerting/build/distributions/*.zip`
