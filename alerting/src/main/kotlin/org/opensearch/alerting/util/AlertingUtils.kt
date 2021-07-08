@@ -57,13 +57,16 @@ fun isValidEmail(email: String): Boolean {
 fun Destination.isAllowed(allowList: List<String>): Boolean = allowList.contains(this.type.value)
 
 fun BaseMessage.isHostInDenylist(networks: List<String>): Boolean {
-    val ipStr = IPAddressString(this.uri.host)
-    for (network in networks) {
-        val netStr = IPAddressString(network)
-        if (netStr.contains(ipStr)) {
-            return true
+    if (this.url != null || this.uri.host != null) {
+        val ipStr = IPAddressString(this.uri.host)
+        for (network in networks) {
+            val netStr = IPAddressString(network)
+            if (netStr.contains(ipStr)) {
+                return true
+            }
         }
     }
+
     return false
 }
 

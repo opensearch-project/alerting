@@ -52,6 +52,7 @@ import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
 import org.opensearch.search.builder.SearchSourceBuilder
+import java.net.URLEncoder
 import java.time.Instant
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -59,6 +60,7 @@ import java.time.temporal.ChronoUnit
 import java.time.temporal.ChronoUnit.DAYS
 import java.time.temporal.ChronoUnit.MILLIS
 import java.time.temporal.ChronoUnit.MINUTES
+import kotlin.collections.HashMap
 
 class MonitorRunnerIT : AlertingRestTestCase() {
 
@@ -368,6 +370,46 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         // Don't expect any alerts for this monitor as it has not been saved
         val alerts = searchAlerts(monitor)
         assertEquals("Alert saved for test monitor", 0, alerts.size)
+    }
+
+    fun `test execute monitor search with date math`() {
+        // Give the index name in the date math format.
+        val testIndex = "<my-index-{now/d{YYYY.MM.dd|+12:00}}>"
+        // Add percent encoding for the http client to resolve the format.
+        val encodedTestIndex = createTestIndex(
+            URLEncoder.encode(testIndex, "utf-8")
+        )
+
+        val fiveDaysAgo = ZonedDateTime.now().minus(5, DAYS).truncatedTo(MILLIS)
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(fiveDaysAgo)
+        val testDoc = """{ "test_strict_date_time" : "$testTime" }"""
+        indexDoc(encodedTestIndex, "1", testDoc)
+
+        // Queries that use period_start/end should expect these values to always be formatted as 'epoch_millis'. Either
+        // the query should specify the format (like below) or the mapping for the index/field being queried should allow
+        // epoch_millis as an alternative (OpenSearch's default mapping for date fields "strict_date_optional_time||epoch_millis")
+        val query = QueryBuilders.rangeQuery("test_strict_date_time")
+            .gt("{{period_end}}||-10d")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
+        val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().query(query))
+        val triggerScript = """
+            // make sure there is exactly one hit
+            return ctx.results[0].hits.hits.size() == 1
+        """.trimIndent()
+        val trigger = randomTrigger(condition = Script(triggerScript))
+        val monitor = randomMonitor(inputs = listOf(input), triggers = listOf(trigger))
+
+        val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
+
+        val output = entityAsMap(response)
+
+        assertEquals(monitor.name, output["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
+        assertEquals("Incorrect search result", 1, total["value"])
     }
 
     fun `test monitor with one bad action and one good action`() {
@@ -709,7 +751,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         )
     }
 
-    fun `test execute monitor with email destination creates alert`() {
+    fun `test execute monitor with email destination creates alerts in error state`() {
         putAlertMappings() // Required as we do not have a create alert API.
 
         val emailAccount = createRandomEmailAccount()
@@ -742,7 +784,8 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
         val alerts = searchAlerts(monitor)
         assertEquals("Alert not saved", 1, alerts.size)
-        verifyAlert(alerts.single(), monitor, ACTIVE)
+        verifyAlert(alerts.single(), monitor, ERROR)
+        Assert.assertTrue(alerts.single().errorMessage?.contains("Failed running action") as Boolean)
     }
 
     fun `test execute monitor with custom webhook destination`() {
