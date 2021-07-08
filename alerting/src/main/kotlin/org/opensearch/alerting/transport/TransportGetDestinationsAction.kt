@@ -35,6 +35,9 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetDestinationsRequest
 import org.opensearch.alerting.action.GetDestinationsResponse
+import org.opensearch.alerting.actionconverter.GetDestinationsConverter.Companion.convertGetDestinationsRequestToGetNotificationConfigRequest
+import org.opensearch.alerting.actionconverter.GetDestinationsConverter.Companion.convertGetNotificationConfigResponseToGetDestinationsResponse
+import org.opensearch.alerting.actionconverter.GetEmailGroupConverter
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.elasticapi.addFilter
 import org.opensearch.alerting.model.destination.Destination
@@ -53,6 +56,7 @@ import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.notifications.action.NotificationsActions
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
@@ -88,52 +92,59 @@ class TransportGetDestinationsAction @Inject constructor(
         getDestinationsRequest: GetDestinationsRequest,
         actionListener: ActionListener<GetDestinationsResponse>
     ) {
-        val userStr = client.threadPool().threadContext.getTransient<String>(
-            ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT
-        )
-        log.debug("User and roles string from thread context: $userStr")
-        val user: User? = User.parse(userStr)
-
-        val tableProp = getDestinationsRequest.table
-
-        val sortBuilder = SortBuilders
-            .fieldSort(tableProp.sortString)
-            .order(SortOrder.fromString(tableProp.sortOrder))
-        if (!tableProp.missing.isNullOrBlank()) {
-            sortBuilder.missing(tableProp.missing)
+        try {
+            val futureResponse = client.execute(NotificationsActions.GET_NOTIFICATION_CONFIG_ACTION_TYPE, convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest))
+            val response = futureResponse.actionGet()
+            actionListener.onResponse(convertGetNotificationConfigResponseToGetDestinationsResponse(response))
+        } catch (e: Exception) {
+            actionListener.onFailure(AlertingException.wrap(e))
         }
-
-        val searchSourceBuilder = SearchSourceBuilder()
-            .sort(sortBuilder)
-            .size(tableProp.size)
-            .from(tableProp.startIndex)
-            .fetchSource(FetchSourceContext(true, Strings.EMPTY_ARRAY, Strings.EMPTY_ARRAY))
-            .seqNoAndPrimaryTerm(true)
-            .version(true)
-        val queryBuilder = QueryBuilders.boolQuery()
-            .must(QueryBuilders.existsQuery("destination"))
-
-        if (!getDestinationsRequest.destinationId.isNullOrBlank())
-            queryBuilder.filter(QueryBuilders.termQuery("_id", getDestinationsRequest.destinationId))
-
-        if (getDestinationsRequest.destinationType != "ALL")
-            queryBuilder.filter(QueryBuilders.termQuery("destination.type", getDestinationsRequest.destinationType))
-
-        if (!tableProp.searchString.isNullOrBlank()) {
-            queryBuilder
-                .must(
-                    QueryBuilders
-                        .queryStringQuery(tableProp.searchString)
-                        .defaultOperator(Operator.AND)
-                        .field("destination.type")
-                        .field("destination.name")
-                )
-        }
-        searchSourceBuilder.query(queryBuilder)
-
-        client.threadPool().threadContext.stashContext().use {
-            resolve(searchSourceBuilder, actionListener, user)
-        }
+//        val userStr = client.threadPool().threadContext.getTransient<String>(
+//            ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT
+//        )
+//        log.debug("User and roles string from thread context: $userStr")
+//        val user: User? = User.parse(userStr)
+//
+//        val tableProp = getDestinationsRequest.table
+//
+//        val sortBuilder = SortBuilders
+//            .fieldSort(tableProp.sortString)
+//            .order(SortOrder.fromString(tableProp.sortOrder))
+//        if (!tableProp.missing.isNullOrBlank()) {
+//            sortBuilder.missing(tableProp.missing)
+//        }
+//
+//        val searchSourceBuilder = SearchSourceBuilder()
+//            .sort(sortBuilder)
+//            .size(tableProp.size)
+//            .from(tableProp.startIndex)
+//            .fetchSource(FetchSourceContext(true, Strings.EMPTY_ARRAY, Strings.EMPTY_ARRAY))
+//            .seqNoAndPrimaryTerm(true)
+//            .version(true)
+//        val queryBuilder = QueryBuilders.boolQuery()
+//            .must(QueryBuilders.existsQuery("destination"))
+//
+//        if (!getDestinationsRequest.destinationId.isNullOrBlank())
+//            queryBuilder.filter(QueryBuilders.termQuery("_id", getDestinationsRequest.destinationId))
+//
+//        if (getDestinationsRequest.destinationType != "ALL")
+//            queryBuilder.filter(QueryBuilders.termQuery("destination.type", getDestinationsRequest.destinationType))
+//
+//        if (!tableProp.searchString.isNullOrBlank()) {
+//            queryBuilder
+//                .must(
+//                    QueryBuilders
+//                        .queryStringQuery(tableProp.searchString)
+//                        .defaultOperator(Operator.AND)
+//                        .field("destination.type")
+//                        .field("destination.name")
+//                )
+//        }
+//        searchSourceBuilder.query(queryBuilder)
+//
+//        client.threadPool().threadContext.stashContext().use {
+//            resolve(searchSourceBuilder, actionListener, user)
+//        }
     }
 
     fun resolve(

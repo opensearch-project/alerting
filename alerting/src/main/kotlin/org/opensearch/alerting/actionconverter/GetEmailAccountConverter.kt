@@ -28,13 +28,13 @@ import java.util.*
 class GetEmailAccountConverter {
 
     companion object {
-        fun convertGetEmailAccountRequestToNotificationRequest(request: GetEmailAccountRequest): GetNotificationConfigRequest {
+        fun convertGetEmailAccountRequestToGetNotificationConfigRequest(request: GetEmailAccountRequest): GetNotificationConfigRequest {
             val configIds: Set<String> = setOf(request.emailAccountID)
 
             return GetNotificationConfigRequest(configIds, 0, 1, null, null, emptyMap())
         }
 
-        fun convertNotificationResponseToGetEmailAccountResponse(response: GetNotificationConfigResponse): GetEmailAccountResponse {
+        fun convertGetNotificationConfigResponseToGetEmailAccountResponse(response: GetNotificationConfigResponse): GetEmailAccountResponse {
             val searchResult = response.searchResult
             if (searchResult.totalHits == 0L) throw OpenSearchStatusException("Email Account not found.", RestStatus.NOT_FOUND)
             val notificationConfigInfo = searchResult.objectList[0]
@@ -56,7 +56,7 @@ class GetEmailAccountConverter {
             return GetEmailAccountResponse(notificationConfigInfo.configId, EmailAccount.NO_VERSION, 0L, 0L, RestStatus.OK, emailAccount)
         }
 
-        fun convertIndexEmailAccountRequestToNotificationRequest(request: IndexEmailAccountRequest): CreateNotificationConfigRequest {
+        fun convertIndexEmailAccountRequestToCreateNotificationConfigRequest(request: IndexEmailAccountRequest): CreateNotificationConfigRequest {
             val emailAccount = request.emailAccount
             val methodType = convertAlertingToNotificationMethodType(emailAccount.method)
             val smtpAccount = SmtpAccount(emailAccount.host, emailAccount.port, methodType, emailAccount.email)
@@ -71,41 +71,41 @@ class GetEmailAccountConverter {
             return CreateNotificationConfigRequest(notificationConfig, request.emailAccountID)
         }
 
-        fun convertCreateNotificationResponseToIndexEmailAccountResponse(createResponse: CreateNotificationConfigResponse, getResponse: GetNotificationConfigResponse): IndexEmailAccountResponse {
-            val getEmailResponse = convertNotificationResponseToGetEmailAccountResponse(getResponse)
+        fun convertCreateNotificationConfigResponseToIndexEmailAccountResponse(createResponse: CreateNotificationConfigResponse, getResponse: GetNotificationConfigResponse): IndexEmailAccountResponse {
+            val getEmailResponse = convertGetNotificationConfigResponseToGetEmailAccountResponse(getResponse)
             val emailAccount = getEmailResponse.emailAccount
                 ?: throw OpenSearchStatusException("Email Account failed to be created.", RestStatus.NOT_FOUND)
             return IndexEmailAccountResponse(createResponse.configId, 0L, 0L, 0L, RestStatus.OK, emailAccount)
         }
 
-        fun convertDeleteEmailAccountRequestToNotificationRequest(request: DeleteEmailAccountRequest): DeleteNotificationConfigRequest {
+        fun convertDeleteEmailAccountRequestToDeleteNotificationConfigRequest(request: DeleteEmailAccountRequest): DeleteNotificationConfigRequest {
             val configIds: Set<String> = setOf(request.emailAccountID)
 
             return DeleteNotificationConfigRequest(configIds)
         }
 
-        fun convertDeleteNotificationResponseToDeleteEmailAccountResponse(response: DeleteNotificationConfigResponse): DeleteResponse {
+        fun convertDeleteNotificationConfigResponseToDeleteResponse(response: DeleteNotificationConfigResponse): DeleteResponse {
             val configIdToStatusList = response.configIdToStatus.entries
-            if (configIdToStatusList.size == 0) throw OpenSearchStatusException("Email Account failed to be deleted.", RestStatus.NOT_FOUND)
+            if (configIdToStatusList.isEmpty()) throw OpenSearchStatusException("Email Account failed to be deleted.", RestStatus.NOT_FOUND)
             val configId = configIdToStatusList.elementAt(0).key
             return DeleteResponse(null, "_doc", configId, 0L, 0L, 0L, true)
         }
 
         fun convertAlertingToNotificationMethodType(alertMethodType: EmailAccount.MethodType): MethodType {
-            when (alertMethodType) {
-                EmailAccount.MethodType.NONE -> return MethodType.NONE
-                EmailAccount.MethodType.SSL -> return MethodType.SSL
-                EmailAccount.MethodType.TLS -> return MethodType.START_TLS
-                else -> return MethodType.NONE
+            return when (alertMethodType) {
+                EmailAccount.MethodType.NONE -> MethodType.NONE
+                EmailAccount.MethodType.SSL -> MethodType.SSL
+                EmailAccount.MethodType.TLS -> MethodType.START_TLS
+                else -> MethodType.NONE
             }
         }
 
         fun convertNotificationToAlertingMethodType(notificationMethodType: MethodType): EmailAccount.MethodType {
-            when (notificationMethodType) {
-                MethodType.NONE -> return EmailAccount.MethodType.NONE
-                MethodType.SSL -> return EmailAccount.MethodType.SSL
-                MethodType.START_TLS -> return EmailAccount.MethodType.TLS
-                else -> return EmailAccount.MethodType.NONE
+            return when (notificationMethodType) {
+                MethodType.NONE -> EmailAccount.MethodType.NONE
+                MethodType.SSL -> EmailAccount.MethodType.SSL
+                MethodType.START_TLS -> EmailAccount.MethodType.TLS
+                else -> EmailAccount.MethodType.NONE
             }
         }
     }
