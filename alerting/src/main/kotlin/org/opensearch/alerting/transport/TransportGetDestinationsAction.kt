@@ -43,7 +43,6 @@ import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.NotificationAPIUtils
-import org.opensearch.client.Client
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.Strings
@@ -57,7 +56,6 @@ import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.authuser.User
-import org.opensearch.commons.notifications.action.NotificationsActions
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
@@ -98,26 +96,13 @@ class TransportGetDestinationsAction @Inject constructor(
         try {
             val getNotificationConfigResponse = NotificationAPIUtils.getNotificationConfig(client, convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest))
             getDestinationsResponse = convertGetNotificationConfigResponseToGetDestinationsResponse(getNotificationConfigResponse)
-            if (getDestinationsResponse.destinations.size == getDestinationsRequest.table.size || getDestinationsRequest.destinationId != null) {
+            if (getDestinationsRequest.destinationId != null) {
+                log.info("Destination size: ${getDestinationsResponse.destinations.size} and table size: ${getDestinationsRequest.table.size}")
                 actionListener.onResponse(getDestinationsResponse)
             }
         } catch (e: Exception) {
             actionListener.onFailure(AlertingException.wrap(e))
         }
-
-
-
-//        NotificationsPluginInterface.getNotificationConfig(client, convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest),
-//            object : ActionListener<GetNotificationConfigResponse> {
-//                override fun onResponse(response: GetNotificationConfigResponse) {
-//                    val getDestinationsResponse = convertGetNotificationConfigResponseToGetDestinationsResponse(response)
-//                    actionListener.onResponse(getDestinationsResponse)
-//                }
-//                override fun onFailure(e: Exception) {
-//                    actionListener.onFailure(AlertingException.wrap(e))
-//                }
-//            }
-//        )
 
         val userStr = client.threadPool().threadContext.getTransient<String>(
             ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT
@@ -136,7 +121,7 @@ class TransportGetDestinationsAction @Inject constructor(
 
         val searchSourceBuilder = SearchSourceBuilder()
             .sort(sortBuilder)
-            .size(tableProp.size)
+            .size(tableProp.size - getDestinationsResponse.destinations.size)
             .from(tableProp.startIndex)
             .fetchSource(FetchSourceContext(true, Strings.EMPTY_ARRAY, Strings.EMPTY_ARRAY))
             .seqNoAndPrimaryTerm(true)
@@ -203,7 +188,7 @@ class TransportGetDestinationsAction @Inject constructor(
             searchRequest,
             object : ActionListener<SearchResponse> {
                 override fun onResponse(response: SearchResponse) {
-                    val totalDestinationCount = response.hits.totalHits?.value?.toInt()?: 0
+                    var totalDestinationCount = response.hits.totalHits?.value?.toInt()?: 0
                     val destinations = mutableListOf<Destination>()
                     for (hit in response.hits) {
                         val id = hit.id
@@ -215,18 +200,21 @@ class TransportGetDestinationsAction @Inject constructor(
                         XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
                         XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
                         XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                        destinations.add(Destination.parse(xcp, id, version, seqNo, primaryTerm))
+                        val destination = Destination.parse(xcp, id, version, seqNo, primaryTerm)
+                        destinations.add(destination)
                     }
+                    totalDestinationCount += getDestinationsResponse.totalDestinations ?: 0
                     destinations.addAll(getDestinationsResponse.destinations)
                     val getResponse = GetDestinationsResponse(
                         RestStatus.OK,
-                        getDestinationsResponse.totalDestinations ?: 0 + totalDestinationCount,
+                        totalDestinationCount,
                         destinations
                     )
                     actionListener.onResponse(getResponse)
                 }
 
                 override fun onFailure(t: Exception) {
+                    log.warn("Failed to get destinations from alerting config index", t)
                     actionListener.onResponse(getDestinationsResponse)
                 }
             }

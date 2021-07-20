@@ -49,11 +49,10 @@ class DestinationActionsConverter {
             val table = request.table
             val fromIndex = table.startIndex
             val maxItems = table.size
-            val sortField = if (table.sortString.isEmpty()) null else table.sortString
             val sortOrder: SortOrder = SortOrder.fromString(table.sortOrder)
             val filterParams: Map<String, String> = emptyMap()
 
-            return GetNotificationConfigRequest(configIds, fromIndex, maxItems, sortField, sortOrder, filterParams)
+            return GetNotificationConfigRequest(configIds, fromIndex, maxItems, null, sortOrder, filterParams)
         }
 
         fun convertGetNotificationConfigResponseToGetDestinationsResponse(response: GetNotificationConfigResponse?): GetDestinationsResponse {
@@ -145,7 +144,7 @@ class DestinationActionsConverter {
                     val password: String? = null
                     val alertWebhook = CustomWebhook(webhook.url, scheme ,host, port, path, method, emptyMap(), webhook.headerParams, username, password)
                     return Destination(Destination.NO_ID, Destination.NO_VERSION, IndexUtils.NO_SCHEMA_VERSION, Destination.NO_SEQ_NO,
-                        Destination.NO_PRIMARY_TERM, DestinationType.CHIME, notificationConfig.name, null, notificationConfigInfo.lastUpdatedTime, null, null, alertWebhook, null)
+                        Destination.NO_PRIMARY_TERM, DestinationType.CUSTOM_WEBHOOK, notificationConfig.name, null, notificationConfigInfo.lastUpdatedTime, null, null, alertWebhook, null)
                 }
                 ConfigType.EMAIL -> {
                     val email: Email = notificationConfig.configData as Email
@@ -186,7 +185,7 @@ class DestinationActionsConverter {
                 }
                 DestinationType.SLACK -> {
                     val alertSlack = destination.slack
-                    val slack = if (alertSlack == null) null else Slack(alertSlack!!.url)
+                    val slack = if (alertSlack == null) null else Slack(alertSlack.url)
                     val description = "Slack destination created from the Alerting plugin"
                     return NotificationConfig(
                         destination.name,
@@ -200,7 +199,12 @@ class DestinationActionsConverter {
                     val alertWebhook = destination.customWebhook
                     var webhook: Webhook? = null
                     if (alertWebhook != null) {
-                        val uri = buildUri(alertWebhook.url!!, alertWebhook.scheme!!, alertWebhook.host, alertWebhook.port, alertWebhook.path, alertWebhook.queryParams).toString()
+                        val uri = buildUri(alertWebhook.url,
+                            alertWebhook.scheme,
+                            alertWebhook.host,
+                            alertWebhook.port,
+                            alertWebhook.path,
+                            alertWebhook.queryParams).toString()
                         logger.info("The url for the webhook is $uri")
                         webhook = Webhook(uri, alertWebhook.headerParams)
                     }
@@ -238,7 +242,7 @@ class DestinationActionsConverter {
             return null
         }
 
-        fun buildUri(endpoint: String, scheme: String, host: String?,
+        fun buildUri(endpoint: String?, scheme: String?, host: String?,
                      port: Int, path: String?, queryParams: Map<String, String>): URI? {
             var scheme = scheme
             return try {

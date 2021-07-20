@@ -124,7 +124,6 @@ class TransportIndexDestinationAction @Inject constructor(
 //            )
             } else {
                 val createRequest = convertIndexDestinationRequestToCreateNotificationConfigRequest(request)
-
                 notificationResponse = NotificationAPIUtils.createNotificationConfig(client, createRequest)
                 configId = notificationResponse.configId
 //            NotificationsPluginInterface.createNotificationConfig(client, convertIndexDestinationRequestToCreateNotificationConfigRequest(request),

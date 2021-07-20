@@ -110,51 +110,58 @@ class MigrationUtilService(
         }
 
         private suspend fun deleteOldDestinations(client: NodeClient, destinationIds: List<String>): List<String> {
-            val bulkDeleteRequest = BulkRequest()
+            val bulkDeleteRequest = BulkRequest().setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
             destinationIds.forEach {
                 val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, it)
-                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
                 bulkDeleteRequest.add(deleteRequest)
             }
             val failedToDeleteDestinations = mutableListOf<String>()
+            var finishedExecution = false
             client.bulk(
                 bulkDeleteRequest,
                 object : ActionListener<BulkResponse> {
                     override fun onResponse(response: BulkResponse) {
                         failedToDeleteDestinations.addAll(response.items.filter { it.isFailed }.map { it.id })
+                        finishedExecution = true
                     }
 
                     override fun onFailure(t: Exception) {
                         failedToDeleteDestinations.addAll(destinationIds)
+                        finishedExecution = true
+                        logger.error("Failed to delete destinations", t)
                     }
                 }
             )
+            while (!finishedExecution) {
+                Thread.sleep(100)
+            }
             return failedToDeleteDestinations
         }
 
         private suspend fun createNotificationChannelIfNotExists(client: NodeClient, destinations: List<Destination>): List<String> {
-            val configIds: Set<String> = destinations.stream().map { it.id }.collect(Collectors.toSet())
-            //TODO: scroll through all the data, so multiple calls are needed
-            val getNotificationConfigRequest = GetNotificationConfigRequest(configIds)
-            val getNotificationConfigResponse = NotificationAPIUtils.getNotificationConfig(client, getNotificationConfigRequest)
-            val alreadyCreatedDestinations: List<String> = getNotificationConfigResponse?.searchResult?.objectList?.stream()?.map { it.configId }?.collect(Collectors.toList()) ?: emptyList()
-            val nonExistentDestinations: List<Destination> = destinations.stream().filter { !alreadyCreatedDestinations.contains(it.id) }.collect(Collectors.toList())
-
             val migratedDestinations = mutableListOf<String>()
-            //TODO: add hardening to retry
-            nonExistentDestinations.forEach {
+            //TODO: add hardening to retry in the NotificationAPIUtils
+            destinations.forEach {
+                logger.info("converting destination: ${it.id}")
                 val notificationConfig = convertDestinationToNotificationConfig(it)
+                logger.info("converted destination: ${it.id}")
                 if (notificationConfig != null) {
                     val createNotificationConfigRequest = CreateNotificationConfigRequest(notificationConfig, it.id)
                     try {
+                        logger.info("Creating destination: ${it.id} with config: $notificationConfig")
                         val createResponse = NotificationAPIUtils.createNotificationConfig(client, createNotificationConfigRequest)
-                        migratedDestinations.plus(createResponse.configId)
+                        migratedDestinations.add(createResponse.configId)
+                        logger.info(("migrated destination: ${createResponse.configId}"))
                     } catch (e: Exception) {
                         logger.warn("Failed to migrate over Destination ${it.id} because failed to create channel in Notification plugin.", e)
+                        if (e.message?.contains("version conflict, document already exists") == true) {
+                            migratedDestinations.add(it.id)
+                        } else {
+                            logger.warn("the exception message is ${e.message}")
+                        }
                     }
                 }
             }
-            migratedDestinations.addAll(alreadyCreatedDestinations)
             return migratedDestinations
 
         }
@@ -162,7 +169,7 @@ class MigrationUtilService(
         private suspend fun retrieveDestinations(client: NodeClient): List<Destination> {
             var start = 0
             val size = 100
-            var destinations = mutableListOf<Destination>()
+            val destinations = mutableListOf<Destination>()
             var hasMoreResults = true
 
             while (hasMoreResults) {

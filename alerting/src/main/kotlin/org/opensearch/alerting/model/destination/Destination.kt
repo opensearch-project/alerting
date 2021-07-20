@@ -73,8 +73,12 @@ data class Destination(
     val email: Email?
 ) : ToXContent {
 
+    private val logger = LogManager.getLogger(javaClass)
+
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         builder.startObject()
+        logger.info("Convert destination toXContent")
+        logger.info("converting destination - name: $name, id: $id, type.val: ${type.value}, type: $type")
         if (params.paramAsBoolean("with_type", false)) builder.startObject(DESTINATION)
         builder.field(ID_FIELD, id)
             .field(TYPE_FIELD, type.value)
