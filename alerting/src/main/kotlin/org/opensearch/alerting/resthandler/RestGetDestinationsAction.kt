@@ -85,7 +85,7 @@ class RestGetDestinationsAction : BaseRestHandler() {
             srcContext = FetchSourceContext.DO_NOT_FETCH_SOURCE
         }
 
-        val sortString = request.param("sortString", "destination.name.keyword")
+        val sortString = request.param("sortString", "")
         val sortOrder = request.param("sortOrder", "asc")
         val missing: String? = request.param("missing")
         val size = request.paramAsInt("size", 20)

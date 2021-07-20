@@ -31,6 +31,6 @@ import org.opensearch.action.ActionType
 class IndexDestinationAction private constructor() : ActionType<IndexDestinationResponse>(NAME, ::IndexDestinationResponse) {
     companion object {
         val INSTANCE = IndexDestinationAction()
-        val NAME = "cluster:admin/opendistro/alerting/destination/write"
+        const val NAME = "cluster:admin/opendistro/alerting/destination/write"
     }
 }

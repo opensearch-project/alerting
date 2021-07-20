@@ -34,21 +34,29 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.DeleteEmailAccountAction
 import org.opensearch.alerting.action.DeleteEmailAccountRequest
+import org.opensearch.alerting.actionconverter.DestinationActionsConverter
+import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertDeleteEmailAccountRequestToDeleteNotificationConfigRequest
+import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertDeleteNotificationConfigResponseToDeleteResponse
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.DestinationType
+import org.opensearch.alerting.util.NotificationAPIUtils
 import org.opensearch.client.Client
+import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
+import org.opensearch.commons.notifications.NotificationsPluginInterface
+import org.opensearch.commons.notifications.action.DeleteNotificationConfigResponse
+import org.opensearch.commons.notifications.action.NotificationsActions
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 
 class TransportDeleteEmailAccountAction @Inject constructor(
     transportService: TransportService,
-    val client: Client,
+    val client: NodeClient,
     actionFilters: ActionFilters,
     val clusterService: ClusterService,
     settings: Settings
@@ -76,21 +84,42 @@ class TransportDeleteEmailAccountAction @Inject constructor(
             return
         }
 
-        val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, request.emailAccountID)
-            .setRefreshPolicy(request.refreshPolicy)
-        client.threadPool().threadContext.stashContext().use {
-            client.delete(
-                deleteRequest,
-                object : ActionListener<DeleteResponse> {
-                    override fun onResponse(response: DeleteResponse) {
-                        actionListener.onResponse(response)
-                    }
-
-                    override fun onFailure(t: Exception) {
-                        actionListener.onFailure(t)
-                    }
-                }
-            )
+        try {
+            val deleteNotificationConfigResponse = NotificationAPIUtils.deleteNotificationConfig(client, convertDeleteEmailAccountRequestToDeleteNotificationConfigRequest(request))
+            actionListener.onResponse(convertDeleteNotificationConfigResponseToDeleteResponse(deleteNotificationConfigResponse))
+        } catch (e: Exception) {
+            actionListener.onFailure(AlertingException.wrap(e))
         }
+//
+//
+//        NotificationsPluginInterface.deleteNotificationConfig(client, convertDeleteEmailAccountRequestToDeleteNotificationConfigRequest(request),
+//            object : ActionListener<DeleteNotificationConfigResponse> {
+//                override fun onResponse(response: DeleteNotificationConfigResponse) {
+//                    val deleteResponse = convertDeleteNotificationConfigResponseToDeleteResponse(response)
+//                    actionListener.onResponse(deleteResponse)
+//                }
+//                override fun onFailure(e: Exception) {
+//                    actionListener.onFailure(AlertingException.wrap(e))
+//                }
+//            }
+//        )
+
+
+//        val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, request.emailAccountID)
+//            .setRefreshPolicy(request.refreshPolicy)
+//        client.threadPool().threadContext.stashContext().use {
+//            client.delete(
+//                deleteRequest,
+//                object : ActionListener<DeleteResponse> {
+//                    override fun onResponse(response: DeleteResponse) {
+//                        actionListener.onResponse(response)
+//                    }
+//
+//                    override fun onFailure(t: Exception) {
+//                        actionListener.onFailure(t)
+//                    }
+//                }
+//            )
+//        }
     }
 }

@@ -42,6 +42,11 @@ import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.action.IndexEmailAccountAction
 import org.opensearch.alerting.action.IndexEmailAccountRequest
 import org.opensearch.alerting.action.IndexEmailAccountResponse
+import org.opensearch.alerting.actionconverter.DestinationActionsConverter
+import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertCreateNotificationConfigResponseToIndexEmailAccountResponse
+import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertIndexEmailAccountRequestToCreateNotificationConfigRequest
+import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertIndexEmailAccountRequestToUpdateNotificationConfigRequest
+import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertUpdateNotificationConfigResponseToIndexEmailAccountResponse
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOB_TYPE
@@ -52,13 +57,22 @@ import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.alerting.util.IndexUtils
+import org.opensearch.alerting.util.NotificationAPIUtils
 import org.opensearch.client.Client
+import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
+import org.opensearch.commons.notifications.NotificationsPluginInterface
+import org.opensearch.commons.notifications.action.BaseResponse
+import org.opensearch.commons.notifications.action.CreateNotificationConfigResponse
+import org.opensearch.commons.notifications.action.GetNotificationConfigRequest
+import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
+import org.opensearch.commons.notifications.action.NotificationsActions
+import org.opensearch.commons.notifications.action.UpdateNotificationConfigResponse
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestStatus
@@ -70,7 +84,7 @@ private val log = LogManager.getLogger(TransportIndexEmailAccountAction::class.j
 
 class TransportIndexEmailAccountAction @Inject constructor(
     transportService: TransportService,
-    val client: Client,
+    val client: NodeClient,
     actionFilters: ActionFilters,
     val scheduledJobIndices: ScheduledJobIndices,
     val clusterService: ClusterService,
@@ -91,9 +105,100 @@ class TransportIndexEmailAccountAction @Inject constructor(
     }
 
     override fun doExecute(task: Task, request: IndexEmailAccountRequest, actionListener: ActionListener<IndexEmailAccountResponse>) {
-        client.threadPool().threadContext.stashContext().use {
-            IndexEmailAccountHandler(client, actionListener, request).start()
+
+        try {
+            val notificationResponse: BaseResponse
+            val configId: String
+            if (request.method == RestRequest.Method.PUT) {
+                notificationResponse = NotificationAPIUtils.updateNotificationConfig(client, convertIndexEmailAccountRequestToUpdateNotificationConfigRequest(request))
+                configId = notificationResponse.configId
+            } else {
+                notificationResponse = NotificationAPIUtils.createNotificationConfig(client, convertIndexEmailAccountRequestToCreateNotificationConfigRequest(request))
+                configId = notificationResponse.configId
+            }
+            val getNotificationConfigRequest = GetNotificationConfigRequest(setOf(configId!!), 0, 1, null, null, emptyMap())
+            val getNotificationConfigResponse = NotificationAPIUtils.getNotificationConfig(client, getNotificationConfigRequest)
+            if (request.method == RestRequest.Method.PUT) {
+                actionListener.onResponse(convertUpdateNotificationConfigResponseToIndexEmailAccountResponse(notificationResponse as UpdateNotificationConfigResponse, getNotificationConfigResponse))
+            } else {
+                actionListener.onResponse(convertCreateNotificationConfigResponseToIndexEmailAccountResponse(notificationResponse as CreateNotificationConfigResponse, getNotificationConfigResponse))
+            }
+        } catch (e: Exception) {
+            actionListener.onFailure(AlertingException.wrap(e))
         }
+
+
+//        var notificationResponse: BaseResponse? = null
+//        var configId: String? = null
+//        if (request.method == RestRequest.Method.PUT) {
+//
+//            NotificationsPluginInterface.updateNotificationConfig(client, convertIndexEmailAccountRequestToUpdateNotificationConfigRequest(request),
+//                object : ActionListener<UpdateNotificationConfigResponse> {
+//                    override fun onResponse(response: UpdateNotificationConfigResponse) {
+//                        notificationResponse = response
+//                        configId = response.configId
+//                    }
+//                    override fun onFailure(e: Exception) {
+//                        actionListener.onFailure(AlertingException.wrap(e))
+//                        return
+//                    }
+//                }
+//            )
+//        } else {
+//            NotificationsPluginInterface.createNotificationConfig(client, convertIndexEmailAccountRequestToCreateNotificationConfigRequest(request),
+//                object : ActionListener<CreateNotificationConfigResponse> {
+//                    override fun onResponse(response: CreateNotificationConfigResponse) {
+//                        notificationResponse = response
+//                        configId = response.configId
+//                    }
+//                    override fun onFailure(e: Exception) {
+//                        actionListener.onFailure(AlertingException.wrap(e))
+//                        return
+//                    }
+//                }
+//            )
+//        }
+//
+//        val getNotificationConfigRequest = GetNotificationConfigRequest(setOf(configId!!), 0, 1, null, null, emptyMap())
+//        NotificationsPluginInterface.getNotificationConfig(client, getNotificationConfigRequest,
+//            object : ActionListener<GetNotificationConfigResponse> {
+//                override fun onResponse(response: GetNotificationConfigResponse) {
+//                    if (request.method == RestRequest.Method.PUT) {
+//                        actionListener.onResponse(convertUpdateNotificationConfigResponseToIndexEmailAccountResponse(notificationResponse!! as UpdateNotificationConfigResponse, response))
+//                    } else {
+//                        actionListener.onResponse(convertCreateNotificationConfigResponseToIndexEmailAccountResponse(notificationResponse!! as CreateNotificationConfigResponse, response))
+//                    }
+//                }
+//                override fun onFailure(e: Exception) {
+//                    actionListener.onFailure(AlertingException.wrap(e))
+//                }
+//            }
+//        )
+//        try {
+//
+//            if (request.method == RestRequest.Method.PUT) {
+//                val futureResponse = client.execute(NotificationsActions.UPDATE_NOTIFICATION_CONFIG_ACTION_TYPE, convertIndexEmailAccountRequestToUpdateNotificationConfigRequest(request))
+//                val response = futureResponse.actionGet()
+//
+//                val getDestinationsRequest = GetNotificationConfigRequest(setOf(request.emailAccountID), 0, 1, null, null, emptyMap())
+//                val getNotificationResponse = client.execute(NotificationsActions.GET_NOTIFICATION_CONFIG_ACTION_TYPE, getDestinationsRequest).actionGet()!!
+//
+//                actionListener.onResponse(convertUpdateNotificationConfigResponseToIndexEmailAccountResponse(response, getNotificationResponse))
+//            } else {
+//                val futureResponse = client.execute(NotificationsActions.CREATE_NOTIFICATION_CONFIG_ACTION_TYPE, convertIndexEmailAccountRequestToCreateNotificationConfigRequest(request))
+//                val response = futureResponse.actionGet()
+//
+//                val getDestinationsRequest = GetNotificationConfigRequest(setOf(response.configId), 0, 1, null, null, emptyMap())
+//                val getNotificationResponse = client.execute(NotificationsActions.GET_NOTIFICATION_CONFIG_ACTION_TYPE, getDestinationsRequest).actionGet()!!
+//
+//                actionListener.onResponse(convertCreateNotificationConfigResponseToIndexEmailAccountResponse(response, getNotificationResponse))
+//            }
+//        } catch (e: Exception) {
+//            actionListener.onFailure(AlertingException.wrap(e))
+//        }
+//        client.threadPool().threadContext.stashContext().use {
+//            IndexEmailAccountHandler(client, actionListener, request).start()
+//        }
     }
 
     inner class IndexEmailAccountHandler(

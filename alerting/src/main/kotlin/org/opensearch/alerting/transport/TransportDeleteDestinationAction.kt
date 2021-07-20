@@ -37,13 +37,18 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.DeleteDestinationAction
 import org.opensearch.alerting.action.DeleteDestinationRequest
+import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertDeleteDestinationRequestToDeleteNotificationConfigRequest
+import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertDeleteNotificationConfigResponseToDeleteResponse
+import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.NotificationAPIUtils
 import org.opensearch.alerting.util.checkFilterByUserBackendRoles
 import org.opensearch.alerting.util.checkUserFilterByPermissions
 import org.opensearch.client.Client
+import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
@@ -55,6 +60,10 @@ import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.notifications.NotificationsPluginInterface
+import org.opensearch.commons.notifications.action.DeleteNotificationConfigResponse
+import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
+import org.opensearch.commons.notifications.action.NotificationsActions
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -62,9 +71,10 @@ import java.io.IOException
 
 private val log = LogManager.getLogger(TransportDeleteDestinationAction::class.java)
 
+//TODO: MAke sure to throw exception that notification plugin is not installed
 class TransportDeleteDestinationAction @Inject constructor(
     transportService: TransportService,
-    val client: Client,
+    val client: NodeClient,
     actionFilters: ActionFilters,
     val clusterService: ClusterService,
     settings: Settings,
@@ -83,15 +93,34 @@ class TransportDeleteDestinationAction @Inject constructor(
         val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
         log.debug("User and roles string from thread context: $userStr")
         val user: User? = User.parse(userStr)
-        val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, request.destinationId)
-            .setRefreshPolicy(request.refreshPolicy)
+//        val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, request.destinationId)
+//            .setRefreshPolicy(request.refreshPolicy)
 
         if (!checkFilterByUserBackendRoles(filterByEnabled, user, actionListener)) {
             return
         }
-        client.threadPool().threadContext.stashContext().use {
-            DeleteDestinationHandler(client, actionListener, deleteRequest, user, request.destinationId).resolveUserAndStart()
+
+        try {
+            val deleteNotificationConfigResponse = NotificationAPIUtils.deleteNotificationConfig(client, convertDeleteDestinationRequestToDeleteNotificationConfigRequest(request))
+            actionListener.onResponse(convertDeleteNotificationConfigResponseToDeleteResponse(deleteNotificationConfigResponse))
+        } catch (e: Exception) {
+            actionListener.onFailure(AlertingException.wrap(e))
         }
+
+//        NotificationsPluginInterface.deleteNotificationConfig(client, convertDeleteDestinationRequestToDeleteNotificationConfigRequest(request),
+//            object : ActionListener<DeleteNotificationConfigResponse> {
+//                override fun onResponse(response: DeleteNotificationConfigResponse) {
+//                    val deleteResponse = convertDeleteNotificationConfigResponseToDeleteResponse(response)
+//                    actionListener.onResponse(deleteResponse)
+//                }
+//                override fun onFailure(e: Exception) {
+//                    actionListener.onFailure(AlertingException.wrap(e))
+//                }
+//            }
+//        )
+//        client.threadPool().threadContext.stashContext().use {
+//            DeleteDestinationHandler(client, actionListener, deleteRequest, user, request.destinationId).resolveUserAndStart()
+//        }
     }
 
     inner class DeleteDestinationHandler(

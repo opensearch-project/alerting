@@ -57,6 +57,9 @@ class IndexUtils {
             private set
         var lastUpdatedHistoryIndex: String? = null
 
+        var notificationDataMigrationNeeded: Boolean = false
+            private set
+
         init {
             scheduledJobIndexSchemaVersion = getSchemaVersion(ScheduledJobIndices.scheduledJobMappings())
             alertIndexSchemaVersion = getSchemaVersion(AlertIndices.alertMapping())

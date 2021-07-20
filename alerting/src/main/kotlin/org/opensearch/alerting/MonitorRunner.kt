@@ -35,6 +35,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
+import org.opensearch.action.ActionListener
 import org.opensearch.action.DocWriteRequest
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.action.bulk.BulkRequest
@@ -43,6 +44,9 @@ import org.opensearch.action.delete.DeleteRequest
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
+import org.opensearch.alerting.action.GetDestinationsResponse
+import org.opensearch.alerting.actionconverter.DestinationActionsConverter
+import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertGetNotificationConfigResponseToGetDestinationsResponse
 import org.opensearch.alerting.alerts.AlertError
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.moveAlerts
@@ -82,11 +86,14 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.MOVE_ALERTS_B
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.HOST_DENY_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.loadDestinationSettings
+import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
+import org.opensearch.alerting.util.NotificationAPIUtils
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.isAllowed
 import org.opensearch.client.Client
+import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.Strings
 import org.opensearch.common.bytes.BytesReference
@@ -100,6 +107,14 @@ import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.notifications.NotificationsPluginInterface
+import org.opensearch.commons.notifications.action.GetNotificationConfigRequest
+import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
+import org.opensearch.commons.notifications.action.NotificationsActions
+import org.opensearch.commons.notifications.action.SendNotificationRequest
+import org.opensearch.commons.notifications.model.ChannelMessage
+import org.opensearch.commons.notifications.model.EventSource
+import org.opensearch.commons.notifications.model.Feature
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
@@ -564,6 +579,7 @@ class MonitorRunner(
         return true
     }
 
+    //TODO make call to send notification here!
     private suspend fun runAction(action: Action, ctx: TriggerExecutionContext, dryrun: Boolean): ActionRunResult {
         return try {
             if (!isActionActionable(action, ctx.alert)) {
@@ -577,18 +593,41 @@ class MonitorRunner(
             }
             if (!dryrun) {
                 withContext(Dispatchers.IO) {
-                    val destination = AlertingConfigAccessor.getDestinationInfo(client, xContentRegistry, action.destinationId)
+//                    val destination = AlertingConfigAccessor.getDestinationInfo(client, xContentRegistry, action.destinationId)
+                    //TODO: support this get getting destination type info
+                    val getNotificationConfigRequest = GetNotificationConfigRequest(setOf(action.destinationId), 0, 1, null, null, emptyMap())
+                    var getDestinationsResponse: GetDestinationsResponse? = null
+                    NotificationsPluginInterface.getNotificationConfig(client as NodeClient, getNotificationConfigRequest,
+                        object : ActionListener<GetNotificationConfigResponse> {
+                            override fun onResponse(response: GetNotificationConfigResponse) {
+                                getDestinationsResponse = convertGetNotificationConfigResponseToGetDestinationsResponse(response)
+                            }
+                            override fun onFailure(e: Exception) {
+                                throw AlertingException.wrap(java.lang.RuntimeException("There is no valid destination with id: ${action.destinationId}", e))
+                            }
+                        }
+                    )
+
+                    val getDestinationsRequest = GetNotificationConfigRequest(setOf(action.destinationId), 0, 1, null, null, emptyMap())
+                    val getNotificationResponse = client.execute(NotificationsActions.GET_NOTIFICATION_CONFIG_ACTION_TYPE, getDestinationsRequest).actionGet()!!
+                    val getDestinationResponse = convertGetNotificationConfigResponseToGetDestinationsResponse(getNotificationResponse)
+                    val destination = getDestinationResponse.destinations[0]
                     if (!destination.isAllowed(allowList)) {
                         throw IllegalStateException("Monitor contains a Destination type that is not allowed: ${destination.type}")
                     }
+                    val title = if (actionOutput[SUBJECT] != null) actionOutput[SUBJECT]!! else ""
+                    val eventSource = EventSource(title, action.destinationId, Feature.ALERTING)
+                    val channelMessage = ChannelMessage(actionOutput[MESSAGE]!!, null, null)
+                    val sendRequest = SendNotificationRequest(eventSource, channelMessage, listOf(action.destinationId), null)
+                    NotificationAPIUtils.sendNotification(client, sendRequest)
 
-                    val destinationCtx = destinationContextFactory.getDestinationContext(destination)
-                    actionOutput[MESSAGE_ID] = destination.publish(
-                        actionOutput[SUBJECT],
-                        actionOutput[MESSAGE]!!,
-                        destinationCtx,
-                        hostDenyList
-                    )
+//                    val destinationCtx = destinationContextFactory.getDestinationContext(destination)
+//                    actionOutput[MESSAGE_ID] = destination.publish(
+//                        actionOutput[SUBJECT],
+//                        actionOutput[MESSAGE]!!,
+//                        destinationCtx,
+//                        hostDenyList
+//                    )
                 }
             }
             ActionRunResult(action.id, action.name, actionOutput, false, currentTime(), null)

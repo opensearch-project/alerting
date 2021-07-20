@@ -16,6 +16,8 @@ import org.opensearch.commons.notifications.action.DeleteNotificationConfigReque
 import org.opensearch.commons.notifications.action.DeleteNotificationConfigResponse
 import org.opensearch.commons.notifications.action.GetNotificationConfigRequest
 import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
+import org.opensearch.commons.notifications.action.UpdateNotificationConfigRequest
+import org.opensearch.commons.notifications.action.UpdateNotificationConfigResponse
 import org.opensearch.commons.notifications.model.ConfigType
 import org.opensearch.commons.notifications.model.Feature
 import org.opensearch.commons.notifications.model.MethodType
@@ -25,7 +27,7 @@ import org.opensearch.index.shard.ShardId
 import org.opensearch.rest.RestStatus
 import java.util.*
 
-class GetEmailAccountConverter {
+class EmailAccountActionsConverter {
 
     companion object {
         fun convertGetEmailAccountRequestToGetNotificationConfigRequest(request: GetEmailAccountRequest): GetNotificationConfigRequest {
@@ -68,11 +70,41 @@ class GetEmailAccountConverter {
                 EnumSet.of(Feature.ALERTING),
                 smtpAccount
             )
-            return CreateNotificationConfigRequest(notificationConfig, request.emailAccountID)
+            return CreateNotificationConfigRequest(notificationConfig, null)
         }
 
-        fun convertCreateNotificationConfigResponseToIndexEmailAccountResponse(createResponse: CreateNotificationConfigResponse, getResponse: GetNotificationConfigResponse): IndexEmailAccountResponse {
-            val getEmailResponse = convertGetNotificationConfigResponseToGetEmailAccountResponse(getResponse)
+        fun convertCreateNotificationConfigResponseToIndexEmailAccountResponse(createResponse: CreateNotificationConfigResponse, getResponse: GetNotificationConfigResponse?): IndexEmailAccountResponse {
+            val getEmailResponse = if (getResponse != null) {
+                convertGetNotificationConfigResponseToGetEmailAccountResponse(getResponse)
+            } else {
+                throw OpenSearchStatusException("Email Account failed to be created.", RestStatus.NOT_FOUND)
+            }
+            val emailAccount = getEmailResponse.emailAccount
+                ?: throw OpenSearchStatusException("Email Account failed to be created.", RestStatus.NOT_FOUND)
+            return IndexEmailAccountResponse(createResponse.configId, 0L, 0L, 0L, RestStatus.OK, emailAccount)
+        }
+
+        fun convertIndexEmailAccountRequestToUpdateNotificationConfigRequest(request: IndexEmailAccountRequest): UpdateNotificationConfigRequest {
+            val emailAccount = request.emailAccount
+            val methodType = convertAlertingToNotificationMethodType(emailAccount.method)
+            val smtpAccount = SmtpAccount(emailAccount.host, emailAccount.port, methodType, emailAccount.email)
+            val description = "Email account created from the Alerting plugin"
+            val notificationConfig = NotificationConfig(
+                emailAccount.name,
+                description,
+                ConfigType.SMTP_ACCOUNT,
+                EnumSet.of(Feature.ALERTING),
+                smtpAccount
+            )
+            return UpdateNotificationConfigRequest(request.emailAccountID, notificationConfig)
+        }
+
+        fun convertUpdateNotificationConfigResponseToIndexEmailAccountResponse(createResponse: UpdateNotificationConfigResponse, getResponse: GetNotificationConfigResponse?): IndexEmailAccountResponse {
+            val getEmailResponse = if (getResponse != null) {
+                convertGetNotificationConfigResponseToGetEmailAccountResponse(getResponse)
+            } else {
+                throw OpenSearchStatusException("Email Account failed to be created.", RestStatus.NOT_FOUND)
+            }
             val emailAccount = getEmailResponse.emailAccount
                 ?: throw OpenSearchStatusException("Email Account failed to be created.", RestStatus.NOT_FOUND)
             return IndexEmailAccountResponse(createResponse.configId, 0L, 0L, 0L, RestStatus.OK, emailAccount)

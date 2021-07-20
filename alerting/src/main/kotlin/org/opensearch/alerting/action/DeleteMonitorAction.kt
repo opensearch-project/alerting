@@ -32,6 +32,6 @@ import org.opensearch.action.delete.DeleteResponse
 class DeleteMonitorAction private constructor() : ActionType<DeleteResponse>(NAME, ::DeleteResponse) {
     companion object {
         val INSTANCE = DeleteMonitorAction()
-        val NAME = "cluster:admin/opendistro/alerting/monitor/delete"
+        const val NAME = "cluster:admin/opendistro/alerting/monitor/delete"
     }
 }

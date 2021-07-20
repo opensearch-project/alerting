@@ -32,6 +32,6 @@ import org.opensearch.action.delete.DeleteResponse
 class DeleteDestinationAction private constructor() : ActionType<DeleteResponse>(NAME, ::DeleteResponse) {
     companion object {
         val INSTANCE = DeleteDestinationAction()
-        val NAME = "cluster:admin/opendistro/alerting/destination/delete"
+        const val NAME = "cluster:admin/opendistro/alerting/destination/delete"
     }
 }

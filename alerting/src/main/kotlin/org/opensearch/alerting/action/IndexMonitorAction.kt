@@ -31,6 +31,6 @@ import org.opensearch.action.ActionType
 class IndexMonitorAction private constructor() : ActionType<IndexMonitorResponse>(NAME, ::IndexMonitorResponse) {
     companion object {
         val INSTANCE = IndexMonitorAction()
-        val NAME = "cluster:admin/opendistro/alerting/monitor/write"
+        const val NAME = "cluster:admin/opendistro/alerting/monitor/write"
     }
 }

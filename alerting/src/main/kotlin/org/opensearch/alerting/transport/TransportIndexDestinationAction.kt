@@ -25,6 +25,12 @@ import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.action.IndexDestinationAction
 import org.opensearch.alerting.action.IndexDestinationRequest
 import org.opensearch.alerting.action.IndexDestinationResponse
+import org.opensearch.alerting.actionconverter.DestinationActionsConverter
+import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertCreateNotificationConfigResponseToIndexDestinationResponse
+import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertIndexDestinationRequestToCreateNotificationConfigRequest
+import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertIndexDestinationRequestToUpdateNotificationConfigRequest
+import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertUpdateNotificationConfigResponseToIndexDestinationResponse
+import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.destination.Destination
@@ -32,9 +38,11 @@ import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
+import org.opensearch.alerting.util.NotificationAPIUtils
 import org.opensearch.alerting.util.checkFilterByUserBackendRoles
 import org.opensearch.alerting.util.checkUserFilterByPermissions
 import org.opensearch.client.Client
+import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
@@ -48,6 +56,13 @@ import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.notifications.NotificationsPluginInterface
+import org.opensearch.commons.notifications.action.BaseResponse
+import org.opensearch.commons.notifications.action.CreateNotificationConfigResponse
+import org.opensearch.commons.notifications.action.GetNotificationConfigRequest
+import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
+import org.opensearch.commons.notifications.action.NotificationsActions
+import org.opensearch.commons.notifications.action.UpdateNotificationConfigResponse
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
@@ -58,7 +73,7 @@ private val log = LogManager.getLogger(TransportIndexDestinationAction::class.ja
 
 class TransportIndexDestinationAction @Inject constructor(
     transportService: TransportService,
-    val client: Client,
+    val client: NodeClient,
     actionFilters: ActionFilters,
     val scheduledJobIndices: ScheduledJobIndices,
     val clusterService: ClusterService,
@@ -86,9 +101,75 @@ class TransportIndexDestinationAction @Inject constructor(
         if (!checkFilterByUserBackendRoles(filterByEnabled, user, actionListener)) {
             return
         }
-        client.threadPool().threadContext.stashContext().use {
-            IndexDestinationHandler(client, actionListener, request, user).resolveUserAndStart()
+
+        try {
+            val notificationResponse: BaseResponse
+            val configId: String
+            if (request.method == RestRequest.Method.PUT) {
+
+                notificationResponse = NotificationAPIUtils.updateNotificationConfig(client, convertIndexDestinationRequestToUpdateNotificationConfigRequest(request))
+                configId = notificationResponse.configId
+
+//            NotificationsPluginInterface.updateNotificationConfig(client, convertIndexDestinationRequestToUpdateNotificationConfigRequest(request),
+//                object : ActionListener<UpdateNotificationConfigResponse> {
+//                    override fun onResponse(response: UpdateNotificationConfigResponse) {
+//                        notificationResponse = response
+//                        configId = response.configId
+//                    }
+//                    override fun onFailure(e: Exception) {
+//                        actionListener.onFailure(AlertingException.wrap(e))
+//                        return
+//                    }
+//                }
+//            )
+            } else {
+                val createRequest = convertIndexDestinationRequestToCreateNotificationConfigRequest(request)
+
+                notificationResponse = NotificationAPIUtils.createNotificationConfig(client, createRequest)
+                configId = notificationResponse.configId
+//            NotificationsPluginInterface.createNotificationConfig(client, convertIndexDestinationRequestToCreateNotificationConfigRequest(request),
+//                object : ActionListener<CreateNotificationConfigResponse> {
+//                    override fun onResponse(response: CreateNotificationConfigResponse) {
+//                        notificationResponse = response
+//                        configId = response.configId
+//                    }
+//                    override fun onFailure(e: Exception) {
+//                        actionListener.onFailure(AlertingException.wrap(e))
+//                        return
+//                    }
+//                }
+//            )
+            }
+
+            val getNotificationConfigRequest = GetNotificationConfigRequest(setOf(configId!!), 0, 1, null, null, emptyMap())
+            val getNotificationConfigResponse = NotificationAPIUtils.getNotificationConfig(client, getNotificationConfigRequest)
+            if (request.method == RestRequest.Method.PUT) {
+                actionListener.onResponse(convertUpdateNotificationConfigResponseToIndexDestinationResponse(notificationResponse as UpdateNotificationConfigResponse, getNotificationConfigResponse))
+            } else {
+                actionListener.onResponse(convertCreateNotificationConfigResponseToIndexDestinationResponse(notificationResponse as CreateNotificationConfigResponse, getNotificationConfigResponse))
+            }
+        } catch (e: Exception) {
+            log.error("Failed to index destination due to", e)
+            actionListener.onFailure(AlertingException.wrap(e))
         }
+//        NotificationsPluginInterface.getNotificationConfig(client, getNotificationConfigRequest,
+//            object : ActionListener<GetNotificationConfigResponse> {
+//                override fun onResponse(response: GetNotificationConfigResponse) {
+//                    if (request.method == RestRequest.Method.PUT) {
+//                        actionListener.onResponse(convertUpdateNotificationConfigResponseToIndexDestinationResponse(notificationResponse!! as UpdateNotificationConfigResponse, response))
+//                    } else {
+//                        actionListener.onResponse(convertCreateNotificationConfigResponseToIndexDestinationResponse(notificationResponse!! as CreateNotificationConfigResponse, response))
+//                    }
+//                }
+//                override fun onFailure(e: Exception) {
+//                    actionListener.onFailure(AlertingException.wrap(e))
+//                }
+//            }
+//        )
+
+//        client.threadPool().threadContext.stashContext().use {
+//            IndexDestinationHandler(client, actionListener, request, user).resolveUserAndStart()
+//        }
     }
 
     inner class IndexDestinationHandler(

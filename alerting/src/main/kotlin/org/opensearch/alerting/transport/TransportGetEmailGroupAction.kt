@@ -29,29 +29,25 @@ package org.opensearch.alerting.transport
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
-import org.opensearch.action.get.GetRequest
-import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.GetEmailGroupAction
 import org.opensearch.alerting.action.GetEmailGroupRequest
 import org.opensearch.alerting.action.GetEmailGroupResponse
-import org.opensearch.alerting.actionconverter.GetEmailGroupConverter
-import org.opensearch.alerting.actionconverter.GetEmailGroupConverter.Companion.convertGetNotificationConfigResponseToGetEmailGroupResponse
-import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
-import org.opensearch.alerting.elasticapi.suspendUntil
-import org.opensearch.alerting.model.destination.email.EmailGroup
+import org.opensearch.alerting.actionconverter.EmailGroupActionsConverter
+import org.opensearch.alerting.actionconverter.EmailGroupActionsConverter.Companion.convertGetEmailGroupRequestToGetNotificationConfigRequest
+import org.opensearch.alerting.actionconverter.EmailGroupActionsConverter.Companion.convertGetNotificationConfigResponseToGetEmailGroupResponse
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.client.Client
+import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
-import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.XContentHelper
-import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.notifications.NotificationsPluginInterface
+import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
 import org.opensearch.commons.notifications.action.NotificationsActions
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
@@ -61,7 +57,7 @@ private val log = LogManager.getLogger(TransportGetEmailGroupAction::class.java)
 
 class TransportGetEmailGroupAction @Inject constructor(
     transportService: TransportService,
-    val client: Client,
+    val client: NodeClient,
     actionFilters: ActionFilters,
     val clusterService: ClusterService,
     settings: Settings,
@@ -94,13 +90,18 @@ class TransportGetEmailGroupAction @Inject constructor(
             return
         }
 
-        try {
-            val futureResponse = client.execute(NotificationsActions.GET_NOTIFICATION_CONFIG_ACTION_TYPE, GetEmailGroupConverter.convertGetEmailGroupRequestToGetNotificationConfigRequest(getEmailGroupRequest))
-            val response = futureResponse.actionGet()
-            actionListener.onResponse(convertGetNotificationConfigResponseToGetEmailGroupResponse(response))
-        } catch (e: Exception) {
-            actionListener.onFailure(AlertingException.wrap(e))
-        }
+        NotificationsPluginInterface.getNotificationConfig(client, convertGetEmailGroupRequestToGetNotificationConfigRequest(getEmailGroupRequest),
+            object : ActionListener<GetNotificationConfigResponse> {
+                override fun onResponse(response: GetNotificationConfigResponse) {
+                    val getEmailGroupResponse = convertGetNotificationConfigResponseToGetEmailGroupResponse(response)
+                    actionListener.onResponse(getEmailGroupResponse)
+                }
+                override fun onFailure(e: Exception) {
+                    actionListener.onFailure(AlertingException.wrap(e))
+                }
+            }
+        )
+
 
 //        try {
 //            val response = client.suspendUntil {

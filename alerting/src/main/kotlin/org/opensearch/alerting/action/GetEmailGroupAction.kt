@@ -31,6 +31,6 @@ import org.opensearch.action.ActionType
 class GetEmailGroupAction private constructor() : ActionType<GetEmailGroupResponse>(NAME, ::GetEmailGroupResponse) {
     companion object {
         val INSTANCE = GetEmailGroupAction()
-        val NAME = "cluster:admin/opendistro/alerting/destination/email_group/get"
+        const val NAME = "cluster:admin/opendistro/alerting/destination/email_group/get"
     }
 }

@@ -31,6 +31,6 @@ import org.opensearch.action.ActionType
 class GetMonitorAction private constructor() : ActionType<GetMonitorResponse>(NAME, ::GetMonitorResponse) {
     companion object {
         val INSTANCE = GetMonitorAction()
-        val NAME = "cluster:admin/opendistro/alerting/monitor/get"
+        const val NAME = "cluster:admin/opendistro/alerting/monitor/get"
     }
 }
