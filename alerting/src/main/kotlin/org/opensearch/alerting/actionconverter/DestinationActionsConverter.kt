@@ -1,3 +1,29 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
+ *   Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License").
+ *   You may not use this file except in compliance with the License.
+ *   A copy of the License is located at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   or in the "license" file accompanying this file. This file is distributed
+ *   on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ *   express or implied. See the License for the specific language governing
+ *   permissions and limitations under the License.
+ */
+
 package org.opensearch.alerting.actionconverter
 
 import org.apache.http.client.utils.URIBuilder
@@ -124,13 +150,13 @@ class DestinationActionsConverter {
                 ConfigType.SLACK -> {
                     val slack = notificationConfig.configData as Slack
                     val alertSlack = org.opensearch.alerting.model.destination.Slack(slack.url)
-                    return Destination(Destination.NO_ID, Destination.NO_VERSION, IndexUtils.NO_SCHEMA_VERSION, Destination.NO_SEQ_NO,
+                    return Destination(notificationConfigInfo.configId, Destination.NO_VERSION, IndexUtils.NO_SCHEMA_VERSION, Destination.NO_SEQ_NO,
                         Destination.NO_PRIMARY_TERM, DestinationType.SLACK, notificationConfig.name, null, notificationConfigInfo.lastUpdatedTime, null, alertSlack, null, null)
                 }
                 ConfigType.CHIME -> {
                     val chime = notificationConfig.configData as Chime
                     val alertChime = org.opensearch.alerting.model.destination.Chime(chime.url)
-                    return Destination(Destination.NO_ID, Destination.NO_VERSION, IndexUtils.NO_SCHEMA_VERSION, Destination.NO_SEQ_NO,
+                    return Destination(notificationConfigInfo.configId, Destination.NO_VERSION, IndexUtils.NO_SCHEMA_VERSION, Destination.NO_SEQ_NO,
                         Destination.NO_PRIMARY_TERM, DestinationType.CHIME, notificationConfig.name, null, notificationConfigInfo.lastUpdatedTime, alertChime, null, null, null)
                 }
                 ConfigType.WEBHOOK -> {
@@ -143,7 +169,7 @@ class DestinationActionsConverter {
                     val username: String? = null
                     val password: String? = null
                     val alertWebhook = CustomWebhook(webhook.url, scheme ,host, port, path, method, emptyMap(), webhook.headerParams, username, password)
-                    return Destination(Destination.NO_ID, Destination.NO_VERSION, IndexUtils.NO_SCHEMA_VERSION, Destination.NO_SEQ_NO,
+                    return Destination(notificationConfigInfo.configId, Destination.NO_VERSION, IndexUtils.NO_SCHEMA_VERSION, Destination.NO_SEQ_NO,
                         Destination.NO_PRIMARY_TERM, DestinationType.CUSTOM_WEBHOOK, notificationConfig.name, null, notificationConfigInfo.lastUpdatedTime, null, null, alertWebhook, null)
                 }
                 ConfigType.EMAIL -> {
@@ -158,7 +184,7 @@ class DestinationActionsConverter {
                         recipients.plus(recipient)
                     }
                     val alertEmail = org.opensearch.alerting.model.destination.email.Email(email.emailAccountID, recipients)
-                    return Destination(Destination.NO_ID, Destination.NO_VERSION, IndexUtils.NO_SCHEMA_VERSION, Destination.NO_SEQ_NO,
+                    return Destination(notificationConfigInfo.configId, Destination.NO_VERSION, IndexUtils.NO_SCHEMA_VERSION, Destination.NO_SEQ_NO,
                         Destination.NO_PRIMARY_TERM, DestinationType.EMAIL, notificationConfig.name, null, notificationConfigInfo.lastUpdatedTime, null, null, null, alertEmail)
                 }
                 else -> {

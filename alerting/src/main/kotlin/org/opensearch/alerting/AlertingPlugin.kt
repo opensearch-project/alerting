@@ -251,8 +251,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         this.threadPool = threadPool
         this.clusterService = clusterService
 //        migrationUtilService = MigrationUtilService(client as NodeClient)
-//        migrationCoordinator = MigrationCoordinator(client, clusterService, threadPool)
-        return listOf(sweeper, scheduler, runner, scheduledJobIndices)//, migrationCoordinator)
+        migrationCoordinator = MigrationCoordinator(client, clusterService, threadPool)
+        return listOf(sweeper, scheduler, runner, scheduledJobIndices, migrationCoordinator)
     }
 
     override fun getSettings(): List<Setting<*>> {
