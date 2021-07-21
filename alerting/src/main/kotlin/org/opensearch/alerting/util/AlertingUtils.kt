@@ -54,20 +54,6 @@ fun isValidEmail(email: String): Boolean {
 /** Allowed Destinations are ones that are specified in the [DestinationSettings.ALLOW_LIST] setting. */
 fun Destination.isAllowed(allowList: List<String>): Boolean = allowList.contains(this.type.value)
 
-//fun BaseMessage.isHostInDenylist(networks: List<String>): Boolean {
-//    if (this.url != null || this.uri.host != null) {
-//        val ipStr = IPAddressString(this.uri.host)
-//        for (network in networks) {
-//            val netStr = IPAddressString(network)
-//            if (netStr.contains(ipStr)) {
-//                return true
-//            }
-//        }
-//    }
-//
-//    return false
-//}
-
 /**
  1. If filterBy is enabled
  a) Don't allow to create monitor/ destination (throw error) if the logged-on user has no backend roles configured.
