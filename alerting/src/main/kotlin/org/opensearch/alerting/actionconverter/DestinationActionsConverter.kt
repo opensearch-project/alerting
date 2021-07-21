@@ -57,18 +57,19 @@ import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import org.opensearch.commons.notifications.model.Slack
 import org.opensearch.commons.notifications.model.Webhook
+import org.opensearch.index.Index
+import org.opensearch.index.shard.ShardId
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.sort.SortOrder
 import java.net.URI
 import java.net.URISyntaxException
-import java.time.Instant
-import java.util.*
-import kotlin.math.log
+import java.util.EnumSet
 
+//TODO: Force destinations to have https url if Notification plugin wont support it
 class DestinationActionsConverter {
 
     companion object {
-        private val logger = LogManager.getLogger(javaClass)
+        private val logger = LogManager.getLogger(DestinationActionsConverter::class)
 
         fun convertGetDestinationsRequestToGetNotificationConfigRequest(request: GetDestinationsRequest): GetNotificationConfigRequest {
             val configIds: Set<String> = if(request.destinationId != null) setOf(request.destinationId) else emptySet()
@@ -76,7 +77,7 @@ class DestinationActionsConverter {
             val fromIndex = table.startIndex
             val maxItems = table.size
             val sortOrder: SortOrder = SortOrder.fromString(table.sortOrder)
-            val filterParams: Map<String, String> = emptyMap()
+            val filterParams: Map<String, String> = mapOf(Pair("config_type", "slack,chime,webhook,email"))
 
             return GetNotificationConfigRequest(configIds, fromIndex, maxItems, null, sortOrder, filterParams)
         }
@@ -87,13 +88,11 @@ class DestinationActionsConverter {
             if (searchResult.objectList.isEmpty()) throw OpenSearchStatusException("Destinations not found.", RestStatus.NOT_FOUND)
             val destinations = mutableListOf<Destination>()
             searchResult.objectList.forEach {
-//                val notificationConfig = it.notificationConfig
-//                logger.info("Get notification config val: ${notificationConfig.name} with type: ${notificationConfig.configType.tag}")
                 val destination = convertNotificationConfigToDestination(it)
-//                logger.info("Destination is $destination with type ${destination?.type}")
                 if (destination != null) {
-//                    logger.info("able to add destination")
                     destinations += destination
+                } else {
+                    logger.error("Destination was null and cannot be converted")
                 }
             }
             return GetDestinationsResponse(RestStatus.OK, searchResult.totalHits.toInt(), destinations)
@@ -141,7 +140,9 @@ class DestinationActionsConverter {
             val configIdToStatusList = response.configIdToStatus.entries
             if (configIdToStatusList.isEmpty()) throw OpenSearchStatusException("Destinations failed to be deleted.", RestStatus.NOT_FOUND)
             val configId = configIdToStatusList.elementAt(0).key
-            return DeleteResponse(null, "_doc", configId, 0L, 0L, 0L, true)
+            val index = Index("notification_index", "uuid")
+            val shardId = ShardId(index, 0)
+            return DeleteResponse(shardId, "_doc", configId, 0L, 0L, 0L, true)
         }
 
         private fun convertNotificationConfigToDestination(notificationConfigInfo: NotificationConfigInfo): Destination? {
@@ -187,9 +188,14 @@ class DestinationActionsConverter {
                     return Destination(notificationConfigInfo.configId, Destination.NO_VERSION, IndexUtils.NO_SCHEMA_VERSION, Destination.NO_SEQ_NO,
                         Destination.NO_PRIMARY_TERM, DestinationType.EMAIL, notificationConfig.name, null, notificationConfigInfo.lastUpdatedTime, null, null, null, alertEmail)
                 }
+                ConfigType.SMTP_ACCOUNT -> {
+                    return null
+                }
+                ConfigType.EMAIL_GROUP -> {
+                    return null
+                }
                 else -> {
-                    logger.info("failed config match for: ${notificationConfig.configType}")
-                    logger.info("val is $notificationConfig")
+                    logger.warn("failed config match for type ${notificationConfig.configType} and configId ${notificationConfigInfo.configId}")
                     return null
                 }
             }
@@ -231,7 +237,6 @@ class DestinationActionsConverter {
                             alertWebhook.port,
                             alertWebhook.path,
                             alertWebhook.queryParams).toString()
-                        logger.info("The url for the webhook is $uri")
                         webhook = Webhook(uri, alertWebhook.headerParams)
                     }
                     val description = "Webhook destination created from the Alerting plugin"

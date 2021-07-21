@@ -27,56 +27,32 @@
 package org.opensearch.alerting.transport
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
-import org.opensearch.action.admin.indices.create.CreateIndexResponse
-import org.opensearch.action.get.GetRequest
-import org.opensearch.action.get.GetResponse
-import org.opensearch.action.index.IndexRequest
-import org.opensearch.action.index.IndexResponse
-import org.opensearch.action.search.SearchRequest
-import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.action.IndexEmailAccountAction
 import org.opensearch.alerting.action.IndexEmailAccountRequest
 import org.opensearch.alerting.action.IndexEmailAccountResponse
-import org.opensearch.alerting.actionconverter.DestinationActionsConverter
 import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertCreateNotificationConfigResponseToIndexEmailAccountResponse
 import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertIndexEmailAccountRequestToCreateNotificationConfigRequest
 import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertIndexEmailAccountRequestToUpdateNotificationConfigRequest
 import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertUpdateNotificationConfigResponseToIndexEmailAccountResponse
 import org.opensearch.alerting.core.ScheduledJobIndices
-import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
-import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOB_TYPE
-import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.AlertingException
-import org.opensearch.alerting.util.DestinationType
-import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.NotificationAPIUtils
-import org.opensearch.client.Client
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
-import org.opensearch.commons.notifications.NotificationsPluginInterface
 import org.opensearch.commons.notifications.action.BaseResponse
 import org.opensearch.commons.notifications.action.CreateNotificationConfigResponse
 import org.opensearch.commons.notifications.action.GetNotificationConfigRequest
-import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
-import org.opensearch.commons.notifications.action.NotificationsActions
 import org.opensearch.commons.notifications.action.UpdateNotificationConfigResponse
-import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestRequest
-import org.opensearch.rest.RestStatus
-import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 
@@ -125,316 +101,6 @@ class TransportIndexEmailAccountAction @Inject constructor(
             }
         } catch (e: Exception) {
             actionListener.onFailure(AlertingException.wrap(e))
-        }
-
-
-//        var notificationResponse: BaseResponse? = null
-//        var configId: String? = null
-//        if (request.method == RestRequest.Method.PUT) {
-//
-//            NotificationsPluginInterface.updateNotificationConfig(client, convertIndexEmailAccountRequestToUpdateNotificationConfigRequest(request),
-//                object : ActionListener<UpdateNotificationConfigResponse> {
-//                    override fun onResponse(response: UpdateNotificationConfigResponse) {
-//                        notificationResponse = response
-//                        configId = response.configId
-//                    }
-//                    override fun onFailure(e: Exception) {
-//                        actionListener.onFailure(AlertingException.wrap(e))
-//                        return
-//                    }
-//                }
-//            )
-//        } else {
-//            NotificationsPluginInterface.createNotificationConfig(client, convertIndexEmailAccountRequestToCreateNotificationConfigRequest(request),
-//                object : ActionListener<CreateNotificationConfigResponse> {
-//                    override fun onResponse(response: CreateNotificationConfigResponse) {
-//                        notificationResponse = response
-//                        configId = response.configId
-//                    }
-//                    override fun onFailure(e: Exception) {
-//                        actionListener.onFailure(AlertingException.wrap(e))
-//                        return
-//                    }
-//                }
-//            )
-//        }
-//
-//        val getNotificationConfigRequest = GetNotificationConfigRequest(setOf(configId!!), 0, 1, null, null, emptyMap())
-//        NotificationsPluginInterface.getNotificationConfig(client, getNotificationConfigRequest,
-//            object : ActionListener<GetNotificationConfigResponse> {
-//                override fun onResponse(response: GetNotificationConfigResponse) {
-//                    if (request.method == RestRequest.Method.PUT) {
-//                        actionListener.onResponse(convertUpdateNotificationConfigResponseToIndexEmailAccountResponse(notificationResponse!! as UpdateNotificationConfigResponse, response))
-//                    } else {
-//                        actionListener.onResponse(convertCreateNotificationConfigResponseToIndexEmailAccountResponse(notificationResponse!! as CreateNotificationConfigResponse, response))
-//                    }
-//                }
-//                override fun onFailure(e: Exception) {
-//                    actionListener.onFailure(AlertingException.wrap(e))
-//                }
-//            }
-//        )
-//        try {
-//
-//            if (request.method == RestRequest.Method.PUT) {
-//                val futureResponse = client.execute(NotificationsActions.UPDATE_NOTIFICATION_CONFIG_ACTION_TYPE, convertIndexEmailAccountRequestToUpdateNotificationConfigRequest(request))
-//                val response = futureResponse.actionGet()
-//
-//                val getDestinationsRequest = GetNotificationConfigRequest(setOf(request.emailAccountID), 0, 1, null, null, emptyMap())
-//                val getNotificationResponse = client.execute(NotificationsActions.GET_NOTIFICATION_CONFIG_ACTION_TYPE, getDestinationsRequest).actionGet()!!
-//
-//                actionListener.onResponse(convertUpdateNotificationConfigResponseToIndexEmailAccountResponse(response, getNotificationResponse))
-//            } else {
-//                val futureResponse = client.execute(NotificationsActions.CREATE_NOTIFICATION_CONFIG_ACTION_TYPE, convertIndexEmailAccountRequestToCreateNotificationConfigRequest(request))
-//                val response = futureResponse.actionGet()
-//
-//                val getDestinationsRequest = GetNotificationConfigRequest(setOf(response.configId), 0, 1, null, null, emptyMap())
-//                val getNotificationResponse = client.execute(NotificationsActions.GET_NOTIFICATION_CONFIG_ACTION_TYPE, getDestinationsRequest).actionGet()!!
-//
-//                actionListener.onResponse(convertCreateNotificationConfigResponseToIndexEmailAccountResponse(response, getNotificationResponse))
-//            }
-//        } catch (e: Exception) {
-//            actionListener.onFailure(AlertingException.wrap(e))
-//        }
-//        client.threadPool().threadContext.stashContext().use {
-//            IndexEmailAccountHandler(client, actionListener, request).start()
-//        }
-    }
-
-    inner class IndexEmailAccountHandler(
-        private val client: Client,
-        private val actionListener: ActionListener<IndexEmailAccountResponse>,
-        private val request: IndexEmailAccountRequest
-    ) {
-
-        fun start() {
-            if (!scheduledJobIndices.scheduledJobIndexExists()) {
-                scheduledJobIndices.initScheduledJobIndex(object : ActionListener<CreateIndexResponse> {
-                    override fun onResponse(response: CreateIndexResponse) {
-                        onCreateMappingsResponse(response)
-                    }
-
-                    override fun onFailure(e: Exception) {
-                        actionListener.onFailure(e)
-                    }
-                })
-            } else if (!IndexUtils.scheduledJobIndexUpdated) {
-                IndexUtils.updateIndexMapping(
-                    SCHEDULED_JOBS_INDEX, SCHEDULED_JOB_TYPE,
-                    ScheduledJobIndices.scheduledJobMappings(), clusterService.state(), client.admin().indices(),
-                    object : ActionListener<AcknowledgedResponse> {
-                        override fun onResponse(response: AcknowledgedResponse) {
-                            onUpdateMappingsResponse(response)
-                        }
-
-                        override fun onFailure(e: Exception) {
-                            actionListener.onFailure(e)
-                        }
-                    }
-                )
-            } else {
-                prepareEmailAccountIndexing()
-            }
-        }
-
-        private fun prepareEmailAccountIndexing() {
-
-            if (!allowList.contains(DestinationType.EMAIL.value)) {
-                actionListener.onFailure(
-                    AlertingException.wrap(
-                        OpenSearchStatusException(
-                            "This API is blocked since Destination type [${DestinationType.EMAIL}] is not allowed",
-                            RestStatus.FORBIDDEN
-                        )
-                    )
-                )
-                return
-            }
-
-            val query = QueryBuilders.boolQuery()
-                .must(
-                    QueryBuilders.termQuery(
-                        "${EmailAccount.EMAIL_ACCOUNT_TYPE}.${EmailAccount.NAME_FIELD}.keyword", request.emailAccount.name
-                    )
-                )
-                .filter(QueryBuilders.existsQuery(EmailAccount.EMAIL_ACCOUNT_TYPE))
-            val searchSource = SearchSourceBuilder().query(query).timeout(requestTimeout)
-            val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
-            client.search(
-                searchRequest,
-                object : ActionListener<SearchResponse> {
-                    override fun onResponse(searchResponse: SearchResponse) {
-                        onSearchResponse(searchResponse)
-                    }
-
-                    override fun onFailure(e: Exception) {
-                        actionListener.onFailure(e)
-                    }
-                }
-            )
-        }
-
-        /**
-         * After searching for all existing email accounts with the same name as the one in the request
-         * we validate if the name has already been used or not.
-         */
-        private fun onSearchResponse(response: SearchResponse) {
-            if (request.method == RestRequest.Method.POST) {
-                // For a request to create a new email account, check if the name exists for another email account
-                val totalHits = response.hits.totalHits?.value
-                if (totalHits != null && totalHits > 0) {
-                    log.error("Unable to create email group with name=[${request.emailAccount.name}] because name is already in use.")
-                    actionListener.onFailure(
-                        IllegalArgumentException(
-                            "Unable to create email group with name=[${request.emailAccount.name}] because name is already in use."
-                        )
-                    )
-                    return
-                } else {
-                    indexEmailAccount()
-                }
-            } else {
-                // For an update request, check if the name is being used by an email account other than the one being updated
-                for (hit in response.hits) {
-                    if (hit.id != request.emailAccountID) {
-                        log.error("Unable to update email group with name=[${request.emailAccount.name}] because name is already in use.")
-                        actionListener.onFailure(
-                            IllegalArgumentException(
-                                "Unable to update email group with name=[${request.emailAccount.name}] because name is already in use."
-                            )
-                        )
-                        // Return early if name is invalid
-                        return
-                    }
-                }
-
-                // Call update if name is valid
-                updateEmailAccount()
-            }
-        }
-
-        private fun onCreateMappingsResponse(response: CreateIndexResponse) {
-            if (response.isAcknowledged) {
-                log.info("Created $SCHEDULED_JOBS_INDEX with mappings.")
-                prepareEmailAccountIndexing()
-                IndexUtils.scheduledJobIndexUpdated()
-            } else {
-                log.error("Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged.")
-                actionListener.onFailure(
-                    AlertingException.wrap(
-                        OpenSearchStatusException(
-                            "Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged.",
-                            RestStatus.INTERNAL_SERVER_ERROR
-                        )
-                    )
-                )
-            }
-        }
-
-        private fun onUpdateMappingsResponse(response: AcknowledgedResponse) {
-            if (response.isAcknowledged) {
-                log.info("Updated $SCHEDULED_JOBS_INDEX with mappings.")
-                IndexUtils.scheduledJobIndexUpdated()
-                prepareEmailAccountIndexing()
-            } else {
-                log.error("Update $SCHEDULED_JOBS_INDEX mappings call not acknowledged.")
-                actionListener.onFailure(
-                    AlertingException.wrap(
-                        OpenSearchStatusException(
-                            "Update $SCHEDULED_JOBS_INDEX mappings call not acknowledged.",
-                            RestStatus.INTERNAL_SERVER_ERROR
-                        )
-                    )
-                )
-            }
-        }
-
-        private fun indexEmailAccount(update: Boolean = false) {
-            request.emailAccount = request.emailAccount.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
-            var indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
-                .setRefreshPolicy(request.refreshPolicy)
-                .source(request.emailAccount.toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-                .setIfSeqNo(request.seqNo)
-                .setIfPrimaryTerm(request.primaryTerm)
-                .timeout(indexTimeout)
-
-            // If request is to update, then add id to index request
-            if (update) indexRequest = indexRequest.id(request.emailAccountID)
-
-            client.index(
-                indexRequest,
-                object : ActionListener<IndexResponse> {
-                    override fun onResponse(response: IndexResponse) {
-                        val failureReasons = checkShardsFailure(response)
-                        if (failureReasons != null) {
-                            actionListener.onFailure(
-                                AlertingException.wrap(
-                                    OpenSearchStatusException(
-                                        failureReasons.toString(), response.status()
-                                    )
-                                )
-                            )
-                            return
-                        }
-                        actionListener.onResponse(
-                            IndexEmailAccountResponse(
-                                response.id, response.version, response.seqNo, response.primaryTerm,
-                                RestStatus.CREATED, request.emailAccount
-                            )
-                        )
-                    }
-
-                    override fun onFailure(e: Exception) {
-                        actionListener.onFailure(e)
-                    }
-                }
-            )
-        }
-
-        private fun updateEmailAccount() {
-            val getRequest = GetRequest(SCHEDULED_JOBS_INDEX, request.emailAccountID)
-            client.get(
-                getRequest,
-                object : ActionListener<GetResponse> {
-                    override fun onResponse(response: GetResponse) {
-                        onGetResponse(response)
-                    }
-
-                    override fun onFailure(e: Exception) {
-                        actionListener.onFailure(e)
-                    }
-                }
-            )
-        }
-
-        private fun onGetResponse(response: GetResponse) {
-            if (!response.isExists) {
-                actionListener.onFailure(
-                    AlertingException.wrap(
-                        OpenSearchStatusException(
-                            "EmailAccount with ${request.emailAccountID} was not found",
-                            RestStatus.NOT_FOUND
-                        )
-                    )
-                )
-                return
-            }
-
-            indexEmailAccount(update = true)
-        }
-
-        private fun checkShardsFailure(response: IndexResponse): String? {
-            val failureReasons = StringBuilder()
-            if (response.shardInfo.failed > 0) {
-                response.shardInfo.failures.forEach {
-                    entry ->
-                    failureReasons.append(entry.reason())
-                }
-
-                return failureReasons.toString()
-            }
-
-            return null
         }
     }
 }

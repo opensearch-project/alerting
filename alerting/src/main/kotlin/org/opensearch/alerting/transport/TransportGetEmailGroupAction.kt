@@ -34,13 +34,11 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.GetEmailGroupAction
 import org.opensearch.alerting.action.GetEmailGroupRequest
 import org.opensearch.alerting.action.GetEmailGroupResponse
-import org.opensearch.alerting.actionconverter.EmailGroupActionsConverter
 import org.opensearch.alerting.actionconverter.EmailGroupActionsConverter.Companion.convertGetEmailGroupRequestToGetNotificationConfigRequest
 import org.opensearch.alerting.actionconverter.EmailGroupActionsConverter.Companion.convertGetNotificationConfigResponseToGetEmailGroupResponse
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.DestinationType
-import org.opensearch.client.Client
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -48,7 +46,6 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.commons.notifications.NotificationsPluginInterface
 import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
-import org.opensearch.commons.notifications.action.NotificationsActions
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -101,57 +98,5 @@ class TransportGetEmailGroupAction @Inject constructor(
                 }
             }
         )
-
-
-//        try {
-//            val response = client.suspendUntil {
-//                client.execute(NotificationsActions.GET_NOTIFICATION_CONFIG_ACTION_TYPE, GetEmailGroupConverter.convertGetAlertRequestToNotificationRequest(getEmailGroupRequest), it)
-//            }
-//            return GetEmailGroupConverter.convertGetNotificationResponseToAlertResponse(response)
-//        } catch (e: Exception) {
-//
-//        }
-//
-//        val getRequest = GetRequest(SCHEDULED_JOBS_INDEX, getEmailGroupRequest.emailGroupID)
-//            .version(getEmailGroupRequest.version)
-//            .fetchSourceContext(getEmailGroupRequest.srcContext)
-//        client.threadPool().threadContext.stashContext().use {
-//            client.get(
-//                getRequest,
-//                object : ActionListener<GetResponse> {
-//                    override fun onResponse(response: GetResponse) {
-//                        if (!response.isExists) {
-//                            actionListener.onFailure(
-//                                AlertingException.wrap(
-//                                    OpenSearchStatusException("Email Group not found.", RestStatus.NOT_FOUND)
-//                                )
-//                            )
-//                            return
-//                        }
-//
-//                        var emailGroup: EmailGroup? = null
-//                        if (!response.isSourceEmpty) {
-//                            XContentHelper.createParser(
-//                                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-//                                response.sourceAsBytesRef, XContentType.JSON
-//                            ).use { xcp ->
-//                                emailGroup = EmailGroup.parseWithType(xcp, response.id, response.version)
-//                            }
-//                        }
-//
-//                        actionListener.onResponse(
-//                            GetEmailGroupResponse(
-//                                response.id, response.version, response.seqNo, response.primaryTerm,
-//                                RestStatus.OK, emailGroup
-//                            )
-//                        )
-//                    }
-//
-//                    override fun onFailure(e: Exception) {
-//                        actionListener.onFailure(e)
-//                    }
-//                }
-//            )
-//        }
     }
 }

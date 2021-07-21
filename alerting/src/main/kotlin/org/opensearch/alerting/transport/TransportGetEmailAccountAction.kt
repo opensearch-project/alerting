@@ -36,11 +36,9 @@ import org.opensearch.alerting.action.GetEmailAccountRequest
 import org.opensearch.alerting.action.GetEmailAccountResponse
 import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertGetEmailAccountRequestToGetNotificationConfigRequest
 import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertGetNotificationConfigResponseToGetEmailAccountResponse
-import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.DestinationType
-import org.opensearch.client.Client
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -48,7 +46,6 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.commons.notifications.NotificationsPluginInterface
 import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
-import org.opensearch.commons.notifications.action.NotificationsActions
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -101,47 +98,5 @@ class TransportGetEmailAccountAction @Inject constructor(
                 }
             }
         )
-
-//        val getRequest = GetRequest(SCHEDULED_JOBS_INDEX, getEmailAccountRequest.emailAccountID)
-//            .version(getEmailAccountRequest.version)
-//            .fetchSourceContext(getEmailAccountRequest.srcContext)
-//        client.threadPool().threadContext.stashContext().use {
-//            client.get(
-//                getRequest,
-//                object : ActionListener<GetResponse> {
-//                    override fun onResponse(response: GetResponse) {
-//                        if (!response.isExists) {
-//                            actionListener.onFailure(
-//                                AlertingException.wrap(
-//                                    OpenSearchStatusException("Email Account not found.", RestStatus.NOT_FOUND)
-//                                )
-//                            )
-//                            return
-//                        }
-//
-//                        var emailAccount: EmailAccount? = null
-//                        if (!response.isSourceEmpty) {
-//                            XContentHelper.createParser(
-//                                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-//                                response.sourceAsBytesRef, XContentType.JSON
-//                            ).use { xcp ->
-//                                emailAccount = EmailAccount.parseWithType(xcp, response.id, response.version)
-//                            }
-//                        }
-//
-//                        actionListener.onResponse(
-//                            GetEmailAccountResponse(
-//                                response.id, response.version, response.seqNo, response.primaryTerm,
-//                                RestStatus.OK, emailAccount
-//                            )
-//                        )
-//                    }
-//
-//                    override fun onFailure(e: Exception) {
-//                        actionListener.onFailure(e)
-//                    }
-//                }
-//            )
-//        }
     }
 }

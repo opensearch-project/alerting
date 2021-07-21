@@ -92,16 +92,20 @@ class TransportGetDestinationsAction @Inject constructor(
         actionListener: ActionListener<GetDestinationsResponse>
     ) {
 
-        var getDestinationsResponse = GetDestinationsResponse(RestStatus.OK, 0, emptyList())
+        val getDestinationsResponse: GetDestinationsResponse
         try {
-            val getNotificationConfigResponse = NotificationAPIUtils.getNotificationConfig(client, convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest))
+            val getRequest = convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest)
+            log.info("Get Notification request is: $getRequest")
+            val getNotificationConfigResponse = NotificationAPIUtils.getNotificationConfig(client, getRequest)
             getDestinationsResponse = convertGetNotificationConfigResponseToGetDestinationsResponse(getNotificationConfigResponse)
             if (getDestinationsRequest.destinationId != null) {
                 log.info("Destination size: ${getDestinationsResponse.destinations.size} and table size: ${getDestinationsRequest.table.size}")
                 actionListener.onResponse(getDestinationsResponse)
+                return
             }
         } catch (e: Exception) {
             actionListener.onFailure(AlertingException.wrap(e))
+            return
         }
 
         val userStr = client.threadPool().threadContext.getTransient<String>(
@@ -130,7 +134,7 @@ class TransportGetDestinationsAction @Inject constructor(
             .must(QueryBuilders.existsQuery("destination"))
 
         if (!getDestinationsRequest.destinationId.isNullOrBlank())
-            queryBuilder.filter(QueryBuilders.termQuery("_id", getDestinationsRequest.destinationId))
+            queryBuilder.filter(QueryBuilders.termQuery("_id", getDestinationsRequest.destinationId as String))
 
         if (getDestinationsRequest.destinationType != "ALL")
             queryBuilder.filter(QueryBuilders.termQuery("destination.type", getDestinationsRequest.destinationType))

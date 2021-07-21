@@ -29,8 +29,7 @@ package org.opensearch.alerting.util
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionListener
 import org.opensearch.action.bulk.BackoffPolicy
-import org.opensearch.alerting.elasticapi.retry
-import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.elasticapi.retryOnAnyException
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.notifications.NotificationsPluginInterface
@@ -44,23 +43,22 @@ import org.opensearch.commons.notifications.action.SendNotificationRequest
 import org.opensearch.commons.notifications.action.SendNotificationResponse
 import org.opensearch.commons.notifications.action.UpdateNotificationConfigRequest
 import org.opensearch.commons.notifications.action.UpdateNotificationConfigResponse
-import java.lang.RuntimeException
 
-//TODO consider adding retry policies
 class NotificationAPIUtils {
 
     companion object {
 
         private val logger = LogManager.getLogger(NotificationAPIUtils::class)
 
-        private val retryPolicy =
-            BackoffPolicy.constantBackoff(TimeValue.timeValueMillis(50), 3)
+        private val defaultRetryPolicy =
+            BackoffPolicy.constantBackoff(TimeValue.timeValueMillis(100), 2)
 
-        fun getNotificationConfig(client: NodeClient, getNotificationConfigRequest: GetNotificationConfigRequest): GetNotificationConfigResponse? {
+        fun getNotificationConfig(client: NodeClient, getNotificationConfigRequest: GetNotificationConfigRequest, retryPolicy: BackoffPolicy = defaultRetryPolicy): GetNotificationConfigResponse? {
             var getNotificationConfigResponse: GetNotificationConfigResponse? = null
-            var exception: Exception? = null
+            var exception: Exception?
             var completed = false
-            retryPolicy.retry {
+            retryPolicy.retryOnAnyException {
+                exception = null
                 NotificationsPluginInterface.getNotificationConfig(client, getNotificationConfigRequest,
                     object : ActionListener<GetNotificationConfigResponse> {
                         override fun onResponse(response: GetNotificationConfigResponse) {
@@ -71,25 +69,28 @@ class NotificationAPIUtils {
 
                         override fun onFailure(e: Exception) {
                             logger.error("Failed to retrieve Notification due to: ${e.message}", e)
-                            completed = true
                             exception = e
+                            completed = true
                         }
                     }
                 )
-                if (exception != null) throw exception as Exception
+                while(!completed) {
+                    Thread.sleep(100)
+                }
+                completed = false
+                if (exception != null) {
+                    throw exception as Exception
+                }
             }
-            while(!completed) {
-                Thread.sleep(100)
-            }
-            if (exception != null) throw exception as Exception
             return getNotificationConfigResponse
         }
 
-        fun createNotificationConfig(client: NodeClient, createNotificationConfigRequest: CreateNotificationConfigRequest): CreateNotificationConfigResponse {
+        fun createNotificationConfig(client: NodeClient, createNotificationConfigRequest: CreateNotificationConfigRequest, retryPolicy: BackoffPolicy = defaultRetryPolicy): CreateNotificationConfigResponse {
             var createNotificationConfigResponse: CreateNotificationConfigResponse? = null
-            var exception: Exception? = null
+            var exception: Exception?
             var completed = false
-            retryPolicy.retry {
+            retryPolicy.retryOnAnyException {
+                exception = null
                 NotificationsPluginInterface.createNotificationConfig(client, createNotificationConfigRequest,
                     object : ActionListener<CreateNotificationConfigResponse> {
                         override fun onResponse(response: CreateNotificationConfigResponse) {
@@ -105,23 +106,23 @@ class NotificationAPIUtils {
                         }
                     }
                 )
-                if (exception != null) throw exception as Exception
-            }
-            while(!completed) {
-                Thread.sleep(100)
-            }
-            if (exception != null) throw exception as Exception
-            if (createNotificationConfigResponse == null) {
-                throw RuntimeException("Some reason cannot create notification")
+                while(!completed) {
+                    Thread.sleep(100)
+                }
+                completed = false
+                if (exception != null) {
+                    throw exception as Exception
+                }
             }
             return createNotificationConfigResponse!!
         }
 
-        fun updateNotificationConfig(client: NodeClient, updateNotificationConfigRequest: UpdateNotificationConfigRequest): UpdateNotificationConfigResponse {
+        fun updateNotificationConfig(client: NodeClient, updateNotificationConfigRequest: UpdateNotificationConfigRequest, retryPolicy: BackoffPolicy = defaultRetryPolicy): UpdateNotificationConfigResponse {
             var updateNotificationConfigResponse: UpdateNotificationConfigResponse? = null
             var completed = false
-            var exception: Exception? = null
-            retryPolicy.retry {
+            var exception: Exception?
+            retryPolicy.retryOnAnyException {
+                exception = null
                 NotificationsPluginInterface.updateNotificationConfig(client, updateNotificationConfigRequest,
                     object : ActionListener<UpdateNotificationConfigResponse> {
                         override fun onResponse(response: UpdateNotificationConfigResponse) {
@@ -132,25 +133,28 @@ class NotificationAPIUtils {
 
                         override fun onFailure(e: Exception) {
                             logger.error("Failed to update Notification due to: ${e.message}", e)
-                            completed = true
                             exception = e
+                            completed = true
                         }
                     }
                 )
-                if (exception != null) throw exception as Exception
+                while(!completed) {
+                    Thread.sleep(100)
+                }
+                completed = false
+                if (exception != null) {
+                    throw exception as Exception
+                }
             }
-            while(!completed) {
-                Thread.sleep(100)
-            }
-            if (exception != null) throw exception as Exception
             return updateNotificationConfigResponse!!
         }
 
-        fun deleteNotificationConfig(client: NodeClient, deleteNotificationConfigRequest: DeleteNotificationConfigRequest): DeleteNotificationConfigResponse {
+        fun deleteNotificationConfig(client: NodeClient, deleteNotificationConfigRequest: DeleteNotificationConfigRequest, retryPolicy: BackoffPolicy = defaultRetryPolicy): DeleteNotificationConfigResponse {
             var deleteNotificationConfigResponse: DeleteNotificationConfigResponse? = null
             var completed = false
-            var exception: Exception? = null
-            retryPolicy.retry {
+            var exception: Exception?
+            retryPolicy.retryOnAnyException {
+                exception = null
                 NotificationsPluginInterface.deleteNotificationConfig(client, deleteNotificationConfigRequest,
                     object : ActionListener<DeleteNotificationConfigResponse> {
                         override fun onResponse(response: DeleteNotificationConfigResponse) {
@@ -161,26 +165,28 @@ class NotificationAPIUtils {
 
                         override fun onFailure(e: Exception) {
                             logger.error("Failed to delete Notification due to: ${e.message}", e)
-                            completed = true
                             exception = e
+                            completed = true
                         }
                     }
                 )
-                if (exception != null) throw exception as Exception
+                while(!completed) {
+                    Thread.sleep(100)
+                }
+                completed = false
+                if (exception != null) {
+                    throw exception as Exception
+                }
             }
-            while(!completed) {
-                Thread.sleep(100)
-            }
-            if (exception != null) throw exception as Exception
             return deleteNotificationConfigResponse!!
         }
 
-        fun sendNotification(client: NodeClient, sendNotificationRequest: SendNotificationRequest): SendNotificationResponse {
+        fun sendNotification(client: NodeClient, sendNotificationRequest: SendNotificationRequest, retryPolicy: BackoffPolicy = defaultRetryPolicy): SendNotificationResponse {
             var sendNotificationResponse: SendNotificationResponse? = null
             var completed = false
-            var exception: Exception? = null
-            var count = 0
-            retryPolicy.retry {
+            var exception: Exception?
+            retryPolicy.retryOnAnyException {
+                exception = null
                 NotificationsPluginInterface.sendNotification(client, sendNotificationRequest.eventSource, sendNotificationRequest.channelMessage, sendNotificationRequest.channelIds,
                     object : ActionListener<SendNotificationResponse> {
                         override fun onResponse(response: SendNotificationResponse) {
@@ -191,24 +197,18 @@ class NotificationAPIUtils {
 
                         override fun onFailure(e: Exception) {
                             logger.error("Failed to send Notification due to: ${e.message}", e)
-                            completed = true
                             exception = e
+                            completed = true
                         }
                     }
                 )
-                count += 1
+                while(!completed) {
+                    Thread.sleep(100)
+                }
+                completed = false
                 if (exception != null) {
-                    logger.error("1 - Failed to send Notification due to:", exception)
                     throw exception as Exception
                 }
-            }
-            logger.info("Send try is: $count")
-            while(!completed) {
-                Thread.sleep(100)
-            }
-            if (exception != null) {
-                logger.error("2 - Failed to send Notification due to:", exception)
-                throw exception as Exception
             }
             return sendNotificationResponse!!
         }

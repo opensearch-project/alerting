@@ -27,47 +27,27 @@
 package org.opensearch.alerting.transport
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
-import org.opensearch.action.delete.DeleteRequest
 import org.opensearch.action.delete.DeleteResponse
-import org.opensearch.action.get.GetRequest
-import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.DeleteDestinationAction
 import org.opensearch.alerting.action.DeleteDestinationRequest
 import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertDeleteDestinationRequestToDeleteNotificationConfigRequest
 import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertDeleteNotificationConfigResponseToDeleteResponse
-import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter
-import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.NotificationAPIUtils
 import org.opensearch.alerting.util.checkFilterByUserBackendRoles
-import org.opensearch.alerting.util.checkUserFilterByPermissions
-import org.opensearch.client.Client
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
-import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.XContentFactory
-import org.opensearch.common.xcontent.XContentParser
-import org.opensearch.common.xcontent.XContentParserUtils
-import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.authuser.User
-import org.opensearch.commons.notifications.NotificationsPluginInterface
-import org.opensearch.commons.notifications.action.DeleteNotificationConfigResponse
-import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
-import org.opensearch.commons.notifications.action.NotificationsActions
-import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
-import java.io.IOException
 
 private val log = LogManager.getLogger(TransportDeleteDestinationAction::class.java)
 
@@ -93,8 +73,6 @@ class TransportDeleteDestinationAction @Inject constructor(
         val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
         log.debug("User and roles string from thread context: $userStr")
         val user: User? = User.parse(userStr)
-//        val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, request.destinationId)
-//            .setRefreshPolicy(request.refreshPolicy)
 
         if (!checkFilterByUserBackendRoles(filterByEnabled, user, actionListener)) {
             return
@@ -104,104 +82,9 @@ class TransportDeleteDestinationAction @Inject constructor(
             val deleteNotificationConfigResponse = NotificationAPIUtils.deleteNotificationConfig(client, convertDeleteDestinationRequestToDeleteNotificationConfigRequest(request))
             actionListener.onResponse(convertDeleteNotificationConfigResponseToDeleteResponse(deleteNotificationConfigResponse))
         } catch (e: Exception) {
+            log.error("Cannot delete destination due to: ${e.message}", e)
             actionListener.onFailure(AlertingException.wrap(e))
         }
 
-//        NotificationsPluginInterface.deleteNotificationConfig(client, convertDeleteDestinationRequestToDeleteNotificationConfigRequest(request),
-//            object : ActionListener<DeleteNotificationConfigResponse> {
-//                override fun onResponse(response: DeleteNotificationConfigResponse) {
-//                    val deleteResponse = convertDeleteNotificationConfigResponseToDeleteResponse(response)
-//                    actionListener.onResponse(deleteResponse)
-//                }
-//                override fun onFailure(e: Exception) {
-//                    actionListener.onFailure(AlertingException.wrap(e))
-//                }
-//            }
-//        )
-//        client.threadPool().threadContext.stashContext().use {
-//            DeleteDestinationHandler(client, actionListener, deleteRequest, user, request.destinationId).resolveUserAndStart()
-//        }
-    }
-
-    inner class DeleteDestinationHandler(
-        private val client: Client,
-        private val actionListener: ActionListener<DeleteResponse>,
-        private val deleteRequest: DeleteRequest,
-        private val user: User?,
-        private val destinationId: String
-    ) {
-
-        fun resolveUserAndStart() {
-            if (user == null) {
-                // Security is disabled, so we can delete the destination without issues
-                deleteDestination()
-            } else if (!filterByEnabled) {
-                // security is enabled and filterby is disabled.
-                deleteDestination()
-            } else {
-                // security is enabled and filterby is enabled.
-                try {
-                    start()
-                } catch (ex: IOException) {
-                    actionListener.onFailure(AlertingException.wrap(ex))
-                }
-            }
-        }
-
-        fun start() {
-            val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, destinationId)
-            client.get(
-                getRequest,
-                object : ActionListener<GetResponse> {
-                    override fun onResponse(response: GetResponse) {
-                        if (!response.isExists) {
-                            actionListener.onFailure(
-                                AlertingException.wrap(
-                                    OpenSearchStatusException("Destination with $destinationId is not found", RestStatus.NOT_FOUND)
-                                )
-                            )
-                            return
-                        }
-                        val id = response.id
-                        val version = response.version
-                        val seqNo = response.seqNo.toInt()
-                        val primaryTerm = response.primaryTerm.toInt()
-                        val xcp = XContentFactory.xContent(XContentType.JSON)
-                            .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, response.sourceAsString)
-                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
-                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                        val dest = Destination.parse(xcp, id, version, seqNo, primaryTerm)
-                        onGetResponse(dest)
-                    }
-                    override fun onFailure(t: Exception) {
-                        actionListener.onFailure(AlertingException.wrap(t))
-                    }
-                }
-            )
-        }
-
-        private fun onGetResponse(destination: Destination) {
-            if (!checkUserFilterByPermissions(filterByEnabled, user, destination.user, actionListener, "destination", destinationId)) {
-                return
-            } else {
-                deleteDestination()
-            }
-        }
-
-        private fun deleteDestination() {
-            client.delete(
-                deleteRequest,
-                object : ActionListener<DeleteResponse> {
-                    override fun onResponse(response: DeleteResponse) {
-                        actionListener.onResponse(response)
-                    }
-
-                    override fun onFailure(t: Exception) {
-                        actionListener.onFailure(AlertingException.wrap(t))
-                    }
-                }
-            )
-        }
     }
 }

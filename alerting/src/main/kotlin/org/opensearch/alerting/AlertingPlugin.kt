@@ -101,7 +101,6 @@ import org.opensearch.alerting.transport.TransportSearchMonitorAction
 import org.opensearch.alerting.util.MigrationCoordinator
 import org.opensearch.alerting.util.MigrationUtilService
 import org.opensearch.client.Client
-import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.node.DiscoveryNodes
 import org.opensearch.cluster.service.ClusterService
@@ -250,7 +249,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
         this.threadPool = threadPool
         this.clusterService = clusterService
-//        migrationUtilService = MigrationUtilService(client as NodeClient)
         migrationCoordinator = MigrationCoordinator(client, clusterService, threadPool)
         return listOf(sweeper, scheduler, runner, scheduledJobIndices, migrationCoordinator)
     }

@@ -29,11 +29,8 @@ package org.opensearch.alerting.actionconverter
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.delete.DeleteResponse
 import org.opensearch.alerting.action.DeleteEmailGroupRequest
-import org.opensearch.alerting.action.GetDestinationsRequest
-import org.opensearch.alerting.action.GetDestinationsResponse
 import org.opensearch.alerting.action.GetEmailGroupRequest
 import org.opensearch.alerting.action.GetEmailGroupResponse
-import org.opensearch.alerting.action.IndexEmailAccountResponse
 import org.opensearch.alerting.action.IndexEmailGroupRequest
 import org.opensearch.alerting.action.IndexEmailGroupResponse
 import org.opensearch.alerting.model.destination.email.EmailAccount
@@ -54,8 +51,7 @@ import org.opensearch.commons.notifications.model.EmailGroup
 import org.opensearch.commons.notifications.model.Feature
 import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.rest.RestStatus
-import org.opensearch.search.sort.SortOrder
-import java.util.*
+import java.util.EnumSet
 
 class EmailGroupActionsConverter {
 
@@ -119,21 +115,7 @@ class EmailGroupActionsConverter {
         }
 
         fun convertIndexEmailGroupRequestToUpdateNotificationConfigRequest(request: IndexEmailGroupRequest): UpdateNotificationConfigRequest {
-            val emailGroup = request.emailGroup
-            val recipients= mutableListOf<String>()
-            emailGroup.emails.forEach {
-                recipients.plus(it.email)
-            }
-            val notificationEmailGroup = EmailGroup(recipients)
-
-            val description = "Email group created from the Alerting plugin"
-            val notificationConfig = NotificationConfig(
-                emailGroup.name,
-                description,
-                ConfigType.EMAIL_GROUP,
-                EnumSet.of(Feature.ALERTING),
-                notificationEmailGroup
-            )
+            val notificationConfig = convertEmailGroupToNotificationConfig(request.emailGroup)
 
             return UpdateNotificationConfigRequest(request.emailGroupID, notificationConfig)
         }
@@ -160,6 +142,23 @@ class EmailGroupActionsConverter {
             if (configIdToStatusList.isEmpty()) throw OpenSearchStatusException("Email Group failed to be deleted.", RestStatus.NOT_FOUND)
             val configId = configIdToStatusList.elementAt(0).key
             return DeleteResponse(null, "_doc", configId, 0L, 0L, 0L, true)
+        }
+
+        fun convertEmailGroupToNotificationConfig(emailGroup: org.opensearch.alerting.model.destination.email.EmailGroup): NotificationConfig {
+            val recipients = mutableListOf<String>()
+            emailGroup.emails.forEach {
+                recipients.plus(it.email)
+            }
+            val notificationEmailGroup = EmailGroup(recipients)
+
+            val description = "Email group created from the Alerting plugin"
+            return NotificationConfig(
+                emailGroup.name,
+                description,
+                ConfigType.EMAIL_GROUP,
+                EnumSet.of(Feature.ALERTING),
+                notificationEmailGroup
+            )
         }
     }
 }

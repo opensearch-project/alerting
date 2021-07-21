@@ -584,12 +584,8 @@ class MonitorRunner(
             }
             if (!dryrun) {
                 withContext(Dispatchers.IO) {
-//                    val destination = AlertingConfigAccessor.getDestinationInfo(client, xContentRegistry, action.destinationId)
-                    //TODO: support this get getting destination type info
                     val getNotificationConfigRequest = GetNotificationConfigRequest(setOf(action.destinationId), 0, 1, null, null, emptyMap())
                     val getNotificationResponse = NotificationAPIUtils.getNotificationConfig(client as NodeClient, getNotificationConfigRequest)
-//                    val getDestinationsRequest = GetNotificationConfigRequest(setOf(action.destinationId), 0, 1, null, null, emptyMap())
-//                    val getNotificationResponse = client.execute(NotificationsActions.GET_NOTIFICATION_CONFIG_ACTION_TYPE, getDestinationsRequest).actionGet()!!
                     val getDestinationResponse = convertGetNotificationConfigResponseToGetDestinationsResponse(getNotificationResponse)
                     val destination = getDestinationResponse.destinations[0]
                     if (!destination.isAllowed(allowList)) {
@@ -603,14 +599,6 @@ class MonitorRunner(
                     logger.info("channelMessage used: html description: ${channelMessage.htmlDescription}, text description: ${channelMessage.textDescription}")
                     val sendRequest = SendNotificationRequest(eventSource, channelMessage, listOf(action.destinationId), null)
                     actionOutput[MESSAGE_ID] = NotificationAPIUtils.sendNotification(client as NodeClient, sendRequest).notificationId
-
-//                    val destinationCtx = destinationContextFactory.getDestinationContext(destination)
-//                    actionOutput[MESSAGE_ID] = destination.publish(
-//                        actionOutput[SUBJECT],
-//                        actionOutput[MESSAGE]!!,
-//                        destinationCtx,
-//                        hostDenyList
-//                    )
                 }
             }
             ActionRunResult(action.id, action.name, actionOutput, false, currentTime(), null)
