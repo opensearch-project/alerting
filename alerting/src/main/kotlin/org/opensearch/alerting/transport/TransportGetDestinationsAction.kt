@@ -95,11 +95,9 @@ class TransportGetDestinationsAction @Inject constructor(
         val getDestinationsResponse: GetDestinationsResponse
         try {
             val getRequest = convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest)
-            log.info("Get Notification request is: $getRequest")
             val getNotificationConfigResponse = NotificationAPIUtils.getNotificationConfig(client, getRequest)
             getDestinationsResponse = convertGetNotificationConfigResponseToGetDestinationsResponse(getNotificationConfigResponse)
             if (getDestinationsRequest.destinationId != null) {
-                log.info("Destination size: ${getDestinationsResponse.destinations.size} and table size: ${getDestinationsRequest.table.size}")
                 actionListener.onResponse(getDestinationsResponse)
                 return
             }
@@ -192,7 +190,7 @@ class TransportGetDestinationsAction @Inject constructor(
             searchRequest,
             object : ActionListener<SearchResponse> {
                 override fun onResponse(response: SearchResponse) {
-                    var totalDestinationCount = response.hits.totalHits?.value?.toInt()?: 0
+                    var totalDestinationCount = response.hits.totalHits?.value?.toInt() ?: 0
                     val destinations = mutableListOf<Destination>()
                     for (hit in response.hits) {
                         val id = hit.id

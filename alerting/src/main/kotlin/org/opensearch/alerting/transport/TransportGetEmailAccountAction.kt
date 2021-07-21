@@ -39,13 +39,12 @@ import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Comp
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.DestinationType
+import org.opensearch.alerting.util.NotificationAPIUtils
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.commons.notifications.NotificationsPluginInterface
-import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -87,16 +86,16 @@ class TransportGetEmailAccountAction @Inject constructor(
             return
         }
 
-        NotificationsPluginInterface.getNotificationConfig(client, convertGetEmailAccountRequestToGetNotificationConfigRequest(getEmailAccountRequest),
-            object : ActionListener<GetNotificationConfigResponse> {
-                override fun onResponse(response: GetNotificationConfigResponse) {
-                    val getEmailAccountResponse = convertGetNotificationConfigResponseToGetEmailAccountResponse(response)
-                    actionListener.onResponse(getEmailAccountResponse)
-                }
-                override fun onFailure(e: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(e))
-                }
-            }
-        )
+        try {
+            val getNotificationConfigResponse = NotificationAPIUtils.getNotificationConfig(
+                client,
+                convertGetEmailAccountRequestToGetNotificationConfigRequest(getEmailAccountRequest)
+            )
+            val getEmailAccountResponse = convertGetNotificationConfigResponseToGetEmailAccountResponse(getNotificationConfigResponse)
+            actionListener.onResponse(getEmailAccountResponse)
+        } catch (e: Exception) {
+            actionListener.onFailure(AlertingException.wrap(e))
+            return
+        }
     }
 }

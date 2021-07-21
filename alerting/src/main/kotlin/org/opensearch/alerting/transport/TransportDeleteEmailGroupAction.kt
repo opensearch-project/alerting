@@ -78,7 +78,10 @@ class TransportDeleteEmailGroupAction @Inject constructor(
         }
 
         try {
-            val deleteNotificationConfigResponse = NotificationAPIUtils.deleteNotificationConfig(client, convertDeleteEmailGroupRequestToDeleteNotificationConfigRequest(request))
+            val deleteNotificationConfigResponse = NotificationAPIUtils.deleteNotificationConfig(
+                client,
+                convertDeleteEmailGroupRequestToDeleteNotificationConfigRequest(request)
+            )
             actionListener.onResponse(convertDeleteNotificationConfigResponseToDeleteResponse(deleteNotificationConfigResponse))
         } catch (e: Exception) {
             actionListener.onFailure(AlertingException.wrap(e))

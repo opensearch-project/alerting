@@ -53,13 +53,19 @@ class NotificationAPIUtils {
         private val defaultRetryPolicy =
             BackoffPolicy.constantBackoff(TimeValue.timeValueMillis(100), 2)
 
-        fun getNotificationConfig(client: NodeClient, getNotificationConfigRequest: GetNotificationConfigRequest, retryPolicy: BackoffPolicy = defaultRetryPolicy): GetNotificationConfigResponse {
+        fun getNotificationConfig(
+            client: NodeClient,
+            getNotificationConfigRequest: GetNotificationConfigRequest,
+            retryPolicy: BackoffPolicy = defaultRetryPolicy
+        ): GetNotificationConfigResponse {
             var getNotificationConfigResponse: GetNotificationConfigResponse? = null
             var exception: Exception?
             var completed = false
             retryPolicy.retryOnAnyException {
                 exception = null
-                NotificationsPluginInterface.getNotificationConfig(client, getNotificationConfigRequest,
+                NotificationsPluginInterface.getNotificationConfig(
+                    client,
+                    getNotificationConfigRequest,
                     object : ActionListener<GetNotificationConfigResponse> {
                         override fun onResponse(response: GetNotificationConfigResponse) {
                             getNotificationConfigResponse = response
@@ -74,7 +80,7 @@ class NotificationAPIUtils {
                         }
                     }
                 )
-                while(!completed) {
+                while (!completed) {
                     Thread.sleep(100)
                 }
                 completed = false
@@ -85,13 +91,19 @@ class NotificationAPIUtils {
             return getNotificationConfigResponse!!
         }
 
-        fun createNotificationConfig(client: NodeClient, createNotificationConfigRequest: CreateNotificationConfigRequest, retryPolicy: BackoffPolicy = defaultRetryPolicy): CreateNotificationConfigResponse {
+        fun createNotificationConfig(
+            client: NodeClient,
+            createNotificationConfigRequest: CreateNotificationConfigRequest,
+            retryPolicy: BackoffPolicy = defaultRetryPolicy
+        ): CreateNotificationConfigResponse {
             var createNotificationConfigResponse: CreateNotificationConfigResponse? = null
             var exception: Exception?
             var completed = false
             retryPolicy.retryOnAnyException {
                 exception = null
-                NotificationsPluginInterface.createNotificationConfig(client, createNotificationConfigRequest,
+                NotificationsPluginInterface.createNotificationConfig(
+                    client,
+                    createNotificationConfigRequest,
                     object : ActionListener<CreateNotificationConfigResponse> {
                         override fun onResponse(response: CreateNotificationConfigResponse) {
                             createNotificationConfigResponse = response
@@ -106,7 +118,7 @@ class NotificationAPIUtils {
                         }
                     }
                 )
-                while(!completed) {
+                while (!completed) {
                     Thread.sleep(100)
                 }
                 completed = false
@@ -117,13 +129,19 @@ class NotificationAPIUtils {
             return createNotificationConfigResponse!!
         }
 
-        fun updateNotificationConfig(client: NodeClient, updateNotificationConfigRequest: UpdateNotificationConfigRequest, retryPolicy: BackoffPolicy = defaultRetryPolicy): UpdateNotificationConfigResponse {
+        fun updateNotificationConfig(
+            client: NodeClient,
+            updateNotificationConfigRequest: UpdateNotificationConfigRequest,
+            retryPolicy: BackoffPolicy = defaultRetryPolicy
+        ): UpdateNotificationConfigResponse {
             var updateNotificationConfigResponse: UpdateNotificationConfigResponse? = null
             var completed = false
             var exception: Exception?
             retryPolicy.retryOnAnyException {
                 exception = null
-                NotificationsPluginInterface.updateNotificationConfig(client, updateNotificationConfigRequest,
+                NotificationsPluginInterface.updateNotificationConfig(
+                    client,
+                    updateNotificationConfigRequest,
                     object : ActionListener<UpdateNotificationConfigResponse> {
                         override fun onResponse(response: UpdateNotificationConfigResponse) {
                             updateNotificationConfigResponse = response
@@ -138,7 +156,7 @@ class NotificationAPIUtils {
                         }
                     }
                 )
-                while(!completed) {
+                while (!completed) {
                     Thread.sleep(100)
                 }
                 completed = false
@@ -149,13 +167,19 @@ class NotificationAPIUtils {
             return updateNotificationConfigResponse!!
         }
 
-        fun deleteNotificationConfig(client: NodeClient, deleteNotificationConfigRequest: DeleteNotificationConfigRequest, retryPolicy: BackoffPolicy = defaultRetryPolicy): DeleteNotificationConfigResponse {
+        fun deleteNotificationConfig(
+            client: NodeClient,
+            deleteNotificationConfigRequest: DeleteNotificationConfigRequest,
+            retryPolicy: BackoffPolicy = defaultRetryPolicy
+        ): DeleteNotificationConfigResponse {
             var deleteNotificationConfigResponse: DeleteNotificationConfigResponse? = null
             var completed = false
             var exception: Exception?
             retryPolicy.retryOnAnyException {
                 exception = null
-                NotificationsPluginInterface.deleteNotificationConfig(client, deleteNotificationConfigRequest,
+                NotificationsPluginInterface.deleteNotificationConfig(
+                    client,
+                    deleteNotificationConfigRequest,
                     object : ActionListener<DeleteNotificationConfigResponse> {
                         override fun onResponse(response: DeleteNotificationConfigResponse) {
                             deleteNotificationConfigResponse = response
@@ -170,7 +194,7 @@ class NotificationAPIUtils {
                         }
                     }
                 )
-                while(!completed) {
+                while (!completed) {
                     Thread.sleep(100)
                 }
                 completed = false
@@ -181,13 +205,21 @@ class NotificationAPIUtils {
             return deleteNotificationConfigResponse!!
         }
 
-        fun sendNotification(client: NodeClient, sendNotificationRequest: SendNotificationRequest, retryPolicy: BackoffPolicy = defaultRetryPolicy): SendNotificationResponse {
+        fun sendNotification(
+            client: NodeClient,
+            sendNotificationRequest: SendNotificationRequest,
+            retryPolicy: BackoffPolicy = defaultRetryPolicy
+        ): SendNotificationResponse {
             var sendNotificationResponse: SendNotificationResponse? = null
             var completed = false
             var exception: Exception?
             retryPolicy.retryOnAnyException {
                 exception = null
-                NotificationsPluginInterface.sendNotification(client, sendNotificationRequest.eventSource, sendNotificationRequest.channelMessage, sendNotificationRequest.channelIds,
+                NotificationsPluginInterface.sendNotification(
+                    client,
+                    sendNotificationRequest.eventSource,
+                    sendNotificationRequest.channelMessage,
+                    sendNotificationRequest.channelIds,
                     object : ActionListener<SendNotificationResponse> {
                         override fun onResponse(response: SendNotificationResponse) {
                             sendNotificationResponse = response
@@ -202,7 +234,7 @@ class NotificationAPIUtils {
                         }
                     }
                 )
-                while(!completed) {
+                while (!completed) {
                     Thread.sleep(100)
                 }
                 completed = false
@@ -214,6 +246,10 @@ class NotificationAPIUtils {
         }
 
 //        fun isNotificationPluginInstalled(client: NodeClient) {
+//            var isInstalled = false
+//            NodesInfoAction
+//            client.get()
+//
 //            val response = entityAsMap(client.makeRequest("GET", "_nodes/plugins"))
 //            val nodesInfo = response["nodes"] as Map<String, Map<String, Any>>
 //            for (nodeInfo in nodesInfo.values) {
@@ -225,6 +261,33 @@ class NotificationAPIUtils {
 //                }
 //            }
 //            return false
+//
+//            val request = NodesInfoRequest().clear().addMetric("plugins")
+//            client.execute(
+//                NodesInfoAction.INSTANCE, request,
+//                object : ActionListener<NodesInfoResponse> {
+//                    override fun onResponse(response: NodesInfoResponse) {
+//                        val versionSet = mutableSetOf<String>()
+//                        val legacyVersionSet = mutableSetOf<String>()
+//
+//                        response.nodes.map { it.getInfo(PluginsAndModules::class.java).pluginInfos }
+//                            .forEach {
+//                                it.forEach { nodePlugin ->
+//                                    if (nodePlugin.name == "opensearch-notifications") {
+//                                        isInstalled = true
+//                                    }
+//                                }
+//                            }
+//                    }
+//
+//                    override fun onFailure(e: Exception) {
+//                        logger.warn("Failed sweeping nodes for ISM plugin versions: $e")
+//                        flag = false
+//                    }
+//                }
+//            )
+//
+//
 //        }
     }
 }

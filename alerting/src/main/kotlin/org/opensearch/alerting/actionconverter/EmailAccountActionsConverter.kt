@@ -60,7 +60,9 @@ class EmailAccountActionsConverter {
             return GetNotificationConfigRequest(configIds, 0, 1, null, null, emptyMap())
         }
 
-        fun convertGetNotificationConfigResponseToGetEmailAccountResponse(response: GetNotificationConfigResponse): GetEmailAccountResponse {
+        fun convertGetNotificationConfigResponseToGetEmailAccountResponse(
+            response: GetNotificationConfigResponse
+        ): GetEmailAccountResponse {
             val searchResult = response.searchResult
             if (searchResult.totalHits == 0L) throw OpenSearchStatusException("Email Account not found.", RestStatus.NOT_FOUND)
             val notificationConfigInfo = searchResult.objectList[0]
@@ -77,12 +79,15 @@ class EmailAccountActionsConverter {
                 smtpAccount.port,
                 methodType,
                 null,
-                null)
+                null
+            )
 
             return GetEmailAccountResponse(notificationConfigInfo.configId, EmailAccount.NO_VERSION, 0L, 0L, RestStatus.OK, emailAccount)
         }
 
-        fun convertIndexEmailAccountRequestToCreateNotificationConfigRequest(request: IndexEmailAccountRequest): CreateNotificationConfigRequest {
+        fun convertIndexEmailAccountRequestToCreateNotificationConfigRequest(
+            request: IndexEmailAccountRequest
+        ): CreateNotificationConfigRequest {
             val emailAccount = request.emailAccount
             val methodType = convertAlertingToNotificationMethodType(emailAccount.method)
             val smtpAccount = SmtpAccount(emailAccount.host, emailAccount.port, methodType, emailAccount.email)
@@ -97,7 +102,10 @@ class EmailAccountActionsConverter {
             return CreateNotificationConfigRequest(notificationConfig, null)
         }
 
-        fun convertCreateNotificationConfigResponseToIndexEmailAccountResponse(createResponse: CreateNotificationConfigResponse, getResponse: GetNotificationConfigResponse?): IndexEmailAccountResponse {
+        fun convertCreateNotificationConfigResponseToIndexEmailAccountResponse(
+            createResponse: CreateNotificationConfigResponse,
+            getResponse: GetNotificationConfigResponse?
+        ): IndexEmailAccountResponse {
             val getEmailResponse = if (getResponse != null) {
                 convertGetNotificationConfigResponseToGetEmailAccountResponse(getResponse)
             } else {
@@ -108,12 +116,17 @@ class EmailAccountActionsConverter {
             return IndexEmailAccountResponse(createResponse.configId, 0L, 0L, 0L, RestStatus.OK, emailAccount)
         }
 
-        fun convertIndexEmailAccountRequestToUpdateNotificationConfigRequest(request: IndexEmailAccountRequest): UpdateNotificationConfigRequest {
+        fun convertIndexEmailAccountRequestToUpdateNotificationConfigRequest(
+            request: IndexEmailAccountRequest
+        ): UpdateNotificationConfigRequest {
             val notificationConfig = convertEmailAccountToNotificationConfig(request.emailAccount)
             return UpdateNotificationConfigRequest(request.emailAccountID, notificationConfig)
         }
 
-        fun convertUpdateNotificationConfigResponseToIndexEmailAccountResponse(createResponse: UpdateNotificationConfigResponse, getResponse: GetNotificationConfigResponse?): IndexEmailAccountResponse {
+        fun convertUpdateNotificationConfigResponseToIndexEmailAccountResponse(
+            createResponse: UpdateNotificationConfigResponse,
+            getResponse: GetNotificationConfigResponse?
+        ): IndexEmailAccountResponse {
             val getEmailResponse = if (getResponse != null) {
                 convertGetNotificationConfigResponseToGetEmailAccountResponse(getResponse)
             } else {
@@ -124,7 +137,9 @@ class EmailAccountActionsConverter {
             return IndexEmailAccountResponse(createResponse.configId, 0L, 0L, 0L, RestStatus.OK, emailAccount)
         }
 
-        fun convertDeleteEmailAccountRequestToDeleteNotificationConfigRequest(request: DeleteEmailAccountRequest): DeleteNotificationConfigRequest {
+        fun convertDeleteEmailAccountRequestToDeleteNotificationConfigRequest(
+            request: DeleteEmailAccountRequest
+        ): DeleteNotificationConfigRequest {
             val configIds: Set<String> = setOf(request.emailAccountID)
 
             return DeleteNotificationConfigRequest(configIds)

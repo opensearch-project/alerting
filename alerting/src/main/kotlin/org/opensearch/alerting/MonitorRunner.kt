@@ -584,8 +584,18 @@ class MonitorRunner(
             }
             if (!dryrun) {
                 withContext(Dispatchers.IO) {
-                    val getNotificationConfigRequest = GetNotificationConfigRequest(setOf(action.destinationId), 0, 1, null, null, emptyMap())
-                    val getNotificationResponse = NotificationAPIUtils.getNotificationConfig(client as NodeClient, getNotificationConfigRequest)
+                    val getNotificationConfigRequest = GetNotificationConfigRequest(
+                        setOf(action.destinationId),
+                        0,
+                        1,
+                        null,
+                        null,
+                        emptyMap()
+                    )
+                    val getNotificationResponse = NotificationAPIUtils.getNotificationConfig(
+                        client as NodeClient,
+                        getNotificationConfigRequest
+                    )
                     val getDestinationResponse = convertGetNotificationConfigResponseToGetDestinationsResponse(getNotificationResponse)
                     val destination = getDestinationResponse.destinations[0]
                     if (!destination.isAllowed(allowList)) {
@@ -594,9 +604,6 @@ class MonitorRunner(
                     val title = if (actionOutput[SUBJECT] != null) actionOutput[SUBJECT]!! else ""
                     val eventSource = EventSource(title, action.destinationId, Feature.ALERTING)
                     val channelMessage = ChannelMessage(actionOutput[MESSAGE]!!, null, null)
-                    logger.info("Destination to send to: $destination")
-                    logger.info("Eventsource used: ${eventSource.feature}, ${eventSource.referenceId}, ${eventSource.title}, ${eventSource.severity}, ${eventSource.tags}")
-                    logger.info("channelMessage used: html description: ${channelMessage.htmlDescription}, text description: ${channelMessage.textDescription}")
                     val sendRequest = SendNotificationRequest(eventSource, channelMessage, listOf(action.destinationId), null)
                     actionOutput[MESSAGE_ID] = NotificationAPIUtils.sendNotification(client as NodeClient, sendRequest).notificationId
                 }

@@ -426,7 +426,10 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
     fun `test monitor with one bad action and one good action`() {
         if (isNotificationPluginInstalled()) {
-            val goodAction = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
+            val goodAction = randomAction(
+                template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+                destinationId = createDestination().id
+            )
             val syntaxErrorAction = randomAction(
                 name = "bad syntax",
                 template = randomTemplateScript("{{foo"),

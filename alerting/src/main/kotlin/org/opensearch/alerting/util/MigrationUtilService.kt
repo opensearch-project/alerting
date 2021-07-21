@@ -57,8 +57,7 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.fetch.subphase.FetchSourceContext
 import java.time.Instant
 
-class MigrationUtilService(
-) {
+class MigrationUtilService {
 
     companion object {
 
@@ -94,7 +93,6 @@ class MigrationUtilService(
                 logger.info("Migrated ${migratedDestinations.size} destinations")
                 val failedDeletedDestinations = deleteOldDestinations(client, migratedDestinations)
                 logger.info("Failed to delete ${failedDeletedDestinations.size} destinations from migration process cleanup")
-
             } finally {
                 runningLock = false
             }
@@ -129,7 +127,10 @@ class MigrationUtilService(
             return failedToDeleteDestinations
         }
 
-        private fun createNotificationChannelIfNotExists(client: NodeClient, notificationConfigInfoList: List<NotificationConfigInfo>): List<String> {
+        private fun createNotificationChannelIfNotExists(
+            client: NodeClient,
+            notificationConfigInfoList: List<NotificationConfigInfo>
+        ): List<String> {
             val migratedNotificationConfigs = mutableListOf<String>()
             notificationConfigInfoList.forEach {
                 val createNotificationConfigRequest = CreateNotificationConfigRequest(it.notificationConfig, it.configId)
@@ -141,73 +142,16 @@ class MigrationUtilService(
                     if (e.message?.contains("version conflict, document already exists") == true) {
                         migratedNotificationConfigs.add(it.configId)
                     } else {
-                        logger.warn("Failed to migrate over Destination ${it.configId} because failed to create channel in Notification plugin.", e)
+                        logger.warn(
+                            "Failed to migrate over Destination ${it.configId} because failed to " +
+                                "create channel in Notification plugin.",
+                            e
+                        )
                     }
                 }
             }
             return migratedNotificationConfigs
-
         }
-
-//        private fun retrieveDestinations(client: NodeClient): List<Destination> {
-//            var start = 0
-//            val size = 100
-//            val destinations = mutableListOf<Destination>()
-//            var hasMoreResults = true
-//
-//            while (hasMoreResults) {
-//                val searchSourceBuilder = SearchSourceBuilder()
-//                    .size(size)
-//                    .from(start)
-//                    .fetchSource(FetchSourceContext(true, Strings.EMPTY_ARRAY, Strings.EMPTY_ARRAY))
-//                    .seqNoAndPrimaryTerm(true)
-//                    .version(true)
-//                val queryBuilder = QueryBuilders.boolQuery()
-//                    .must(QueryBuilders.existsQuery("destination"))
-//                searchSourceBuilder.query(queryBuilder)
-//
-//                val searchRequest = SearchRequest()
-//                    .source(searchSourceBuilder)
-//                    .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
-//                var finishedExecution = false
-//                client.search(
-//                    searchRequest,
-//                    object : ActionListener<SearchResponse> {
-//                        override fun onResponse(response: SearchResponse) {
-//                            if (response.hits.hits.isEmpty()) {
-//                                hasMoreResults = false
-//                            }
-//                            logger.info("Getting destinations for migration and found ${response.hits.totalHits?.value?.toInt()}")
-//                            for (hit in response.hits) {
-//                                val id = hit.id
-//                                val version = hit.version
-//                                val seqNo = hit.seqNo.toInt()
-//                                val primaryTerm = hit.primaryTerm.toInt()
-//                                val xcp = XContentFactory.xContent(XContentType.JSON)
-//                                    .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
-//                                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-//                                XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
-//                                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-//                                destinations.add(Destination.parse(xcp, id, version, seqNo, primaryTerm))
-//                            }
-//                            logger.info("Getting destinations for migration and got ${destinations.size}")
-//                            finishedExecution = true
-//                        }
-//
-//                        override fun onFailure(t: Exception) {
-//                            hasMoreResults = false
-//                            finishedExecution = true
-//                        }
-//                    }
-//                )
-//                while (!finishedExecution) {
-//                    Thread.sleep(100)
-//                }
-//                start += size
-//            }
-//            logger.info("Returning these many destinations: ${destinations.size} with start being at: ")
-//            return destinations
-//        }
 
         private fun retrieveDestinationsToMigrate(client: NodeClient): List<NotificationConfigInfo> {
             var start = 0
@@ -253,12 +197,26 @@ class MigrationUtilService(
                                     XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
                                     XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
                                     XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                                    val destination = Destination.parse(xcp, hit.id, hit.version, hit.seqNo.toInt(), hit.primaryTerm.toInt())
+                                    val destination = Destination.parse(
+                                        xcp,
+                                        hit.id,
+                                        hit.version,
+                                        hit.seqNo.toInt(),
+                                        hit.primaryTerm.toInt()
+                                    )
                                     notificationConfig = convertDestinationToNotificationConfig(destination)
                                 }
 
                                 if (notificationConfig != null)
-                                    notificationConfigInfoList.add(NotificationConfigInfo(hit.id, Instant.now(), Instant.now(), "", notificationConfig))
+                                    notificationConfigInfoList.add(
+                                        NotificationConfigInfo(
+                                            hit.id,
+                                            Instant.now(),
+                                            Instant.now(),
+                                            "",
+                                            notificationConfig
+                                        )
+                                    )
                             }
                             finishedExecution = true
                         }
@@ -277,5 +235,4 @@ class MigrationUtilService(
             return notificationConfigInfoList
         }
     }
-
 }

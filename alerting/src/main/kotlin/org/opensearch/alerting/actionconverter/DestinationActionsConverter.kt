@@ -65,14 +65,14 @@ import java.net.URI
 import java.net.URISyntaxException
 import java.util.EnumSet
 
-//TODO: Force destinations to have https url if Notification plugin wont support it
+// TODO: Force destinations to have https url if Notification plugin wont support it
 class DestinationActionsConverter {
 
     companion object {
         private val logger = LogManager.getLogger(DestinationActionsConverter::class)
 
         fun convertGetDestinationsRequestToGetNotificationConfigRequest(request: GetDestinationsRequest): GetNotificationConfigRequest {
-            val configIds: Set<String> = if(request.destinationId != null) setOf(request.destinationId) else emptySet()
+            val configIds: Set<String> = if (request.destinationId != null) setOf(request.destinationId) else emptySet()
             val table = request.table
             val fromIndex = table.startIndex
             val maxItems = table.size
@@ -82,7 +82,9 @@ class DestinationActionsConverter {
             return GetNotificationConfigRequest(configIds, fromIndex, maxItems, null, sortOrder, filterParams)
         }
 
-        fun convertGetNotificationConfigResponseToGetDestinationsResponse(response: GetNotificationConfigResponse?): GetDestinationsResponse {
+        fun convertGetNotificationConfigResponseToGetDestinationsResponse(
+            response: GetNotificationConfigResponse?
+        ): GetDestinationsResponse {
             if (response == null) throw OpenSearchStatusException("Destination cannot be found.", RestStatus.NOT_FOUND)
             val searchResult = response.searchResult
             if (searchResult.objectList.isEmpty()) throw OpenSearchStatusException("Destinations not found.", RestStatus.NOT_FOUND)
@@ -98,14 +100,19 @@ class DestinationActionsConverter {
             return GetDestinationsResponse(RestStatus.OK, searchResult.totalHits.toInt(), destinations)
         }
 
-        fun convertIndexDestinationRequestToCreateNotificationConfigRequest(request: IndexDestinationRequest): CreateNotificationConfigRequest {
+        fun convertIndexDestinationRequestToCreateNotificationConfigRequest(
+            request: IndexDestinationRequest
+        ): CreateNotificationConfigRequest {
             val notificationConfig = convertDestinationToNotificationConfig(request.destination)
                 ?: throw OpenSearchStatusException("Destination cannot be created.", RestStatus.NOT_FOUND)
             val configId = if (request.destinationId == "") null else request.destinationId
             return CreateNotificationConfigRequest(notificationConfig, configId)
         }
 
-        fun convertCreateNotificationConfigResponseToIndexDestinationResponse(createResponse: CreateNotificationConfigResponse, getResponse: GetNotificationConfigResponse?): IndexDestinationResponse {
+        fun convertCreateNotificationConfigResponseToIndexDestinationResponse(
+            createResponse: CreateNotificationConfigResponse,
+            getResponse: GetNotificationConfigResponse?
+        ): IndexDestinationResponse {
             val destination = if (getResponse != null) {
                 convertGetNotificationConfigResponseToGetDestinationsResponse(getResponse).destinations[0]
             } else {
@@ -115,13 +122,18 @@ class DestinationActionsConverter {
             return IndexDestinationResponse(createResponse.configId, 0L, 0L, 0L, RestStatus.OK, destination)
         }
 
-        fun convertIndexDestinationRequestToUpdateNotificationConfigRequest(request: IndexDestinationRequest): UpdateNotificationConfigRequest {
+        fun convertIndexDestinationRequestToUpdateNotificationConfigRequest(
+            request: IndexDestinationRequest
+        ): UpdateNotificationConfigRequest {
             val notificationConfig = convertDestinationToNotificationConfig(request.destination)
                 ?: throw OpenSearchStatusException("Destination cannot be created.", RestStatus.NOT_FOUND)
             return UpdateNotificationConfigRequest(request.destinationId, notificationConfig)
         }
 
-        fun convertUpdateNotificationConfigResponseToIndexDestinationResponse(updateResponse: UpdateNotificationConfigResponse, getResponse: GetNotificationConfigResponse?): IndexDestinationResponse {
+        fun convertUpdateNotificationConfigResponseToIndexDestinationResponse(
+            updateResponse: UpdateNotificationConfigResponse,
+            getResponse: GetNotificationConfigResponse?
+        ): IndexDestinationResponse {
             val destination = if (getResponse != null) {
                 convertGetNotificationConfigResponseToGetDestinationsResponse(getResponse).destinations[0]
             } else {
@@ -131,7 +143,9 @@ class DestinationActionsConverter {
             return IndexDestinationResponse(updateResponse.configId, 0L, 0L, 0L, RestStatus.OK, destination)
         }
 
-        fun convertDeleteDestinationRequestToDeleteNotificationConfigRequest(request: DeleteDestinationRequest): DeleteNotificationConfigRequest {
+        fun convertDeleteDestinationRequestToDeleteNotificationConfigRequest(
+            request: DeleteDestinationRequest
+        ): DeleteNotificationConfigRequest {
             val configIds: Set<String> = setOf(request.destinationId)
             return DeleteNotificationConfigRequest(configIds)
         }
@@ -147,18 +161,44 @@ class DestinationActionsConverter {
 
         private fun convertNotificationConfigToDestination(notificationConfigInfo: NotificationConfigInfo): Destination? {
             val notificationConfig = notificationConfigInfo.notificationConfig
-            when(notificationConfig.configType) {
+            when (notificationConfig.configType) {
                 ConfigType.SLACK -> {
                     val slack = notificationConfig.configData as Slack
                     val alertSlack = org.opensearch.alerting.model.destination.Slack(slack.url)
-                    return Destination(notificationConfigInfo.configId, Destination.NO_VERSION, IndexUtils.NO_SCHEMA_VERSION, Destination.NO_SEQ_NO,
-                        Destination.NO_PRIMARY_TERM, DestinationType.SLACK, notificationConfig.name, null, notificationConfigInfo.lastUpdatedTime, null, alertSlack, null, null)
+                    return Destination(
+                        notificationConfigInfo.configId,
+                        Destination.NO_VERSION,
+                        IndexUtils.NO_SCHEMA_VERSION,
+                        Destination.NO_SEQ_NO,
+                        Destination.NO_PRIMARY_TERM,
+                        DestinationType.SLACK,
+                        notificationConfig.name,
+                        null,
+                        notificationConfigInfo.lastUpdatedTime,
+                        null,
+                        alertSlack,
+                        null,
+                        null
+                    )
                 }
                 ConfigType.CHIME -> {
                     val chime = notificationConfig.configData as Chime
                     val alertChime = org.opensearch.alerting.model.destination.Chime(chime.url)
-                    return Destination(notificationConfigInfo.configId, Destination.NO_VERSION, IndexUtils.NO_SCHEMA_VERSION, Destination.NO_SEQ_NO,
-                        Destination.NO_PRIMARY_TERM, DestinationType.CHIME, notificationConfig.name, null, notificationConfigInfo.lastUpdatedTime, alertChime, null, null, null)
+                    return Destination(
+                        notificationConfigInfo.configId,
+                        Destination.NO_VERSION,
+                        IndexUtils.NO_SCHEMA_VERSION,
+                        Destination.NO_SEQ_NO,
+                        Destination.NO_PRIMARY_TERM,
+                        DestinationType.CHIME,
+                        notificationConfig.name,
+                        null,
+                        notificationConfigInfo.lastUpdatedTime,
+                        alertChime,
+                        null,
+                        null,
+                        null
+                    )
                 }
                 ConfigType.WEBHOOK -> {
                     val webhook = notificationConfig.configData as Webhook
@@ -169,9 +209,33 @@ class DestinationActionsConverter {
                     val method: String? = null
                     val username: String? = null
                     val password: String? = null
-                    val alertWebhook = CustomWebhook(webhook.url, scheme ,host, port, path, method, emptyMap(), webhook.headerParams, username, password)
-                    return Destination(notificationConfigInfo.configId, Destination.NO_VERSION, IndexUtils.NO_SCHEMA_VERSION, Destination.NO_SEQ_NO,
-                        Destination.NO_PRIMARY_TERM, DestinationType.CUSTOM_WEBHOOK, notificationConfig.name, null, notificationConfigInfo.lastUpdatedTime, null, null, alertWebhook, null)
+                    val alertWebhook = CustomWebhook(
+                        webhook.url,
+                        scheme,
+                        host,
+                        port,
+                        path,
+                        method,
+                        emptyMap(),
+                        webhook.headerParams,
+                        username,
+                        password
+                    )
+                    return Destination(
+                        notificationConfigInfo.configId,
+                        Destination.NO_VERSION,
+                        IndexUtils.NO_SCHEMA_VERSION,
+                        Destination.NO_SEQ_NO,
+                        Destination.NO_PRIMARY_TERM,
+                        DestinationType.CUSTOM_WEBHOOK,
+                        notificationConfig.name,
+                        null,
+                        notificationConfigInfo.lastUpdatedTime,
+                        null,
+                        null,
+                        alertWebhook,
+                        null
+                    )
                 }
                 ConfigType.EMAIL -> {
                     val email: Email = notificationConfig.configData as Email
@@ -185,8 +249,21 @@ class DestinationActionsConverter {
                         recipients.plus(recipient)
                     }
                     val alertEmail = org.opensearch.alerting.model.destination.email.Email(email.emailAccountID, recipients)
-                    return Destination(notificationConfigInfo.configId, Destination.NO_VERSION, IndexUtils.NO_SCHEMA_VERSION, Destination.NO_SEQ_NO,
-                        Destination.NO_PRIMARY_TERM, DestinationType.EMAIL, notificationConfig.name, null, notificationConfigInfo.lastUpdatedTime, null, null, null, alertEmail)
+                    return Destination(
+                        notificationConfigInfo.configId,
+                        Destination.NO_VERSION,
+                        IndexUtils.NO_SCHEMA_VERSION,
+                        Destination.NO_SEQ_NO,
+                        Destination.NO_PRIMARY_TERM,
+                        DestinationType.EMAIL,
+                        notificationConfig.name,
+                        null,
+                        notificationConfigInfo.lastUpdatedTime,
+                        null,
+                        null,
+                        null,
+                        alertEmail
+                    )
                 }
                 ConfigType.SMTP_ACCOUNT -> {
                     return null
@@ -195,14 +272,17 @@ class DestinationActionsConverter {
                     return null
                 }
                 else -> {
-                    logger.warn("failed config match for type ${notificationConfig.configType} and configId ${notificationConfigInfo.configId}")
+                    logger.warn(
+                        "Failed config match for type ${notificationConfig.configType} and configId " +
+                            notificationConfigInfo.configId
+                    )
                     return null
                 }
             }
         }
 
         fun convertDestinationToNotificationConfig(destination: Destination): NotificationConfig? {
-            when(destination.type) {
+            when (destination.type) {
                 DestinationType.CHIME -> {
                     val alertChime = destination.chime
                     val chime = if (alertChime == null) null else Chime(alertChime!!.url)
@@ -231,12 +311,14 @@ class DestinationActionsConverter {
                     val alertWebhook = destination.customWebhook
                     var webhook: Webhook? = null
                     if (alertWebhook != null) {
-                        val uri = buildUri(alertWebhook.url,
+                        val uri = buildUri(
+                            alertWebhook.url,
                             alertWebhook.scheme,
                             alertWebhook.host,
                             alertWebhook.port,
                             alertWebhook.path,
-                            alertWebhook.queryParams).toString()
+                            alertWebhook.queryParams
+                        ).toString()
                         webhook = Webhook(uri, alertWebhook.headerParams)
                     }
                     val description = "Webhook destination created from the Alerting plugin"
@@ -273,8 +355,14 @@ class DestinationActionsConverter {
             return null
         }
 
-        fun buildUri(endpoint: String?, scheme: String?, host: String?,
-                     port: Int, path: String?, queryParams: Map<String, String>): URI? {
+        fun buildUri(
+            endpoint: String?,
+            scheme: String?,
+            host: String?,
+            port: Int,
+            path: String?,
+            queryParams: Map<String, String>
+        ): URI? {
             var scheme = scheme
             return try {
                 if (Strings.isNullOrEmpty(endpoint)) {

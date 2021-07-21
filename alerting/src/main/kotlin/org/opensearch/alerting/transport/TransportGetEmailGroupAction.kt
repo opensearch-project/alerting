@@ -39,13 +39,12 @@ import org.opensearch.alerting.actionconverter.EmailGroupActionsConverter.Compan
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.DestinationType
+import org.opensearch.alerting.util.NotificationAPIUtils
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.commons.notifications.NotificationsPluginInterface
-import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -87,16 +86,16 @@ class TransportGetEmailGroupAction @Inject constructor(
             return
         }
 
-        NotificationsPluginInterface.getNotificationConfig(client, convertGetEmailGroupRequestToGetNotificationConfigRequest(getEmailGroupRequest),
-            object : ActionListener<GetNotificationConfigResponse> {
-                override fun onResponse(response: GetNotificationConfigResponse) {
-                    val getEmailGroupResponse = convertGetNotificationConfigResponseToGetEmailGroupResponse(response)
-                    actionListener.onResponse(getEmailGroupResponse)
-                }
-                override fun onFailure(e: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(e))
-                }
-            }
-        )
+        try {
+            val getNotificationConfigResponse = NotificationAPIUtils.getNotificationConfig(
+                client,
+                convertGetEmailGroupRequestToGetNotificationConfigRequest(getEmailGroupRequest)
+            )
+            val getEmailGroupResponse = convertGetNotificationConfigResponseToGetEmailGroupResponse(getNotificationConfigResponse)
+            actionListener.onResponse(getEmailGroupResponse)
+        } catch (e: Exception) {
+            actionListener.onFailure(AlertingException.wrap(e))
+            return
+        }
     }
 }

@@ -78,7 +78,10 @@ class TransportDeleteEmailAccountAction @Inject constructor(
         }
 
         try {
-            val deleteNotificationConfigResponse = NotificationAPIUtils.deleteNotificationConfig(client, convertDeleteEmailAccountRequestToDeleteNotificationConfigRequest(request))
+            val deleteNotificationConfigResponse = NotificationAPIUtils.deleteNotificationConfig(
+                client,
+                convertDeleteEmailAccountRequestToDeleteNotificationConfigRequest(request)
+            )
             actionListener.onResponse(convertDeleteNotificationConfigResponseToDeleteResponse(deleteNotificationConfigResponse))
         } catch (e: Exception) {
             actionListener.onFailure(AlertingException.wrap(e))

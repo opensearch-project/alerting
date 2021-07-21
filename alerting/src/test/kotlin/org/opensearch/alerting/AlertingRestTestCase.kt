@@ -37,7 +37,6 @@ import org.junit.rules.DisableOnDebug
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
-import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertDestinationToNotificationConfig
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
@@ -67,11 +66,6 @@ import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.common.xcontent.json.JsonXContent.jsonXContent
-import org.opensearch.commons.notifications.model.Chime
-import org.opensearch.commons.notifications.model.ConfigType
-import org.opensearch.commons.notifications.model.NotificationConfig
-import org.opensearch.commons.notifications.model.Slack
-import org.opensearch.commons.notifications.model.Webhook
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.SearchModule
 import java.net.URLEncoder

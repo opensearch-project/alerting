@@ -51,7 +51,7 @@ import org.opensearch.transport.TransportService
 
 private val log = LogManager.getLogger(TransportDeleteDestinationAction::class.java)
 
-//TODO: MAke sure to throw exception that notification plugin is not installed
+// TODO: MAke sure to throw exception that notification plugin is not installed
 class TransportDeleteDestinationAction @Inject constructor(
     transportService: TransportService,
     val client: NodeClient,
@@ -79,12 +79,14 @@ class TransportDeleteDestinationAction @Inject constructor(
         }
 
         try {
-            val deleteNotificationConfigResponse = NotificationAPIUtils.deleteNotificationConfig(client, convertDeleteDestinationRequestToDeleteNotificationConfigRequest(request))
+            val deleteNotificationConfigResponse = NotificationAPIUtils.deleteNotificationConfig(
+                client,
+                convertDeleteDestinationRequestToDeleteNotificationConfigRequest(request)
+            )
             actionListener.onResponse(convertDeleteNotificationConfigResponseToDeleteResponse(deleteNotificationConfigResponse))
         } catch (e: Exception) {
             log.error("Cannot delete destination due to: ${e.message}", e)
             actionListener.onFailure(AlertingException.wrap(e))
         }
-
     }
 }

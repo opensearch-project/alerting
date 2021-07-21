@@ -288,7 +288,9 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             val updatedRecipient = Recipient(type = Recipient.RecipientType.EMAIL_GROUP, emailGroupID = "testID", email = null)
             val updatedEmail = Email("testEmailAccountID", listOf(updatedRecipient))
             Assert.assertNotNull("Email object should not be null", updatedDestination.email)
-            updatedDestination = updateDestination(destination.copy(type = DestinationType.EMAIL, name = "updatedName", email = updatedEmail))
+            updatedDestination = updateDestination(
+                destination.copy(type = DestinationType.EMAIL, name = "updatedName", email = updatedEmail)
+            )
             assertEquals(
                 "Incorrect email destination recipient type after update", updatedDestination.email?.recipients?.get(0)?.type,
                 Recipient.RecipientType.EMAIL_GROUP

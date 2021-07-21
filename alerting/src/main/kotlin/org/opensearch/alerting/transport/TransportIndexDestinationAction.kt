@@ -81,7 +81,10 @@ class TransportIndexDestinationAction @Inject constructor(
             val configId: String
             if (request.method == RestRequest.Method.PUT) {
 
-                notificationResponse = NotificationAPIUtils.updateNotificationConfig(client, convertIndexDestinationRequestToUpdateNotificationConfigRequest(request))
+                notificationResponse = NotificationAPIUtils.updateNotificationConfig(
+                    client,
+                    convertIndexDestinationRequestToUpdateNotificationConfigRequest(request)
+                )
                 configId = notificationResponse.configId
             } else {
                 val createRequest = convertIndexDestinationRequestToCreateNotificationConfigRequest(request)
@@ -92,14 +95,23 @@ class TransportIndexDestinationAction @Inject constructor(
             val getNotificationConfigRequest = GetNotificationConfigRequest(setOf(configId!!), 0, 1, null, null, emptyMap())
             val getNotificationConfigResponse = NotificationAPIUtils.getNotificationConfig(client, getNotificationConfigRequest)
             if (request.method == RestRequest.Method.PUT) {
-                actionListener.onResponse(convertUpdateNotificationConfigResponseToIndexDestinationResponse(notificationResponse as UpdateNotificationConfigResponse, getNotificationConfigResponse))
+                actionListener.onResponse(
+                    convertUpdateNotificationConfigResponseToIndexDestinationResponse(
+                        notificationResponse as UpdateNotificationConfigResponse,
+                        getNotificationConfigResponse
+                    )
+                )
             } else {
-                actionListener.onResponse(convertCreateNotificationConfigResponseToIndexDestinationResponse(notificationResponse as CreateNotificationConfigResponse, getNotificationConfigResponse))
+                actionListener.onResponse(
+                    convertCreateNotificationConfigResponseToIndexDestinationResponse(
+                        notificationResponse as CreateNotificationConfigResponse,
+                        getNotificationConfigResponse
+                    )
+                )
             }
         } catch (e: Exception) {
             log.error("Failed to index destination due to", e)
             actionListener.onFailure(AlertingException.wrap(e))
         }
     }
-
 }

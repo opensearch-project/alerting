@@ -43,7 +43,7 @@ import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
 import org.opensearch.commons.authuser.User
 import java.io.IOException
 import java.time.Instant
-import java.util.*
+import java.util.Locale
 
 /**
  * A value object that represents a Destination message.
