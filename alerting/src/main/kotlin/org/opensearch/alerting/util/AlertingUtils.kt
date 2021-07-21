@@ -26,10 +26,8 @@
 
 package org.opensearch.alerting.util
 
-import inet.ipaddr.IPAddressString
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
-import org.opensearch.alerting.destination.message.BaseMessage
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.commons.authuser.User
@@ -56,19 +54,19 @@ fun isValidEmail(email: String): Boolean {
 /** Allowed Destinations are ones that are specified in the [DestinationSettings.ALLOW_LIST] setting. */
 fun Destination.isAllowed(allowList: List<String>): Boolean = allowList.contains(this.type.value)
 
-fun BaseMessage.isHostInDenylist(networks: List<String>): Boolean {
-    if (this.url != null || this.uri.host != null) {
-        val ipStr = IPAddressString(this.uri.host)
-        for (network in networks) {
-            val netStr = IPAddressString(network)
-            if (netStr.contains(ipStr)) {
-                return true
-            }
-        }
-    }
-
-    return false
-}
+//fun BaseMessage.isHostInDenylist(networks: List<String>): Boolean {
+//    if (this.url != null || this.uri.host != null) {
+//        val ipStr = IPAddressString(this.uri.host)
+//        for (network in networks) {
+//            val netStr = IPAddressString(network)
+//            if (netStr.contains(ipStr)) {
+//                return true
+//            }
+//        }
+//    }
+//
+//    return false
+//}
 
 /**
  1. If filterBy is enabled

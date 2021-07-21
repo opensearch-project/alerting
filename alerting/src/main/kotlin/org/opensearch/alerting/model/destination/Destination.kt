@@ -27,13 +27,6 @@
 package org.opensearch.alerting.model.destination
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.alerting.destination.Notification
-import org.opensearch.alerting.destination.message.BaseMessage
-import org.opensearch.alerting.destination.message.ChimeMessage
-import org.opensearch.alerting.destination.message.CustomWebhookMessage
-import org.opensearch.alerting.destination.message.EmailMessage
-import org.opensearch.alerting.destination.message.SlackMessage
-import org.opensearch.alerting.destination.response.DestinationResponse
 import org.opensearch.alerting.elasticapi.convertToMap
 import org.opensearch.alerting.elasticapi.instant
 import org.opensearch.alerting.elasticapi.optionalTimeField
@@ -41,7 +34,6 @@ import org.opensearch.alerting.elasticapi.optionalUserField
 import org.opensearch.alerting.model.destination.email.Email
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
-import org.opensearch.alerting.util.isHostInDenylist
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.ToXContent
@@ -50,9 +42,8 @@ import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
 import org.opensearch.commons.authuser.User
 import java.io.IOException
-import java.net.InetAddress
 import java.time.Instant
-import java.util.Locale
+import java.util.*
 
 /**
  * A value object that represents a Destination message.
@@ -254,70 +245,70 @@ data class Destination(
         }
     }
 
-    @Throws(IOException::class)
-    fun publish(
-        compiledSubject: String?,
-        compiledMessage: String,
-        destinationCtx: DestinationContext,
-        denyHostRanges: List<String>
-    ): String {
-
-        val destinationMessage: BaseMessage
-        val responseContent: String
-        val responseStatusCode: Int
-        when (type) {
-            DestinationType.CHIME -> {
-                val messageContent = chime?.constructMessageContent(compiledSubject, compiledMessage)
-                destinationMessage = ChimeMessage.Builder(name)
-                    .withUrl(chime?.url)
-                    .withMessage(messageContent)
-                    .build()
-            }
-            DestinationType.SLACK -> {
-                val messageContent = slack?.constructMessageContent(compiledSubject, compiledMessage)
-                destinationMessage = SlackMessage.Builder(name)
-                    .withUrl(slack?.url)
-                    .withMessage(messageContent)
-                    .build()
-            }
-            DestinationType.CUSTOM_WEBHOOK -> {
-                destinationMessage = CustomWebhookMessage.Builder(name)
-                    .withUrl(customWebhook?.url)
-                    .withScheme(customWebhook?.scheme)
-                    .withHost(customWebhook?.host)
-                    .withPort(customWebhook?.port)
-                    .withPath(customWebhook?.path)
-                    .withMethod(customWebhook?.method)
-                    .withQueryParams(customWebhook?.queryParams)
-                    .withHeaderParams(customWebhook?.headerParams)
-                    .withMessage(compiledMessage).build()
-            }
-            DestinationType.EMAIL -> {
-                val emailAccount = destinationCtx.emailAccount
-                destinationMessage = EmailMessage.Builder(name)
-                    .withHost(emailAccount?.host)
-                    .withPort(emailAccount?.port)
-                    .withMethod(emailAccount?.method?.value)
-                    .withUserName(emailAccount?.username)
-                    .withPassword(emailAccount?.password)
-                    .withFrom(emailAccount?.email)
-                    .withRecipients(destinationCtx.recipients)
-                    .withSubject(compiledSubject)
-                    .withMessage(compiledMessage).build()
-            }
-            DestinationType.TEST_ACTION -> {
-                return "test action"
-            }
-        }
-
-        validateDestinationUri(destinationMessage, denyHostRanges)
-        val response = Notification.publish(destinationMessage) as org.opensearch.alerting.destination.response.DestinationResponse
-        responseContent = response.responseContent
-        responseStatusCode = response.statusCode
-
-        logger.info("Message published for action name: $name, messageid: $responseContent, statuscode: $responseStatusCode")
-        return responseContent
-    }
+//    @Throws(IOException::class)
+//    fun publish(
+//        compiledSubject: String?,
+//        compiledMessage: String,
+//        destinationCtx: DestinationContext,
+//        denyHostRanges: List<String>
+//    ): String {
+//
+//        val destinationMessage: BaseMessage
+//        val responseContent: String
+//        val responseStatusCode: Int
+//        when (type) {
+//            DestinationType.CHIME -> {
+//                val messageContent = chime?.constructMessageContent(compiledSubject, compiledMessage)
+//                destinationMessage = ChimeMessage.Builder(name)
+//                    .withUrl(chime?.url)
+//                    .withMessage(messageContent)
+//                    .build()
+//            }
+//            DestinationType.SLACK -> {
+//                val messageContent = slack?.constructMessageContent(compiledSubject, compiledMessage)
+//                destinationMessage = SlackMessage.Builder(name)
+//                    .withUrl(slack?.url)
+//                    .withMessage(messageContent)
+//                    .build()
+//            }
+//            DestinationType.CUSTOM_WEBHOOK -> {
+//                destinationMessage = CustomWebhookMessage.Builder(name)
+//                    .withUrl(customWebhook?.url)
+//                    .withScheme(customWebhook?.scheme)
+//                    .withHost(customWebhook?.host)
+//                    .withPort(customWebhook?.port)
+//                    .withPath(customWebhook?.path)
+//                    .withMethod(customWebhook?.method)
+//                    .withQueryParams(customWebhook?.queryParams)
+//                    .withHeaderParams(customWebhook?.headerParams)
+//                    .withMessage(compiledMessage).build()
+//            }
+//            DestinationType.EMAIL -> {
+//                val emailAccount = destinationCtx.emailAccount
+//                destinationMessage = EmailMessage.Builder(name)
+//                    .withHost(emailAccount?.host)
+//                    .withPort(emailAccount?.port)
+//                    .withMethod(emailAccount?.method?.value)
+//                    .withUserName(emailAccount?.username)
+//                    .withPassword(emailAccount?.password)
+//                    .withFrom(emailAccount?.email)
+//                    .withRecipients(destinationCtx.recipients)
+//                    .withSubject(compiledSubject)
+//                    .withMessage(compiledMessage).build()
+//            }
+//            DestinationType.TEST_ACTION -> {
+//                return "test action"
+//            }
+//        }
+//
+//        validateDestinationUri(destinationMessage, denyHostRanges)
+//        val response = Notification.publish(destinationMessage) as org.opensearch.alerting.destination.response.DestinationResponse
+//        responseContent = response.responseContent
+//        responseStatusCode = response.statusCode
+//
+//        logger.info("Message published for action name: $name, messageid: $responseContent, statuscode: $responseStatusCode")
+//        return responseContent
+//    }
 
     fun constructResponseForDestinationType(type: DestinationType): Any {
         var content: Any? = null
@@ -334,13 +325,13 @@ data class Destination(
         return content
     }
 
-    private fun validateDestinationUri(destinationMessage: BaseMessage, denyHostRanges: List<String>) {
-        if (destinationMessage.isHostInDenylist(denyHostRanges)) {
-            logger.error(
-                "Host: {} resolves to: {} which is in denylist: {}.", destinationMessage.uri.host,
-                InetAddress.getByName(destinationMessage.uri.host), denyHostRanges
-            )
-            throw IOException("The destination address is invalid.")
-        }
-    }
+//    private fun validateDestinationUri(destinationMessage: BaseMessage, denyHostRanges: List<String>) {
+//        if (destinationMessage.isHostInDenylist(denyHostRanges)) {
+//            logger.error(
+//                "Host: {} resolves to: {} which is in denylist: {}.", destinationMessage.uri.host,
+//                InetAddress.getByName(destinationMessage.uri.host), denyHostRanges
+//            )
+//            throw IOException("The destination address is invalid.")
+//        }
+//    }
 }

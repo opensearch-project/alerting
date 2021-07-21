@@ -89,8 +89,6 @@ dependencies {
     compile "org.jetbrains:annotations:13.0"
 
     compile project(":alerting-core")
-    compile project(":alerting-notification")
-//    compile "com.amazon.opendistroforelasticsearch:opensearch-notifications:1.0.0.0-beta1-SNAPSHOT"
     implementation "com.github.seancfoley:ipaddress:5.3.3"
 
     testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlin_version}"
