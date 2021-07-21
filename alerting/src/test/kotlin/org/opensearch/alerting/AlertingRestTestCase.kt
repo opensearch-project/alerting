@@ -37,6 +37,7 @@ import org.junit.rules.DisableOnDebug
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
+import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertDestinationToNotificationConfig
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
@@ -66,6 +67,11 @@ import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.common.xcontent.json.JsonXContent.jsonXContent
+import org.opensearch.commons.notifications.model.Chime
+import org.opensearch.commons.notifications.model.ConfigType
+import org.opensearch.commons.notifications.model.NotificationConfig
+import org.opensearch.commons.notifications.model.Slack
+import org.opensearch.commons.notifications.model.Webhook
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.SearchModule
 import java.net.URLEncoder
@@ -121,6 +127,89 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
         return response
     }
+
+//    protected fun createDestination(destination: Destination = getTestDestination(), refresh: Boolean = true): Destination {
+//        val notificationConfig = convertDestinationToNotificationConfig(destination)
+//        val createRequestJsonString = generateCreateNotificationConfigRequest(notificationConfig!!)
+//
+//        val response = client().makeRequest(
+//            "POST",
+//            "$DESTINATION_BASE_URI?refresh=$refresh",
+//            emptyMap(),
+//            StringEntity(createRequestJsonString, APPLICATION_JSON)
+//        )
+//        assertEquals("Unable to create a new destination", RestStatus.CREATED, response.restStatus())
+//
+//
+//
+//        val destinationJson = jsonXContent.createParser(
+//            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+//            response.entity.content
+//        ).map()
+//        return destination.copy(
+//            id = destinationJson["_id"] as String,
+//            version = (destinationJson["_version"] as Int).toLong(),
+//            primaryTerm = destinationJson["_primary_term"] as Int
+//        )
+//    }
+
+//    protected fun generateCreateNotificationConfigRequest(notificationConfig: NotificationConfig): String {
+//        when(notificationConfig.configType) {
+//            ConfigType.SLACK -> {
+//                return """
+//                {
+//                    "config":{
+//                        "name":"${notificationConfig!!.name}",
+//                        "description":"channel for integ test",
+//                        "config_type":"slack",
+//                        "feature_list":[
+//                            "alerting"
+//                        ],
+//                        "is_enabled":true,
+//                        "slack":{"url":"${(notificationConfig.configData as Slack).url}"}
+//                    }
+//                }
+//                """.trimIndent()
+//            }
+//            ConfigType.CHIME -> {
+//                return """
+//                {
+//                    "config":{
+//                        "name":"${notificationConfig!!.name}",
+//                        "description":"channel for integ test",
+//                        "config_type":"chime",
+//                        "feature_list":[
+//                            "alerting"
+//                        ],
+//                        "is_enabled":true,
+//                        "chime":{"url":"${(notificationConfig.configData as Chime).url}"}
+//                    }
+//                }
+//                """.trimIndent()
+//            }
+//            ConfigType.WEBHOOK -> {
+//                return """
+//                {
+//                    "config":{
+//                        "name":"${notificationConfig!!.name}",
+//                        "description":"channel for integ test",
+//                        "config_type":"webhook",
+//                        "feature_list":[
+//                            "alerting"
+//                        ],
+//                        "is_enabled":true,
+//                        "webhook":{"url":"${(notificationConfig.configData as Webhook).url}"}
+//                    }
+//                }
+//                """.trimIndent()
+//            }
+//            ConfigType.EMAIL -> {
+//
+//            }
+//            else -> return ""
+//        }
+//        return ""
+//    }
 
     protected fun createDestination(destination: Destination = getTestDestination(), refresh: Boolean = true): Destination {
         val response = client().makeRequest(

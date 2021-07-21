@@ -66,6 +66,20 @@ abstract class ODFERestTestCase : OpenSearchRestTestCase() {
         return System.getProperty("security", "false")!!.toBoolean()
     }
 
+    fun isNotificationPluginInstalled(): Boolean {
+        val response = entityAsMap(client().makeRequest("GET", "_nodes/plugins"))
+        val nodesInfo = response["nodes"] as Map<String, Map<String, Any>>
+        for (nodeInfo in nodesInfo.values) {
+            val plugins = nodeInfo["plugins"] as List<Map<String, Any>>
+            for (plugin in plugins) {
+                if (plugin["name"] == "opensearch-notifications") {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
     override fun getProtocol(): String {
         return if (isHttps()) {
             "https"

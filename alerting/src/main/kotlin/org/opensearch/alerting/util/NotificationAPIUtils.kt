@@ -53,7 +53,7 @@ class NotificationAPIUtils {
         private val defaultRetryPolicy =
             BackoffPolicy.constantBackoff(TimeValue.timeValueMillis(100), 2)
 
-        fun getNotificationConfig(client: NodeClient, getNotificationConfigRequest: GetNotificationConfigRequest, retryPolicy: BackoffPolicy = defaultRetryPolicy): GetNotificationConfigResponse? {
+        fun getNotificationConfig(client: NodeClient, getNotificationConfigRequest: GetNotificationConfigRequest, retryPolicy: BackoffPolicy = defaultRetryPolicy): GetNotificationConfigResponse {
             var getNotificationConfigResponse: GetNotificationConfigResponse? = null
             var exception: Exception?
             var completed = false
@@ -82,7 +82,7 @@ class NotificationAPIUtils {
                     throw exception as Exception
                 }
             }
-            return getNotificationConfigResponse
+            return getNotificationConfigResponse!!
         }
 
         fun createNotificationConfig(client: NodeClient, createNotificationConfigRequest: CreateNotificationConfigRequest, retryPolicy: BackoffPolicy = defaultRetryPolicy): CreateNotificationConfigResponse {
@@ -212,5 +212,19 @@ class NotificationAPIUtils {
             }
             return sendNotificationResponse!!
         }
+
+//        fun isNotificationPluginInstalled(client: NodeClient) {
+//            val response = entityAsMap(client.makeRequest("GET", "_nodes/plugins"))
+//            val nodesInfo = response["nodes"] as Map<String, Map<String, Any>>
+//            for (nodeInfo in nodesInfo.values) {
+//                val plugins = nodeInfo["plugins"] as List<Map<String, Any>>
+//                for (plugin in plugins) {
+//                    if (plugin["name"] == "opensearch-notifications") {
+//                        return true
+//                    }
+//                }
+//            }
+//            return false
+//        }
     }
 }
