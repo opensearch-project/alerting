@@ -29,7 +29,7 @@ package org.opensearch.alerting.util
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionListener
 import org.opensearch.action.bulk.BackoffPolicy
-import org.opensearch.alerting.elasticapi.retryOnAnyException
+import org.opensearch.alerting.elasticapi.retryForNotification
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.notifications.NotificationsPluginInterface
@@ -61,7 +61,7 @@ class NotificationAPIUtils {
             var getNotificationConfigResponse: GetNotificationConfigResponse? = null
             var exception: Exception?
             var completed = false
-            retryPolicy.retryOnAnyException {
+            retryPolicy.retryForNotification {
                 exception = null
                 NotificationsPluginInterface.getNotificationConfig(
                     client,
@@ -99,7 +99,7 @@ class NotificationAPIUtils {
             var createNotificationConfigResponse: CreateNotificationConfigResponse? = null
             var exception: Exception?
             var completed = false
-            retryPolicy.retryOnAnyException {
+            retryPolicy.retryForNotification {
                 exception = null
                 NotificationsPluginInterface.createNotificationConfig(
                     client,
@@ -137,7 +137,7 @@ class NotificationAPIUtils {
             var updateNotificationConfigResponse: UpdateNotificationConfigResponse? = null
             var completed = false
             var exception: Exception?
-            retryPolicy.retryOnAnyException {
+            retryPolicy.retryForNotification {
                 exception = null
                 NotificationsPluginInterface.updateNotificationConfig(
                     client,
@@ -175,7 +175,7 @@ class NotificationAPIUtils {
             var deleteNotificationConfigResponse: DeleteNotificationConfigResponse? = null
             var completed = false
             var exception: Exception?
-            retryPolicy.retryOnAnyException {
+            retryPolicy.retryForNotification {
                 exception = null
                 NotificationsPluginInterface.deleteNotificationConfig(
                     client,
@@ -213,7 +213,7 @@ class NotificationAPIUtils {
             var sendNotificationResponse: SendNotificationResponse? = null
             var completed = false
             var exception: Exception?
-            retryPolicy.retryOnAnyException {
+            retryPolicy.retryForNotification {
                 exception = null
                 NotificationsPluginInterface.sendNotification(
                     client,

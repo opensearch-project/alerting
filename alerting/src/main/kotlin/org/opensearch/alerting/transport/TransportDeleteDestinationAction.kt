@@ -51,7 +51,6 @@ import org.opensearch.transport.TransportService
 
 private val log = LogManager.getLogger(TransportDeleteDestinationAction::class.java)
 
-// TODO: MAke sure to throw exception that notification plugin is not installed
 class TransportDeleteDestinationAction @Inject constructor(
     transportService: TransportService,
     val client: NodeClient,
