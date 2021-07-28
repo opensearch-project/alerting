@@ -45,6 +45,7 @@ import org.opensearch.alerting.action.IndexMonitorAction
 import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
 import org.opensearch.alerting.action.SearchMonitorAction
+import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.JobSweeper
 import org.opensearch.alerting.core.ScheduledJobIndices
@@ -103,12 +104,14 @@ import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.node.DiscoveryNodes
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.io.stream.NamedWriteableRegistry
+import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.common.settings.IndexScopedSettings
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.settings.SettingsFilter
 import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.env.Environment
 import org.opensearch.env.NodeEnvironment
 import org.opensearch.index.IndexModule
@@ -119,6 +122,7 @@ import org.opensearch.plugins.ActionPlugin
 import org.opensearch.plugins.Plugin
 import org.opensearch.plugins.ReloadablePlugin
 import org.opensearch.plugins.ScriptPlugin
+import org.opensearch.plugins.SearchPlugin
 import org.opensearch.repositories.RepositoriesService
 import org.opensearch.rest.RestController
 import org.opensearch.rest.RestHandler
@@ -134,7 +138,7 @@ import java.util.function.Supplier
  * It also adds [Monitor.XCONTENT_REGISTRY], [SearchInput.XCONTENT_REGISTRY] to the
  * [NamedXContentRegistry] so that we are able to deserialize the custom named objects.
  */
-internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, ReloadablePlugin, Plugin() {
+internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, ReloadablePlugin, SearchPlugin, Plugin() {
 
     override fun getContextWhitelists(): Map<ScriptContext<*>, List<Whitelist>> {
         val whitelist = WhitelistLoader.loadFromResourceFiles(javaClass, "org.opensearch.alerting.txt")
@@ -329,5 +333,17 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
 
     override fun reload(settings: Settings) {
         runner.reloadDestinationSettings(settings)
+    }
+
+    override fun getPipelineAggregations(): List<SearchPlugin.PipelineAggregationSpec> {
+        return listOf(
+            SearchPlugin.PipelineAggregationSpec(
+                BucketSelectorExtAggregationBuilder.NAME,
+                { sin: StreamInput -> BucketSelectorExtAggregationBuilder(sin) },
+                { parser: XContentParser, agg_name: String ->
+                    BucketSelectorExtAggregationBuilder.parse(agg_name, parser)
+                }
+            )
+        )
     }
 }
