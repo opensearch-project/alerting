@@ -57,7 +57,9 @@ import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler
 import org.opensearch.alerting.core.schedule.JobScheduler
 import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSettings
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
+import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.resthandler.RestAcknowledgeAlertAction
 import org.opensearch.alerting.resthandler.RestDeleteDestinationAction
 import org.opensearch.alerting.resthandler.RestDeleteEmailAccountAction
@@ -135,8 +137,8 @@ import java.util.function.Supplier
 /**
  * Entry point of the OpenDistro for Elasticsearch alerting plugin
  * This class initializes the [RestGetMonitorAction], [RestDeleteMonitorAction], [RestIndexMonitorAction] rest handlers.
- * It also adds [Monitor.XCONTENT_REGISTRY], [SearchInput.XCONTENT_REGISTRY] to the
- * [NamedXContentRegistry] so that we are able to deserialize the custom named objects.
+ * It also adds [Monitor.XCONTENT_REGISTRY], [SearchInput.XCONTENT_REGISTRY], [QueryLevelTrigger.XCONTENT_REGISTRY],
+ * [BucketLevelTrigger.XCONTENT_REGISTRY] to the [NamedXContentRegistry] so that we are able to deserialize the custom named objects.
  */
 internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, ReloadablePlugin, SearchPlugin, Plugin() {
 
@@ -224,7 +226,12 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     }
 
     override fun getNamedXContent(): List<NamedXContentRegistry.Entry> {
-        return listOf(Monitor.XCONTENT_REGISTRY, SearchInput.XCONTENT_REGISTRY)
+        return listOf(
+            Monitor.XCONTENT_REGISTRY,
+            SearchInput.XCONTENT_REGISTRY,
+            QueryLevelTrigger.XCONTENT_REGISTRY,
+            BucketLevelTrigger.XCONTENT_REGISTRY
+        )
     }
 
     override fun createComponents(
