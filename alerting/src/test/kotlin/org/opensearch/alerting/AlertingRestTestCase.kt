@@ -43,7 +43,9 @@ import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.elasticapi.string
 import org.opensearch.alerting.model.Alert
+import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
@@ -72,6 +74,9 @@ import java.net.URLEncoder
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import javax.management.MBeanServerInvocationHandler
 import javax.management.ObjectName
@@ -88,10 +93,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return NamedXContentRegistry(
             mutableListOf(
                 Monitor.XCONTENT_REGISTRY,
-                SearchInput.XCONTENT_REGISTRY
-            ) +
-                SearchModule(Settings.EMPTY, false, emptyList()).namedXContents
-        )
+                SearchInput.XCONTENT_REGISTRY,
+                QueryLevelTrigger.XCONTENT_REGISTRY,
+                BucketLevelTrigger.XCONTENT_REGISTRY
+            ) + SearchModule(Settings.EMPTY, false, emptyList()).namedXContents)
     }
 
     fun Response.asMap(): Map<String, Any> {
@@ -148,7 +153,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             emptyMap(),
             destination.toHttpEntity()
         )
-        assertEquals("Unable to create a new destination", RestStatus.OK, response.restStatus())
+        assertEquals("Unable to delete destination", RestStatus.OK, response.restStatus())
 
         return response
     }
@@ -398,7 +403,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun createRandomMonitor(refresh: Boolean = false, withMetadata: Boolean = false): Monitor {
-        val monitor = randomMonitor(withMetadata = withMetadata)
+        val monitor = randomQueryLevelMonitor(withMetadata = withMetadata)
         val monitorId = createMonitor(monitor, refresh).id
         if (withMetadata) {
             return getMonitor(monitorId = monitorId, header = BasicHeader(HttpHeaders.USER_AGENT, "OpenSearch-Dashboards"))
@@ -533,14 +538,22 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return response
     }
 
+    protected fun deleteDoc(index: String, id: String, refresh: Boolean = true): Response {
+        val params = if (refresh) mapOf("refresh" to "true") else mapOf()
+        val response = client().makeRequest("DELETE", "$index/_doc/$id", params)
+        assertTrue("Unable to delete doc with ID $id in index: '$index'", listOf(RestStatus.OK).contains(response.restStatus()))
+        return response
+    }
+
     /** A test index that can be used across tests. Feel free to add new fields but don't remove any. */
     protected fun createTestIndex(index: String = randomAlphaOfLength(10).toLowerCase(Locale.ROOT)): String {
         createIndex(
             index, Settings.EMPTY,
             """
-          "properties" : {
-             "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" }
-          }
+                "properties" : {
+                  "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
+                  "test_field" : { "type" : "keyword" }
+                }
             """.trimIndent()
         )
         return index
@@ -556,15 +569,35 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             createIndex(
                 index, Settings.builder().build(),
                 """
-          "properties" : {
-             "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" }
-          }
-                """.trimIndent()
-            )
+                    "properties" : {
+                      "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" }
+                    }
+                """.trimIndent())
         } catch (ex: WarningFailureException) {
             // ignore
         }
         return index
+    }
+
+    protected fun insertSampleTimeSerializedData(index: String, data: List<String>) {
+        data.forEachIndexed { i, value ->
+            val twoMinsAgo = ZonedDateTime.now().minus(2, ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MILLIS)
+            val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(twoMinsAgo)
+            val testDoc = """
+                {
+                  "test_strict_date_time": "$testTime",
+                  "test_field": "$value"
+                }
+            """.trimIndent()
+            // Indexing documents with deterministic doc id to allow for easy selected deletion during testing
+            indexDoc(index, (i + 1).toString(), testDoc)
+        }
+    }
+
+    protected fun deleteDataWithDocIds(index: String, docIds: List<String>) {
+        docIds.forEach {
+            deleteDoc(index, it)
+        }
     }
 
     fun putAlertMappings(mapping: String? = null) {

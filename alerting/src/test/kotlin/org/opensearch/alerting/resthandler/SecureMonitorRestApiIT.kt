@@ -24,9 +24,9 @@ import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomAlert
-import org.opensearch.alerting.randomMonitor
+import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomTemplateScript
-import org.opensearch.alerting.randomTrigger
+import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
 import org.opensearch.client.RestClient
@@ -72,7 +72,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         createUserRolesMapping("alerting_full_access", arrayOf(user))
         try {
             // randomMonitor has a dummy user, api ignores the User passed as part of monitor, it picks user info from the logged-in user.
-            val monitor = randomMonitor().copy(
+            val monitor = randomQueryLevelMonitor().copy(
                 inputs = listOf(
                     SearchInput(
                         indices = listOf("hr_data"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
@@ -106,7 +106,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUserWithTestData(user, "hr_data", "hr_role", "HR")
         try {
-            val monitor = randomMonitor().copy(
+            val monitor = randomQueryLevelMonitor().copy(
                 inputs = listOf(
                     SearchInput(
                         indices = listOf("hr_data"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
@@ -129,7 +129,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         createUserWithTestData(user, "hr_data", "hr_role", "HR")
         createUserRolesMapping("alerting_full_access", arrayOf(user))
         try {
-            val monitor = randomMonitor().copy(
+            val monitor = randomQueryLevelMonitor().copy(
                 inputs = listOf(
                     SearchInput(
                         indices = listOf("not_hr_data"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
@@ -150,14 +150,14 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test create monitor with disable filter by`() {
         disableFilterBy()
-        val monitor = randomMonitor()
+        val monitor = randomQueryLevelMonitor()
         val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
         assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
     }
 
     fun `test create monitor with enable filter by`() {
         enableFilterBy()
-        val monitor = randomMonitor()
+        val monitor = randomQueryLevelMonitor()
 
         if (securityEnabled()) {
             // when security is enabled. No errors, must succeed.
@@ -185,7 +185,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     // Query Monitors related security tests
     fun `test update monitor with disable filter by`() {
         disableFilterBy()
-        val monitor = randomMonitor(enabled = true)
+        val monitor = randomQueryLevelMonitor(enabled = true)
 
         val createdMonitor = createMonitor(monitor = monitor)
 
@@ -205,7 +205,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             // refer: `test create monitor with enable filter by`
             return
         }
-        val monitor = randomMonitor(enabled = true)
+        val monitor = randomQueryLevelMonitor(enabled = true)
 
         val createdMonitor = createMonitor(monitor = monitor)
 
@@ -220,7 +220,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test delete monitor with disable filter by`() {
         disableFilterBy()
-        val monitor = randomMonitor(enabled = true)
+        val monitor = randomQueryLevelMonitor(enabled = true)
 
         val createdMonitor = createMonitor(monitor = monitor)
 
@@ -254,7 +254,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             // refer: `test create monitor with enable filter by`
             return
         }
-        val monitor = randomMonitor(enabled = true)
+        val monitor = randomQueryLevelMonitor(enabled = true)
 
         val createdMonitor = createMonitor(monitor = monitor)
 
@@ -463,7 +463,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
             )
         )
-        val monitor = randomMonitor(triggers = listOf(randomTrigger(condition = ALWAYS_RUN, actions = listOf(action))), inputs = inputs)
+        val monitor = randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))), inputs = inputs)
 
         // Make sure the elevating the permissions fails execute.
         val adminUser = User("admin", listOf("admin"), listOf("all_access"), listOf())

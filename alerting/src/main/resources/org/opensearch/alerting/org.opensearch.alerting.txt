@@ -4,7 +4,7 @@
 
 class org.opensearch.alerting.script.TriggerScript {
     Map getParams()
-    boolean execute(TriggerExecutionContext)
+    boolean execute(QueryLevelTriggerExecutionContext)
     String[] PARAMETERS
 }
 
@@ -14,7 +14,15 @@ class org.opensearch.alerting.script.TriggerScript$Factory {
 
 class org.opensearch.alerting.script.TriggerExecutionContext {
     Monitor getMonitor()
-    Trigger getTrigger()
+    List getResults()
+    java.time.Instant getPeriodStart()
+    java.time.Instant getPeriodEnd()
+    Exception getError()
+}
+
+class org.opensearch.alerting.script.QueryLevelTriggerExecutionContext {
+    Monitor getMonitor()
+    QueryLevelTrigger getTrigger()
     List getResults()
     java.time.Instant getPeriodStart()
     java.time.Instant getPeriodEnd()
@@ -29,15 +37,11 @@ class org.opensearch.alerting.model.Monitor {
     boolean getEnabled()
 }
 
-class org.opensearch.alerting.model.Trigger {
+class org.opensearch.alerting.model.QueryLevelTrigger {
     String getId()
     String getName()
     String getSeverity()
     List getActions()
-}
-
-class org.opensearch.alerting.model.action.Action {
-    String getName()
 }
 
 class org.opensearch.alerting.model.Alert {

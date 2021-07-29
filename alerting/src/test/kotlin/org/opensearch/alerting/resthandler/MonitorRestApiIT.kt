@@ -42,15 +42,16 @@ import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.Trigger
 import org.opensearch.alerting.randomADMonitor
 import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomAlert
 import org.opensearch.alerting.randomAnomalyDetector
 import org.opensearch.alerting.randomAnomalyDetectorWithUser
-import org.opensearch.alerting.randomMonitor
+import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomThrottle
-import org.opensearch.alerting.randomTrigger
+import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.client.ResponseException
 import org.opensearch.client.WarningFailureException
@@ -102,7 +103,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
     @Throws(Exception::class)
     fun `test creating a monitor`() {
-        val monitor = randomMonitor()
+        val monitor = randomQueryLevelMonitor()
 
         val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
 
@@ -116,7 +117,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test creating a monitor with legacy ODFE`() {
-        val monitor = randomMonitor()
+        val monitor = randomQueryLevelMonitor()
         val createResponse = client().makeRequest("POST", LEGACY_OPENDISTRO_ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
         assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
         val responseBody = createResponse.asMap()
@@ -161,7 +162,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test creating a monitor with PUT fails`() {
         try {
-            val monitor = randomMonitor()
+            val monitor = randomQueryLevelMonitor()
             client().makeRequest("PUT", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             fail("Expected 405 Method Not Allowed response")
         } catch (e: ResponseException) {
@@ -172,7 +173,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     fun `test creating a monitor with illegal index name`() {
         try {
             val si = SearchInput(listOf("_#*IllegalIndexCharacters"), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
-            val monitor = randomMonitor()
+            val monitor = randomQueryLevelMonitor()
             client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.copy(inputs = listOf(si)).toHttpEntity())
         } catch (e: ResponseException) {
             // When an index with invalid name is mentioned, instead of returning invalid_index_name_exception security plugin throws security_exception.
@@ -319,7 +320,14 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     fun `test updating conditions for a monitor`() {
         val monitor = createRandomMonitor()
 
-        val updatedTriggers = listOf(Trigger("foo", "1", Script("return true"), emptyList()))
+        val updatedTriggers = listOf(
+            QueryLevelTrigger(
+                name = "foo",
+                severity = "1",
+                condition = Script("return true"),
+                actions = emptyList()
+            )
+        )
         val updateResponse = client().makeRequest(
             "PUT", monitor.relativeUrl(),
             emptyMap(), monitor.copy(triggers = updatedTriggers).toHttpEntity()
@@ -715,8 +723,8 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     fun `test delete trigger moves alerts`() {
         client().updateSettings(ScheduledJobSettings.SWEEPER_ENABLED.key, true)
         putAlertMappings()
-        val trigger = randomTrigger()
-        val monitor = createMonitor(randomMonitor(triggers = listOf(trigger)))
+        val trigger = randomQueryLevelTrigger()
+        val monitor = createMonitor(randomQueryLevelMonitor(triggers = listOf(trigger)))
         val alert = createAlert(randomAlert(monitor).copy(triggerId = trigger.id, state = Alert.State.ACTIVE))
         refreshIndex("*")
         val updatedMonitor = monitor.copy(triggers = emptyList())
@@ -740,9 +748,9 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     fun `test delete trigger moves alerts only for deleted trigger`() {
         client().updateSettings(ScheduledJobSettings.SWEEPER_ENABLED.key, true)
         putAlertMappings()
-        val triggerToDelete = randomTrigger()
-        val triggerToKeep = randomTrigger()
-        val monitor = createMonitor(randomMonitor(triggers = listOf(triggerToDelete, triggerToKeep)))
+        val triggerToDelete = randomQueryLevelTrigger()
+        val triggerToKeep = randomQueryLevelTrigger()
+        val monitor = createMonitor(randomQueryLevelMonitor(triggers = listOf(triggerToDelete, triggerToKeep)))
         val alertKeep = createAlert(randomAlert(monitor).copy(triggerId = triggerToKeep.id, state = Alert.State.ACTIVE))
         val alertDelete = createAlert(randomAlert(monitor).copy(triggerId = triggerToDelete.id, state = Alert.State.ACTIVE))
         refreshIndex("*")
@@ -878,7 +886,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     private fun randomMonitorWithThrottle(value: Int, unit: ChronoUnit = ChronoUnit.MINUTES): Monitor {
         val throttle = randomThrottle(value, unit)
         val action = randomAction().copy(throttle = throttle)
-        val trigger = randomTrigger(actions = listOf(action))
-        return randomMonitor(triggers = listOf(trigger))
+        val trigger = randomQueryLevelTrigger(actions = listOf(action))
+        return randomQueryLevelMonitor(triggers = listOf(trigger))
     }
 }

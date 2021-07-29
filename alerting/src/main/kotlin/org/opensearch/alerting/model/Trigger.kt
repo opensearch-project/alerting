@@ -26,120 +26,77 @@
 
 package org.opensearch.alerting.model
 
+import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.alerting.model.action.Action
-import org.opensearch.common.UUIDs
 import org.opensearch.common.io.stream.StreamInput
-import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.io.stream.Writeable
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.common.xcontent.ToXContentObject
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParser.Token
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
-import org.opensearch.script.Script
 import java.io.IOException
 
-data class Trigger(
-    val name: String,
-    val severity: String,
-    val condition: Script,
-    val actions: List<Action>,
-    val id: String = UUIDs.base64UUID()
-) : Writeable, ToXContent {
+interface Trigger : Writeable, ToXContentObject {
 
-    @Throws(IOException::class)
-    constructor(sin: StreamInput) : this(
-        sin.readString(), // name
-        sin.readString(), // severity
-        Script(sin), // condition
-        sin.readList(::Action), // actions
-        sin.readString() // id
-    )
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        builder.startObject()
-            .field(ID_FIELD, id)
-            .field(NAME_FIELD, name)
-            .field(SEVERITY_FIELD, severity)
-            .startObject(CONDITION_FIELD)
-            .field(SCRIPT_FIELD, condition)
-            .endObject()
-            .field(ACTIONS_FIELD, actions.toTypedArray())
-            .endObject()
-        return builder
-    }
+    enum class Type(val value: String) {
+        QUERY_LEVEL_TRIGGER(QueryLevelTrigger.QUERY_LEVEL_TRIGGER_FIELD),
+        BUCKET_LEVEL_TRIGGER(BucketLevelTrigger.BUCKET_LEVEL_TRIGGER_FIELD);
 
-    /** Returns a representation of the trigger suitable for passing into painless and mustache scripts. */
-    fun asTemplateArg(): Map<String, Any> {
-        return mapOf(
-            ID_FIELD to id, NAME_FIELD to name, SEVERITY_FIELD to severity,
-            ACTIONS_FIELD to actions.map { it.asTemplateArg() }
-        )
-    }
-
-    @Throws(IOException::class)
-    override fun writeTo(out: StreamOutput) {
-        out.writeString(name)
-        out.writeString(severity)
-        condition.writeTo(out)
-        out.writeCollection(actions)
-        out.writeString(id)
+        override fun toString(): String {
+            return value
+        }
     }
 
     companion object {
         const val ID_FIELD = "id"
         const val NAME_FIELD = "name"
         const val SEVERITY_FIELD = "severity"
-        const val CONDITION_FIELD = "condition"
         const val ACTIONS_FIELD = "actions"
-        const val SCRIPT_FIELD = "script"
 
-        @JvmStatic @Throws(IOException::class)
+        @Throws(IOException::class)
         fun parse(xcp: XContentParser): Trigger {
-            var id = UUIDs.base64UUID() // assign a default triggerId if one is not specified
-            lateinit var name: String
-            lateinit var severity: String
-            lateinit var condition: Script
-            val actions: MutableList<Action> = mutableListOf()
+            val trigger: Trigger
+
             ensureExpectedToken(Token.START_OBJECT, xcp.currentToken(), xcp)
-
-            while (xcp.nextToken() != Token.END_OBJECT) {
-                val fieldName = xcp.currentName()
-
-                xcp.nextToken()
-                when (fieldName) {
-                    ID_FIELD -> id = xcp.text()
-                    NAME_FIELD -> name = xcp.text()
-                    SEVERITY_FIELD -> severity = xcp.text()
-                    CONDITION_FIELD -> {
-                        xcp.nextToken()
-                        condition = Script.parse(xcp)
-                        require(condition.lang == Script.DEFAULT_SCRIPT_LANG) {
-                            "Invalid script language. Allowed languages are [${Script.DEFAULT_SCRIPT_LANG}]"
-                        }
-                        xcp.nextToken()
-                    }
-                    ACTIONS_FIELD -> {
-                        ensureExpectedToken(Token.START_ARRAY, xcp.currentToken(), xcp)
-                        while (xcp.nextToken() != Token.END_ARRAY) {
-                            actions.add(Action.parse(xcp))
-                        }
-                    }
-                }
+            ensureExpectedToken(Token.FIELD_NAME, xcp.nextToken(), xcp)
+            val triggerTypeNames = Type.values().map { it.toString() }
+            if (triggerTypeNames.contains(xcp.currentName())) {
+                ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
+                trigger = xcp.namedObject(Trigger::class.java, xcp.currentName(), null)
+                ensureExpectedToken(Token.END_OBJECT, xcp.nextToken(), xcp)
+            } else {
+                // Infer the old Trigger (now called QueryLevelTrigger) when it is not defined as a named
+                // object to remain backwards compatible when parsing the old format
+                trigger = QueryLevelTrigger.parseInner(xcp)
+                ensureExpectedToken(Token.END_OBJECT, xcp.currentToken(), xcp)
             }
-
-            return Trigger(
-                name = requireNotNull(name) { "Trigger name is null" },
-                severity = requireNotNull(severity) { "Trigger severity is null" },
-                condition = requireNotNull(condition) { "Trigger is null" },
-                actions = requireNotNull(actions) { "Trigger actions are null" },
-                id = requireNotNull(id) { "Trigger id is null." }
-            )
+            return trigger
         }
 
         @JvmStatic
         @Throws(IOException::class)
         fun readFrom(sin: StreamInput): Trigger {
-            return Trigger(sin)
+            return when (val type = sin.readEnum(Trigger.Type::class.java)) {
+                Type.QUERY_LEVEL_TRIGGER -> QueryLevelTrigger(sin)
+                Type.BUCKET_LEVEL_TRIGGER -> BucketLevelTrigger(sin)
+                // This shouldn't be reachable but ensuring exhaustiveness as Kotlin warns
+                // enum can be null in Java
+                else -> throw IllegalStateException("Unexpected input [$type] when reading Trigger")
+            }
         }
     }
+
+    /** The id of the Trigger in the [SCHEDULED_JOBS_INDEX] */
+    val id: String
+
+    /** The name of the Trigger */
+    val name: String
+
+    /** The severity of the Trigger, used to classify the subsequent Alert */
+    val severity: String
+
+    /** The actions executed if the Trigger condition evaluates to true */
+    val actions: List<Action>
+
+    fun name(): String
 }
