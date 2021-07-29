@@ -59,10 +59,13 @@ class BucketSelectorExtAggregatorTests : AggregatorTestCase() {
 
         val scriptEngine = MockScriptEngine(
             MockScriptEngine.NAME,
-            Collections.singletonMap(SCRIPTNAME,
+            Collections.singletonMap(
+                SCRIPTNAME,
                 Function<Map<String?, Any?>, Any> { script: Map<String?, Any?> ->
                     script[paramName].toString().toDouble() == paramValue
-                }), emptyMap()
+                }
+            ),
+            emptyMap()
         )
         val engines: Map<String, ScriptEngine> = Collections.singletonMap(scriptEngine.type, scriptEngine)
         return ScriptService(Settings.EMPTY, engines, ScriptModule.CORE_CONTEXTS)
@@ -103,11 +106,11 @@ class BucketSelectorExtAggregatorTests : AggregatorTestCase() {
             },
             Consumer { f: InternalFilters ->
                 assertThat(
-                    (f.buckets[0].aggregations
-                        .get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices).bucketIndices[0],
+                    (f.buckets[0].aggregations.get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices).bucketIndices[0],
                     CoreMatchers.equalTo(1)
                 )
-            }, fieldType, fieldType1
+            },
+            fieldType, fieldType1
         )
     }
 
@@ -163,11 +166,11 @@ class BucketSelectorExtAggregatorTests : AggregatorTestCase() {
             },
             Consumer { f: InternalFilters ->
                 assertThat(
-                    (f.buckets[0].aggregations
-                        .get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices).bucketIndices.size,
+                    (f.buckets[0].aggregations.get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices).bucketIndices.size,
                     CoreMatchers.equalTo(0)
                 )
-            }, fieldType, fieldType1
+            },
+            fieldType, fieldType1
         )
 
         testCase(
@@ -184,11 +187,11 @@ class BucketSelectorExtAggregatorTests : AggregatorTestCase() {
             },
             Consumer { f: InternalFilters ->
                 assertThat(
-                    (f.buckets[0].aggregations
-                        .get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices).bucketIndices[0],
+                    (f.buckets[0].aggregations.get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices).bucketIndices[0],
                     CoreMatchers.equalTo(1)
                 )
-            }, fieldType, fieldType1
+            },
+            fieldType, fieldType1
         )
     }
 
@@ -227,11 +230,11 @@ class BucketSelectorExtAggregatorTests : AggregatorTestCase() {
             },
             Consumer { f: InternalFilters ->
                 assertThat(
-                    (f.buckets[0].aggregations
-                        .get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices).bucketIndices.size,
+                    (f.buckets[0].aggregations.get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices).bucketIndices.size,
                     CoreMatchers.equalTo(0)
                 )
-            }, fieldType, fieldType1
+            },
+            fieldType, fieldType1
         )
     }
 
@@ -271,11 +274,11 @@ class BucketSelectorExtAggregatorTests : AggregatorTestCase() {
             },
             Consumer { f: InternalFilters ->
                 assertThat(
-                    (f.buckets[0].aggregations
-                        .get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices).bucketIndices[0],
+                    (f.buckets[0].aggregations.get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices).bucketIndices[0],
                     CoreMatchers.equalTo(0)
                 )
-            }, fieldType, fieldType1
+            },
+            fieldType, fieldType1
         )
     }
 
@@ -319,11 +322,11 @@ class BucketSelectorExtAggregatorTests : AggregatorTestCase() {
             },
             Consumer { f: InternalFilter ->
                 assertThat(
-                    (f.aggregations
-                        .get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices).bucketIndices[0],
+                    (f.aggregations.get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices).bucketIndices[0],
                     CoreMatchers.equalTo(1)
                 )
-            }, fieldType, fieldType1
+            },
+            fieldType, fieldType1
         )
     }
 
