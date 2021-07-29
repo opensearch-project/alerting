@@ -30,6 +30,7 @@ import inet.ipaddr.IPAddressString
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
 import org.opensearch.alerting.destination.message.BaseMessage
+import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.commons.authuser.User
@@ -139,3 +140,9 @@ fun <T : Any> checkUserFilterByPermissions(
     }
     return true
 }
+
+/**
+ * Since buckets can have multi-value keys, this converts the bucket key values to a string that can be used
+ * as the key for a HashMap to easily retrieve [AggregationResultBucket] based on the bucket key values.
+ */
+fun AggregationResultBucket.getBucketKeysHash(): String = this.bucketKeys.joinToString(separator = "#")
