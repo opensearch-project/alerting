@@ -31,6 +31,7 @@ import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
 import org.opensearch.alerting.destination.message.BaseMessage
 import org.opensearch.alerting.model.AggregationResultBucket
+import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.action.ActionExecutionScope
@@ -154,3 +155,19 @@ fun AggregationResultBucket.getBucketKeysHash(): String = this.bucketKeys.joinTo
 
 fun Action.getActionScope(): ActionExecutionScope.Type =
     this.actionExecutionPolicy.actionExecutionScope.getExecutionScope()
+
+fun BucketLevelTriggerRunResult.getCombinedTriggerRunResult(
+    prevTriggerRunResult: BucketLevelTriggerRunResult?
+): BucketLevelTriggerRunResult {
+    if (prevTriggerRunResult == null) return this
+
+    // The aggregation results and action results across to two trigger run results should not have overlapping keys
+    // since they represent different pages of aggregations so a simple concatenation will combine them
+    val mergedAggregationResultBuckets = prevTriggerRunResult.aggregationResultBuckets + this.aggregationResultBuckets
+    val mergedActionResultsMap = (prevTriggerRunResult.actionResultsMap + this.actionResultsMap).toMutableMap()
+
+    // Update to the most recent error if it's not null, otherwise keep the old one
+    val error = this.error ?: prevTriggerRunResult.error
+
+    return this.copy(aggregationResultBuckets = mergedAggregationResultBuckets, actionResultsMap = mergedActionResultsMap, error = error)
+}
