@@ -19,6 +19,7 @@ import org.opensearch.alerting.elasticapi.convertToMap
 import org.opensearch.alerting.elasticapi.suspendUntil
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.util.AggregationQueryRewriter
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.client.Client
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
@@ -40,15 +41,23 @@ class InputService(
 
     private val logger = LogManager.getLogger(InputService::class.java)
 
-    suspend fun collectInputResults(monitor: Monitor, periodStart: Instant, periodEnd: Instant): InputRunResults {
+    suspend fun collectInputResults(
+        monitor: Monitor,
+        periodStart: Instant,
+        periodEnd: Instant,
+        prevResult: InputRunResults? = null
+    ): InputRunResults {
         return try {
             val results = mutableListOf<Map<String, Any>>()
+            val aggTriggerAfterKeys: MutableMap<String, Map<String, Any>?> = mutableMapOf()
+
             monitor.inputs.forEach { input ->
                 when (input) {
                     is SearchInput -> {
                         // TODO: Figure out a way to use SearchTemplateRequest without bringing in the entire TransportClient
                         val searchParams = mapOf("period_start" to periodStart.toEpochMilli(),
                             "period_end" to periodEnd.toEpochMilli())
+                        AggregationQueryRewriter.rewriteQuery(input.query, prevResult, monitor.triggers)
                         val searchSource = scriptService.compile(Script(ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
                             input.query.toString(), searchParams), TemplateScript.CONTEXT)
                             .newInstance(searchParams)
@@ -59,6 +68,7 @@ class InputService(
                             searchRequest.source(SearchSourceBuilder.fromXContent(it))
                         }
                         val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
+                        aggTriggerAfterKeys += AggregationQueryRewriter.getAfterKeysFromSearchResponse(searchResponse, monitor.triggers)
                         results += searchResponse.convertToMap()
                     }
                     else -> {
@@ -66,7 +76,7 @@ class InputService(
                     }
                 }
             }
-            InputRunResults(results.toList())
+            InputRunResults(results.toList(), aggTriggersAfterKey = aggTriggerAfterKeys)
         } catch (e: Exception) {
             logger.info("Error collecting inputs for monitor: ${monitor.id}", e)
             InputRunResults(emptyList(), e)
