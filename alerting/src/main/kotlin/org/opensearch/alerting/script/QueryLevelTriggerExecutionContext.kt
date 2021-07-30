@@ -33,8 +33,10 @@ data class QueryLevelTriggerExecutionContext(
         trigger: QueryLevelTrigger,
         monitorRunResult: MonitorRunResult<QueryLevelTriggerRunResult>,
         alert: Alert? = null
-    ) : this(monitor, trigger, monitorRunResult.inputResults.results, monitorRunResult.periodStart, monitorRunResult.periodEnd,
-        alert, monitorRunResult.scriptContextError(trigger))
+    ) : this(
+        monitor, trigger, monitorRunResult.inputResults.results, monitorRunResult.periodStart, monitorRunResult.periodEnd,
+        alert, monitorRunResult.scriptContextError(trigger)
+    )
 
     /**
      * Mustache templates need special permissions to reflectively introspect field names. To avoid doing this we

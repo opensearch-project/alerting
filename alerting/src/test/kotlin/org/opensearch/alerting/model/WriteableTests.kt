@@ -43,9 +43,9 @@ import org.opensearch.alerting.randomEmailGroup
 import org.opensearch.alerting.randomInputRunResults
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelMonitorRunResult
-import org.opensearch.alerting.randomThrottle
 import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.randomQueryLevelTriggerRunResult
+import org.opensearch.alerting.randomThrottle
 import org.opensearch.alerting.randomUser
 import org.opensearch.alerting.randomUserEmpty
 import org.opensearch.common.io.stream.BytesStreamOutput

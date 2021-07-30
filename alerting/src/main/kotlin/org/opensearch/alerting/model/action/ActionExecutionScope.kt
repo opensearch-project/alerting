@@ -113,7 +113,7 @@ data class PerAlertActionScope(
 ) : ActionExecutionScope() {
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         sin.readSet { si -> si.readEnum(AlertCategory::class.java) } // alertFilter
     )
 

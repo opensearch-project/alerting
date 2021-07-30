@@ -96,7 +96,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                 SearchInput.XCONTENT_REGISTRY,
                 QueryLevelTrigger.XCONTENT_REGISTRY,
                 BucketLevelTrigger.XCONTENT_REGISTRY
-            ) + SearchModule(Settings.EMPTY, false, emptyList()).namedXContents)
+            ) + SearchModule(Settings.EMPTY, false, emptyList()).namedXContents
+        )
     }
 
     fun Response.asMap(): Map<String, Any> {
@@ -572,7 +573,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                     "properties" : {
                       "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" }
                     }
-                """.trimIndent())
+                """.trimIndent()
+            )
         } catch (ex: WarningFailureException) {
             // ignore
         }

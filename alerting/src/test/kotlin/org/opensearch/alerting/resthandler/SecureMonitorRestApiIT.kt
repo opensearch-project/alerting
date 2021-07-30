@@ -25,8 +25,8 @@ import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomAlert
 import org.opensearch.alerting.randomQueryLevelMonitor
-import org.opensearch.alerting.randomTemplateScript
 import org.opensearch.alerting.randomQueryLevelTrigger
+import org.opensearch.alerting.randomTemplateScript
 import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
 import org.opensearch.client.RestClient
@@ -463,7 +463,10 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
             )
         )
-        val monitor = randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))), inputs = inputs)
+        val monitor = randomQueryLevelMonitor(
+            triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))),
+            inputs = inputs
+        )
 
         // Make sure the elevating the permissions fails execute.
         val adminUser = User("admin", listOf("admin"), listOf("all_access"), listOf())

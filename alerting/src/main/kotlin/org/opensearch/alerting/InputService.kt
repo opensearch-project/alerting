@@ -55,11 +55,18 @@ class InputService(
                 when (input) {
                     is SearchInput -> {
                         // TODO: Figure out a way to use SearchTemplateRequest without bringing in the entire TransportClient
-                        val searchParams = mapOf("period_start" to periodStart.toEpochMilli(),
-                            "period_end" to periodEnd.toEpochMilli())
+                        val searchParams = mapOf(
+                            "period_start" to periodStart.toEpochMilli(),
+                            "period_end" to periodEnd.toEpochMilli()
+                        )
                         AggregationQueryRewriter.rewriteQuery(input.query, prevResult, monitor.triggers)
-                        val searchSource = scriptService.compile(Script(ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
-                            input.query.toString(), searchParams), TemplateScript.CONTEXT)
+                        val searchSource = scriptService.compile(
+                            Script(
+                                ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
+                                input.query.toString(), searchParams
+                            ),
+                            TemplateScript.CONTEXT
+                        )
                             .newInstance(searchParams)
                             .execute()
 
@@ -100,8 +107,13 @@ class InputService(
             val input = monitor.inputs[0] as SearchInput
 
             val searchParams = mapOf("period_start" to periodStart.toEpochMilli(), "period_end" to periodEnd.toEpochMilli())
-            val searchSource = scriptService.compile(Script(ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
-                input.query.toString(), searchParams), TemplateScript.CONTEXT)
+            val searchSource = scriptService.compile(
+                Script(
+                    ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
+                    input.query.toString(), searchParams
+                ),
+                TemplateScript.CONTEXT
+            )
                 .newInstance(searchParams)
                 .execute()
 

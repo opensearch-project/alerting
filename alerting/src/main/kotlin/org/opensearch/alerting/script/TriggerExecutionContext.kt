@@ -39,9 +39,11 @@ abstract class TriggerExecutionContext(
     open val error: Exception? = null
 ) {
 
-    constructor(monitor: Monitor, trigger: Trigger, monitorRunResult: MonitorRunResult<*>):
-        this(monitor, monitorRunResult.inputResults.results, monitorRunResult.periodStart,
-            monitorRunResult.periodEnd, monitorRunResult.scriptContextError(trigger))
+    constructor(monitor: Monitor, trigger: Trigger, monitorRunResult: MonitorRunResult<*>) :
+        this(
+            monitor, monitorRunResult.inputResults.results, monitorRunResult.periodStart,
+            monitorRunResult.periodEnd, monitorRunResult.scriptContextError(trigger)
+        )
 
     /**
      * Mustache templates need special permissions to reflectively introspect field names. To avoid doing this we

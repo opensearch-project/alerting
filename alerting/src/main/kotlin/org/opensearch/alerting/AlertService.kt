@@ -97,9 +97,11 @@ class AlertService(
 
         return monitor.triggers.associateWith { trigger ->
             // Default to an empty map if there are no Alerts found for a Trigger to make Alert categorization logic easier
-            (foundAlerts[trigger.id]?.mapNotNull { alert ->
-                alert.aggregationResultBucket?.let { it.getBucketKeysHash() to alert }
-            }?.toMap() ?: mutableMapOf()) as MutableMap<String, Alert>
+            (
+                foundAlerts[trigger.id]?.mapNotNull { alert ->
+                    alert.aggregationResultBucket?.let { it.getBucketKeysHash() to alert }
+                }?.toMap() ?: mutableMapOf()
+                ) as MutableMap<String, Alert>
         }
     }
 
@@ -122,38 +124,52 @@ class AlertService(
                 when {
                     actionRunResult == null -> updatedActionExecutionResults.add(actionExecutionResult)
                     actionRunResult.throttled ->
-                        updatedActionExecutionResults.add(actionExecutionResult.copy(
-                            throttledCount = actionExecutionResult.throttledCount + 1))
+                        updatedActionExecutionResults.add(
+                            actionExecutionResult.copy(
+                                throttledCount = actionExecutionResult.throttledCount + 1
+                            )
+                        )
                     else -> updatedActionExecutionResults.add(actionExecutionResult.copy(lastExecutionTime = actionRunResult.executionTime))
                 }
             }
             // add action execution results which not exist in current alert
-            updatedActionExecutionResults.addAll(result.actionResults.filter { !currentActionIds.contains(it.key) }
-                .map { ActionExecutionResult(it.key, it.value.executionTime, if (it.value.throttled) 1 else 0) })
+            updatedActionExecutionResults.addAll(
+                result.actionResults.filter { !currentActionIds.contains(it.key) }
+                    .map { ActionExecutionResult(it.key, it.value.executionTime, if (it.value.throttled) 1 else 0) }
+            )
         } else {
-            updatedActionExecutionResults.addAll(result.actionResults.map {
-                ActionExecutionResult(it.key, it.value.executionTime, if (it.value.throttled) 1 else 0) })
+            updatedActionExecutionResults.addAll(
+                result.actionResults.map {
+                    ActionExecutionResult(it.key, it.value.executionTime, if (it.value.throttled) 1 else 0)
+                }
+            )
         }
 
         // Merge the alert's error message to the current alert's history
         val updatedHistory = currentAlert?.errorHistory.update(alertError)
         return if (alertError == null && !result.triggered) {
-            currentAlert?.copy(state = Alert.State.COMPLETED, endTime = currentTime, errorMessage = null,
+            currentAlert?.copy(
+                state = Alert.State.COMPLETED, endTime = currentTime, errorMessage = null,
                 errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
-                schemaVersion = IndexUtils.alertIndexSchemaVersion)
+                schemaVersion = IndexUtils.alertIndexSchemaVersion
+            )
         } else if (alertError == null && currentAlert?.isAcknowledged() == true) {
             null
         } else if (currentAlert != null) {
             val alertState = if (alertError == null) Alert.State.ACTIVE else Alert.State.ERROR
-            currentAlert.copy(state = alertState, lastNotificationTime = currentTime, errorMessage = alertError?.message,
+            currentAlert.copy(
+                state = alertState, lastNotificationTime = currentTime, errorMessage = alertError?.message,
                 errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
-                schemaVersion = IndexUtils.alertIndexSchemaVersion)
+                schemaVersion = IndexUtils.alertIndexSchemaVersion
+            )
         } else {
             val alertState = if (alertError == null) Alert.State.ACTIVE else Alert.State.ERROR
-            Alert(monitor = ctx.monitor, trigger = ctx.trigger, startTime = currentTime,
+            Alert(
+                monitor = ctx.monitor, trigger = ctx.trigger, startTime = currentTime,
                 lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
                 errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
-                schemaVersion = IndexUtils.alertIndexSchemaVersion)
+                schemaVersion = IndexUtils.alertIndexSchemaVersion
+            )
         }
     }
 
@@ -172,8 +188,11 @@ class AlertService(
             when {
                 actionRunResult == null -> updatedActionExecutionResults.add(actionExecutionResult)
                 actionRunResult.throttled ->
-                    updatedActionExecutionResults.add(actionExecutionResult.copy(
-                        throttledCount = actionExecutionResult.throttledCount + 1))
+                    updatedActionExecutionResults.add(
+                        actionExecutionResult.copy(
+                            throttledCount = actionExecutionResult.throttledCount + 1
+                        )
+                    )
                 else -> updatedActionExecutionResults.add(actionExecutionResult.copy(lastExecutionTime = actionRunResult.executionTime))
             }
         }
@@ -221,10 +240,12 @@ class AlertService(
             } else {
                 // New Alert
                 // TODO: Setting lastNotificationTime is deceiving since the actions haven't run yet, maybe it should be null here
-                val newAlert = Alert(monitor = monitor, trigger = trigger, startTime = currentTime,
+                val newAlert = Alert(
+                    monitor = monitor, trigger = trigger, startTime = currentTime,
                     lastNotificationTime = currentTime, state = Alert.State.ACTIVE, errorMessage = null,
                     errorHistory = mutableListOf(), actionExecutionResults = mutableListOf(),
-                    schemaVersion = IndexUtils.alertIndexSchemaVersion, aggregationResultBucket = aggAlertBucket)
+                    schemaVersion = IndexUtils.alertIndexSchemaVersion, aggregationResultBucket = aggAlertBucket
+                )
                 newAlerts.add(newAlert)
             }
         }
@@ -238,8 +259,10 @@ class AlertService(
     fun convertToCompletedAlerts(currentAlerts: Map<String, Alert>?): List<Alert> {
         val currentTime = Instant.now()
         return currentAlerts?.map {
-            it.value.copy(state = Alert.State.COMPLETED, endTime = currentTime, errorMessage = null,
-                schemaVersion = IndexUtils.alertIndexSchemaVersion)
+            it.value.copy(
+                state = Alert.State.COMPLETED, endTime = currentTime, errorMessage = null,
+                schemaVersion = IndexUtils.alertIndexSchemaVersion
+            )
         } ?: listOf()
     }
 
@@ -251,10 +274,12 @@ class AlertService(
             // spend time reloading the alert and writing it back.
             when (alert.state) {
                 Alert.State.ACTIVE, Alert.State.ERROR -> {
-                    listOf<DocWriteRequest<*>>(IndexRequest(AlertIndices.ALERT_INDEX)
-                        .routing(alert.monitorId)
-                        .source(alert.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
-                        .id(if (alert.id != Alert.NO_ID) alert.id else null))
+                    listOf<DocWriteRequest<*>>(
+                        IndexRequest(AlertIndices.ALERT_INDEX)
+                            .routing(alert.monitorId)
+                            .source(alert.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
+                            .id(if (alert.id != Alert.NO_ID) alert.id else null)
+                    )
                 }
                 Alert.State.ACKNOWLEDGED, Alert.State.DELETED -> {
                     throw IllegalStateException("Unexpected attempt to save ${alert.state} alert: $alert")
@@ -354,8 +379,10 @@ class AlertService(
     }
 
     private fun contentParser(bytesReference: BytesReference): XContentParser {
-        val xcp = XContentHelper.createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-            bytesReference, XContentType.JSON)
+        val xcp = XContentHelper.createParser(
+            xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+            bytesReference, XContentType.JSON
+        )
         XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
         return xcp
     }

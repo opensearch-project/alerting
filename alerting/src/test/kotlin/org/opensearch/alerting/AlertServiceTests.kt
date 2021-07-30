@@ -11,15 +11,17 @@
 
 package org.opensearch.alerting
 
+import org.junit.Before
+import org.mockito.Mockito
+import org.opensearch.Version
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.model.AggregationResultBucket
-import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.Alert
+import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.action.AlertCategory
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.getBucketKeysHash
-import org.opensearch.Version
 import org.opensearch.client.Client
 import org.opensearch.cluster.node.DiscoveryNode
 import org.opensearch.cluster.service.ClusterService
@@ -30,8 +32,6 @@ import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.test.ClusterServiceUtils
 import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.threadpool.ThreadPool
-import org.junit.Before
-import org.mockito.Mockito
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
@@ -77,19 +77,24 @@ class AlertServiceTests : OpenSearchTestCase() {
         val monitor = randomBucketLevelMonitor(triggers = listOf(trigger))
 
         val currentAlerts = mutableMapOf<String, Alert>()
-        val aggResultBuckets = createAggregationResultBucketsFromBucketKeys(listOf(
-            listOf("a"),
-            listOf("b")
-        ))
+        val aggResultBuckets = createAggregationResultBucketsFromBucketKeys(
+            listOf(
+                listOf("a"),
+                listOf("b")
+            )
+        )
 
         val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(monitor, trigger, currentAlerts, aggResultBuckets)
         // Completed Alerts are what remains in currentAlerts after categorization
         val completedAlerts = currentAlerts.values.toList()
         assertEquals(listOf<Alert>(), categorizedAlerts[AlertCategory.DEDUPED])
-        assertAlertsExistForBucketKeys(listOf(
-            listOf("a"),
-            listOf("b")
-        ), categorizedAlerts[AlertCategory.NEW] ?: error("New alerts not found"))
+        assertAlertsExistForBucketKeys(
+            listOf(
+                listOf("a"),
+                listOf("b")
+            ),
+            categorizedAlerts[AlertCategory.NEW] ?: error("New alerts not found")
+        )
         assertEquals(listOf<Alert>(), completedAlerts)
     }
 
@@ -97,22 +102,30 @@ class AlertServiceTests : OpenSearchTestCase() {
         val trigger = randomBucketLevelTrigger()
         val monitor = randomBucketLevelMonitor(triggers = listOf(trigger))
 
-        val currentAlerts = createCurrentAlertsFromBucketKeys(monitor, trigger, listOf(
-            listOf("a"),
-            listOf("b")
-        ))
-        val aggResultBuckets = createAggregationResultBucketsFromBucketKeys(listOf(
-            listOf("a"),
-            listOf("b")
-        ))
+        val currentAlerts = createCurrentAlertsFromBucketKeys(
+            monitor, trigger,
+            listOf(
+                listOf("a"),
+                listOf("b")
+            )
+        )
+        val aggResultBuckets = createAggregationResultBucketsFromBucketKeys(
+            listOf(
+                listOf("a"),
+                listOf("b")
+            )
+        )
 
         val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(monitor, trigger, currentAlerts, aggResultBuckets)
         // Completed Alerts are what remains in currentAlerts after categorization
         val completedAlerts = currentAlerts.values.toList()
-        assertAlertsExistForBucketKeys(listOf(
-            listOf("a"),
-            listOf("b")
-        ), categorizedAlerts[AlertCategory.DEDUPED] ?: error("Deduped alerts not found"))
+        assertAlertsExistForBucketKeys(
+            listOf(
+                listOf("a"),
+                listOf("b")
+            ),
+            categorizedAlerts[AlertCategory.DEDUPED] ?: error("Deduped alerts not found")
+        )
         assertEquals(listOf<Alert>(), categorizedAlerts[AlertCategory.NEW])
         assertEquals(listOf<Alert>(), completedAlerts)
     }
@@ -121,10 +134,13 @@ class AlertServiceTests : OpenSearchTestCase() {
         val trigger = randomBucketLevelTrigger()
         val monitor = randomBucketLevelMonitor(triggers = listOf(trigger))
 
-        val currentAlerts = createCurrentAlertsFromBucketKeys(monitor, trigger, listOf(
-            listOf("a"),
-            listOf("b")
-        ))
+        val currentAlerts = createCurrentAlertsFromBucketKeys(
+            monitor, trigger,
+            listOf(
+                listOf("a"),
+                listOf("b")
+            )
+        )
         val aggResultBuckets = listOf<AggregationResultBucket>()
 
         val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(monitor, trigger, currentAlerts, aggResultBuckets)
@@ -132,24 +148,32 @@ class AlertServiceTests : OpenSearchTestCase() {
         val completedAlerts = currentAlerts.values.toList()
         assertEquals(listOf<Alert>(), categorizedAlerts[AlertCategory.DEDUPED])
         assertEquals(listOf<Alert>(), categorizedAlerts[AlertCategory.NEW])
-        assertAlertsExistForBucketKeys(listOf(
-            listOf("a"),
-            listOf("b")
-        ), completedAlerts)
+        assertAlertsExistForBucketKeys(
+            listOf(
+                listOf("a"),
+                listOf("b")
+            ),
+            completedAlerts
+        )
     }
 
     fun `test getting categorized alerts for bucket-level monitor with de-duped and completed alerts`() {
         val trigger = randomBucketLevelTrigger()
         val monitor = randomBucketLevelMonitor(triggers = listOf(trigger))
 
-        val currentAlerts = createCurrentAlertsFromBucketKeys(monitor, trigger, listOf(
-            listOf("a"),
-            listOf("b")
-        ))
-        val aggResultBuckets = createAggregationResultBucketsFromBucketKeys(listOf(
-            listOf("b"),
-            listOf("c")
-        ))
+        val currentAlerts = createCurrentAlertsFromBucketKeys(
+            monitor, trigger,
+            listOf(
+                listOf("a"),
+                listOf("b")
+            )
+        )
+        val aggResultBuckets = createAggregationResultBucketsFromBucketKeys(
+            listOf(
+                listOf("b"),
+                listOf("c")
+            )
+        )
 
         val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(monitor, trigger, currentAlerts, aggResultBuckets)
         // Completed Alerts are what remains in currentAlerts after categorization
@@ -166,8 +190,10 @@ class AlertServiceTests : OpenSearchTestCase() {
     ): MutableMap<String, Alert> {
         return bucketKeysList.map { bucketKeys ->
             val aggResultBucket = AggregationResultBucket("parent_bucket_path", bucketKeys, mapOf())
-            val alert = Alert(monitor, trigger, Instant.now().truncatedTo(ChronoUnit.MILLIS), null,
-                actionExecutionResults = listOf(randomActionExecutionResult()), aggregationResultBucket = aggResultBucket)
+            val alert = Alert(
+                monitor, trigger, Instant.now().truncatedTo(ChronoUnit.MILLIS), null,
+                actionExecutionResults = listOf(randomActionExecutionResult()), aggregationResultBucket = aggResultBucket
+            )
             aggResultBucket.getBucketKeysHash() to alert
         }.toMap() as MutableMap<String, Alert>
     }

@@ -56,7 +56,8 @@ class IndexMonitorResponseTests : OpenSearchTestCase() {
             schemaVersion = 0,
             inputs = mutableListOf(),
             triggers = mutableListOf(),
-            uiMetadata = mutableMapOf())
+            uiMetadata = mutableMapOf()
+        )
         val req = IndexMonitorResponse("1234", 1L, 2L, 0L, RestStatus.OK, monitor)
         assertNotNull(req)
 

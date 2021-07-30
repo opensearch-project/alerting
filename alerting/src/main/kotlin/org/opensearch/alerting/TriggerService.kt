@@ -68,8 +68,10 @@ class TriggerService(val scriptService: ScriptService) {
         return try {
             val bucketIndices =
                 ((ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)[trigger.id] as HashMap<*, *>)[BUCKET_INDICES] as List<*>
-            val parentBucketPath = ((ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
-                .get(trigger.id) as HashMap<*, *>)[PARENT_BUCKET_PATH] as String
+            val parentBucketPath = (
+                (ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
+                    .get(trigger.id) as HashMap<*, *>
+                )[PARENT_BUCKET_PATH] as String
             val aggregationPath = AggregationPath.parse(parentBucketPath)
             // TODO test this part by passing sub-aggregation path
             var parentAgg = (ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
