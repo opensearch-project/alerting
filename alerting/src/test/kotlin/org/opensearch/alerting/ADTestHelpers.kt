@@ -514,12 +514,16 @@ fun randomADMonitor(
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     withMetadata: Boolean = false
 ): Monitor {
-    return Monitor(name = name, monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
+    return Monitor(
+        name = name, monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime,
-        user = user, uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf())
+        user = user, uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+    )
 }
 
 fun randomADUser(backendRole: String = OpenSearchRestTestCase.randomAlphaOfLength(10)): User {
-    return User(OpenSearchRestTestCase.randomAlphaOfLength(10), listOf(backendRole),
-        listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), "all_access"), listOf("test_attr=test"))
+    return User(
+        OpenSearchRestTestCase.randomAlphaOfLength(10), listOf(backendRole),
+        listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), "all_access"), listOf("test_attr=test")
+    )
 }

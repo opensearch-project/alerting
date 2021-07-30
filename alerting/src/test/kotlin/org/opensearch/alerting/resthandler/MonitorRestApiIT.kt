@@ -43,15 +43,14 @@ import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
-import org.opensearch.alerting.model.Trigger
 import org.opensearch.alerting.randomADMonitor
 import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomAlert
 import org.opensearch.alerting.randomAnomalyDetector
 import org.opensearch.alerting.randomAnomalyDetectorWithUser
 import org.opensearch.alerting.randomQueryLevelMonitor
-import org.opensearch.alerting.randomThrottle
 import org.opensearch.alerting.randomQueryLevelTrigger
+import org.opensearch.alerting.randomThrottle
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.client.ResponseException
 import org.opensearch.client.WarningFailureException

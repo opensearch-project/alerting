@@ -26,7 +26,7 @@ data class BucketLevelTriggerRunResult(
 
     @Throws(IOException::class)
     @Suppress("UNCHECKED_CAST")
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         sin.readString(),
         sin.readException() as Exception?, // error
         sin.readMap(StreamInput::readString, ::AggregationResultBucket),
@@ -44,7 +44,8 @@ data class BucketLevelTriggerRunResult(
     override fun writeTo(out: StreamOutput) {
         super.writeTo(out)
         out.writeMap(aggregationResultBuckets, StreamOutput::writeString) {
-            valueOut: StreamOutput, aggResultBucket: AggregationResultBucket -> aggResultBucket.writeTo(valueOut)
+            valueOut: StreamOutput, aggResultBucket: AggregationResultBucket ->
+            aggResultBucket.writeTo(valueOut)
         }
         out.writeMap(actionResultsMap as Map<String, Any>)
     }

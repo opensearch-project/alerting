@@ -11,10 +11,10 @@
 
 package org.opensearch.alerting.util
 
+import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.Trigger
-import org.opensearch.action.search.SearchResponse
 import org.opensearch.search.aggregations.AggregationBuilder
 import org.opensearch.search.aggregations.AggregatorFactories
 import org.opensearch.search.aggregations.bucket.SingleBucketAggregation

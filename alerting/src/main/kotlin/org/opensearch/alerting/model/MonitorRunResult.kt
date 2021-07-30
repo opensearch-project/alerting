@@ -27,9 +27,9 @@
 package org.opensearch.alerting.model
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.OpenSearchException
 import org.opensearch.alerting.alerts.AlertError
 import org.opensearch.alerting.elasticapi.optionalTimeField
-import org.opensearch.OpenSearchException
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.io.stream.Writeable
