@@ -233,16 +233,15 @@ class AlertService(
             val currentAlert = currentAlerts[aggAlertBucket.getBucketKeysHash()]
             if (currentAlert != null) {
                 // De-duped Alert
-                dedupedAlerts.add(currentAlert.copy(lastNotificationTime = currentTime, aggregationResultBucket = aggAlertBucket))
+                dedupedAlerts.add(currentAlert.copy(aggregationResultBucket = aggAlertBucket))
 
                 // Remove de-duped Alert from currentAlerts since it is no longer a candidate for a potentially completed Alert
                 currentAlerts.remove(aggAlertBucket.getBucketKeysHash())
             } else {
                 // New Alert
-                // TODO: Setting lastNotificationTime is deceiving since the actions haven't run yet, maybe it should be null here
                 val newAlert = Alert(
                     monitor = monitor, trigger = trigger, startTime = currentTime,
-                    lastNotificationTime = currentTime, state = Alert.State.ACTIVE, errorMessage = null,
+                    lastNotificationTime = null, state = Alert.State.ACTIVE, errorMessage = null,
                     errorHistory = mutableListOf(), actionExecutionResults = mutableListOf(),
                     schemaVersion = IndexUtils.alertIndexSchemaVersion, aggregationResultBucket = aggAlertBucket
                 )
@@ -266,7 +265,7 @@ class AlertService(
         } ?: listOf()
     }
 
-    suspend fun saveAlerts(alerts: List<Alert>, retryPolicy: BackoffPolicy) {
+    suspend fun saveAlerts(alerts: List<Alert>, retryPolicy: BackoffPolicy, allowUpdatingAcknowledgedAlert: Boolean = false) {
         var requestsToRetry = alerts.flatMap { alert ->
             // We don't want to set the version when saving alerts because the MonitorRunner has first priority when writing alerts.
             // In the rare event that a user acknowledges an alert between when it's read and when it's written
@@ -281,7 +280,21 @@ class AlertService(
                             .id(if (alert.id != Alert.NO_ID) alert.id else null)
                     )
                 }
-                Alert.State.ACKNOWLEDGED, Alert.State.DELETED -> {
+                Alert.State.ACKNOWLEDGED -> {
+                    // Allow ACKNOWLEDGED Alerts to be updated for Bucket-Level Monitors since de-duped Alerts can be ACKNOWLEDGED
+                    // and updated by the MonitorRunner
+                    if (allowUpdatingAcknowledgedAlert) {
+                        listOf<DocWriteRequest<*>>(
+                            IndexRequest(AlertIndices.ALERT_INDEX)
+                                .routing(alert.monitorId)
+                                .source(alert.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
+                                .id(if (alert.id != Alert.NO_ID) alert.id else null)
+                        )
+                    } else {
+                        throw IllegalStateException("Unexpected attempt to save ${alert.state} alert: $alert")
+                    }
+                }
+                Alert.State.DELETED -> {
                     throw IllegalStateException("Unexpected attempt to save ${alert.state} alert: $alert")
                 }
                 Alert.State.COMPLETED -> {

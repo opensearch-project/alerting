@@ -47,6 +47,7 @@ import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.email.Email
 import org.opensearch.alerting.model.destination.email.Recipient
 import org.opensearch.alerting.util.DestinationType
+import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.ResponseException
 import org.opensearch.client.WarningFailureException
 import org.opensearch.common.settings.Settings
@@ -1084,6 +1085,95 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         val completedAlerts = alerts.filter { it.state == COMPLETED }
         assertEquals("Incorrect number of active alerts", 1, activeAlerts.size)
         assertEquals("Incorrect number of completed alerts", 1, completedAlerts.size)
+    }
+
+    fun `test bucket-level monitor with acknowledged alert`() {
+        val testIndex = createTestIndex()
+        insertSampleTimeSerializedData(
+            testIndex,
+            listOf(
+                "test_value_1",
+                "test_value_2"
+            )
+        )
+
+        val query = QueryBuilders.rangeQuery("test_strict_date_time")
+            .gt("{{period_end}}||-10d")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
+        val compositeSources = listOf(
+            TermsValuesSourceBuilder("test_field").field("test_field")
+        )
+        val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
+        val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
+        val triggerScript = """
+            params.docCount > 0
+        """.trimIndent()
+
+        var trigger = randomBucketLevelTrigger()
+        trigger = trigger.copy(
+            bucketSelector = BucketSelectorExtAggregationBuilder(
+                name = trigger.id,
+                bucketsPathsMap = mapOf("docCount" to "_count"),
+                script = Script(triggerScript),
+                parentBucketPath = "composite_agg",
+                filter = null
+            )
+        )
+        val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
+        executeMonitor(monitor.id, params = DRYRUN_MONITOR)
+
+        // Check created Alerts
+        var currentAlerts = searchAlerts(monitor)
+        assertEquals("Alerts not saved", 2, currentAlerts.size)
+        currentAlerts.forEach {
+            verifyAlert(it, monitor, ACTIVE)
+        }
+
+        // Acknowledge one of the Alerts
+        val alertToAcknowledge = currentAlerts.single { it.aggregationResultBucket?.getBucketKeysHash().equals("test_value_1") }
+        acknowledgeAlerts(monitor, alertToAcknowledge)
+        currentAlerts = searchAlerts(monitor)
+        val acknowledgedAlert = currentAlerts.single { it.state == ACKNOWLEDGED }
+        val activeAlert = currentAlerts.single { it.state == ACTIVE }
+
+        // Runner uses ThreadPool.CachedTimeThread thread which only updates once every 200 ms. Wait a bit to
+        // let lastNotificationTime change.  W/o this sleep the test can result in a false negative.
+        Thread.sleep(200)
+        executeMonitor(monitor.id, params = DRYRUN_MONITOR)
+
+        // Check that the lastNotification time of the acknowledged Alert wasn't updated and the active Alert's was
+        currentAlerts = searchAlerts(monitor)
+        val currentAcknowledgedAlert = currentAlerts.single { it.state == ACKNOWLEDGED }
+        val currentActiveAlert = currentAlerts.single { it.state == ACTIVE }
+        assertEquals("Acknowledged alert was updated", acknowledgedAlert.lastNotificationTime, currentAcknowledgedAlert.lastNotificationTime)
+        assertTrue("Active alert was not updated", currentActiveAlert.lastNotificationTime!! > activeAlert.lastNotificationTime)
+
+        // Remove data so that both Alerts are moved into completed
+        deleteDataWithDocIds(
+            testIndex,
+            listOf(
+                "1", // test_value_1
+                "2" // test_value_2
+            )
+        )
+
+        // Execute Monitor and check that both Alerts were updated
+        Thread.sleep(200)
+        executeMonitor(monitor.id, params = DRYRUN_MONITOR)
+        currentAlerts = searchAlerts(monitor, AlertIndices.ALL_INDEX_PATTERN)
+        val completedAlerts = currentAlerts.filter { it.state == COMPLETED }
+        assertEquals("Incorrect number of completed alerts", 2, completedAlerts.size)
+        val previouslyAcknowledgedAlert = completedAlerts.single { it.aggregationResultBucket?.getBucketKeysHash().equals("test_value_1") }
+        val previouslyActiveAlert = completedAlerts.single { it.aggregationResultBucket?.getBucketKeysHash().equals("test_value_2") }
+        assertTrue(
+            "Previously acknowledged alert was not updated when it moved to completed",
+            previouslyAcknowledgedAlert.lastNotificationTime!! > currentAcknowledgedAlert.lastNotificationTime
+        )
+        assertTrue(
+            "Previously active alert was not updated when it moved to completed",
+            previouslyActiveAlert.lastNotificationTime!! > currentActiveAlert.lastNotificationTime
+        )
     }
 
     @Suppress("UNCHECKED_CAST")
