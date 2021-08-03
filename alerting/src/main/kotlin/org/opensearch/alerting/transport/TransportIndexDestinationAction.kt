@@ -91,13 +91,9 @@ class TransportIndexDestinationAction @Inject constructor(
                 notificationResponse = NotificationAPIUtils.createNotificationConfig(client, createRequest)
                 configId = notificationResponse.configId
             }
-            log.info("destination has been updated")
-
-            Thread.sleep(1000)
 
             val getNotificationConfigRequest = GetNotificationConfigRequest(setOf(configId), 0, 1, null, null, emptyMap())
             val getNotificationConfigResponse = NotificationAPIUtils.getNotificationConfig(client, getNotificationConfigRequest)
-            log.info("destination data has been retrieved")
             if (request.method == RestRequest.Method.PUT) {
                 actionListener.onResponse(
                     convertUpdateNotificationConfigResponseToIndexDestinationResponse(

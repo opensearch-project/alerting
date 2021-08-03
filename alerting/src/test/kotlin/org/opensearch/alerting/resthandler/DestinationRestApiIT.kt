@@ -211,8 +211,22 @@ class DestinationRestApiIT : AlertingRestTestCase() {
 
     fun `test updating a custom webhook destination`() {
         if (isNotificationPluginInstalled()) {
-            val destination = createDestination()
-            val customWebhook = CustomWebhook("http://update1.com", "http", "abc.com", 80, null, null, emptyMap(), emptyMap(), null, null)
+            var customWebhook = CustomWebhook(
+                "", "http", "abc.com", 80, "a/b/c", "PATCH",
+                mapOf("foo" to "1", "bar" to "2"), mapOf("h1" to "1", "h2" to "2"), null, null
+            )
+            val dest = Destination(
+                type = DestinationType.CUSTOM_WEBHOOK,
+                name = "test",
+                user = randomUser(),
+                lastUpdateTime = Instant.now(),
+                chime = null,
+                slack = null,
+                customWebhook = customWebhook,
+                email = null
+            )
+            val destination = createDestination(dest)
+            customWebhook = CustomWebhook("http://update1.com", "http", "abc.com", 80, null, null, emptyMap(), emptyMap(), null, null)
             var updatedDestination = updateDestination(
                 destination.copy(
                     name = "updatedName", customWebhook = customWebhook,
@@ -278,9 +292,21 @@ class DestinationRestApiIT : AlertingRestTestCase() {
 
     fun `test updating an email destination`() {
         if (isNotificationPluginInstalled()) {
-            val destination = createDestination()
             val recipient = Recipient(type = Recipient.RecipientType.EMAIL, emailGroupID = null, email = "test@email.com")
-            val email = Email("", listOf(recipient))
+            var email = Email("", listOf(recipient))
+            val dest = Destination(
+                type = DestinationType.EMAIL,
+                name = "test",
+                user = randomUser(),
+                lastUpdateTime = Instant.now(),
+                chime = null,
+                slack = null,
+                customWebhook = null,
+                email = email
+            )
+            val destination = createDestination(dest)
+            val recipient2 = Recipient(type = Recipient.RecipientType.EMAIL, emailGroupID = null, email = "test2@email.com")
+            email = Email("", listOf(recipient, recipient2))
 
             var updatedDestination = updateDestination(destination.copy(type = DestinationType.EMAIL, name = "updatedName", email = email))
             Assert.assertNotNull("Email object should not be null", updatedDestination.email)
@@ -387,14 +413,14 @@ class DestinationRestApiIT : AlertingRestTestCase() {
 
     fun `test get destinations with slack destination type`() {
         if (isNotificationPluginInstalled()) {
-            val slack = Slack("url")
+            val chime = Chime("http://abc.com")
             val dest = Destination(
-                type = DestinationType.SLACK,
-                name = "testSlack",
+                type = DestinationType.CHIME,
+                name = "test",
                 user = randomUser(),
                 lastUpdateTime = Instant.now(),
-                chime = null,
-                slack = slack,
+                chime = chime,
+                slack = null,
                 customWebhook = null,
                 email = null
             )
@@ -403,8 +429,9 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             inputMap["missing"] = "_last"
             inputMap["destinationType"] = "slack"
 
-            val destination = createDestination(dest)
-            val destination2 = createDestination()
+            //this defaults to creating a slack destination
+            val destination = createDestination()
+            val destination2 = createDestination(dest)
             val getDestinationsResponse = getDestinations(inputMap)
 
             assertEquals(1, getDestinationsResponse.size)
