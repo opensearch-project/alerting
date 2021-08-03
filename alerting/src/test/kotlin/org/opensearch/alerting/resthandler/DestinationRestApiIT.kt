@@ -94,8 +94,19 @@ class DestinationRestApiIT : AlertingRestTestCase() {
 
     fun `test updating a chime destination`() {
         if (isNotificationPluginInstalled()) {
-            val destination = createDestination()
-            val chime = Chime("http://updated.com")
+            var chime = Chime("http://abc.com")
+            val dest = Destination(
+                type = DestinationType.CHIME,
+                name = "test",
+                user = randomUser(),
+                lastUpdateTime = Instant.now(),
+                chime = chime,
+                slack = null,
+                customWebhook = null,
+                email = null
+            )
+            val destination = createDestination(dest)
+            chime = Chime("http://updated.com")
             var updatedDestination = updateDestination(
                 destination.copy(name = "updatedName", chime = chime, type = DestinationType.CHIME)
             )
