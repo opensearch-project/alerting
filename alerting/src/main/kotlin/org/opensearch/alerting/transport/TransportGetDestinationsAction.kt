@@ -27,6 +27,7 @@
 package org.opensearch.alerting.transport
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
@@ -98,7 +99,16 @@ class TransportGetDestinationsAction @Inject constructor(
             val getNotificationConfigResponse = NotificationAPIUtils.getNotificationConfig(client, getRequest)
             getDestinationsResponse = convertGetNotificationConfigResponseToGetDestinationsResponse(getNotificationConfigResponse)
             if (getDestinationsRequest.destinationId != null) {
-                actionListener.onResponse(getDestinationsResponse)
+                if (getDestinationsResponse.destinations.isEmpty()) {
+                    actionListener.onFailure(
+                        OpenSearchStatusException(
+                            "Destination ${getDestinationsRequest.destinationId} cannot be found",
+                            RestStatus.NOT_FOUND
+                        )
+                    )
+                } else {
+                    actionListener.onResponse(getDestinationsResponse)
+                }
                 return
             }
         } catch (e: Exception) {

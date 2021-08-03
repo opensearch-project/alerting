@@ -45,6 +45,7 @@ import org.opensearch.alerting.elasticapi.string
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.destination.Destination
+import org.opensearch.alerting.model.destination.Slack
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
 import org.opensearch.alerting.settings.AlertingSettings
@@ -423,13 +424,14 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     private fun getTestDestination(): Destination {
+        val slack = Slack("https://hooks.slack.com/services/slackId")
         return Destination(
-            type = DestinationType.TEST_ACTION,
+            type = DestinationType.SLACK,
             name = "test",
             user = randomUser(),
             lastUpdateTime = Instant.now(),
             chime = null,
-            slack = null,
+            slack = slack,
             customWebhook = null,
             email = null
         )
