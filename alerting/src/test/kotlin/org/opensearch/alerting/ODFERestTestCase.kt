@@ -92,31 +92,31 @@ abstract class ODFERestTestCase : OpenSearchRestTestCase() {
         return true
     }
 
-    @Throws(IOException::class)
-    @After
-    open fun wipeAllODFEIndices() {
-        val response = client().performRequest(Request("GET", "/_cat/indices?format=json&expand_wildcards=all"))
-
-        val xContentType = XContentType.fromMediaTypeOrFormat(response.entity.contentType.value)
-        xContentType.xContent().createParser(
-            NamedXContentRegistry.EMPTY, DeprecationHandler.THROW_UNSUPPORTED_OPERATION,
-            response.entity.content
-        ).use { parser ->
-            for (index in parser.list()) {
-                val jsonObject: Map<*, *> = index as java.util.HashMap<*, *>
-                val indexName: String = jsonObject["index"] as String
-                // .opendistro_security isn't allowed to delete from cluster
-                if (".opendistro_security" != indexName) {
-                    var request = Request("DELETE", "/$indexName")
-                    // TODO: remove PERMISSIVE option after moving system index access to REST API call
-                    val options = RequestOptions.DEFAULT.toBuilder()
-                    options.setWarningsHandler(WarningsHandler.PERMISSIVE)
-                    request.options = options.build()
-                    adminClient().performRequest(request)
-                }
-            }
-        }
-    }
+//    @Throws(IOException::class)
+//    @After
+//    open fun wipeAllODFEIndices() {
+//        val response = client().performRequest(Request("GET", "/_cat/indices?format=json&expand_wildcards=all"))
+//
+//        val xContentType = XContentType.fromMediaTypeOrFormat(response.entity.contentType.value)
+//        xContentType.xContent().createParser(
+//            NamedXContentRegistry.EMPTY, DeprecationHandler.THROW_UNSUPPORTED_OPERATION,
+//            response.entity.content
+//        ).use { parser ->
+//            for (index in parser.list()) {
+//                val jsonObject: Map<*, *> = index as java.util.HashMap<*, *>
+//                val indexName: String = jsonObject["index"] as String
+//                // .opendistro_security isn't allowed to delete from cluster
+//                if (".opendistro_security" != indexName) {
+//                    var request = Request("DELETE", "/$indexName")
+//                    // TODO: remove PERMISSIVE option after moving system index access to REST API call
+//                    val options = RequestOptions.DEFAULT.toBuilder()
+//                    options.setWarningsHandler(WarningsHandler.PERMISSIVE)
+//                    request.options = options.build()
+//                    adminClient().performRequest(request)
+//                }
+//            }
+//        }
+//    }
 
     /**
      * Returns the REST client settings used for super-admin actions like cleaning up after the test has completed.

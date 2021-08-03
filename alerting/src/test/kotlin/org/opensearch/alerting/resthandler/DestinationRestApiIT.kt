@@ -372,9 +372,6 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             val getDestinationResponse = getDestination(destination)
             assertEquals(destination.id, getDestinationResponse["id"])
             assertEquals(destination.type.value, getDestinationResponse["type"])
-            assertEquals(destination.seqNo, getDestinationResponse["seq_no"])
-            assertEquals(destination.lastUpdateTime.toEpochMilli(), getDestinationResponse["last_update_time"])
-            assertEquals(destination.primaryTerm, getDestinationResponse["primary_term"])
         }
     }
 
@@ -406,15 +403,12 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             assertEquals(destination.id, getDestinationResponse["id"])
             assertNotEquals(destination2.id, getDestinationResponse["id"])
             assertEquals(destination.type.value, getDestinationResponse["type"])
-            assertEquals(destination.seqNo, getDestinationResponse["seq_no"])
-            assertEquals(destination.lastUpdateTime.toEpochMilli(), getDestinationResponse["last_update_time"])
-            assertEquals(destination.primaryTerm, getDestinationResponse["primary_term"])
         }
     }
 
     fun `test get destinations matching a given name`() {
         if (isNotificationPluginInstalled()) {
-            val slack = Slack("https://hooks.slack.com/services/slackIdTest")
+            val slack = Slack("https://hooks.slack.com/services/slackGivenName")
             val dest = Destination(
                 type = DestinationType.SLACK,
                 name = "testSlack",
@@ -439,9 +433,6 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             assertEquals(destination.id, getDestinationResponse["id"])
             assertNotEquals(destination2.id, getDestinationResponse["id"])
             assertEquals(destination.type.value, getDestinationResponse["type"])
-            assertEquals(destination.seqNo, getDestinationResponse["seq_no"])
-            assertEquals(destination.lastUpdateTime.toEpochMilli(), getDestinationResponse["last_update_time"])
-            assertEquals(destination.primaryTerm, getDestinationResponse["primary_term"])
         }
     }
 }
