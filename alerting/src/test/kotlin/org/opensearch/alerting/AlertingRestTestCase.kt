@@ -244,6 +244,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun updateDestination(destination: Destination, refresh: Boolean = true): Destination {
+        log.info("updated Destination: ${destination.toHttpEntity()}")
         val response = client().makeRequest(
             "PUT",
             "$DESTINATION_BASE_URI/${destination.id}?refresh=$refresh",
