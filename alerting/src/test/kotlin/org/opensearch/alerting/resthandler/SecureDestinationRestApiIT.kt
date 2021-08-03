@@ -109,7 +109,7 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
         if (isNotificationPluginInstalled()) {
             disableFilterBy()
 
-            val chime = Chime("http://abc.com")
+            var chime = Chime("http://abc.com")
             val destination = Destination(
                 type = DestinationType.CHIME,
                 name = "test",
@@ -124,12 +124,14 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
 
             assertEquals("Incorrect destination name", createdDestination.name, "test")
             assertEquals("Incorrect destination type", createdDestination.type, DestinationType.CHIME)
+            assertEquals("Incorrect destination url", createdDestination.chime?.url, "http://abc.com")
 
-            val slack = Slack("http://abc.com")
-            val destinationV2 = createdDestination.copy(name = "testUpdate", type = DestinationType.SLACK, chime = null, slack = slack)
+            chime = Chime("http://abcUpdated.com")
+            val destinationV2 = createdDestination.copy(name = "testUpdate", chime = chime)
 
             val updatedDestination = updateDestination(destination = destinationV2)
             assertEquals("Incorrect destination name", updatedDestination.name, "testUpdate")
+            assertEquals("Incorrect destination url", updatedDestination.chime?.url, "http://abcUpdated.com")
             assertEquals("Incorrect destination type", updatedDestination.type, DestinationType.SLACK)
         }
     }
@@ -244,7 +246,7 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
     fun `test get destinations with a destination type and disable filter by`() {
         if (isNotificationPluginInstalled()) {
             disableFilterBy()
-            val slack = Slack("url")
+            val slack = Slack("https://hooks.slack.com/services/slackId")
             val destination = Destination(
                 type = DestinationType.SLACK,
                 name = "testSlack",

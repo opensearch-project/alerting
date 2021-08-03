@@ -263,7 +263,7 @@ class DestinationRestApiIT : AlertingRestTestCase() {
     fun `test creating an email destination`() {
         if (isNotificationPluginInstalled()) {
             val recipient = Recipient(type = Recipient.RecipientType.EMAIL, emailGroupID = null, email = "test@email.com")
-            val email = Email("", listOf(recipient))
+            val email = Email("fakeEmailAccountId", listOf(recipient))
             val destination = Destination(
                 type = DestinationType.EMAIL,
                 name = "test",
@@ -293,7 +293,7 @@ class DestinationRestApiIT : AlertingRestTestCase() {
     fun `test updating an email destination`() {
         if (isNotificationPluginInstalled()) {
             val recipient = Recipient(type = Recipient.RecipientType.EMAIL, emailGroupID = null, email = "test@email.com")
-            var email = Email("", listOf(recipient))
+            var email = Email("fakeEmailAccountId", listOf(recipient))
             val dest = Destination(
                 type = DestinationType.EMAIL,
                 name = "test",
@@ -306,7 +306,7 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             )
             val destination = createDestination(dest)
             val recipient2 = Recipient(type = Recipient.RecipientType.EMAIL, emailGroupID = null, email = "test2@email.com")
-            email = Email("", listOf(recipient, recipient2))
+            email = Email("fakeEmailAccountId2", listOf(recipient, recipient2))
 
             var updatedDestination = updateDestination(destination.copy(type = DestinationType.EMAIL, name = "updatedName", email = email))
             Assert.assertNotNull("Email object should not be null", updatedDestination.email)
@@ -359,38 +359,8 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             assertEquals("Create destination failed", RestStatus.CREATED, createResponse.restStatus())
             val responseBody = createResponse.asMap()
             val createdId = responseBody["_id"] as String
-            val createdVersion = responseBody["_version"] as Int
             assertNotEquals("response is missing Id", Destination.NO_ID, createdId)
-            assertTrue("incorrect version", createdVersion > 0)
             assertEquals("Incorrect Location header", "$DESTINATION_BASE_URI/$createdId", createResponse.getHeader("Location"))
-        }
-    }
-
-    fun `test creating a disallowed destination fails`() {
-        if (isNotificationPluginInstalled()) {
-            try {
-                // Remove Slack from the allow_list
-                val allowedDestinations = DestinationType.values().toList()
-                    .filter { destinationType -> destinationType != DestinationType.SLACK }
-                    .joinToString(prefix = "[", postfix = "]") { string -> "\"$string\"" }
-                client().updateSettings(DestinationSettings.ALLOW_LIST.key, allowedDestinations)
-
-                val slack = Slack("http://abc.com")
-                val destination = Destination(
-                    type = DestinationType.SLACK,
-                    name = "test",
-                    user = randomUser(),
-                    lastUpdateTime = Instant.now(),
-                    chime = null,
-                    slack = slack,
-                    customWebhook = null,
-                    email = null
-                )
-                createDestination(destination = destination)
-                fail("Expected 403 Method FORBIDDEN response")
-            } catch (e: ResponseException) {
-                assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
-            }
         }
     }
 

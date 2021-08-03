@@ -77,7 +77,15 @@ class DestinationActionsConverter {
             val fromIndex = table.startIndex
             val maxItems = table.size
             val sortOrder: SortOrder = SortOrder.fromString(table.sortOrder)
-            val filterParams = mutableMapOf(Pair("config_type", "slack,chime,webhook,email"))
+            val filterParams = if (request.destinationType != "ALL") {
+                mutableMapOf(Pair("config_type", "slack,chime,webhook,email"))
+            } else {
+                if (request.destinationType == "custom_webhook") {
+                    mutableMapOf(Pair("config_type", "custom_webhook"))
+                } else {
+                    mutableMapOf(Pair("config_type", request.destinationType))
+                }
+            }
             if (!table.searchString.isNullOrBlank()) {
                 filterParams["name"] = table.searchString
             }
