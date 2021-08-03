@@ -222,6 +222,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             response.entity.content
         ).map()
         log.info("create a destination: $destinationJson")
+        Thread.sleep(100)
         return destination.copy(
             id = destinationJson["_id"] as String,
             version = (destinationJson["_version"] as Int).toLong(),
@@ -237,6 +238,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             destination.toHttpEntity()
         )
         assertEquals("Unable to create a new destination", RestStatus.OK, response.restStatus())
+        Thread.sleep(100)
 
         return response
     }
@@ -253,6 +255,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
+        Thread.sleep(100)
         return destination.copy(id = destinationJson["_id"] as String, version = (destinationJson["_version"] as Int).toLong())
     }
 
@@ -279,7 +282,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                 "email_account" -> emailAccount = EmailAccount.parse(parser)
             }
         }
-
         return emailAccount.copy(id = id, version = version)
     }
 
@@ -295,6 +297,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
+        Thread.sleep(100)
         return emailAccount.copy(id = emailAccountJson["_id"] as String)
     }
 
@@ -316,6 +319,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
+        Thread.sleep(100)
         return emailAccount.copy(id = emailAccountJson["_id"] as String)
     }
 
@@ -342,7 +346,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                 "email_group" -> emailGroup = EmailGroup.parse(parser)
             }
         }
-
         return emailGroup.copy(id = id, version = version)
     }
 
@@ -358,6 +361,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
+        Thread.sleep(100)
         return emailGroup.copy(id = emailGroupJson["_id"] as String)
     }
 
@@ -379,6 +383,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
+        Thread.sleep(100)
         return emailGroup.copy(id = emailGroupJson["_id"] as String)
     }
 

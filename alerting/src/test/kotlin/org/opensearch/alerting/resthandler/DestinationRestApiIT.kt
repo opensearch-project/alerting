@@ -65,8 +65,7 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             val createdDestination = createDestination(destination = destination)
             assertEquals("Incorrect destination name", createdDestination.name, "test")
             assertEquals("Incorrect destination type", createdDestination.type, DestinationType.CHIME)
-            // TODO: change this to assertNotNull
-            Assert.assertNull("chime object should not be null", createdDestination.chime)
+            Assert.assertNotNull("chime object should not be null", createdDestination.chime)
         }
     }
 
@@ -425,7 +424,6 @@ class DestinationRestApiIT : AlertingRestTestCase() {
 
             val destination = createDestination(dest)
             val destination2 = createDestination()
-            Thread.sleep(1000)
             val getDestinationsResponse = getDestinations(inputMap)
 
             assertEquals(1, getDestinationsResponse.size)
