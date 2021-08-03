@@ -44,6 +44,7 @@ import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 
+// TODO: support email search
 class TransportSearchEmailAccountAction @Inject constructor(
     transportService: TransportService,
     val client: Client,

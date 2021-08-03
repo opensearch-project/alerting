@@ -96,25 +96,6 @@ class EmailGroupRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test updating an email group when email destination is disallowed fails`() {
-        if (isNotificationPluginInstalled()) {
-            val emailGroup = createRandomEmailGroup()
-
-            try {
-                removeEmailFromAllowList()
-                updateEmailGroup(
-                    emailGroup.copy(
-                        name = "updatedName",
-                        emails = listOf(EmailEntry("test@email.com"))
-                    )
-                )
-                fail("Expected 403 Method FORBIDDEN response")
-            } catch (e: ResponseException) {
-                assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
-            }
-        }
-    }
-
     fun `test getting an email group`() {
         if (isNotificationPluginInstalled()) {
             val emailGroup = createRandomEmailGroup()
@@ -201,88 +182,89 @@ class EmailGroupRestApiIT : AlertingRestTestCase() {
             }
         }
     }
-
-    fun `test querying an email group that exists`() {
-        if (isNotificationPluginInstalled()) {
-            val emailGroup = createRandomEmailGroup()
-
-            val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", emailGroup.id)).toString()
-            val searchResponse = client().makeRequest(
-                "GET",
-                "$EMAIL_GROUP_BASE_URI/_search",
-                emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON)
-            )
-            assertEquals("Search email group failed", RestStatus.OK, searchResponse.restStatus())
-            val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
-            val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
-            val numberOfDocsFound = hits["total"]?.get("value")
-            assertEquals("Email group not found during search", 1, numberOfDocsFound)
-        }
-    }
-
-    fun `test querying an email group that exists with POST`() {
-        if (isNotificationPluginInstalled()) {
-            val emailGroup = createRandomEmailGroup()
-
-            val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", emailGroup.id)).toString()
-            val searchResponse = client().makeRequest(
-                "POST",
-                "$EMAIL_GROUP_BASE_URI/_search",
-                emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON)
-            )
-            assertEquals("Search email group failed", RestStatus.OK, searchResponse.restStatus())
-            val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
-            val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
-            val numberOfDocsFound = hits["total"]?.get("value")
-            assertEquals("Email group not found during search", 1, numberOfDocsFound)
-        }
-    }
-
-    fun `test querying an email group that doesn't exist`() {
-        if (isNotificationPluginInstalled()) {
-            // Create a random email group to create the ScheduledJob index. Otherwise the test will fail with a 404 index not found error.
-            createRandomEmailGroup()
-            val search = SearchSourceBuilder()
-                .query(
-                    QueryBuilders.termQuery(
-                        OpenSearchTestCase.randomAlphaOfLength(5),
-                        OpenSearchTestCase.randomAlphaOfLength(5)
-                    )
-                ).toString()
-
-            val searchResponse = client().makeRequest(
-                "GET",
-                "$EMAIL_GROUP_BASE_URI/_search",
-                emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON)
-            )
-            assertEquals("Search email group failed", RestStatus.OK, searchResponse.restStatus())
-            val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
-            val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
-            val numberOfDocsFound = hits["total"]?.get("value")
-            assertEquals("Email group found during search when no document was present", 0, numberOfDocsFound)
-        }
-    }
-
-    fun `test querying an email group when email destination is disallowed fails`() {
-        if (isNotificationPluginInstalled()) {
-            val emailGroup = createRandomEmailGroup()
-
-            try {
-                removeEmailFromAllowList()
-                val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", emailGroup.id)).toString()
-                client().makeRequest(
-                    "GET",
-                    "$EMAIL_GROUP_BASE_URI/_search",
-                    emptyMap(),
-                    NStringEntity(search, ContentType.APPLICATION_JSON)
-                )
-                fail("Expected 403 Method FORBIDDEN response")
-            } catch (e: ResponseException) {
-                assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
-            }
-        }
-    }
+//
+//    fun `test querying an email group that exists`() {
+//        if (isNotificationPluginInstalled()) {
+//            val emailGroup = createRandomEmailGroup()
+//
+//            val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", emailGroup.id)).toString()
+//            val searchResponse = client().makeRequest(
+//                "GET",
+//                "$EMAIL_GROUP_BASE_URI/_search",
+//                emptyMap(),
+//                NStringEntity(search, ContentType.APPLICATION_JSON)
+//            )
+//            assertEquals("Search email group failed", RestStatus.OK, searchResponse.restStatus())
+//            val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
+//            val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+//            val numberOfDocsFound = hits["total"]?.get("value")
+//            assertEquals("Email group not found during search", 1, numberOfDocsFound)
+//        }
+//    }
+//
+//    fun `test querying an email group that exists with POST`() {
+//        if (isNotificationPluginInstalled()) {
+//            val emailGroup = createRandomEmailGroup()
+//
+//            val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", emailGroup.id)).toString()
+//            val searchResponse = client().makeRequest(
+//                "POST",
+//                "$EMAIL_GROUP_BASE_URI/_search",
+//                emptyMap(),
+//                NStringEntity(search, ContentType.APPLICATION_JSON)
+//            )
+//            assertEquals("Search email group failed", RestStatus.OK, searchResponse.restStatus())
+//            val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
+//            val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+//            val numberOfDocsFound = hits["total"]?.get("value")
+//            assertEquals("Email group not found during search", 1, numberOfDocsFound)
+//        }
+//    }
+//
+//    fun `test querying an email group that doesn't exist`() {
+//        if (isNotificationPluginInstalled()) {
+//            // Create a random monitor to create the ScheduledJob index. Otherwise the test will fail with a 404 index not found error.
+//            createRandomMonitor()
+////            createRandomEmailGroup()
+//            val search = SearchSourceBuilder()
+//                .query(
+//                    QueryBuilders.termQuery(
+//                        OpenSearchTestCase.randomAlphaOfLength(5),
+//                        OpenSearchTestCase.randomAlphaOfLength(5)
+//                    )
+//                ).toString()
+//
+//            val searchResponse = client().makeRequest(
+//                "GET",
+//                "$EMAIL_GROUP_BASE_URI/_search",
+//                emptyMap(),
+//                NStringEntity(search, ContentType.APPLICATION_JSON)
+//            )
+//            assertEquals("Search email group failed", RestStatus.OK, searchResponse.restStatus())
+//            val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
+//            val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+//            val numberOfDocsFound = hits["total"]?.get("value")
+//            assertEquals("Email group found during search when no document was present", 0, numberOfDocsFound)
+//        }
+//    }
+//
+//    fun `test querying an email group when email destination is disallowed fails`() {
+//        if (isNotificationPluginInstalled()) {
+//            val emailGroup = createRandomEmailGroup()
+//
+//            try {
+//                removeEmailFromAllowList()
+//                val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", emailGroup.id)).toString()
+//                client().makeRequest(
+//                    "GET",
+//                    "$EMAIL_GROUP_BASE_URI/_search",
+//                    emptyMap(),
+//                    NStringEntity(search, ContentType.APPLICATION_JSON)
+//                )
+//                fail("Expected 403 Method FORBIDDEN response")
+//            } catch (e: ResponseException) {
+//                assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
+//            }
+//        }
+//    }
 }

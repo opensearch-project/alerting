@@ -41,6 +41,9 @@ import org.opensearch.alerting.model.destination.email.Recipient
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.common.Strings
+import org.opensearch.commons.notifications.NotificationConstants.CONFIG_TYPE_TAG
+import org.opensearch.commons.notifications.NotificationConstants.NAME_TAG
+import org.opensearch.commons.notifications.NotificationConstants.UPDATED_TIME_TAG
 import org.opensearch.commons.notifications.action.CreateNotificationConfigRequest
 import org.opensearch.commons.notifications.action.CreateNotificationConfigResponse
 import org.opensearch.commons.notifications.action.DeleteNotificationConfigRequest
@@ -91,7 +94,14 @@ class DestinationActionsConverter {
                 filterParams["name"] = table.searchString
             }
 
-            return GetNotificationConfigRequest(configIds, fromIndex, maxItems, null, sortOrder, filterParams)
+            val sortField = when(table.sortString) {
+                "destination.name.keyword" -> NAME_TAG
+                "destination.type" -> CONFIG_TYPE_TAG
+                "destination.last_update_time" -> UPDATED_TIME_TAG
+                else -> null
+            }
+
+            return GetNotificationConfigRequest(configIds, fromIndex, maxItems, sortField, sortOrder, filterParams)
         }
 
         fun convertGetNotificationConfigResponseToGetDestinationsResponse(
@@ -99,7 +109,7 @@ class DestinationActionsConverter {
         ): GetDestinationsResponse {
             if (response == null) throw OpenSearchStatusException("Destination cannot be found.", RestStatus.NOT_FOUND)
             val searchResult = response.searchResult
-            if (searchResult.objectList.isEmpty()) throw OpenSearchStatusException("Destinations not found.", RestStatus.NOT_FOUND)
+//            if (searchResult.objectList.isEmpty()) throw OpenSearchStatusException("Destinations not found.", RestStatus.NOT_FOUND)
             val destinations = mutableListOf<Destination>()
             searchResult.objectList.forEach {
                 val destination = convertNotificationConfigToDestination(it)

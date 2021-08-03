@@ -263,7 +263,8 @@ class DestinationRestApiIT : AlertingRestTestCase() {
     fun `test creating an email destination`() {
         if (isNotificationPluginInstalled()) {
             val recipient = Recipient(type = Recipient.RecipientType.EMAIL, emailGroupID = null, email = "test@email.com")
-            val email = Email("fakeEmailAccountId", listOf(recipient))
+            val emailAccount = createRandomEmailAccount()
+            val email = Email(emailAccount.id, listOf(recipient))
             val destination = Destination(
                 type = DestinationType.EMAIL,
                 name = "test",
@@ -293,7 +294,8 @@ class DestinationRestApiIT : AlertingRestTestCase() {
     fun `test updating an email destination`() {
         if (isNotificationPluginInstalled()) {
             val recipient = Recipient(type = Recipient.RecipientType.EMAIL, emailGroupID = null, email = "test@email.com")
-            var email = Email("fakeEmailAccountId", listOf(recipient))
+            val emailAccount = createRandomEmailAccount()
+            var email = Email(emailAccount.id, listOf(recipient))
             val dest = Destination(
                 type = DestinationType.EMAIL,
                 name = "test",
@@ -306,7 +308,7 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             )
             val destination = createDestination(dest)
             val recipient2 = Recipient(type = Recipient.RecipientType.EMAIL, emailGroupID = null, email = "test2@email.com")
-            email = Email("fakeEmailAccountId2", listOf(recipient, recipient2))
+            email = Email(emailAccount.id, listOf(recipient, recipient2))
 
             var updatedDestination = updateDestination(destination.copy(type = DestinationType.EMAIL, name = "updatedName", email = email))
             Assert.assertNotNull("Email object should not be null", updatedDestination.email)
@@ -323,7 +325,8 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             )
 
             val updatedRecipient = Recipient(type = Recipient.RecipientType.EMAIL_GROUP, emailGroupID = "testID", email = null)
-            val updatedEmail = Email("testEmailAccountID", listOf(updatedRecipient))
+            val updatedEmailAccount = createRandomEmailAccount()
+            val updatedEmail = Email(updatedEmailAccount.id, listOf(updatedRecipient))
             Assert.assertNotNull("Email object should not be null", updatedDestination.email)
             updatedDestination = updateDestination(
                 destination.copy(type = DestinationType.EMAIL, name = "updatedName", email = updatedEmail)

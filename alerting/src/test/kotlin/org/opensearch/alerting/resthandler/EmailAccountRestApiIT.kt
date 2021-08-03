@@ -137,26 +137,6 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test updating an email account when email destination is disallowed fails`() {
-        if (isNotificationPluginInstalled()) {
-            val emailAccount = createEmailAccount()
-
-            try {
-                removeEmailFromAllowList()
-                updateEmailAccount(
-                    emailAccount.copy(
-                        name = "updatedName",
-                        port = 465,
-                        method = EmailAccount.MethodType.SSL
-                    )
-                )
-                fail("Expected 403 Method FORBIDDEN response")
-            } catch (e: ResponseException) {
-                assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
-            }
-        }
-    }
-
     fun `test getting an email account`() {
         if (isNotificationPluginInstalled()) {
             val emailAccount = createRandomEmailAccount()
@@ -244,87 +224,87 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test querying an email account that exists`() {
-        if (isNotificationPluginInstalled()) {
-            val emailAccount = createRandomEmailAccount()
-
-            val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", emailAccount.id)).toString()
-            val searchResponse = client().makeRequest(
-                "GET",
-                "$EMAIL_ACCOUNT_BASE_URI/_search",
-                emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON)
-            )
-            assertEquals("Search email account failed", RestStatus.OK, searchResponse.restStatus())
-            val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
-            val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
-            val numberOfDocsFound = hits["total"]?.get("value")
-            assertEquals("Email account not found during search", 1, numberOfDocsFound)
-        }
-    }
-
-    fun `test querying an email account that exists with POST`() {
-        if (isNotificationPluginInstalled()) {
-            val emailAccount = createRandomEmailAccount()
-
-            val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", emailAccount.id)).toString()
-            val searchResponse = client().makeRequest(
-                "POST",
-                "$EMAIL_ACCOUNT_BASE_URI/_search",
-                emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON)
-            )
-            assertEquals("Search email account failed", RestStatus.OK, searchResponse.restStatus())
-            val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
-            val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
-            val numberOfDocsFound = hits["total"]?.get("value")
-            assertEquals("Email account not found during search", 1, numberOfDocsFound)
-        }
-    }
-
-    fun `test querying an email account that doesn't exist`() {
-        if (isNotificationPluginInstalled()) {
-            // Create a random email account to create the ScheduledJob index. Otherwise the test will fail with a 404 index not found error.
-            createRandomEmailAccount()
-            val search = SearchSourceBuilder()
-                .query(
-                    QueryBuilders.termQuery(
-                        OpenSearchTestCase.randomAlphaOfLength(5),
-                        OpenSearchTestCase.randomAlphaOfLength(5)
-                    )
-                ).toString()
-
-            val searchResponse = client().makeRequest(
-                "GET",
-                "$EMAIL_ACCOUNT_BASE_URI/_search",
-                emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON)
-            )
-            assertEquals("Search email account failed", RestStatus.OK, searchResponse.restStatus())
-            val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
-            val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
-            val numberOfDocsFound = hits["total"]?.get("value")
-            assertEquals("Email account found during search when no document was present", 0, numberOfDocsFound)
-        }
-    }
-
-    fun `test querying an email account when email destination is disallowed fails`() {
-        if (isNotificationPluginInstalled()) {
-            val emailAccount = createRandomEmailAccount()
-
-            try {
-                removeEmailFromAllowList()
-                val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", emailAccount.id)).toString()
-                client().makeRequest(
-                    "GET",
-                    "$EMAIL_ACCOUNT_BASE_URI/_search",
-                    emptyMap(),
-                    NStringEntity(search, ContentType.APPLICATION_JSON)
-                )
-                fail("Expected 403 Method FORBIDDEN response")
-            } catch (e: ResponseException) {
-                assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
-            }
-        }
-    }
+//    fun `test querying an email account that exists`() {
+//        if (isNotificationPluginInstalled()) {
+//            val emailAccount = createRandomEmailAccount()
+//
+//            val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", emailAccount.id)).toString()
+//            val searchResponse = client().makeRequest(
+//                "GET",
+//                "$EMAIL_ACCOUNT_BASE_URI/_search",
+//                emptyMap(),
+//                NStringEntity(search, ContentType.APPLICATION_JSON)
+//            )
+//            assertEquals("Search email account failed", RestStatus.OK, searchResponse.restStatus())
+//            val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
+//            val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+//            val numberOfDocsFound = hits["total"]?.get("value")
+//            assertEquals("Email account not found during search", 1, numberOfDocsFound)
+//        }
+//    }
+//
+//    fun `test querying an email account that exists with POST`() {
+//        if (isNotificationPluginInstalled()) {
+//            val emailAccount = createRandomEmailAccount()
+//
+//            val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", emailAccount.id)).toString()
+//            val searchResponse = client().makeRequest(
+//                "POST",
+//                "$EMAIL_ACCOUNT_BASE_URI/_search",
+//                emptyMap(),
+//                NStringEntity(search, ContentType.APPLICATION_JSON)
+//            )
+//            assertEquals("Search email account failed", RestStatus.OK, searchResponse.restStatus())
+//            val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
+//            val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+//            val numberOfDocsFound = hits["total"]?.get("value")
+//            assertEquals("Email account not found during search", 1, numberOfDocsFound)
+//        }
+//    }
+//
+//    fun `test querying an email account that doesn't exist`() {
+//        if (isNotificationPluginInstalled()) {
+//            // Create a random email account to create the ScheduledJob index. Otherwise the test will fail with a 404 index not found error.
+//            createRandomEmailAccount()
+//            val search = SearchSourceBuilder()
+//                .query(
+//                    QueryBuilders.termQuery(
+//                        OpenSearchTestCase.randomAlphaOfLength(5),
+//                        OpenSearchTestCase.randomAlphaOfLength(5)
+//                    )
+//                ).toString()
+//
+//            val searchResponse = client().makeRequest(
+//                "GET",
+//                "$EMAIL_ACCOUNT_BASE_URI/_search",
+//                emptyMap(),
+//                NStringEntity(search, ContentType.APPLICATION_JSON)
+//            )
+//            assertEquals("Search email account failed", RestStatus.OK, searchResponse.restStatus())
+//            val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
+//            val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+//            val numberOfDocsFound = hits["total"]?.get("value")
+//            assertEquals("Email account found during search when no document was present", 0, numberOfDocsFound)
+//        }
+//    }
+//
+//    fun `test querying an email account when email destination is disallowed fails`() {
+//        if (isNotificationPluginInstalled()) {
+//            val emailAccount = createRandomEmailAccount()
+//
+//            try {
+//                removeEmailFromAllowList()
+//                val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", emailAccount.id)).toString()
+//                client().makeRequest(
+//                    "GET",
+//                    "$EMAIL_ACCOUNT_BASE_URI/_search",
+//                    emptyMap(),
+//                    NStringEntity(search, ContentType.APPLICATION_JSON)
+//                )
+//                fail("Expected 403 Method FORBIDDEN response")
+//            } catch (e: ResponseException) {
+//                assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
+//            }
+//        }
+//    }
 }

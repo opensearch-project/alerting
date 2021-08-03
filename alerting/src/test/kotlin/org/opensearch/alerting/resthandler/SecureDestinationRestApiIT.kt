@@ -132,7 +132,7 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
             val updatedDestination = updateDestination(destination = destinationV2)
             assertEquals("Incorrect destination name", updatedDestination.name, "testUpdate")
             assertEquals("Incorrect destination url", updatedDestination.chime?.url, "http://abcUpdated.com")
-            assertEquals("Incorrect destination type", updatedDestination.type, DestinationType.SLACK)
+            assertEquals("Incorrect destination type", updatedDestination.type, DestinationType.CHIME)
         }
     }
 
