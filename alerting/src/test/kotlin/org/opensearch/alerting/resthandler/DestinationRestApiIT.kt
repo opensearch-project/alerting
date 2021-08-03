@@ -425,6 +425,7 @@ class DestinationRestApiIT : AlertingRestTestCase() {
 
             val destination = createDestination(dest)
             val destination2 = createDestination()
+            Thread.sleep(1000)
             val getDestinationsResponse = getDestinations(inputMap)
 
             assertEquals(1, getDestinationsResponse.size)
