@@ -414,7 +414,7 @@ class DestinationRestApiIT : AlertingRestTestCase() {
 
     fun `test get destinations matching a given name`() {
         if (isNotificationPluginInstalled()) {
-            val slack = Slack("https://hooks.slack.com/services/slackId")
+            val slack = Slack("https://hooks.slack.com/services/slackIdTest")
             val dest = Destination(
                 type = DestinationType.SLACK,
                 name = "testSlack",

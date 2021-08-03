@@ -32,6 +32,7 @@ import org.apache.http.entity.ContentType
 import org.apache.http.entity.ContentType.APPLICATION_JSON
 import org.apache.http.entity.StringEntity
 import org.apache.http.message.BasicHeader
+import org.apache.logging.log4j.LogManager
 import org.junit.AfterClass
 import org.junit.rules.DisableOnDebug
 import org.opensearch.action.search.SearchResponse
@@ -50,6 +51,7 @@ import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
+import org.opensearch.alerting.transport.TransportGetDestinationsAction
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.client.Request
 import org.opensearch.client.Response
@@ -81,6 +83,7 @@ import javax.management.remote.JMXServiceURL
 
 abstract class AlertingRestTestCase : ODFERestTestCase() {
 
+    private val log = LogManager.getLogger(AlertingRestTestCase::class.java)
     private val isDebuggingTest = DisableOnDebug(null).isDebugging
     private val isDebuggingRemoteCluster = System.getProperty("cluster.debug", "false")!!.toBoolean()
     val numberOfNodes = System.getProperty("cluster.number_of_nodes", "1")!!.toInt()
@@ -218,6 +221,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
+        log.info("create a destination: $destinationJson")
         return destination.copy(
             id = destinationJson["_id"] as String,
             version = (destinationJson["_version"] as Int).toLong(),
@@ -384,7 +388,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             "GET",
             "$DESTINATION_BASE_URI/${destination.id}"
         )
-        assertEquals("Unable to update a destination", RestStatus.OK, response.restStatus())
+        assertEquals("Unable to get a destination", RestStatus.OK, response.restStatus())
         val destinationJson = jsonXContent.createParser(
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
@@ -409,13 +413,15 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             baseEndpoint += "${entry.key}=${entry.value}&"
         }
 
+        log.info("get destinations: $baseEndpoint")
+
         val response = client.makeRequest(
             "GET",
             baseEndpoint,
             null,
             header
         )
-        assertEquals("Unable to update a destination", RestStatus.OK, response.restStatus())
+        assertEquals("Unable to get destinations", RestStatus.OK, response.restStatus())
         val destinationJson = jsonXContent.createParser(
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content

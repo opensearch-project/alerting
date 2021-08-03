@@ -77,7 +77,10 @@ class DestinationActionsConverter {
             val fromIndex = table.startIndex
             val maxItems = table.size
             val sortOrder: SortOrder = SortOrder.fromString(table.sortOrder)
-            val filterParams: Map<String, String> = mapOf(Pair("config_type", "slack,chime,webhook,email"))
+            val filterParams = mutableMapOf(Pair("config_type", "slack,chime,webhook,email"))
+            if (!table.searchString.isNullOrBlank()) {
+                filterParams["name"] = table.searchString
+            }
 
             return GetNotificationConfigRequest(configIds, fromIndex, maxItems, null, sortOrder, filterParams)
         }
