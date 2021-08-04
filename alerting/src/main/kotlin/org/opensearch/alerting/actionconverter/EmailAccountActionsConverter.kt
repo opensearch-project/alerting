@@ -48,6 +48,8 @@ import org.opensearch.commons.notifications.model.Feature
 import org.opensearch.commons.notifications.model.MethodType
 import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.SmtpAccount
+import org.opensearch.index.Index
+import org.opensearch.index.shard.ShardId
 import org.opensearch.rest.RestStatus
 import java.util.EnumSet
 
@@ -149,7 +151,9 @@ class EmailAccountActionsConverter {
             val configIdToStatusList = response.configIdToStatus.entries
             if (configIdToStatusList.isEmpty()) throw OpenSearchStatusException("Email Account failed to be deleted.", RestStatus.NOT_FOUND)
             val configId = configIdToStatusList.elementAt(0).key
-            return DeleteResponse(null, "_doc", configId, 0L, 0L, 0L, true)
+            val index = Index("notification_index", "uuid")
+            val shardId = ShardId(index, 0)
+            return DeleteResponse(shardId, "_doc", configId, 0L, 0L, 0L, true)
         }
 
         fun convertAlertingToNotificationMethodType(alertMethodType: EmailAccount.MethodType): MethodType {
