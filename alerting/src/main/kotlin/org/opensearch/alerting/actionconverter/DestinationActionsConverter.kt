@@ -261,7 +261,7 @@ class DestinationActionsConverter {
                 }
                 ConfigType.EMAIL -> {
                     val email: Email = notificationConfig.configData as Email
-                    var recipients = mutableListOf<Recipient>()
+                    val recipients = mutableListOf<Recipient>()
                     logger.info("trying to get email info: email account - ${email.emailAccountID}, email groups - ${email.emailGroupIds}, recipients  - ${email.recipients}")
                     email.recipients.forEach {
                         val recipient = Recipient(Recipient.RecipientType.EMAIL, null, it)
@@ -360,8 +360,8 @@ class DestinationActionsConverter {
                         val recipients = mutableListOf<String>()
                         val emailGroupIds = mutableListOf<String>()
                         alertEmail.recipients.forEach {
-                            if (it.type == Recipient.RecipientType.EMAIL_GROUP) emailGroupIds.plus(it.emailGroupID)
-                            else recipients.plus(it.email)
+                            if (it.type == Recipient.RecipientType.EMAIL_GROUP) it.emailGroupID?.let { emailGroup -> emailGroupIds.add(emailGroup) }
+                            else it.email?.let { emailRecipient -> recipients.add(emailRecipient) }
                         }
                         email = Email(alertEmail.emailAccountID, recipients, emailGroupIds)
                     }
