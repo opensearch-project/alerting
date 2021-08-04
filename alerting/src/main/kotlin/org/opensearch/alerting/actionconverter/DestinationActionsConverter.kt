@@ -264,11 +264,11 @@ class DestinationActionsConverter {
                     val recipients = mutableListOf<Recipient>()
                     email.recipients.forEach {
                         val recipient = Recipient(Recipient.RecipientType.EMAIL, null, it)
-                        recipients.plus(recipient)
+                        recipients.add(recipient)
                     }
                     email.emailGroupIds.forEach {
                         val recipient = Recipient(Recipient.RecipientType.EMAIL_GROUP, it, null)
-                        recipients.plus(recipient)
+                        recipients.add(recipient)
                     }
                     val alertEmail = org.opensearch.alerting.model.destination.email.Email(email.emailAccountID, recipients)
                     return Destination(
