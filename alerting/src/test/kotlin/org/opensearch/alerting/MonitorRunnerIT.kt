@@ -972,10 +972,6 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         }
     }
 
-    // TODO: The composite aggregation will paginate through all results during the Bucket-Level Monitor run.
-    //  The last page (when after_key is null) is empty if all the contents fit on the previous page, meaning the
-    //  input results returned by the monitor execution is empty.
-    //  Skipping this test for now until this is resolved to show a non-empty result.
     fun `test execute bucket-level monitor returns search result`() {
         val testIndex = createTestIndex()
         insertSampleTimeSerializedData(
@@ -1058,7 +1054,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             )
         )
         val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
-        executeMonitor(monitor.id, params = DRYRUN_MONITOR)
+        executeMonitor(monitor.id)
 
         // Check created alerts
         var alerts = searchAlerts(monitor)
@@ -1077,7 +1073,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         )
 
         // Execute monitor again
-        executeMonitor(monitor.id, params = DRYRUN_MONITOR)
+        executeMonitor(monitor.id)
 
         // Verify expected alert was completed
         alerts = searchAlerts(monitor, AlertIndices.ALL_INDEX_PATTERN)
@@ -1121,7 +1117,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             )
         )
         val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
-        executeMonitor(monitor.id, params = DRYRUN_MONITOR)
+        executeMonitor(monitor.id)
 
         // Check created Alerts
         var currentAlerts = searchAlerts(monitor)
@@ -1140,7 +1136,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         // Runner uses ThreadPool.CachedTimeThread thread which only updates once every 200 ms. Wait a bit to
         // let lastNotificationTime change.  W/o this sleep the test can result in a false negative.
         Thread.sleep(200)
-        executeMonitor(monitor.id, params = DRYRUN_MONITOR)
+        executeMonitor(monitor.id)
 
         // Check that the lastNotification time of the acknowledged Alert wasn't updated and the active Alert's was
         currentAlerts = searchAlerts(monitor)
@@ -1160,7 +1156,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
         // Execute Monitor and check that both Alerts were updated
         Thread.sleep(200)
-        executeMonitor(monitor.id, params = DRYRUN_MONITOR)
+        executeMonitor(monitor.id)
         currentAlerts = searchAlerts(monitor, AlertIndices.ALL_INDEX_PATTERN)
         val completedAlerts = currentAlerts.filter { it.state == COMPLETED }
         assertEquals("Incorrect number of completed alerts", 2, completedAlerts.size)

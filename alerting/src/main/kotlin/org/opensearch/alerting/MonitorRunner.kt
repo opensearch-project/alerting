@@ -64,6 +64,8 @@ import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_MILLIS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.DEFAULT_MAX_ACTIONABLE_ALERT_COUNT
+import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTIONABLE_ALERT_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MOVE_ALERTS_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MOVE_ALERTS_BACKOFF_MILLIS
 import org.opensearch.alerting.settings.DestinationSettings
@@ -114,6 +116,8 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
 
     @Volatile private lateinit var destinationSettings: Map<String, DestinationSettings.Companion.SecureDestinationSettings>
     @Volatile private lateinit var destinationContextFactory: DestinationContextFactory
+
+    @Volatile private var maxActionableAlertCount = DEFAULT_MAX_ACTIONABLE_ALERT_COUNT
 
     private lateinit var runnerSupervisor: Job
     override val coroutineContext: CoroutineContext
@@ -189,6 +193,11 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
 
         // Host deny list is not a dynamic setting so no consumer is registered but the variable is set here
         hostDenyList = HOST_DENY_LIST.get(settings)
+
+        maxActionableAlertCount = MAX_ACTIONABLE_ALERT_COUNT.get(settings)
+        clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_ACTIONABLE_ALERT_COUNT) {
+            maxActionableAlertCount = it
+        }
 
         return this
     }
@@ -415,7 +424,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 var newAlerts = categorizedAlerts.getOrDefault(AlertCategory.NEW, emptyList())
 
                 /*
-                 * Index de-duped and new Alerts here so they are available at the time the Actions are executed.
+                 * Index de-duped and new Alerts here (if it's not a test Monitor) so they are available at the time the Actions are executed.
                  *
                  * The new Alerts have to be returned and saved back with their indexed doc ID to prevent duplicate documents
                  * when the Alerts are updated again after Action execution.
@@ -423,8 +432,10 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                  * Note: Index operations can fail for various reasons (such as write blocks on cluster), in such a case, the Actions
                  * will still execute with the Alert information in the ctx but the Alerts may not be visible.
                  */
-                alertService.saveAlerts(dedupedAlerts, retryPolicy, allowUpdatingAcknowledgedAlert = true)
-                newAlerts = alertService.saveNewAlerts(newAlerts, retryPolicy)
+                if (!dryrun && monitor.id != Monitor.NO_ID) {
+                    alertService.saveAlerts(dedupedAlerts, retryPolicy, allowUpdatingAcknowledgedAlert = true)
+                    newAlerts = alertService.saveNewAlerts(newAlerts, retryPolicy)
+                }
 
                 // Store deduped and new Alerts to accumulate across pages
                 if (!nextAlerts.containsKey(trigger.id)) {
@@ -452,8 +463,10 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             // Filter ACKNOWLEDGED Alerts from the deduped list so they do not have Actions executed for them.
             // New Alerts are ignored since they cannot be acknowledged yet.
             val dedupedAlerts = nextAlerts[trigger.id]?.get(AlertCategory.DEDUPED)
-                ?.filterNot { it.state == Alert.State.ACKNOWLEDGED }
+                ?.filterNot { it.state == Alert.State.ACKNOWLEDGED }?.toMutableList()
                 ?: mutableListOf()
+            // Update nextAlerts so the filtered DEDUPED Alerts are reflected for PER_ALERT Action execution
+            nextAlerts[trigger.id]?.set(AlertCategory.DEDUPED, dedupedAlerts)
             val newAlerts = nextAlerts[trigger.id]?.get(AlertCategory.NEW) ?: mutableListOf()
             val completedAlerts = nextAlerts[trigger.id]?.get(AlertCategory.COMPLETED) ?: mutableListOf()
 
@@ -461,19 +474,17 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             val triggerCtx = triggerContexts[trigger.id]!!
             val triggerResult = triggerResults[trigger.id]!!
             val monitorOrTriggerError = monitorResult.error ?: triggerResult.error
+            val shouldDefaultToPerExecution = defaultToPerExecutionAction(
+                monitorId = monitor.id,
+                triggerId = trigger.id,
+                totalActionableAlertCount = dedupedAlerts.size + newAlerts.size + completedAlerts.size,
+                monitorOrTriggerError = monitorOrTriggerError
+            )
             for (action in trigger.actions) {
-                // If the monitor or triggerResult has an error, then default to PER_EXECUTION to communicate the error.
-                // Typically, given the actions taken by runBucketLevelTrigger, an exception during the operation could mean
-                // either there were incompatible trigger conditions or there was a parsing error on the results.
-                if (action.getActionScope() == ActionExecutionScope.Type.PER_ALERT && monitorOrTriggerError == null) {
+                if (action.getActionScope() == ActionExecutionScope.Type.PER_ALERT && !shouldDefaultToPerExecution) {
                     val perAlertActionFrequency = action.actionExecutionPolicy.actionExecutionScope as PerAlertActionScope
                     for (alertCategory in perAlertActionFrequency.actionableAlerts) {
-                        var alertsToExecuteActionsFor = nextAlerts[trigger.id]?.get(alertCategory) ?: mutableListOf()
-                        // Filter out ACKNOWLEDGED Alerts from the deduped Alerts
-                        if (alertCategory == AlertCategory.DEDUPED) {
-                            alertsToExecuteActionsFor = alertsToExecuteActionsFor.filterNot { it.state == Alert.State.ACKNOWLEDGED }
-                                .toMutableList()
-                        }
+                        val alertsToExecuteActionsFor = nextAlerts[trigger.id]?.get(alertCategory) ?: mutableListOf()
                         for (alert in alertsToExecuteActionsFor) {
                             if (isBucketLevelTriggerActionThrottled(action, alert)) continue
 
@@ -491,7 +502,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                             alertsToUpdate.add(alert)
                         }
                     }
-                } else if (action.getActionScope() == ActionExecutionScope.Type.PER_EXECUTION || monitorOrTriggerError != null) {
+                } else if (action.getActionScope() == ActionExecutionScope.Type.PER_EXECUTION || shouldDefaultToPerExecution) {
                     // If all categories of Alerts are empty, there is nothing to message on and we can skip the Action.
                     // If the error is not null, this is disregarded and the Action is executed anyway so the user can be notified.
                     if (monitorOrTriggerError == null && dedupedAlerts.isEmpty() && newAlerts.isEmpty() && completedAlerts.isEmpty()) continue
@@ -533,12 +544,46 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 )
             }
 
-            // Update Alerts with action execution results
-            // ACKNOWLEDGED Alerts should not be saved here since actions are not executed for them
-            alertService.saveAlerts(updatedAlerts, retryPolicy, allowUpdatingAcknowledgedAlert = false)
+            // Update Alerts with action execution results (if it's not a test Monitor).
+            // ACKNOWLEDGED Alerts should not be saved here since actions are not executed for them.
+            if (!dryrun && monitor.id != Monitor.NO_ID) {
+                alertService.saveAlerts(updatedAlerts, retryPolicy, allowUpdatingAcknowledgedAlert = false)
+            }
         }
 
         return monitorResult.copy(inputResults = firstPageOfInputResults, triggerResults = triggerResults)
+    }
+
+    private fun defaultToPerExecutionAction(
+        monitorId: String,
+        triggerId: String,
+        totalActionableAlertCount: Int,
+        monitorOrTriggerError: Exception?
+    ): Boolean {
+        // If the monitorId or triggerResult has an error, then also default to PER_EXECUTION to communicate the error
+        if (monitorOrTriggerError != null) {
+            logger.debug(
+                "Trigger [$triggerId] in monitor [$monitorId] encountered an error. Defaulting to " +
+                    "[${ActionExecutionScope.Type.PER_EXECUTION}] for action execution to communicate error."
+            )
+            return true
+        }
+
+        // If the MAX_ACTIONABLE_ALERT_COUNT is set to -1, consider it unbounded and proceed regardless of actionable Alert count
+        if (maxActionableAlertCount < 0) return false
+
+        // If the total number of Alerts to execute Actions on exceeds the MAX_ACTIONABLE_ALERT_COUNT setting then default to
+        // PER_EXECUTION for less intrusive Actions
+        if (totalActionableAlertCount > maxActionableAlertCount) {
+            logger.debug(
+                "The total actionable alerts for trigger [$triggerId] in monitor [$monitorId] is [$totalActionableAlertCount] " +
+                    "which exceeds the maximum of [$maxActionableAlertCount]. Defaulting to [${ActionExecutionScope.Type.PER_EXECUTION}] " +
+                    "for action execution."
+            )
+            return true
+        }
+
+        return false
     }
 
     private fun getRolesForMonitor(monitor: Monitor): List<String> {
