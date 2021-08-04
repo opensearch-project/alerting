@@ -261,7 +261,8 @@ class DestinationActionsConverter {
                 }
                 ConfigType.EMAIL -> {
                     val email: Email = notificationConfig.configData as Email
-                    val recipients = mutableListOf<Recipient>()
+                    var recipients = mutableListOf<Recipient>()
+                    logger.info("trying to get email info: email account - ${email.emailAccountID}, email groups - ${email.emailGroupIds}, recipients  - ${email.recipients}")
                     email.recipients.forEach {
                         val recipient = Recipient(Recipient.RecipientType.EMAIL, null, it)
                         recipients.add(recipient)
