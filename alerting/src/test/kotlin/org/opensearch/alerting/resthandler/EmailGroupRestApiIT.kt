@@ -182,7 +182,11 @@ class EmailGroupRestApiIT : AlertingRestTestCase() {
             }
         }
     }
-//
+
+/**
+ * TODO: Make sure these tests are working after this issue, https://github.com/opensearch-project/notifications/issues/255, is resolved
+ * and the SearchEmailGroup API is integrated with the notification plugin.
+ */
 //    fun `test querying an email group that exists`() {
 //        if (isNotificationPluginInstalled()) {
 //            val emailGroup = createRandomEmailGroup()

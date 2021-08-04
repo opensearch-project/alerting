@@ -224,6 +224,10 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
         }
     }
 
+/**
+ * TODO: Make sure these tests are working after this issue, https://github.com/opensearch-project/notifications/issues/255, is resolved
+ * and the SearchEmailAccount API is integrated with the notification plugin.
+ */
 //    fun `test querying an email account that exists`() {
 //        if (isNotificationPluginInstalled()) {
 //            val emailAccount = createRandomEmailAccount()

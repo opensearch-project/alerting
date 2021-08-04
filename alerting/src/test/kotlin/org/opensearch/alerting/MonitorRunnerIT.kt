@@ -778,44 +778,45 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test execute monitor with email destination creates alerts in error state`() {
-        if (isNotificationPluginInstalled()) {
-            putAlertMappings() // Required as we do not have a create alert API.
-
-            val emailAccount = createRandomEmailAccount()
-            val emailGroup = createRandomEmailGroup()
-            val email = Email(
-                emailAccountID = emailAccount.id,
-                recipients = listOf(
-                    Recipient(type = Recipient.RecipientType.EMAIL, emailGroupID = null, email = "test@email.com"),
-                    Recipient(type = Recipient.RecipientType.EMAIL_GROUP, emailGroupID = emailGroup.id, email = "test2@email.com")
-                )
-            )
-
-            val destination = createDestination(
-                Destination(
-                    type = DestinationType.EMAIL,
-                    name = "testDestination",
-                    user = randomUser(),
-                    lastUpdateTime = Instant.now(),
-                    chime = null,
-                    slack = null,
-                    customWebhook = null,
-                    email = email
-                )
-            )
-            val action = randomAction(destinationId = destination.id)
-            val trigger = randomTrigger(condition = ALWAYS_RUN, actions = listOf(action))
-            val monitor = createMonitor(randomMonitor(triggers = listOf(trigger)))
-
-            executeMonitor(monitor.id)
-
-            val alerts = searchAlerts(monitor)
-            assertEquals("Alert not saved", 1, alerts.size)
-            verifyAlert(alerts.single(), monitor, ERROR)
-            Assert.assertTrue(alerts.single().errorMessage?.contains("Failed running action") as Boolean)
-        }
-    }
+    // TODO: Make sure this test is working after this issue is resolved: https://github.com/opensearch-project/notifications/issues/256
+//    fun `test execute monitor with email destination creates alerts in error state`() {
+//        if (isNotificationPluginInstalled()) {
+//            putAlertMappings() // Required as we do not have a create alert API.
+//
+//            val emailAccount = createRandomEmailAccount()
+//            val emailGroup = createRandomEmailGroup()
+//            val email = Email(
+//                emailAccountID = emailAccount.id,
+//                recipients = listOf(
+//                    Recipient(type = Recipient.RecipientType.EMAIL, emailGroupID = null, email = "test@email.com"),
+//                    Recipient(type = Recipient.RecipientType.EMAIL_GROUP, emailGroupID = emailGroup.id, email = "test2@email.com")
+//                )
+//            )
+//
+//            val destination = createDestination(
+//                Destination(
+//                    type = DestinationType.EMAIL,
+//                    name = "testDestination",
+//                    user = randomUser(),
+//                    lastUpdateTime = Instant.now(),
+//                    chime = null,
+//                    slack = null,
+//                    customWebhook = null,
+//                    email = email
+//                )
+//            )
+//            val action = randomAction(destinationId = destination.id)
+//            val trigger = randomTrigger(condition = ALWAYS_RUN, actions = listOf(action))
+//            val monitor = createMonitor(randomMonitor(triggers = listOf(trigger)))
+//
+//            executeMonitor(monitor.id)
+//
+//            val alerts = searchAlerts(monitor)
+//            assertEquals("Alert not saved", 1, alerts.size)
+//            verifyAlert(alerts.single(), monitor, ERROR)
+//            Assert.assertTrue(alerts.single().errorMessage?.contains("Failed running action") as Boolean)
+//        }
+//    }
 
     fun `test execute monitor with custom webhook destination`() {
         if (isNotificationPluginInstalled()) {

@@ -324,7 +324,8 @@ class DestinationRestApiIT : AlertingRestTestCase() {
                 updatedDestination.email?.recipients?.get(0)?.email, "test@email.com"
             )
 
-            val updatedRecipient = Recipient(type = Recipient.RecipientType.EMAIL_GROUP, emailGroupID = "testID", email = null)
+            val emailGroup = createRandomEmailGroup()
+            val updatedRecipient = Recipient(type = Recipient.RecipientType.EMAIL_GROUP, emailGroupID = emailGroup.id, email = null)
             val updatedEmailAccount = createRandomEmailAccount()
             val updatedEmail = Email(updatedEmailAccount.id, listOf(updatedRecipient))
             Assert.assertNotNull("Email object should not be null", updatedDestination.email)
@@ -337,7 +338,7 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             )
             assertEquals(
                 "Incorrect email destination recipient email group ID after update",
-                updatedDestination.email?.recipients?.get(0)?.emailGroupID, "testID"
+                updatedDestination.email?.recipients?.get(0)?.emailGroupID, emailGroup.id
             )
         }
     }

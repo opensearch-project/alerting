@@ -223,7 +223,7 @@ class NotificationAPIUtils {
                     object : ActionListener<SendNotificationResponse> {
                         override fun onResponse(response: SendNotificationResponse) {
                             sendNotificationResponse = response
-                            logger.info("Sent notification successfully: $response")
+                            logger.debug("Sent notification successfully: $response")
                             completed = true
                         }
 
@@ -244,50 +244,5 @@ class NotificationAPIUtils {
             }
             return sendNotificationResponse!!
         }
-
-//        fun isNotificationPluginInstalled(client: NodeClient) {
-//            var isInstalled = false
-//            NodesInfoAction
-//            client.get()
-//
-//            val response = entityAsMap(client.makeRequest("GET", "_nodes/plugins"))
-//            val nodesInfo = response["nodes"] as Map<String, Map<String, Any>>
-//            for (nodeInfo in nodesInfo.values) {
-//                val plugins = nodeInfo["plugins"] as List<Map<String, Any>>
-//                for (plugin in plugins) {
-//                    if (plugin["name"] == "opensearch-notifications") {
-//                        return true
-//                    }
-//                }
-//            }
-//            return false
-//
-//            val request = NodesInfoRequest().clear().addMetric("plugins")
-//            client.execute(
-//                NodesInfoAction.INSTANCE, request,
-//                object : ActionListener<NodesInfoResponse> {
-//                    override fun onResponse(response: NodesInfoResponse) {
-//                        val versionSet = mutableSetOf<String>()
-//                        val legacyVersionSet = mutableSetOf<String>()
-//
-//                        response.nodes.map { it.getInfo(PluginsAndModules::class.java).pluginInfos }
-//                            .forEach {
-//                                it.forEach { nodePlugin ->
-//                                    if (nodePlugin.name == "opensearch-notifications") {
-//                                        isInstalled = true
-//                                    }
-//                                }
-//                            }
-//                    }
-//
-//                    override fun onFailure(e: Exception) {
-//                        logger.warn("Failed sweeping nodes for ISM plugin versions: $e")
-//                        flag = false
-//                    }
-//                }
-//            )
-//
-//
-//        }
     }
 }
