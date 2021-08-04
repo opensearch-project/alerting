@@ -26,6 +26,7 @@
 
 package org.opensearch.alerting.transport
 
+import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
 import org.opensearch.action.delete.DeleteResponse
@@ -46,6 +47,8 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
+
+private val log = LogManager.getLogger(TransportDeleteEmailGroupAction::class.java)
 
 class TransportDeleteEmailGroupAction @Inject constructor(
     transportService: TransportService,
@@ -84,6 +87,7 @@ class TransportDeleteEmailGroupAction @Inject constructor(
             )
             actionListener.onResponse(convertDeleteNotificationConfigResponseToDeleteResponse(deleteNotificationConfigResponse))
         } catch (e: Exception) {
+            log.error("Failed to delete destination", e)
             actionListener.onFailure(AlertingException.wrap(e))
         }
     }
