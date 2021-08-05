@@ -19,6 +19,7 @@ import org.opensearch.alerting.elasticapi.convertToMap
 import org.opensearch.alerting.elasticapi.suspendUntil
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.TriggerAfterKey
 import org.opensearch.alerting.util.AggregationQueryRewriter
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.client.Client
@@ -49,8 +50,10 @@ class InputService(
     ): InputRunResults {
         return try {
             val results = mutableListOf<Map<String, Any>>()
-            val aggTriggerAfterKeys: MutableMap<String, Map<String, Any>?> = mutableMapOf()
+            val aggTriggerAfterKey: MutableMap<String, TriggerAfterKey> = mutableMapOf()
 
+            // TODO: If/when multiple input queries are supported for Bucket-Level Monitor execution, aggTriggerAfterKeys will
+            //  need to be updated to account for it
             monitor.inputs.forEach { input ->
                 when (input) {
                     is SearchInput -> {
@@ -75,7 +78,11 @@ class InputService(
                             searchRequest.source(SearchSourceBuilder.fromXContent(it))
                         }
                         val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
-                        aggTriggerAfterKeys += AggregationQueryRewriter.getAfterKeysFromSearchResponse(searchResponse, monitor.triggers)
+                        aggTriggerAfterKey += AggregationQueryRewriter.getAfterKeysFromSearchResponse(
+                            searchResponse,
+                            monitor.triggers,
+                            prevResult?.aggTriggersAfterKey
+                        )
                         results += searchResponse.convertToMap()
                     }
                     else -> {
@@ -83,7 +90,7 @@ class InputService(
                     }
                 }
             }
-            InputRunResults(results.toList(), aggTriggersAfterKey = aggTriggerAfterKeys)
+            InputRunResults(results.toList(), aggTriggersAfterKey = aggTriggerAfterKey)
         } catch (e: Exception) {
             logger.info("Error collecting inputs for monitor: ${monitor.id}", e)
             InputRunResults(emptyList(), e)
