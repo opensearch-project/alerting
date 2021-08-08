@@ -38,9 +38,7 @@ import org.opensearch.alerting.model.destination.Slack
 import org.opensearch.alerting.model.destination.email.Email
 import org.opensearch.alerting.model.destination.email.Recipient
 import org.opensearch.alerting.randomUser
-import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.DestinationType
-import org.opensearch.client.ResponseException
 import org.opensearch.rest.RestStatus
 import org.opensearch.test.junit.annotations.TestLogging
 import java.time.Instant
@@ -403,7 +401,7 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             inputMap["missing"] = "_last"
             inputMap["destinationType"] = "slack"
 
-            //this defaults to creating a slack destination
+            // this defaults to creating a slack destination
             val destination = createDestination()
             val destination2 = createDestination(dest)
             val getDestinationsResponse = getDestinations(inputMap)

@@ -32,7 +32,6 @@ import org.apache.http.entity.ContentType
 import org.apache.http.entity.ContentType.APPLICATION_JSON
 import org.apache.http.entity.StringEntity
 import org.apache.http.message.BasicHeader
-import org.apache.logging.log4j.LogManager
 import org.junit.AfterClass
 import org.junit.rules.DisableOnDebug
 import org.opensearch.action.search.SearchResponse
@@ -45,13 +44,16 @@ import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.elasticapi.string
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.destination.Chime
+import org.opensearch.alerting.model.destination.CustomWebhook
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.Slack
+import org.opensearch.alerting.model.destination.email.Email
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
+import org.opensearch.alerting.model.destination.email.Recipient
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
-import org.opensearch.alerting.transport.TransportGetDestinationsAction
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.client.Request
 import org.opensearch.client.Response
@@ -83,7 +85,6 @@ import javax.management.remote.JMXServiceURL
 
 abstract class AlertingRestTestCase : ODFERestTestCase() {
 
-    private val log = LogManager.getLogger(AlertingRestTestCase::class.java)
     private val isDebuggingTest = DisableOnDebug(null).isDebugging
     private val isDebuggingRemoteCluster = System.getProperty("cluster.debug", "false")!!.toBoolean()
     val numberOfNodes = System.getProperty("cluster.number_of_nodes", "1")!!.toInt()
@@ -138,7 +139,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
-        log.info("create a destination: $destinationJson")
         Thread.sleep(1000)
         return destination.copy(
             id = destinationJson["_id"] as String,
@@ -161,8 +161,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun updateDestination(destination: Destination, refresh: Boolean = true): Destination {
-        log.info("updated Destination: $destination")
-        log.info("updated Destination: ${destination.chime}")
         val response = client().makeRequest(
             "PUT",
             "$DESTINATION_BASE_URI/${destination.id}?refresh=$refresh",
@@ -337,8 +335,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             baseEndpoint += "${entry.key}=${entry.value}&"
         }
 
-        log.info("get destinations: $baseEndpoint")
-
         val response = client.makeRequest(
             "GET",
             baseEndpoint,
@@ -364,6 +360,74 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             slack = slack,
             customWebhook = null,
             email = null
+        )
+    }
+
+    fun getSlackDestination(): Destination {
+        val slack = Slack("https://hooks.slack.com/services/slackId")
+        return Destination(
+            type = DestinationType.SLACK,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = null,
+            slack = slack,
+            customWebhook = null,
+            email = null
+        )
+    }
+
+    fun getChimeDestination(): Destination {
+        val chime = Chime("https://hooks.chime.aws/incomingwebhooks/chimeId")
+        return Destination(
+            type = DestinationType.SLACK,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = chime,
+            slack = null,
+            customWebhook = null,
+            email = null
+        )
+    }
+
+    fun getCustomWebhookDestination(): Destination {
+        val customWebhook = CustomWebhook(
+            "https://hooks.slack.com/services/customWebhookId",
+            null,
+            null,
+            80,
+            null,
+            null,
+            emptyMap(),
+            emptyMap(),
+            null,
+            null
+        )
+        return Destination(
+            type = DestinationType.SLACK,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = null,
+            slack = null,
+            customWebhook = customWebhook,
+            email = null
+        )
+    }
+
+    fun getEmailDestination(): Destination {
+        val recipient = Recipient(Recipient.RecipientType.EMAIL, null, "test@email.com")
+        val email = Email("emailAccountId", listOf(recipient))
+        return Destination(
+            type = DestinationType.EMAIL,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = null,
+            slack = null,
+            customWebhook = null,
+            email = email
         )
     }
 

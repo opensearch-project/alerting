@@ -109,6 +109,9 @@ class RestGetDestinationsAction : BaseRestHandler() {
             table,
             destinationType
         )
+
+        // TODO: support using notification config action
+        // ActionType(GetDestinationsAction.NAME, ::GetDestinationsResponse)
         return RestChannelConsumer {
             channel ->
             client.execute(GetDestinationsAction.INSTANCE, getDestinationsRequest, RestToXContentListener(channel))

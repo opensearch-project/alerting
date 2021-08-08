@@ -26,8 +26,6 @@
 
 package org.opensearch.alerting.resthandler
 
-import org.apache.http.entity.ContentType
-import org.apache.http.nio.entity.NStringEntity
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest
@@ -35,11 +33,7 @@ import org.opensearch.alerting.model.destination.email.EmailEntry
 import org.opensearch.alerting.model.destination.email.EmailGroup
 import org.opensearch.alerting.randomEmailGroup
 import org.opensearch.client.ResponseException
-import org.opensearch.common.xcontent.XContentType
-import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
-import org.opensearch.search.builder.SearchSourceBuilder
-import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.test.junit.annotations.TestLogging
 
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
@@ -183,10 +177,10 @@ class EmailGroupRestApiIT : AlertingRestTestCase() {
         }
     }
 
-/**
- * TODO: Make sure these tests are working after this issue, https://github.com/opensearch-project/notifications/issues/255, is resolved
- * and the SearchEmailGroup API is integrated with the notification plugin.
- */
+    /**
+     * TODO: Make sure these tests are working after this issue, https://github.com/opensearch-project/notifications/issues/255, is resolved
+     * and the SearchEmailGroup API is integrated with the notification plugin.
+     */
 //    fun `test querying an email group that exists`() {
 //        if (isNotificationPluginInstalled()) {
 //            val emailGroup = createRandomEmailGroup()
@@ -229,7 +223,7 @@ class EmailGroupRestApiIT : AlertingRestTestCase() {
 //        if (isNotificationPluginInstalled()) {
 //            // Create a random monitor to create the ScheduledJob index. Otherwise the test will fail with a 404 index not found error.
 //            createRandomMonitor()
-////            createRandomEmailGroup()
+//            createRandomEmailGroup()
 //            val search = SearchSourceBuilder()
 //                .query(
 //                    QueryBuilders.termQuery(

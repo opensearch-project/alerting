@@ -45,13 +45,11 @@ import org.opensearch.commons.notifications.NotificationConstants.CONFIG_TYPE_TA
 import org.opensearch.commons.notifications.NotificationConstants.NAME_TAG
 import org.opensearch.commons.notifications.NotificationConstants.UPDATED_TIME_TAG
 import org.opensearch.commons.notifications.action.CreateNotificationConfigRequest
-import org.opensearch.commons.notifications.action.CreateNotificationConfigResponse
 import org.opensearch.commons.notifications.action.DeleteNotificationConfigRequest
 import org.opensearch.commons.notifications.action.DeleteNotificationConfigResponse
 import org.opensearch.commons.notifications.action.GetNotificationConfigRequest
 import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
 import org.opensearch.commons.notifications.action.UpdateNotificationConfigRequest
-import org.opensearch.commons.notifications.action.UpdateNotificationConfigResponse
 import org.opensearch.commons.notifications.model.Chime
 import org.opensearch.commons.notifications.model.ConfigType
 import org.opensearch.commons.notifications.model.Email
@@ -68,7 +66,6 @@ import java.net.URI
 import java.net.URISyntaxException
 import java.util.EnumSet
 
-// TODO: Force destinations to have https url if Notification plugin wont support it
 class DestinationActionsConverter {
 
     companion object {
@@ -85,7 +82,7 @@ class DestinationActionsConverter {
                 filterParams["config_type"] = "slack,chime,webhook,email"
             } else {
                 if (request.destinationType == "custom_webhook") {
-                    filterParams["config_type"] = "custom_webhook"
+                    filterParams["config_type"] = "webhook"
                 } else {
                     filterParams["config_type"] = request.destinationType
                 }
@@ -94,7 +91,7 @@ class DestinationActionsConverter {
                 filterParams["name"] = table.searchString
             }
 
-            val sortField = when(table.sortString) {
+            val sortField = when (table.sortString) {
                 "destination.name.keyword" -> NAME_TAG
                 "destination.type" -> CONFIG_TYPE_TAG
                 "destination.last_update_time" -> UPDATED_TIME_TAG
@@ -109,7 +106,6 @@ class DestinationActionsConverter {
         ): GetDestinationsResponse {
             if (response == null) throw OpenSearchStatusException("Destination cannot be found.", RestStatus.NOT_FOUND)
             val searchResult = response.searchResult
-//            if (searchResult.objectList.isEmpty()) throw OpenSearchStatusException("Destinations not found.", RestStatus.NOT_FOUND)
             val destinations = mutableListOf<Destination>()
             searchResult.objectList.forEach {
                 val destination = convertNotificationConfigToDestination(it)
@@ -131,39 +127,52 @@ class DestinationActionsConverter {
             return CreateNotificationConfigRequest(notificationConfig, configId)
         }
 
-        fun convertCreateNotificationConfigResponseToIndexDestinationResponse(
-            createResponse: CreateNotificationConfigResponse,
-            getResponse: GetNotificationConfigResponse?
-        ): IndexDestinationResponse {
-            val destination = if (getResponse != null) {
-                convertGetNotificationConfigResponseToGetDestinationsResponse(getResponse).destinations[0]
-            } else {
-                throw OpenSearchStatusException("Destination failed to be created.", RestStatus.NOT_FOUND)
-            }
-
-            return IndexDestinationResponse(createResponse.configId, 0L, 0L, 0L, RestStatus.OK, destination)
-        }
+//        fun convertCreateNotificationConfigResponseToIndexDestinationResponse(
+//            createResponse: CreateNotificationConfigResponse,
+//            getResponse: GetNotificationConfigResponse?
+//        ): IndexDestinationResponse {
+//            val destination = if (getResponse != null) {
+//                convertGetNotificationConfigResponseToGetDestinationsResponse(getResponse).destinations[0]
+//            } else {
+//                throw OpenSearchStatusException("Destination failed to be created.", RestStatus.NOT_FOUND)
+//            }
+//
+//            return IndexDestinationResponse(createResponse.configId, 0L, 0L, 0L, RestStatus.OK, destination)
+//        }
 
         fun convertIndexDestinationRequestToUpdateNotificationConfigRequest(
             request: IndexDestinationRequest
         ): UpdateNotificationConfigRequest {
             val notificationConfig = convertDestinationToNotificationConfig(request.destination)
-                ?: throw OpenSearchStatusException("Destination cannot be created.", RestStatus.NOT_FOUND)
+                ?: throw OpenSearchStatusException("Destination cannot be updated.", RestStatus.NOT_FOUND)
             return UpdateNotificationConfigRequest(request.destinationId, notificationConfig)
         }
 
-        fun convertUpdateNotificationConfigResponseToIndexDestinationResponse(
-            updateResponse: UpdateNotificationConfigResponse,
+        fun convertToIndexDestinationResponse(
+            configId: String,
             getResponse: GetNotificationConfigResponse?
         ): IndexDestinationResponse {
             val destination = if (getResponse != null) {
                 convertGetNotificationConfigResponseToGetDestinationsResponse(getResponse).destinations[0]
             } else {
-                throw OpenSearchStatusException("Destination failed to be created.", RestStatus.NOT_FOUND)
+                throw OpenSearchStatusException("Destination failed to be created/updated.", RestStatus.NOT_FOUND)
             }
 
-            return IndexDestinationResponse(updateResponse.configId, 0L, 0L, 0L, RestStatus.OK, destination)
+            return IndexDestinationResponse(configId, 0L, 0L, 0L, RestStatus.OK, destination)
         }
+
+//        fun convertUpdateNotificationConfigResponseToIndexDestinationResponse(
+//            updateResponse: UpdateNotificationConfigResponse,
+//            getResponse: GetNotificationConfigResponse?
+//        ): IndexDestinationResponse {
+//            val destination = if (getResponse != null) {
+//                convertGetNotificationConfigResponseToGetDestinationsResponse(getResponse).destinations[0]
+//            } else {
+//                throw OpenSearchStatusException("Destination failed to be created.", RestStatus.NOT_FOUND)
+//            }
+//
+//            return IndexDestinationResponse(updateResponse.configId, 0L, 0L, 0L, RestStatus.OK, destination)
+//        }
 
         fun convertDeleteDestinationRequestToDeleteNotificationConfigRequest(
             request: DeleteDestinationRequest
@@ -262,7 +271,6 @@ class DestinationActionsConverter {
                 ConfigType.EMAIL -> {
                     val email: Email = notificationConfig.configData as Email
                     val recipients = mutableListOf<Recipient>()
-                    logger.info("trying to get email info: email account - ${email.emailAccountID}, email groups - ${email.emailGroupIds}, recipients  - ${email.recipients}")
                     email.recipients.forEach {
                         val recipient = Recipient(Recipient.RecipientType.EMAIL, null, it)
                         recipients.add(recipient)
@@ -360,7 +368,8 @@ class DestinationActionsConverter {
                         val recipients = mutableListOf<String>()
                         val emailGroupIds = mutableListOf<String>()
                         alertEmail.recipients.forEach {
-                            if (it.type == Recipient.RecipientType.EMAIL_GROUP) it.emailGroupID?.let { emailGroup -> emailGroupIds.add(emailGroup) }
+                            if (it.type == Recipient.RecipientType.EMAIL_GROUP)
+                                it.emailGroupID?.let { emailGroup -> emailGroupIds.add(emailGroup) }
                             else it.email?.let { emailRecipient -> recipients.add(emailRecipient) }
                         }
                         email = Email(alertEmail.emailAccountID, recipients, emailGroupIds)

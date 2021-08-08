@@ -41,8 +41,6 @@ import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.action.Throttle
 import org.opensearch.alerting.model.destination.CustomWebhook
 import org.opensearch.alerting.model.destination.Destination
-import org.opensearch.alerting.model.destination.email.Email
-import org.opensearch.alerting.model.destination.email.Recipient
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.client.ResponseException
 import org.opensearch.client.WarningFailureException
@@ -60,7 +58,6 @@ import java.time.temporal.ChronoUnit
 import java.time.temporal.ChronoUnit.DAYS
 import java.time.temporal.ChronoUnit.MILLIS
 import java.time.temporal.ChronoUnit.MINUTES
-import kotlin.collections.HashMap
 
 class MonitorRunnerIT : AlertingRestTestCase() {
 

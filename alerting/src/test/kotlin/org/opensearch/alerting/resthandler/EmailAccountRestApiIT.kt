@@ -26,19 +26,13 @@
 
 package org.opensearch.alerting.resthandler
 
-import org.apache.http.entity.ContentType
-import org.apache.http.nio.entity.NStringEntity
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.randomEmailAccount
 import org.opensearch.client.ResponseException
-import org.opensearch.common.xcontent.XContentType
-import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
-import org.opensearch.search.builder.SearchSourceBuilder
-import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.test.junit.annotations.TestLogging
 
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
@@ -224,10 +218,10 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
         }
     }
 
-/**
- * TODO: Make sure these tests are working after this issue, https://github.com/opensearch-project/notifications/issues/255, is resolved
- * and the SearchEmailAccount API is integrated with the notification plugin.
- */
+    /**
+     * TODO: Make sure these tests are working after this issue, https://github.com/opensearch-project/notifications/issues/255, is resolved
+     * and the SearchEmailAccount API is integrated with the notification plugin.
+     */
 //    fun `test querying an email account that exists`() {
 //        if (isNotificationPluginInstalled()) {
 //            val emailAccount = createRandomEmailAccount()

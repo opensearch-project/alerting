@@ -18,10 +18,9 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.IndexDestinationAction
 import org.opensearch.alerting.action.IndexDestinationRequest
 import org.opensearch.alerting.action.IndexDestinationResponse
-import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertCreateNotificationConfigResponseToIndexDestinationResponse
 import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertIndexDestinationRequestToCreateNotificationConfigRequest
 import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertIndexDestinationRequestToUpdateNotificationConfigRequest
-import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertUpdateNotificationConfigResponseToIndexDestinationResponse
+import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertToIndexDestinationResponse
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
@@ -36,9 +35,7 @@ import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.notifications.action.BaseResponse
-import org.opensearch.commons.notifications.action.CreateNotificationConfigResponse
 import org.opensearch.commons.notifications.action.GetNotificationConfigRequest
-import org.opensearch.commons.notifications.action.UpdateNotificationConfigResponse
 import org.opensearch.rest.RestRequest
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -94,21 +91,25 @@ class TransportIndexDestinationAction @Inject constructor(
 
             val getNotificationConfigRequest = GetNotificationConfigRequest(setOf(configId), 0, 1, null, null, emptyMap())
             val getNotificationConfigResponse = NotificationAPIUtils.getNotificationConfig(client, getNotificationConfigRequest)
-            if (request.method == RestRequest.Method.PUT) {
-                actionListener.onResponse(
-                    convertUpdateNotificationConfigResponseToIndexDestinationResponse(
-                        notificationResponse as UpdateNotificationConfigResponse,
-                        getNotificationConfigResponse
-                    )
-                )
-            } else {
-                actionListener.onResponse(
-                    convertCreateNotificationConfigResponseToIndexDestinationResponse(
-                        notificationResponse as CreateNotificationConfigResponse,
-                        getNotificationConfigResponse
-                    )
-                )
-            }
+            actionListener.onResponse(
+                convertToIndexDestinationResponse(configId, getNotificationConfigResponse)
+            )
+
+//            if (request.method == RestRequest.Method.PUT) {
+//                actionListener.onResponse(
+//                    convertToIndexDestinationResponse(
+//                        (notificationResponse.configId as UpdateNotificationConfigResponse).configId,
+//                        getNotificationConfigResponse
+//                    )
+//                )
+//            } else {
+//                actionListener.onResponse(
+//                    convertToIndexDestinationResponse(
+//                        (notificationResponse as CreateNotificationConfigResponse).configId,
+//                        getNotificationConfigResponse
+//                    )
+//                )
+//            }
         } catch (e: Exception) {
             log.error("Failed to index destination due to", e)
             actionListener.onFailure(AlertingException.wrap(e))
