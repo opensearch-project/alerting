@@ -1,8 +1,11 @@
 package org.opensearch.alerting.actionconverter
 
 import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.action.DeleteDestinationRequest
 import org.opensearch.alerting.action.GetDestinationsRequest
 import org.opensearch.alerting.action.IndexDestinationRequest
+import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertDeleteDestinationRequestToDeleteNotificationConfigRequest
+import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertDeleteNotificationConfigResponseToDeleteResponse
 import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertGetDestinationsRequestToGetNotificationConfigRequest
 import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertGetNotificationConfigResponseToGetDestinationsResponse
 import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertIndexDestinationRequestToCreateNotificationConfigRequest
@@ -15,6 +18,7 @@ import org.opensearch.alerting.getSlackDestination
 import org.opensearch.alerting.model.Table
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.commons.notifications.NotificationConstants
+import org.opensearch.commons.notifications.action.DeleteNotificationConfigResponse
 import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
 import org.opensearch.commons.notifications.model.Chime
 import org.opensearch.commons.notifications.model.ConfigType
@@ -516,5 +520,19 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
         assertEquals("configId", indexDestinationResponse.destination.id)
         assertEquals(email.emailAccountID, indexDestinationResponse.destination.email?.emailAccountID)
         assertEquals(email.recipients[0], indexDestinationResponse.destination.email?.recipients?.get(0)?.email)
+    }
+
+    fun `test convertDeleteDestinationRequestToDeleteNotificationConfigRequest`() {
+        val deleteDestinationRequest = DeleteDestinationRequest("destinationId", WriteRequest.RefreshPolicy.NONE)
+        val deleteNotificationConfigRequest = convertDeleteDestinationRequestToDeleteNotificationConfigRequest(deleteDestinationRequest)
+
+        assertEquals(1, deleteNotificationConfigRequest.configIds.size)
+        assertEquals(deleteDestinationRequest.destinationId, deleteNotificationConfigRequest.configIds.elementAt(0))
+    }
+
+    fun `test convertDeleteNotificationConfigResponseToDeleteResponse`() {
+        val deleteNotificationConfigResponse = DeleteNotificationConfigResponse(mapOf(Pair("configId", RestStatus.OK)))
+        val deleteResponse = convertDeleteNotificationConfigResponseToDeleteResponse(deleteNotificationConfigResponse)
+        assertEquals("configId", deleteResponse.id)
     }
 }

@@ -51,25 +51,25 @@ When launching a cluster using one of the above commands, logs are placed in `al
 
 1. Setup a local opensearch cluster with security plugin.
 
-   - `./gradlew :alerting:integTestRunner -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=es-integrationtest -Dhttps=true -Dsecurity=true -Duser=admin -Dpassword=admin`
+   - `./gradlew :alerting:integTest -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=es-integrationtest -Dhttps=true -Dsecurity=true -Duser=admin -Dpassword=admin`
 
-   - `./gradlew :alerting:integTestRunner -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=es-integrationtest -Dhttps=true -Dsecurity=true -Duser=admin -Dpassword=admin --tests "org.opensearch.alerting.MonitorRunnerIT.test execute monitor returns search result"`
+   - `./gradlew :alerting:integTest -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=es-integrationtest -Dhttps=true -Dsecurity=true -Duser=admin -Dpassword=admin --tests "org.opensearch.alerting.MonitorRunnerIT.test execute monitor returns search result"`
 
 #### Run integration tests with Notification plugin 
 
 1. Setup a local opensearch cluster with notification plugin.
 
-   - `./gradlew :alerting:integTestRunner -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=es-integrationtest
+   - `./gradlew :alerting:integTest -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=es-integrationtest
 
-   - `./gradlew :alerting:integTestRunner -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=es-integrationtest --tests "org.opensearch.alerting.MonitorRunnerIT.test execute monitor returns search result"`
+   - `./gradlew :alerting:integTest -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=es-integrationtest --tests "org.opensearch.alerting.MonitorRunnerIT.test execute monitor returns search result"`
 
 #### Run integration tests with Notification plugin and Security enabled
 
 1. Setup a local opensearch cluster with notification and security plugin.
 
-   - `./gradlew :alerting:integTestRunner -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=es-integrationtest -Dhttps=true -Dsecurity=true -Duser=admin -Dpassword=admin`
+   - `./gradlew :alerting:integTest -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=es-integrationtest -Dhttps=true -Dsecurity=true -Duser=admin -Dpassword=admin`
 
-   - `./gradlew :alerting:integTestRunner -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=es-integrationtest -Dhttps=true -Dsecurity=true -Duser=admin -Dpassword=admin --tests "org.opensearch.alerting.MonitorRunnerIT.test execute monitor returns search result"`
+   - `./gradlew :alerting:integTest -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=es-integrationtest -Dhttps=true -Dsecurity=true -Duser=admin -Dpassword=admin --tests "org.opensearch.alerting.MonitorRunnerIT.test execute monitor returns search result"`
 
 #### Building from the IDE
 

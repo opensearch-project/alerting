@@ -33,10 +33,9 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.IndexEmailGroupAction
 import org.opensearch.alerting.action.IndexEmailGroupRequest
 import org.opensearch.alerting.action.IndexEmailGroupResponse
-import org.opensearch.alerting.actionconverter.EmailGroupActionsConverter.Companion.convertCreateNotificationConfigResponseToIndexEmailGroupResponse
+import org.opensearch.alerting.actionconverter.EmailGroupActionsConverter
 import org.opensearch.alerting.actionconverter.EmailGroupActionsConverter.Companion.convertIndexEmailGroupRequestToCreateNotificationConfigRequest
 import org.opensearch.alerting.actionconverter.EmailGroupActionsConverter.Companion.convertIndexEmailGroupRequestToUpdateNotificationConfigRequest
-import org.opensearch.alerting.actionconverter.EmailGroupActionsConverter.Companion.convertUpdateNotificationConfigResponseToIndexEmailGroupResponse
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
@@ -48,9 +47,7 @@ import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.commons.notifications.action.BaseResponse
-import org.opensearch.commons.notifications.action.CreateNotificationConfigResponse
 import org.opensearch.commons.notifications.action.GetNotificationConfigRequest
-import org.opensearch.commons.notifications.action.UpdateNotificationConfigResponse
 import org.opensearch.rest.RestRequest
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -96,21 +93,27 @@ class TransportIndexEmailGroupAction @Inject constructor(
             }
             val getNotificationConfigRequest = GetNotificationConfigRequest(setOf(configId!!), 0, 1, null, null, emptyMap())
             val getNotificationConfigResponse = NotificationAPIUtils.getNotificationConfig(client, getNotificationConfigRequest)
-            if (request.method == RestRequest.Method.PUT) {
-                actionListener.onResponse(
-                    convertUpdateNotificationConfigResponseToIndexEmailGroupResponse(
-                        notificationResponse as UpdateNotificationConfigResponse,
-                        getNotificationConfigResponse
-                    )
+            actionListener.onResponse(
+                EmailGroupActionsConverter.convertToIndexEmailGroupResponse(
+                    configId,
+                    getNotificationConfigResponse
                 )
-            } else {
-                actionListener.onResponse(
-                    convertCreateNotificationConfigResponseToIndexEmailGroupResponse(
-                        notificationResponse as CreateNotificationConfigResponse,
-                        getNotificationConfigResponse
-                    )
-                )
-            }
+            )
+//            if (request.method == RestRequest.Method.PUT) {
+//                actionListener.onResponse(
+//                    convertUpdateNotificationConfigResponseToIndexEmailGroupResponse(
+//                        notificationResponse as UpdateNotificationConfigResponse,
+//                        getNotificationConfigResponse
+//                    )
+//                )
+//            } else {
+//                actionListener.onResponse(
+//                    convertCreateNotificationConfigResponseToIndexEmailGroupResponse(
+//                        notificationResponse as CreateNotificationConfigResponse,
+//                        getNotificationConfigResponse
+//                    )
+//                )
+//            }
         } catch (e: Exception) {
             actionListener.onFailure(AlertingException.wrap(e))
         }

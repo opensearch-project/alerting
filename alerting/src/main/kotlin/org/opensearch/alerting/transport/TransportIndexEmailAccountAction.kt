@@ -33,10 +33,9 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.IndexEmailAccountAction
 import org.opensearch.alerting.action.IndexEmailAccountRequest
 import org.opensearch.alerting.action.IndexEmailAccountResponse
-import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertCreateNotificationConfigResponseToIndexEmailAccountResponse
 import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertIndexEmailAccountRequestToCreateNotificationConfigRequest
 import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertIndexEmailAccountRequestToUpdateNotificationConfigRequest
-import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertUpdateNotificationConfigResponseToIndexEmailAccountResponse
+import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertToIndexEmailAccountResponse
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
@@ -49,9 +48,7 @@ import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.commons.notifications.action.BaseResponse
-import org.opensearch.commons.notifications.action.CreateNotificationConfigResponse
 import org.opensearch.commons.notifications.action.GetNotificationConfigRequest
-import org.opensearch.commons.notifications.action.UpdateNotificationConfigResponse
 import org.opensearch.rest.RestRequest
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -98,23 +95,26 @@ class TransportIndexEmailAccountAction @Inject constructor(
                 )
                 configId = notificationResponse.configId
             }
-            val getNotificationConfigRequest = GetNotificationConfigRequest(setOf(configId!!), 0, 1, null, null, emptyMap())
+            val getNotificationConfigRequest = GetNotificationConfigRequest(setOf(configId), 0, 1, null, null, emptyMap())
             val getNotificationConfigResponse = NotificationAPIUtils.getNotificationConfig(client, getNotificationConfigRequest)
-            if (request.method == RestRequest.Method.PUT) {
-                actionListener.onResponse(
-                    convertUpdateNotificationConfigResponseToIndexEmailAccountResponse(
-                        notificationResponse as UpdateNotificationConfigResponse,
-                        getNotificationConfigResponse
-                    )
-                )
-            } else {
-                actionListener.onResponse(
-                    convertCreateNotificationConfigResponseToIndexEmailAccountResponse(
-                        notificationResponse as CreateNotificationConfigResponse,
-                        getNotificationConfigResponse
-                    )
-                )
-            }
+            actionListener.onResponse(
+                convertToIndexEmailAccountResponse(configId, getNotificationConfigResponse)
+            )
+//            if (request.method == RestRequest.Method.PUT) {
+//                actionListener.onResponse(
+//                    convertToIndexEmailAccountResponse(
+//                        notificationResponse as UpdateNotificationConfigResponse,
+//                        getNotificationConfigResponse
+//                    )
+//                )
+//            } else {
+//                actionListener.onResponse(
+//                    convertCreateNotificationConfigResponseToIndexEmailAccountResponse(
+//                        notificationResponse as CreateNotificationConfigResponse,
+//                        getNotificationConfigResponse
+//                    )
+//                )
+//            }
         } catch (e: Exception) {
             actionListener.onFailure(AlertingException.wrap(e))
         }

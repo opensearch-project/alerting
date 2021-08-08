@@ -33,19 +33,15 @@ import org.opensearch.alerting.action.GetEmailGroupRequest
 import org.opensearch.alerting.action.GetEmailGroupResponse
 import org.opensearch.alerting.action.IndexEmailGroupRequest
 import org.opensearch.alerting.action.IndexEmailGroupResponse
-import org.opensearch.alerting.model.destination.email.EmailAccount
-import org.opensearch.alerting.model.destination.email.EmailAccount.Companion.NO_ID
 import org.opensearch.alerting.model.destination.email.EmailAccount.Companion.NO_VERSION
 import org.opensearch.alerting.model.destination.email.EmailEntry
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.commons.notifications.action.CreateNotificationConfigRequest
-import org.opensearch.commons.notifications.action.CreateNotificationConfigResponse
 import org.opensearch.commons.notifications.action.DeleteNotificationConfigRequest
 import org.opensearch.commons.notifications.action.DeleteNotificationConfigResponse
 import org.opensearch.commons.notifications.action.GetNotificationConfigRequest
 import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
 import org.opensearch.commons.notifications.action.UpdateNotificationConfigRequest
-import org.opensearch.commons.notifications.action.UpdateNotificationConfigResponse
 import org.opensearch.commons.notifications.model.ConfigType
 import org.opensearch.commons.notifications.model.EmailGroup
 import org.opensearch.commons.notifications.model.Feature
@@ -72,17 +68,17 @@ class EmailGroupActionsConverter {
             val emailGroup: EmailGroup = notificationConfig.configData as EmailGroup
             val recipients = mutableListOf<EmailEntry>()
             emailGroup.recipients.forEach {
-                recipients.plus(EmailEntry(it))
+                recipients.add(EmailEntry(it))
             }
             val alertEmailGroup = org.opensearch.alerting.model.destination.email.EmailGroup(
-                NO_ID,
+                notificationConfigInfo.configId,
                 NO_VERSION,
                 IndexUtils.NO_SCHEMA_VERSION,
                 notificationConfig.name,
                 recipients
             )
 
-            return GetEmailGroupResponse(notificationConfigInfo.configId, EmailAccount.NO_VERSION, 0L, 0L, RestStatus.OK, alertEmailGroup)
+            return GetEmailGroupResponse(notificationConfigInfo.configId, NO_VERSION, 0L, 0L, RestStatus.OK, alertEmailGroup)
         }
 
         fun convertIndexEmailGroupRequestToCreateNotificationConfigRequest(
@@ -91,7 +87,7 @@ class EmailGroupActionsConverter {
             val emailGroup = request.emailGroup
             val recipients = mutableListOf<String>()
             emailGroup.emails.forEach {
-                recipients.plus(it.email)
+                recipients.add(it.email)
             }
             val notificationEmailGroup = EmailGroup(recipients)
 
@@ -103,30 +99,30 @@ class EmailGroupActionsConverter {
                 EnumSet.of(Feature.ALERTING),
                 notificationEmailGroup
             )
-
-            return CreateNotificationConfigRequest(notificationConfig, null)
+            val configId = if (request.emailGroupID == "") null else request.emailGroupID
+            return CreateNotificationConfigRequest(notificationConfig, configId)
         }
 
-        fun convertCreateNotificationConfigResponseToIndexEmailGroupResponse(
-            createResponse: CreateNotificationConfigResponse,
-            getResponse: GetNotificationConfigResponse?
-        ): IndexEmailGroupResponse {
-            val getEmailGroupResponse = if (getResponse != null) {
-                convertGetNotificationConfigResponseToGetEmailGroupResponse(getResponse)
-            } else {
-                throw OpenSearchStatusException("Email Group failed to be created.", RestStatus.NOT_FOUND)
-            }
-            val emailGroup = getEmailGroupResponse.emailGroup
-                ?: throw OpenSearchStatusException("Email Group failed to be created.", RestStatus.NOT_FOUND)
-            return IndexEmailGroupResponse(
-                createResponse.configId,
-                0L,
-                0L,
-                0L,
-                RestStatus.OK,
-                emailGroup
-            )
-        }
+//        fun convertCreateNotificationConfigResponseToIndexEmailGroupResponse(
+//            createResponse: CreateNotificationConfigResponse,
+//            getResponse: GetNotificationConfigResponse?
+//        ): IndexEmailGroupResponse {
+//            val getEmailGroupResponse = if (getResponse != null) {
+//                convertGetNotificationConfigResponseToGetEmailGroupResponse(getResponse)
+//            } else {
+//                throw OpenSearchStatusException("Email Group failed to be created.", RestStatus.NOT_FOUND)
+//            }
+//            val emailGroup = getEmailGroupResponse.emailGroup
+//                ?: throw OpenSearchStatusException("Email Group failed to be created.", RestStatus.NOT_FOUND)
+//            return IndexEmailGroupResponse(
+//                createResponse.configId,
+//                0L,
+//                0L,
+//                0L,
+//                RestStatus.OK,
+//                emailGroup
+//            )
+//        }
 
         fun convertIndexEmailGroupRequestToUpdateNotificationConfigRequest(
             request: IndexEmailGroupRequest
@@ -136,19 +132,33 @@ class EmailGroupActionsConverter {
             return UpdateNotificationConfigRequest(request.emailGroupID, notificationConfig)
         }
 
-        fun convertUpdateNotificationConfigResponseToIndexEmailGroupResponse(
-            createResponse: UpdateNotificationConfigResponse,
+        fun convertToIndexEmailGroupResponse(
+            configId: String,
             getResponse: GetNotificationConfigResponse?
         ): IndexEmailGroupResponse {
             val getEmailGroupResponse = if (getResponse != null) {
                 convertGetNotificationConfigResponseToGetEmailGroupResponse(getResponse)
             } else {
-                throw OpenSearchStatusException("Email Group failed to be created.", RestStatus.NOT_FOUND)
+                throw OpenSearchStatusException("Email Group failed to be created/updated.", RestStatus.NOT_FOUND)
             }
             val emailGroup = getEmailGroupResponse.emailGroup
-                ?: throw OpenSearchStatusException("Email Group failed to be created.", RestStatus.NOT_FOUND)
-            return IndexEmailGroupResponse(createResponse.configId, 0L, 0L, 0L, RestStatus.OK, emailGroup)
+                ?: throw OpenSearchStatusException("Email Group failed to be created/updated.", RestStatus.NOT_FOUND)
+            return IndexEmailGroupResponse(configId, 0L, 0L, 0L, RestStatus.OK, emailGroup)
         }
+
+//        fun convertUpdateNotificationConfigResponseToIndexEmailGroupResponse(
+//            createResponse: UpdateNotificationConfigResponse,
+//            getResponse: GetNotificationConfigResponse?
+//        ): IndexEmailGroupResponse {
+//            val getEmailGroupResponse = if (getResponse != null) {
+//                convertGetNotificationConfigResponseToGetEmailGroupResponse(getResponse)
+//            } else {
+//                throw OpenSearchStatusException("Email Group failed to be created.", RestStatus.NOT_FOUND)
+//            }
+//            val emailGroup = getEmailGroupResponse.emailGroup
+//                ?: throw OpenSearchStatusException("Email Group failed to be created.", RestStatus.NOT_FOUND)
+//            return IndexEmailGroupResponse(createResponse.configId, 0L, 0L, 0L, RestStatus.OK, emailGroup)
+//        }
 
         fun convertDeleteEmailGroupRequestToDeleteNotificationConfigRequest(
             request: DeleteEmailGroupRequest
@@ -172,7 +182,7 @@ class EmailGroupActionsConverter {
         ): NotificationConfig {
             val recipients = mutableListOf<String>()
             emailGroup.emails.forEach {
-                recipients.plus(it.email)
+                recipients.add(it.email)
             }
             val notificationEmailGroup = EmailGroup(recipients)
 
