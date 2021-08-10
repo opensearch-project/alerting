@@ -3,6 +3,9 @@ package org.opensearch.alerting.util
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.alerting.makeRequest
+import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.common.xcontent.json.JsonXContent
 import java.util.UUID
 
 class MigrationUtilServiceIT : AlertingRestTestCase() {
@@ -16,6 +19,10 @@ class MigrationUtilServiceIT : AlertingRestTestCase() {
             "GET",
             "_plugins/_notifications/configs"
         )
-        assertEquals("random", response.entity.content)
+        val valJson = JsonXContent.jsonXContent.createParser(
+            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            response.entity.content
+        ).map()
+        assertEquals("random", valJson)
     }
 }
