@@ -161,6 +161,28 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
         assertEquals("slack,chime,webhook,email", getNotificationConfigRequest.filterParams["config_type"])
     }
 
+    fun `test convertGetDestinationsRequestToGetNotificationConfigRequest with sort by invalid field`() {
+        val table = Table("asc", "destination.some_unknown_field", null, 0, 0, "searchString")
+        val getDestinationsRequest = GetDestinationsRequest(
+            null,
+            0L,
+            FetchSourceContext.DO_NOT_FETCH_SOURCE,
+            table,
+            "ALL"
+        )
+        val getNotificationConfigRequest = convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest)
+
+        assertTrue(getNotificationConfigRequest.configIds.isEmpty())
+        assertEquals(table.startIndex, getNotificationConfigRequest.fromIndex)
+        assertEquals(table.size, getNotificationConfigRequest.maxItems)
+        assertNull(getNotificationConfigRequest.sortField)
+        assertEquals(SortOrder.fromString(table.sortOrder), getNotificationConfigRequest.sortOrder)
+        assertTrue(getNotificationConfigRequest.filterParams.containsKey("name"))
+        assertEquals(table.searchString, getNotificationConfigRequest.filterParams["name"])
+        assertTrue(getNotificationConfigRequest.filterParams.containsKey("config_type"))
+        assertEquals("slack,chime,webhook,email", getNotificationConfigRequest.filterParams["config_type"])
+    }
+
     fun `test convertGetNotificationConfigResponseToGetDestinationsResponse with chime`() {
         val chime = Chime("https://hooks.chime.aws/incomingwebhooks/webhookId")
         val notificationConfig = NotificationConfig(
@@ -257,6 +279,36 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
         assertEquals(webhook.url, destination.customWebhook?.url)
         assertEquals(notificationConfig.name, destination.name)
         assertEquals(notificationConfigInfo.configId, destination.id)
+    }
+
+    fun `test convertGetNotificationConfigResponseToGetDestinationsResponse with email group`() {
+        val emailGroup = EmailGroup(listOf("emailGroup1"))
+        val notificationConfig = NotificationConfig(
+            "notificationConfig",
+            "description",
+            ConfigType.EMAIL_GROUP,
+            EnumSet.of(Feature.ALERTING),
+            emailGroup,
+            true
+        )
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val notificationConfigSearchResult = NotificationConfigSearchResult(notificationConfigInfo)
+        val getNotificationConfigResponse = GetNotificationConfigResponse(notificationConfigSearchResult)
+        val getDestinationsResponse = convertGetNotificationConfigResponseToGetDestinationsResponse(getNotificationConfigResponse)
+
+        assertEquals(0, getDestinationsResponse.totalDestinations)
+        assertEquals(0, getDestinationsResponse.destinations.size)
+        assertEquals(RestStatus.OK, getDestinationsResponse.status)
+    }
+
+    fun `test convertGetNotificationConfigResponseToGetDestinationsResponse with null response`() {
+        try {
+            convertGetNotificationConfigResponseToGetDestinationsResponse(null)
+            fail("Expecting OpenSearchStatusException")
+        } catch (e: OpenSearchStatusException) {
+            assertEquals(RestStatus.NOT_FOUND, e.status())
+            assertEquals("Destination cannot be found.", e.localizedMessage)
+        }
     }
 
     fun `test convertIndexDestinationRequestToCreateNotificationConfigRequest with webhook`() {
