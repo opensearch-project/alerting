@@ -681,7 +681,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return StringEntity(toJsonString(), APPLICATION_JSON)
     }
 
-    private fun Destination.toJsonString(): String {
+    protected fun Destination.toJsonString(): String {
         val builder = XContentFactory.jsonBuilder()
         return shuffleXContent(toXContent(builder)).string()
     }
