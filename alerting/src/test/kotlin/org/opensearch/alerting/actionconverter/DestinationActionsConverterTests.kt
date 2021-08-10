@@ -282,7 +282,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
     }
 
     fun `test convertGetNotificationConfigResponseToGetDestinationsResponse with email group`() {
-        val emailGroup = EmailGroup(listOf("emailGroup1"))
+        val emailGroup = EmailGroup(listOf("test@email.com"))
         val notificationConfig = NotificationConfig(
             "notificationConfig",
             "description",

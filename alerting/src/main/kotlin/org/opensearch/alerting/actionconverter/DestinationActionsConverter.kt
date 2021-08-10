@@ -110,15 +110,17 @@ class DestinationActionsConverter {
             if (response == null) throw OpenSearchStatusException("Destination cannot be found.", RestStatus.NOT_FOUND)
             val searchResult = response.searchResult
             val destinations = mutableListOf<Destination>()
+            var invalidCount = 0
             searchResult.objectList.forEach {
                 val destination = convertNotificationConfigToDestination(it)
                 if (destination != null) {
-                    destinations += destination
+                    destinations.add(destination)
                 } else {
                     logger.error("Destination was null and cannot be converted")
+                    invalidCount++
                 }
             }
-            return GetDestinationsResponse(RestStatus.OK, searchResult.totalHits.toInt(), destinations)
+            return GetDestinationsResponse(RestStatus.OK, searchResult.totalHits.toInt() - invalidCount, destinations)
         }
 
         fun convertIndexDestinationRequestToCreateNotificationConfigRequest(
