@@ -14,6 +14,7 @@ class MigrationUtilServiceIT : AlertingRestTestCase() {
         val destination = getSlackDestination()
         val id = UUID.randomUUID().toString()
         wipeAllODFEIndices()
+        createAlertingConfigIndex()
         indexDoc(SCHEDULED_JOBS_INDEX, id, destination.toJsonString())
         Thread.sleep(10000)
         val response = client().makeRequest(
