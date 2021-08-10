@@ -14,7 +14,7 @@ class MigrationUtilServiceIT : AlertingRestTestCase() {
         val destination = getSlackDestination()
         val id = UUID.randomUUID().toString()
         wipeAllODFEIndices()
-        createAlertingConfigIndex()
+        createRandomMonitor()
         indexDoc(SCHEDULED_JOBS_INDEX, id, destination.toJsonString())
         Thread.sleep(10000)
         val response = client().makeRequest(
@@ -36,6 +36,6 @@ class MigrationUtilServiceIT : AlertingRestTestCase() {
             response2.entity.content
         ).map()
         logger.info("destination data: $valJson2")
-        assertEquals("random", valJson)
+        assertEquals(id, valJson)
     }
 }
