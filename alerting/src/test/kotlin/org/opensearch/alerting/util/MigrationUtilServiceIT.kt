@@ -12,7 +12,7 @@ class MigrationUtilServiceIT : AlertingRestTestCase() {
 
     fun `test migrateData`() {
         val destination = getSlackDestination()
-        val id = UUID.randomUUID().toString()
+        val id = "bHz3xHoB77vMD-zLfb9o"
         wipeAllODFEIndices()
         createRandomMonitor()
         indexDoc(SCHEDULED_JOBS_INDEX, id, destination.toJsonString())
@@ -29,13 +29,13 @@ class MigrationUtilServiceIT : AlertingRestTestCase() {
 
         val response2 = client().makeRequest(
             "GET",
-            "_plugins/_alerting/destinations", // "_plugins/_notifications/configs"
+            ".opendistro-alerting-config/_doc/$id", // "_plugins/_notifications/configs"
         )
         val valJson2 = JsonXContent.jsonXContent.createParser(
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response2.entity.content
         ).map()
-        logger.info("destination data: $valJson2")
+        logger.info("config index data: $valJson2")
         assertEquals(id, valJson)
     }
 }
