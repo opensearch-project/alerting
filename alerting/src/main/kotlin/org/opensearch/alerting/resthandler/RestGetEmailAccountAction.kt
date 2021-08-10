@@ -26,19 +26,22 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.opensearch.action.ActionType
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.GetEmailAccountAction
 import org.opensearch.alerting.action.GetEmailAccountRequest
+import org.opensearch.alerting.action.GetEmailAccountResponse
 import org.opensearch.alerting.util.context
 import org.opensearch.client.node.NodeClient
+import org.opensearch.commons.notifications.action.NotificationsActions.GET_NOTIFICATION_CONFIG_NAME
 import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.action.RestActions
 import org.opensearch.rest.action.RestToXContentListener
 import org.opensearch.search.fetch.subphase.FetchSourceContext
-import java.lang.IllegalArgumentException
 
 /**
  * Rest handler to retrieve an EmailAccount.
@@ -82,8 +85,19 @@ class RestGetEmailAccountAction : BaseRestHandler() {
         }
 
         val getEmailAccountRequest = GetEmailAccountRequest(emailAccountID, RestActions.parseVersion(request), request.method(), srcContext)
-        return RestChannelConsumer { channel ->
-            client.execute(GetEmailAccountAction.INSTANCE, getEmailAccountRequest, RestToXContentListener(channel))
+
+        return try {
+            RestChannelConsumer { channel ->
+                client.execute(GetEmailAccountAction.INSTANCE, getEmailAccountRequest, RestToXContentListener(channel))
+            }
+        } catch (e: Exception) {
+            RestChannelConsumer { channel ->
+                client.execute(
+                    ActionType(GET_NOTIFICATION_CONFIG_NAME, ::GetEmailAccountResponse),
+                    getEmailAccountRequest,
+                    RestToXContentListener(channel)
+                )
+            }
         }
     }
 }

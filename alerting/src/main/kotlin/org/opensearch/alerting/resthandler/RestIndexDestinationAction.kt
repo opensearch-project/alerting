@@ -27,6 +27,7 @@
 package org.opensearch.alerting.resthandler
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.action.ActionType
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.IndexDestinationAction
@@ -40,6 +41,7 @@ import org.opensearch.client.node.NodeClient
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
+import org.opensearch.commons.notifications.action.NotificationsActions.CREATE_NOTIFICATION_CONFIG_NAME
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
@@ -106,12 +108,23 @@ class RestIndexDestinationAction : BaseRestHandler() {
             WriteRequest.RefreshPolicy.IMMEDIATE
         }
         val indexDestinationRequest = IndexDestinationRequest(id, seqNo, primaryTerm, refreshPolicy, request.method(), destination)
-        return RestChannelConsumer {
-            channel ->
-            client.execute(
-                IndexDestinationAction.INSTANCE, indexDestinationRequest,
-                indexDestinationResponse(channel, request.method())
-            )
+        return try {
+            RestChannelConsumer {
+                channel ->
+                client.execute(
+                    IndexDestinationAction.INSTANCE, indexDestinationRequest,
+                    indexDestinationResponse(channel, request.method())
+                )
+            }
+        } catch (e: Exception) {
+            RestChannelConsumer {
+                channel ->
+                client.execute(
+                    ActionType(CREATE_NOTIFICATION_CONFIG_NAME, ::IndexDestinationResponse),
+                    indexDestinationRequest,
+                    indexDestinationResponse(channel, request.method())
+                )
+            }
         }
     }
 

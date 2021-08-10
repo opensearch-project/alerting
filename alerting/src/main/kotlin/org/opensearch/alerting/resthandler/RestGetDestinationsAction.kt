@@ -27,12 +27,15 @@
 package org.opensearch.alerting.resthandler
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.action.ActionType
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetDestinationsRequest
+import org.opensearch.alerting.action.GetDestinationsResponse
 import org.opensearch.alerting.model.Table
 import org.opensearch.alerting.util.context
 import org.opensearch.client.node.NodeClient
+import org.opensearch.commons.notifications.action.NotificationsActions.GET_NOTIFICATION_CONFIG_NAME
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.RestHandler.ReplacedRoute
@@ -112,9 +115,18 @@ class RestGetDestinationsAction : BaseRestHandler() {
 
         // TODO: support using notification config action
         // ActionType(GetDestinationsAction.NAME, ::GetDestinationsResponse)
-        return RestChannelConsumer {
-            channel ->
-            client.execute(GetDestinationsAction.INSTANCE, getDestinationsRequest, RestToXContentListener(channel))
+        return try {
+            RestChannelConsumer { channel ->
+                client.execute(GetDestinationsAction.INSTANCE, getDestinationsRequest, RestToXContentListener(channel))
+            }
+        } catch (e: Exception) {
+            RestChannelConsumer { channel ->
+                client.execute(
+                    ActionType(GET_NOTIFICATION_CONFIG_NAME, ::GetDestinationsResponse),
+                    getDestinationsRequest,
+                    RestToXContentListener(channel)
+                )
+            }
         }
     }
 }

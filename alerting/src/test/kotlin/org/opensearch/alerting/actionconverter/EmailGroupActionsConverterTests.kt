@@ -1,5 +1,6 @@
 package org.opensearch.alerting.actionconverter
 
+import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.action.DeleteEmailGroupRequest
 import org.opensearch.alerting.action.GetEmailGroupRequest
@@ -66,10 +67,22 @@ class EmailGroupActionsConverterTests : OpenSearchTestCase() {
         assertEquals("test@email.com", getEmailGroupResponse.emailGroup?.emails?.get(0)?.email)
     }
 
+    fun `test convertGetNotificationConfigResponseToGetEmailGroupResponse with no results`() {
+        val notificationConfigSearchResult = NotificationConfigSearchResult(listOf())
+        val getNotificationConfigResponse = GetNotificationConfigResponse(notificationConfigSearchResult)
+        try {
+            convertGetNotificationConfigResponseToGetEmailGroupResponse(getNotificationConfigResponse)
+            fail("Expecting OpenSearchStatusException")
+        } catch (e: OpenSearchStatusException) {
+            assertEquals(RestStatus.NOT_FOUND, e.status())
+            assertEquals("Email Group not found.", e.localizedMessage)
+        }
+    }
+
     fun `test convertIndexEmailGroupRequestToCreateNotificationConfigRequest`() {
         val recipients = listOf(EmailEntry("test@email.com"))
         val emailGroup = org.opensearch.alerting.model.destination.email.EmailGroup(
-            EmailAccount.NO_ID,
+            "emailGroupId",
             EmailAccount.NO_VERSION,
             IndexUtils.NO_SCHEMA_VERSION,
             "emailGroupName",
@@ -88,6 +101,37 @@ class EmailGroupActionsConverterTests : OpenSearchTestCase() {
         val createNotificationConfigRequest = convertIndexEmailGroupRequestToCreateNotificationConfigRequest(indexEmailGroupRequest)
 
         assertEquals(indexEmailGroupRequest.emailGroupID, createNotificationConfigRequest.configId)
+        val notifEmailGroup = createNotificationConfigRequest.notificationConfig.configData as EmailGroup
+        assertEquals(1, notifEmailGroup.recipients.size)
+        assertEquals("test@email.com", notifEmailGroup.recipients[0])
+        assertEquals(emailGroup.name, createNotificationConfigRequest.notificationConfig.name)
+        assertEquals(EnumSet.of(Feature.ALERTING), createNotificationConfigRequest.notificationConfig.features)
+        assertEquals(ConfigType.EMAIL_GROUP, createNotificationConfigRequest.notificationConfig.configType)
+        assertEquals("Email group created from the Alerting plugin", createNotificationConfigRequest.notificationConfig.description)
+    }
+
+    fun `test convertIndexEmailGroupRequestToCreateNotificationConfigRequest with no email group id`() {
+        val recipients = listOf(EmailEntry("test@email.com"))
+        val emailGroup = org.opensearch.alerting.model.destination.email.EmailGroup(
+            EmailAccount.NO_ID,
+            EmailAccount.NO_VERSION,
+            IndexUtils.NO_SCHEMA_VERSION,
+            "emailGroupName",
+            recipients
+        )
+
+        val indexEmailGroupRequest = IndexEmailGroupRequest(
+            "",
+            0L,
+            0L,
+            WriteRequest.RefreshPolicy.NONE,
+            RestRequest.Method.GET,
+            emailGroup
+        )
+
+        val createNotificationConfigRequest = convertIndexEmailGroupRequestToCreateNotificationConfigRequest(indexEmailGroupRequest)
+
+        assertNull(createNotificationConfigRequest.configId)
         val notifEmailGroup = createNotificationConfigRequest.notificationConfig.configData as EmailGroup
         assertEquals(1, notifEmailGroup.recipients.size)
         assertEquals("test@email.com", notifEmailGroup.recipients[0])
@@ -152,6 +196,16 @@ class EmailGroupActionsConverterTests : OpenSearchTestCase() {
         assertEquals("test@email.com", emailGroupResponse.emailGroup.emails[0].email)
     }
 
+    fun `test convertToIndexEmailGroupResponse with null getResponse`() {
+        try {
+            convertToIndexEmailGroupResponse("configId", null)
+            fail("Expecting OpenSearchStatusException")
+        } catch (e: OpenSearchStatusException) {
+            assertEquals(RestStatus.NOT_FOUND, e.status())
+            assertEquals("Email Group failed to be created/updated.", e.localizedMessage)
+        }
+    }
+
     fun `test convertDeleteEmailGroupRequestToDeleteNotificationConfigRequest`() {
         val deleteEmailGroupRequest = DeleteEmailGroupRequest("emailGroupId", WriteRequest.RefreshPolicy.NONE)
         val deleteNotificationConfigRequest = convertDeleteEmailGroupRequestToDeleteNotificationConfigRequest(deleteEmailGroupRequest)
@@ -164,5 +218,16 @@ class EmailGroupActionsConverterTests : OpenSearchTestCase() {
         val deleteNotificationConfigResponse = DeleteNotificationConfigResponse(mapOf(Pair("configId", RestStatus.OK)))
         val deleteResponse = convertDeleteNotificationConfigResponseToDeleteResponse(deleteNotificationConfigResponse)
         assertEquals("configId", deleteResponse.id)
+    }
+
+    fun `test convertDeleteNotificationConfigResponseToDeleteResponse with delete failure`() {
+        val deleteNotificationConfigResponse = DeleteNotificationConfigResponse(emptyMap())
+        try {
+            convertDeleteNotificationConfigResponseToDeleteResponse(deleteNotificationConfigResponse)
+            fail("Expecting OpenSearchStatusException")
+        } catch (e: OpenSearchStatusException) {
+            assertEquals(RestStatus.NOT_FOUND, e.status())
+            assertEquals("Email Group failed to be deleted.", e.localizedMessage)
+        }
     }
 }

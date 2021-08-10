@@ -26,6 +26,7 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.opensearch.action.ActionType
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin
@@ -39,8 +40,10 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.notifications.action.NotificationsActions.GET_NOTIFICATION_CONFIG_NAME
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.BytesRestResponse
 import org.opensearch.rest.RestChannel
 import org.opensearch.rest.RestHandler.ReplacedRoute
@@ -98,8 +101,18 @@ class RestSearchEmailGroupAction : BaseRestHandler() {
         val searchRequest = SearchRequest()
             .source(searchSourceBuilder)
             .indices(SCHEDULED_JOBS_INDEX)
-        return RestChannelConsumer { channel ->
-            client.execute(SearchEmailGroupAction.INSTANCE, searchRequest, searchEmailGroupResponse(channel))
+        return try {
+            RestChannelConsumer { channel ->
+                client.execute(SearchEmailGroupAction.INSTANCE, searchRequest, searchEmailGroupResponse(channel))
+            }
+        } catch (e: Exception) {
+            RestChannelConsumer { channel ->
+                client.execute(
+                    ActionType(GET_NOTIFICATION_CONFIG_NAME, ::SearchResponse),
+                    searchRequest,
+                    searchEmailGroupResponse(channel)
+                )
+            }
         }
     }
 

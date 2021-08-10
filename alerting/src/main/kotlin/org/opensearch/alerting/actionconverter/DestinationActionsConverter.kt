@@ -71,6 +71,9 @@ class DestinationActionsConverter {
     companion object {
         private val logger = LogManager.getLogger(DestinationActionsConverter::class)
 
+        private val INVALID_DESTINATION_TYPES = listOf(ConfigType.NONE, ConfigType.EMAIL_GROUP, ConfigType.SMTP_ACCOUNT)
+        private val ALL_DESTINATION_CONFIG_TYPES = ConfigType.values().filter { !INVALID_DESTINATION_TYPES.contains(it) }
+
         fun convertGetDestinationsRequestToGetNotificationConfigRequest(request: GetDestinationsRequest): GetNotificationConfigRequest {
             val configIds: Set<String> = if (request.destinationId != null) setOf(request.destinationId) else emptySet()
             val table = request.table
@@ -79,10 +82,10 @@ class DestinationActionsConverter {
             val sortOrder: SortOrder = SortOrder.fromString(table.sortOrder)
             val filterParams = HashMap<String, String>()
             if (request.destinationType == "ALL") {
-                filterParams["config_type"] = "slack,chime,webhook,email"
+                filterParams["config_type"] = ALL_DESTINATION_CONFIG_TYPES.joinToString(",")
             } else {
-                if (request.destinationType == "custom_webhook") {
-                    filterParams["config_type"] = "webhook"
+                if (request.destinationType == DestinationType.CUSTOM_WEBHOOK.value) {
+                    filterParams["config_type"] = ConfigType.WEBHOOK.tag
                 } else {
                     filterParams["config_type"] = request.destinationType
                 }
@@ -127,19 +130,6 @@ class DestinationActionsConverter {
             return CreateNotificationConfigRequest(notificationConfig, configId)
         }
 
-//        fun convertCreateNotificationConfigResponseToIndexDestinationResponse(
-//            createResponse: CreateNotificationConfigResponse,
-//            getResponse: GetNotificationConfigResponse?
-//        ): IndexDestinationResponse {
-//            val destination = if (getResponse != null) {
-//                convertGetNotificationConfigResponseToGetDestinationsResponse(getResponse).destinations[0]
-//            } else {
-//                throw OpenSearchStatusException("Destination failed to be created.", RestStatus.NOT_FOUND)
-//            }
-//
-//            return IndexDestinationResponse(createResponse.configId, 0L, 0L, 0L, RestStatus.OK, destination)
-//        }
-
         fun convertIndexDestinationRequestToUpdateNotificationConfigRequest(
             request: IndexDestinationRequest
         ): UpdateNotificationConfigRequest {
@@ -161,19 +151,6 @@ class DestinationActionsConverter {
             return IndexDestinationResponse(configId, 0L, 0L, 0L, RestStatus.OK, destination)
         }
 
-//        fun convertUpdateNotificationConfigResponseToIndexDestinationResponse(
-//            updateResponse: UpdateNotificationConfigResponse,
-//            getResponse: GetNotificationConfigResponse?
-//        ): IndexDestinationResponse {
-//            val destination = if (getResponse != null) {
-//                convertGetNotificationConfigResponseToGetDestinationsResponse(getResponse).destinations[0]
-//            } else {
-//                throw OpenSearchStatusException("Destination failed to be created.", RestStatus.NOT_FOUND)
-//            }
-//
-//            return IndexDestinationResponse(updateResponse.configId, 0L, 0L, 0L, RestStatus.OK, destination)
-//        }
-
         fun convertDeleteDestinationRequestToDeleteNotificationConfigRequest(
             request: DeleteDestinationRequest
         ): DeleteNotificationConfigRequest {
@@ -190,7 +167,7 @@ class DestinationActionsConverter {
             return DeleteResponse(shardId, "_doc", configId, 0L, 0L, 0L, true)
         }
 
-        private fun convertNotificationConfigToDestination(notificationConfigInfo: NotificationConfigInfo): Destination? {
+        internal fun convertNotificationConfigToDestination(notificationConfigInfo: NotificationConfigInfo): Destination? {
             val notificationConfig = notificationConfigInfo.notificationConfig
             when (notificationConfig.configType) {
                 ConfigType.SLACK -> {
@@ -315,8 +292,8 @@ class DestinationActionsConverter {
         fun convertDestinationToNotificationConfig(destination: Destination): NotificationConfig? {
             when (destination.type) {
                 DestinationType.CHIME -> {
-                    val alertChime = destination.chime
-                    val chime = if (alertChime == null) null else Chime(alertChime!!.url)
+                    val alertChime = destination.chime ?: return null
+                    val chime = Chime(alertChime.url)
                     val description = "Chime destination created from the Alerting plugin"
                     return NotificationConfig(
                         destination.name,
@@ -327,8 +304,8 @@ class DestinationActionsConverter {
                     )
                 }
                 DestinationType.SLACK -> {
-                    val alertSlack = destination.slack
-                    val slack = if (alertSlack == null) null else Slack(alertSlack.url)
+                    val alertSlack = destination.slack ?: return null
+                    val slack = Slack(alertSlack.url)
                     val description = "Slack destination created from the Alerting plugin"
                     return NotificationConfig(
                         destination.name,
@@ -339,19 +316,16 @@ class DestinationActionsConverter {
                     )
                 }
                 DestinationType.CUSTOM_WEBHOOK -> {
-                    val alertWebhook = destination.customWebhook
-                    var webhook: Webhook? = null
-                    if (alertWebhook != null) {
-                        val uri = buildUri(
-                            alertWebhook.url,
-                            alertWebhook.scheme,
-                            alertWebhook.host,
-                            alertWebhook.port,
-                            alertWebhook.path,
-                            alertWebhook.queryParams
-                        ).toString()
-                        webhook = Webhook(uri, alertWebhook.headerParams)
-                    }
+                    val alertWebhook = destination.customWebhook ?: return null
+                    val uri = buildUri(
+                        alertWebhook.url,
+                        alertWebhook.scheme,
+                        alertWebhook.host,
+                        alertWebhook.port,
+                        alertWebhook.path,
+                        alertWebhook.queryParams
+                    ).toString()
+                    val webhook = Webhook(uri, alertWebhook.headerParams)
                     val description = "Webhook destination created from the Alerting plugin"
                     return NotificationConfig(
                         destination.name,
@@ -362,18 +336,15 @@ class DestinationActionsConverter {
                     )
                 }
                 DestinationType.EMAIL -> {
-                    val alertEmail = destination.email
-                    var email: Email? = null
-                    if (alertEmail != null) {
-                        val recipients = mutableListOf<String>()
-                        val emailGroupIds = mutableListOf<String>()
-                        alertEmail.recipients.forEach {
-                            if (it.type == Recipient.RecipientType.EMAIL_GROUP)
-                                it.emailGroupID?.let { emailGroup -> emailGroupIds.add(emailGroup) }
-                            else it.email?.let { emailRecipient -> recipients.add(emailRecipient) }
-                        }
-                        email = Email(alertEmail.emailAccountID, recipients, emailGroupIds)
+                    val alertEmail = destination.email ?: return null
+                    val recipients = mutableListOf<String>()
+                    val emailGroupIds = mutableListOf<String>()
+                    alertEmail.recipients.forEach {
+                        if (it.type == Recipient.RecipientType.EMAIL_GROUP)
+                            it.emailGroupID?.let { emailGroup -> emailGroupIds.add(emailGroup) }
+                        else it.email?.let { emailRecipient -> recipients.add(emailRecipient) }
                     }
+                    val email = Email(alertEmail.emailAccountID, recipients, emailGroupIds)
                     val description = "Email destination created from the Alerting plugin"
                     return NotificationConfig(
                         destination.name,
@@ -383,8 +354,8 @@ class DestinationActionsConverter {
                         email
                     )
                 }
+                else -> return null
             }
-            return null
         }
 
         fun buildUri(
@@ -395,21 +366,24 @@ class DestinationActionsConverter {
             path: String?,
             queryParams: Map<String, String>
         ): URI? {
-            var scheme = scheme
             return try {
                 if (Strings.isNullOrEmpty(endpoint)) {
+                    if (host == null) {
+                        throw IllegalStateException("No host was provided when endpoint was null")
+                    }
+                    var uriScheme = scheme
                     if (Strings.isNullOrEmpty(scheme)) {
-                        scheme = "https"
+                        uriScheme = "https"
                     }
                     val uriBuilder = URIBuilder()
-                    if (queryParams != null) {
+                    if (queryParams.isNotEmpty()) {
                         for ((key, value) in queryParams) uriBuilder.addParameter(key, value)
                     }
-                    return uriBuilder.setScheme(scheme).setHost(host).setPort(port).setPath(path).build()
+                    return uriBuilder.setScheme(uriScheme).setHost(host).setPort(port).setPath(path).build()
                 }
                 URIBuilder(endpoint).build()
-            } catch (exception: URISyntaxException) {
-                throw IllegalStateException("Error creating URI")
+            } catch (e: URISyntaxException) {
+                throw IllegalStateException("Error creating URI", e)
             }
         }
     }

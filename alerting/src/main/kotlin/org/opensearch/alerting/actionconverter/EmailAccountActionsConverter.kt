@@ -103,20 +103,6 @@ class EmailAccountActionsConverter {
             return CreateNotificationConfigRequest(notificationConfig, configId)
         }
 
-//        fun convertCreateNotificationConfigResponseToIndexEmailAccountResponse(
-//            createResponse: CreateNotificationConfigResponse,
-//            getResponse: GetNotificationConfigResponse?
-//        ): IndexEmailAccountResponse {
-//            val getEmailResponse = if (getResponse != null) {
-//                convertGetNotificationConfigResponseToGetEmailAccountResponse(getResponse)
-//            } else {
-//                throw OpenSearchStatusException("Email Account failed to be created.", RestStatus.NOT_FOUND)
-//            }
-//            val emailAccount = getEmailResponse.emailAccount
-//                ?: throw OpenSearchStatusException("Email Account failed to be created.", RestStatus.NOT_FOUND)
-//            return IndexEmailAccountResponse(createResponse.configId, 0L, 0L, 0L, RestStatus.OK, emailAccount)
-//        }
-
         fun convertIndexEmailAccountRequestToUpdateNotificationConfigRequest(
             request: IndexEmailAccountRequest
         ): UpdateNotificationConfigRequest {
@@ -138,20 +124,6 @@ class EmailAccountActionsConverter {
             return IndexEmailAccountResponse(configId, 0L, 0L, 0L, RestStatus.OK, emailAccount)
         }
 
-//        fun convertUpdateNotificationConfigResponseToIndexEmailAccountResponse(
-//            createResponse: UpdateNotificationConfigResponse,
-//            getResponse: GetNotificationConfigResponse?
-//        ): IndexEmailAccountResponse {
-//            val getEmailResponse = if (getResponse != null) {
-//                convertGetNotificationConfigResponseToGetEmailAccountResponse(getResponse)
-//            } else {
-//                throw OpenSearchStatusException("Email Account failed to be created.", RestStatus.NOT_FOUND)
-//            }
-//            val emailAccount = getEmailResponse.emailAccount
-//                ?: throw OpenSearchStatusException("Email Account failed to be created.", RestStatus.NOT_FOUND)
-//            return IndexEmailAccountResponse(createResponse.configId, 0L, 0L, 0L, RestStatus.OK, emailAccount)
-//        }
-
         fun convertDeleteEmailAccountRequestToDeleteNotificationConfigRequest(
             request: DeleteEmailAccountRequest
         ): DeleteNotificationConfigRequest {
@@ -169,16 +141,15 @@ class EmailAccountActionsConverter {
             return DeleteResponse(shardId, "_doc", configId, 0L, 0L, 0L, true)
         }
 
-        private fun convertAlertingToNotificationMethodType(alertMethodType: EmailAccount.MethodType): MethodType {
+        internal fun convertAlertingToNotificationMethodType(alertMethodType: EmailAccount.MethodType): MethodType {
             return when (alertMethodType) {
                 EmailAccount.MethodType.NONE -> MethodType.NONE
                 EmailAccount.MethodType.SSL -> MethodType.SSL
                 EmailAccount.MethodType.TLS -> MethodType.START_TLS
-                else -> MethodType.NONE
             }
         }
 
-        private fun convertNotificationToAlertingMethodType(notificationMethodType: MethodType): EmailAccount.MethodType {
+        internal fun convertNotificationToAlertingMethodType(notificationMethodType: MethodType): EmailAccount.MethodType {
             return when (notificationMethodType) {
                 MethodType.NONE -> EmailAccount.MethodType.NONE
                 MethodType.SSL -> EmailAccount.MethodType.SSL

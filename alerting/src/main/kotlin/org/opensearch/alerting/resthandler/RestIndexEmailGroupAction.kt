@@ -27,6 +27,7 @@
 package org.opensearch.alerting.resthandler
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.action.ActionType
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.IndexEmailGroupAction
@@ -40,8 +41,10 @@ import org.opensearch.client.node.NodeClient
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
+import org.opensearch.commons.notifications.action.NotificationsActions.CREATE_NOTIFICATION_CONFIG_NAME
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.BytesRestResponse
 import org.opensearch.rest.RestChannel
 import org.opensearch.rest.RestHandler.ReplacedRoute
@@ -105,8 +108,18 @@ class RestIndexEmailGroupAction : BaseRestHandler() {
 
         val indexEmailGroupRequest = IndexEmailGroupRequest(id, seqNo, primaryTerm, refreshPolicy, request.method(), emailGroup)
 
-        return RestChannelConsumer { channel ->
-            client.execute(IndexEmailGroupAction.INSTANCE, indexEmailGroupRequest, indexEmailGroupResponse(channel, request.method()))
+        return try {
+            RestChannelConsumer { channel ->
+                client.execute(IndexEmailGroupAction.INSTANCE, indexEmailGroupRequest, indexEmailGroupResponse(channel, request.method()))
+            }
+        } catch (e: Exception) {
+            RestChannelConsumer { channel ->
+                client.execute(
+                    ActionType(CREATE_NOTIFICATION_CONFIG_NAME, ::IndexEmailGroupResponse),
+                    indexEmailGroupRequest,
+                    indexEmailGroupResponse(channel, request.method())
+                )
+            }
         }
     }
 

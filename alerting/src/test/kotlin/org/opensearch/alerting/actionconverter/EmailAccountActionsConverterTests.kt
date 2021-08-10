@@ -1,15 +1,18 @@
 package org.opensearch.alerting.actionconverter
 
+import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.action.DeleteEmailAccountRequest
 import org.opensearch.alerting.action.GetEmailAccountRequest
 import org.opensearch.alerting.action.IndexEmailAccountRequest
+import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertAlertingToNotificationMethodType
 import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertDeleteEmailAccountRequestToDeleteNotificationConfigRequest
 import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertDeleteNotificationConfigResponseToDeleteResponse
 import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertGetEmailAccountRequestToGetNotificationConfigRequest
 import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertGetNotificationConfigResponseToGetEmailAccountResponse
 import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertIndexEmailAccountRequestToCreateNotificationConfigRequest
 import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertIndexEmailAccountRequestToUpdateNotificationConfigRequest
+import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertNotificationToAlertingMethodType
 import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertToIndexEmailAccountResponse
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.commons.notifications.action.DeleteNotificationConfigResponse
@@ -67,6 +70,18 @@ class EmailAccountActionsConverterTests : OpenSearchTestCase() {
         assertEquals(smtpAccount.port, getEmailAccountResponse.emailAccount?.port)
     }
 
+    fun `test convertGetNotificationConfigResponseToGetEmailAccountResponse with no result`() {
+        val notificationConfigSearchResult = NotificationConfigSearchResult(emptyList())
+        val getNotificationConfigResponse = GetNotificationConfigResponse(notificationConfigSearchResult)
+        try {
+            convertGetNotificationConfigResponseToGetEmailAccountResponse(getNotificationConfigResponse)
+            fail("Expecting OpenSearchStatusException")
+        } catch (e: OpenSearchStatusException) {
+            assertEquals("Email Account not found.", e.localizedMessage)
+            assertEquals(RestStatus.NOT_FOUND, e.status())
+        }
+    }
+
     fun `test convertIndexEmailAccountRequestToCreateNotificationConfigRequest`() {
         val emailAccount = EmailAccount(
             "accountId",
@@ -92,6 +107,42 @@ class EmailAccountActionsConverterTests : OpenSearchTestCase() {
         val createNotificationConfigRequest = convertIndexEmailAccountRequestToCreateNotificationConfigRequest(indexEmailAccountRequest)
 
         assertEquals(indexEmailAccountRequest.emailAccountID, createNotificationConfigRequest.configId)
+        val smtpAccount = createNotificationConfigRequest.notificationConfig.configData as SmtpAccount
+        assertEquals(emailAccount.host, smtpAccount.host)
+        assertEquals(emailAccount.email, smtpAccount.fromAddress)
+        assertEquals(emailAccount.port, smtpAccount.port)
+        assertEquals(MethodType.SSL, smtpAccount.method)
+        assertEquals(emailAccount.name, createNotificationConfigRequest.notificationConfig.name)
+        assertEquals(EnumSet.of(Feature.ALERTING), createNotificationConfigRequest.notificationConfig.features)
+        assertEquals(ConfigType.SMTP_ACCOUNT, createNotificationConfigRequest.notificationConfig.configType)
+        assertEquals("Email account created from the Alerting plugin", createNotificationConfigRequest.notificationConfig.description)
+    }
+
+    fun `test convertIndexEmailAccountRequestToCreateNotificationConfigRequest with no email account id`() {
+        val emailAccount = EmailAccount(
+            "",
+            0L,
+            0,
+            "accountName",
+            "test@email.com",
+            "host",
+            80,
+            EmailAccount.MethodType.SSL,
+            null,
+            null
+        )
+        val indexEmailAccountRequest = IndexEmailAccountRequest(
+            "",
+            0L,
+            0L,
+            WriteRequest.RefreshPolicy.NONE,
+            RestRequest.Method.GET,
+            emailAccount
+        )
+
+        val createNotificationConfigRequest = convertIndexEmailAccountRequestToCreateNotificationConfigRequest(indexEmailAccountRequest)
+
+        assertNull(createNotificationConfigRequest.configId)
         val smtpAccount = createNotificationConfigRequest.notificationConfig.configData as SmtpAccount
         assertEquals(emailAccount.host, smtpAccount.host)
         assertEquals(emailAccount.email, smtpAccount.fromAddress)
@@ -165,6 +216,16 @@ class EmailAccountActionsConverterTests : OpenSearchTestCase() {
         assertNull(emailAccountResponse.emailAccount.password)
     }
 
+    fun `test convertToIndexEmailAccountResponse with null getResponse`() {
+        try {
+            convertToIndexEmailAccountResponse("configId", null)
+            fail("Expecting OpenSearchStatusException")
+        } catch (e: OpenSearchStatusException) {
+            assertEquals("Email Account failed to be created/updated.", e.localizedMessage)
+            assertEquals(RestStatus.NOT_FOUND, e.status())
+        }
+    }
+
     fun `test convertDeleteEmailAccountRequestToDeleteNotificationConfigRequest`() {
         val deleteEmailAccountRequest = DeleteEmailAccountRequest("emailAccountId", WriteRequest.RefreshPolicy.NONE)
         val deleteNotificationConfigRequest = convertDeleteEmailAccountRequestToDeleteNotificationConfigRequest(deleteEmailAccountRequest)
@@ -177,5 +238,36 @@ class EmailAccountActionsConverterTests : OpenSearchTestCase() {
         val deleteNotificationConfigResponse = DeleteNotificationConfigResponse(mapOf(Pair("configId", RestStatus.OK)))
         val deleteResponse = convertDeleteNotificationConfigResponseToDeleteResponse(deleteNotificationConfigResponse)
         assertEquals("configId", deleteResponse.id)
+    }
+
+    fun `test convertDeleteNotificationConfigResponseToDeleteResponse with delete failure`() {
+        val deleteNotificationConfigResponse = DeleteNotificationConfigResponse(emptyMap())
+        try {
+            convertDeleteNotificationConfigResponseToDeleteResponse(deleteNotificationConfigResponse)
+            fail("Expecting OpenSearchStatusException")
+        } catch (e: OpenSearchStatusException) {
+            assertEquals(RestStatus.NOT_FOUND, e.status())
+            assertEquals("Email Account failed to be deleted.", e.localizedMessage)
+        }
+    }
+
+    fun `test convertAlertingToNotificationMethodType type none`() {
+        val methodType = convertAlertingToNotificationMethodType(EmailAccount.MethodType.NONE)
+        assertEquals(MethodType.NONE, methodType)
+    }
+
+    fun `test convertAlertingToNotificationMethodType type TLS`() {
+        val methodType = convertAlertingToNotificationMethodType(EmailAccount.MethodType.TLS)
+        assertEquals(MethodType.START_TLS, methodType)
+    }
+
+    fun `test convertNotificationToAlertingMethodType type none`() {
+        val methodType = convertNotificationToAlertingMethodType(MethodType.NONE)
+        assertEquals(EmailAccount.MethodType.NONE, methodType)
+    }
+
+    fun `test convertNotificationToAlertingMethodType type start tls`() {
+        val methodType = convertNotificationToAlertingMethodType(MethodType.START_TLS)
+        assertEquals(EmailAccount.MethodType.TLS, methodType)
     }
 }

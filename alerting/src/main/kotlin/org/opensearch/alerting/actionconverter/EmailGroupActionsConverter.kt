@@ -103,27 +103,6 @@ class EmailGroupActionsConverter {
             return CreateNotificationConfigRequest(notificationConfig, configId)
         }
 
-//        fun convertCreateNotificationConfigResponseToIndexEmailGroupResponse(
-//            createResponse: CreateNotificationConfigResponse,
-//            getResponse: GetNotificationConfigResponse?
-//        ): IndexEmailGroupResponse {
-//            val getEmailGroupResponse = if (getResponse != null) {
-//                convertGetNotificationConfigResponseToGetEmailGroupResponse(getResponse)
-//            } else {
-//                throw OpenSearchStatusException("Email Group failed to be created.", RestStatus.NOT_FOUND)
-//            }
-//            val emailGroup = getEmailGroupResponse.emailGroup
-//                ?: throw OpenSearchStatusException("Email Group failed to be created.", RestStatus.NOT_FOUND)
-//            return IndexEmailGroupResponse(
-//                createResponse.configId,
-//                0L,
-//                0L,
-//                0L,
-//                RestStatus.OK,
-//                emailGroup
-//            )
-//        }
-
         fun convertIndexEmailGroupRequestToUpdateNotificationConfigRequest(
             request: IndexEmailGroupRequest
         ): UpdateNotificationConfigRequest {
@@ -145,20 +124,6 @@ class EmailGroupActionsConverter {
                 ?: throw OpenSearchStatusException("Email Group failed to be created/updated.", RestStatus.NOT_FOUND)
             return IndexEmailGroupResponse(configId, 0L, 0L, 0L, RestStatus.OK, emailGroup)
         }
-
-//        fun convertUpdateNotificationConfigResponseToIndexEmailGroupResponse(
-//            createResponse: UpdateNotificationConfigResponse,
-//            getResponse: GetNotificationConfigResponse?
-//        ): IndexEmailGroupResponse {
-//            val getEmailGroupResponse = if (getResponse != null) {
-//                convertGetNotificationConfigResponseToGetEmailGroupResponse(getResponse)
-//            } else {
-//                throw OpenSearchStatusException("Email Group failed to be created.", RestStatus.NOT_FOUND)
-//            }
-//            val emailGroup = getEmailGroupResponse.emailGroup
-//                ?: throw OpenSearchStatusException("Email Group failed to be created.", RestStatus.NOT_FOUND)
-//            return IndexEmailGroupResponse(createResponse.configId, 0L, 0L, 0L, RestStatus.OK, emailGroup)
-//        }
 
         fun convertDeleteEmailGroupRequestToDeleteNotificationConfigRequest(
             request: DeleteEmailGroupRequest

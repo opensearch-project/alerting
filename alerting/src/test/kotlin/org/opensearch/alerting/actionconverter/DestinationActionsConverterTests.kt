@@ -1,21 +1,27 @@
 package org.opensearch.alerting.actionconverter
 
+import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.action.DeleteDestinationRequest
 import org.opensearch.alerting.action.GetDestinationsRequest
 import org.opensearch.alerting.action.IndexDestinationRequest
+import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.buildUri
 import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertDeleteDestinationRequestToDeleteNotificationConfigRequest
 import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertDeleteNotificationConfigResponseToDeleteResponse
 import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertGetDestinationsRequestToGetNotificationConfigRequest
 import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertGetNotificationConfigResponseToGetDestinationsResponse
 import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertIndexDestinationRequestToCreateNotificationConfigRequest
 import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertIndexDestinationRequestToUpdateNotificationConfigRequest
+import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertNotificationConfigToDestination
 import org.opensearch.alerting.actionconverter.DestinationActionsConverter.Companion.convertToIndexDestinationResponse
 import org.opensearch.alerting.getChimeDestination
 import org.opensearch.alerting.getCustomWebhookDestination
 import org.opensearch.alerting.getEmailDestination
 import org.opensearch.alerting.getSlackDestination
 import org.opensearch.alerting.model.Table
+import org.opensearch.alerting.model.destination.Destination
+import org.opensearch.alerting.model.destination.email.Recipient
+import org.opensearch.alerting.randomUser
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.commons.notifications.NotificationConstants
 import org.opensearch.commons.notifications.action.DeleteNotificationConfigResponse
@@ -23,11 +29,14 @@ import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
 import org.opensearch.commons.notifications.model.Chime
 import org.opensearch.commons.notifications.model.ConfigType
 import org.opensearch.commons.notifications.model.Email
+import org.opensearch.commons.notifications.model.EmailGroup
 import org.opensearch.commons.notifications.model.Feature
+import org.opensearch.commons.notifications.model.MethodType
 import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import org.opensearch.commons.notifications.model.NotificationConfigSearchResult
 import org.opensearch.commons.notifications.model.Slack
+import org.opensearch.commons.notifications.model.SmtpAccount
 import org.opensearch.commons.notifications.model.Webhook
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestStatus
@@ -273,6 +282,34 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
         assertEquals(customWebhook.customWebhook?.url, webhook.url)
     }
 
+    fun `test convertIndexDestinationRequestToCreateNotificationConfigRequest with webhook and no data`() {
+        val destination = Destination(
+            type = DestinationType.CUSTOM_WEBHOOK,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = null,
+            slack = null,
+            customWebhook = null,
+            email = null
+        )
+        val indexDestinationRequest = IndexDestinationRequest(
+            "destinationId",
+            0L,
+            0L,
+            WriteRequest.RefreshPolicy.NONE,
+            RestRequest.Method.POST,
+            destination
+        )
+
+        try {
+            convertIndexDestinationRequestToCreateNotificationConfigRequest(indexDestinationRequest)
+            fail("Expected OpenSearchStatusException")
+        } catch (e: OpenSearchStatusException) {
+            assertEquals("Destination cannot be created.", e.localizedMessage)
+        }
+    }
+
     fun `test convertIndexDestinationRequestToCreateNotificationConfigRequest with slack`() {
         val slack = getSlackDestination()
         val indexDestinationRequest = IndexDestinationRequest(
@@ -294,6 +331,34 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
         assertEquals(EnumSet.of(Feature.ALERTING), notificationConfig.features)
         val notifSlack = notificationConfig.configData as Slack
         assertEquals(slack.slack?.url, notifSlack.url)
+    }
+
+    fun `test convertIndexDestinationRequestToCreateNotificationConfigRequest with slack and no data`() {
+        val destination = Destination(
+            type = DestinationType.SLACK,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = null,
+            slack = null,
+            customWebhook = null,
+            email = null
+        )
+        val indexDestinationRequest = IndexDestinationRequest(
+            "destinationId",
+            0L,
+            0L,
+            WriteRequest.RefreshPolicy.NONE,
+            RestRequest.Method.POST,
+            destination
+        )
+
+        try {
+            convertIndexDestinationRequestToCreateNotificationConfigRequest(indexDestinationRequest)
+            fail("Expected OpenSearchStatusException")
+        } catch (e: OpenSearchStatusException) {
+            assertEquals("Destination cannot be created.", e.localizedMessage)
+        }
     }
 
     fun `test convertIndexDestinationRequestToCreateNotificationConfigRequest with chime`() {
@@ -319,7 +384,35 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
         assertEquals(chime.chime?.url, notifChime.url)
     }
 
-    fun `test convertIndexDestinationRequestToCreateNotificationConfigRequest with email`() {
+    fun `test convertIndexDestinationRequestToCreateNotificationConfigRequest with chime and no data`() {
+        val destination = Destination(
+            type = DestinationType.CHIME,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = null,
+            slack = null,
+            customWebhook = null,
+            email = null
+        )
+        val indexDestinationRequest = IndexDestinationRequest(
+            "destinationId",
+            0L,
+            0L,
+            WriteRequest.RefreshPolicy.NONE,
+            RestRequest.Method.POST,
+            destination
+        )
+
+        try {
+            convertIndexDestinationRequestToCreateNotificationConfigRequest(indexDestinationRequest)
+            fail("Expected OpenSearchStatusException")
+        } catch (e: OpenSearchStatusException) {
+            assertEquals("Destination cannot be created.", e.localizedMessage)
+        }
+    }
+
+    fun `test convertIndexDestinationRequestToCreateNotificationConfigRequest with email and email recipients`() {
         val email = getEmailDestination()
         val indexDestinationRequest = IndexDestinationRequest(
             "destinationId",
@@ -341,6 +434,125 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
         val notifEmail = notificationConfig.configData as Email
         assertEquals(email.email?.emailAccountID, notifEmail.emailAccountID)
         assertEquals(email.email?.recipients?.get(0)?.email, notifEmail.recipients[0])
+    }
+
+    fun `test convertIndexDestinationRequestToCreateNotificationConfigRequest with email and email group recipients`() {
+        val recipient = Recipient(Recipient.RecipientType.EMAIL_GROUP, "emailGroupId", null)
+        val email = org.opensearch.alerting.model.destination.email.Email("emailAccountId", listOf(recipient))
+        val destination = Destination(
+            type = DestinationType.EMAIL,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = null,
+            slack = null,
+            customWebhook = null,
+            email = email
+        )
+        val indexDestinationRequest = IndexDestinationRequest(
+            "destinationId",
+            0L,
+            0L,
+            WriteRequest.RefreshPolicy.NONE,
+            RestRequest.Method.POST,
+            destination
+        )
+
+        val createNotificationConfigRequest = convertIndexDestinationRequestToCreateNotificationConfigRequest(indexDestinationRequest)
+
+        assertEquals(indexDestinationRequest.destinationId, createNotificationConfigRequest.configId)
+        val notificationConfig = createNotificationConfigRequest.notificationConfig
+        assertEquals(destination.name, notificationConfig.name)
+        assertEquals(ConfigType.EMAIL, notificationConfig.configType)
+        assertEquals("Email destination created from the Alerting plugin", notificationConfig.description)
+        assertEquals(EnumSet.of(Feature.ALERTING), notificationConfig.features)
+        val notifEmail = notificationConfig.configData as Email
+        assertEquals(destination.email?.emailAccountID, notifEmail.emailAccountID)
+        assertEquals(destination.email?.recipients?.get(0)?.emailGroupID, notifEmail.emailGroupIds[0])
+    }
+
+    fun `test convertIndexDestinationRequestToCreateNotificationConfigRequest with email and no data`() {
+        val destination = Destination(
+            type = DestinationType.EMAIL,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = null,
+            slack = null,
+            customWebhook = null,
+            email = null
+        )
+        val indexDestinationRequest = IndexDestinationRequest(
+            "destinationId",
+            0L,
+            0L,
+            WriteRequest.RefreshPolicy.NONE,
+            RestRequest.Method.POST,
+            destination
+        )
+
+        try {
+            convertIndexDestinationRequestToCreateNotificationConfigRequest(indexDestinationRequest)
+            fail("Expected OpenSearchStatusException")
+        } catch (e: OpenSearchStatusException) {
+            assertEquals("Destination cannot be created.", e.localizedMessage)
+        }
+    }
+
+    fun `test convertIndexDestinationRequestToCreateNotificationConfigRequest with invalid destination type`() {
+        val destination = Destination(
+            type = DestinationType.TEST_ACTION,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = null,
+            slack = null,
+            customWebhook = null,
+            email = null
+        )
+        val indexDestinationRequest = IndexDestinationRequest(
+            "destinationId",
+            0L,
+            0L,
+            WriteRequest.RefreshPolicy.NONE,
+            RestRequest.Method.POST,
+            destination
+        )
+
+        try {
+            convertIndexDestinationRequestToCreateNotificationConfigRequest(indexDestinationRequest)
+            fail("Expected OpenSearchStatusException")
+        } catch (e: OpenSearchStatusException) {
+            assertEquals("Destination cannot be created.", e.localizedMessage)
+        }
+    }
+
+    fun `test convertIndexDestinationRequestToUpdateNotificationConfigRequest with null data`() {
+        val destination = Destination(
+            type = DestinationType.EMAIL,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = null,
+            slack = null,
+            customWebhook = null,
+            email = null
+        )
+        val indexDestinationRequest = IndexDestinationRequest(
+            "destinationId",
+            0L,
+            0L,
+            WriteRequest.RefreshPolicy.NONE,
+            RestRequest.Method.POST,
+            destination
+        )
+
+        try {
+            convertIndexDestinationRequestToUpdateNotificationConfigRequest(indexDestinationRequest)
+            fail("Expected OpenSearchStatusException")
+        } catch (e: OpenSearchStatusException) {
+            assertEquals("Destination cannot be updated.", e.localizedMessage)
+        }
     }
 
     fun `test convertIndexDestinationRequestToUpdateNotificationConfigRequest with webhook`() {
@@ -534,5 +746,97 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
         val deleteNotificationConfigResponse = DeleteNotificationConfigResponse(mapOf(Pair("configId", RestStatus.OK)))
         val deleteResponse = convertDeleteNotificationConfigResponseToDeleteResponse(deleteNotificationConfigResponse)
         assertEquals("configId", deleteResponse.id)
+    }
+
+    fun `test convertNotificationConfigToDestination convert invalid destination using smtp account`() {
+        val smtpAccount = SmtpAccount("host", 80, MethodType.SSL, "test@email.com")
+        val notificationConfig = NotificationConfig(
+            "notificationConfig",
+            "description",
+            ConfigType.SMTP_ACCOUNT,
+            EnumSet.of(Feature.ALERTING),
+            smtpAccount,
+            true
+        )
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val destination = convertNotificationConfigToDestination(notificationConfigInfo)
+        assertNull(destination)
+    }
+
+    fun `test convertNotificationConfigToDestination convert invalid destination using email group`() {
+        val emailGroup = EmailGroup(listOf("test@email.com"))
+        val notificationConfig = NotificationConfig(
+            "notificationConfig",
+            "description",
+            ConfigType.EMAIL_GROUP,
+            EnumSet.of(Feature.ALERTING),
+            emailGroup,
+            true
+        )
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val destination = convertNotificationConfigToDestination(notificationConfigInfo)
+        assertNull(destination)
+    }
+
+    fun `test convertNotificationConfigToDestination convert invalid destination using none`() {
+        val notificationConfig = NotificationConfig(
+            "notificationConfig",
+            "description",
+            ConfigType.NONE,
+            EnumSet.of(Feature.ALERTING),
+            null,
+            true
+        )
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val destination = convertNotificationConfigToDestination(notificationConfigInfo)
+        assertNull(destination)
+    }
+
+    fun `test convertNotificationConfigToDestination convert email type with email groups`() {
+        val email = Email("emailAccountId", emptyList(), listOf("emailGroupId"))
+        val notificationConfig = NotificationConfig(
+            "notificationConfig",
+            "description",
+            ConfigType.EMAIL,
+            EnumSet.of(Feature.ALERTING),
+            email,
+            true
+        )
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val destination = convertNotificationConfigToDestination(notificationConfigInfo)
+        assertEquals(notificationConfigInfo.configId, destination?.id)
+        assertEquals(notificationConfig.name, destination?.name)
+        assertEquals(DestinationType.EMAIL, destination?.type)
+        assertEquals(1, destination?.email?.recipients?.size)
+        assertEquals(email.emailGroupIds[0], destination?.email?.recipients?.get(0)?.emailGroupID)
+        assertEquals(email.emailAccountID, destination?.email?.emailAccountID)
+    }
+
+    fun `test buildUri with no endpoint and only params`() {
+        val uri = buildUri(null, "http", "host", 80, "somePath", mapOf(Pair("key", "val")))
+        assertEquals("http://host:80/somePath?key=val", uri.toString())
+    }
+
+    fun `test buildUri with no endpoint and only params and not scheme`() {
+        val uri = buildUri(null, null, "host", 80, "somePath", emptyMap())
+        assertEquals("https://host:80/somePath", uri.toString())
+    }
+
+    fun `test buildUri with no endpoint and no host`() {
+        try {
+            buildUri(null, null, null, 80, "somePath", emptyMap())
+            fail("Expected IllegalStateException")
+        } catch (e: IllegalStateException) {
+            assertEquals("No host was provided when endpoint was null", e.localizedMessage)
+        }
+    }
+
+    fun `test buildUri with no endpoint and only params and not valid scheme`() {
+        try {
+            buildUri(null, ":", "host", 80, "somePath", emptyMap())
+            fail("Expected IllegalStateException")
+        } catch (e: IllegalStateException) {
+            assertEquals("Error creating URI", e.localizedMessage)
+        }
     }
 }

@@ -28,12 +28,15 @@ package org.opensearch.alerting.resthandler
 
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
+import org.opensearch.action.ActionType
+import org.opensearch.action.delete.DeleteResponse
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.DeleteDestinationAction
 import org.opensearch.alerting.action.DeleteDestinationRequest
 import org.opensearch.alerting.util.REFRESH
 import org.opensearch.client.node.NodeClient
+import org.opensearch.commons.notifications.action.NotificationsActions.DELETE_NOTIFICATION_CONFIG_NAME
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.RestHandler.ReplacedRoute
@@ -78,8 +81,18 @@ class RestDeleteDestinationAction : BaseRestHandler() {
         val refreshPolicy = WriteRequest.RefreshPolicy.parse(request.param(REFRESH, WriteRequest.RefreshPolicy.IMMEDIATE.value))
         val deleteDestinationRequest = DeleteDestinationRequest(destinationId, refreshPolicy)
 
-        return RestChannelConsumer { channel ->
-            client.execute(DeleteDestinationAction.INSTANCE, deleteDestinationRequest, RestToXContentListener(channel))
+        return try {
+            RestChannelConsumer { channel ->
+                client.execute(DeleteDestinationAction.INSTANCE, deleteDestinationRequest, RestToXContentListener(channel))
+            }
+        } catch (e: Exception) {
+            RestChannelConsumer { channel ->
+                client.execute(
+                    ActionType(DELETE_NOTIFICATION_CONFIG_NAME, ::DeleteResponse),
+                    deleteDestinationRequest,
+                    RestToXContentListener(channel)
+                )
+            }
         }
     }
 }
