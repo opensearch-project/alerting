@@ -13,6 +13,7 @@ class MigrationUtilServiceIT : AlertingRestTestCase() {
     fun `test migrateData`() {
         val destination = getSlackDestination()
         val id = UUID.randomUUID().toString()
+        wipeAllODFEIndices()
         indexDoc(SCHEDULED_JOBS_INDEX, id, destination.toJsonString())
         Thread.sleep(10000)
         val response = client().makeRequest(
@@ -23,6 +24,17 @@ class MigrationUtilServiceIT : AlertingRestTestCase() {
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
+        logger.info("Notification data: $valJson")
+
+        val response2 = client().makeRequest(
+            "GET",
+            "_plugins/_alerting/destinations", // "_plugins/_notifications/configs"
+        )
+        val valJson2 = JsonXContent.jsonXContent.createParser(
+            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            response2.entity.content
+        ).map()
+        logger.info("destination data: $valJson2")
         assertEquals("random", valJson)
     }
 }
