@@ -31,7 +31,7 @@ class AggregationQueryRewriter {
          * Add the bucket selector conditions for each trigger in input query. It also adds afterKeys from previous result
          * for each trigger.
          */
-        fun rewriteQuery(query: SearchSourceBuilder, prevResult: InputRunResults?, triggers: List<Trigger>) {
+        fun rewriteQuery(query: SearchSourceBuilder, prevResult: InputRunResults?, triggers: List<Trigger>): SearchSourceBuilder {
             triggers.forEach { trigger ->
                 if (trigger is BucketLevelTrigger) {
                     // add bucket selector pipeline aggregation for each trigger in query
@@ -65,6 +65,8 @@ class AggregationQueryRewriter {
                     }
                 }
             }
+
+            return query
         }
 
         /**
