@@ -23,6 +23,9 @@ import org.opensearch.alerting.model.TriggerAfterKey
 import org.opensearch.alerting.util.AggregationQueryRewriter
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.client.Client
+import org.opensearch.common.io.stream.BytesStreamOutput
+import org.opensearch.common.io.stream.NamedWriteableAwareStreamInput
+import org.opensearch.common.io.stream.NamedWriteableRegistry
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentType
@@ -37,6 +40,7 @@ import java.time.Instant
 class InputService(
     val client: Client,
     val scriptService: ScriptService,
+    val namedWriteableRegistry: NamedWriteableRegistry,
     val xContentRegistry: NamedXContentRegistry
 ) {
 
@@ -62,11 +66,13 @@ class InputService(
                             "period_start" to periodStart.toEpochMilli(),
                             "period_end" to periodEnd.toEpochMilli()
                         )
-                        AggregationQueryRewriter.rewriteQuery(input.query, prevResult, monitor.triggers)
+                        // Deep copying query before passing it to rewriteQuery since otherwise, the monitor.input is modified directly
+                        // which causes a strange bug where the rewritten query persists on the Monitor across executions
+                        val rewrittenQuery = AggregationQueryRewriter.rewriteQuery(deepCopyQuery(input.query), prevResult, monitor.triggers)
                         val searchSource = scriptService.compile(
                             Script(
                                 ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
-                                input.query.toString(), searchParams
+                                rewrittenQuery.toString(), searchParams
                             ),
                             TemplateScript.CONTEXT
                         )
@@ -95,6 +101,13 @@ class InputService(
             logger.info("Error collecting inputs for monitor: ${monitor.id}", e)
             InputRunResults(emptyList(), e)
         }
+    }
+
+    private fun deepCopyQuery(query: SearchSourceBuilder): SearchSourceBuilder {
+        val out = BytesStreamOutput()
+        query.writeTo(out)
+        val sin = NamedWriteableAwareStreamInput(out.bytes().streamInput(), namedWriteableRegistry)
+        return SearchSourceBuilder(sin)
     }
 
     /**

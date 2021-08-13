@@ -254,7 +254,7 @@ fun randomThrottle(
 
 fun randomActionExecutionPolicy(
     throttle: Throttle = randomThrottle(),
-    actionExecutionScope: ActionExecutionScope = randomActionExecutionFrequency()
+    actionExecutionScope: ActionExecutionScope = randomActionExecutionScope()
 ): ActionExecutionPolicy {
     return if (actionExecutionScope is PerExecutionActionScope) {
         // Return null for throttle when using PerExecutionActionScope since throttling is currently not supported for it
@@ -264,7 +264,7 @@ fun randomActionExecutionPolicy(
     }
 }
 
-fun randomActionExecutionFrequency(): ActionExecutionScope {
+fun randomActionExecutionScope(): ActionExecutionScope {
     return if (randomBoolean()) {
         val alertCategories = AlertCategory.values()
         PerAlertActionScope(actionableAlerts = (1..randomInt(alertCategories.size)).map { alertCategories[it - 1] }.toSet())

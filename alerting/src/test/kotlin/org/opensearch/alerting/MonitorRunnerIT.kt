@@ -40,6 +40,8 @@ import org.opensearch.alerting.model.Alert.State.COMPLETED
 import org.opensearch.alerting.model.Alert.State.ERROR
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.action.ActionExecutionPolicy
+import org.opensearch.alerting.model.action.AlertCategory
+import org.opensearch.alerting.model.action.PerAlertActionScope
 import org.opensearch.alerting.model.action.PerExecutionActionScope
 import org.opensearch.alerting.model.action.Throttle
 import org.opensearch.alerting.model.destination.CustomWebhook
@@ -1140,10 +1142,10 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
         // Check that the lastNotification time of the acknowledged Alert wasn't updated and the active Alert's was
         currentAlerts = searchAlerts(monitor)
-        val currentAcknowledgedAlert = currentAlerts.single { it.state == ACKNOWLEDGED }
-        val currentActiveAlert = currentAlerts.single { it.state == ACTIVE }
-        assertEquals("Acknowledged alert was updated", acknowledgedAlert.lastNotificationTime, currentAcknowledgedAlert.lastNotificationTime)
-        assertTrue("Active alert was not updated", currentActiveAlert.lastNotificationTime!! > activeAlert.lastNotificationTime)
+        val acknowledgedAlert2 = currentAlerts.single { it.state == ACKNOWLEDGED }
+        val activeAlert2 = currentAlerts.single { it.state == ACTIVE }
+        assertEquals("Acknowledged alert was updated", acknowledgedAlert.lastNotificationTime, acknowledgedAlert2.lastNotificationTime)
+        assertTrue("Active alert was not updated", activeAlert2.lastNotificationTime!! > activeAlert.lastNotificationTime)
 
         // Remove data so that both Alerts are moved into completed
         deleteDataWithDocIds(
@@ -1162,13 +1164,18 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         assertEquals("Incorrect number of completed alerts", 2, completedAlerts.size)
         val previouslyAcknowledgedAlert = completedAlerts.single { it.aggregationResultBucket?.getBucketKeysHash().equals("test_value_1") }
         val previouslyActiveAlert = completedAlerts.single { it.aggregationResultBucket?.getBucketKeysHash().equals("test_value_2") }
+        // Note: Given the randomization of the Actions and ActionExecutionPolicy for the Bucket-Level Monitor
+        // there is a very small chance we could end up with COMPLETED Alerts that never had lastNotificationTime updated
+        // (This would occur if the Trigger contained Actions with ActionExecutionScope of PER_ALERT that all somehow excluded the
+        // same Alert categories being tested in this test)
+        // In such a rare case, the tests can just be rerun
         assertTrue(
             "Previously acknowledged alert was not updated when it moved to completed",
-            previouslyAcknowledgedAlert.lastNotificationTime!! > currentAcknowledgedAlert.lastNotificationTime
+            previouslyAcknowledgedAlert.lastNotificationTime!! > acknowledgedAlert2.lastNotificationTime
         )
         assertTrue(
             "Previously active alert was not updated when it moved to completed",
-            previouslyActiveAlert.lastNotificationTime!! > currentActiveAlert.lastNotificationTime
+            previouslyActiveAlert.lastNotificationTime!! > activeAlert2.lastNotificationTime
         )
     }
 
@@ -1251,7 +1258,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
     }
 
     @Suppress("UNCHECKED_CAST")
-    fun `test bucket-level monitor with per execution action frequency`() {
+    fun `test bucket-level monitor with per execution action scope`() {
         val testIndex = createTestIndex()
         insertSampleTimeSerializedData(
             testIndex,
@@ -1320,6 +1327,195 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         }
     }
 
+    fun `test bucket-level monitor with per alert action scope saves completed alerts even if not actionable`() {
+        val testIndex = createTestIndex()
+        insertSampleTimeSerializedData(
+            testIndex,
+            listOf(
+                "test_value_1",
+                "test_value_1",
+                "test_value_2",
+                "test_value_2"
+            )
+        )
+
+        val query = QueryBuilders.rangeQuery("test_strict_date_time")
+            .gt("{{period_end}}||-10d")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
+        val compositeSources = listOf(
+            TermsValuesSourceBuilder("test_field").field("test_field")
+        )
+        val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
+        val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
+        val triggerScript = """
+            params.docCount > 1
+        """.trimIndent()
+
+        val action = randomAction(
+            template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+            destinationId = createDestination().id,
+            actionExecutionPolicy = ActionExecutionPolicy(null, PerAlertActionScope(setOf(AlertCategory.DEDUPED, AlertCategory.NEW)))
+        )
+        var trigger = randomBucketLevelTrigger(actions = listOf(action))
+        trigger = trigger.copy(
+            bucketSelector = BucketSelectorExtAggregationBuilder(
+                name = trigger.id,
+                bucketsPathsMap = mapOf("docCount" to "_count"),
+                script = Script(triggerScript),
+                parentBucketPath = "composite_agg",
+                filter = null
+            )
+        )
+        val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
+        executeMonitor(monitor.id)
+
+        // Check created Alerts
+        var currentAlerts = searchAlerts(monitor)
+        assertEquals("Alerts not saved", 2, currentAlerts.size)
+        currentAlerts.forEach {
+            verifyAlert(it, monitor, ACTIVE)
+        }
+
+        // Remove data so that both Alerts are moved into completed
+        deleteDataWithDocIds(
+            testIndex,
+            listOf(
+                "1", // test_value_1
+                "2", // test_value_1
+                "3", // test_value_2
+                "4" // test_value_2
+            )
+        )
+
+        // Execute Monitor and check that both Alerts were moved to COMPLETED
+        executeMonitor(monitor.id)
+        currentAlerts = searchAlerts(monitor, AlertIndices.ALL_INDEX_PATTERN)
+        val completedAlerts = currentAlerts.filter { it.state == COMPLETED }
+        assertEquals("Incorrect number of completed alerts", 2, completedAlerts.size)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun `test bucket-level monitor throttling with per alert action scope`() {
+        val testIndex = createTestIndex()
+        insertSampleTimeSerializedData(
+            testIndex,
+            listOf(
+                "test_value_1",
+                "test_value_2"
+            )
+        )
+
+        val query = QueryBuilders.rangeQuery("test_strict_date_time")
+            .gt("{{period_end}}||-10d")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
+        val compositeSources = listOf(
+            TermsValuesSourceBuilder("test_field").field("test_field")
+        )
+        val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
+        val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
+        val triggerScript = """
+            params.docCount > 0
+        """.trimIndent()
+
+        val actionThrottleEnabled = randomAction(
+            template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+            destinationId = createDestination().id,
+            throttleEnabled = true,
+            actionExecutionPolicy = ActionExecutionPolicy(
+                throttle = Throttle(value = 5, unit = MINUTES),
+                actionExecutionScope = PerAlertActionScope(setOf(AlertCategory.DEDUPED, AlertCategory.NEW))
+            )
+        )
+        val actionThrottleNotEnabled = randomAction(
+            template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+            destinationId = createDestination().id,
+            throttleEnabled = false,
+            actionExecutionPolicy = ActionExecutionPolicy(
+                throttle = Throttle(value = 5, unit = MINUTES),
+                actionExecutionScope = PerAlertActionScope(setOf(AlertCategory.DEDUPED, AlertCategory.NEW))
+            )
+        )
+        val actions = listOf(actionThrottleEnabled, actionThrottleNotEnabled)
+        var trigger = randomBucketLevelTrigger(actions = actions)
+        trigger = trigger.copy(
+            bucketSelector = BucketSelectorExtAggregationBuilder(
+                name = trigger.id,
+                bucketsPathsMap = mapOf("docCount" to "_count"),
+                script = Script(triggerScript),
+                parentBucketPath = "composite_agg",
+                filter = null
+            )
+        )
+        val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
+
+        val monitorRunResultNotThrottled = entityAsMap(executeMonitor(monitor.id))
+        verifyActionThrottleResultsForBucketLevelMonitor(
+            monitorRunResult = monitorRunResultNotThrottled,
+            expectedEvents = setOf("test_value_1", "test_value_2"),
+            expectedActionResults = mapOf(
+                Pair(actionThrottleEnabled.id, false),
+                Pair(actionThrottleNotEnabled.id, false)
+            )
+        )
+
+        val notThrottledAlerts = searchAlerts(monitor)
+        assertEquals("Alerts may not have been saved correctly", 2, notThrottledAlerts.size)
+        val previousAlertExecutionTime: MutableMap<String, MutableMap<String, Instant?>> = mutableMapOf()
+        notThrottledAlerts.forEach {
+            verifyAlert(it, monitor, ACTIVE)
+            val notThrottledActionResults = verifyActionExecutionResultInAlert(
+                it,
+                mutableMapOf(Pair(actionThrottleEnabled.id, 0), Pair(actionThrottleNotEnabled.id, 0))
+            )
+            assertEquals(notThrottledActionResults.size, 2)
+            // Save the lastExecutionTimes of the actions for the Alert to be compared later against
+            // the next Monitor execution run
+            previousAlertExecutionTime[it.id] = mutableMapOf()
+            previousAlertExecutionTime[it.id]!![actionThrottleEnabled.id] =
+                notThrottledActionResults[actionThrottleEnabled.id]!!.lastExecutionTime
+            previousAlertExecutionTime[it.id]!![actionThrottleNotEnabled.id] =
+                notThrottledActionResults[actionThrottleNotEnabled.id]!!.lastExecutionTime
+        }
+
+        // Runner uses ThreadPool.CachedTimeThread thread which only updates once every 200 ms. Wait a bit to
+        // let Action executionTime change.  W/o this sleep the test can result in a false negative.
+        Thread.sleep(200)
+        val monitorRunResultThrottled = entityAsMap(executeMonitor(monitor.id))
+        verifyActionThrottleResultsForBucketLevelMonitor(
+            monitorRunResult = monitorRunResultThrottled,
+            expectedEvents = setOf("test_value_1", "test_value_2"),
+            expectedActionResults = mapOf(
+                Pair(actionThrottleEnabled.id, true),
+                Pair(actionThrottleNotEnabled.id, false)
+            )
+        )
+
+        val throttledAlerts = searchAlerts(monitor)
+        assertEquals("Alerts may not have been saved correctly", 2, throttledAlerts.size)
+        throttledAlerts.forEach {
+            verifyAlert(it, monitor, ACTIVE)
+            val throttledActionResults = verifyActionExecutionResultInAlert(
+                it,
+                mutableMapOf(Pair(actionThrottleEnabled.id, 1), Pair(actionThrottleNotEnabled.id, 0))
+            )
+            assertEquals(throttledActionResults.size, 2)
+
+            val prevthrottledActionLastExecutionTime = previousAlertExecutionTime[it.id]!![actionThrottleEnabled.id]
+            val prevNotThrottledActionLastExecutionTime = previousAlertExecutionTime[it.id]!![actionThrottleNotEnabled.id]
+            assertEquals(
+                "Last execution time of a throttled action was updated for one of the Alerts",
+                prevthrottledActionLastExecutionTime,
+                throttledActionResults[actionThrottleEnabled.id]!!.lastExecutionTime
+            )
+            assertTrue(
+                "Last execution time of a non-throttled action was not updated for one of the Alerts",
+                throttledActionResults[actionThrottleNotEnabled.id]!!.lastExecutionTime!! > prevNotThrottledActionLastExecutionTime
+            )
+        }
+    }
+
     private fun prepareTestAnomalyResult(detectorId: String, user: User) {
         val adResultIndex = ".opendistro-anomaly-results-history-2020.10.17"
         try {
@@ -1376,6 +1572,24 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             for (actionResult in triggerResult.objectMap("action_results").values) {
                 val expected = expectedResult[actionResult["id"]]
                 assertEquals(expected, actionResult["throttled"])
+            }
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun verifyActionThrottleResultsForBucketLevelMonitor(
+        monitorRunResult: MutableMap<String, Any>,
+        expectedEvents: Set<String>,
+        expectedActionResults: Map<String, Boolean>
+    ) {
+        for (triggerResult in monitorRunResult.objectMap("trigger_results").values) {
+            for (alertEvent in triggerResult.objectMap("action_results")) {
+                assertTrue(expectedEvents.contains(alertEvent.key))
+                val actionResults = alertEvent.value.values as Collection<Map<String, Any>>
+                for (actionResult in actionResults) {
+                    val expected = expectedActionResults[actionResult["id"]]
+                    assertEquals(expected, actionResult["throttled"])
+                }
             }
         }
     }
