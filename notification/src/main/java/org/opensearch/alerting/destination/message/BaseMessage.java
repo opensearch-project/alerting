@@ -85,7 +85,7 @@ public abstract class BaseMessage {
     }
 
     public URI getUri() {
-        return buildUri(getUrl().trim(), null, null, -1, null, null);
+        return buildUri(getUrl(), null, null, -1, null, null);
     }
 
     protected URI buildUri(String endpoint, String scheme, String host,
@@ -102,7 +102,7 @@ public abstract class BaseMessage {
                 }
                 return uriBuilder.setScheme(scheme).setHost(host).setPort(port).setPath(path).build();
             }
-            return new URIBuilder(endpoint).build();
+            return new URIBuilder(endpoint.trim()).build();
         } catch (URISyntaxException exception) {
             throw new IllegalStateException("Error creating URI");
         }
