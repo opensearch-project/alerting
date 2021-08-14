@@ -28,8 +28,10 @@ buildscript {
     apply from: 'build-tools/repositories.gradle'
 
     ext {
-        opensearch_version = System.getProperty("opensearch.version", "1.0.0")
-        common_utils_version = '1.0.0.0'
+        opensearch_version = System.getProperty("opensearch.version", "1.1.0-SNAPSHOT")
+        // 1.0.0 -> 1.0.0.0, and 1.0.0-SNAPSHOT -> 1.0.0.0-SNAPSHOT
+        opensearch_build = opensearch_version.replaceAll(/(\.\d)([^\d]*)$/, '$1.0$2')
+        common_utils_version = System.getProperty("common_utils.version", opensearch_build)
         kotlin_version = '1.3.72'
     }
 
@@ -45,7 +47,6 @@ buildscript {
     }
 }
 
-
 plugins {
     id 'nebula.ospackage' version "8.3.0" apply false
     id "com.dorongold.task-tree" version "1.5"
@@ -54,11 +55,6 @@ plugins {
 apply plugin: 'base'
 apply plugin: 'jacoco'
 apply from: 'build-tools/merged-coverage.gradle'
-
-ext {
-    opendistroVersion = "${version}"
-    isSnapshot = "true" == System.getProperty("build.snapshot", "true")
-}
 
 configurations {
     ktlint
@@ -88,12 +84,16 @@ task ktlintFormat(type: JavaExec, group: "formatting") {
 
 check.dependsOn ktlint
 
+ext {
+    isSnapshot = "true" == System.getProperty("build.snapshot", "true")
+}
 
 allprojects {
     group = "org.opensearch"
-    // Increment the final digit when there's a new plugin versions for the same opendistro version
-    // Reset the final digit to 0 when upgrading to a new opendistro version
-    version = "${opendistroVersion}.0"
+    version = "${opensearch_version}" - "-SNAPSHOT" + ".0"
+    if (isSnapshot) {
+        version += "-SNAPSHOT"
+    }
 
     apply from: "$rootDir/build-tools/repositories.gradle"
 
