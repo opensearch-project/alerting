@@ -35,15 +35,10 @@ apply plugin: 'jacoco'
 def usingRemoteCluster = System.properties.containsKey('tests.rest.cluster') || System.properties.containsKey('tests.cluster')
 def usingMultiNode = project.properties.containsKey('numNodes')
 
-
 ext {
     projectSubstitutions = [:]
     licenseFile = rootProject.file('LICENSE.txt')
     noticeFile = rootProject.file('NOTICE.txt')
-}
-
-if (isSnapshot) {
-    version += "-SNAPSHOT"
 }
 
 opensearchplugin {
