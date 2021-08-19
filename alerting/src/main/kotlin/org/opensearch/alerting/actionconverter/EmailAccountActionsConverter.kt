@@ -85,6 +85,7 @@ class EmailAccountActionsConverter {
             return GetEmailAccountResponse(notificationConfigInfo.configId, EmailAccount.NO_VERSION, 0L, 0L, RestStatus.OK, emailAccount)
         }
 
+        //{"name":"Test_sender","email":"test@example.com","host":"example.com","port":25,"method":"none"}
         fun convertIndexEmailAccountRequestToCreateNotificationConfigRequest(
             request: IndexEmailAccountRequest
         ): CreateNotificationConfigRequest {

@@ -39,9 +39,13 @@ class MigrationCoordinator(
 
     override fun clusterChanged(event: ClusterChangedEvent) {
         logger.info("Detected cluster change event for migration")
+        if (MigrationUtilService.finishFlag) {
+            logger.info("Reset migration process.")
+            scheduledMigration?.cancel()
+            MigrationUtilService.finishFlag = false
+        }
         if (
             event.localNodeMaster() &&
-            !MigrationUtilService.finishFlag &&
             !runningLock &&
             (scheduledMigration == null || scheduledMigration!!.isCancelled)
         ) {

@@ -69,7 +69,7 @@ class MigrationUtilService {
         // used in migration coordinator to cancel scheduled process
         @Volatile
         var finishFlag = false
-            private set
+            internal set
 
         fun migrateDestinations(client: NodeClient) {
             if (runningLock) {
@@ -171,6 +171,7 @@ class MigrationUtilService {
                     .should(QueryBuilders.existsQuery("email_group"))
                     .should(QueryBuilders.existsQuery("destination"))
                 searchSourceBuilder.query(queryBuilder)
+                logger.info("Query running is: ${client.prepareSearch().setQuery(queryBuilder)}")
 
                 val searchRequest = SearchRequest()
                     .source(searchSourceBuilder)
@@ -184,13 +185,14 @@ class MigrationUtilService {
                                 hasMoreResults = false
                             }
                             for (hit in response.hits) {
+                                logger.info("Migration, found results: ${hit.sourceAsString}")
                                 val xcp = XContentFactory.xContent(XContentType.JSON)
                                     .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
                                 var notificationConfig: NotificationConfig?
-                                if (hit.sourceAsString.contains("{\"email_group\":{")) {
+                                if (hit.sourceAsString.contains("\"email_group\"")) {
                                     val emailGroup = EmailGroup.parseWithType(xcp, hit.id, hit.version)
                                     notificationConfig = convertEmailGroupToNotificationConfig(emailGroup)
-                                } else if (hit.sourceAsString.contains("{\"email_account\":{")) {
+                                } else if (hit.sourceAsString.contains("\"email_account\"")) {
                                     val emailAccount = EmailAccount.parseWithType(xcp, hit.id, hit.version)
                                     notificationConfig = convertEmailAccountToNotificationConfig(emailAccount)
                                 } else {

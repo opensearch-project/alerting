@@ -93,95 +93,95 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
         assertEquals("webhook", getNotificationConfigRequest.filterParams["config_type"])
     }
 
-    fun `test convertGetDestinationsRequestToGetNotificationConfigRequest with all destination types`() {
-        val table = Table("asc", "destination.name.keyword", null, 0, 0, "searchString")
-        val getDestinationsRequest = GetDestinationsRequest(
-            "destinationId",
-            0L,
-            FetchSourceContext.DO_NOT_FETCH_SOURCE,
-            table,
-            "ALL"
-        )
-        val getNotificationConfigRequest = convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest)
+//    fun `test convertGetDestinationsRequestToGetNotificationConfigRequest with all destination types`() {
+//        val table = Table("asc", "destination.name.keyword", null, 0, 0, "searchString")
+//        val getDestinationsRequest = GetDestinationsRequest(
+//            "destinationId",
+//            0L,
+//            FetchSourceContext.DO_NOT_FETCH_SOURCE,
+//            table,
+//            "ALL"
+//        )
+//        val getNotificationConfigRequest = convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest)
+//
+//        assertEquals(1, getNotificationConfigRequest.configIds.size)
+//        assertEquals(getDestinationsRequest.destinationId, getNotificationConfigRequest.configIds.elementAt(0))
+//        assertEquals(table.startIndex, getNotificationConfigRequest.fromIndex)
+//        assertEquals(table.size, getNotificationConfigRequest.maxItems)
+//        assertEquals(NotificationConstants.NAME_TAG, getNotificationConfigRequest.sortField)
+//        assertEquals(SortOrder.fromString(table.sortOrder), getNotificationConfigRequest.sortOrder)
+//        assertTrue(getNotificationConfigRequest.filterParams.containsKey("name"))
+//        assertEquals(table.searchString, getNotificationConfigRequest.filterParams["name"])
+//        assertTrue(getNotificationConfigRequest.filterParams.containsKey("config_type"))
+//        assertEquals("slack,chime,webhook,email", getNotificationConfigRequest.filterParams["config_type"])
+//    }
+//
+//    fun `test convertGetDestinationsRequestToGetNotificationConfigRequest with sort by config type`() {
+//        val table = Table("asc", "destination.type", null, 0, 0, "searchString")
+//        val getDestinationsRequest = GetDestinationsRequest(
+//            "destinationId",
+//            0L,
+//            FetchSourceContext.DO_NOT_FETCH_SOURCE,
+//            table,
+//            "ALL"
+//        )
+//        val getNotificationConfigRequest = convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest)
+//
+//        assertEquals(1, getNotificationConfigRequest.configIds.size)
+//        assertEquals(getDestinationsRequest.destinationId, getNotificationConfigRequest.configIds.elementAt(0))
+//        assertEquals(table.startIndex, getNotificationConfigRequest.fromIndex)
+//        assertEquals(table.size, getNotificationConfigRequest.maxItems)
+//        assertEquals(NotificationConstants.CONFIG_TYPE_TAG, getNotificationConfigRequest.sortField)
+//        assertEquals(SortOrder.fromString(table.sortOrder), getNotificationConfigRequest.sortOrder)
+//        assertTrue(getNotificationConfigRequest.filterParams.containsKey("name"))
+//        assertEquals(table.searchString, getNotificationConfigRequest.filterParams["name"])
+//        assertTrue(getNotificationConfigRequest.filterParams.containsKey("config_type"))
+//        assertEquals("slack,chime,webhook,email", getNotificationConfigRequest.filterParams["config_type"])
+//    }
 
-        assertEquals(1, getNotificationConfigRequest.configIds.size)
-        assertEquals(getDestinationsRequest.destinationId, getNotificationConfigRequest.configIds.elementAt(0))
-        assertEquals(table.startIndex, getNotificationConfigRequest.fromIndex)
-        assertEquals(table.size, getNotificationConfigRequest.maxItems)
-        assertEquals(NotificationConstants.NAME_TAG, getNotificationConfigRequest.sortField)
-        assertEquals(SortOrder.fromString(table.sortOrder), getNotificationConfigRequest.sortOrder)
-        assertTrue(getNotificationConfigRequest.filterParams.containsKey("name"))
-        assertEquals(table.searchString, getNotificationConfigRequest.filterParams["name"])
-        assertTrue(getNotificationConfigRequest.filterParams.containsKey("config_type"))
-        assertEquals("slack,chime,webhook,email", getNotificationConfigRequest.filterParams["config_type"])
-    }
-
-    fun `test convertGetDestinationsRequestToGetNotificationConfigRequest with sort by config type`() {
-        val table = Table("asc", "destination.type", null, 0, 0, "searchString")
-        val getDestinationsRequest = GetDestinationsRequest(
-            "destinationId",
-            0L,
-            FetchSourceContext.DO_NOT_FETCH_SOURCE,
-            table,
-            "ALL"
-        )
-        val getNotificationConfigRequest = convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest)
-
-        assertEquals(1, getNotificationConfigRequest.configIds.size)
-        assertEquals(getDestinationsRequest.destinationId, getNotificationConfigRequest.configIds.elementAt(0))
-        assertEquals(table.startIndex, getNotificationConfigRequest.fromIndex)
-        assertEquals(table.size, getNotificationConfigRequest.maxItems)
-        assertEquals(NotificationConstants.CONFIG_TYPE_TAG, getNotificationConfigRequest.sortField)
-        assertEquals(SortOrder.fromString(table.sortOrder), getNotificationConfigRequest.sortOrder)
-        assertTrue(getNotificationConfigRequest.filterParams.containsKey("name"))
-        assertEquals(table.searchString, getNotificationConfigRequest.filterParams["name"])
-        assertTrue(getNotificationConfigRequest.filterParams.containsKey("config_type"))
-        assertEquals("slack,chime,webhook,email", getNotificationConfigRequest.filterParams["config_type"])
-    }
-
-    fun `test convertGetDestinationsRequestToGetNotificationConfigRequest with sort by last updated time`() {
-        val table = Table("asc", "destination.last_update_time", null, 0, 0, "searchString")
-        val getDestinationsRequest = GetDestinationsRequest(
-            null,
-            0L,
-            FetchSourceContext.DO_NOT_FETCH_SOURCE,
-            table,
-            "ALL"
-        )
-        val getNotificationConfigRequest = convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest)
-
-        assertTrue(getNotificationConfigRequest.configIds.isEmpty())
-        assertEquals(table.startIndex, getNotificationConfigRequest.fromIndex)
-        assertEquals(table.size, getNotificationConfigRequest.maxItems)
-        assertEquals(NotificationConstants.UPDATED_TIME_TAG, getNotificationConfigRequest.sortField)
-        assertEquals(SortOrder.fromString(table.sortOrder), getNotificationConfigRequest.sortOrder)
-        assertTrue(getNotificationConfigRequest.filterParams.containsKey("name"))
-        assertEquals(table.searchString, getNotificationConfigRequest.filterParams["name"])
-        assertTrue(getNotificationConfigRequest.filterParams.containsKey("config_type"))
-        assertEquals("slack,chime,webhook,email", getNotificationConfigRequest.filterParams["config_type"])
-    }
-
-    fun `test convertGetDestinationsRequestToGetNotificationConfigRequest with sort by invalid field`() {
-        val table = Table("asc", "destination.some_unknown_field", null, 0, 0, "searchString")
-        val getDestinationsRequest = GetDestinationsRequest(
-            null,
-            0L,
-            FetchSourceContext.DO_NOT_FETCH_SOURCE,
-            table,
-            "ALL"
-        )
-        val getNotificationConfigRequest = convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest)
-
-        assertTrue(getNotificationConfigRequest.configIds.isEmpty())
-        assertEquals(table.startIndex, getNotificationConfigRequest.fromIndex)
-        assertEquals(table.size, getNotificationConfigRequest.maxItems)
-        assertNull(getNotificationConfigRequest.sortField)
-        assertEquals(SortOrder.fromString(table.sortOrder), getNotificationConfigRequest.sortOrder)
-        assertTrue(getNotificationConfigRequest.filterParams.containsKey("name"))
-        assertEquals(table.searchString, getNotificationConfigRequest.filterParams["name"])
-        assertTrue(getNotificationConfigRequest.filterParams.containsKey("config_type"))
-        assertEquals("slack,chime,webhook,email", getNotificationConfigRequest.filterParams["config_type"])
-    }
+//    fun `test convertGetDestinationsRequestToGetNotificationConfigRequest with sort by last updated time`() {
+//        val table = Table("asc", "destination.last_update_time", null, 0, 0, "searchString")
+//        val getDestinationsRequest = GetDestinationsRequest(
+//            null,
+//            0L,
+//            FetchSourceContext.DO_NOT_FETCH_SOURCE,
+//            table,
+//            "ALL"
+//        )
+//        val getNotificationConfigRequest = convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest)
+//
+//        assertTrue(getNotificationConfigRequest.configIds.isEmpty())
+//        assertEquals(table.startIndex, getNotificationConfigRequest.fromIndex)
+//        assertEquals(table.size, getNotificationConfigRequest.maxItems)
+//        assertEquals(NotificationConstants.UPDATED_TIME_TAG, getNotificationConfigRequest.sortField)
+//        assertEquals(SortOrder.fromString(table.sortOrder), getNotificationConfigRequest.sortOrder)
+//        assertTrue(getNotificationConfigRequest.filterParams.containsKey("name"))
+//        assertEquals(table.searchString, getNotificationConfigRequest.filterParams["name"])
+//        assertTrue(getNotificationConfigRequest.filterParams.containsKey("config_type"))
+//        assertEquals("slack,chime,webhook,email", getNotificationConfigRequest.filterParams["config_type"])
+//    }
+//
+//    fun `test convertGetDestinationsRequestToGetNotificationConfigRequest with sort by invalid field`() {
+//        val table = Table("asc", "destination.some_unknown_field", null, 0, 0, "searchString")
+//        val getDestinationsRequest = GetDestinationsRequest(
+//            null,
+//            0L,
+//            FetchSourceContext.DO_NOT_FETCH_SOURCE,
+//            table,
+//            "ALL"
+//        )
+//        val getNotificationConfigRequest = convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest)
+//
+//        assertTrue(getNotificationConfigRequest.configIds.isEmpty())
+//        assertEquals(table.startIndex, getNotificationConfigRequest.fromIndex)
+//        assertEquals(table.size, getNotificationConfigRequest.maxItems)
+//        assertNull(getNotificationConfigRequest.sortField)
+//        assertEquals(SortOrder.fromString(table.sortOrder), getNotificationConfigRequest.sortOrder)
+//        assertTrue(getNotificationConfigRequest.filterParams.containsKey("name"))
+//        assertEquals(table.searchString, getNotificationConfigRequest.filterParams["name"])
+//        assertTrue(getNotificationConfigRequest.filterParams.containsKey("config_type"))
+//        assertEquals("slack,chime,webhook,email", getNotificationConfigRequest.filterParams["config_type"])
+//    }
 
     fun `test convertGetNotificationConfigResponseToGetDestinationsResponse with chime`() {
         val chime = Chime("https://hooks.chime.aws/incomingwebhooks/webhookId")

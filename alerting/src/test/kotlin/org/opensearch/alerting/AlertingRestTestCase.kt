@@ -380,7 +380,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     fun getChimeDestination(): Destination {
         val chime = Chime("https://hooks.chime.aws/incomingwebhooks/chimeId")
         return Destination(
-            type = DestinationType.SLACK,
+            type = DestinationType.CHIME,
             name = "test",
             user = randomUser(),
             lastUpdateTime = Instant.now(),
@@ -405,7 +405,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             null
         )
         return Destination(
-            type = DestinationType.SLACK,
+            type = DestinationType.CUSTOM_WEBHOOK,
             name = "test",
             user = randomUser(),
             lastUpdateTime = Instant.now(),

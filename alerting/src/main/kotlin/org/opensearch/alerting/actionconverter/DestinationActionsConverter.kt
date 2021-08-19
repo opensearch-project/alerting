@@ -327,7 +327,7 @@ class DestinationActionsConverter {
                         alertWebhook.path,
                         alertWebhook.queryParams
                     ).toString()
-                    val webhook = Webhook(uri, alertWebhook.headerParams)
+                    val webhook = Webhook(uri, alertWebhook.headerParams, alertWebhook.method)
                     val description = "Webhook destination created from the Alerting plugin"
                     return NotificationConfig(
                         destination.name,
