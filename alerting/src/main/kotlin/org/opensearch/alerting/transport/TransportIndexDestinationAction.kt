@@ -78,6 +78,7 @@ class TransportIndexDestinationAction @Inject constructor(
             val configId: String
             if (request.method == RestRequest.Method.PUT) {
 
+                //client.threadPool().threadContext.stashContext().use
                 notificationResponse = NotificationAPIUtils.updateNotificationConfig(
                     client,
                     convertIndexDestinationRequestToUpdateNotificationConfigRequest(request)

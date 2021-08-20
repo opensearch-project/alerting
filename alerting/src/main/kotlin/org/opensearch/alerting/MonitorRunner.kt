@@ -102,11 +102,11 @@ import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.notifications.NotificationConstants
 import org.opensearch.commons.notifications.action.GetNotificationConfigRequest
 import org.opensearch.commons.notifications.action.SendNotificationRequest
 import org.opensearch.commons.notifications.model.ChannelMessage
 import org.opensearch.commons.notifications.model.EventSource
-import org.opensearch.commons.notifications.model.Feature
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
@@ -602,7 +602,7 @@ class MonitorRunner(
                         throw IllegalStateException("Monitor contains a Destination type that is not allowed: ${destination.type}")
                     }
                     val title = if (actionOutput[SUBJECT] != null) actionOutput[SUBJECT]!! else ""
-                    val eventSource = EventSource(title, action.destinationId, Feature.ALERTING)
+                    val eventSource = EventSource(title, action.destinationId, NotificationConstants.FEATURE_ALERTING)
                     val channelMessage = ChannelMessage(actionOutput[MESSAGE]!!, null, null)
                     val sendRequest = SendNotificationRequest(eventSource, channelMessage, listOf(action.destinationId), null)
                     actionOutput[MESSAGE_ID] = NotificationAPIUtils.sendNotification(client as NodeClient, sendRequest).notificationId

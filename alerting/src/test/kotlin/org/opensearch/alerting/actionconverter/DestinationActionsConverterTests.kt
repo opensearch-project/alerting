@@ -24,13 +24,13 @@ import org.opensearch.alerting.model.destination.email.Recipient
 import org.opensearch.alerting.randomUser
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.commons.notifications.NotificationConstants
+import org.opensearch.commons.notifications.NotificationConstants.FEATURE_ALERTING
 import org.opensearch.commons.notifications.action.DeleteNotificationConfigResponse
 import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
 import org.opensearch.commons.notifications.model.Chime
 import org.opensearch.commons.notifications.model.ConfigType
 import org.opensearch.commons.notifications.model.Email
 import org.opensearch.commons.notifications.model.EmailGroup
-import org.opensearch.commons.notifications.model.Feature
 import org.opensearch.commons.notifications.model.MethodType
 import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
@@ -44,7 +44,6 @@ import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.search.sort.SortOrder
 import org.opensearch.test.OpenSearchTestCase
 import java.time.Instant
-import java.util.EnumSet
 
 class DestinationActionsConverterTests : OpenSearchTestCase() {
 
@@ -189,7 +188,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             "notificationConfig",
             "description",
             ConfigType.CHIME,
-            EnumSet.of(Feature.ALERTING),
+            setOf(FEATURE_ALERTING),
             chime,
             true
         )
@@ -213,7 +212,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             "notificationConfig",
             "description",
             ConfigType.SLACK,
-            EnumSet.of(Feature.ALERTING),
+            setOf(FEATURE_ALERTING),
             slack,
             true
         )
@@ -237,7 +236,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             "notificationConfig",
             "description",
             ConfigType.EMAIL,
-            EnumSet.of(Feature.ALERTING),
+            setOf(FEATURE_ALERTING),
             email,
             true
         )
@@ -263,7 +262,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             "notificationConfig",
             "description",
             ConfigType.WEBHOOK,
-            EnumSet.of(Feature.ALERTING),
+            setOf(FEATURE_ALERTING),
             webhook,
             true
         )
@@ -287,7 +286,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             "notificationConfig",
             "description",
             ConfigType.EMAIL_GROUP,
-            EnumSet.of(Feature.ALERTING),
+            setOf(FEATURE_ALERTING),
             emailGroup,
             true
         )
@@ -329,7 +328,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
         assertEquals(customWebhook.name, notificationConfig.name)
         assertEquals(ConfigType.WEBHOOK, notificationConfig.configType)
         assertEquals("Webhook destination created from the Alerting plugin", notificationConfig.description)
-        assertEquals(EnumSet.of(Feature.ALERTING), notificationConfig.features)
+        assertEquals(setOf(FEATURE_ALERTING), notificationConfig.features)
         val webhook = notificationConfig.configData as Webhook
         assertEquals(customWebhook.customWebhook?.url, webhook.url)
     }
@@ -380,7 +379,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
         assertEquals(slack.name, notificationConfig.name)
         assertEquals(ConfigType.SLACK, notificationConfig.configType)
         assertEquals("Slack destination created from the Alerting plugin", notificationConfig.description)
-        assertEquals(EnumSet.of(Feature.ALERTING), notificationConfig.features)
+        assertEquals(setOf(FEATURE_ALERTING), notificationConfig.features)
         val notifSlack = notificationConfig.configData as Slack
         assertEquals(slack.slack?.url, notifSlack.url)
     }
@@ -431,7 +430,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
         assertEquals(chime.name, notificationConfig.name)
         assertEquals(ConfigType.CHIME, notificationConfig.configType)
         assertEquals("Chime destination created from the Alerting plugin", notificationConfig.description)
-        assertEquals(EnumSet.of(Feature.ALERTING), notificationConfig.features)
+        assertEquals(setOf(FEATURE_ALERTING), notificationConfig.features)
         val notifChime = notificationConfig.configData as Chime
         assertEquals(chime.chime?.url, notifChime.url)
     }
@@ -482,7 +481,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
         assertEquals(email.name, notificationConfig.name)
         assertEquals(ConfigType.EMAIL, notificationConfig.configType)
         assertEquals("Email destination created from the Alerting plugin", notificationConfig.description)
-        assertEquals(EnumSet.of(Feature.ALERTING), notificationConfig.features)
+        assertEquals(setOf(FEATURE_ALERTING), notificationConfig.features)
         val notifEmail = notificationConfig.configData as Email
         assertEquals(email.email?.emailAccountID, notifEmail.emailAccountID)
         assertEquals(email.email?.recipients?.get(0)?.email, notifEmail.recipients[0])
@@ -517,7 +516,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
         assertEquals(destination.name, notificationConfig.name)
         assertEquals(ConfigType.EMAIL, notificationConfig.configType)
         assertEquals("Email destination created from the Alerting plugin", notificationConfig.description)
-        assertEquals(EnumSet.of(Feature.ALERTING), notificationConfig.features)
+        assertEquals(setOf(FEATURE_ALERTING), notificationConfig.features)
         val notifEmail = notificationConfig.configData as Email
         assertEquals(destination.email?.emailAccountID, notifEmail.emailAccountID)
         assertEquals(destination.email?.recipients?.get(0)?.emailGroupID, notifEmail.emailGroupIds[0])
@@ -625,7 +624,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
         assertEquals(customWebhook.name, notificationConfig.name)
         assertEquals(ConfigType.WEBHOOK, notificationConfig.configType)
         assertEquals("Webhook destination created from the Alerting plugin", notificationConfig.description)
-        assertEquals(EnumSet.of(Feature.ALERTING), notificationConfig.features)
+        assertEquals(setOf(FEATURE_ALERTING), notificationConfig.features)
         val webhook = notificationConfig.configData as Webhook
         assertEquals(customWebhook.customWebhook?.url, webhook.url)
     }
@@ -648,7 +647,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
         assertEquals(slack.name, notificationConfig.name)
         assertEquals(ConfigType.SLACK, notificationConfig.configType)
         assertEquals("Slack destination created from the Alerting plugin", notificationConfig.description)
-        assertEquals(EnumSet.of(Feature.ALERTING), notificationConfig.features)
+        assertEquals(setOf(FEATURE_ALERTING), notificationConfig.features)
         val notifSlack = notificationConfig.configData as Slack
         assertEquals(slack.slack?.url, notifSlack.url)
     }
@@ -671,7 +670,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
         assertEquals(chime.name, notificationConfig.name)
         assertEquals(ConfigType.CHIME, notificationConfig.configType)
         assertEquals("Chime destination created from the Alerting plugin", notificationConfig.description)
-        assertEquals(EnumSet.of(Feature.ALERTING), notificationConfig.features)
+        assertEquals(setOf(FEATURE_ALERTING), notificationConfig.features)
         val notifChime = notificationConfig.configData as Chime
         assertEquals(chime.chime?.url, notifChime.url)
     }
@@ -694,7 +693,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
         assertEquals(email.name, notificationConfig.name)
         assertEquals(ConfigType.EMAIL, notificationConfig.configType)
         assertEquals("Email destination created from the Alerting plugin", notificationConfig.description)
-        assertEquals(EnumSet.of(Feature.ALERTING), notificationConfig.features)
+        assertEquals(setOf(FEATURE_ALERTING), notificationConfig.features)
         val notifEmail = notificationConfig.configData as Email
         assertEquals(email.email?.emailAccountID, notifEmail.emailAccountID)
         assertEquals(email.email?.recipients?.get(0)?.email, notifEmail.recipients[0])
@@ -706,7 +705,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             "notificationConfig",
             "description",
             ConfigType.SLACK,
-            EnumSet.of(Feature.ALERTING),
+            setOf(FEATURE_ALERTING),
             slack,
             true
         )
@@ -727,7 +726,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             "notificationConfig",
             "description",
             ConfigType.CHIME,
-            EnumSet.of(Feature.ALERTING),
+            setOf(FEATURE_ALERTING),
             chime,
             true
         )
@@ -748,7 +747,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             "notificationConfig",
             "description",
             ConfigType.WEBHOOK,
-            EnumSet.of(Feature.ALERTING),
+            setOf(FEATURE_ALERTING),
             webhook,
             true
         )
@@ -770,7 +769,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             "notificationConfig",
             "description",
             ConfigType.EMAIL,
-            EnumSet.of(Feature.ALERTING),
+            setOf(FEATURE_ALERTING),
             email,
             true
         )
@@ -806,7 +805,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             "notificationConfig",
             "description",
             ConfigType.SMTP_ACCOUNT,
-            EnumSet.of(Feature.ALERTING),
+            setOf(FEATURE_ALERTING),
             smtpAccount,
             true
         )
@@ -821,7 +820,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             "notificationConfig",
             "description",
             ConfigType.EMAIL_GROUP,
-            EnumSet.of(Feature.ALERTING),
+            setOf(FEATURE_ALERTING),
             emailGroup,
             true
         )
@@ -835,7 +834,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             "notificationConfig",
             "description",
             ConfigType.NONE,
-            EnumSet.of(Feature.ALERTING),
+            setOf(FEATURE_ALERTING),
             null,
             true
         )
@@ -850,7 +849,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             "notificationConfig",
             "description",
             ConfigType.EMAIL,
-            EnumSet.of(Feature.ALERTING),
+            setOf(FEATURE_ALERTING),
             email,
             true
         )

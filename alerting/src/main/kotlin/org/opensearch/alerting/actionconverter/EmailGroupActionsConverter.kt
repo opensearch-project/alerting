@@ -36,6 +36,7 @@ import org.opensearch.alerting.action.IndexEmailGroupResponse
 import org.opensearch.alerting.model.destination.email.EmailAccount.Companion.NO_VERSION
 import org.opensearch.alerting.model.destination.email.EmailEntry
 import org.opensearch.alerting.util.IndexUtils
+import org.opensearch.commons.notifications.NotificationConstants.FEATURE_ALERTING
 import org.opensearch.commons.notifications.action.CreateNotificationConfigRequest
 import org.opensearch.commons.notifications.action.DeleteNotificationConfigRequest
 import org.opensearch.commons.notifications.action.DeleteNotificationConfigResponse
@@ -44,12 +45,10 @@ import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
 import org.opensearch.commons.notifications.action.UpdateNotificationConfigRequest
 import org.opensearch.commons.notifications.model.ConfigType
 import org.opensearch.commons.notifications.model.EmailGroup
-import org.opensearch.commons.notifications.model.Feature
 import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.index.Index
 import org.opensearch.index.shard.ShardId
 import org.opensearch.rest.RestStatus
-import java.util.EnumSet
 
 class EmailGroupActionsConverter {
 
@@ -96,7 +95,7 @@ class EmailGroupActionsConverter {
                 emailGroup.name,
                 description,
                 ConfigType.EMAIL_GROUP,
-                EnumSet.of(Feature.ALERTING),
+                setOf(FEATURE_ALERTING),
                 notificationEmailGroup
             )
             val configId = if (request.emailGroupID == "") null else request.emailGroupID
@@ -156,7 +155,7 @@ class EmailGroupActionsConverter {
                 emailGroup.name,
                 description,
                 ConfigType.EMAIL_GROUP,
-                EnumSet.of(Feature.ALERTING),
+                setOf(FEATURE_ALERTING),
                 notificationEmailGroup
             )
         }

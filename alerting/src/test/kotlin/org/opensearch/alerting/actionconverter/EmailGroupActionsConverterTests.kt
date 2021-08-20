@@ -15,11 +15,12 @@ import org.opensearch.alerting.actionconverter.EmailGroupActionsConverter.Compan
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailEntry
 import org.opensearch.alerting.util.IndexUtils
+import org.opensearch.commons.notifications.NotificationConstants
+import org.opensearch.commons.notifications.NotificationConstants.FEATURE_ALERTING
 import org.opensearch.commons.notifications.action.DeleteNotificationConfigResponse
 import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
 import org.opensearch.commons.notifications.model.ConfigType
 import org.opensearch.commons.notifications.model.EmailGroup
-import org.opensearch.commons.notifications.model.Feature
 import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import org.opensearch.commons.notifications.model.NotificationConfigSearchResult
@@ -28,7 +29,6 @@ import org.opensearch.rest.RestStatus
 import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.test.OpenSearchTestCase
 import java.time.Instant
-import java.util.EnumSet
 
 class EmailGroupActionsConverterTests : OpenSearchTestCase() {
 
@@ -51,7 +51,7 @@ class EmailGroupActionsConverterTests : OpenSearchTestCase() {
             "notificationConfig",
             "description",
             ConfigType.EMAIL_GROUP,
-            EnumSet.of(Feature.ALERTING),
+            setOf(FEATURE_ALERTING),
             emailGroup,
             true
         )
@@ -105,7 +105,7 @@ class EmailGroupActionsConverterTests : OpenSearchTestCase() {
         assertEquals(1, notifEmailGroup.recipients.size)
         assertEquals("test@email.com", notifEmailGroup.recipients[0])
         assertEquals(emailGroup.name, createNotificationConfigRequest.notificationConfig.name)
-        assertEquals(EnumSet.of(Feature.ALERTING), createNotificationConfigRequest.notificationConfig.features)
+        assertEquals(setOf(NotificationConstants.FEATURE_ALERTING), createNotificationConfigRequest.notificationConfig.features)
         assertEquals(ConfigType.EMAIL_GROUP, createNotificationConfigRequest.notificationConfig.configType)
         assertEquals("Email group created from the Alerting plugin", createNotificationConfigRequest.notificationConfig.description)
     }
@@ -136,7 +136,7 @@ class EmailGroupActionsConverterTests : OpenSearchTestCase() {
         assertEquals(1, notifEmailGroup.recipients.size)
         assertEquals("test@email.com", notifEmailGroup.recipients[0])
         assertEquals(emailGroup.name, createNotificationConfigRequest.notificationConfig.name)
-        assertEquals(EnumSet.of(Feature.ALERTING), createNotificationConfigRequest.notificationConfig.features)
+        assertEquals(setOf(NotificationConstants.FEATURE_ALERTING), createNotificationConfigRequest.notificationConfig.features)
         assertEquals(ConfigType.EMAIL_GROUP, createNotificationConfigRequest.notificationConfig.configType)
         assertEquals("Email group created from the Alerting plugin", createNotificationConfigRequest.notificationConfig.description)
     }
@@ -167,7 +167,7 @@ class EmailGroupActionsConverterTests : OpenSearchTestCase() {
         assertEquals(1, notifEmailGroup.recipients.size)
         assertEquals("test@email.com", notifEmailGroup.recipients[0])
         assertEquals(emailGroup.name, updateNotificationConfigRequest.notificationConfig.name)
-        assertEquals(EnumSet.of(Feature.ALERTING), updateNotificationConfigRequest.notificationConfig.features)
+        assertEquals(setOf(NotificationConstants.FEATURE_ALERTING), updateNotificationConfigRequest.notificationConfig.features)
         assertEquals(ConfigType.EMAIL_GROUP, updateNotificationConfigRequest.notificationConfig.configType)
         assertEquals("Email group created from the Alerting plugin", updateNotificationConfigRequest.notificationConfig.description)
     }
@@ -178,7 +178,7 @@ class EmailGroupActionsConverterTests : OpenSearchTestCase() {
             "notificationConfig",
             "description",
             ConfigType.EMAIL_GROUP,
-            EnumSet.of(Feature.ALERTING),
+            setOf(NotificationConstants.FEATURE_ALERTING),
             emailGroup,
             true
         )

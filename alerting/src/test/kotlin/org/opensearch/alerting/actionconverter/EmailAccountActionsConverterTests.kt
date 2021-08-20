@@ -15,10 +15,10 @@ import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Comp
 import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertNotificationToAlertingMethodType
 import org.opensearch.alerting.actionconverter.EmailAccountActionsConverter.Companion.convertToIndexEmailAccountResponse
 import org.opensearch.alerting.model.destination.email.EmailAccount
+import org.opensearch.commons.notifications.NotificationConstants.FEATURE_ALERTING
 import org.opensearch.commons.notifications.action.DeleteNotificationConfigResponse
 import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
 import org.opensearch.commons.notifications.model.ConfigType
-import org.opensearch.commons.notifications.model.Feature
 import org.opensearch.commons.notifications.model.MethodType
 import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
@@ -29,7 +29,6 @@ import org.opensearch.rest.RestStatus
 import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.test.OpenSearchTestCase
 import java.time.Instant
-import java.util.EnumSet
 
 class EmailAccountActionsConverterTests : OpenSearchTestCase() {
 
@@ -52,7 +51,7 @@ class EmailAccountActionsConverterTests : OpenSearchTestCase() {
             "notificationConfig",
             "description",
             ConfigType.SMTP_ACCOUNT,
-            EnumSet.of(Feature.ALERTING),
+            setOf(FEATURE_ALERTING),
             smtpAccount,
             true
         )
@@ -113,7 +112,7 @@ class EmailAccountActionsConverterTests : OpenSearchTestCase() {
         assertEquals(emailAccount.port, smtpAccount.port)
         assertEquals(MethodType.SSL, smtpAccount.method)
         assertEquals(emailAccount.name, createNotificationConfigRequest.notificationConfig.name)
-        assertEquals(EnumSet.of(Feature.ALERTING), createNotificationConfigRequest.notificationConfig.features)
+        assertEquals(setOf(FEATURE_ALERTING), createNotificationConfigRequest.notificationConfig.features)
         assertEquals(ConfigType.SMTP_ACCOUNT, createNotificationConfigRequest.notificationConfig.configType)
         assertEquals("Email account created from the Alerting plugin", createNotificationConfigRequest.notificationConfig.description)
     }
@@ -149,7 +148,7 @@ class EmailAccountActionsConverterTests : OpenSearchTestCase() {
         assertEquals(emailAccount.port, smtpAccount.port)
         assertEquals(MethodType.SSL, smtpAccount.method)
         assertEquals(emailAccount.name, createNotificationConfigRequest.notificationConfig.name)
-        assertEquals(EnumSet.of(Feature.ALERTING), createNotificationConfigRequest.notificationConfig.features)
+        assertEquals(setOf(FEATURE_ALERTING), createNotificationConfigRequest.notificationConfig.features)
         assertEquals(ConfigType.SMTP_ACCOUNT, createNotificationConfigRequest.notificationConfig.configType)
         assertEquals("Email account created from the Alerting plugin", createNotificationConfigRequest.notificationConfig.description)
     }
@@ -185,7 +184,7 @@ class EmailAccountActionsConverterTests : OpenSearchTestCase() {
         assertEquals(emailAccount.port, smtpAccount.port)
         assertEquals(MethodType.SSL, smtpAccount.method)
         assertEquals(emailAccount.name, updateNotificationConfigRequest.notificationConfig.name)
-        assertEquals(EnumSet.of(Feature.ALERTING), updateNotificationConfigRequest.notificationConfig.features)
+        assertEquals(setOf(FEATURE_ALERTING), updateNotificationConfigRequest.notificationConfig.features)
         assertEquals(ConfigType.SMTP_ACCOUNT, updateNotificationConfigRequest.notificationConfig.configType)
         assertEquals("Email account created from the Alerting plugin", updateNotificationConfigRequest.notificationConfig.description)
     }
@@ -196,7 +195,7 @@ class EmailAccountActionsConverterTests : OpenSearchTestCase() {
             "notificationConfig",
             "description",
             ConfigType.SMTP_ACCOUNT,
-            EnumSet.of(Feature.ALERTING),
+            setOf(FEATURE_ALERTING),
             smtpAccount,
             true
         )

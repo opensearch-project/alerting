@@ -35,6 +35,7 @@ import org.opensearch.alerting.action.IndexEmailAccountRequest
 import org.opensearch.alerting.action.IndexEmailAccountResponse
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.util.IndexUtils
+import org.opensearch.commons.notifications.NotificationConstants
 import org.opensearch.commons.notifications.action.CreateNotificationConfigRequest
 import org.opensearch.commons.notifications.action.DeleteNotificationConfigRequest
 import org.opensearch.commons.notifications.action.DeleteNotificationConfigResponse
@@ -42,14 +43,12 @@ import org.opensearch.commons.notifications.action.GetNotificationConfigRequest
 import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
 import org.opensearch.commons.notifications.action.UpdateNotificationConfigRequest
 import org.opensearch.commons.notifications.model.ConfigType
-import org.opensearch.commons.notifications.model.Feature
 import org.opensearch.commons.notifications.model.MethodType
 import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.SmtpAccount
 import org.opensearch.index.Index
 import org.opensearch.index.shard.ShardId
 import org.opensearch.rest.RestStatus
-import java.util.EnumSet
 
 class EmailAccountActionsConverter {
 
@@ -97,7 +96,7 @@ class EmailAccountActionsConverter {
                 emailAccount.name,
                 description,
                 ConfigType.SMTP_ACCOUNT,
-                EnumSet.of(Feature.ALERTING),
+                setOf(NotificationConstants.FEATURE_ALERTING),
                 smtpAccount
             )
             val configId = if (request.emailAccountID == "") null else request.emailAccountID
@@ -167,7 +166,7 @@ class EmailAccountActionsConverter {
                 emailAccount.name,
                 description,
                 ConfigType.SMTP_ACCOUNT,
-                EnumSet.of(Feature.ALERTING),
+                setOf(NotificationConstants.FEATURE_ALERTING),
                 smtpAccount
             )
         }

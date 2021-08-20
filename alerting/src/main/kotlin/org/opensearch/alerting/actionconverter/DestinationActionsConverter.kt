@@ -41,6 +41,7 @@ import org.opensearch.alerting.model.destination.email.Recipient
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.common.Strings
+import org.opensearch.commons.notifications.NotificationConstants
 import org.opensearch.commons.notifications.NotificationConstants.CONFIG_TYPE_TAG
 import org.opensearch.commons.notifications.NotificationConstants.NAME_TAG
 import org.opensearch.commons.notifications.NotificationConstants.UPDATED_TIME_TAG
@@ -53,7 +54,6 @@ import org.opensearch.commons.notifications.action.UpdateNotificationConfigReque
 import org.opensearch.commons.notifications.model.Chime
 import org.opensearch.commons.notifications.model.ConfigType
 import org.opensearch.commons.notifications.model.Email
-import org.opensearch.commons.notifications.model.Feature
 import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import org.opensearch.commons.notifications.model.Slack
@@ -64,7 +64,6 @@ import org.opensearch.rest.RestStatus
 import org.opensearch.search.sort.SortOrder
 import java.net.URI
 import java.net.URISyntaxException
-import java.util.EnumSet
 
 class DestinationActionsConverter {
 
@@ -301,7 +300,7 @@ class DestinationActionsConverter {
                         destination.name,
                         description,
                         ConfigType.CHIME,
-                        EnumSet.of(Feature.ALERTING),
+                        setOf(NotificationConstants.FEATURE_ALERTING),
                         chime
                     )
                 }
@@ -313,7 +312,7 @@ class DestinationActionsConverter {
                         destination.name,
                         description,
                         ConfigType.SLACK,
-                        EnumSet.of(Feature.ALERTING),
+                        setOf(NotificationConstants.FEATURE_ALERTING),
                         slack
                     )
                 }
@@ -327,13 +326,14 @@ class DestinationActionsConverter {
                         alertWebhook.path,
                         alertWebhook.queryParams
                     ).toString()
-                    val webhook = Webhook(uri, alertWebhook.headerParams, alertWebhook.method)
+                    // TODO: add this here alertWebhook.method
+                    val webhook = Webhook(uri, alertWebhook.headerParams)
                     val description = "Webhook destination created from the Alerting plugin"
                     return NotificationConfig(
                         destination.name,
                         description,
                         ConfigType.WEBHOOK,
-                        EnumSet.of(Feature.ALERTING),
+                        setOf(NotificationConstants.FEATURE_ALERTING),
                         webhook
                     )
                 }
@@ -352,7 +352,7 @@ class DestinationActionsConverter {
                         destination.name,
                         description,
                         ConfigType.EMAIL,
-                        EnumSet.of(Feature.ALERTING),
+                        setOf(NotificationConstants.FEATURE_ALERTING),
                         email
                     )
                 }
