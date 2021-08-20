@@ -1,6 +1,6 @@
-# Document-Level Alerting RFC
+# Bucket-Level Alerting RFC
 
-The purpose of this request for comments (RFC) is to introduce our plans to enhance the Alerting plugin with document-level alerting functionality and collect feedback and discuss our plans with the community. This RFC is meant to cover the high-level functionality and does not go into implementation details and architecture.
+The purpose of this request for comments (RFC) is to introduce our plans to enhance the Alerting plugin with bucket-level alerting functionality and collect feedback and discuss our plans with the community. This RFC is meant to cover the high-level functionality and does not go into implementation details and architecture.
 
 ## Problem Statement
 
@@ -28,4 +28,4 @@ Similar to controlling the possible flood of alerts, the resulting actions/notif
 
 ## Providing Feedback
 
-If you have comments or feedback on our plans for Document-Level Alerting, please comment on the [GitHub issue](https://github.com/opendistro-for-elasticsearch/alerting/issues/326) in this project to discuss.
+If you have comments or feedback on our plans for Bucket-Level Alerting, please comment on the [GitHub issue](https://github.com/opensearch-project/alerting/issues/86) in this project to discuss.
