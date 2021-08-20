@@ -29,7 +29,7 @@ class LegacyOpenDistroDestinationSettings {
         const val DESTINATION_SETTING_PREFIX = "opendistro.alerting.destination."
         const val EMAIL_DESTINATION_SETTING_PREFIX = DESTINATION_SETTING_PREFIX + "email."
         val ALLOW_LIST_ALL = DestinationType.values().toList().map { it.value }
-        val DENY_LIST_NONE = emptyList<String>()
+        val HOST_DENY_LIST_NONE = emptyList<String>()
 
         val ALLOW_LIST: Setting<List<String>> = Setting.listSetting(
             DESTINATION_SETTING_PREFIX + "allow_list",
@@ -56,7 +56,7 @@ class LegacyOpenDistroDestinationSettings {
 
         val HOST_DENY_LIST: Setting<List<String>> = Setting.listSetting(
             "opendistro.destination.host.deny_list",
-            DENY_LIST_NONE,
+            HOST_DENY_LIST_NONE,
             Function.identity(),
             Setting.Property.NodeScope,
             Setting.Property.Final,
