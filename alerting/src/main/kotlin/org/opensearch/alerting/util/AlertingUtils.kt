@@ -31,6 +31,8 @@ import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
 import org.opensearch.alerting.destination.message.BaseMessage
 import org.opensearch.alerting.model.AggregationResultBucket
+import org.opensearch.alerting.model.action.Action
+import org.opensearch.alerting.model.action.ActionExecutionScope
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.commons.authuser.User
@@ -146,3 +148,6 @@ fun <T : Any> checkUserFilterByPermissions(
  * as the key for a HashMap to easily retrieve [AggregationResultBucket] based on the bucket key values.
  */
 fun AggregationResultBucket.getBucketKeysHash(): String = this.bucketKeys.joinToString(separator = "#")
+
+fun Action.getActionScope(): ActionExecutionScope.Type =
+    this.actionExecutionPolicy.actionExecutionScope.getExecutionScope()
