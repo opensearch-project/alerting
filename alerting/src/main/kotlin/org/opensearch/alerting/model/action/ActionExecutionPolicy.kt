@@ -31,6 +31,12 @@ data class ActionExecutionPolicy(
     val actionExecutionScope: ActionExecutionScope
 ) : Writeable, ToXContentObject {
 
+    init {
+        if (actionExecutionScope is PerExecutionActionScope) {
+            require(throttle == null) { "Throttle is currently not supported for per execution action scope" }
+        }
+    }
+
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this (
         sin.readOptionalWriteable(::Throttle), // throttle
