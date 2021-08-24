@@ -70,6 +70,9 @@ sealed class ActionExecutionScope : Writeable, ToXContentObject {
                                         alertFilter.add(AlertCategory.valueOf(alertCategory))
                                     }
                                 }
+                                else -> throw IllegalArgumentException(
+                                    "Invalid field [$perAlertFieldName] found in per alert action execution scope."
+                                )
                             }
                         }
                     }
