@@ -39,6 +39,8 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.MONITOR_MAX_T
 import org.opensearch.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
 import org.opensearch.alerting.util._ID
 import org.opensearch.alerting.util._VERSION
+import org.opensearch.alerting.util.isBucketLevelMonitor
+import org.opensearch.commons.authuser.User
 import org.opensearch.common.CheckedFunction
 import org.opensearch.common.ParseField
 import org.opensearch.common.io.stream.StreamInput
@@ -49,9 +51,9 @@ import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParser.Token
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
-import org.opensearch.commons.authuser.User
 import java.io.IOException
 import java.time.Instant
+import java.util.Locale
 
 /**
  * A value object that represents a Monitor. Monitors are used to periodically execute a source query and check the
@@ -65,6 +67,9 @@ data class Monitor(
     override val schedule: Schedule,
     override val lastUpdateTime: Instant,
     override val enabledTime: Instant?,
+    // TODO: Check how this behaves during rolling upgrade/multi-version cluster
+    //  Can read/write and parsing break if it's done from an old -> new version of the plugin?
+    val monitorType: MonitorType,
     val user: User?,
     val schemaVersion: Int = NO_SCHEMA_VERSION,
     val inputs: List<Input>,
@@ -79,6 +84,13 @@ data class Monitor(
         val triggerIds = mutableSetOf<String>()
         triggers.forEach { trigger ->
             require(triggerIds.add(trigger.id)) { "Duplicate trigger id: ${trigger.id}. Trigger ids must be unique." }
+            // Verify Trigger type based on Monitor type
+            when (monitorType) {
+                MonitorType.QUERY_LEVEL_MONITOR ->
+                    require(trigger is QueryLevelTrigger) { "Incompatible trigger [$trigger.id] for monitor type [$monitorType]" }
+                MonitorType.BUCKET_LEVEL_MONITOR ->
+                    require(trigger is BucketLevelTrigger) { "Incompatible trigger [$trigger.id] for monitor type [$monitorType]" }
+            }
         }
         if (enabled) {
             requireNotNull(enabledTime)
@@ -87,10 +99,20 @@ data class Monitor(
         }
         require(inputs.size <= MONITOR_MAX_INPUTS) { "Monitors can only have $MONITOR_MAX_INPUTS search input." }
         require(triggers.size <= MONITOR_MAX_TRIGGERS) { "Monitors can only support up to $MONITOR_MAX_TRIGGERS triggers." }
+        if (this.isBucketLevelMonitor()) {
+            inputs.forEach { input ->
+                require(input is SearchInput) { "Unsupported input [$input] for Monitor" }
+                // TODO: Keeping query validation simple for now, only term aggregations have full support for the "group by" on the
+                //  initial release. Should either add tests for other aggregation types or add validation to prevent using them.
+                require(input.query.aggregations() != null && !input.query.aggregations().aggregatorFactories.isEmpty()) {
+                    "At least one aggregation is required for the input [$input]"
+                }
+            }
+        }
     }
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput) : this(
+    constructor(sin: StreamInput): this(
         id = sin.readString(),
         version = sin.readLong(),
         name = sin.readString(),
@@ -98,14 +120,27 @@ data class Monitor(
         schedule = Schedule.readFrom(sin),
         lastUpdateTime = sin.readInstant(),
         enabledTime = sin.readOptionalInstant(),
+        monitorType = sin.readEnum(MonitorType::class.java),
         user = if (sin.readBoolean()) {
             User(sin)
         } else null,
         schemaVersion = sin.readInt(),
         inputs = sin.readList(::SearchInput),
-        triggers = sin.readList(::Trigger),
+        triggers = sin.readList((Trigger)::readFrom),
         uiMetadata = suppressWarning(sin.readMap())
     )
+
+    // This enum classifies different Monitors
+    // This is different from 'type' which denotes the Scheduled Job type
+    enum class MonitorType(val value: String) {
+        QUERY_LEVEL_MONITOR("query_level_monitor"),
+        BUCKET_LEVEL_MONITOR("bucket_level_monitor");
+
+        override fun toString(): String {
+            return value
+        }
+    }
+
     fun toXContent(builder: XContentBuilder): XContentBuilder {
         return toXContent(builder, ToXContent.EMPTY_PARAMS)
     }
@@ -121,6 +156,7 @@ data class Monitor(
         builder.field(TYPE_FIELD, type)
             .field(SCHEMA_VERSION_FIELD, schemaVersion)
             .field(NAME_FIELD, name)
+            .field(MONITOR_TYPE_FIELD, monitorType)
             .optionalUserField(USER_FIELD, user)
             .field(ENABLED_FIELD, enabled)
             .optionalTimeField(ENABLED_TIME_FIELD, enabledTime)
@@ -149,17 +185,25 @@ data class Monitor(
         schedule.writeTo(out)
         out.writeInstant(lastUpdateTime)
         out.writeOptionalInstant(enabledTime)
+        out.writeEnum(monitorType)
         out.writeBoolean(user != null)
         user?.writeTo(out)
         out.writeInt(schemaVersion)
         out.writeCollection(inputs)
-        out.writeCollection(triggers)
+        // Outputting type with each Trigger so that the generic Trigger.readFrom() can read it
+        out.writeVInt(triggers.size)
+        triggers.forEach {
+            if (it is QueryLevelTrigger) out.writeEnum(Trigger.Type.QUERY_LEVEL_TRIGGER)
+            else out.writeEnum(Trigger.Type.BUCKET_LEVEL_TRIGGER)
+            it.writeTo(out)
+        }
         out.writeMap(uiMetadata)
     }
 
     companion object {
         const val MONITOR_TYPE = "monitor"
         const val TYPE_FIELD = "type"
+        const val MONITOR_TYPE_FIELD = "monitor_type"
         const val SCHEMA_VERSION_FIELD = "schema_version"
         const val NAME_FIELD = "name"
         const val USER_FIELD = "user"
@@ -175,17 +219,17 @@ data class Monitor(
 
         // This is defined here instead of in ScheduledJob to avoid having the ScheduledJob class know about all
         // the different subclasses and creating circular dependencies
-        val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(
-            ScheduledJob::class.java,
+        val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(ScheduledJob::class.java,
             ParseField(MONITOR_TYPE),
-            CheckedFunction { parse(it) }
-        )
+            CheckedFunction { parse(it) })
 
         @JvmStatic
         @JvmOverloads
         @Throws(IOException::class)
         fun parse(xcp: XContentParser, id: String = NO_ID, version: Long = NO_VERSION): Monitor {
             lateinit var name: String
+            // Default to QUERY_LEVEL_MONITOR to cover Monitors that existed before the addition of MonitorType
+            var monitorType: String = MonitorType.QUERY_LEVEL_MONITOR.toString()
             var user: User? = null
             lateinit var schedule: Schedule
             var lastUpdateTime: Instant? = null
@@ -204,6 +248,13 @@ data class Monitor(
                 when (fieldName) {
                     SCHEMA_VERSION_FIELD -> schemaVersion = xcp.intValue()
                     NAME_FIELD -> name = xcp.text()
+                    MONITOR_TYPE_FIELD -> {
+                        monitorType = xcp.text()
+                        val allowedTypes = MonitorType.values().map { it.value }
+                        if (!allowedTypes.contains(monitorType)) {
+                            throw IllegalStateException("Monitor type should be one of $allowedTypes")
+                        }
+                    }
                     USER_FIELD -> user = if (xcp.currentToken() == Token.VALUE_NULL) null else User.parse(xcp)
                     ENABLED_FIELD -> enabled = xcp.booleanValue()
                     SCHEDULE_FIELD -> schedule = Schedule.parse(xcp)
@@ -233,20 +284,19 @@ data class Monitor(
             } else if (!enabled) {
                 enabledTime = null
             }
-            return Monitor(
-                id,
+            return Monitor(id,
                 version,
                 requireNotNull(name) { "Monitor name is null" },
                 enabled,
                 requireNotNull(schedule) { "Monitor schedule is null" },
                 lastUpdateTime ?: Instant.now(),
                 enabledTime,
+                MonitorType.valueOf(monitorType.toUpperCase(Locale.ROOT)),
                 user,
                 schemaVersion,
                 inputs.toList(),
                 triggers.toList(),
-                uiMetadata
-            )
+                uiMetadata)
         }
 
         @JvmStatic

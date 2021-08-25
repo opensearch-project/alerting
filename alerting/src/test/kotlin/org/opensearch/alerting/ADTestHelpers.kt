@@ -30,6 +30,7 @@ import org.opensearch.alerting.core.model.IntervalSchedule
 import org.opensearch.alerting.core.model.Schedule
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.Trigger
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.BoolQueryBuilder
@@ -490,12 +491,12 @@ fun maxAnomalyGradeSearchInput(
     return SearchInput(indices = listOf(adResultIndex), query = searchSourceBuilder)
 }
 
-fun adMonitorTrigger(): Trigger {
+fun adMonitorTrigger(): QueryLevelTrigger {
     val triggerScript = """
             return ctx.results[0].aggregations.max_anomaly_grade.value != null && 
                    ctx.results[0].aggregations.max_anomaly_grade.value > 0.7
     """.trimIndent()
-    return randomTrigger(condition = Script(triggerScript))
+    return randomQueryLevelTrigger(condition = Script(triggerScript))
 }
 
 fun adSearchInput(detectorId: String): SearchInput {
@@ -508,21 +509,17 @@ fun randomADMonitor(
     inputs: List<Input> = listOf(adSearchInput("test_detector_id")),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
     enabled: Boolean = OpenSearchTestCase.randomBoolean(),
-    triggers: List<Trigger> = (1..OpenSearchTestCase.randomInt(10)).map { randomTrigger() },
+    triggers: List<Trigger> = (1..OpenSearchTestCase.randomInt(10)).map { randomQueryLevelTrigger() },
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     withMetadata: Boolean = false
 ): Monitor {
-    return Monitor(
-        name = name, enabled = enabled, inputs = inputs, schedule = schedule, triggers = triggers,
-        enabledTime = enabledTime, lastUpdateTime = lastUpdateTime,
-        user = user, uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
-    )
+    return Monitor(name = name, monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
+        schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime,
+        user = user, uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf())
 }
 
 fun randomADUser(backendRole: String = OpenSearchRestTestCase.randomAlphaOfLength(10)): User {
-    return User(
-        OpenSearchRestTestCase.randomAlphaOfLength(10), listOf(backendRole),
-        listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), "all_access"), listOf("test_attr=test")
-    )
+    return User(OpenSearchRestTestCase.randomAlphaOfLength(10), listOf(backendRole),
+        listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), "all_access"), listOf("test_attr=test"))
 }

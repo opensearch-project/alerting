@@ -34,8 +34,8 @@ import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.NEVER_RUN
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.makeRequest
-import org.opensearch.alerting.randomMonitor
-import org.opensearch.alerting.randomTrigger
+import org.opensearch.alerting.randomQueryLevelMonitor
+import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent.jsonXContent
@@ -44,7 +44,7 @@ import org.opensearch.rest.RestStatus
 class AlertIndicesIT : AlertingRestTestCase() {
 
     fun `test create alert index`() {
-        executeMonitor(randomMonitor(triggers = listOf(randomTrigger(condition = ALWAYS_RUN))))
+        executeMonitor(randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN))))
 
         assertIndexExists(AlertIndices.ALERT_INDEX)
         assertIndexExists(AlertIndices.HISTORY_WRITE_INDEX)
@@ -57,7 +57,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
 
         putAlertMappings(
             AlertIndices.alertMapping().trimStart('{').trimEnd('}')
-                .replace("\"schema_version\": 2", "\"schema_version\": 0")
+                .replace("\"schema_version\": 3", "\"schema_version\": 0")
         )
         assertIndexExists(AlertIndices.ALERT_INDEX)
         assertIndexExists(AlertIndices.HISTORY_WRITE_INDEX)
@@ -67,15 +67,15 @@ class AlertIndicesIT : AlertingRestTestCase() {
         executeMonitor(createRandomMonitor())
         assertIndexExists(AlertIndices.ALERT_INDEX)
         assertIndexExists(AlertIndices.HISTORY_WRITE_INDEX)
-        verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 3)
-        verifyIndexSchemaVersion(AlertIndices.ALERT_INDEX, 2)
-        verifyIndexSchemaVersion(AlertIndices.HISTORY_WRITE_INDEX, 2)
+        verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 4)
+        verifyIndexSchemaVersion(AlertIndices.ALERT_INDEX, 3)
+        verifyIndexSchemaVersion(AlertIndices.HISTORY_WRITE_INDEX, 3)
     }
 
     fun `test alert index gets recreated automatically if deleted`() {
         wipeAllODFEIndices()
         assertIndexDoesNotExist(AlertIndices.ALERT_INDEX)
-        val trueMonitor = randomMonitor(triggers = listOf(randomTrigger(condition = ALWAYS_RUN)))
+        val trueMonitor = randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN)))
 
         executeMonitor(trueMonitor)
         assertIndexExists(AlertIndices.ALERT_INDEX)
@@ -95,7 +95,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         client().updateSettings(AlertingSettings.ALERT_HISTORY_ROLLOVER_PERIOD.key, "1s")
         client().updateSettings(AlertingSettings.ALERT_HISTORY_INDEX_MAX_AGE.key, "1s")
 
-        val trueMonitor = randomMonitor(triggers = listOf(randomTrigger(condition = ALWAYS_RUN)))
+        val trueMonitor = randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN)))
         executeMonitor(trueMonitor)
 
         // Allow for a rollover index.
@@ -106,8 +106,8 @@ class AlertIndicesIT : AlertingRestTestCase() {
     fun `test history disabled`() {
         resetHistorySettings()
 
-        val trigger1 = randomTrigger(condition = ALWAYS_RUN)
-        val monitor1 = createMonitor(randomMonitor(triggers = listOf(trigger1)))
+        val trigger1 = randomQueryLevelTrigger(condition = ALWAYS_RUN)
+        val monitor1 = createMonitor(randomQueryLevelMonitor(triggers = listOf(trigger1)))
         executeMonitor(monitor1.id)
 
         // Check if alert is active
@@ -126,8 +126,8 @@ class AlertIndicesIT : AlertingRestTestCase() {
         // Disable alert history
         client().updateSettings(AlertingSettings.ALERT_HISTORY_ENABLED.key, "false")
 
-        val trigger2 = randomTrigger(condition = ALWAYS_RUN)
-        val monitor2 = createMonitor(randomMonitor(triggers = listOf(trigger2)))
+        val trigger2 = randomQueryLevelTrigger(condition = ALWAYS_RUN)
+        val monitor2 = createMonitor(randomQueryLevelMonitor(triggers = listOf(trigger2)))
         executeMonitor(monitor2.id)
 
         // Check if second alert is active
@@ -151,8 +151,8 @@ class AlertIndicesIT : AlertingRestTestCase() {
         resetHistorySettings()
 
         // Create monitor and execute
-        val trigger = randomTrigger(condition = ALWAYS_RUN)
-        val monitor = createMonitor(randomMonitor(triggers = listOf(trigger)))
+        val trigger = randomQueryLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomQueryLevelMonitor(triggers = listOf(trigger)))
         executeMonitor(monitor.id)
 
         // Check if alert is active and alert index is created
@@ -179,7 +179,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         client().updateSettings(AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD.key, "1s")
 
         // Give some time for history to be rolled over and cleared
-        Thread.sleep(2000)
+        Thread.sleep(5000)
 
         // Given the max_docs and retention settings above, the history index will rollover and the non-write index will be deleted.
         // This leaves two indices: alert index and an empty history write index

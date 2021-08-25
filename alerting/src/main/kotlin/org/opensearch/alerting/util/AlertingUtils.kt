@@ -31,6 +31,7 @@ import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
 import org.opensearch.alerting.destination.message.BaseMessage
 import org.opensearch.alerting.model.AggregationResultBucket
+import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.action.ActionExecutionScope
 import org.opensearch.alerting.model.destination.Destination
@@ -142,6 +143,8 @@ fun <T : Any> checkUserFilterByPermissions(
     }
     return true
 }
+
+fun Monitor.isBucketLevelMonitor(): Boolean = this.monitorType == Monitor.MonitorType.BUCKET_LEVEL_MONITOR
 
 /**
  * Since buckets can have multi-value keys, this converts the bucket key values to a string that can be used
