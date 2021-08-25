@@ -171,7 +171,7 @@ data class QueryLevelTrigger(
             return QueryLevelTrigger(
                 name = requireNotNull(name) { "Trigger name is null" },
                 severity = requireNotNull(severity) { "Trigger severity is null" },
-                condition = requireNotNull(condition) { "Trigger is null" },
+                condition = requireNotNull(condition) { "Trigger condition is null" },
                 actions = requireNotNull(actions) { "Trigger actions are null" },
                 id = requireNotNull(id) { "Trigger id is null." })
         }
