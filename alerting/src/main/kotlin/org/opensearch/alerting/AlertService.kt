@@ -60,6 +60,10 @@ class AlertService(
     val alertIndices: AlertIndices
 ) {
 
+    companion object {
+        const val MAX_BUCKET_LEVEL_MONITOR_ALERT_SEARCH_COUNT = 500
+    }
+
     private val logger = LogManager.getLogger(AlertService::class.java)
 
     suspend fun loadCurrentAlertsForQueryLevelMonitor(monitor: Monitor): Map<Trigger, Alert?> {
@@ -84,7 +88,8 @@ class AlertService(
     suspend fun loadCurrentAlertsForBucketLevelMonitor(monitor: Monitor): Map<Trigger, MutableMap<String, Alert>> {
         val searchAlertsResponse: SearchResponse = searchAlerts(
             monitorId = monitor.id,
-            size = 500 // TODO: This should be a constant and limited based on the circuit breaker that limits Alerts
+            // TODO: This should be limited based on a circuit breaker that limits Alerts
+            size = MAX_BUCKET_LEVEL_MONITOR_ALERT_SEARCH_COUNT
         )
 
         val foundAlerts = searchAlertsResponse.hits.map { Alert.parse(contentParser(it.sourceRef), it.id, it.version) }
