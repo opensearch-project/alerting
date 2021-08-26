@@ -25,7 +25,6 @@ import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.util.getBucketKeysHash
-import org.opensearch.client.Client
 import org.opensearch.script.ScriptService
 import org.opensearch.search.aggregations.Aggregation
 import org.opensearch.search.aggregations.Aggregations
@@ -33,7 +32,7 @@ import org.opensearch.search.aggregations.support.AggregationPath
 import java.lang.IllegalArgumentException
 
 /** Service that handles executing Triggers */
-class TriggerService(val client: Client, val scriptService: ScriptService) {
+class TriggerService(val scriptService: ScriptService) {
 
     private val logger = LogManager.getLogger(TriggerService::class.java)
 
@@ -99,6 +98,8 @@ class TriggerService(val client: Client, val scriptService: ScriptService) {
         val keyValuesList = mutableListOf<String>()
         when {
             bucket[keyField] is String -> keyValuesList.add(bucket[keyField] as String)
+            // In the case where the key field is an object with multiple values (such as a composite aggregation with more than one source)
+            // the values will be iterated through and converted into a string
             bucket[keyField] is Map<*, *> -> (bucket[keyField] as Map<String, Any>).values.map { keyValuesList.add(it as String) }
             else -> throw IllegalArgumentException("Unexpected format for key in bucket [$bucket]")
         }
