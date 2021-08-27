@@ -358,7 +358,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
         // Queries that use period_start/end should expect these values to always be formatted as 'epoch_millis'. Either
         // the query should specify the format (like below) or the mapping for the index/field being queried should allow
-        // epoch_millis as an alternative (ES's default mapping for date fields "strict_date_optional_time||epoch_millis")
+        // epoch_millis as an alternative (OpenSearch's default mapping for date fields "strict_date_optional_time||epoch_millis")
         val query = QueryBuilders.rangeQuery("test_strict_date_time")
             .gt("{{period_end}}||-10d")
             .lte("{{period_end}}")
