@@ -1,5 +1,5 @@
 /*
- *   Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *   Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License").
  *   You may not use this file except in compliance with the License.
@@ -61,21 +61,15 @@ class RestImportMonitorAction : BaseRestHandler() {
         // Create list of Monitor objects
         var monitors = mutableListOf<Monitor>()
 
-        // Validate request by parsing JSON to Monitor
+        // Validate request by parsing JSON to list of Monitor objects
         val xcp = request.contentParser()
         ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
-        while (xcp.nextToken() != Token.END_OBJECT) {
-            val fieldName = xcp.currentName()
-
-            if (fieldName == "monitors") {
-                ensureExpectedToken(Token.START_ARRAY, xcp.currentToken(), xcp)
-                while (xcp.nextToken() != Token.END_ARRAY) {
-                    monitors.add(Monitor.parse(xcp).copy(lastUpdateTime = Instant.now()))
-                }
-            } else {
-                xcp.skipChildren()
-            }
+        ensureExpectedToken(Token.FIELD_NAME, xcp.nextToken(), xcp)
+        ensureExpectedToken(Token.START_ARRAY, xcp.nextToken(), xcp)
+        while (xcp.nextToken() != Token.END_ARRAY) {
+            monitors.add(Monitor.parse(xcp).copy(lastUpdateTime = Instant.now()))
         }
+        ensureExpectedToken(Token.END_OBJECT, xcp.nextToken(), xcp)
 
         val importMonitorRequest = ImportMonitorRequest(monitors)
 
@@ -90,7 +84,7 @@ class RestImportMonitorAction : BaseRestHandler() {
             @Throws(Exception::class)
             override fun buildResponse(response: ImportMonitorResponse): RestResponse {
                 val restResponse = BytesRestResponse(RestStatus.CREATED, response.toXContent(channel.newBuilder(), ToXContent.EMPTY_PARAMS))
-                val location = "${AlertingPlugin.MONITOR_BASE_URI}/import/"
+                val location = "${AlertingPlugin.MONITOR_BASE_URI}/import"
                 restResponse.addHeader("Location", location)
                 return restResponse
             }
