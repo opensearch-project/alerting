@@ -11,11 +11,12 @@
 
 package org.opensearch.alerting.util
 
+import org.junit.Assert
+import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.Trigger
 import org.opensearch.alerting.randomBucketLevelTrigger
 import org.opensearch.alerting.randomQueryLevelTrigger
-import org.opensearch.action.search.SearchResponse
 import org.opensearch.cluster.ClusterModule
 import org.opensearch.common.CheckedFunction
 import org.opensearch.common.ParseField
@@ -30,7 +31,6 @@ import org.opensearch.search.aggregations.bucket.composite.TermsValuesSourceBuil
 import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase
-import org.junit.Assert
 import java.io.IOException
 
 class AggregationQueryRewriterTests : OpenSearchTestCase() {

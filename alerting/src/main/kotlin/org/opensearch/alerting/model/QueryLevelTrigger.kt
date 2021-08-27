@@ -44,7 +44,7 @@ data class QueryLevelTrigger(
 ) : Trigger {
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         sin.readString(), // id
         sin.readString(), // name
         sin.readString(), // severity
@@ -73,8 +73,10 @@ data class QueryLevelTrigger(
 
     /** Returns a representation of the trigger suitable for passing into painless and mustache scripts. */
     fun asTemplateArg(): Map<String, Any> {
-        return mapOf(ID_FIELD to id, NAME_FIELD to name, SEVERITY_FIELD to severity,
-            ACTIONS_FIELD to actions.map { it.asTemplateArg() })
+        return mapOf(
+            ID_FIELD to id, NAME_FIELD to name, SEVERITY_FIELD to severity,
+            ACTIONS_FIELD to actions.map { it.asTemplateArg() }
+        )
     }
 
     @Throws(IOException::class)
@@ -91,8 +93,10 @@ data class QueryLevelTrigger(
         const val CONDITION_FIELD = "condition"
         const val SCRIPT_FIELD = "script"
 
-        val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(Trigger::class.java, ParseField(QUERY_LEVEL_TRIGGER_FIELD),
-            CheckedFunction { parseInner(it) })
+        val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(
+            Trigger::class.java, ParseField(QUERY_LEVEL_TRIGGER_FIELD),
+            CheckedFunction { parseInner(it) }
+        )
 
         /**
          * This parse method needs to account for both the old and new Trigger format.
@@ -173,7 +177,8 @@ data class QueryLevelTrigger(
                 severity = requireNotNull(severity) { "Trigger severity is null" },
                 condition = requireNotNull(condition) { "Trigger condition is null" },
                 actions = requireNotNull(actions) { "Trigger actions are null" },
-                id = requireNotNull(id) { "Trigger id is null." })
+                id = requireNotNull(id) { "Trigger id is null." }
+            )
         }
 
         @JvmStatic

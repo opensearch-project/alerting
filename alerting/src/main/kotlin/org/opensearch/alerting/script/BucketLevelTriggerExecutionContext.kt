@@ -11,9 +11,9 @@
 
 package org.opensearch.alerting.script
 
+import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
-import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorRunResult
 import java.time.Instant
@@ -37,8 +37,10 @@ data class BucketLevelTriggerExecutionContext(
         dedupedAlerts: List<Alert> = listOf(),
         newAlerts: List<Alert> = listOf(),
         completedAlerts: List<Alert> = listOf()
-    ) : this(monitor, trigger, monitorRunResult.inputResults.results, monitorRunResult.periodStart, monitorRunResult.periodEnd,
-        dedupedAlerts, newAlerts, completedAlerts, monitorRunResult.scriptContextError(trigger))
+    ) : this(
+        monitor, trigger, monitorRunResult.inputResults.results, monitorRunResult.periodStart, monitorRunResult.periodEnd,
+        dedupedAlerts, newAlerts, completedAlerts, monitorRunResult.scriptContextError(trigger)
+    )
 
     /**
      * Mustache templates need special permissions to reflectively introspect field names. To avoid doing this we

@@ -40,7 +40,6 @@ import org.opensearch.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
 import org.opensearch.alerting.util._ID
 import org.opensearch.alerting.util._VERSION
 import org.opensearch.alerting.util.isBucketLevelMonitor
-import org.opensearch.commons.authuser.User
 import org.opensearch.common.CheckedFunction
 import org.opensearch.common.ParseField
 import org.opensearch.common.io.stream.StreamInput
@@ -51,6 +50,7 @@ import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParser.Token
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
+import org.opensearch.commons.authuser.User
 import java.io.IOException
 import java.time.Instant
 import java.util.Locale
@@ -112,7 +112,7 @@ data class Monitor(
     }
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         id = sin.readString(),
         version = sin.readLong(),
         name = sin.readString(),
@@ -219,9 +219,11 @@ data class Monitor(
 
         // This is defined here instead of in ScheduledJob to avoid having the ScheduledJob class know about all
         // the different subclasses and creating circular dependencies
-        val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(ScheduledJob::class.java,
+        val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(
+            ScheduledJob::class.java,
             ParseField(MONITOR_TYPE),
-            CheckedFunction { parse(it) })
+            CheckedFunction { parse(it) }
+        )
 
         @JvmStatic
         @JvmOverloads
@@ -284,7 +286,8 @@ data class Monitor(
             } else if (!enabled) {
                 enabledTime = null
             }
-            return Monitor(id,
+            return Monitor(
+                id,
                 version,
                 requireNotNull(name) { "Monitor name is null" },
                 enabled,
@@ -296,7 +299,8 @@ data class Monitor(
                 schemaVersion,
                 inputs.toList(),
                 triggers.toList(),
-                uiMetadata)
+                uiMetadata
+            )
         }
 
         @JvmStatic

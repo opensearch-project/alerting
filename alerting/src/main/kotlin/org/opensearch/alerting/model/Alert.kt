@@ -31,7 +31,6 @@ import org.opensearch.alerting.elasticapi.instant
 import org.opensearch.alerting.elasticapi.optionalTimeField
 import org.opensearch.alerting.elasticapi.optionalUserField
 import org.opensearch.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
-import org.opensearch.commons.authuser.User
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.io.stream.Writeable
@@ -40,6 +39,7 @@ import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
+import org.opensearch.commons.authuser.User
 import java.io.IOException
 import java.time.Instant
 
@@ -81,11 +81,13 @@ data class Alert(
         errorHistory: List<AlertError> = mutableListOf(),
         actionExecutionResults: List<ActionExecutionResult> = mutableListOf(),
         schemaVersion: Int = NO_SCHEMA_VERSION
-    ) : this(monitorId = monitor.id, monitorName = monitor.name, monitorVersion = monitor.version, monitorUser = monitor.user,
+    ) : this(
+        monitorId = monitor.id, monitorName = monitor.name, monitorVersion = monitor.version, monitorUser = monitor.user,
         triggerId = trigger.id, triggerName = trigger.name, state = state, startTime = startTime,
         lastNotificationTime = lastNotificationTime, errorMessage = errorMessage, errorHistory = errorHistory,
         severity = trigger.severity, actionExecutionResults = actionExecutionResults, schemaVersion = schemaVersion,
-        aggregationResultBucket = null)
+        aggregationResultBucket = null
+    )
 
     constructor(
         monitor: Monitor,
@@ -97,11 +99,13 @@ data class Alert(
         errorHistory: List<AlertError> = mutableListOf(),
         actionExecutionResults: List<ActionExecutionResult> = mutableListOf(),
         schemaVersion: Int = NO_SCHEMA_VERSION
-    ) : this(monitorId = monitor.id, monitorName = monitor.name, monitorVersion = monitor.version, monitorUser = monitor.user,
+    ) : this(
+        monitorId = monitor.id, monitorName = monitor.name, monitorVersion = monitor.version, monitorUser = monitor.user,
         triggerId = trigger.id, triggerName = trigger.name, state = state, startTime = startTime,
         lastNotificationTime = lastNotificationTime, errorMessage = errorMessage, errorHistory = errorHistory,
         severity = trigger.severity, actionExecutionResults = actionExecutionResults, schemaVersion = schemaVersion,
-        aggregationResultBucket = null)
+        aggregationResultBucket = null
+    )
 
     constructor(
         monitor: Monitor,
@@ -114,11 +118,13 @@ data class Alert(
         actionExecutionResults: List<ActionExecutionResult> = mutableListOf(),
         schemaVersion: Int = NO_SCHEMA_VERSION,
         aggregationResultBucket: AggregationResultBucket
-    ) : this(monitorId = monitor.id, monitorName = monitor.name, monitorVersion = monitor.version, monitorUser = monitor.user,
+    ) : this(
+        monitorId = monitor.id, monitorName = monitor.name, monitorVersion = monitor.version, monitorUser = monitor.user,
         triggerId = trigger.id, triggerName = trigger.name, state = state, startTime = startTime,
         lastNotificationTime = lastNotificationTime, errorMessage = errorMessage, errorHistory = errorHistory,
         severity = trigger.severity, actionExecutionResults = actionExecutionResults, schemaVersion = schemaVersion,
-        aggregationResultBucket = aggregationResultBucket)
+        aggregationResultBucket = aggregationResultBucket
+    )
 
     enum class State {
         ACTIVE, ACKNOWLEDGED, COMPLETED, ERROR, DELETED
@@ -272,13 +278,15 @@ data class Alert(
                 }
             }
 
-            return Alert(id = id, version = version, schemaVersion = schemaVersion, monitorId = requireNotNull(monitorId),
+            return Alert(
+                id = id, version = version, schemaVersion = schemaVersion, monitorId = requireNotNull(monitorId),
                 monitorName = requireNotNull(monitorName), monitorVersion = monitorVersion, monitorUser = monitorUser,
                 triggerId = requireNotNull(triggerId), triggerName = requireNotNull(triggerName),
                 state = requireNotNull(state), startTime = requireNotNull(startTime), endTime = endTime,
                 lastNotificationTime = lastNotificationTime, acknowledgedTime = acknowledgedTime,
                 errorMessage = errorMessage, errorHistory = errorHistory, severity = severity,
-                actionExecutionResults = actionExecutionResults, aggregationResultBucket = aggAlertBucket)
+                actionExecutionResults = actionExecutionResults, aggregationResultBucket = aggAlertBucket
+            )
         }
 
         @JvmStatic

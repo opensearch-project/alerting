@@ -67,10 +67,12 @@ data class AggregationResultBucket(
             ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.currentToken(), xcp)
 
             if (CONFIG_NAME != xcp.currentName()) {
-                throw ParsingException(xcp.tokenLocation,
+                throw ParsingException(
+                    xcp.tokenLocation,
                     String.format(
                         Locale.ROOT, "Failed to parse object: expecting token with name [%s] but found [%s]",
-                        CONFIG_NAME, xcp.currentName())
+                        CONFIG_NAME, xcp.currentName()
+                    )
                 )
             }
             while (xcp.nextToken() != Token.END_OBJECT) {

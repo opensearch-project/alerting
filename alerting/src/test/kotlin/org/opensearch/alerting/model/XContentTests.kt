@@ -45,8 +45,8 @@ import org.opensearch.alerting.randomEmailAccount
 import org.opensearch.alerting.randomEmailGroup
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelMonitorWithoutUser
-import org.opensearch.alerting.randomThrottle
 import org.opensearch.alerting.randomQueryLevelTrigger
+import org.opensearch.alerting.randomThrottle
 import org.opensearch.alerting.randomUser
 import org.opensearch.alerting.randomUserEmpty
 import org.opensearch.alerting.toJsonString
@@ -84,7 +84,8 @@ class XContentTests : OpenSearchTestCase() {
         val action = randomAction().copy(throttle = null).copy(throttleEnabled = true)
         val actionString = action.toXContent(builder(), ToXContent.EMPTY_PARAMS).string()
         assertFailsWith<IllegalArgumentException>("Action throttle enabled but not set throttle value") {
-            Action.parse(parser(actionString)) }
+            Action.parse(parser(actionString))
+        }
     }
 
     fun `test throttle parsing`() {

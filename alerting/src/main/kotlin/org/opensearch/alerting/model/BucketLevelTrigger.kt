@@ -43,7 +43,7 @@ data class BucketLevelTrigger(
 ) : Trigger {
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         sin.readString(), // id
         sin.readString(), // name
         sin.readString(), // severity
@@ -98,8 +98,10 @@ data class BucketLevelTrigger(
         const val CONDITION_FIELD = "condition"
         const val PARENT_BUCKET_PATH = "parentBucketPath"
 
-        val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(Trigger::class.java, ParseField(BUCKET_LEVEL_TRIGGER_FIELD),
-            CheckedFunction { parseInner(it) })
+        val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(
+            Trigger::class.java, ParseField(BUCKET_LEVEL_TRIGGER_FIELD),
+            CheckedFunction { parseInner(it) }
+        )
 
         @JvmStatic
         @Throws(IOException::class)
@@ -140,7 +142,8 @@ data class BucketLevelTrigger(
                 name = requireNotNull(name) { "Trigger name is null" },
                 severity = requireNotNull(severity) { "Trigger severity is null" },
                 bucketSelector = requireNotNull(bucketSelector) { "Trigger condition is null" },
-                actions = requireNotNull(actions) { "Trigger actions are null" })
+                actions = requireNotNull(actions) { "Trigger actions are null" }
+            )
         }
 
         @JvmStatic
