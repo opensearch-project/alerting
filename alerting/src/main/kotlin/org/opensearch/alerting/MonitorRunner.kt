@@ -320,6 +320,8 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         return monitorResult.copy(triggerResults = triggerResults)
     }
 
+    // TODO: This method has grown very large with all the business logic that has been added.
+    //  Revisit this during refactoring and break it down to be more manageable.
     suspend fun runBucketLevelMonitor(
         monitor: Monitor,
         periodStart: Instant,
