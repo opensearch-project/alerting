@@ -27,6 +27,7 @@
 package org.opensearch.alerting
 
 import org.junit.Assert
+import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.alerting.alerts.AlertError
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.model.IntervalSchedule
@@ -38,6 +39,8 @@ import org.opensearch.alerting.model.Alert.State.ACTIVE
 import org.opensearch.alerting.model.Alert.State.COMPLETED
 import org.opensearch.alerting.model.Alert.State.ERROR
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.action.ActionExecutionPolicy
+import org.opensearch.alerting.model.action.PerExecutionActionScope
 import org.opensearch.alerting.model.action.Throttle
 import org.opensearch.alerting.model.destination.CustomWebhook
 import org.opensearch.alerting.model.destination.Destination
@@ -51,6 +54,8 @@ import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
+import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
+import org.opensearch.search.aggregations.bucket.composite.TermsValuesSourceBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.net.URLEncoder
 import java.time.Instant
@@ -66,7 +71,9 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
     fun `test execute monitor with dryrun`() {
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
-        val monitor = randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))))
+        val monitor = randomQueryLevelMonitor(
+            triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
+        )
 
         val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
 
@@ -132,7 +139,9 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
     fun `test active alert is updated on each run`() {
         val monitor = createMonitor(
-            randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, destinationId = createDestination().id)))
+            randomQueryLevelMonitor(
+                triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, destinationId = createDestination().id))
+            )
         )
 
         executeMonitor(monitor.id)
@@ -231,7 +240,9 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
     fun `test acknowledged alert is not updated unnecessarily`() {
         val monitor = createMonitor(
-            randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, destinationId = createDestination().id)))
+            randomQueryLevelMonitor(
+                triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, destinationId = createDestination().id))
+            )
         )
         executeMonitor(monitor.id)
         acknowledgeAlerts(monitor, searchAlerts(monitor).single())
@@ -286,7 +297,9 @@ class MonitorRunnerIT : AlertingRestTestCase() {
     fun `test execute action template error`() {
         // Intentional syntax error in mustache template
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name"))
-        val monitor = randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))))
+        val monitor = randomQueryLevelMonitor(
+            triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
+        )
 
         val response = executeMonitor(monitor)
 
@@ -413,14 +426,19 @@ class MonitorRunnerIT : AlertingRestTestCase() {
     }
 
     fun `test monitor with one bad action and one good action`() {
-        val goodAction = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
+        val goodAction = randomAction(
+            template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+            destinationId = createDestination().id
+        )
         val syntaxErrorAction = randomAction(
             name = "bad syntax",
             template = randomTemplateScript("{{foo"),
             destinationId = createDestination().id
         )
         val actions = listOf(goodAction, syntaxErrorAction)
-        val monitor = createMonitor(randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = actions))))
+        val monitor = createMonitor(
+            randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = actions)))
+        )
 
         val output = entityAsMap(executeMonitor(monitor.id))
 
@@ -612,7 +630,9 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         putAlertMappings()
 
         val newMonitor = createMonitor(
-            randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger(condition = NEVER_RUN, actions = listOf(randomAction()))))
+            randomQueryLevelMonitor(
+                triggers = listOf(randomQueryLevelTrigger(condition = NEVER_RUN, actions = listOf(randomAction())))
+            )
         )
         val deleteNewMonitorResponse = client().makeRequest("DELETE", "$ALERTING_BASE_URI/${newMonitor.id}")
 
@@ -751,7 +771,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         )
     }
 
-    fun `test execute monitor with email destination creates alerts in error state`() {
+    fun `test execute monitor with email destination creates alert in error state`() {
         putAlertMappings() // Required as we do not have a create alert API.
 
         val emailAccount = createRandomEmailAccount()
@@ -815,33 +835,30 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
     fun `test execute monitor with custom webhook destination and denied host`() {
 
-        // TODO: change to REST API call to test security enabled case
-        if (!securityEnabled()) {
-            listOf("http://10.1.1.1", "127.0.0.1").forEach {
-                val customWebhook = CustomWebhook(it, null, null, 80, null, "PUT", emptyMap(), emptyMap(), null, null)
-                val destination = createDestination(
-                    Destination(
-                        type = DestinationType.CUSTOM_WEBHOOK,
-                        name = "testDesination",
-                        user = randomUser(),
-                        lastUpdateTime = Instant.now(),
-                        chime = null,
-                        slack = null,
-                        customWebhook = customWebhook,
-                        email = null
-                    )
+        listOf("http://10.1.1.1", "127.0.0.1").forEach {
+            val customWebhook = CustomWebhook(it, null, null, 80, null, "PUT", emptyMap(), emptyMap(), null, null)
+            val destination = createDestination(
+                Destination(
+                    type = DestinationType.CUSTOM_WEBHOOK,
+                    name = "testDesination",
+                    user = randomUser(),
+                    lastUpdateTime = Instant.now(),
+                    chime = null,
+                    slack = null,
+                    customWebhook = customWebhook,
+                    email = null
                 )
-                val action = randomAction(destinationId = destination.id)
-                val trigger = randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))
-                val monitor = createMonitor(randomQueryLevelMonitor(triggers = listOf(trigger)))
-                executeMonitor(adminClient(), monitor.id)
+            )
+            val action = randomAction(destinationId = destination.id)
+            val trigger = randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))
+            val monitor = createMonitor(randomQueryLevelMonitor(triggers = listOf(trigger)))
+            executeMonitor(adminClient(), monitor.id)
 
-                val alerts = searchAlerts(monitor)
-                assertEquals("Alert not saved", 1, alerts.size)
-                verifyAlert(alerts.single(), monitor, ERROR)
+            val alerts = searchAlerts(monitor)
+            assertEquals("Alert not saved", 1, alerts.size)
+            verifyAlert(alerts.single(), monitor, ERROR)
 
-                Assert.assertTrue(alerts.single().errorMessage?.contains("The destination address is invalid") as Boolean)
-            }
+            Assert.assertTrue(alerts.single().errorMessage?.contains("The destination address is invalid") as Boolean)
         }
     }
 
@@ -951,6 +968,269 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             @Suppress("UNCHECKED_CAST")
             val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
             assertEquals("Incorrect search result", 0, total["value"])
+        }
+    }
+
+    // TODO: The composite aggregation will paginate through all results during the Bucket-Level Monitor run.
+    //  The last page (when after_key is null) is empty if all the contents fit on the previous page, meaning the
+    //  input results returned by the monitor execution is empty.
+    //  Skipping this test for now until this is resolved to show a non-empty result.
+    fun `skip test execute bucket-level monitor returns search result`() {
+        val testIndex = createTestIndex()
+        insertSampleTimeSerializedData(
+            testIndex,
+            listOf(
+                "test_value_1",
+                "test_value_1", // adding duplicate to verify aggregation
+                "test_value_2"
+            )
+        )
+
+        val query = QueryBuilders.rangeQuery("test_strict_date_time")
+            .gt("{{period_end}}||-10d")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
+        val compositeSources = listOf(
+            TermsValuesSourceBuilder("test_field").field("test_field")
+        )
+        val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
+        val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
+        val triggerScript = """
+            params.docCount > 0
+        """.trimIndent()
+
+        var trigger = randomBucketLevelTrigger()
+        trigger = trigger.copy(
+            bucketSelector = BucketSelectorExtAggregationBuilder(
+                name = trigger.id,
+                bucketsPathsMap = mapOf("docCount" to "_count"),
+                script = Script(triggerScript),
+                parentBucketPath = "composite_agg",
+                filter = null
+            )
+        )
+        val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
+        val response = executeMonitor(monitor.id, params = DRYRUN_MONITOR)
+        val output = entityAsMap(response)
+        // print("Output is: $output")
+
+        assertEquals(monitor.name, output["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        val buckets = searchResult.stringMap("aggregations")?.stringMap("composite_agg")?.get("buckets") as List<Map<String, Any>>
+        assertEquals("Incorrect search result", 2, buckets.size)
+    }
+
+    fun `test bucket-level monitor alert creation and completion`() {
+        val testIndex = createTestIndex()
+        insertSampleTimeSerializedData(
+            testIndex,
+            listOf(
+                "test_value_1",
+                "test_value_1", // adding duplicate to verify aggregation
+                "test_value_2"
+            )
+        )
+
+        val query = QueryBuilders.rangeQuery("test_strict_date_time")
+            .gt("{{period_end}}||-10d")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
+        val compositeSources = listOf(
+            TermsValuesSourceBuilder("test_field").field("test_field")
+        )
+        val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
+        val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
+        val triggerScript = """
+            params.docCount > 0
+        """.trimIndent()
+
+        var trigger = randomBucketLevelTrigger()
+        trigger = trigger.copy(
+            bucketSelector = BucketSelectorExtAggregationBuilder(
+                name = trigger.id,
+                bucketsPathsMap = mapOf("docCount" to "_count"),
+                script = Script(triggerScript),
+                parentBucketPath = "composite_agg",
+                filter = null
+            )
+        )
+        val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
+        executeMonitor(monitor.id, params = DRYRUN_MONITOR)
+
+        // Check created alerts
+        var alerts = searchAlerts(monitor)
+        assertEquals("Alerts not saved", 2, alerts.size)
+        alerts.forEach {
+            verifyAlert(it, monitor, ACTIVE)
+        }
+
+        // Delete documents of a particular value
+        deleteDataWithDocIds(
+            testIndex,
+            listOf(
+                "1", // test_value_1
+                "2" // test_value_1
+            )
+        )
+
+        // Execute monitor again
+        executeMonitor(monitor.id, params = DRYRUN_MONITOR)
+
+        // Verify expected alert was completed
+        alerts = searchAlerts(monitor, AlertIndices.ALL_INDEX_PATTERN)
+        val activeAlerts = alerts.filter { it.state == ACTIVE }
+        val completedAlerts = alerts.filter { it.state == COMPLETED }
+        assertEquals("Incorrect number of active alerts", 1, activeAlerts.size)
+        assertEquals("Incorrect number of completed alerts", 1, completedAlerts.size)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun `test bucket-level monitor with one good action and one bad action`() {
+        val testIndex = createTestIndex()
+        insertSampleTimeSerializedData(
+            testIndex,
+            listOf(
+                "test_value_1",
+                "test_value_1",
+                "test_value_3",
+                "test_value_2",
+                "test_value_2"
+            )
+        )
+
+        val query = QueryBuilders.rangeQuery("test_strict_date_time")
+            .gt("{{period_end}}||-10d")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
+        val compositeSources = listOf(
+            TermsValuesSourceBuilder("test_field").field("test_field")
+        )
+        val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
+        val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
+        // Trigger script should only create Alerts for 'test_value_1' and 'test_value_2'
+        val triggerScript = """
+            params.docCount > 1
+        """.trimIndent()
+
+        val goodAction = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
+        val syntaxErrorAction = randomAction(
+            name = "bad syntax",
+            template = randomTemplateScript("{{foo"),
+            destinationId = createDestination().id
+        )
+        val actions = listOf(goodAction, syntaxErrorAction)
+
+        var trigger = randomBucketLevelTrigger(actions = actions)
+        trigger = trigger.copy(
+            bucketSelector = BucketSelectorExtAggregationBuilder(
+                name = trigger.id,
+                bucketsPathsMap = mapOf("docCount" to "_count"),
+                script = Script(triggerScript),
+                parentBucketPath = "composite_agg",
+                filter = null
+            )
+        )
+        val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
+
+        val output = entityAsMap(executeMonitor(monitor.id))
+        // The 'events' in this case are the bucketKeys hashes representing the Alert events
+        val expectedEvents = setOf("test_value_1", "test_value_2")
+
+        assertEquals(monitor.name, output["monitor_name"])
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            for (alertEvent in triggerResult.objectMap("action_results")) {
+                assertTrue(expectedEvents.contains(alertEvent.key))
+                val actionResults = alertEvent.value.values as Collection<Map<String, Any>>
+                for (actionResult in actionResults) {
+                    val actionOutput = actionResult["output"] as Map<String, String>
+                    if (actionResult["name"] == goodAction.name) {
+                        assertEquals("Hello ${monitor.name}", actionOutput["message"])
+                    } else if (actionResult["name"] == syntaxErrorAction.name) {
+                        assertTrue("Missing action error message", (actionResult["error"] as String).isNotEmpty())
+                    } else {
+                        fail("Unknown action: ${actionResult["name"]}")
+                    }
+                }
+            }
+        }
+
+        // Check created alerts
+        val alerts = searchAlerts(monitor)
+        assertEquals("Alerts not saved", 2, alerts.size)
+        alerts.forEach {
+            verifyAlert(it, monitor, ACTIVE)
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun `test bucket-level monitor with per execution action frequency`() {
+        val testIndex = createTestIndex()
+        insertSampleTimeSerializedData(
+            testIndex,
+            listOf(
+                "test_value_1",
+                "test_value_1",
+                "test_value_3",
+                "test_value_2",
+                "test_value_2"
+            )
+        )
+
+        val query = QueryBuilders.rangeQuery("test_strict_date_time")
+            .gt("{{period_end}}||-10d")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
+        val compositeSources = listOf(
+            TermsValuesSourceBuilder("test_field").field("test_field")
+        )
+        val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
+        val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
+        // Trigger script should only create Alerts for 'test_value_1' and 'test_value_2'
+        val triggerScript = """
+            params.docCount > 1
+        """.trimIndent()
+
+        val action = randomAction(
+            template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+            destinationId = createDestination().id,
+            actionExecutionPolicy = ActionExecutionPolicy(null, PerExecutionActionScope())
+        )
+        var trigger = randomBucketLevelTrigger(actions = listOf(action))
+        trigger = trigger.copy(
+            bucketSelector = BucketSelectorExtAggregationBuilder(
+                name = trigger.id,
+                bucketsPathsMap = mapOf("docCount" to "_count"),
+                script = Script(triggerScript),
+                parentBucketPath = "composite_agg",
+                filter = null
+            )
+        )
+        val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
+
+        val output = entityAsMap(executeMonitor(monitor.id))
+        // The 'events' in this case are the bucketKeys hashes representing the Alert events
+        val expectedEvents = setOf("test_value_1", "test_value_2")
+
+        assertEquals(monitor.name, output["monitor_name"])
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            for (alertEvent in triggerResult.objectMap("action_results")) {
+                assertTrue(expectedEvents.contains(alertEvent.key))
+                val actionResults = alertEvent.value.values as Collection<Map<String, Any>>
+                for (actionResult in actionResults) {
+                    val actionOutput = actionResult["output"] as Map<String, String>
+                    assertEquals("Unknown action: ${actionResult["name"]}", action.name, actionResult["name"])
+                    assertEquals("Hello ${monitor.name}", actionOutput["message"])
+                }
+            }
+        }
+
+        // Check created alerts
+        val alerts = searchAlerts(monitor)
+        assertEquals("Alerts not saved", 2, alerts.size)
+        alerts.forEach {
+            verifyAlert(it, monitor, ACTIVE)
         }
     }
 
