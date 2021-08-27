@@ -88,8 +88,7 @@ class TriggerService(val scriptService: ScriptService) {
             }
             BucketLevelTriggerRunResult(trigger.name, null, selectedBuckets)
         } catch (e: Exception) {
-            logger.info("Error running script for monitor ${monitor.id}, trigger: ${trigger.id}", e)
-            // TODO empty map here with error should be treated in the same way as QueryLevelTrigger with error running script
+            logger.info("Error running trigger [${trigger.id}] for monitor [${monitor.id}]", e)
             BucketLevelTriggerRunResult(trigger.name, e, emptyMap())
         }
     }
