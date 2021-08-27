@@ -105,7 +105,7 @@ class TransportImportMonitorAction @Inject constructor(
     }
 
     /**
-     *  Check if user has permissions to read the configured indices on the monitor and
+     *  Check if user has permissions to read the configured indices on each monitor and
      *  then create monitor.
      */
     fun checkIndicesAndExecute(
@@ -114,21 +114,25 @@ class TransportImportMonitorAction @Inject constructor(
         request: ImportMonitorRequest,
         user: User?
     ) {
-        val indices = mutableListOf<String>()
-        val searchInputs = request.monitor.inputs.filter { it.name() == SearchInput.SEARCH_FIELD }
-        searchInputs.forEach {
-            val searchInput = it as SearchInput
-            indices.addAll(searchInput.indices)
-        }
-        val searchRequest = SearchRequest().indices(*indices.toTypedArray())
-            .source(SearchSourceBuilder.searchSource().size(1).query(QueryBuilders.matchAllQuery()))
-        client.search(searchRequest, object : ActionListener<SearchResponse> {
-            override fun onResponse(searchResponse: SearchResponse) {
-                // User has read access to configured indices in the monitor, now create monitor with out user context.
-                client.threadPool().threadContext.stashContext().use {
-                    IndexMonitorHandler(client, actionListener, request, user).resolveUserAndStart()
-                }
+        var responseMonitors = mutableListOf<Monitor>()
+
+        for (index in request.monitors.indices) {
+            val monitor = request.monitors[index]
+            val indices = mutableListOf<String>()
+            val searchInputs = monitor.inputs.filter { it.name() == SearchInput.SEARCH_FIELD }
+            searchInputs.forEach {
+                val searchInput = it as SearchInput
+                indices.addAll(searchInput.indices)
             }
+            val searchRequest = SearchRequest().indices(*indices.toTypedArray())
+                .source(SearchSourceBuilder.searchSource().size(1).query(QueryBuilders.matchAllQuery()))
+            client.search(searchRequest, object : ActionListener<SearchResponse> {
+                override fun onResponse(searchResponse: SearchResponse) {
+                    // User has read access to configured indices in the monitor, now create monitor with out user context.
+                    client.threadPool().threadContext.stashContext().use {
+                        IndexMonitorHandler(client, actionListener, request, index, monitor, responseMonitors, user).resolveUserAndStart()
+                    }
+                }
 
             //  Due to below issue with security plugin, we get security_exception when invalid index name is mentioned.
             //  https://github.com/opendistro-for-elasticsearch/security/issues/718
@@ -144,21 +148,29 @@ class TransportImportMonitorAction @Inject constructor(
         })
     }
 
+        actionListener.onResponse(
+            ImportMonitorResponse(responseMonitors)
+        )
+    }
+
     inner class IndexMonitorHandler(
         private val client: Client,
         private val actionListener: ActionListener<ImportMonitorResponse>,
         private val request: ImportMonitorRequest,
+        private val monitorIndex: Int,
+        private val monitor: Monitor,
+        private var responseMonitors: MutableList<Monitor>,
         private val user: User?
     ) {
 
         fun resolveUserAndStart() {
             if (user == null) {
                 // Security is disabled, add empty user to Monitor. user is null for older versions.
-                request.monitor = request.monitor
+                request.monitors[monitorIndex] = monitor
                     .copy(user = User("", listOf(), listOf(), listOf()))
                 start()
             } else {
-                request.monitor = request.monitor
+                request.monitors[monitorIndex] = monitor
                     .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttNames))
                 start()
             }
@@ -203,7 +215,7 @@ class TransportImportMonitorAction @Inject constructor(
             // checkForDisallowedDestinations(allowList)
 
             try {
-                validateActionThrottle(request.monitor, maxActionThrottle, TimeValue.timeValueMinutes(1))
+                validateActionThrottle(monitor, maxActionThrottle, TimeValue.timeValueMinutes(1))
             } catch (e: RuntimeException) {
                 actionListener.onFailure(AlertingException.wrap(e))
                 return
@@ -248,7 +260,6 @@ class TransportImportMonitorAction @Inject constructor(
                         "This request would create more than the allowed monitors [$maxMonitors]."))
                 )
             } else {
-
                 indexMonitor()
             }
         }
@@ -281,13 +292,13 @@ class TransportImportMonitorAction @Inject constructor(
 //        }
 
         private fun indexMonitor() {
-            request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
+            request.monitors[monitorIndex] = monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
+            responseMonitors.add(request.monitors[monitorIndex])
+
             val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
-                .setRefreshPolicy(request.refreshPolicy)
-                .source(request.monitor.toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-                .setIfSeqNo(request.seqNo)
-                .setIfPrimaryTerm(request.primaryTerm)
+                .source(monitor.toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
                 .timeout(indexTimeout)
+
             client.index(indexRequest, object : ActionListener<IndexResponse> {
                 override fun onResponse(response: IndexResponse) {
                     val failureReasons = checkShardsFailure(response)
@@ -296,10 +307,6 @@ class TransportImportMonitorAction @Inject constructor(
                             AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), response.status())))
                         return
                     }
-                    actionListener.onResponse(
-                        ImportMonitorResponse(response.id, response.version, response.seqNo,
-                        response.primaryTerm, RestStatus.CREATED, request.monitor)
-                    )
                 }
                 override fun onFailure(t: Exception) {
                     actionListener.onFailure(AlertingException.wrap(t))
@@ -327,43 +334,43 @@ class TransportImportMonitorAction @Inject constructor(
 //            })
 //        }
 
-        private fun onGetResponse(currentMonitor: Monitor) {
-            if (!checkUserFilterByPermissions(filterByEnabled, user, currentMonitor.user, actionListener, "monitor", request.monitorId)) {
-                return
-            }
-
-            // If both are enabled, use the current existing monitor enabled time, otherwise the next execution will be
-            // incorrect.
-            if (request.monitor.enabled && currentMonitor.enabled)
-                request.monitor = request.monitor.copy(enabledTime = currentMonitor.enabledTime)
-
-            request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
-            val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
-                .setRefreshPolicy(request.refreshPolicy)
-                .source(request.monitor.toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-                .id(request.monitorId)
-                .setIfSeqNo(request.seqNo)
-                .setIfPrimaryTerm(request.primaryTerm)
-                .timeout(indexTimeout)
-
-            client.index(indexRequest, object : ActionListener<IndexResponse> {
-                override fun onResponse(response: IndexResponse) {
-                    val failureReasons = checkShardsFailure(response)
-                    if (failureReasons != null) {
-                        actionListener.onFailure(
-                            AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), response.status())))
-                        return
-                    }
-                    actionListener.onResponse(
-                        ImportMonitorResponse(response.id, response.version, response.seqNo,
-                            response.primaryTerm, RestStatus.CREATED, request.monitor)
-                    )
-                }
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
-                }
-            })
-        }
+//        private fun onGetResponse(currentMonitor: Monitor) {
+//            if (!checkUserFilterByPermissions(filterByEnabled, user, currentMonitor.user, actionListener, "monitor", request.monitorId)) {
+//                return
+//            }
+//
+//            // If both are enabled, use the current existing monitor enabled time, otherwise the next execution will be
+//            // incorrect.
+//            if (request.monitor.enabled && currentMonitor.enabled)
+//                request.monitor = request.monitor.copy(enabledTime = currentMonitor.enabledTime)
+//
+//            request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
+//            val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
+//                .setRefreshPolicy(request.refreshPolicy)
+//                .source(request.monitor.toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+//                .id(request.monitorId)
+//                .setIfSeqNo(request.seqNo)
+//                .setIfPrimaryTerm(request.primaryTerm)
+//                .timeout(indexTimeout)
+//
+//            client.index(indexRequest, object : ActionListener<IndexResponse> {
+//                override fun onResponse(response: IndexResponse) {
+//                    val failureReasons = checkShardsFailure(response)
+//                    if (failureReasons != null) {
+//                        actionListener.onFailure(
+//                            AlertingException.wrap(ElasticsearchStatusException(failureReasons.toString(), response.status())))
+//                        return
+//                    }
+//                    actionListener.onResponse(
+//                        ImportMonitorResponse(response.id, response.version, response.seqNo,
+//                            response.primaryTerm, RestStatus.CREATED, request.monitor)
+//                    )
+//                }
+//                override fun onFailure(t: Exception) {
+//                    actionListener.onFailure(AlertingException.wrap(t))
+//                }
+//            })
+//        }
 
         private fun checkShardsFailure(response: IndexResponse): String? {
             val failureReasons = StringBuilder()

@@ -25,37 +25,18 @@ import org.opensearch.rest.RestRequest
 import java.io.IOException
 
 class ImportMonitorRequest : ActionRequest {
-    val monitorId: String
-    val seqNo: Long
-    val primaryTerm: Long
-    val refreshPolicy: WriteRequest.RefreshPolicy
-    val method: RestRequest.Method
-    var monitor: Monitor
+    var monitors: MutableList<Monitor>
 
     constructor(
-        monitorId: String,
-        seqNo: Long,
-        primaryTerm: Long,
-        refreshPolicy: WriteRequest.RefreshPolicy,
-        method: RestRequest.Method,
-        monitor: Monitor
+        monitors: MutableList<Monitor>
     ): super() {
-        this.monitorId = monitorId
-        this.seqNo = seqNo
-        this.primaryTerm = primaryTerm
-        this.refreshPolicy = refreshPolicy
-        this.method = method
-        this.monitor = monitor
+        this.monitors = monitors
     }
 
     @Throws(IOException::class)
     constructor(sin: StreamInput): this(
-        monitorId = sin.readString(),
-        seqNo = sin.readLong(),
-        primaryTerm = sin.readLong(),
-        refreshPolicy = WriteRequest.RefreshPolicy.readFrom(sin),
-        method = sin.readEnum(RestRequest.Method::class.java),
-        monitor = Monitor.readFrom(sin) as Monitor
+//        monitors = Monitor.readFrom(sin) as Monitor
+        monitors = sin.readList(::Monitor) as MutableList<Monitor>
     )
 
     override fun validate(): ActionRequestValidationException? {
@@ -64,11 +45,8 @@ class ImportMonitorRequest : ActionRequest {
 
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {
-        out.writeString(monitorId)
-        out.writeLong(seqNo)
-        out.writeLong(primaryTerm)
-        refreshPolicy.writeTo(out)
-        out.writeEnum(method)
-        monitor.writeTo(out)
+        this.monitors.forEach{ monitor ->
+            monitor.writeTo(out)
+        }
     }
 }

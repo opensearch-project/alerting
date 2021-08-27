@@ -63,20 +63,26 @@ class RestImportMonitorAction : BaseRestHandler() {
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
         log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/import")
 
-//        val id = request.param("monitorID", Monitor.NO_ID)
+        // Create list of Monitor objects
+        var monitors = mutableListOf<Monitor>()
 
         // Validate request by parsing JSON to Monitor
         val xcp = request.contentParser()
         ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
-        val monitor = Monitor.parse(xcp).copy(lastUpdateTime = Instant.now())
-        val seqNo = request.paramAsLong(IF_SEQ_NO, SequenceNumbers.UNASSIGNED_SEQ_NO)
-        val primaryTerm = request.paramAsLong(IF_PRIMARY_TERM, SequenceNumbers.UNASSIGNED_PRIMARY_TERM)
-        val refreshPolicy = if (request.hasParam(REFRESH)) {
-            WriteRequest.RefreshPolicy.parse(request.param(REFRESH))
-        } else {
-            WriteRequest.RefreshPolicy.IMMEDIATE
+        while (xcp.nextToken() != Token.END_OBJECT) {
+            val fieldName = xcp.currentName()
+
+            if (fieldName == "monitors") {
+                ensureExpectedToken(Token.START_ARRAY, xcp.currentToken(), xcp)
+                while (xcp.nextToken() != Token.END_ARRAY) {
+                    monitors.add(Monitor.parse(xcp).copy(lastUpdateTime = Instant.now()))
+                }
+            } else {
+                xcp.skipChildren()
+            }
         }
-        val importMonitorRequest = ImportMonitorRequest(Monitor.NO_ID, seqNo, primaryTerm, refreshPolicy, request.method(), monitor)
+
+        val importMonitorRequest = ImportMonitorRequest(monitors)
 
         return RestChannelConsumer { channel ->
             client.execute(ImportMonitorAction.INSTANCE, importMonitorRequest, importMonitorResponse(channel))
@@ -89,7 +95,7 @@ class RestImportMonitorAction : BaseRestHandler() {
             @Throws(Exception::class)
             override fun buildResponse(response: ImportMonitorResponse): RestResponse {
                 val restResponse = BytesRestResponse(RestStatus.CREATED, response.toXContent(channel.newBuilder(), ToXContent.EMPTY_PARAMS))
-                val location = "${AlertingPlugin.MONITOR_BASE_URI}/import/${response.id}"
+                val location = "${AlertingPlugin.MONITOR_BASE_URI}/import/"
                 restResponse.addHeader("Location", location)
                 return restResponse
             }

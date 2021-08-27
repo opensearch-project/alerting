@@ -30,57 +30,59 @@ import org.opensearch.rest.RestStatus
 import java.io.IOException
 
 class ImportMonitorResponse : ActionResponse, ToXContentObject {
-    var id: String
-    var version: Long
-    var seqNo: Long
-    var primaryTerm: Long
-    var status: RestStatus
-    var monitor: Monitor
+//    var id: String
+//    var version: Long
+//    var seqNo: Long
+//    var primaryTerm: Long
+//    var status: RestStatus
+    var monitors: MutableList<Monitor>
 
     constructor(
-        id: String,
-        version: Long,
-        seqNo: Long,
-        primaryTerm: Long,
-        status: RestStatus,
-        monitor: Monitor
+//        id: String,
+//        version: Long,
+//        seqNo: Long,
+//        primaryTerm: Long,
+//        status: RestStatus,
+        monitors: MutableList<Monitor>
     ) : super() {
-        this.id = id
-        this.version = version
-        this.seqNo = seqNo
-        this.primaryTerm = primaryTerm
-        this.status = status
-        this.monitor = monitor
+//        this.id = id
+//        this.version = version
+//        this.seqNo = seqNo
+//        this.primaryTerm = primaryTerm
+//        this.status = status
+        this.monitors = monitors
     }
 
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
-        sin.readString(), // id
-        sin.readLong(), // version
-        sin.readLong(), // seqNo
-        sin.readLong(), // primaryTerm
-        sin.readEnum(RestStatus::class.java), // status
-        Monitor.readFrom(sin) as Monitor // monitor
+//        sin.readString(), // id
+//        sin.readLong(), // version
+//        sin.readLong(), // seqNo
+//        sin.readLong(), // primaryTerm
+//        sin.readEnum(RestStatus::class.java), // status
+        sin.readList(::Monitor) as MutableList<Monitor>
+//        Monitor.readFrom(sin) as Monitor // monitor
     )
 
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {
-        out.writeString(id)
-        out.writeLong(version)
-        out.writeLong(seqNo)
-        out.writeLong(primaryTerm)
-        out.writeEnum(status)
-        monitor.writeTo(out)
+//        out.writeString(id)
+//        out.writeLong(version)
+//        out.writeLong(seqNo)
+//        out.writeLong(primaryTerm)
+//        out.writeEnum(status)
+        out.writeList(monitors) // Todo: Check to see if this works
+//        monitors.writeTo(out)
     }
 
     @Throws(IOException::class)
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         return builder.startObject()
-            .field(_ID, id)
-            .field(_VERSION, version)
-            .field(_SEQ_NO, seqNo)
-            .field(_PRIMARY_TERM, primaryTerm)
-            .field("monitor", monitor)
+//            .field(_ID, id)
+//            .field(_VERSION, version)
+//            .field(_SEQ_NO, seqNo)
+//            .field(_PRIMARY_TERM, primaryTerm)
+            .field("monitors", monitors)
             .endObject()
     }
 }
