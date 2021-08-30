@@ -976,7 +976,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
     //  The last page (when after_key is null) is empty if all the contents fit on the previous page, meaning the
     //  input results returned by the monitor execution is empty.
     //  Skipping this test for now until this is resolved to show a non-empty result.
-    fun `skip test execute bucket-level monitor returns search result`() {
+    fun `test execute bucket-level monitor returns search result`() {
         val testIndex = createTestIndex()
         insertSampleTimeSerializedData(
             testIndex,
