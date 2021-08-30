@@ -413,7 +413,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                  * Note: Index operations can fail for various reasons (such as write blocks on cluster), in such a case, the Actions
                  * will still execute with the Alert information in the ctx but the Alerts may not be visible.
                  */
-                alertService.saveAlerts(dedupedAlerts, retryPolicy)
+                alertService.saveAlerts(dedupedAlerts, retryPolicy, allowUpdatingAcknowledgedAlert = true)
                 newAlerts = alertService.saveNewAlerts(newAlerts, retryPolicy)
 
                 // Store deduped and new Alerts to accumulate across pages
@@ -439,7 +439,11 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
 
         for (trigger in monitor.triggers) {
             val alertsToUpdate = mutableSetOf<Alert>()
-            val dedupedAlerts = nextAlerts[trigger.id]?.get(AlertCategory.DEDUPED) ?: mutableListOf()
+            // Filter ACKNOWLEDGED Alerts from the deduped list so they do not have Actions executed for them.
+            // New Alerts are ignored since they cannot be acknowledged yet.
+            val dedupedAlerts = nextAlerts[trigger.id]?.get(AlertCategory.DEDUPED)
+                ?.filterNot { it.state == Alert.State.ACKNOWLEDGED }
+                ?: mutableListOf()
             val newAlerts = nextAlerts[trigger.id]?.get(AlertCategory.NEW) ?: mutableListOf()
             val completedAlerts = nextAlerts[trigger.id]?.get(AlertCategory.COMPLETED) ?: mutableListOf()
 
@@ -454,7 +458,12 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 if (action.getActionScope() == ActionExecutionScope.Type.PER_ALERT && monitorOrTriggerError == null) {
                     val perAlertActionFrequency = action.actionExecutionPolicy.actionExecutionScope as PerAlertActionScope
                     for (alertCategory in perAlertActionFrequency.actionableAlerts) {
-                        val alertsToExecuteActionsFor = nextAlerts[trigger.id]?.get(alertCategory) ?: mutableListOf()
+                        var alertsToExecuteActionsFor = nextAlerts[trigger.id]?.get(alertCategory) ?: mutableListOf()
+                        // Filter out ACKNOWLEDGED Alerts from the deduped Alerts
+                        if (alertCategory == AlertCategory.DEDUPED) {
+                            alertsToExecuteActionsFor = alertsToExecuteActionsFor.filterNot { it.state == Alert.State.ACKNOWLEDGED }
+                                .toMutableList()
+                        }
                         for (alert in alertsToExecuteActionsFor) {
                             if (isBucketLevelTriggerActionThrottled(action, alert)) continue
 
@@ -507,7 +516,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 val bucketKeysHash = alert.aggregationResultBucket!!.getBucketKeysHash()
                 val actionResults = triggerResult.actionResultsMap.getOrDefault(bucketKeysHash, emptyMap<String, ActionRunResult>())
                 alertService.updateActionResultsForBucketLevelAlert(
-                    alert,
+                    alert.copy(lastNotificationTime = currentTime()),
                     actionResults,
                     // TODO: Update BucketLevelTriggerRunResult.alertError() to retrieve error based on the first failed Action
                     monitorResult.alertError() ?: triggerResult.alertError()
@@ -515,7 +524,8 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             }
 
             // Update Alerts with action execution results
-            alertService.saveAlerts(updatedAlerts, retryPolicy)
+            // ACKNOWLEDGED Alerts should not be saved here since actions are not executed for them
+            alertService.saveAlerts(updatedAlerts, retryPolicy, allowUpdatingAcknowledgedAlert = false)
         }
 
         return monitorResult.copy(triggerResults = triggerResults)
