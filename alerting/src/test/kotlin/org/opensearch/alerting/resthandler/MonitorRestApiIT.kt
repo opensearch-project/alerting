@@ -32,8 +32,8 @@ import org.apache.http.nio.entity.NStringEntity
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ANOMALY_DETECTOR_INDEX
 import org.opensearch.alerting.AlertingRestTestCase
+import org.opensearch.alerting.DESTINATION_BASE_URI
 import org.opensearch.alerting.LEGACY_OPENDISTRO_ALERTING_BASE_URI
-import org.opensearch.alerting.LEGACY_OPENDISTRO_DESTINATION_BASE_URI
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.anomalyDetectorIndexMapping
 import org.opensearch.alerting.core.model.CronSchedule
@@ -899,7 +899,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     fun `test search monitors only`() {
 
         // 1. create monitor
-        val monitor = createRandomMonitor()
+        val monitor = randomQueryLevelMonitor()
         val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
         assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
 
@@ -917,7 +917,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         )
         val response = client().makeRequest(
             "POST",
-            LEGACY_OPENDISTRO_DESTINATION_BASE_URI,
+            DESTINATION_BASE_URI,
             emptyMap(),
             destination.toHttpEntity()
         )
@@ -936,5 +936,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
         val numberDocsFound = hits["total"]?.get("value")
         assertEquals("Destination objects are also returned by /_search.", 1, numberDocsFound)
+
+        val searchHits = hits["hits"] as List<Any>
+        val hit = searchHits[0] as Map<String, Any>
+        val monitorHit = hit["_source"] as Map<String, Any>
+        assertEquals("Type is not monitor", monitorHit[Monitor.TYPE_FIELD], "monitor")
     }
 }
