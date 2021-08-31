@@ -33,6 +33,7 @@ import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ANOMALY_DETECTOR_INDEX
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.LEGACY_OPENDISTRO_ALERTING_BASE_URI
+import org.opensearch.alerting.LEGACY_OPENDISTRO_DESTINATION_BASE_URI
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.anomalyDetectorIndexMapping
 import org.opensearch.alerting.core.model.CronSchedule
@@ -53,6 +54,7 @@ import org.opensearch.alerting.randomAnomalyDetectorWithUser
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.randomThrottle
+import org.opensearch.alerting.randomUser
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.client.ResponseException
