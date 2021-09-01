@@ -113,7 +113,7 @@ data class MonitorRunResult<TriggerResult : TriggerRunResult>(
 data class InputRunResults(
     val results: List<Map<String, Any>> = listOf(),
     val error: Exception? = null,
-    val aggTriggersAfterKey: MutableMap<String, Map<String, Any>?>? = null
+    val aggTriggersAfterKey: MutableMap<String, TriggerAfterKey>? = null
 ) : Writeable, ToXContent {
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
@@ -152,13 +152,15 @@ data class InputRunResults(
 
     fun afterKeysPresent(): Boolean {
         aggTriggersAfterKey?.forEach {
-            if (it.value != null) {
+            if (it.value.afterKey != null && !it.value.lastPage) {
                 return true
             }
         }
         return false
     }
 }
+
+data class TriggerAfterKey(val afterKey: Map<String, Any>?, val lastPage: Boolean)
 
 data class ActionRunResult(
     val actionId: String,
