@@ -32,6 +32,7 @@ import org.apache.http.nio.entity.NStringEntity
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ANOMALY_DETECTOR_INDEX
 import org.opensearch.alerting.AlertingRestTestCase
+import org.opensearch.alerting.DESTINATION_BASE_URI
 import org.opensearch.alerting.LEGACY_OPENDISTRO_ALERTING_BASE_URI
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.anomalyDetectorIndexMapping
@@ -43,6 +44,8 @@ import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
+import org.opensearch.alerting.model.destination.Chime
+import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.randomADMonitor
 import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomAlert
@@ -51,7 +54,9 @@ import org.opensearch.alerting.randomAnomalyDetectorWithUser
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.randomThrottle
+import org.opensearch.alerting.randomUser
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.util.DestinationType
 import org.opensearch.client.ResponseException
 import org.opensearch.client.WarningFailureException
 import org.opensearch.common.bytes.BytesReference
@@ -66,6 +71,7 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.test.junit.annotations.TestLogging
 import org.opensearch.test.rest.OpenSearchRestTestCase
+import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
@@ -887,5 +893,53 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val action = randomAction().copy(throttle = throttle)
         val trigger = randomQueryLevelTrigger(actions = listOf(action))
         return randomQueryLevelMonitor(triggers = listOf(trigger))
+    }
+
+    @Throws(Exception::class)
+    fun `test search monitors only`() {
+
+        // 1. create monitor
+        val monitor = randomQueryLevelMonitor()
+        val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+        assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
+
+        // 2. create destination
+        val chime = Chime("http://abc.com")
+        val destination = Destination(
+            type = DestinationType.CHIME,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = chime,
+            slack = null,
+            customWebhook = null,
+            email = null
+        )
+        val response = client().makeRequest(
+            "POST",
+            DESTINATION_BASE_URI,
+            emptyMap(),
+            destination.toHttpEntity()
+        )
+        assertEquals("Unable to create a new destination", RestStatus.CREATED, response.restStatus())
+
+        // 3. search - must return only monitors.
+        val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
+        val searchResponse = client().makeRequest(
+            "GET",
+            "$ALERTING_BASE_URI/_search",
+            emptyMap(),
+            NStringEntity(search, ContentType.APPLICATION_JSON)
+        )
+        assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
+        val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
+        val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+        val numberDocsFound = hits["total"]?.get("value")
+        assertEquals("Destination objects are also returned by /_search.", 1, numberDocsFound)
+
+        val searchHits = hits["hits"] as List<Any>
+        val hit = searchHits[0] as Map<String, Any>
+        val monitorHit = hit["_source"] as Map<String, Any>
+        assertEquals("Type is not monitor", monitorHit[Monitor.TYPE_FIELD], "monitor")
     }
 }

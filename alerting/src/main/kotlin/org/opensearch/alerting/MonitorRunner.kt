@@ -517,7 +517,8 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 } else if (action.getActionScope() == ActionExecutionScope.Type.PER_EXECUTION || shouldDefaultToPerExecution) {
                     // If all categories of Alerts are empty, there is nothing to message on and we can skip the Action.
                     // If the error is not null, this is disregarded and the Action is executed anyway so the user can be notified.
-                    if (monitorOrTriggerError == null && dedupedAlerts.isEmpty() && newAlerts.isEmpty() && completedAlerts.isEmpty()) continue
+                    if (monitorOrTriggerError == null && dedupedAlerts.isEmpty() && newAlerts.isEmpty() && completedAlerts.isEmpty())
+                        continue
 
                     val actionCtx = triggerCtx.copy(
                         dedupedAlerts = dedupedAlerts,
