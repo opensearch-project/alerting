@@ -31,6 +31,7 @@ import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.elasticapi.string
 import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.action.ActionExecutionPolicy
+import org.opensearch.alerting.model.action.PerExecutionActionScope
 import org.opensearch.alerting.model.action.Throttle
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
@@ -38,6 +39,7 @@ import org.opensearch.alerting.parser
 import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomActionExecutionPolicy
 import org.opensearch.alerting.randomActionExecutionResult
+import org.opensearch.alerting.randomActionWithPolicy
 import org.opensearch.alerting.randomAlert
 import org.opensearch.alerting.randomBucketLevelMonitor
 import org.opensearch.alerting.randomBucketLevelTrigger
@@ -55,6 +57,7 @@ import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase
+import java.time.temporal.ChronoUnit
 import kotlin.test.assertFailsWith
 
 class XContentTests : OpenSearchTestCase() {
@@ -85,6 +88,18 @@ class XContentTests : OpenSearchTestCase() {
         val actionString = action.toXContent(builder(), ToXContent.EMPTY_PARAMS).string()
         assertFailsWith<IllegalArgumentException>("Action throttle enabled but not set throttle value") {
             Action.parse(parser(actionString))
+        }
+    }
+
+    fun `test action with per execution scope does not support throttling`() {
+        try {
+            val action = randomActionWithPolicy().copy(
+                throttleEnabled = true,
+                throttle = Throttle(value = 5, unit = ChronoUnit.MINUTES),
+                actionExecutionPolicy = ActionExecutionPolicy(PerExecutionActionScope())
+            )
+            fail("Creating an action with per execution scope and throttle enabled did not fail.")
+        } catch (ignored: IllegalArgumentException) {
         }
     }
 
@@ -338,13 +353,6 @@ class XContentTests : OpenSearchTestCase() {
 
     fun `test action execution policy`() {
         val actionExecutionPolicy = randomActionExecutionPolicy()
-        val actionExecutionPolicyString = actionExecutionPolicy.toXContent(builder(), ToXContent.EMPTY_PARAMS).string()
-        val parsedActionExecutionPolicy = ActionExecutionPolicy.parse(parser(actionExecutionPolicyString))
-        assertEquals("Round tripping ActionExecutionPolicy doesn't work", actionExecutionPolicy, parsedActionExecutionPolicy)
-    }
-
-    fun `test action execution policy with null throttle`() {
-        val actionExecutionPolicy = randomActionExecutionPolicy().copy(throttle = null)
         val actionExecutionPolicyString = actionExecutionPolicy.toXContent(builder(), ToXContent.EMPTY_PARAMS).string()
         val parsedActionExecutionPolicy = ActionExecutionPolicy.parse(parser(actionExecutionPolicyString))
         assertEquals("Round tripping ActionExecutionPolicy doesn't work", actionExecutionPolicy, parsedActionExecutionPolicy)

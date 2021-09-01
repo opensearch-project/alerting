@@ -49,7 +49,7 @@ data class Action(
     val throttleEnabled: Boolean,
     val throttle: Throttle?,
     val id: String = UUIDs.base64UUID(),
-    val actionExecutionPolicy: ActionExecutionPolicy = ActionExecutionPolicy.getDefaultConfiguration()
+    val actionExecutionPolicy: ActionExecutionPolicy? = null
 ) : Writeable, ToXContentObject {
 
     init {
@@ -57,6 +57,10 @@ data class Action(
             require(subjectTemplate.lang == MUSTACHE) { "subject_template must be a mustache script" }
         }
         require(messageTemplate.lang == MUSTACHE) { "message_template must be a mustache script" }
+
+        if (actionExecutionPolicy?.actionExecutionScope is PerExecutionActionScope) {
+            require(throttle == null) { "Throttle is currently not supported for per execution action scope" }
+        }
     }
 
     @Throws(IOException::class)
@@ -68,7 +72,7 @@ data class Action(
         sin.readBoolean(), // throttleEnabled
         sin.readOptionalWriteable(::Throttle), // throttle
         sin.readString(), // id
-        ActionExecutionPolicy(sin) // actionExecutionPolicy
+        sin.readOptionalWriteable(::ActionExecutionPolicy) // actionExecutionPolicy
     )
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
@@ -78,12 +82,14 @@ data class Action(
             .field(DESTINATION_ID_FIELD, destinationId)
             .field(MESSAGE_TEMPLATE_FIELD, messageTemplate)
             .field(THROTTLE_ENABLED_FIELD, throttleEnabled)
-            .field(ACTION_EXECUTION_POLICY_FIELD, actionExecutionPolicy)
         if (subjectTemplate != null) {
             xContentBuilder.field(SUBJECT_TEMPLATE_FIELD, subjectTemplate)
         }
         if (throttle != null) {
             xContentBuilder.field(THROTTLE_FIELD, throttle)
+        }
+        if (actionExecutionPolicy != null) {
+            xContentBuilder.field(ACTION_EXECUTION_POLICY_FIELD, actionExecutionPolicy)
         }
         return xContentBuilder.endObject()
     }
@@ -111,7 +117,12 @@ data class Action(
             out.writeBoolean(false)
         }
         out.writeString(id)
-        actionExecutionPolicy.writeTo(out)
+        if (actionExecutionPolicy != null) {
+            out.writeBoolean(true)
+            actionExecutionPolicy.writeTo(out)
+        } else {
+            out.writeBoolean(false)
+        }
     }
 
     companion object {
@@ -138,7 +149,7 @@ data class Action(
             lateinit var messageTemplate: Script
             var throttleEnabled = false
             var throttle: Throttle? = null
-            var actionExecutionPolicy: ActionExecutionPolicy = ActionExecutionPolicy.getDefaultConfiguration()
+            var actionExecutionPolicy: ActionExecutionPolicy? = null
 
             XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.currentToken(), xcp)
             while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
@@ -160,7 +171,11 @@ data class Action(
                         throttleEnabled = xcp.booleanValue()
                     }
                     ACTION_EXECUTION_POLICY_FIELD -> {
-                        actionExecutionPolicy = ActionExecutionPolicy.parse(xcp)
+                        actionExecutionPolicy = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) {
+                            null
+                        } else {
+                            ActionExecutionPolicy.parse(xcp)
+                        }
                     }
                     else -> {
                         throw IllegalStateException("Unexpected field: $fieldName, while parsing action")
@@ -180,7 +195,7 @@ data class Action(
                 throttleEnabled,
                 throttle,
                 id = requireNotNull(id),
-                actionExecutionPolicy = requireNotNull(actionExecutionPolicy) { "Action execution policy is null" }
+                actionExecutionPolicy = actionExecutionPolicy
             )
         }
 

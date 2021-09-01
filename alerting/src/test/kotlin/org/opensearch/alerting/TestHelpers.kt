@@ -175,7 +175,7 @@ fun randomBucketLevelTrigger(
         name = name,
         severity = severity,
         bucketSelector = bucketSelector,
-        actions = if (actions.isEmpty()) (0..randomInt(10)).map { randomAction(destinationId = destinationId) } else actions
+        actions = if (actions.isEmpty()) (0..randomInt(10)).map { randomActionWithPolicy(destinationId = destinationId) } else actions
     )
 }
 
@@ -243,9 +243,24 @@ fun randomAction(
     template: Script = randomTemplateScript("Hello World"),
     destinationId: String = "",
     throttleEnabled: Boolean = false,
+    throttle: Throttle = randomThrottle()
+) = Action(name, destinationId, template, template, throttleEnabled, throttle, actionExecutionPolicy = null)
+
+fun randomActionWithPolicy(
+    name: String = OpenSearchRestTestCase.randomUnicodeOfLength(10),
+    template: Script = randomTemplateScript("Hello World"),
+    destinationId: String = "",
+    throttleEnabled: Boolean = false,
     throttle: Throttle = randomThrottle(),
-    actionExecutionPolicy: ActionExecutionPolicy = randomActionExecutionPolicy()
-) = Action(name, destinationId, template, template, throttleEnabled, throttle, actionExecutionPolicy = actionExecutionPolicy)
+    actionExecutionPolicy: ActionExecutionPolicy? = randomActionExecutionPolicy()
+): Action {
+    return if (actionExecutionPolicy?.actionExecutionScope is PerExecutionActionScope) {
+        // Return null for throttle when using PerExecutionActionScope since throttling is currently not supported for it
+        Action(name, destinationId, template, template, throttleEnabled, null, actionExecutionPolicy = actionExecutionPolicy)
+    } else {
+        Action(name, destinationId, template, template, throttleEnabled, throttle, actionExecutionPolicy = actionExecutionPolicy)
+    }
+}
 
 fun randomThrottle(
     value: Int = randomIntBetween(60, 120),
@@ -253,16 +268,8 @@ fun randomThrottle(
 ) = Throttle(value, unit)
 
 fun randomActionExecutionPolicy(
-    throttle: Throttle = randomThrottle(),
     actionExecutionScope: ActionExecutionScope = randomActionExecutionScope()
-): ActionExecutionPolicy {
-    return if (actionExecutionScope is PerExecutionActionScope) {
-        // Return null for throttle when using PerExecutionActionScope since throttling is currently not supported for it
-        ActionExecutionPolicy(null, actionExecutionScope)
-    } else {
-        ActionExecutionPolicy(throttle, actionExecutionScope)
-    }
-}
+) = ActionExecutionPolicy(actionExecutionScope)
 
 fun randomActionExecutionScope(): ActionExecutionScope {
     return if (randomBoolean()) {

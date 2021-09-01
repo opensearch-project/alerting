@@ -1285,10 +1285,10 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             params.docCount > 1
         """.trimIndent()
 
-        val action = randomAction(
+        val action = randomActionWithPolicy(
             template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
             destinationId = createDestination().id,
-            actionExecutionPolicy = ActionExecutionPolicy(null, PerExecutionActionScope())
+            actionExecutionPolicy = ActionExecutionPolicy(PerExecutionActionScope())
         )
         var trigger = randomBucketLevelTrigger(actions = listOf(action))
         trigger = trigger.copy(
@@ -1352,10 +1352,10 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             params.docCount > 1
         """.trimIndent()
 
-        val action = randomAction(
+        val action = randomActionWithPolicy(
             template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
             destinationId = createDestination().id,
-            actionExecutionPolicy = ActionExecutionPolicy(null, PerAlertActionScope(setOf(AlertCategory.DEDUPED, AlertCategory.NEW)))
+            actionExecutionPolicy = ActionExecutionPolicy(PerAlertActionScope(setOf(AlertCategory.DEDUPED, AlertCategory.NEW)))
         )
         var trigger = randomBucketLevelTrigger(actions = listOf(action))
         trigger = trigger.copy(
@@ -1419,21 +1419,21 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             params.docCount > 0
         """.trimIndent()
 
-        val actionThrottleEnabled = randomAction(
+        val actionThrottleEnabled = randomActionWithPolicy(
             template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
             destinationId = createDestination().id,
             throttleEnabled = true,
+            throttle = Throttle(value = 5, unit = MINUTES),
             actionExecutionPolicy = ActionExecutionPolicy(
-                throttle = Throttle(value = 5, unit = MINUTES),
                 actionExecutionScope = PerAlertActionScope(setOf(AlertCategory.DEDUPED, AlertCategory.NEW))
             )
         )
-        val actionThrottleNotEnabled = randomAction(
+        val actionThrottleNotEnabled = randomActionWithPolicy(
             template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
             destinationId = createDestination().id,
             throttleEnabled = false,
+            throttle = Throttle(value = 5, unit = MINUTES),
             actionExecutionPolicy = ActionExecutionPolicy(
-                throttle = Throttle(value = 5, unit = MINUTES),
                 actionExecutionScope = PerAlertActionScope(setOf(AlertCategory.DEDUPED, AlertCategory.NEW))
             )
         )
