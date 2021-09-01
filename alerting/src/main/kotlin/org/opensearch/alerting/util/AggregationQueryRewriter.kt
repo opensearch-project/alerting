@@ -98,21 +98,16 @@ class AggregationQueryRewriter {
                          */
                         val afterKey = lastAgg.afterKey()
                         val prevTriggerAfterKey = prevBucketLevelTriggerAfterKeys?.get(trigger.id)
-                        if (prevTriggerAfterKey == null) {
+                        bucketLevelTriggerAfterKeys[trigger.id] = when {
                             // If the previous TriggerAfterKey was null, this should be the first page
-                            bucketLevelTriggerAfterKeys[trigger.id] = TriggerAfterKey(afterKey, afterKey == null)
-                        } else {
-                            if (prevTriggerAfterKey.lastPage) {
-                                // If the previous TriggerAfterKey already hit the last page, pass along the after key it used to get there
-                                bucketLevelTriggerAfterKeys[trigger.id] = prevTriggerAfterKey
-                            } else if (afterKey == null) {
-                                // If the previous TriggerAfterKey had not reached the last page and the after key for the current result
-                                // is null, then the last page has been reached so the after key that was used to get there is stored
-                                bucketLevelTriggerAfterKeys[trigger.id] = TriggerAfterKey(prevTriggerAfterKey.afterKey, true)
-                            } else {
-                                // Otherwise, update the after key to the current one
-                                bucketLevelTriggerAfterKeys[trigger.id] = TriggerAfterKey(afterKey, false)
-                            }
+                            prevTriggerAfterKey == null -> TriggerAfterKey(afterKey, afterKey == null)
+                            // If the previous TriggerAfterKey already hit the last page, pass along the after key it used to get there
+                            prevTriggerAfterKey.lastPage -> prevTriggerAfterKey
+                            // If the previous TriggerAfterKey had not reached the last page and the after key for the current result
+                            // is null, then the last page has been reached so the after key that was used to get there is stored
+                            afterKey == null -> TriggerAfterKey(prevTriggerAfterKey.afterKey, true)
+                            // Otherwise, update the after key to the current one
+                            else -> TriggerAfterKey(afterKey, false)
                         }
                     }
                 }
