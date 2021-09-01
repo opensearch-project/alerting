@@ -16,12 +16,12 @@
 package org.opensearch.alerting.transport
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.OpenSearchSecurityException
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
+import org.opensearch.action.bulk.BulkRequest
+import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.index.IndexRequest
-import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
@@ -31,9 +31,7 @@ import org.opensearch.alerting.action.ImportMonitorRequest
 import org.opensearch.alerting.action.ImportMonitorResponse
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
-import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.FILTER_BY_BACKEND_ROLES
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
@@ -79,7 +77,7 @@ class TransportImportMonitorAction @Inject constructor(
     @Volatile private var indexTimeout = INDEX_TIMEOUT.get(settings)
     @Volatile private var maxActionThrottle = MAX_ACTION_THROTTLE_VALUE.get(settings)
     @Volatile private var allowList = ALLOW_LIST.get(settings)
-    @Volatile private var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile private var filterByEnabled = FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_MAX_MONITORS) { maxMonitors = it }
@@ -113,64 +111,35 @@ class TransportImportMonitorAction @Inject constructor(
         request: ImportMonitorRequest,
         user: User?
     ) {
-        for (index in request.monitors.indices) {
-            val monitor = request.monitors[index]
-            val indices = mutableListOf<String>()
-            val searchInputs = monitor.inputs.filter { it.name() == SearchInput.SEARCH_FIELD }
-            searchInputs.forEach {
-                val searchInput = it as SearchInput
-                indices.addAll(searchInput.indices)
-            }
-            val searchRequest = SearchRequest().indices(*indices.toTypedArray())
-                .source(SearchSourceBuilder.searchSource().size(1).query(QueryBuilders.matchAllQuery()))
-            client.search(searchRequest, object : ActionListener<SearchResponse> {
-                override fun onResponse(searchResponse: SearchResponse) {
-                    // User has read access to configured indices in the monitor, now create monitor with out user context.
-                    client.threadPool().threadContext.stashContext().use {
-                        IndexMonitorHandler(client, actionListener, request, index, monitor, user).resolveUserAndStart()
-                    }
-                }
+        // TODO: Check search permissions for all indices
 
-            //  Due to below issue with security plugin, we get security_exception when invalid index name is mentioned.
-            //  https://github.com/opendistro-for-elasticsearch/security/issues/718
-            override fun onFailure(t: Exception) {
-                actionListener.onFailure(AlertingException.wrap(
-                    when (t is OpenSearchSecurityException) {
-                        true -> OpenSearchStatusException("User doesn't have read permissions for one or more configured index " +
-                                "$indices", RestStatus.FORBIDDEN)
-                        false -> t
-                    }
-                ))
-            }
-        })
+        client.threadPool().threadContext.stashContext().use {
+            BulkIndexMonitorHandler(client, actionListener, request, user).resolveUserAndStart()
+        }
     }
 
-        var responseMonitors = request.monitors
-        actionListener.onResponse(
-            ImportMonitorResponse(responseMonitors)
-        )
-    }
-
-    inner class IndexMonitorHandler(
+    inner class BulkIndexMonitorHandler(
         private val client: Client,
         private val actionListener: ActionListener<ImportMonitorResponse>,
         private val request: ImportMonitorRequest,
-        private val monitorIndex: Int,
-        private val monitor: Monitor,
         private val user: User?
     ) {
 
         fun resolveUserAndStart() {
             if (user == null) {
                 // Security is disabled, add empty user to Monitor. user is null for older versions.
-                request.monitors[monitorIndex] = monitor
-                    .copy(user = User("", listOf(), listOf(), listOf()))
-                start()
+                for (monitorIndex in request.monitors.indices) {
+                    request.monitors[monitorIndex] = request.monitors[monitorIndex]
+                        .copy(user = User("", listOf(), listOf(), listOf()))
+                }
             } else {
-                request.monitors[monitorIndex] = monitor
-                    .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttNames))
-                start()
+                for (monitorIndex in request.monitors.indices) {
+                    request.monitors[monitorIndex] = request.monitors[monitorIndex]
+                        .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttNames))
+                }
             }
+
+            start()
         }
 
         fun start() {
@@ -195,19 +164,22 @@ class TransportImportMonitorAction @Inject constructor(
          * Requests that breach this threshold will be rejected.
          */
         private fun prepareMonitorIndexing() {
-
-            // Below check needs to be async operations and needs to be refactored issue#269
-            // checkForDisallowedDestinations(allowList)
-            try {
-                validateActionThrottle(monitor, maxActionThrottle, TimeValue.timeValueMinutes(1))
-            } catch (e: RuntimeException) {
-                actionListener.onFailure(AlertingException.wrap(e))
-                return
+            for (monitor in request.monitors) {
+                try {
+                    validateActionThrottle(monitor, maxActionThrottle, TimeValue.timeValueMinutes(1))
+                } catch (e: RuntimeException) {
+                    actionListener.onFailure(AlertingException.wrap(e))
+                    return
+                }
             }
 
-            val query = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery("${Monitor.MONITOR_TYPE}.type", Monitor.MONITOR_TYPE))
-            val searchSource = SearchSourceBuilder().query(query).timeout(requestTimeout)
-            val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
+            val query = QueryBuilders.boolQuery()
+                .filter(QueryBuilders.termQuery("${Monitor.MONITOR_TYPE}.type", Monitor.MONITOR_TYPE))
+            val searchSource = SearchSourceBuilder()
+                .query(query)
+                .timeout(requestTimeout)
+            val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX)
+                .source(searchSource)
             client.search(searchRequest, object : ActionListener<SearchResponse> {
                 override fun onResponse(searchResponse: SearchResponse) {
                     onSearchResponse(searchResponse)
@@ -261,36 +233,41 @@ class TransportImportMonitorAction @Inject constructor(
         }
 
         private fun indexMonitor() {
-            request.monitors[monitorIndex] = monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
+            val bulkRequest = BulkRequest()
 
-            val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
-                .source(request.monitors[monitorIndex].toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-                .timeout(indexTimeout)
+            for (monitorIndex in request.monitors.indices) {
+                request.monitors[monitorIndex] = request.monitors[monitorIndex].copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
 
-            client.index(indexRequest, object : ActionListener<IndexResponse> {
-                override fun onResponse(response: IndexResponse) {
-                    val failureReasons = checkShardsFailure(response)
-                    if (failureReasons != null) {
-                        actionListener.onFailure(
-                            AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), response.status())))
-                        return
+                bulkRequest.add(
+                    IndexRequest(SCHEDULED_JOBS_INDEX)
+                        .source(request.monitors[monitorIndex].toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+                        .timeout(indexTimeout)
+                )
+            }
+
+            client.bulk(bulkRequest, object : ActionListener<BulkResponse> {
+                override fun onResponse(response: BulkResponse) {
+                    // TODO: All monitor-creation failures happen in RestHandler, so failures need to passed here later.
+
+                    var successful = 0
+                    var failed = 0
+
+                    for (bulkResponseItem in response.items) {
+                        if (!bulkResponseItem.isFailed()) {
+                            successful += 1
+                        } else {
+                            failed += 1
+                        }
                     }
+
+                    actionListener.onResponse(
+                        ImportMonitorResponse(request.monitors.size, successful, failed)
+                    )
                 }
                 override fun onFailure(t: Exception) {
                     actionListener.onFailure(AlertingException.wrap(t))
                 }
             })
-        }
-
-        private fun checkShardsFailure(response: IndexResponse): String? {
-            val failureReasons = StringBuilder()
-            if (response.shardInfo.failed > 0) {
-                response.shardInfo.failures.forEach {
-                        entry -> failureReasons.append(entry.reason())
-                }
-                return failureReasons.toString()
-            }
-            return null
         }
     }
 }

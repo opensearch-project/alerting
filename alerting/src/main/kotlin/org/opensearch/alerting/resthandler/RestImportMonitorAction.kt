@@ -40,7 +40,7 @@ import java.time.Instant
 private val log = LogManager.getLogger(RestImportMonitorAction::class.java)
 
 /**
- * Rest handlers to create monitors.
+ * Rest handler to bulk import monitors.
  */
 class RestImportMonitorAction : BaseRestHandler() {
 

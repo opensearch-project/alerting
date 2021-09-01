@@ -121,7 +121,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
                 RestGetEmailGroupAction(),
                 RestGetDestinationsAction(),
                 RestGetAlertsAction(),
-                RestImportMonitorAction()
+                RestImportMonitorAction(),
+                RestExportMonitorAction()
         )
     }
 
@@ -146,7 +147,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(DeleteEmailGroupAction.INSTANCE, TransportDeleteEmailGroupAction::class.java),
             ActionPlugin.ActionHandler(GetDestinationsAction.INSTANCE, TransportGetDestinationsAction::class.java),
             ActionPlugin.ActionHandler(GetAlertsAction.INSTANCE, TransportGetAlertsAction::class.java),
-            ActionPlugin.ActionHandler(ImportMonitorAction.INSTANCE, TransportImportMonitorAction::class.java)
+            ActionPlugin.ActionHandler(ImportMonitorAction.INSTANCE, TransportImportMonitorAction::class.java),
+            ActionPlugin.ActionHandler(ExportMonitorAction.INSTANCE, TransportExportMonitorAction::class.java)
 
         )
     }
