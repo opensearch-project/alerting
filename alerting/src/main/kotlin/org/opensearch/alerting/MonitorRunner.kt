@@ -460,6 +460,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
 
         for (trigger in monitor.triggers) {
             val alertsToUpdate = mutableSetOf<Alert>()
+            val completedAlertsToUpdate = mutableSetOf<Alert>()
             // Filter ACKNOWLEDGED Alerts from the deduped list so they do not have Actions executed for them.
             // New Alerts are ignored since they cannot be acknowledged yet.
             val dedupedAlerts = nextAlerts[trigger.id]?.get(AlertCategory.DEDUPED)
@@ -469,6 +470,10 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             nextAlerts[trigger.id]?.set(AlertCategory.DEDUPED, dedupedAlerts)
             val newAlerts = nextAlerts[trigger.id]?.get(AlertCategory.NEW) ?: mutableListOf()
             val completedAlerts = nextAlerts[trigger.id]?.get(AlertCategory.COMPLETED) ?: mutableListOf()
+
+            // Adding all the COMPLETED Alerts to a separate set and removing them if they get added
+            // to alertsToUpdate to ensure the Alert doc is updated at the end in either case
+            completedAlertsToUpdate.addAll(completedAlerts)
 
             // All trigger contexts and results should be available at this point since all triggers were evaluated in the main do-while loop
             val triggerCtx = triggerContexts[trigger.id]!!
@@ -482,12 +487,10 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             )
             for (action in trigger.actions) {
                 if (action.getActionScope() == ActionExecutionScope.Type.PER_ALERT && !shouldDefaultToPerExecution) {
-                    val perAlertActionFrequency = action.actionExecutionPolicy.actionExecutionScope as PerAlertActionScope
-                    for (alertCategory in perAlertActionFrequency.actionableAlerts) {
+                    val perAlertActionScope = action.actionExecutionPolicy.actionExecutionScope as PerAlertActionScope
+                    for (alertCategory in perAlertActionScope.actionableAlerts) {
                         val alertsToExecuteActionsFor = nextAlerts[trigger.id]?.get(alertCategory) ?: mutableListOf()
                         for (alert in alertsToExecuteActionsFor) {
-                            if (isBucketLevelTriggerActionThrottled(action, alert)) continue
-
                             val actionCtx = getActionContextForAlertCategory(
                                 alertCategory, alert, triggerCtx, monitorOrTriggerError
                             )
@@ -497,9 +500,18 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                                 triggerResult.actionResultsMap[alertBucketKeysHash] = mutableMapOf()
                             }
 
-                            val actionResult = runAction(action, actionCtx, dryrun)
+                            // Keeping the throttled response separate from runAction for now since
+                            // throttling is not supported for PER_EXECUTION
+                            val actionResult = if (isBucketLevelTriggerActionThrottled(action, alert)) {
+                                ActionRunResult(action.id, action.name, mapOf(), true, null, null)
+                            } else {
+                                runAction(action, actionCtx, dryrun)
+                            }
                             triggerResult.actionResultsMap[alertBucketKeysHash]?.set(action.id, actionResult)
                             alertsToUpdate.add(alert)
+                            // Remove the alert from completedAlertsToUpdate in case it is present there since
+                            // its update will be handled in the alertsToUpdate batch
+                            completedAlertsToUpdate.remove(alert)
                         }
                     }
                 } else if (action.getActionScope() == ActionExecutionScope.Type.PER_EXECUTION || shouldDefaultToPerExecution) {
@@ -527,6 +539,9 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                         }
                         triggerResult.actionResultsMap[alertBucketKeysHash]?.set(action.id, actionResult)
                         alertsToUpdate.add(alert)
+                        // Remove the alert from completedAlertsToUpdate in case it is present there since
+                        // its update will be handled in the alertsToUpdate batch
+                        completedAlertsToUpdate.remove(alert)
                     }
                 }
             }
@@ -548,6 +563,8 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             // ACKNOWLEDGED Alerts should not be saved here since actions are not executed for them.
             if (!dryrun && monitor.id != Monitor.NO_ID) {
                 alertService.saveAlerts(updatedAlerts, retryPolicy, allowUpdatingAcknowledgedAlert = false)
+                // Save any COMPLETED Alerts that were not covered in updatedAlerts
+                alertService.saveAlerts(completedAlertsToUpdate.toList(), retryPolicy, allowUpdatingAcknowledgedAlert = false)
             }
         }
 

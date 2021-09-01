@@ -258,7 +258,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerSettings(settings)
             .registerThreadPool(threadPool)
             .registerAlertIndices(alertIndices)
-            .registerInputService(InputService(client, scriptService, xContentRegistry))
+            .registerInputService(InputService(client, scriptService, namedWriteableRegistry, xContentRegistry))
             .registerTriggerService(TriggerService(scriptService))
             .registerAlertService(AlertService(client, xContentRegistry, alertIndices))
             .registerConsumers()
