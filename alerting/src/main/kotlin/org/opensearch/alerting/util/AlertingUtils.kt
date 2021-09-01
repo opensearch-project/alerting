@@ -34,7 +34,7 @@ import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.action.Action
-import org.opensearch.alerting.model.action.ActionExecutionScope
+import org.opensearch.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.commons.authuser.User
@@ -153,8 +153,17 @@ fun Monitor.isBucketLevelMonitor(): Boolean = this.monitorType == Monitor.Monito
  */
 fun AggregationResultBucket.getBucketKeysHash(): String = this.bucketKeys.joinToString(separator = "#")
 
-fun Action.getActionScope(): ActionExecutionScope.Type =
-    this.actionExecutionPolicy.actionExecutionScope.getExecutionScope()
+fun Action.getActionExecutionPolicy(monitor: Monitor): ActionExecutionPolicy? {
+    // When the ActionExecutionPolicy is null for an Action, the default is resolved at runtime
+    // so it can be chosen based on the Monitor type at that time.
+    // The Action config is not aware of the Monitor type which is why the default was not stored during
+    // the parse.
+    return this.actionExecutionPolicy ?: if (monitor.isBucketLevelMonitor()) {
+        ActionExecutionPolicy.getDefaultConfigurationForBucketLevelMonitor()
+    } else {
+        null
+    }
+}
 
 fun BucketLevelTriggerRunResult.getCombinedTriggerRunResult(
     prevTriggerRunResult: BucketLevelTriggerRunResult?

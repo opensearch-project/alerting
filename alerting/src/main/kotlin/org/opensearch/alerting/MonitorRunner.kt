@@ -58,6 +58,7 @@ import org.opensearch.alerting.model.action.Action.Companion.SUBJECT
 import org.opensearch.alerting.model.action.ActionExecutionScope
 import org.opensearch.alerting.model.action.AlertCategory
 import org.opensearch.alerting.model.action.PerAlertActionScope
+import org.opensearch.alerting.model.action.PerExecutionActionScope
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
@@ -74,7 +75,7 @@ import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.HOST_DENY_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.loadDestinationSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings.Companion.HOST_DENY_LIST_NONE
-import org.opensearch.alerting.util.getActionScope
+import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.alerting.util.getCombinedTriggerRunResult
 import org.opensearch.alerting.util.isADMonitor
@@ -486,9 +487,10 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 monitorOrTriggerError = monitorOrTriggerError
             )
             for (action in trigger.actions) {
-                if (action.getActionScope() == ActionExecutionScope.Type.PER_ALERT && !shouldDefaultToPerExecution) {
-                    val perAlertActionScope = action.actionExecutionPolicy.actionExecutionScope as PerAlertActionScope
-                    for (alertCategory in perAlertActionScope.actionableAlerts) {
+                // ActionExecutionPolicy should not be null for Bucket-Level Monitors since it has a default config when not set explicitly
+                val actionExecutionScope = action.getActionExecutionPolicy(monitor)!!.actionExecutionScope
+                if (actionExecutionScope is PerAlertActionScope && !shouldDefaultToPerExecution) {
+                    for (alertCategory in actionExecutionScope.actionableAlerts) {
                         val alertsToExecuteActionsFor = nextAlerts[trigger.id]?.get(alertCategory) ?: mutableListOf()
                         for (alert in alertsToExecuteActionsFor) {
                             val actionCtx = getActionContextForAlertCategory(
@@ -502,11 +504,12 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
 
                             // Keeping the throttled response separate from runAction for now since
                             // throttling is not supported for PER_EXECUTION
-                            val actionResult = if (isBucketLevelTriggerActionThrottled(action, alert)) {
-                                ActionRunResult(action.id, action.name, mapOf(), true, null, null)
-                            } else {
+                            val actionResult = if (isActionActionable(action, alert)) {
                                 runAction(action, actionCtx, dryrun)
+                            } else {
+                                ActionRunResult(action.id, action.name, mapOf(), true, null, null)
                             }
+
                             triggerResult.actionResultsMap[alertBucketKeysHash]?.set(action.id, actionResult)
                             alertsToUpdate.add(alert)
                             // Remove the alert from completedAlertsToUpdate in case it is present there since
@@ -514,7 +517,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                             completedAlertsToUpdate.remove(alert)
                         }
                     }
-                } else if (action.getActionScope() == ActionExecutionScope.Type.PER_EXECUTION || shouldDefaultToPerExecution) {
+                } else if (actionExecutionScope is PerExecutionActionScope || shouldDefaultToPerExecution) {
                     // If all categories of Alerts are empty, there is nothing to message on and we can skip the Action.
                     // If the error is not null, this is disregarded and the Action is executed anyway so the user can be notified.
                     if (monitorOrTriggerError == null && dedupedAlerts.isEmpty() && newAlerts.isEmpty() && completedAlerts.isEmpty())
@@ -637,23 +640,6 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             return (lastExecutionTime == null || lastExecutionTime.isBefore(throttledTimeBound))
         }
         return true
-    }
-
-    // TODO: Add unit test for this method (or at least cover it in MonitorRunnerIT)
-    // Bucket-Level Monitors use the throttle configurations defined in ActionExecutionPolicy, this method evaluates that configuration.
-    private fun isBucketLevelTriggerActionThrottled(action: Action, alert: Alert): Boolean {
-        if (action.actionExecutionPolicy.throttle == null) return false
-        // TODO: This will need to be updated if throttleEnabled is moved to ActionExecutionPolicy
-        if (action.throttleEnabled) {
-            val result = alert.actionExecutionResults.firstOrNull { r -> r.actionId == action.id }
-            val lastExecutionTime: Instant? = result?.lastExecutionTime
-            val throttledTimeBound = currentTime().minus(
-                action.actionExecutionPolicy.throttle.value.toLong(),
-                action.actionExecutionPolicy.throttle.unit
-            )
-            return !(lastExecutionTime == null || lastExecutionTime.isBefore(throttledTimeBound))
-        }
-        return false
     }
 
     private fun getActionContextForAlertCategory(
