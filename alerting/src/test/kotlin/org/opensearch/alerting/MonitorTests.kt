@@ -34,7 +34,7 @@ import java.time.Instant
 class MonitorTests : OpenSearchTestCase() {
 
     fun `test enabled time`() {
-        val monitor = randomMonitor()
+        val monitor = randomQueryLevelMonitor()
         val enabledMonitor = monitor.copy(enabled = true, enabledTime = Instant.now())
         try {
             enabledMonitor.copy(enabled = false)
@@ -52,11 +52,11 @@ class MonitorTests : OpenSearchTestCase() {
     }
 
     fun `test max triggers`() {
-        val monitor = randomMonitor()
+        val monitor = randomQueryLevelMonitor()
 
         val tooManyTriggers = mutableListOf<Trigger>()
         for (i in 0..10) {
-            tooManyTriggers.add(randomTrigger())
+            tooManyTriggers.add(randomQueryLevelTrigger())
         }
 
         try {

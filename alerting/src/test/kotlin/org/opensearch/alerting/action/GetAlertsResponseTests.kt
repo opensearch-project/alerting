@@ -72,7 +72,8 @@ class GetAlertsResponseTests : OpenSearchTestCase() {
             null,
             Collections.emptyList(),
             "severity",
-            Collections.emptyList()
+            Collections.emptyList(),
+            null
         )
         val req = GetAlertsResponse(listOf(alert), 1)
         assertNotNull(req)
@@ -107,7 +108,8 @@ class GetAlertsResponseTests : OpenSearchTestCase() {
             null,
             Collections.emptyList(),
             "severity",
-            Collections.emptyList()
+            Collections.emptyList(),
+            null
         )
         val req = GetAlertsResponse(listOf(alert), 1)
         var actualXContentString = req.toXContent(builder(), ToXContent.EMPTY_PARAMS).string()

@@ -29,7 +29,7 @@ package org.opensearch.alerting.util
 import org.opensearch.alerting.ANOMALY_RESULT_INDEX
 import org.opensearch.alerting.core.model.Input
 import org.opensearch.alerting.core.model.SearchInput
-import org.opensearch.alerting.randomMonitor
+import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
@@ -41,7 +41,7 @@ import org.opensearch.test.OpenSearchTestCase
 class AnomalyDetectionUtilsTests : OpenSearchTestCase() {
 
     fun `test is ad monitor`() {
-        val monitor = randomMonitor(
+        val monitor = randomQueryLevelMonitor(
             inputs = listOf(
                 SearchInput(
                     listOf(ANOMALY_RESULT_INDEX),
@@ -54,14 +54,14 @@ class AnomalyDetectionUtilsTests : OpenSearchTestCase() {
 
     fun `test not ad monitor if monitor have no inputs`() {
 
-        val monitor = randomMonitor(
+        val monitor = randomQueryLevelMonitor(
             inputs = listOf()
         )
         assertFalse(isADMonitor(monitor))
     }
 
     fun `test not ad monitor if monitor input is not search input`() {
-        val monitor = randomMonitor(
+        val monitor = randomQueryLevelMonitor(
             inputs = listOf(object : Input {
                 override fun name(): String {
                     TODO("Not yet implemented")
@@ -80,7 +80,7 @@ class AnomalyDetectionUtilsTests : OpenSearchTestCase() {
     }
 
     fun `test not ad monitor if monitor input has more than 1 indices`() {
-        val monitor = randomMonitor(
+        val monitor = randomQueryLevelMonitor(
             inputs = listOf(
                 SearchInput(
                     listOf(randomAlphaOfLength(5), randomAlphaOfLength(5)),
@@ -92,7 +92,7 @@ class AnomalyDetectionUtilsTests : OpenSearchTestCase() {
     }
 
     fun `test not ad monitor if monitor input's index name is not AD result index`() {
-        val monitor = randomMonitor(
+        val monitor = randomQueryLevelMonitor(
             inputs = listOf(SearchInput(listOf(randomAlphaOfLength(5)), SearchSourceBuilder().query(QueryBuilders.matchAllQuery())))
         )
         assertFalse(isADMonitor(monitor))
