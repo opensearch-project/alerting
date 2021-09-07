@@ -236,11 +236,13 @@ class TransportImportMonitorAction @Inject constructor(
             val bulkRequest = BulkRequest()
 
             for (monitorIndex in request.monitors.indices) {
-                request.monitors[monitorIndex] = request.monitors[monitorIndex].copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
+                request.monitors[monitorIndex] = request.monitors[monitorIndex]
+                    .copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
 
                 bulkRequest.add(
                     IndexRequest(SCHEDULED_JOBS_INDEX)
-                        .source(request.monitors[monitorIndex].toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+                        .source(request.monitors[monitorIndex]
+                            .toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
                         .timeout(indexTimeout)
                 )
             }
@@ -253,10 +255,10 @@ class TransportImportMonitorAction @Inject constructor(
                     var failed = 0
 
                     for (bulkResponseItem in response.items) {
-                        if (!bulkResponseItem.isFailed()) {
-                            successful += 1
-                        } else {
+                        if (bulkResponseItem.isFailed) {
                             failed += 1
+                        } else {
+                            successful += 1
                         }
                     }
 
