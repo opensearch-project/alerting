@@ -62,7 +62,7 @@ class RestExportMonitorAction : BaseRestHandler() {
         return object : RestResponseListener<ExportMonitorResponse>(channel) {
             @Throws(Exception::class)
             override fun buildResponse(response: ExportMonitorResponse): RestResponse {
-                val restResponse = BytesRestResponse(RestStatus.CREATED, response.toXContent(channel.newBuilder(), ToXContent.EMPTY_PARAMS))
+                val restResponse = BytesRestResponse(RestStatus.OK, response.toXContent(channel.newBuilder(), ToXContent.EMPTY_PARAMS))
                 val location = "${AlertingPlugin.MONITOR_BASE_URI}/export"
                 restResponse.addHeader("Location", location)
                 return restResponse

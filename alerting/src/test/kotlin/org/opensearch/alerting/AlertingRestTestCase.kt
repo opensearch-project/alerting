@@ -593,6 +593,18 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return StringEntity(toJsonString(), APPLICATION_JSON)
     }
 
+    protected fun MutableList<Monitor>.toHttpEntity(): HttpEntity {
+        var jsonString = "{\"monitors\": ["
+
+        // Build inner monitors JSON
+        for (monitor in this) {
+            jsonString += monitor.toJsonString() + ", "
+        }
+
+        // Strip off extra ", "
+        return StringEntity(jsonString.subSequence(0, jsonString.lastIndex-1).toString() + "]}", APPLICATION_JSON)
+    }
+
     private fun Monitor.toJsonString(): String {
         val builder = XContentFactory.jsonBuilder()
         return shuffleXContent(toXContent(builder)).string()
