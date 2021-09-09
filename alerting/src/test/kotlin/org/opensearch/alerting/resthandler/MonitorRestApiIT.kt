@@ -963,7 +963,6 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         // Verify that request was successful
         assertEquals("Importing monitors request failed", RestStatus.OK, exportResponse.restStatus())
 
-        // Create list of Monitor objects
         var responseMonitors = mutableListOf<Monitor>()
 
         // Parsing JSON to list of Monitor objects
@@ -981,7 +980,61 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
     }
 
-    fun `test round trip import and export`() {
+    fun `test import and export round trip`() {
+        val NUM_MONITORS = 3
+        var monitors = mutableListOf<Monitor>()
 
+        for (i in 1..NUM_MONITORS) {
+            monitors.add(randomMonitorWithoutUser())
+        }
+
+        // TODO: Figure out error for import API call.
+        //  Search response returns correctly, so the error must be in the payload given to the API call.
+        // First import monitors
+        client().makeRequest("POST", "$ALERTING_BASE_URI/import", emptyMap(), monitors.toHttpEntity())
+
+        refreshIndex("*")
+
+        // Then export monitors
+        val exportResponse = client()
+            .makeRequest("GET", "$ALERTING_BASE_URI/export", null,
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"))
+
+        var exportResponseMonitors = mutableListOf<Monitor>()
+
+        // Parsing JSON to list of Monitor objects
+        val xcp = createParser(XContentType.JSON.xContent(), exportResponse.entity.content)
+        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+        XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
+        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_ARRAY, xcp.nextToken(), xcp)
+        while (xcp.nextToken() != XContentParser.Token.END_ARRAY) {
+            exportResponseMonitors.add(Monitor.parse(xcp).copy(lastUpdateTime = Instant.now()))
+        }
+        XContentParserUtils.ensureExpectedToken(XContentParser.Token.END_OBJECT, xcp.nextToken(), xcp)
+
+        // Ensure all monitors are returned
+        assertEquals("Number of monitors exported does not match number of monitors imported",
+            NUM_MONITORS, exportResponseMonitors.size)
+
+        // Take monitors from export response and import it
+        client().makeRequest("POST", "$ALERTING_BASE_URI/import", emptyMap(), exportResponseMonitors.toHttpEntity())
+
+        // Verify that all monitors were created
+        val search = SearchSourceBuilder()
+            .query(QueryBuilders.termQuery("${Monitor.MONITOR_TYPE}.type", Monitor.MONITOR_TYPE))
+            .toString()
+
+        val searchResponse = client().makeRequest(
+            "GET",
+            "$ALERTING_BASE_URI/_search",
+            emptyMap(),
+            NStringEntity(search, ContentType.APPLICATION_JSON))
+
+        val searchParser = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
+        val hits = searchParser.map()["hits"]!! as Map<String, Map<String, Any>>
+        val numberDocsFound = hits["total"]?.get("value")
+
+        // We should now expect NUM_MONITORS*2 monitors since we import twice
+        assertEquals("Not all monitors created successfully", NUM_MONITORS*2, numberDocsFound)
     }
 }
