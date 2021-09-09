@@ -152,8 +152,7 @@ class TransportImportMonitorAction @Inject constructor(
                         actionListener.onFailure(AlertingException.wrap(t))
                     }
                 })
-            }
-            else {
+            } else {
                 prepareMonitorIndexing()
             }
         }

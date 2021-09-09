@@ -15,7 +15,9 @@
 package com.amazon.opendistroforelasticsearch.alerting.resthandler
 
 import com.amazon.opendistroforelasticsearch.alerting.AlertingPlugin
-import com.amazon.opendistroforelasticsearch.alerting.action.*
+import com.amazon.opendistroforelasticsearch.alerting.action.ExportMonitorAction
+import com.amazon.opendistroforelasticsearch.alerting.action.ExportMonitorRequest
+import com.amazon.opendistroforelasticsearch.alerting.action.ExportMonitorResponse
 import org.apache.logging.log4j.LogManager
 import org.elasticsearch.client.node.NodeClient
 import org.elasticsearch.common.xcontent.ToXContent

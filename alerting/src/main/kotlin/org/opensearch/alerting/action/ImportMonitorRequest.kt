@@ -42,7 +42,7 @@ class ImportMonitorRequest : ActionRequest {
 
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {
-        this.monitors.forEach{ monitor ->
+        this.monitors.forEach { monitor ->
             monitor.writeTo(out)
         }
     }

@@ -22,12 +22,10 @@ import org.elasticsearch.common.io.stream.StreamOutput
 import java.io.IOException
 
 class ExportMonitorRequest : ActionRequest {
-    constructor(
-    ): super()
+    constructor(): super()
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
-    )
+    constructor(sin: StreamInput): this()
 
     override fun validate(): ActionRequestValidationException? {
         return null

@@ -602,7 +602,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         }
 
         // Strip off extra ", "
-        return StringEntity(jsonString.subSequence(0, jsonString.lastIndex-1).toString() + "]}", APPLICATION_JSON)
+        return StringEntity(jsonString.subSequence(0, jsonString.lastIndex - 1).toString() + "]}", APPLICATION_JSON)
     }
 
     private fun Monitor.toJsonString(): String {
