@@ -12,25 +12,25 @@
  *   express or implied. See the License for the specific language governing
  *   permissions and limitations under the License.
  */
-package com.amazon.opendistroforelasticsearch.alerting.resthandler
+package org.opensearch.alerting.resthandler
 
-import com.amazon.opendistroforelasticsearch.alerting.AlertingPlugin
-import com.amazon.opendistroforelasticsearch.alerting.action.ExportMonitorAction
-import com.amazon.opendistroforelasticsearch.alerting.action.ExportMonitorRequest
-import com.amazon.opendistroforelasticsearch.alerting.action.ExportMonitorResponse
 import org.apache.logging.log4j.LogManager
-import org.elasticsearch.client.node.NodeClient
-import org.elasticsearch.common.xcontent.ToXContent
-import org.elasticsearch.rest.BaseRestHandler
-import org.elasticsearch.rest.BaseRestHandler.RestChannelConsumer
-import org.elasticsearch.rest.BytesRestResponse
-import org.elasticsearch.rest.RestChannel
-import org.elasticsearch.rest.RestHandler.Route
-import org.elasticsearch.rest.RestRequest
-import org.elasticsearch.rest.RestRequest.Method.GET
-import org.elasticsearch.rest.RestResponse
-import org.elasticsearch.rest.RestStatus
-import org.elasticsearch.rest.action.RestResponseListener
+import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.action.ExportMonitorAction
+import org.opensearch.alerting.action.ExportMonitorRequest
+import org.opensearch.alerting.action.ExportMonitorResponse
+import org.opensearch.client.node.NodeClient
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
+import org.opensearch.rest.BytesRestResponse
+import org.opensearch.rest.RestChannel
+import org.opensearch.rest.RestHandler.Route
+import org.opensearch.rest.RestRequest
+import org.opensearch.rest.RestRequest.Method.GET
+import org.opensearch.rest.RestResponse
+import org.opensearch.rest.RestStatus
+import org.opensearch.rest.action.RestResponseListener
 import java.io.IOException
 
 private val log = LogManager.getLogger(RestExportMonitorAction::class.java)
@@ -59,8 +59,7 @@ class RestExportMonitorAction : BaseRestHandler() {
         }
     }
 
-    private fun exportMonitorResponse(channel: RestChannel):
-            RestResponseListener<ExportMonitorResponse> {
+    private fun exportMonitorResponse(channel: RestChannel): RestResponseListener<ExportMonitorResponse> {
         return object : RestResponseListener<ExportMonitorResponse>(channel) {
             @Throws(Exception::class)
             override fun buildResponse(response: ExportMonitorResponse): RestResponse {

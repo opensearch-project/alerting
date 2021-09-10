@@ -915,7 +915,8 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             "GET",
             "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON))
+            NStringEntity(search, ContentType.APPLICATION_JSON)
+        )
 
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
@@ -941,12 +942,14 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             client().makeRequest("POST", "$ALERTING_BASE_URI/import", emptyMap(), monitors.toHttpEntity())
         } catch (e: ResponseException) {
             // When an index with invalid name is mentioned, instead of returning invalid_index_name_exception security
-                // plugin throws security_exception.
+            // plugin throws security_exception.
             // Refer: https://github.com/opendistro-for-elasticsearch/security/issues/718
             // Without security plugin we get BAD_REQUEST correctly. With security_plugin we get INTERNAL_SERVER_ERROR,
-                // till above issue is fixed.
-            assertTrue("Unexpected status",
-                listOf<RestStatus>(RestStatus.BAD_REQUEST, RestStatus.FORBIDDEN).contains(e.response.restStatus()))
+            // till above issue is fixed.
+            assertTrue(
+                "Unexpected status",
+                listOf<RestStatus>(RestStatus.BAD_REQUEST, RestStatus.FORBIDDEN).contains(e.response.restStatus())
+            )
         }
     }
 
@@ -958,8 +961,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         }
 
         val exportResponse = client()
-            .makeRequest("GET", "$ALERTING_BASE_URI/export", null,
-                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"))
+            .makeRequest(
+                "GET", "$ALERTING_BASE_URI/export", null,
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+            )
 
         // Verify that request was successful
         assertEquals("Exporting monitors request failed", RestStatus.OK, exportResponse.restStatus())
@@ -995,8 +1000,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
         // Then export monitors
         val exportResponse = client()
-            .makeRequest("GET", "$ALERTING_BASE_URI/export", null,
-                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"))
+            .makeRequest(
+                "GET", "$ALERTING_BASE_URI/export", null,
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+            )
 
         var exportResponseMonitors = mutableListOf<Monitor>()
 
@@ -1032,7 +1039,8 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             "GET",
             "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON))
+            NStringEntity(search, ContentType.APPLICATION_JSON)
+        )
 
         val searchParser = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
         val hits = searchParser.map()["hits"]!! as Map<String, Map<String, Any>>

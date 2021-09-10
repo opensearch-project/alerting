@@ -27,12 +27,12 @@ class ImportMonitorRequest : ActionRequest {
 
     constructor(
         monitors: MutableList<Monitor>
-    ): super() {
+    ) : super() {
         this.monitors = monitors
     }
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this(
+    constructor(sin: StreamInput) : this(
         monitors = sin.readList(::Monitor) as MutableList<Monitor>
     )
 

@@ -179,25 +179,48 @@ class TransportImportMonitorAction @Inject constructor(
                 .timeout(requestTimeout)
             val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX)
                 .source(searchSource)
-            client.search(searchRequest, object : ActionListener<SearchResponse> {
-                override fun onResponse(searchResponse: SearchResponse) {
-                    onSearchResponse(searchResponse)
-                }
+            client.search(
+                searchRequest,
+                object : ActionListener<SearchResponse> {
+                    override fun onResponse(searchResponse: SearchResponse) {
+                        onSearchResponse(searchResponse)
+                    }
 
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
+                    override fun onFailure(t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                    }
                 }
-            })
+            )
         }
 
         private fun validateActionThrottle(monitor: Monitor, maxValue: TimeValue, minValue: TimeValue) {
             monitor.triggers.forEach { trigger ->
                 trigger.actions.forEach { action ->
                     if (action.throttle != null) {
-                        require(TimeValue(Duration.of(action.throttle.value.toLong(), action.throttle.unit).toMillis())
-                            .compareTo(maxValue) <= 0, { "Can only set throttle period less than or equal to $maxValue" })
-                        require(TimeValue(Duration.of(action.throttle.value.toLong(), action.throttle.unit).toMillis())
-                            .compareTo(minValue) >= 0, { "Can only set throttle period greater than or equal to $minValue" })
+                        require(
+                            TimeValue(
+                                Duration.of(
+                                    action.throttle.value.toLong(),
+                                    action.throttle.unit
+                                ).toMillis()
+                            )
+                                .compareTo(
+                                    maxValue
+                                ) <= 0,
+                            { "Can only set throttle period less than or equal to $maxValue" }
+                        )
+                        require(
+                            TimeValue(
+                                Duration.of(
+                                    action.throttle.value.toLong(),
+                                    action.throttle.unit
+                                ).toMillis()
+                            )
+                                .compareTo(
+                                    minValue
+                                ) >= 0,
+                            { "Can only set throttle period greater than or equal to $minValue" }
+                        )
                     }
                 }
             }
@@ -211,8 +234,11 @@ class TransportImportMonitorAction @Inject constructor(
             if (totalHits != null && totalHits >= maxMonitors) {
                 log.error("This request would create more than the allowed monitors [$maxMonitors].")
                 actionListener.onFailure(
-                    AlertingException.wrap(IllegalArgumentException(
-                        "This request would create more than the allowed monitors [$maxMonitors]."))
+                    AlertingException.wrap(
+                        IllegalArgumentException(
+                            "This request would create more than the allowed monitors [$maxMonitors]."
+                        )
+                    )
                 )
             } else {
                 indexMonitor()
@@ -225,8 +251,12 @@ class TransportImportMonitorAction @Inject constructor(
                 prepareMonitorIndexing()
             } else {
                 log.error("Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged.")
-                actionListener.onFailure(AlertingException.wrap(OpenSearchStatusException(
-                    "Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged", RestStatus.INTERNAL_SERVER_ERROR))
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged", RestStatus.INTERNAL_SERVER_ERROR
+                        )
+                    )
                 )
             }
         }
@@ -236,39 +266,48 @@ class TransportImportMonitorAction @Inject constructor(
 
             for (monitorIndex in request.monitors.indices) {
                 request.monitors[monitorIndex] = request.monitors[monitorIndex]
-                    .copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
+                    .copy(
+                        schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion
+                    )
 
                 bulkRequest.add(
                     IndexRequest(SCHEDULED_JOBS_INDEX)
-                        .source(request.monitors[monitorIndex]
-                            .toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+                        .source(
+                            request.monitors[monitorIndex].toXContent(
+                                jsonBuilder(),
+                                ToXContent.MapParams(mapOf("with_type" to "true"))
+                            )
+                        )
                         .timeout(indexTimeout)
                 )
             }
 
-            client.bulk(bulkRequest, object : ActionListener<BulkResponse> {
-                override fun onResponse(response: BulkResponse) {
-                    // TODO: All monitor-creation failures happen in RestHandler, so failures need to passed here later.
+            client.bulk(
+                bulkRequest,
+                object : ActionListener<BulkResponse> {
+                    override fun onResponse(response: BulkResponse) {
+                        // TODO: All monitor-creation failures happen in RestHandler, so failures need to passed here later.
 
-                    var successful = 0
-                    var failed = 0
+                        var successful = 0
+                        var failed = 0
 
-                    for (bulkResponseItem in response.items) {
-                        if (bulkResponseItem.isFailed) {
-                            failed += 1
-                        } else {
-                            successful += 1
+                        for (bulkResponseItem in response.items) {
+                            if (bulkResponseItem.isFailed) {
+                                failed += 1
+                            } else {
+                                successful += 1
+                            }
                         }
-                    }
 
-                    actionListener.onResponse(
-                        ImportMonitorResponse(request.monitors.size, successful, failed)
-                    )
+                        actionListener.onResponse(
+                            ImportMonitorResponse(request.monitors.size, successful, failed)
+                        )
+                    }
+                    override fun onFailure(t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                    }
                 }
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
-                }
-            })
+            )
         }
     }
 }

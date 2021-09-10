@@ -38,6 +38,7 @@ import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetEmailAccountAction
 import org.opensearch.alerting.action.GetEmailGroupAction
 import org.opensearch.alerting.action.GetMonitorAction
+import org.opensearch.alerting.action.ImportMonitorAction
 import org.opensearch.alerting.action.IndexDestinationAction
 import org.opensearch.alerting.action.IndexEmailAccountAction
 import org.opensearch.alerting.action.IndexEmailGroupAction
@@ -45,7 +46,6 @@ import org.opensearch.alerting.action.IndexMonitorAction
 import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
 import org.opensearch.alerting.action.SearchMonitorAction
-import org.opensearch.alerting.action.ImportMonitorAction
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.JobSweeper
 import org.opensearch.alerting.core.ScheduledJobIndices

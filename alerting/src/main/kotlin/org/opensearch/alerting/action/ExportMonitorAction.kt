@@ -13,9 +13,9 @@
  *   permissions and limitations under the License.
  */
 
-package com.amazon.opendistroforelasticsearch.alerting.action
+package org.opensearch.alerting.action
 
-import org.elasticsearch.action.ActionType
+import org.opensearch.action.ActionType
 
 class ExportMonitorAction private constructor() : ActionType<ExportMonitorResponse>(NAME, ::ExportMonitorResponse) {
     companion object {

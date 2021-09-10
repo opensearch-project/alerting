@@ -78,8 +78,7 @@ class RestImportMonitorAction : BaseRestHandler() {
         }
     }
 
-    private fun importMonitorResponse(channel: RestChannel):
-            RestResponseListener<ImportMonitorResponse> {
+    private fun importMonitorResponse(channel: RestChannel): RestResponseListener<ImportMonitorResponse> {
         return object : RestResponseListener<ImportMonitorResponse>(channel) {
             @Throws(Exception::class)
             override fun buildResponse(response: ImportMonitorResponse): RestResponse {

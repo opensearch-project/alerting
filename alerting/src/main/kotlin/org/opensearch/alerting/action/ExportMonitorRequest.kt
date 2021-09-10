@@ -13,19 +13,19 @@
  *   permissions and limitations under the License.
  */
 
-package com.amazon.opendistroforelasticsearch.alerting.action
+package org.opensearch.alerting.action
 
-import org.elasticsearch.action.ActionRequest
-import org.elasticsearch.action.ActionRequestValidationException
-import org.elasticsearch.common.io.stream.StreamInput
-import org.elasticsearch.common.io.stream.StreamOutput
+import org.opensearch.action.ActionRequest
+import org.opensearch.action.ActionRequestValidationException
+import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.common.io.stream.StreamOutput
 import java.io.IOException
 
 class ExportMonitorRequest : ActionRequest {
-    constructor(): super()
+    constructor() : super()
 
     @Throws(IOException::class)
-    constructor(sin: StreamInput): this()
+    constructor(sin: StreamInput) : this()
 
     override fun validate(): ActionRequestValidationException? {
         return null

@@ -13,15 +13,15 @@
  *   permissions and limitations under the License.
  */
 
-package com.amazon.opendistroforelasticsearch.alerting.action
+package org.opensearch.alerting.action
 
-import com.amazon.opendistroforelasticsearch.alerting.model.Monitor
-import org.elasticsearch.action.ActionResponse
-import org.elasticsearch.common.io.stream.StreamInput
-import org.elasticsearch.common.io.stream.StreamOutput
-import org.elasticsearch.common.xcontent.ToXContent
-import org.elasticsearch.common.xcontent.ToXContentObject
-import org.elasticsearch.common.xcontent.XContentBuilder
+import org.opensearch.action.ActionResponse
+import org.opensearch.alerting.model.Monitor
+import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.common.io.stream.StreamOutput
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.ToXContentObject
+import org.opensearch.common.xcontent.XContentBuilder
 import java.io.IOException
 
 class ExportMonitorResponse : ActionResponse, ToXContentObject {
