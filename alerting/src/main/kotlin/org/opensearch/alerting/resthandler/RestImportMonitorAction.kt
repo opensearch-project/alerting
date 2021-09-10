@@ -15,20 +15,15 @@
 package org.opensearch.alerting.resthandler
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.ImportMonitorAction
 import org.opensearch.alerting.action.ImportMonitorRequest
 import org.opensearch.alerting.action.ImportMonitorResponse
 import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.util.IF_PRIMARY_TERM
-import org.opensearch.alerting.util.IF_SEQ_NO
-import org.opensearch.alerting.util.REFRESH
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentParser.Token
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
-import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.BytesRestResponse

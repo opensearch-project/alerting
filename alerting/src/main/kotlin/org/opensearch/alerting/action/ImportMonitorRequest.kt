@@ -17,11 +17,9 @@ package org.opensearch.alerting.action
 
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionRequestValidationException
-import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
-import org.opensearch.rest.RestRequest
 import java.io.IOException
 
 class ImportMonitorRequest : ActionRequest {
