@@ -33,6 +33,7 @@ import org.opensearch.alerting.action.DeleteEmailAccountAction
 import org.opensearch.alerting.action.DeleteEmailGroupAction
 import org.opensearch.alerting.action.DeleteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorAction
+import org.opensearch.alerting.action.ExportMonitorAction
 import org.opensearch.alerting.action.GetAlertsAction
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetEmailAccountAction
@@ -64,6 +65,7 @@ import org.opensearch.alerting.resthandler.RestDeleteEmailAccountAction
 import org.opensearch.alerting.resthandler.RestDeleteEmailGroupAction
 import org.opensearch.alerting.resthandler.RestDeleteMonitorAction
 import org.opensearch.alerting.resthandler.RestExecuteMonitorAction
+import org.opensearch.alerting.resthandler.RestExportMonitorAction
 import org.opensearch.alerting.resthandler.RestGetAlertsAction
 import org.opensearch.alerting.resthandler.RestGetDestinationsAction
 import org.opensearch.alerting.resthandler.RestGetEmailAccountAction
@@ -88,6 +90,7 @@ import org.opensearch.alerting.transport.TransportDeleteEmailAccountAction
 import org.opensearch.alerting.transport.TransportDeleteEmailGroupAction
 import org.opensearch.alerting.transport.TransportDeleteMonitorAction
 import org.opensearch.alerting.transport.TransportExecuteMonitorAction
+import org.opensearch.alerting.transport.TransportExportMonitorAction
 import org.opensearch.alerting.transport.TransportGetAlertsAction
 import org.opensearch.alerting.transport.TransportGetDestinationsAction
 import org.opensearch.alerting.transport.TransportGetEmailAccountAction
@@ -195,7 +198,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestGetEmailGroupAction(),
             RestGetDestinationsAction(),
             RestGetAlertsAction(),
-            RestImportMonitorAction()
+            RestImportMonitorAction(),
+            RestExportMonitorAction()
         )
     }
 
@@ -220,7 +224,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(DeleteEmailGroupAction.INSTANCE, TransportDeleteEmailGroupAction::class.java),
             ActionPlugin.ActionHandler(GetDestinationsAction.INSTANCE, TransportGetDestinationsAction::class.java),
             ActionPlugin.ActionHandler(GetAlertsAction.INSTANCE, TransportGetAlertsAction::class.java),
-            ActionPlugin.ActionHandler(ImportMonitorAction.INSTANCE, TransportImportMonitorAction::class.java)
+            ActionPlugin.ActionHandler(ImportMonitorAction.INSTANCE, TransportImportMonitorAction::class.java),
+            ActionPlugin.ActionHandler(ExportMonitorAction.INSTANCE, TransportExportMonitorAction::class.java)
         )
     }
 
