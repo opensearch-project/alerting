@@ -1,5 +1,5 @@
 name: Test Workflow
-# This workflow is triggered on pull requests and pushes to main or an opendistro release branch
+# This workflow is triggered on pull requests and pushes to main or an opensearch release branch
 on:
   pull_request:
     branches:
@@ -35,7 +35,7 @@ jobs:
         with:
           repository: 'opensearch-project/OpenSearch'
           path: OpenSearch
-          ref: '1.x'
+          ref: '1.1'
       - name: Build OpenSearch
         working-directory: ./OpenSearch
         run: ./gradlew publishToMavenLocal
