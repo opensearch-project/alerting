@@ -1,5 +1,5 @@
 name: Test Workflow
-# This workflow is triggered on pull requests and pushes to main or an opendistro release branch
+# This workflow is triggered on pull requests and pushes to main or an opensearch release branch
 on:
   pull_request:
     branches:
