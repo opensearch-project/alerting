@@ -34,125 +34,183 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
-import org.opensearch.ExceptionsHelper
-import org.opensearch.action.DocWriteRequest
 import org.opensearch.action.bulk.BackoffPolicy
-import org.opensearch.action.bulk.BulkRequest
-import org.opensearch.action.bulk.BulkResponse
-import org.opensearch.action.delete.DeleteRequest
-import org.opensearch.action.index.IndexRequest
-import org.opensearch.action.search.SearchRequest
-import org.opensearch.action.search.SearchResponse
-import org.opensearch.alerting.alerts.AlertError
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.moveAlerts
 import org.opensearch.alerting.core.JobRunner
 import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.elasticapi.InjectorContextElement
-import org.opensearch.alerting.elasticapi.convertToMap
-import org.opensearch.alerting.elasticapi.firstFailureOrNull
 import org.opensearch.alerting.elasticapi.retry
-import org.opensearch.alerting.elasticapi.suspendUntil
-import org.opensearch.alerting.model.ActionExecutionResult
 import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.Alert.State.ACKNOWLEDGED
-import org.opensearch.alerting.model.Alert.State.ACTIVE
-import org.opensearch.alerting.model.Alert.State.COMPLETED
-import org.opensearch.alerting.model.Alert.State.DELETED
-import org.opensearch.alerting.model.Alert.State.ERROR
 import org.opensearch.alerting.model.AlertingConfigAccessor
+import org.opensearch.alerting.model.BucketLevelTrigger
+import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.model.Trigger
-import org.opensearch.alerting.model.TriggerRunResult
+import org.opensearch.alerting.model.QueryLevelTrigger
+import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.action.Action.Companion.MESSAGE
 import org.opensearch.alerting.model.action.Action.Companion.MESSAGE_ID
 import org.opensearch.alerting.model.action.Action.Companion.SUBJECT
+import org.opensearch.alerting.model.action.ActionExecutionScope
+import org.opensearch.alerting.model.action.AlertCategory
+import org.opensearch.alerting.model.action.PerAlertActionScope
+import org.opensearch.alerting.model.action.PerExecutionActionScope
 import org.opensearch.alerting.model.destination.DestinationContextFactory
+import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
+import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
-import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_MILLIS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.DEFAULT_MAX_ACTIONABLE_ALERT_COUNT
+import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTIONABLE_ALERT_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MOVE_ALERTS_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MOVE_ALERTS_BACKOFF_MILLIS
+import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
+import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST_NONE
 import org.opensearch.alerting.settings.DestinationSettings.Companion.HOST_DENY_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.loadDestinationSettings
-import org.opensearch.alerting.util.IndexUtils
-import org.opensearch.alerting.util.addUserBackendRolesFilter
+import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings.Companion.HOST_DENY_LIST_NONE
+import org.opensearch.alerting.util.getActionExecutionPolicy
+import org.opensearch.alerting.util.getBucketKeysHash
+import org.opensearch.alerting.util.getCombinedTriggerRunResult
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.isAllowed
+import org.opensearch.alerting.util.isBucketLevelMonitor
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.Strings
-import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.component.AbstractLifecycleComponent
 import org.opensearch.common.settings.Settings
-import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentFactory
-import org.opensearch.common.xcontent.XContentHelper
-import org.opensearch.common.xcontent.XContentParser
-import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
-import org.opensearch.common.xcontent.XContentType
-import org.opensearch.index.query.QueryBuilders
-import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
-import org.opensearch.script.ScriptType
 import org.opensearch.script.TemplateScript
-import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
 import kotlin.coroutines.CoroutineContext
 
-class MonitorRunner(
-    private val settings: Settings,
-    private val client: Client,
-    private val threadPool: ThreadPool,
-    private val scriptService: ScriptService,
-    private val xContentRegistry: NamedXContentRegistry,
-    private val alertIndices: AlertIndices,
-    clusterService: ClusterService
-) : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
+object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
 
-    private val logger = LogManager.getLogger(MonitorRunner::class.java)
+    private val logger = LogManager.getLogger(javaClass)
+
+    private lateinit var clusterService: ClusterService
+    private lateinit var client: Client
+    private lateinit var xContentRegistry: NamedXContentRegistry
+    private lateinit var scriptService: ScriptService
+    private lateinit var settings: Settings
+    private lateinit var threadPool: ThreadPool
+    private lateinit var alertIndices: AlertIndices
+    private lateinit var inputService: InputService
+    private lateinit var triggerService: TriggerService
+    private lateinit var alertService: AlertService
+
+    @Volatile private lateinit var retryPolicy: BackoffPolicy
+    @Volatile private lateinit var moveAlertsRetryPolicy: BackoffPolicy
+
+    @Volatile private var allowList = ALLOW_LIST_NONE
+    @Volatile private var hostDenyList = HOST_DENY_LIST_NONE
+
+    @Volatile private lateinit var destinationSettings: Map<String, DestinationSettings.Companion.SecureDestinationSettings>
+    @Volatile private lateinit var destinationContextFactory: DestinationContextFactory
+
+    @Volatile private var maxActionableAlertCount = DEFAULT_MAX_ACTIONABLE_ALERT_COUNT
 
     private lateinit var runnerSupervisor: Job
     override val coroutineContext: CoroutineContext
         get() = Dispatchers.Default + runnerSupervisor
 
-    @Volatile private var retryPolicy =
-        BackoffPolicy.constantBackoff(ALERT_BACKOFF_MILLIS.get(settings), ALERT_BACKOFF_COUNT.get(settings))
-    @Volatile private var moveAlertsRetryPolicy =
-        BackoffPolicy.exponentialBackoff(MOVE_ALERTS_BACKOFF_MILLIS.get(settings), MOVE_ALERTS_BACKOFF_COUNT.get(settings))
-    @Volatile private var allowList = ALLOW_LIST.get(settings)
+    fun registerClusterService(clusterService: ClusterService): MonitorRunner {
+        this.clusterService = clusterService
+        return this
+    }
 
-    @Volatile private var hostDenyList = HOST_DENY_LIST.get(settings)
+    fun registerClient(client: Client): MonitorRunner {
+        this.client = client
+        return this
+    }
 
-    @Volatile private var destinationSettings = loadDestinationSettings(settings)
-    @Volatile private var destinationContextFactory = DestinationContextFactory(client, xContentRegistry, destinationSettings)
+    fun registerNamedXContentRegistry(xContentRegistry: NamedXContentRegistry): MonitorRunner {
+        this.xContentRegistry = xContentRegistry
+        return this
+    }
 
-    init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERT_BACKOFF_MILLIS, ALERT_BACKOFF_COUNT) {
-            millis, count ->
+    fun registerScriptService(scriptService: ScriptService): MonitorRunner {
+        this.scriptService = scriptService
+        return this
+    }
+
+    fun registerSettings(settings: Settings): MonitorRunner {
+        this.settings = settings
+        return this
+    }
+
+    fun registerThreadPool(threadPool: ThreadPool): MonitorRunner {
+        this.threadPool = threadPool
+        return this
+    }
+
+    fun registerAlertIndices(alertIndices: AlertIndices): MonitorRunner {
+        this.alertIndices = alertIndices
+        return this
+    }
+
+    fun registerInputService(inputService: InputService): MonitorRunner {
+        this.inputService = inputService
+        return this
+    }
+
+    fun registerTriggerService(triggerService: TriggerService): MonitorRunner {
+        this.triggerService = triggerService
+        return this
+    }
+
+    fun registerAlertService(alertService: AlertService): MonitorRunner {
+        this.alertService = alertService
+        return this
+    }
+
+    // Must be called after registerClusterService and registerSettings in AlertingPlugin
+    fun registerConsumers(): MonitorRunner {
+        retryPolicy = BackoffPolicy.constantBackoff(ALERT_BACKOFF_MILLIS.get(settings), ALERT_BACKOFF_COUNT.get(settings))
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERT_BACKOFF_MILLIS, ALERT_BACKOFF_COUNT) { millis, count ->
             retryPolicy = BackoffPolicy.constantBackoff(millis, count)
         }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(MOVE_ALERTS_BACKOFF_MILLIS, MOVE_ALERTS_BACKOFF_COUNT) {
-            millis, count ->
+
+        moveAlertsRetryPolicy =
+            BackoffPolicy.exponentialBackoff(MOVE_ALERTS_BACKOFF_MILLIS.get(settings), MOVE_ALERTS_BACKOFF_COUNT.get(settings))
+        clusterService.clusterSettings.addSettingsUpdateConsumer(MOVE_ALERTS_BACKOFF_MILLIS, MOVE_ALERTS_BACKOFF_COUNT) { millis, count ->
             moveAlertsRetryPolicy = BackoffPolicy.exponentialBackoff(millis, count)
         }
+
+        allowList = ALLOW_LIST.get(settings)
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALLOW_LIST) {
             allowList = it
         }
+
+        // Host deny list is not a dynamic setting so no consumer is registered but the variable is set here
+        hostDenyList = HOST_DENY_LIST.get(settings)
+
+        maxActionableAlertCount = MAX_ACTIONABLE_ALERT_COUNT.get(settings)
+        clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_ACTIONABLE_ALERT_COUNT) {
+            maxActionableAlertCount = it
+        }
+
+        return this
     }
 
-    /** Update destination settings when the reload API is called so that new keystore values are visible */
+    // To be safe, call this last as it depends on a number of other components being registered beforehand (client, settings, etc.)
+    fun registerDestinationSettings(): MonitorRunner {
+        destinationSettings = loadDestinationSettings(settings)
+        destinationContextFactory = DestinationContextFactory(client, xContentRegistry, destinationSettings)
+        return this
+    }
+
+    // Updates destination settings when the reload API is called so that new keystore values are visible
     fun reloadDestinationSettings(settings: Settings) {
         destinationSettings = loadDestinationSettings(settings)
 
@@ -207,35 +265,29 @@ class MonitorRunner(
             throw IllegalArgumentException("Invalid job type")
         }
 
-        launch { runMonitor(job, periodStart, periodEnd) }
+        launch {
+            if (job.isBucketLevelMonitor()) {
+                runBucketLevelMonitor(job, periodStart, periodEnd)
+            } else {
+                runQueryLevelMonitor(job, periodStart, periodEnd)
+            }
+        }
     }
 
-    suspend fun runMonitor(monitor: Monitor, periodStart: Instant, periodEnd: Instant, dryrun: Boolean = false): MonitorRunResult {
-        /*
-         * We need to handle 3 cases:
-         * 1. Monitors created by older versions and never updated. These monitors wont have User details in the
-         * monitor object. `monitor.user` will be null. Insert `all_access, AmazonES_all_access` role.
-         * 2. Monitors are created when security plugin is disabled, these will have empty User object.
-         * (`monitor.user.name`, `monitor.user.roles` are empty )
-         * 3. Monitors are created when security plugin is enabled, these will have an User object.
-         */
-        var roles = if (monitor.user == null) {
-            // fixme: discuss and remove hardcoded to settings?
-            settings.getAsList("", listOf("all_access", "AmazonES_all_access"))
-        } else {
-            monitor.user.roles
-        }
+    suspend fun runQueryLevelMonitor(monitor: Monitor, periodStart: Instant, periodEnd: Instant, dryrun: Boolean = false):
+        MonitorRunResult<QueryLevelTriggerRunResult> {
+        val roles = getRolesForMonitor(monitor)
         logger.debug("Running monitor: ${monitor.name} with roles: $roles Thread: ${Thread.currentThread().name}")
 
         if (periodStart == periodEnd) {
             logger.warn("Start and end time are the same: $periodStart. This monitor will probably only run once.")
         }
 
-        var monitorResult = MonitorRunResult(monitor.name, periodStart, periodEnd)
+        var monitorResult = MonitorRunResult<QueryLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
         val currentAlerts = try {
             alertIndices.createOrUpdateAlertIndex()
             alertIndices.createOrUpdateInitialHistoryIndex()
-            loadCurrentAlerts(monitor)
+            alertService.loadCurrentAlertsForQueryLevelMonitor(monitor)
         } catch (e: Exception) {
             // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
             val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
@@ -244,312 +296,338 @@ class MonitorRunner(
         }
         if (!isADMonitor(monitor)) {
             runBlocking(InjectorContextElement(monitor.id, settings, threadPool.threadContext, roles)) {
-                monitorResult = monitorResult.copy(inputResults = collectInputResults(monitor, periodStart, periodEnd))
+                monitorResult = monitorResult.copy(inputResults = inputService.collectInputResults(monitor, periodStart, periodEnd))
             }
         } else {
-            monitorResult = monitorResult.copy(inputResults = collectInputResultsForADMonitor(monitor, periodStart, periodEnd))
+            monitorResult = monitorResult.copy(inputResults = inputService.collectInputResultsForADMonitor(monitor, periodStart, periodEnd))
         }
 
         val updatedAlerts = mutableListOf<Alert>()
-        val triggerResults = mutableMapOf<String, TriggerRunResult>()
+        val triggerResults = mutableMapOf<String, QueryLevelTriggerRunResult>()
         for (trigger in monitor.triggers) {
             val currentAlert = currentAlerts[trigger]
-            val triggerCtx = TriggerExecutionContext(monitor, trigger, monitorResult, currentAlert)
-            val triggerResult = runTrigger(monitor, trigger, triggerCtx)
+            val triggerCtx = QueryLevelTriggerExecutionContext(monitor, trigger as QueryLevelTrigger, monitorResult, currentAlert)
+            val triggerResult = triggerService.runQueryLevelTrigger(monitor, trigger, triggerCtx)
             triggerResults[trigger.id] = triggerResult
 
-            if (isTriggerActionable(triggerCtx, triggerResult)) {
+            if (triggerService.isQueryLevelTriggerActionable(triggerCtx, triggerResult)) {
                 val actionCtx = triggerCtx.copy(error = monitorResult.error ?: triggerResult.error)
                 for (action in trigger.actions) {
                     triggerResult.actionResults[action.id] = runAction(action, actionCtx, dryrun)
                 }
             }
 
-            val updatedAlert = composeAlert(triggerCtx, triggerResult, monitorResult.alertError() ?: triggerResult.alertError())
+            val updatedAlert = alertService.composeQueryLevelAlert(
+                triggerCtx, triggerResult,
+                monitorResult.alertError() ?: triggerResult.alertError()
+            )
             if (updatedAlert != null) updatedAlerts += updatedAlert
         }
 
         // Don't save alerts if this is a test monitor
         if (!dryrun && monitor.id != Monitor.NO_ID) {
-            saveAlerts(updatedAlerts)
+            alertService.saveAlerts(updatedAlerts, retryPolicy)
         }
         return monitorResult.copy(triggerResults = triggerResults)
     }
 
-    private fun currentTime() = Instant.ofEpochMilli(threadPool.absoluteTimeInMillis())
+    // TODO: This method has grown very large with all the business logic that has been added.
+    //  Revisit this during refactoring and break it down to be more manageable.
+    suspend fun runBucketLevelMonitor(
+        monitor: Monitor,
+        periodStart: Instant,
+        periodEnd: Instant,
+        dryrun: Boolean = false
+    ): MonitorRunResult<BucketLevelTriggerRunResult> {
+        val roles = getRolesForMonitor(monitor)
+        logger.debug("Running monitor: ${monitor.name} with roles: $roles Thread: ${Thread.currentThread().name}")
 
-    private fun composeAlert(ctx: TriggerExecutionContext, result: TriggerRunResult, alertError: AlertError?): Alert? {
-        val currentTime = currentTime()
-        val currentAlert = ctx.alert
+        if (periodStart == periodEnd) {
+            logger.warn("Start and end time are the same: $periodStart. This monitor will probably only run once.")
+        }
 
-        val updatedActionExecutionResults = mutableListOf<ActionExecutionResult>()
-        val currentActionIds = mutableSetOf<String>()
-        if (currentAlert != null) {
-            // update current alert's action execution results
-            for (actionExecutionResult in currentAlert.actionExecutionResults) {
-                val actionId = actionExecutionResult.actionId
-                currentActionIds.add(actionId)
-                val actionRunResult = result.actionResults[actionId]
-                when {
-                    actionRunResult == null -> updatedActionExecutionResults.add(actionExecutionResult)
-                    actionRunResult.throttled ->
-                        updatedActionExecutionResults.add(
-                            actionExecutionResult.copy(
-                                throttledCount = actionExecutionResult.throttledCount + 1
+        var monitorResult = MonitorRunResult<BucketLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
+        val currentAlerts = try {
+            alertIndices.createOrUpdateAlertIndex()
+            alertIndices.createOrUpdateInitialHistoryIndex()
+            alertService.loadCurrentAlertsForBucketLevelMonitor(monitor)
+        } catch (e: Exception) {
+            // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
+            val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
+            logger.error("Error loading alerts for monitor: $id", e)
+            return monitorResult.copy(error = e)
+        }
+
+        /*
+         * Since the aggregation query can consist of multiple pages, each iteration of the do-while loop only has partial results
+         * from the runBucketLevelTrigger results whereas the currentAlerts has a complete view of existing Alerts. This means that
+         * it can be confirmed if an Alert is new or de-duped local to the do-while loop if a key appears or doesn't appear in
+         * the currentAlerts. However, it cannot be guaranteed that an existing Alert is COMPLETED until all pages have been
+         * iterated over (since a bucket that did not appear in one page of the aggregation results, could appear in a later page).
+         *
+         * To solve for this, the currentAlerts will be acting as a list of "potentially completed alerts" throughout the execution.
+         * When categorizing the Alerts in each iteration, de-duped Alerts will be removed from the currentAlerts map
+         * (for the Trigger being executed) and the Alerts left in currentAlerts after all pages have been iterated through can
+         * be marked as COMPLETED since they were never de-duped.
+         *
+         * Meanwhile, the nextAlerts map will contain Alerts that will exist at the end of this Monitor execution. It is a compilation
+         * across Triggers because in the case of executing actions at a PER_EXECUTION frequency, all the Alerts are needed before executing
+         * Actions which can only be done once all of the aggregation results (and Triggers given the pagination logic) have been evaluated.
+         */
+        val triggerResults = mutableMapOf<String, BucketLevelTriggerRunResult>()
+        val triggerContexts = mutableMapOf<String, BucketLevelTriggerExecutionContext>()
+        val nextAlerts = mutableMapOf<String, MutableMap<AlertCategory, MutableList<Alert>>>()
+        var firstIteration = true
+        var firstPageOfInputResults = InputRunResults(listOf(), null)
+        do {
+            // TODO: Since a composite aggregation is being used for the input query, the total bucket count cannot be determined.
+            //  If a setting is imposed that limits buckets that can be processed for Bucket-Level Monitors, we'd need to iterate over
+            //  the buckets until we hit that threshold. In that case, we'd want to exit the execution without creating any alerts since the
+            //  buckets we iterate over before hitting the limit is not deterministic. Is there a better way to fail faster in this case?
+            runBlocking(InjectorContextElement(monitor.id, settings, threadPool.threadContext, roles)) {
+                // Storing the first page of results in the case of pagination input results to prevent empty results
+                // in the final output of monitorResult which occurs when all pages have been exhausted.
+                // If it's favorable to return the last page, will need to check how to accomplish that with multiple aggregation paths
+                // with different page counts.
+                val inputResults = inputService.collectInputResults(monitor, periodStart, periodEnd, monitorResult.inputResults)
+                if (firstIteration) {
+                    firstPageOfInputResults = inputResults
+                    firstIteration = false
+                }
+                monitorResult = monitorResult.copy(inputResults = inputResults)
+            }
+
+            for (trigger in monitor.triggers) {
+                // The currentAlerts map is formed by iterating over the Monitor's Triggers as keys so null should not be returned here
+                val currentAlertsForTrigger = currentAlerts[trigger]!!
+                val triggerCtx = BucketLevelTriggerExecutionContext(monitor, trigger as BucketLevelTrigger, monitorResult)
+                triggerContexts[trigger.id] = triggerCtx
+                val triggerResult = triggerService.runBucketLevelTrigger(monitor, trigger, triggerCtx)
+                triggerResults[trigger.id] = triggerResult.getCombinedTriggerRunResult(triggerResults[trigger.id])
+
+                /*
+                 * If an error was encountered when running the trigger, it means that something went wrong when parsing the input results
+                 * for the filtered buckets returned from the pipeline bucket selector injected into the input query.
+                 *
+                 * In this case, the returned aggregation result buckets are empty so the categorization of the Alerts that happens below
+                 * should be skipped/invalidated since comparing the current Alerts to an empty result will lead the execution to believe
+                 * that all Alerts have been COMPLETED. Not doing so would mean it would not be possible to propagate the error into the
+                 * existing Alerts in a way the user can easily view them since they will have all been moved to the history index.
+                 */
+                if (triggerResults[trigger.id]?.error != null) continue
+
+                // TODO: Should triggerResult's aggregationResultBucket be a list? If not, getCategorizedAlertsForBucketLevelMonitor can
+                //  be refactored to use a map instead
+                val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(
+                    monitor, trigger, currentAlertsForTrigger, triggerResult.aggregationResultBuckets.values.toList()
+                ).toMutableMap()
+                val dedupedAlerts = categorizedAlerts.getOrDefault(AlertCategory.DEDUPED, emptyList())
+                var newAlerts = categorizedAlerts.getOrDefault(AlertCategory.NEW, emptyList())
+
+                /*
+                 * Index de-duped and new Alerts here (if it's not a test Monitor) so they are available at the time the Actions are executed.
+                 *
+                 * The new Alerts have to be returned and saved back with their indexed doc ID to prevent duplicate documents
+                 * when the Alerts are updated again after Action execution.
+                 *
+                 * Note: Index operations can fail for various reasons (such as write blocks on cluster), in such a case, the Actions
+                 * will still execute with the Alert information in the ctx but the Alerts may not be visible.
+                 */
+                if (!dryrun && monitor.id != Monitor.NO_ID) {
+                    alertService.saveAlerts(dedupedAlerts, retryPolicy, allowUpdatingAcknowledgedAlert = true)
+                    newAlerts = alertService.saveNewAlerts(newAlerts, retryPolicy)
+                }
+
+                // Store deduped and new Alerts to accumulate across pages
+                if (!nextAlerts.containsKey(trigger.id)) {
+                    nextAlerts[trigger.id] = mutableMapOf(
+                        AlertCategory.DEDUPED to mutableListOf(),
+                        AlertCategory.NEW to mutableListOf(),
+                        AlertCategory.COMPLETED to mutableListOf()
+                    )
+                }
+                nextAlerts[trigger.id]?.get(AlertCategory.DEDUPED)?.addAll(dedupedAlerts)
+                nextAlerts[trigger.id]?.get(AlertCategory.NEW)?.addAll(newAlerts)
+            }
+        } while (monitorResult.inputResults.afterKeysPresent())
+
+        // The completed Alerts are whatever are left in the currentAlerts.
+        // However, this operation will only be done if there was no trigger error, since otherwise the nextAlerts were not collected
+        // in favor of just using the currentAlerts as-is.
+        currentAlerts.forEach { (trigger, keysToAlertsMap) ->
+            if (triggerResults[trigger.id]?.error == null)
+                nextAlerts[trigger.id]?.get(AlertCategory.COMPLETED)?.addAll(alertService.convertToCompletedAlerts(keysToAlertsMap))
+        }
+
+        for (trigger in monitor.triggers) {
+            val alertsToUpdate = mutableSetOf<Alert>()
+            val completedAlertsToUpdate = mutableSetOf<Alert>()
+            // Filter ACKNOWLEDGED Alerts from the deduped list so they do not have Actions executed for them.
+            // New Alerts are ignored since they cannot be acknowledged yet.
+            val dedupedAlerts = nextAlerts[trigger.id]?.get(AlertCategory.DEDUPED)
+                ?.filterNot { it.state == Alert.State.ACKNOWLEDGED }?.toMutableList()
+                ?: mutableListOf()
+            // Update nextAlerts so the filtered DEDUPED Alerts are reflected for PER_ALERT Action execution
+            nextAlerts[trigger.id]?.set(AlertCategory.DEDUPED, dedupedAlerts)
+            val newAlerts = nextAlerts[trigger.id]?.get(AlertCategory.NEW) ?: mutableListOf()
+            val completedAlerts = nextAlerts[trigger.id]?.get(AlertCategory.COMPLETED) ?: mutableListOf()
+
+            // Adding all the COMPLETED Alerts to a separate set and removing them if they get added
+            // to alertsToUpdate to ensure the Alert doc is updated at the end in either case
+            completedAlertsToUpdate.addAll(completedAlerts)
+
+            // All trigger contexts and results should be available at this point since all triggers were evaluated in the main do-while loop
+            val triggerCtx = triggerContexts[trigger.id]!!
+            val triggerResult = triggerResults[trigger.id]!!
+            val monitorOrTriggerError = monitorResult.error ?: triggerResult.error
+            val shouldDefaultToPerExecution = defaultToPerExecutionAction(
+                monitorId = monitor.id,
+                triggerId = trigger.id,
+                totalActionableAlertCount = dedupedAlerts.size + newAlerts.size + completedAlerts.size,
+                monitorOrTriggerError = monitorOrTriggerError
+            )
+            for (action in trigger.actions) {
+                // ActionExecutionPolicy should not be null for Bucket-Level Monitors since it has a default config when not set explicitly
+                val actionExecutionScope = action.getActionExecutionPolicy(monitor)!!.actionExecutionScope
+                if (actionExecutionScope is PerAlertActionScope && !shouldDefaultToPerExecution) {
+                    for (alertCategory in actionExecutionScope.actionableAlerts) {
+                        val alertsToExecuteActionsFor = nextAlerts[trigger.id]?.get(alertCategory) ?: mutableListOf()
+                        for (alert in alertsToExecuteActionsFor) {
+                            val actionCtx = getActionContextForAlertCategory(
+                                alertCategory, alert, triggerCtx, monitorOrTriggerError
                             )
-                        )
-                    else -> updatedActionExecutionResults.add(actionExecutionResult.copy(lastExecutionTime = actionRunResult.executionTime))
-                }
-            }
-            // add action execution results which not exist in current alert
-            updatedActionExecutionResults.addAll(
-                result.actionResults.filter { it -> !currentActionIds.contains(it.key) }
-                    .map { it -> ActionExecutionResult(it.key, it.value.executionTime, if (it.value.throttled) 1 else 0) }
-            )
-        } else {
-            updatedActionExecutionResults.addAll(
-                result.actionResults.map { it ->
-                    ActionExecutionResult(
-                        it.key, it.value.executionTime,
-                        if (it.value.throttled) 1 else 0
-                    )
-                }
-            )
-        }
+                            // AggregationResultBucket should not be null here
+                            val alertBucketKeysHash = alert.aggregationResultBucket!!.getBucketKeysHash()
+                            if (!triggerResult.actionResultsMap.containsKey(alertBucketKeysHash)) {
+                                triggerResult.actionResultsMap[alertBucketKeysHash] = mutableMapOf()
+                            }
 
-        // Merge the alert's error message to the current alert's history
-        val updatedHistory = currentAlert?.errorHistory.update(alertError)
-        return if (alertError == null && !result.triggered) {
-            currentAlert?.copy(
-                state = COMPLETED, endTime = currentTime, errorMessage = null,
-                errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
-                schemaVersion = IndexUtils.alertIndexSchemaVersion
-            )
-        } else if (alertError == null && currentAlert?.isAcknowledged() == true) {
-            null
-        } else if (currentAlert != null) {
-            val alertState = if (alertError == null) ACTIVE else ERROR
-            currentAlert.copy(
-                state = alertState, lastNotificationTime = currentTime, errorMessage = alertError?.message,
-                errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
-                schemaVersion = IndexUtils.alertIndexSchemaVersion
-            )
-        } else {
-            val alertState = if (alertError == null) ACTIVE else ERROR
-            Alert(
-                monitor = ctx.monitor, trigger = ctx.trigger, startTime = currentTime,
-                lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
-                errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
-                schemaVersion = IndexUtils.alertIndexSchemaVersion
-            )
-        }
-    }
+                            // Keeping the throttled response separate from runAction for now since
+                            // throttling is not supported for PER_EXECUTION
+                            val actionResult = if (isActionActionable(action, alert)) {
+                                runAction(action, actionCtx, dryrun)
+                            } else {
+                                ActionRunResult(action.id, action.name, mapOf(), true, null, null)
+                            }
 
-    private suspend fun collectInputResults(monitor: Monitor, periodStart: Instant, periodEnd: Instant): InputRunResults {
-        return try {
-            val results = mutableListOf<Map<String, Any>>()
-            monitor.inputs.forEach { input ->
-                when (input) {
-                    is SearchInput -> {
-                        // TODO: Figure out a way to use SearchTemplateRequest without bringing in the entire TransportClient
-                        val searchParams = mapOf(
-                            "period_start" to periodStart.toEpochMilli(),
-                            "period_end" to periodEnd.toEpochMilli()
-                        )
-                        val searchSource = scriptService.compile(
-                            Script(
-                                ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
-                                input.query.toString(), searchParams
-                            ),
-                            TemplateScript.CONTEXT
-                        )
-                            .newInstance(searchParams)
-                            .execute()
-
-                        val searchRequest = SearchRequest().indices(*input.indices.toTypedArray())
-                        XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource).use {
-                            searchRequest.source(SearchSourceBuilder.fromXContent(it))
+                            triggerResult.actionResultsMap[alertBucketKeysHash]?.set(action.id, actionResult)
+                            alertsToUpdate.add(alert)
+                            // Remove the alert from completedAlertsToUpdate in case it is present there since
+                            // its update will be handled in the alertsToUpdate batch
+                            completedAlertsToUpdate.remove(alert)
                         }
-                        val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
-                        results += searchResponse.convertToMap()
                     }
-                    else -> {
-                        throw IllegalArgumentException("Unsupported input type: ${input.name()}.")
+                } else if (actionExecutionScope is PerExecutionActionScope || shouldDefaultToPerExecution) {
+                    // If all categories of Alerts are empty, there is nothing to message on and we can skip the Action.
+                    // If the error is not null, this is disregarded and the Action is executed anyway so the user can be notified.
+                    if (monitorOrTriggerError == null && dedupedAlerts.isEmpty() && newAlerts.isEmpty() && completedAlerts.isEmpty())
+                        continue
+
+                    val actionCtx = triggerCtx.copy(
+                        dedupedAlerts = dedupedAlerts,
+                        newAlerts = newAlerts,
+                        completedAlerts = completedAlerts,
+                        error = monitorResult.error ?: triggerResult.error
+                    )
+                    val actionResult = runAction(action, actionCtx, dryrun)
+                    // If there was an error during trigger execution then the Alerts to be updated are the current Alerts since the state
+                    // was not changed. Otherwise, the Alerts to be updated are the sum of the deduped, new and completed Alerts.
+                    val alertsToIterate = if (monitorOrTriggerError == null) {
+                        (dedupedAlerts + newAlerts + completedAlerts)
+                    } else currentAlerts[trigger]?.map { it.value } ?: listOf()
+                    // Save the Action run result for every Alert
+                    for (alert in alertsToIterate) {
+                        val alertBucketKeysHash = alert.aggregationResultBucket!!.getBucketKeysHash()
+                        if (!triggerResult.actionResultsMap.containsKey(alertBucketKeysHash)) {
+                            triggerResult.actionResultsMap[alertBucketKeysHash] = mutableMapOf()
+                        }
+                        triggerResult.actionResultsMap[alertBucketKeysHash]?.set(action.id, actionResult)
+                        alertsToUpdate.add(alert)
+                        // Remove the alert from completedAlertsToUpdate in case it is present there since
+                        // its update will be handled in the alertsToUpdate batch
+                        completedAlertsToUpdate.remove(alert)
                     }
                 }
             }
-            InputRunResults(results.toList())
-        } catch (e: Exception) {
-            logger.info("Error collecting inputs for monitor: ${monitor.id}", e)
-            InputRunResults(emptyList(), e)
+
+            // Alerts are only added to alertsToUpdate after Action execution meaning the action results for it should be present
+            // in the actionResultsMap but returning a default value when accessing the map to be safe.
+            val updatedAlerts = alertsToUpdate.map { alert ->
+                val bucketKeysHash = alert.aggregationResultBucket!!.getBucketKeysHash()
+                val actionResults = triggerResult.actionResultsMap.getOrDefault(bucketKeysHash, emptyMap<String, ActionRunResult>())
+                alertService.updateActionResultsForBucketLevelAlert(
+                    alert.copy(lastNotificationTime = currentTime()),
+                    actionResults,
+                    // TODO: Update BucketLevelTriggerRunResult.alertError() to retrieve error based on the first failed Action
+                    monitorResult.alertError() ?: triggerResult.alertError()
+                )
+            }
+
+            // Update Alerts with action execution results (if it's not a test Monitor).
+            // ACKNOWLEDGED Alerts should not be saved here since actions are not executed for them.
+            if (!dryrun && monitor.id != Monitor.NO_ID) {
+                alertService.saveAlerts(updatedAlerts, retryPolicy, allowUpdatingAcknowledgedAlert = false)
+                // Save any COMPLETED Alerts that were not covered in updatedAlerts
+                alertService.saveAlerts(completedAlertsToUpdate.toList(), retryPolicy, allowUpdatingAcknowledgedAlert = false)
+            }
         }
+
+        return monitorResult.copy(inputResults = firstPageOfInputResults, triggerResults = triggerResults)
     }
 
-    /**
-     * We moved anomaly result index to system index list. So common user could not directly query
-     * this index any more. This method will stash current thread context to pass security check.
-     * So monitor job can access anomaly result index. We will add monitor user roles filter in
-     * search query to only return documents the monitor user can access.
-     *
-     * On alerting Kibana, monitor users can only see detectors that they have read access. So they
-     * can't create monitor on other user's detector which they have no read access. Even they know
-     * other user's detector id and use it to create monitor, this method will only return anomaly
-     * results they can read.
-     */
-    private suspend fun collectInputResultsForADMonitor(monitor: Monitor, periodStart: Instant, periodEnd: Instant): InputRunResults {
-        return try {
-            val results = mutableListOf<Map<String, Any>>()
-            val input = monitor.inputs[0] as SearchInput
-
-            val searchParams = mapOf("period_start" to periodStart.toEpochMilli(), "period_end" to periodEnd.toEpochMilli())
-            val searchSource = scriptService.compile(
-                Script(
-                    ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
-                    input.query.toString(), searchParams
-                ),
-                TemplateScript.CONTEXT
+    private fun defaultToPerExecutionAction(
+        monitorId: String,
+        triggerId: String,
+        totalActionableAlertCount: Int,
+        monitorOrTriggerError: Exception?
+    ): Boolean {
+        // If the monitorId or triggerResult has an error, then also default to PER_EXECUTION to communicate the error
+        if (monitorOrTriggerError != null) {
+            logger.debug(
+                "Trigger [$triggerId] in monitor [$monitorId] encountered an error. Defaulting to " +
+                    "[${ActionExecutionScope.Type.PER_EXECUTION}] for action execution to communicate error."
             )
-                .newInstance(searchParams)
-                .execute()
+            return true
+        }
 
-            val searchRequest = SearchRequest().indices(*input.indices.toTypedArray())
-            XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource).use {
-                searchRequest.source(SearchSourceBuilder.fromXContent(it))
-            }
+        // If the MAX_ACTIONABLE_ALERT_COUNT is set to -1, consider it unbounded and proceed regardless of actionable Alert count
+        if (maxActionableAlertCount < 0) return false
 
-            // Add user role filter for AD result
-            client.threadPool().threadContext.stashContext().use {
-                // Currently we have no way to verify if user has AD read permission or not. So we always add user
-                // role filter here no matter AD backend role filter enabled or not. If we don't add user role filter
-                // when AD backend filter disabled, user can run monitor on any detector and get anomaly data even
-                // they have no AD read permission. So if domain disabled AD backend role filter, monitor runner
-                // still can't get AD result with different user backend role, even the monitor user has permission
-                // to read AD result. This is a short term solution to trade off between user experience and security.
-                //
-                // Possible long term solution:
-                // 1.Use secure rest client to send request to AD search result API. If no permission exception,
-                // that mean user has read access on AD result. Then don't need to add user role filter when query
-                // AD result if AD backend role filter is disabled.
-                // 2.Security provide some transport action to verify if user has permission to search AD result.
-                // Monitor runner will send transport request to check permission first. If security plugin response
-                // is yes, user has permission to query AD result. If AD role filter enabled, we will add user role
-                // filter to protect data at user role level; otherwise, user can query any AD result.
-                addUserBackendRolesFilter(monitor.user, searchRequest.source())
-                val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
-                results += searchResponse.convertToMap()
-            }
-            InputRunResults(results.toList())
-        } catch (e: Exception) {
-            logger.info("Error collecting anomaly result inputs for monitor: ${monitor.id}", e)
-            InputRunResults(emptyList(), e)
+        // If the total number of Alerts to execute Actions on exceeds the MAX_ACTIONABLE_ALERT_COUNT setting then default to
+        // PER_EXECUTION for less intrusive Actions
+        if (totalActionableAlertCount > maxActionableAlertCount) {
+            logger.debug(
+                "The total actionable alerts for trigger [$triggerId] in monitor [$monitorId] is [$totalActionableAlertCount] " +
+                    "which exceeds the maximum of [$maxActionableAlertCount]. Defaulting to [${ActionExecutionScope.Type.PER_EXECUTION}] " +
+                    "for action execution."
+            )
+            return true
+        }
+
+        return false
+    }
+
+    private fun getRolesForMonitor(monitor: Monitor): List<String> {
+        /*
+         * We need to handle 3 cases:
+         * 1. Monitors created by older versions and never updated. These monitors wont have User details in the
+         * monitor object. `monitor.user` will be null. Insert `all_access, AmazonES_all_access` role.
+         * 2. Monitors are created when security plugin is disabled, these will have empty User object.
+         * (`monitor.user.name`, `monitor.user.roles` are empty )
+         * 3. Monitors are created when security plugin is enabled, these will have an User object.
+         */
+        return if (monitor.user == null) {
+            // fixme: discuss and remove hardcoded to settings?
+            // TODO: Remove "AmazonES_all_access" role?
+            settings.getAsList("", listOf("all_access", "AmazonES_all_access"))
+        } else {
+            monitor.user.roles
         }
     }
 
-    private fun runTrigger(monitor: Monitor, trigger: Trigger, ctx: TriggerExecutionContext): TriggerRunResult {
-        return try {
-            val triggered = scriptService.compile(trigger.condition, TriggerScript.CONTEXT)
-                .newInstance(trigger.condition.params)
-                .execute(ctx)
-            TriggerRunResult(trigger.name, triggered, null)
-        } catch (e: Exception) {
-            logger.info("Error running script for monitor ${monitor.id}, trigger: ${trigger.id}", e)
-            // if the script fails we need to send an alert so set triggered = true
-            TriggerRunResult(trigger.name, true, e)
-        }
-    }
-
-    private suspend fun loadCurrentAlerts(monitor: Monitor): Map<Trigger, Alert?> {
-        val request = SearchRequest(AlertIndices.ALERT_INDEX)
-            .routing(monitor.id)
-            .source(alertQuery(monitor))
-        val response: SearchResponse = client.suspendUntil { client.search(request, it) }
-        if (response.status() != RestStatus.OK) {
-            throw (response.firstFailureOrNull()?.cause ?: RuntimeException("Unknown error loading alerts"))
-        }
-
-        val foundAlerts = response.hits.map { Alert.parse(contentParser(it.sourceRef), it.id, it.version) }
-            .groupBy { it.triggerId }
-        foundAlerts.values.forEach { alerts ->
-            if (alerts.size > 1) {
-                logger.warn("Found multiple alerts for same trigger: $alerts")
-            }
-        }
-
-        return monitor.triggers.associate { trigger ->
-            trigger to (foundAlerts[trigger.id]?.firstOrNull())
-        }
-    }
-
-    private fun contentParser(bytesReference: BytesReference): XContentParser {
-        val xcp = XContentHelper.createParser(
-            xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-            bytesReference, XContentType.JSON
-        )
-        ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-        return xcp
-    }
-
-    private fun alertQuery(monitor: Monitor): SearchSourceBuilder {
-        return SearchSourceBuilder.searchSource()
-            .size(monitor.triggers.size * 2) // We expect there to be only a single in-progress alert so fetch 2 to check
-            .query(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, monitor.id))
-    }
-
-    private suspend fun saveAlerts(alerts: List<Alert>) {
-        var requestsToRetry = alerts.flatMap { alert ->
-            // we don't want to set the version when saving alerts because the Runner has first priority when writing alerts.
-            // In the rare event that a user acknowledges an alert between when it's read and when it's written
-            // back we're ok if that acknowledgement is lost. It's easier to get the user to retry than for the runner to
-            // spend time reloading the alert and writing it back.
-            when (alert.state) {
-                ACTIVE, ERROR -> {
-                    listOf<DocWriteRequest<*>>(
-                        IndexRequest(AlertIndices.ALERT_INDEX)
-                            .routing(alert.monitorId)
-                            .source(alert.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
-                            .id(if (alert.id != Alert.NO_ID) alert.id else null)
-                    )
-                }
-                ACKNOWLEDGED, DELETED -> {
-                    throw IllegalStateException("Unexpected attempt to save ${alert.state} alert: $alert")
-                }
-                COMPLETED -> {
-                    listOfNotNull<DocWriteRequest<*>>(
-                        DeleteRequest(AlertIndices.ALERT_INDEX, alert.id)
-                            .routing(alert.monitorId),
-                        // Only add completed alert to history index if history is enabled
-                        if (alertIndices.isHistoryEnabled()) {
-                            IndexRequest(AlertIndices.HISTORY_WRITE_INDEX)
-                                .routing(alert.monitorId)
-                                .source(alert.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
-                                .id(alert.id)
-                        } else null
-                    )
-                }
-            }
-        }
-
-        if (requestsToRetry.isEmpty()) return
-        // Retry Bulk requests if there was any 429 response
-        retryPolicy.retry(logger, listOf(RestStatus.TOO_MANY_REQUESTS)) {
-            val bulkRequest = BulkRequest().add(requestsToRetry)
-            val bulkResponse: BulkResponse = client.suspendUntil { client.bulk(bulkRequest, it) }
-            val failedResponses = (bulkResponse.items ?: arrayOf()).filter { it.isFailed }
-            requestsToRetry = failedResponses.filter { it.status() == RestStatus.TOO_MANY_REQUESTS }
-                .map { bulkRequest.requests()[it.itemId] as IndexRequest }
-
-            if (requestsToRetry.isNotEmpty()) {
-                val retryCause = failedResponses.first { it.status() == RestStatus.TOO_MANY_REQUESTS }.failure.cause
-                throw ExceptionsHelper.convertToOpenSearchException(retryCause)
-            }
-        }
-    }
-
-    private fun isTriggerActionable(ctx: TriggerExecutionContext, result: TriggerRunResult): Boolean {
-        // Suppress actions if the current alert is acknowledged and there are no errors.
-        val suppress = ctx.alert?.state == ACKNOWLEDGED && result.error == null && ctx.error == null
-        return result.triggered && !suppress
-    }
+    // TODO: Can this be updated to just use 'Instant.now()'?
+    //  'threadPool.absoluteTimeInMillis()' is referring to a cached value of System.currentTimeMillis() that by default updates every 200ms
+    private fun currentTime() = Instant.ofEpochMilli(threadPool.absoluteTimeInMillis())
 
     private fun isActionActionable(action: Action, alert: Alert?): Boolean {
         if (alert == null || action.throttle == null) {
@@ -564,7 +642,23 @@ class MonitorRunner(
         return true
     }
 
-    private suspend fun runAction(action: Action, ctx: TriggerExecutionContext, dryrun: Boolean): ActionRunResult {
+    private fun getActionContextForAlertCategory(
+        alertCategory: AlertCategory,
+        alert: Alert,
+        ctx: BucketLevelTriggerExecutionContext,
+        error: Exception?
+    ): BucketLevelTriggerExecutionContext {
+        return when (alertCategory) {
+            AlertCategory.DEDUPED ->
+                ctx.copy(dedupedAlerts = listOf(alert), newAlerts = emptyList(), completedAlerts = emptyList(), error = error)
+            AlertCategory.NEW ->
+                ctx.copy(dedupedAlerts = emptyList(), newAlerts = listOf(alert), completedAlerts = emptyList(), error = error)
+            AlertCategory.COMPLETED ->
+                ctx.copy(dedupedAlerts = emptyList(), newAlerts = emptyList(), completedAlerts = listOf(alert), error = error)
+        }
+    }
+
+    private suspend fun runAction(action: Action, ctx: QueryLevelTriggerExecutionContext, dryrun: Boolean): ActionRunResult {
         return try {
             if (!isActionActionable(action, ctx.alert)) {
                 return ActionRunResult(action.id, action.name, mapOf(), true, null, null)
@@ -597,19 +691,41 @@ class MonitorRunner(
         }
     }
 
+    // TODO: This is largely a duplicate of runAction above for BucketLevelTriggerExecutionContext for now.
+    //   After suppression logic implementation, if this remains mostly the same, it can be refactored.
+    private suspend fun runAction(action: Action, ctx: BucketLevelTriggerExecutionContext, dryrun: Boolean): ActionRunResult {
+        return try {
+            val actionOutput = mutableMapOf<String, String>()
+            actionOutput[SUBJECT] = if (action.subjectTemplate != null) compileTemplate(action.subjectTemplate, ctx) else ""
+            actionOutput[MESSAGE] = compileTemplate(action.messageTemplate, ctx)
+            if (Strings.isNullOrEmpty(actionOutput[MESSAGE])) {
+                throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
+            }
+            if (!dryrun) {
+                withContext(Dispatchers.IO) {
+                    val destination = AlertingConfigAccessor.getDestinationInfo(client, xContentRegistry, action.destinationId)
+                    if (!destination.isAllowed(allowList)) {
+                        throw IllegalStateException("Monitor contains a Destination type that is not allowed: ${destination.type}")
+                    }
+
+                    val destinationCtx = destinationContextFactory.getDestinationContext(destination)
+                    actionOutput[MESSAGE_ID] = destination.publish(
+                        actionOutput[SUBJECT],
+                        actionOutput[MESSAGE]!!,
+                        destinationCtx,
+                        hostDenyList
+                    )
+                }
+            }
+            ActionRunResult(action.id, action.name, actionOutput, false, currentTime(), null)
+        } catch (e: Exception) {
+            ActionRunResult(action.id, action.name, mapOf(), false, currentTime(), e)
+        }
+    }
+
     private fun compileTemplate(template: Script, ctx: TriggerExecutionContext): String {
         return scriptService.compile(template, TemplateScript.CONTEXT)
             .newInstance(template.params + mapOf("ctx" to ctx.asTemplateArg()))
             .execute()
-    }
-
-    private fun List<AlertError>?.update(alertError: AlertError?): List<AlertError> {
-        return when {
-            this == null && alertError == null -> emptyList()
-            this != null && alertError == null -> this
-            this == null && alertError != null -> listOf(alertError)
-            this != null && alertError != null -> (listOf(alertError) + this).take(10)
-            else -> throw IllegalStateException("Unreachable code reached!")
-        }
     }
 }

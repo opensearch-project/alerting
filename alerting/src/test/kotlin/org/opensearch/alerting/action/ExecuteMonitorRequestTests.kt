@@ -27,7 +27,7 @@
 package org.opensearch.alerting.action
 
 import org.opensearch.alerting.core.model.SearchInput
-import org.opensearch.alerting.randomMonitor
+import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.unit.TimeValue
@@ -52,7 +52,7 @@ class ExecuteMonitorRequestTests : OpenSearchTestCase() {
     }
 
     fun `test execute monitor request with monitor`() {
-        val monitor = randomMonitor().copy(inputs = listOf(SearchInput(emptyList(), SearchSourceBuilder())))
+        val monitor = randomQueryLevelMonitor().copy(inputs = listOf(SearchInput(emptyList(), SearchSourceBuilder())))
         val req = ExecuteMonitorRequest(false, TimeValue.timeValueSeconds(100L), null, monitor)
         assertNotNull(req.monitor)
 

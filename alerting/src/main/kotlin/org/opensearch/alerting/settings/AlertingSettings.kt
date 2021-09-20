@@ -38,6 +38,7 @@ class AlertingSettings {
 
         const val MONITOR_MAX_INPUTS = 1
         const val MONITOR_MAX_TRIGGERS = 10
+        const val DEFAULT_MAX_ACTIONABLE_ALERT_COUNT = 50L
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(
             "plugins.alerting.monitor.max_monitors",
@@ -132,6 +133,13 @@ class AlertingSettings {
         val FILTER_BY_BACKEND_ROLES = Setting.boolSetting(
             "plugins.alerting.filter_by_backend_roles",
             LegacyOpenDistroAlertingSettings.FILTER_BY_BACKEND_ROLES,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val MAX_ACTIONABLE_ALERT_COUNT = Setting.longSetting(
+            "plugins.alerting.max_actionable_alert_count",
+            DEFAULT_MAX_ACTIONABLE_ALERT_COUNT,
+            -1L,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
     }

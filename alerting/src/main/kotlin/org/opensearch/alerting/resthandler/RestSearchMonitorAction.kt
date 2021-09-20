@@ -33,6 +33,7 @@ import org.opensearch.alerting.action.SearchMonitorAction
 import org.opensearch.alerting.action.SearchMonitorRequest
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
+import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.context
 import org.opensearch.client.node.NodeClient
@@ -112,6 +113,7 @@ class RestSearchMonitorAction(
         searchSourceBuilder.fetchSource(context(request))
 
         val queryBuilder = QueryBuilders.boolQuery().must(searchSourceBuilder.query())
+        queryBuilder.filter(QueryBuilders.existsQuery(Monitor.MONITOR_TYPE))
 
         searchSourceBuilder.query(queryBuilder)
             .seqNoAndPrimaryTerm(true)

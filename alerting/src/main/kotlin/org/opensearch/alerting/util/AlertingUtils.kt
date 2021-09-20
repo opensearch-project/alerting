@@ -30,6 +30,11 @@ import inet.ipaddr.IPAddressString
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
 import org.opensearch.alerting.destination.message.BaseMessage
+import org.opensearch.alerting.model.AggregationResultBucket
+import org.opensearch.alerting.model.BucketLevelTriggerRunResult
+import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.action.Action
+import org.opensearch.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.commons.authuser.User
@@ -138,4 +143,40 @@ fun <T : Any> checkUserFilterByPermissions(
         return false
     }
     return true
+}
+
+fun Monitor.isBucketLevelMonitor(): Boolean = this.monitorType == Monitor.MonitorType.BUCKET_LEVEL_MONITOR
+
+/**
+ * Since buckets can have multi-value keys, this converts the bucket key values to a string that can be used
+ * as the key for a HashMap to easily retrieve [AggregationResultBucket] based on the bucket key values.
+ */
+fun AggregationResultBucket.getBucketKeysHash(): String = this.bucketKeys.joinToString(separator = "#")
+
+fun Action.getActionExecutionPolicy(monitor: Monitor): ActionExecutionPolicy? {
+    // When the ActionExecutionPolicy is null for an Action, the default is resolved at runtime
+    // so it can be chosen based on the Monitor type at that time.
+    // The Action config is not aware of the Monitor type which is why the default was not stored during
+    // the parse.
+    return this.actionExecutionPolicy ?: if (monitor.isBucketLevelMonitor()) {
+        ActionExecutionPolicy.getDefaultConfigurationForBucketLevelMonitor()
+    } else {
+        null
+    }
+}
+
+fun BucketLevelTriggerRunResult.getCombinedTriggerRunResult(
+    prevTriggerRunResult: BucketLevelTriggerRunResult?
+): BucketLevelTriggerRunResult {
+    if (prevTriggerRunResult == null) return this
+
+    // The aggregation results and action results across to two trigger run results should not have overlapping keys
+    // since they represent different pages of aggregations so a simple concatenation will combine them
+    val mergedAggregationResultBuckets = prevTriggerRunResult.aggregationResultBuckets + this.aggregationResultBuckets
+    val mergedActionResultsMap = (prevTriggerRunResult.actionResultsMap + this.actionResultsMap).toMutableMap()
+
+    // Update to the most recent error if it's not null, otherwise keep the old one
+    val error = this.error ?: prevTriggerRunResult.error
+
+    return this.copy(aggregationResultBuckets = mergedAggregationResultBuckets, actionResultsMap = mergedActionResultsMap, error = error)
 }
