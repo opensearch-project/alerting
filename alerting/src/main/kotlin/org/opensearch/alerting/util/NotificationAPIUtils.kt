@@ -43,6 +43,7 @@ import org.opensearch.commons.notifications.action.SendNotificationRequest
 import org.opensearch.commons.notifications.action.SendNotificationResponse
 import org.opensearch.commons.notifications.action.UpdateNotificationConfigRequest
 import org.opensearch.commons.notifications.action.UpdateNotificationConfigResponse
+import org.opensearch.commons.ConfigConstants
 
 class NotificationAPIUtils {
 
@@ -61,31 +62,35 @@ class NotificationAPIUtils {
             var getNotificationConfigResponse: GetNotificationConfigResponse? = null
             var exception: Exception?
             var completed = false
-            retryPolicy.retryForNotification {
-                exception = null
-                NotificationsPluginInterface.getNotificationConfig(
-                    client,
-                    getNotificationConfigRequest,
-                    object : ActionListener<GetNotificationConfigResponse> {
-                        override fun onResponse(response: GetNotificationConfigResponse) {
-                            getNotificationConfigResponse = response
-                            logger.debug("Retrieved notification(s) successfully: $response")
-                            completed = true
-                        }
+            val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
+            client.threadPool().threadContext.stashContext().use {
+                client.threadPool().threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
+                retryPolicy.retryForNotification {
+                    exception = null
+                    NotificationsPluginInterface.getNotificationConfig(
+                        client,
+                        getNotificationConfigRequest,
+                        object : ActionListener<GetNotificationConfigResponse> {
+                            override fun onResponse(response: GetNotificationConfigResponse) {
+                                getNotificationConfigResponse = response
+                                logger.debug("Retrieved notification(s) successfully: $response")
+                                completed = true
+                            }
 
-                        override fun onFailure(e: Exception) {
-                            logger.error("Failed to retrieve Notification due to: ${e.message}", e)
-                            exception = e
-                            completed = true
+                            override fun onFailure(e: Exception) {
+                                logger.error("Failed to retrieve Notification due to: ${e.message}", e)
+                                exception = e
+                                completed = true
+                            }
                         }
+                    )
+                    while (!completed) {
+                        Thread.sleep(100)
                     }
-                )
-                while (!completed) {
-                    Thread.sleep(100)
-                }
-                completed = false
-                if (exception != null) {
-                    throw exception as Exception
+                    completed = false
+                    if (exception != null) {
+                        throw exception as Exception
+                    }
                 }
             }
             return getNotificationConfigResponse!!
@@ -99,31 +104,35 @@ class NotificationAPIUtils {
             var createNotificationConfigResponse: CreateNotificationConfigResponse? = null
             var exception: Exception?
             var completed = false
-            retryPolicy.retryForNotification {
-                exception = null
-                NotificationsPluginInterface.createNotificationConfig(
-                    client,
-                    createNotificationConfigRequest,
-                    object : ActionListener<CreateNotificationConfigResponse> {
-                        override fun onResponse(response: CreateNotificationConfigResponse) {
-                            createNotificationConfigResponse = response
-                            logger.debug("Created notification successfully: $response")
-                            completed = true
-                        }
+            val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
+            client.threadPool().threadContext.stashContext().use {
+                client.threadPool().threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
+                retryPolicy.retryForNotification {
+                    exception = null
+                    NotificationsPluginInterface.createNotificationConfig(
+                        client,
+                        createNotificationConfigRequest,
+                        object : ActionListener<CreateNotificationConfigResponse> {
+                            override fun onResponse(response: CreateNotificationConfigResponse) {
+                                createNotificationConfigResponse = response
+                                logger.debug("Created notification successfully: $response")
+                                completed = true
+                            }
 
-                        override fun onFailure(e: Exception) {
-                            logger.error("Failed to create Notification due to: ${e.message}", e)
-                            exception = e
-                            completed = true
+                            override fun onFailure(e: Exception) {
+                                logger.error("Failed to create Notification due to: ${e.message}", e)
+                                exception = e
+                                completed = true
+                            }
                         }
+                    )
+                    while (!completed) {
+                        Thread.sleep(100)
                     }
-                )
-                while (!completed) {
-                    Thread.sleep(100)
-                }
-                completed = false
-                if (exception != null) {
-                    throw exception as Exception
+                    completed = false
+                    if (exception != null) {
+                        throw exception as Exception
+                    }
                 }
             }
             return createNotificationConfigResponse!!
@@ -137,31 +146,35 @@ class NotificationAPIUtils {
             var updateNotificationConfigResponse: UpdateNotificationConfigResponse? = null
             var completed = false
             var exception: Exception?
-            retryPolicy.retryForNotification {
-                exception = null
-                NotificationsPluginInterface.updateNotificationConfig(
-                    client,
-                    updateNotificationConfigRequest,
-                    object : ActionListener<UpdateNotificationConfigResponse> {
-                        override fun onResponse(response: UpdateNotificationConfigResponse) {
-                            updateNotificationConfigResponse = response
-                            logger.debug("Updated notification successfully: $response")
-                            completed = true
-                        }
+            val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
+            client.threadPool().threadContext.stashContext().use {
+                client.threadPool().threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
+                retryPolicy.retryForNotification {
+                    exception = null
+                    NotificationsPluginInterface.updateNotificationConfig(
+                        client,
+                        updateNotificationConfigRequest,
+                        object : ActionListener<UpdateNotificationConfigResponse> {
+                            override fun onResponse(response: UpdateNotificationConfigResponse) {
+                                updateNotificationConfigResponse = response
+                                logger.debug("Updated notification successfully: $response")
+                                completed = true
+                            }
 
-                        override fun onFailure(e: Exception) {
-                            logger.error("Failed to update Notification due to: ${e.message}", e)
-                            exception = e
-                            completed = true
+                            override fun onFailure(e: Exception) {
+                                logger.error("Failed to update Notification due to: ${e.message}", e)
+                                exception = e
+                                completed = true
+                            }
                         }
+                    )
+                    while (!completed) {
+                        Thread.sleep(100)
                     }
-                )
-                while (!completed) {
-                    Thread.sleep(100)
-                }
-                completed = false
-                if (exception != null) {
-                    throw exception as Exception
+                    completed = false
+                    if (exception != null) {
+                        throw exception as Exception
+                    }
                 }
             }
             return updateNotificationConfigResponse!!
@@ -175,31 +188,35 @@ class NotificationAPIUtils {
             var deleteNotificationConfigResponse: DeleteNotificationConfigResponse? = null
             var completed = false
             var exception: Exception?
-            retryPolicy.retryForNotification {
-                exception = null
-                NotificationsPluginInterface.deleteNotificationConfig(
-                    client,
-                    deleteNotificationConfigRequest,
-                    object : ActionListener<DeleteNotificationConfigResponse> {
-                        override fun onResponse(response: DeleteNotificationConfigResponse) {
-                            deleteNotificationConfigResponse = response
-                            logger.debug("Deleted notification successfully: $response")
-                            completed = true
-                        }
+            val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
+            client.threadPool().threadContext.stashContext().use {
+                client.threadPool().threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
+                retryPolicy.retryForNotification {
+                    exception = null
+                    NotificationsPluginInterface.deleteNotificationConfig(
+                        client,
+                        deleteNotificationConfigRequest,
+                        object : ActionListener<DeleteNotificationConfigResponse> {
+                            override fun onResponse(response: DeleteNotificationConfigResponse) {
+                                deleteNotificationConfigResponse = response
+                                logger.debug("Deleted notification successfully: $response")
+                                completed = true
+                            }
 
-                        override fun onFailure(e: Exception) {
-                            logger.error("Failed to delete Notification due to: ${e.message}", e)
-                            exception = e
-                            completed = true
+                            override fun onFailure(e: Exception) {
+                                logger.error("Failed to delete Notification due to: ${e.message}", e)
+                                exception = e
+                                completed = true
+                            }
                         }
+                    )
+                    while (!completed) {
+                        Thread.sleep(100)
                     }
-                )
-                while (!completed) {
-                    Thread.sleep(100)
-                }
-                completed = false
-                if (exception != null) {
-                    throw exception as Exception
+                    completed = false
+                    if (exception != null) {
+                        throw exception as Exception
+                    }
                 }
             }
             return deleteNotificationConfigResponse!!
@@ -213,33 +230,37 @@ class NotificationAPIUtils {
             var sendNotificationResponse: SendNotificationResponse? = null
             var completed = false
             var exception: Exception?
-            retryPolicy.retryForNotification {
-                exception = null
-                NotificationsPluginInterface.sendNotification(
-                    client,
-                    sendNotificationRequest.eventSource,
-                    sendNotificationRequest.channelMessage,
-                    sendNotificationRequest.channelIds,
-                    object : ActionListener<SendNotificationResponse> {
-                        override fun onResponse(response: SendNotificationResponse) {
-                            sendNotificationResponse = response
-                            logger.debug("Sent notification successfully: $response")
-                            completed = true
-                        }
+            val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
+            client.threadPool().threadContext.stashContext().use {
+                client.threadPool().threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
+                retryPolicy.retryForNotification {
+                    exception = null
+                    NotificationsPluginInterface.sendNotification(
+                        client,
+                        sendNotificationRequest.eventSource,
+                        sendNotificationRequest.channelMessage,
+                        sendNotificationRequest.channelIds,
+                        object : ActionListener<SendNotificationResponse> {
+                            override fun onResponse(response: SendNotificationResponse) {
+                                sendNotificationResponse = response
+                                logger.debug("Sent notification successfully: $response")
+                                completed = true
+                            }
 
-                        override fun onFailure(e: Exception) {
-                            logger.error("Failed to send Notification due to: ${e.message}", e)
-                            exception = e
-                            completed = true
+                            override fun onFailure(e: Exception) {
+                                logger.error("Failed to send Notification due to: ${e.message}", e)
+                                exception = e
+                                completed = true
+                            }
                         }
+                    )
+                    while (!completed) {
+                        Thread.sleep(100)
                     }
-                )
-                while (!completed) {
-                    Thread.sleep(100)
-                }
-                completed = false
-                if (exception != null) {
-                    throw exception as Exception
+                    completed = false
+                    if (exception != null) {
+                        throw exception as Exception
+                    }
                 }
             }
             return sendNotificationResponse!!
