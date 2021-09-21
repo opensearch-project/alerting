@@ -55,7 +55,7 @@ class EmailAccountActionsConverterTests : OpenSearchTestCase() {
             smtpAccount,
             true
         )
-        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), notificationConfig)
         val notificationConfigSearchResult = NotificationConfigSearchResult(notificationConfigInfo)
         val getNotificationConfigResponse = GetNotificationConfigResponse(notificationConfigSearchResult)
         val getEmailAccountResponse = convertGetNotificationConfigResponseToGetEmailAccountResponse(getNotificationConfigResponse)
@@ -199,7 +199,7 @@ class EmailAccountActionsConverterTests : OpenSearchTestCase() {
             smtpAccount,
             true
         )
-        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), notificationConfig)
         val notificationConfigSearchResult = NotificationConfigSearchResult(notificationConfigInfo)
         val getNotificationConfigResponse = GetNotificationConfigResponse(notificationConfigSearchResult)
         val emailAccountResponse = convertToIndexEmailAccountResponse("configId", getNotificationConfigResponse)

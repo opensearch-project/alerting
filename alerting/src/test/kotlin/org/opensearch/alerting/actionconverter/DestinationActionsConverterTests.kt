@@ -19,6 +19,7 @@ import org.opensearch.alerting.getCustomWebhookDestination
 import org.opensearch.alerting.getEmailDestination
 import org.opensearch.alerting.getSlackDestination
 import org.opensearch.alerting.model.Table
+import org.opensearch.alerting.model.destination.CustomWebhook
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.email.Recipient
 import org.opensearch.alerting.randomUser
@@ -92,95 +93,95 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
         assertEquals("webhook", getNotificationConfigRequest.filterParams["config_type"])
     }
 
-//    fun `test convertGetDestinationsRequestToGetNotificationConfigRequest with all destination types`() {
-//        val table = Table("asc", "destination.name.keyword", null, 0, 0, "searchString")
-//        val getDestinationsRequest = GetDestinationsRequest(
-//            "destinationId",
-//            0L,
-//            FetchSourceContext.DO_NOT_FETCH_SOURCE,
-//            table,
-//            "ALL"
-//        )
-//        val getNotificationConfigRequest = convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest)
-//
-//        assertEquals(1, getNotificationConfigRequest.configIds.size)
-//        assertEquals(getDestinationsRequest.destinationId, getNotificationConfigRequest.configIds.elementAt(0))
-//        assertEquals(table.startIndex, getNotificationConfigRequest.fromIndex)
-//        assertEquals(table.size, getNotificationConfigRequest.maxItems)
-//        assertEquals(NotificationConstants.NAME_TAG, getNotificationConfigRequest.sortField)
-//        assertEquals(SortOrder.fromString(table.sortOrder), getNotificationConfigRequest.sortOrder)
-//        assertTrue(getNotificationConfigRequest.filterParams.containsKey("name"))
-//        assertEquals(table.searchString, getNotificationConfigRequest.filterParams["name"])
-//        assertTrue(getNotificationConfigRequest.filterParams.containsKey("config_type"))
-//        assertEquals("slack,chime,webhook,email", getNotificationConfigRequest.filterParams["config_type"])
-//    }
-//
-//    fun `test convertGetDestinationsRequestToGetNotificationConfigRequest with sort by config type`() {
-//        val table = Table("asc", "destination.type", null, 0, 0, "searchString")
-//        val getDestinationsRequest = GetDestinationsRequest(
-//            "destinationId",
-//            0L,
-//            FetchSourceContext.DO_NOT_FETCH_SOURCE,
-//            table,
-//            "ALL"
-//        )
-//        val getNotificationConfigRequest = convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest)
-//
-//        assertEquals(1, getNotificationConfigRequest.configIds.size)
-//        assertEquals(getDestinationsRequest.destinationId, getNotificationConfigRequest.configIds.elementAt(0))
-//        assertEquals(table.startIndex, getNotificationConfigRequest.fromIndex)
-//        assertEquals(table.size, getNotificationConfigRequest.maxItems)
-//        assertEquals(NotificationConstants.CONFIG_TYPE_TAG, getNotificationConfigRequest.sortField)
-//        assertEquals(SortOrder.fromString(table.sortOrder), getNotificationConfigRequest.sortOrder)
-//        assertTrue(getNotificationConfigRequest.filterParams.containsKey("name"))
-//        assertEquals(table.searchString, getNotificationConfigRequest.filterParams["name"])
-//        assertTrue(getNotificationConfigRequest.filterParams.containsKey("config_type"))
-//        assertEquals("slack,chime,webhook,email", getNotificationConfigRequest.filterParams["config_type"])
-//    }
+    fun `test convertGetDestinationsRequestToGetNotificationConfigRequest with all destination types`() {
+        val table = Table("asc", "destination.name.keyword", null, 0, 0, "searchString")
+        val getDestinationsRequest = GetDestinationsRequest(
+            "destinationId",
+            0L,
+            FetchSourceContext.DO_NOT_FETCH_SOURCE,
+            table,
+            "ALL"
+        )
+        val getNotificationConfigRequest = convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest)
 
-//    fun `test convertGetDestinationsRequestToGetNotificationConfigRequest with sort by last updated time`() {
-//        val table = Table("asc", "destination.last_update_time", null, 0, 0, "searchString")
-//        val getDestinationsRequest = GetDestinationsRequest(
-//            null,
-//            0L,
-//            FetchSourceContext.DO_NOT_FETCH_SOURCE,
-//            table,
-//            "ALL"
-//        )
-//        val getNotificationConfigRequest = convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest)
-//
-//        assertTrue(getNotificationConfigRequest.configIds.isEmpty())
-//        assertEquals(table.startIndex, getNotificationConfigRequest.fromIndex)
-//        assertEquals(table.size, getNotificationConfigRequest.maxItems)
-//        assertEquals(NotificationConstants.UPDATED_TIME_TAG, getNotificationConfigRequest.sortField)
-//        assertEquals(SortOrder.fromString(table.sortOrder), getNotificationConfigRequest.sortOrder)
-//        assertTrue(getNotificationConfigRequest.filterParams.containsKey("name"))
-//        assertEquals(table.searchString, getNotificationConfigRequest.filterParams["name"])
-//        assertTrue(getNotificationConfigRequest.filterParams.containsKey("config_type"))
-//        assertEquals("slack,chime,webhook,email", getNotificationConfigRequest.filterParams["config_type"])
-//    }
-//
-//    fun `test convertGetDestinationsRequestToGetNotificationConfigRequest with sort by invalid field`() {
-//        val table = Table("asc", "destination.some_unknown_field", null, 0, 0, "searchString")
-//        val getDestinationsRequest = GetDestinationsRequest(
-//            null,
-//            0L,
-//            FetchSourceContext.DO_NOT_FETCH_SOURCE,
-//            table,
-//            "ALL"
-//        )
-//        val getNotificationConfigRequest = convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest)
-//
-//        assertTrue(getNotificationConfigRequest.configIds.isEmpty())
-//        assertEquals(table.startIndex, getNotificationConfigRequest.fromIndex)
-//        assertEquals(table.size, getNotificationConfigRequest.maxItems)
-//        assertNull(getNotificationConfigRequest.sortField)
-//        assertEquals(SortOrder.fromString(table.sortOrder), getNotificationConfigRequest.sortOrder)
-//        assertTrue(getNotificationConfigRequest.filterParams.containsKey("name"))
-//        assertEquals(table.searchString, getNotificationConfigRequest.filterParams["name"])
-//        assertTrue(getNotificationConfigRequest.filterParams.containsKey("config_type"))
-//        assertEquals("slack,chime,webhook,email", getNotificationConfigRequest.filterParams["config_type"])
-//    }
+        assertEquals(1, getNotificationConfigRequest.configIds.size)
+        assertEquals(getDestinationsRequest.destinationId, getNotificationConfigRequest.configIds.elementAt(0))
+        assertEquals(table.startIndex, getNotificationConfigRequest.fromIndex)
+        assertEquals(table.size, getNotificationConfigRequest.maxItems)
+        assertEquals(NotificationConstants.NAME_TAG, getNotificationConfigRequest.sortField)
+        assertEquals(SortOrder.fromString(table.sortOrder), getNotificationConfigRequest.sortOrder)
+        assertTrue(getNotificationConfigRequest.filterParams.containsKey("name"))
+        assertEquals(table.searchString, getNotificationConfigRequest.filterParams["name"])
+        assertTrue(getNotificationConfigRequest.filterParams.containsKey("config_type"))
+        assertEquals(DestinationActionsConverter.ALL_DESTINATION_CONFIG_TYPES.joinToString(","), getNotificationConfigRequest.filterParams["config_type"])
+    }
+
+    fun `test convertGetDestinationsRequestToGetNotificationConfigRequest with sort by config type`() {
+        val table = Table("asc", "destination.type", null, 0, 0, "searchString")
+        val getDestinationsRequest = GetDestinationsRequest(
+            "destinationId",
+            0L,
+            FetchSourceContext.DO_NOT_FETCH_SOURCE,
+            table,
+            "ALL"
+        )
+        val getNotificationConfigRequest = convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest)
+
+        assertEquals(1, getNotificationConfigRequest.configIds.size)
+        assertEquals(getDestinationsRequest.destinationId, getNotificationConfigRequest.configIds.elementAt(0))
+        assertEquals(table.startIndex, getNotificationConfigRequest.fromIndex)
+        assertEquals(table.size, getNotificationConfigRequest.maxItems)
+        assertEquals(NotificationConstants.CONFIG_TYPE_TAG, getNotificationConfigRequest.sortField)
+        assertEquals(SortOrder.fromString(table.sortOrder), getNotificationConfigRequest.sortOrder)
+        assertTrue(getNotificationConfigRequest.filterParams.containsKey("name"))
+        assertEquals(table.searchString, getNotificationConfigRequest.filterParams["name"])
+        assertTrue(getNotificationConfigRequest.filterParams.containsKey("config_type"))
+        assertEquals(DestinationActionsConverter.ALL_DESTINATION_CONFIG_TYPES.joinToString(","), getNotificationConfigRequest.filterParams["config_type"])
+    }
+
+    fun `test convertGetDestinationsRequestToGetNotificationConfigRequest with sort by last updated time`() {
+        val table = Table("asc", "destination.last_update_time", null, 0, 0, "searchString")
+        val getDestinationsRequest = GetDestinationsRequest(
+            null,
+            0L,
+            FetchSourceContext.DO_NOT_FETCH_SOURCE,
+            table,
+            "ALL"
+        )
+        val getNotificationConfigRequest = convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest)
+
+        assertTrue(getNotificationConfigRequest.configIds.isEmpty())
+        assertEquals(table.startIndex, getNotificationConfigRequest.fromIndex)
+        assertEquals(table.size, getNotificationConfigRequest.maxItems)
+        assertEquals(NotificationConstants.UPDATED_TIME_TAG, getNotificationConfigRequest.sortField)
+        assertEquals(SortOrder.fromString(table.sortOrder), getNotificationConfigRequest.sortOrder)
+        assertTrue(getNotificationConfigRequest.filterParams.containsKey("name"))
+        assertEquals(table.searchString, getNotificationConfigRequest.filterParams["name"])
+        assertTrue(getNotificationConfigRequest.filterParams.containsKey("config_type"))
+        assertEquals(DestinationActionsConverter.ALL_DESTINATION_CONFIG_TYPES.joinToString(","), getNotificationConfigRequest.filterParams["config_type"])
+    }
+
+    fun `test convertGetDestinationsRequestToGetNotificationConfigRequest with sort by invalid field`() {
+        val table = Table("asc", "destination.some_unknown_field", null, 0, 0, "searchString")
+        val getDestinationsRequest = GetDestinationsRequest(
+            null,
+            0L,
+            FetchSourceContext.DO_NOT_FETCH_SOURCE,
+            table,
+            "ALL"
+        )
+        val getNotificationConfigRequest = convertGetDestinationsRequestToGetNotificationConfigRequest(getDestinationsRequest)
+
+        assertTrue(getNotificationConfigRequest.configIds.isEmpty())
+        assertEquals(table.startIndex, getNotificationConfigRequest.fromIndex)
+        assertEquals(table.size, getNotificationConfigRequest.maxItems)
+        assertNull(getNotificationConfigRequest.sortField)
+        assertEquals(SortOrder.fromString(table.sortOrder), getNotificationConfigRequest.sortOrder)
+        assertTrue(getNotificationConfigRequest.filterParams.containsKey("name"))
+        assertEquals(table.searchString, getNotificationConfigRequest.filterParams["name"])
+        assertTrue(getNotificationConfigRequest.filterParams.containsKey("config_type"))
+        assertEquals(DestinationActionsConverter.ALL_DESTINATION_CONFIG_TYPES.joinToString(","), getNotificationConfigRequest.filterParams["config_type"])
+    }
 
     fun `test convertGetNotificationConfigResponseToGetDestinationsResponse with chime`() {
         val chime = Chime("https://hooks.chime.aws/incomingwebhooks/webhookId")
@@ -192,7 +193,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             chime,
             true
         )
-        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), notificationConfig)
         val notificationConfigSearchResult = NotificationConfigSearchResult(notificationConfigInfo)
         val getNotificationConfigResponse = GetNotificationConfigResponse(notificationConfigSearchResult)
         val getDestinationsResponse = convertGetNotificationConfigResponseToGetDestinationsResponse(getNotificationConfigResponse)
@@ -216,7 +217,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             slack,
             true
         )
-        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), notificationConfig)
         val notificationConfigSearchResult = NotificationConfigSearchResult(notificationConfigInfo)
         val getNotificationConfigResponse = GetNotificationConfigResponse(notificationConfigSearchResult)
         val getDestinationsResponse = convertGetNotificationConfigResponseToGetDestinationsResponse(getNotificationConfigResponse)
@@ -240,7 +241,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             email,
             true
         )
-        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), notificationConfig)
         val notificationConfigSearchResult = NotificationConfigSearchResult(notificationConfigInfo)
         val getNotificationConfigResponse = GetNotificationConfigResponse(notificationConfigSearchResult)
         val getDestinationsResponse = convertGetNotificationConfigResponseToGetDestinationsResponse(getNotificationConfigResponse)
@@ -266,7 +267,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             webhook,
             true
         )
-        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), notificationConfig)
         val notificationConfigSearchResult = NotificationConfigSearchResult(notificationConfigInfo)
         val getNotificationConfigResponse = GetNotificationConfigResponse(notificationConfigSearchResult)
         val getDestinationsResponse = convertGetNotificationConfigResponseToGetDestinationsResponse(getNotificationConfigResponse)
@@ -290,7 +291,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             emailGroup,
             true
         )
-        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), notificationConfig)
         val notificationConfigSearchResult = NotificationConfigSearchResult(notificationConfigInfo)
         val getNotificationConfigResponse = GetNotificationConfigResponse(notificationConfigSearchResult)
         val getDestinationsResponse = convertGetNotificationConfigResponseToGetDestinationsResponse(getNotificationConfigResponse)
@@ -312,6 +313,94 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
 
     fun `test convertIndexDestinationRequestToCreateNotificationConfigRequest with webhook`() {
         val customWebhook = getCustomWebhookDestination()
+        val indexDestinationRequest = IndexDestinationRequest(
+            "destinationId",
+            0L,
+            0L,
+            WriteRequest.RefreshPolicy.NONE,
+            RestRequest.Method.POST,
+            customWebhook
+        )
+
+        val createNotificationConfigRequest = convertIndexDestinationRequestToCreateNotificationConfigRequest(indexDestinationRequest)
+
+        assertEquals(indexDestinationRequest.destinationId, createNotificationConfigRequest.configId)
+        val notificationConfig = createNotificationConfigRequest.notificationConfig
+        assertEquals(customWebhook.name, notificationConfig.name)
+        assertEquals(ConfigType.WEBHOOK, notificationConfig.configType)
+        assertEquals("Webhook destination created from the Alerting plugin", notificationConfig.description)
+        assertEquals(setOf(FEATURE_ALERTING), notificationConfig.features)
+        val webhook = notificationConfig.configData as Webhook
+        assertEquals(customWebhook.customWebhook?.url, webhook.url)
+    }
+
+    fun `test convertIndexDestinationRequestToCreateNotificationConfigRequest with put webhook`() {
+        val alertWebhook = CustomWebhook(
+            "https://hooks.slack.com/services/customWebhookId",
+            null,
+            null,
+            80,
+            null,
+            "PUT",
+            emptyMap(),
+            emptyMap(),
+            null,
+            null
+        )
+        val customWebhook = Destination(
+            type = DestinationType.CUSTOM_WEBHOOK,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = null,
+            slack = null,
+            customWebhook = alertWebhook,
+            email = null
+        )
+        val indexDestinationRequest = IndexDestinationRequest(
+            "destinationId",
+            0L,
+            0L,
+            WriteRequest.RefreshPolicy.NONE,
+            RestRequest.Method.POST,
+            customWebhook
+        )
+
+        val createNotificationConfigRequest = convertIndexDestinationRequestToCreateNotificationConfigRequest(indexDestinationRequest)
+
+        assertEquals(indexDestinationRequest.destinationId, createNotificationConfigRequest.configId)
+        val notificationConfig = createNotificationConfigRequest.notificationConfig
+        assertEquals(customWebhook.name, notificationConfig.name)
+        assertEquals(ConfigType.WEBHOOK, notificationConfig.configType)
+        assertEquals("Webhook destination created from the Alerting plugin", notificationConfig.description)
+        assertEquals(setOf(FEATURE_ALERTING), notificationConfig.features)
+        val webhook = notificationConfig.configData as Webhook
+        assertEquals(customWebhook.customWebhook?.url, webhook.url)
+    }
+
+    fun `test convertIndexDestinationRequestToCreateNotificationConfigRequest with patch webhook`() {
+        val alertWebhook = CustomWebhook(
+            "https://hooks.slack.com/services/customWebhookId",
+            null,
+            null,
+            80,
+            null,
+            "PATCH",
+            emptyMap(),
+            emptyMap(),
+            null,
+            null
+        )
+        val customWebhook = Destination(
+            type = DestinationType.CUSTOM_WEBHOOK,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = null,
+            slack = null,
+            customWebhook = alertWebhook,
+            email = null
+        )
         val indexDestinationRequest = IndexDestinationRequest(
             "destinationId",
             0L,
@@ -709,7 +798,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             slack,
             true
         )
-        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), notificationConfig)
         val notificationConfigSearchResult = NotificationConfigSearchResult(notificationConfigInfo)
         val getNotificationConfigResponse = GetNotificationConfigResponse(notificationConfigSearchResult)
         val indexDestinationResponse = convertToIndexDestinationResponse("configId", getNotificationConfigResponse)
@@ -730,7 +819,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             chime,
             true
         )
-        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), notificationConfig)
         val notificationConfigSearchResult = NotificationConfigSearchResult(notificationConfigInfo)
         val getNotificationConfigResponse = GetNotificationConfigResponse(notificationConfigSearchResult)
         val indexDestinationResponse = convertToIndexDestinationResponse("configId", getNotificationConfigResponse)
@@ -751,7 +840,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             webhook,
             true
         )
-        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), notificationConfig)
         val notificationConfigSearchResult = NotificationConfigSearchResult(notificationConfigInfo)
         val getNotificationConfigResponse = GetNotificationConfigResponse(notificationConfigSearchResult)
         val indexDestinationResponse = convertToIndexDestinationResponse("configId", getNotificationConfigResponse)
@@ -773,7 +862,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             email,
             true
         )
-        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), notificationConfig)
         val notificationConfigSearchResult = NotificationConfigSearchResult(notificationConfigInfo)
         val getNotificationConfigResponse = GetNotificationConfigResponse(notificationConfigSearchResult)
         val indexDestinationResponse = convertToIndexDestinationResponse("configId", getNotificationConfigResponse)
@@ -809,7 +898,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             smtpAccount,
             true
         )
-        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), notificationConfig)
         val destination = convertNotificationConfigToDestination(notificationConfigInfo)
         assertNull(destination)
     }
@@ -824,7 +913,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             emailGroup,
             true
         )
-        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), notificationConfig)
         val destination = convertNotificationConfigToDestination(notificationConfigInfo)
         assertNull(destination)
     }
@@ -838,7 +927,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             null,
             true
         )
-        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), notificationConfig)
         val destination = convertNotificationConfigToDestination(notificationConfigInfo)
         assertNull(destination)
     }
@@ -853,7 +942,7 @@ class DestinationActionsConverterTests : OpenSearchTestCase() {
             email,
             true
         )
-        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), notificationConfig)
         val destination = convertNotificationConfigToDestination(notificationConfigInfo)
         assertEquals(notificationConfigInfo.configId, destination?.id)
         assertEquals(notificationConfig.name, destination?.name)

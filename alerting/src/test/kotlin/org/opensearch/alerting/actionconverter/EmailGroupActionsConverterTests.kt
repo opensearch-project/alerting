@@ -55,7 +55,7 @@ class EmailGroupActionsConverterTests : OpenSearchTestCase() {
             emailGroup,
             true
         )
-        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(),notificationConfig)
         val notificationConfigSearchResult = NotificationConfigSearchResult(notificationConfigInfo)
         val getNotificationConfigResponse = GetNotificationConfigResponse(notificationConfigSearchResult)
         val getEmailGroupResponse = convertGetNotificationConfigResponseToGetEmailGroupResponse(getNotificationConfigResponse)
@@ -183,7 +183,7 @@ class EmailGroupActionsConverterTests : OpenSearchTestCase() {
             true
         )
 
-        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), "tenant", notificationConfig)
+        val notificationConfigInfo = NotificationConfigInfo("configId", Instant.now(), Instant.now(), notificationConfig)
         val notificationConfigSearchResult = NotificationConfigSearchResult(notificationConfigInfo)
         val getNotificationConfigResponse = GetNotificationConfigResponse(notificationConfigSearchResult)
         val emailGroupResponse = convertToIndexEmailGroupResponse("configId", getNotificationConfigResponse)

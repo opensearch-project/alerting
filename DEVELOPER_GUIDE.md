@@ -59,7 +59,7 @@ When launching a cluster using one of the above commands, logs are placed in `al
 
 1. Setup a local opensearch cluster with notification plugin.
 
-   - `./gradlew :alerting:integTest -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=es-integrationtest
+   - `./gradlew :alerting:integTest -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=es-integrationtest`
 
    - `./gradlew :alerting:integTest -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=es-integrationtest --tests "org.opensearch.alerting.MonitorRunnerIT.test execute monitor returns search result"`
 

@@ -49,6 +49,7 @@ import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.notifications.action.CreateNotificationConfigRequest
 import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
@@ -127,23 +128,32 @@ class MigrationUtilService {
             return failedToDeleteDestinations
         }
 
+
         private fun createNotificationChannelIfNotExists(
             client: NodeClient,
-            notificationConfigInfoList: List<NotificationConfigInfo>
+            notificationConfigInfoList: List<Pair<NotificationConfigInfo, String>>
         ): List<String> {
             val migratedNotificationConfigs = mutableListOf<String>()
             notificationConfigInfoList.forEach {
-                val createNotificationConfigRequest = CreateNotificationConfigRequest(it.notificationConfig, it.configId)
+                val notificationConfigInfo = it.first
+                val userStr = it.second
+                val createNotificationConfigRequest = CreateNotificationConfigRequest(notificationConfigInfo.notificationConfig, notificationConfigInfo.configId)
                 try {
-                    val createResponse = NotificationAPIUtils.createNotificationConfig(client, createNotificationConfigRequest)
-                    migratedNotificationConfigs.add(createResponse.configId)
-                    logger.debug(("Migrated destination: ${createResponse.configId}"))
+                    // TODO: recreate user object to pass along the same permissions. Make sure this works when user based security is removed
+                    client.threadPool().threadContext.stashContext().use {
+                        if (userStr.isNotBlank()) {
+                            client.threadPool().threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
+                        }
+                        val createResponse = NotificationAPIUtils.createNotificationConfig(client, createNotificationConfigRequest)
+                        migratedNotificationConfigs.add(createResponse.configId)
+                        logger.debug(("Migrated destination: ${createResponse.configId}"))
+                    }
                 } catch (e: Exception) {
                     if (e.message?.contains("version conflict, document already exists") == true) {
-                        migratedNotificationConfigs.add(it.configId)
+                        migratedNotificationConfigs.add(notificationConfigInfo.configId)
                     } else {
                         logger.warn(
-                            "Failed to migrate over Destination ${it.configId} because failed to " +
+                            "Failed to migrate over Destination ${notificationConfigInfo.configId} because failed to " +
                                 "create channel in Notification plugin.",
                             e
                         )
@@ -153,10 +163,10 @@ class MigrationUtilService {
             return migratedNotificationConfigs
         }
 
-        private fun retrieveDestinationsToMigrate(client: NodeClient): List<NotificationConfigInfo> {
+        private fun retrieveDestinationsToMigrate(client: NodeClient): List<Pair<NotificationConfigInfo, String>> {
             var start = 0
             val size = 100
-            val notificationConfigInfoList = mutableListOf<NotificationConfigInfo>()
+            val notificationConfigInfoList = mutableListOf<Pair<NotificationConfigInfo, String>>()
             var hasMoreResults = true
 
             while (hasMoreResults) {
@@ -189,6 +199,7 @@ class MigrationUtilService {
                                 val xcp = XContentFactory.xContent(XContentType.JSON)
                                     .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
                                 var notificationConfig: NotificationConfig?
+                                var userStr = ""
                                 if (hit.sourceAsString.contains("\"email_group\"")) {
                                     val emailGroup = EmailGroup.parseWithType(xcp, hit.id, hit.version)
                                     notificationConfig = convertEmailGroupToNotificationConfig(emailGroup)
@@ -206,17 +217,20 @@ class MigrationUtilService {
                                         hit.seqNo.toInt(),
                                         hit.primaryTerm.toInt()
                                     )
+                                    userStr = destination.user.toString()
                                     notificationConfig = convertDestinationToNotificationConfig(destination)
                                 }
 
                                 if (notificationConfig != null)
                                     notificationConfigInfoList.add(
-                                        NotificationConfigInfo(
-                                            hit.id,
-                                            Instant.now(),
-                                            Instant.now(),
-                                            "",
-                                            notificationConfig
+                                        Pair(
+                                            NotificationConfigInfo(
+                                                hit.id,
+                                                Instant.now(),
+                                                Instant.now(),
+                                                notificationConfig
+                                            ),
+                                            userStr
                                         )
                                     )
                             }

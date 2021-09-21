@@ -54,6 +54,7 @@ import org.opensearch.commons.notifications.action.UpdateNotificationConfigReque
 import org.opensearch.commons.notifications.model.Chime
 import org.opensearch.commons.notifications.model.ConfigType
 import org.opensearch.commons.notifications.model.Email
+import org.opensearch.commons.notifications.model.HttpMethodType
 import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import org.opensearch.commons.notifications.model.Slack
@@ -62,8 +63,11 @@ import org.opensearch.index.Index
 import org.opensearch.index.shard.ShardId
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.sort.SortOrder
+import java.lang.RuntimeException
 import java.net.URI
 import java.net.URISyntaxException
+import java.util.*
+import kotlin.collections.HashMap
 
 class DestinationActionsConverter {
 
@@ -71,7 +75,7 @@ class DestinationActionsConverter {
         private val logger = LogManager.getLogger(DestinationActionsConverter::class)
 
         private val INVALID_DESTINATION_TYPES = listOf(ConfigType.NONE, ConfigType.EMAIL_GROUP, ConfigType.SMTP_ACCOUNT)
-        private val ALL_DESTINATION_CONFIG_TYPES = ConfigType.values().filter { !INVALID_DESTINATION_TYPES.contains(it) }
+        internal val ALL_DESTINATION_CONFIG_TYPES = ConfigType.values().filter { !INVALID_DESTINATION_TYPES.contains(it) }
 
         fun convertGetDestinationsRequestToGetNotificationConfigRequest(request: GetDestinationsRequest): GetNotificationConfigRequest {
             val configIds: Set<String> = if (request.destinationId != null) setOf(request.destinationId) else emptySet()
@@ -326,8 +330,13 @@ class DestinationActionsConverter {
                         alertWebhook.path,
                         alertWebhook.queryParams
                     ).toString()
-                    // TODO: add this here alertWebhook.method
-                    val webhook = Webhook(uri, alertWebhook.headerParams)
+                    val methodType = when(alertWebhook.method?.toUpperCase(Locale.ENGLISH)) {
+                        "POST" -> HttpMethodType.POST
+                        "PUT" -> HttpMethodType.PUT
+                        "PATCH" -> HttpMethodType.PATCH
+                        else -> HttpMethodType.POST
+                    }
+                    val webhook = Webhook(uri, alertWebhook.headerParams, methodType)
                     val description = "Webhook destination created from the Alerting plugin"
                     return NotificationConfig(
                         destination.name,
