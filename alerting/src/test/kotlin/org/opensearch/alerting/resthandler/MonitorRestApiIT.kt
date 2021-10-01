@@ -942,4 +942,22 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val monitorHit = hit["_source"] as Map<String, Any>
         assertEquals("Type is not monitor", monitorHit[Monitor.TYPE_FIELD], "monitor")
     }
+
+    @Throws(Exception::class)
+    fun `test search monitor with alerting indices only`() {
+        // 1. search - must return error as invalid index is passed
+        val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
+        val params: MutableMap<String, String> = HashMap()
+        params["index"] = "data-logs"
+        try {
+            client().makeRequest(
+                "GET",
+                "$ALERTING_BASE_URI/_search",
+                params,
+                NStringEntity(search, ContentType.APPLICATION_JSON)
+            )
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())
+        }
+    }
 }
