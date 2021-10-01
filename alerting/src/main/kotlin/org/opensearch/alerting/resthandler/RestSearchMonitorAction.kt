@@ -31,6 +31,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.SearchMonitorAction
 import org.opensearch.alerting.action.SearchMonitorRequest
+import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_INDEX_PATTERN
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.alerting.model.Monitor
@@ -108,12 +109,18 @@ class RestSearchMonitorAction(
         log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/_search")
 
         val index = request.param("index", SCHEDULED_JOBS_INDEX)
+        if (index != SCHEDULED_JOBS_INDEX && index != ALL_INDEX_PATTERN) {
+            throw IllegalArgumentException("Invalid index name.")
+        }
+
         val searchSourceBuilder = SearchSourceBuilder()
         searchSourceBuilder.parseXContent(request.contentOrSourceParamParser())
         searchSourceBuilder.fetchSource(context(request))
 
         val queryBuilder = QueryBuilders.boolQuery().must(searchSourceBuilder.query())
-        queryBuilder.filter(QueryBuilders.existsQuery(Monitor.MONITOR_TYPE))
+        if (index == SCHEDULED_JOBS_INDEX) {
+            queryBuilder.filter(QueryBuilders.existsQuery(Monitor.MONITOR_TYPE))
+        }
 
         searchSourceBuilder.query(queryBuilder)
             .seqNoAndPrimaryTerm(true)
