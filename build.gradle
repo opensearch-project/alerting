@@ -28,7 +28,7 @@ buildscript {
     apply from: 'build-tools/repositories.gradle'
 
     ext {
-        opensearch_version = System.getProperty("opensearch.version", "1.1.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "1.2.0-SNAPSHOT")
         // 1.0.0 -> 1.0.0.0, and 1.0.0-SNAPSHOT -> 1.0.0.0-SNAPSHOT
         opensearch_build = opensearch_version.replaceAll(/(\.\d)([^\d]*)$/, '$1.0$2')
         common_utils_version = System.getProperty("common_utils.version", opensearch_build)
@@ -40,6 +40,7 @@ buildscript {
         mavenCentral()
         maven { url "https://plugins.gradle.org/m2/" }
         jcenter()
+        maven { url "https://aws.oss.sonatype.org/content/repositories/snapshots" }
     }
     dependencies {
         classpath "org.opensearch.gradle:build-tools:${opensearch_version}"

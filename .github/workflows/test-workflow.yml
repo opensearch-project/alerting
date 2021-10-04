@@ -29,30 +29,8 @@ jobs:
         with:
           java-version: ${{ matrix.java }}
 
-      # dependencies: OpenSearch
-      - name: Checkout OpenSearch
-        uses: actions/checkout@v2
-        with:
-          repository: 'opensearch-project/OpenSearch'
-          path: OpenSearch
-          ref: '1.1'
-      - name: Build OpenSearch
-        working-directory: ./OpenSearch
-        run: ./gradlew publishToMavenLocal
-
-      # dependencies: common-utils
-      - name: Checkout common-utils
-        uses: actions/checkout@v2
-        with:
-          repository: 'opensearch-project/common-utils'
-          path: common-utils
-          ref: 'main'
-      - name: Build common-utils
-        working-directory: ./common-utils
-        run: ./gradlew publishToMavenLocal -Dopensearch.version=1.1.0-SNAPSHOT
-
       - name: Build and run with Gradle
-        run: ./gradlew build -Dopensearch.version=1.1.0-SNAPSHOT
+        run: ./gradlew build -Dopensearch.version=1.2.0-SNAPSHOT
 
 #      - name: Create Artifact Path
 #        run: |
@@ -71,4 +49,4 @@ jobs:
 #          path: alerting-artifacts
       # Publish to local maven
       - name: Publish to Maven Local
-        run: ./gradlew publishToMavenLocal -Dopensearch.version=1.1.0-SNAPSHOT
+        run: ./gradlew publishToMavenLocal -Dopensearch.version=1.2.0-SNAPSHOT
