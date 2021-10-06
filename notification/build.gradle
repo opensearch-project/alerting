@@ -103,17 +103,6 @@ publishing {
         }
     }
 
-    repositories {
-        maven {
-            name = "sonatype-staging"
-            url "https://aws.oss.sonatype.org/service/local/staging/deploy/maven2"
-            credentials {
-                username project.hasProperty('ossrhUsername') ? project.property('ossrhUsername') : ''
-                password project.hasProperty('ossrhPassword') ? project.property('ossrhPassword') : ''
-            }
-        }
-    }
-
     // TODO - enabled debug logging for the time being, remove this eventually
     gradle.startParameter.setShowStacktrace(ShowStacktrace.ALWAYS)
     gradle.startParameter.setLogLevel(LogLevel.DEBUG)
