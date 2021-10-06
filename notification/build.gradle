@@ -45,11 +45,6 @@ shadowJar {
     relocate 'org.apache.commons.logging', 'org.opensearch.notification.repackage.org.apache.commons.logging'
     relocate 'org.apache.commons.codec', 'org.opensearch.notification.repackage.org.apache.commons.codec'
     classifier = null
-    
-    doLast {
-        ant.checksum algorithm: 'md5', file: it.archivePath
-        ant.checksum algorithm: 'sha1', file: it.archivePath
-    }
 }
 
 task sourcesJar(type: Jar) {
@@ -57,19 +52,18 @@ task sourcesJar(type: Jar) {
     from sourceSets.main.allJava
 }
 
-sourcesJar.doLast {
-    ant.checksum algorithm: 'md5', file: it.archivePath
-    ant.checksum algorithm: 'sha1', file: it.archivePath
-}
-
 task javadocJar(type: Jar) {
     classifier = 'javadoc'
     from javadoc.destinationDir
 }
 
-javadocJar.doLast {
-    ant.checksum algorithm: 'md5', file: it.archivePath
-    ant.checksum algorithm: 'sha1', file: it.archivePath
+tasks.withType(Jar) { task ->
+    task.doLast {
+        ant.checksum algorithm: 'md5', file: it.archivePath
+        ant.checksum algorithm: 'sha1', file: it.archivePath
+        ant.checksum algorithm: 'sha-256', file: it.archivePath, fileext: '.sha256'
+        ant.checksum algorithm: 'sha-512', file: it.archivePath, fileext: '.sha512'
+    }
 }
 
 publishing {
