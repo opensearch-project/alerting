@@ -37,6 +37,8 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
 
     override fun preserveTemplatesUponCompletion(): Boolean = true
 
+    override fun preserveODFEIndicesAfterTest(): Boolean = true
+
     override fun restClientSettings(): Settings {
         return Settings.builder()
             .put(super.restClientSettings())
@@ -62,11 +64,21 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
                 }
                 ClusterType.MIXED -> {
                     assertTrue(pluginNames.contains("opensearch-alerting"))
-                    verifyMonitor(LEGACY_OPENDISTRO_ALERTING_BASE_URI)
+                    verifyMonitorExists(LEGACY_OPENDISTRO_ALERTING_BASE_URI)
+                    // Waiting a minute to ensure the Monitor ran again at least once before checking if the job is running
+                    // on time
+                    // TODO: Should probably change the next execution time of the Monitor manually instead since this inflates
+                    //  the test execution by a lot
+                    Thread.sleep(60000)
+                    // TODO: Need to move the base URI being used here into a constant and rename ALERTING_BASE_URI to
+                    //  MONITOR_BASE_URI
+                    verifyMonitorStats("/_opendistro/_alerting")
                 }
                 ClusterType.UPGRADED -> {
                     assertTrue(pluginNames.contains("opensearch-alerting"))
-                    verifyMonitor(ALERTING_BASE_URI)
+                    verifyMonitorExists(ALERTING_BASE_URI)
+                    Thread.sleep(60000)
+                    verifyMonitorStats("/_plugins/_alerting")
                 }
             }
             break
@@ -167,7 +179,7 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
 
     @Throws(Exception::class)
     @Suppress("UNCHECKED_CAST")
-    private fun verifyMonitor(uri: String) {
+    private fun verifyMonitorExists(uri: String) {
         val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
         val searchResponse = client().makeRequest(
             "GET",
@@ -180,5 +192,29 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
         val numberDocsFound = hits["total"]?.get("value")
         assertEquals("Unexpected number of Monitors returned", 1, numberDocsFound)
+    }
+
+    @Throws(Exception::class)
+    @Suppress("UNCHECKED_CAST")
+    /**
+     * Monitor stats will check if the Monitor scheduled job is running on time but does not necessarily mean that the
+     * Monitor execution itself did not fail.
+     */
+    private fun verifyMonitorStats(uri: String) {
+        val statsResponse = client().makeRequest(
+            "GET",
+            "$uri/stats",
+            emptyMap()
+        )
+        assertEquals("Monitor stats failed", RestStatus.OK, statsResponse.restStatus())
+        val xcp = createParser(XContentType.JSON.xContent(), statsResponse.entity.content)
+        val responseMap = xcp.map()
+        val nodesCount = responseMap["_nodes"]!! as Map<String, Any>
+        val totalNodes = nodesCount["total"]
+        val successfulNodes = nodesCount["successful"]
+        val nodesOnSchedule = responseMap["nodes_on_schedule"]!!
+        assertEquals("Incorrect number of total nodes", 3, totalNodes)
+        assertEquals("Some nodes in stats response failed", totalNodes, successfulNodes)
+        assertEquals("Not all nodes are on schedule", totalNodes, nodesOnSchedule)
     }
 }

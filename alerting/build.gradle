@@ -311,7 +311,7 @@ task bwcTestSuite(type: StandaloneRestIntegTestTask) {
     exclude '**/*IT*'
     dependsOn tasks.named("${baseName}#mixedClusterTask")
     dependsOn tasks.named("${baseName}#rollingUpgradeClusterTask")
-//    dependsOn tasks.named("${baseName}#fullRestartClusterTask")
+    dependsOn tasks.named("${baseName}#fullRestartClusterTask")
 }
 
 run {
