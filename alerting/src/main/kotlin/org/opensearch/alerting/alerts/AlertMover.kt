@@ -41,7 +41,6 @@ import org.opensearch.client.Client
 import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentParser
@@ -88,7 +87,7 @@ suspend fun moveAlerts(client: Client, monitorId: String, monitor: Monitor? = nu
             .source(
                 Alert.parse(alertContentParser(hit.sourceRef), hit.id, hit.version)
                     .copy(state = Alert.State.DELETED)
-                    .toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS)
+                    .toXContentWithUser(XContentFactory.jsonBuilder())
             )
             .version(hit.version)
             .versionType(VersionType.EXTERNAL_GTE)
