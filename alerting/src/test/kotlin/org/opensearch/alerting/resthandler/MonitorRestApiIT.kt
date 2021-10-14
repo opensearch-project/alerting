@@ -573,23 +573,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         // GIVEN
         putAlertMappings() // Required as we do not have a create alert API.
         val monitor = createRandomMonitor(refresh = true)
-        val alertsToAcknowledge = arrayOf(
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
-        )
+        val alertsToAcknowledge = (1..15).map { createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)) }.toTypedArray()
 
         // WHEN
         val response = acknowledgeAlerts(monitor, *alertsToAcknowledge)
@@ -606,51 +590,16 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
         val failedResponse = responseMap["failed"] as List<String>
         assertTrue("Expected 0 alerts to fail acknowledgment.", failedResponse.isEmpty())
-
-        val failedResponseList = failedResponse.toString()
-        alertsToAcknowledge.forEach { alert -> assertFalse("Alert with ID ${alert.id} found in failed list.", failedResponseList.contains(alert.id)) }
     }
 
     fun `test acknowledging more than 10 alerts at once, including acknowledged alerts`() {
         // GIVEN
         putAlertMappings() // Required as we do not have a create alert API.
         val monitor = createRandomMonitor(refresh = true)
-        val alertsGroup1 = arrayOf(
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
-        )
+        val alertsGroup1 = (1..15).map { createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)) }.toTypedArray()
         acknowledgeAlerts(monitor, *alertsGroup1) // Acknowledging the first array of alerts.
 
-        val alertsGroup2 = arrayOf(
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)),
-            createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
-        )
+        val alertsGroup2 = (1..15).map { createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)) }.toTypedArray()
 
         val alertsToAcknowledge = arrayOf(*alertsGroup1, *alertsGroup2) // Creating an array of alerts that includes alerts that have been already acknowledged, and new alerts.
 

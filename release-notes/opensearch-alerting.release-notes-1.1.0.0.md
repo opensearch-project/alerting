@@ -27,6 +27,7 @@ Compatible with OpenSearch 1.1.0
 * Various bug fixes for Bucket-Level Alerting ([#164](https://github.com/opensearch-project/alerting/pull/164))
 * Return only monitors for /monitors/_search ([#162](https://github.com/opensearch-project/alerting/pull/162))
 * Add valid search filters ([#191](https://github.com/opensearch-project/alerting/pull/191))
+* Fixed a bug that was preventing the AcknowledgeAlerts API from acknowledging more than 10 alerts at once ([#205](https://github.com/opensearch-project/alerting/pull/205/))
 
 ### Infrastructure
 
