@@ -19,6 +19,7 @@ import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.DRYRUN_MONITOR
+import org.opensearch.alerting.assertUserNull
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.Alert
@@ -82,18 +83,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             val createResponse = userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             assertEquals("Create monitor failed", RestStatus.CREATED, createResponse?.restStatus())
 
-            // val newMonitor = getMonitor(userClient as RestClient, monitor.id)
-            val responseBody = createResponse?.asMap()
-            val monitorMap = responseBody!!["monitor"] as HashMap<String, Any>
-            val userMap = monitorMap["user"] as HashMap<String, Any>
-            assertEquals("User is not present", user, userMap["name"])
-
-            val brolesArray = userMap["backend_roles"] as ArrayList<String>
-            assertTrue(brolesArray.contains("HR"))
-
-            val rolesArray = userMap["roles"] as ArrayList<String>
-            assertTrue(rolesArray.contains("hr_role"))
-            assertTrue(rolesArray.contains("alerting_full_access"))
+            assertUserNull(createResponse?.asMap()!!["monitor"] as HashMap<String, Any>)
         } finally {
             deleteRoleMapping("hr_role")
             deleteRole("hr_role")
@@ -153,6 +143,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         val monitor = randomQueryLevelMonitor()
         val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
         assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
+        assertUserNull(createResponse.asMap()["monitor"] as HashMap<String, Any>)
     }
 
     fun `test create monitor with enable filter by`() {
@@ -163,6 +154,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             // when security is enabled. No errors, must succeed.
             val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
+            assertUserNull(createResponse.asMap()["monitor"] as HashMap<String, Any>)
         } else {
             // when security is disable. Must return Forbidden.
             try {
@@ -419,7 +411,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         enableFilterBy()
         putAlertMappings()
-        val monitor = createRandomMonitor(refresh = true)
+        val adminUser = User("admin", listOf("admin"), listOf("all_access"), listOf())
+        var monitor = createRandomMonitor(refresh = true).copy(user = adminUser)
         createAlert(randomAlert(monitor).copy(state = Alert.State.ACKNOWLEDGED))
         createAlert(randomAlert(monitor).copy(state = Alert.State.COMPLETED))
         createAlert(randomAlert(monitor).copy(state = Alert.State.ERROR))
