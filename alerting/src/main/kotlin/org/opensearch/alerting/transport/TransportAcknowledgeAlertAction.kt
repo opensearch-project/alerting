@@ -75,7 +75,13 @@ class TransportAcknowledgeAlertAction @Inject constructor(
             val searchRequest = SearchRequest()
                 .indices(AlertIndices.ALERT_INDEX)
                 .routing(request.monitorId)
-                .source(SearchSourceBuilder().query(queryBuilder).version(true).seqNoAndPrimaryTerm(true))
+                .source(
+                    SearchSourceBuilder()
+                        .query(queryBuilder)
+                        .version(true)
+                        .seqNoAndPrimaryTerm(true)
+                        .size(request.alertIds.size)
+                )
 
             client.search(
                 searchRequest,
