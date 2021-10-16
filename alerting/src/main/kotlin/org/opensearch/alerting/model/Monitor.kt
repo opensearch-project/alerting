@@ -141,24 +141,32 @@ data class Monitor(
         }
     }
 
-    fun toXContent(builder: XContentBuilder): XContentBuilder {
-        return toXContent(builder, ToXContent.EMPTY_PARAMS)
-    }
-
     /** Returns a representation of the monitor suitable for passing into painless and mustache scripts. */
     fun asTemplateArg(): Map<String, Any> {
         return mapOf(_ID to id, _VERSION to version, NAME_FIELD to name, ENABLED_FIELD to enabled)
     }
 
+    fun toXContentWithUser(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+        return createXContentBuilder(builder, params, false)
+    }
+
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+        return createXContentBuilder(builder, params, true)
+    }
+
+    private fun createXContentBuilder(builder: XContentBuilder, params: ToXContent.Params, secure: Boolean): XContentBuilder {
         builder.startObject()
         if (params.paramAsBoolean("with_type", false)) builder.startObject(type)
         builder.field(TYPE_FIELD, type)
             .field(SCHEMA_VERSION_FIELD, schemaVersion)
             .field(NAME_FIELD, name)
             .field(MONITOR_TYPE_FIELD, monitorType)
-            .optionalUserField(USER_FIELD, user)
-            .field(ENABLED_FIELD, enabled)
+
+        if (!secure) {
+            builder.optionalUserField(USER_FIELD, user)
+        }
+
+        builder.field(ENABLED_FIELD, enabled)
             .optionalTimeField(ENABLED_TIME_FIELD, enabledTime)
             .field(SCHEDULE_FIELD, schedule)
             .field(INPUTS_FIELD, inputs.toTypedArray())

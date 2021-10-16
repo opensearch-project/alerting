@@ -42,7 +42,6 @@ import org.opensearch.client.Client
 import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentParser
@@ -276,7 +275,7 @@ class AlertService(
                     listOf<DocWriteRequest<*>>(
                         IndexRequest(AlertIndices.ALERT_INDEX)
                             .routing(alert.monitorId)
-                            .source(alert.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
+                            .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                             .id(if (alert.id != Alert.NO_ID) alert.id else null)
                     )
                 }
@@ -287,7 +286,7 @@ class AlertService(
                         listOf<DocWriteRequest<*>>(
                             IndexRequest(AlertIndices.ALERT_INDEX)
                                 .routing(alert.monitorId)
-                                .source(alert.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
+                                .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                                 .id(if (alert.id != Alert.NO_ID) alert.id else null)
                         )
                     } else {
@@ -305,7 +304,7 @@ class AlertService(
                         if (alertIndices.isHistoryEnabled()) {
                             IndexRequest(AlertIndices.HISTORY_WRITE_INDEX)
                                 .routing(alert.monitorId)
-                                .source(alert.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
+                                .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                                 .id(alert.id)
                         } else null
                     )
@@ -349,7 +348,7 @@ class AlertService(
             }
             IndexRequest(AlertIndices.ALERT_INDEX)
                 .routing(alert.monitorId)
-                .source(alert.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
+                .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
         }.toMutableList()
 
         if (requestsToRetry.isEmpty()) return listOf()

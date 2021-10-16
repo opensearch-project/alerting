@@ -297,6 +297,13 @@ data class Alert(
     }
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+        return createXContentBuilder(builder, true)
+    }
+
+    fun toXContentWithUser(builder: XContentBuilder): XContentBuilder {
+        return createXContentBuilder(builder, false)
+    }
+    private fun createXContentBuilder(builder: XContentBuilder, secure: Boolean): XContentBuilder {
         builder.startObject()
             .field(ALERT_ID_FIELD, id)
             .field(ALERT_VERSION_FIELD, version)
@@ -304,8 +311,12 @@ data class Alert(
             .field(SCHEMA_VERSION_FIELD, schemaVersion)
             .field(MONITOR_VERSION_FIELD, monitorVersion)
             .field(MONITOR_NAME_FIELD, monitorName)
-            .optionalUserField(MONITOR_USER_FIELD, monitorUser)
-            .field(TRIGGER_ID_FIELD, triggerId)
+
+        if (!secure) {
+            builder.optionalUserField(MONITOR_USER_FIELD, monitorUser)
+        }
+
+        builder.field(TRIGGER_ID_FIELD, triggerId)
             .field(TRIGGER_NAME_FIELD, triggerName)
             .field(STATE_FIELD, state)
             .field(ERROR_MESSAGE_FIELD, errorMessage)
