@@ -25,6 +25,7 @@
  */
 package org.opensearch.alerting
 
+import junit.framework.TestCase.assertNull
 import org.apache.http.Header
 import org.apache.http.HttpEntity
 import org.opensearch.alerting.core.model.Input
@@ -55,6 +56,7 @@ import org.opensearch.common.settings.SecureString
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentParser
@@ -239,7 +241,17 @@ fun randomActionRunResult(): ActionRunResult {
 
 fun Monitor.toJsonString(): String {
     val builder = XContentFactory.jsonBuilder()
-    return this.toXContent(builder).string()
+    return this.toXContent(builder, ToXContent.EMPTY_PARAMS).string()
+}
+
+fun Monitor.toJsonStringWithUser(): String {
+    val builder = XContentFactory.jsonBuilder()
+    return this.toXContentWithUser(builder, ToXContent.EMPTY_PARAMS).string()
+}
+
+fun Alert.toJsonString(): String {
+    val builder = XContentFactory.jsonBuilder()
+    return this.toXContent(builder, ToXContent.EMPTY_PARAMS).string()
 }
 
 fun randomUser(): User {
@@ -335,4 +347,13 @@ fun xContentRegistry(): NamedXContentRegistry {
         ) +
             SearchModule(Settings.EMPTY, false, emptyList()).namedXContents
     )
+}
+
+fun assertUserNull(map: Map<String, Any?>) {
+    val user = map["user"]
+    assertNull("User is not null", user)
+}
+
+fun assertUserNull(monitor: Monitor) {
+    assertNull("User is not null", monitor.user)
 }

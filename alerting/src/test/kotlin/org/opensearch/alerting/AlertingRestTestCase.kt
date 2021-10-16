@@ -109,6 +109,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
+        assertUserNull(monitorJson as HashMap<String, Any>)
         return monitor.copy(id = monitorJson["_id"] as String, version = (monitorJson["_version"] as Int).toLong())
     }
 
@@ -134,6 +135,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
+        assertUserNull(destinationJson as HashMap<String, Any>)
+
         return destination.copy(
             id = destinationJson["_id"] as String,
             version = (destinationJson["_version"] as Int).toLong(),
@@ -148,7 +151,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             emptyMap(),
             destination.toHttpEntity()
         )
-        assertEquals("Unable to create a new destination", RestStatus.OK, response.restStatus())
+        assertEquals("Unable to delete destination", RestStatus.OK, response.restStatus())
 
         return response
     }
@@ -165,6 +168,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
+        assertUserNull(destinationJson as HashMap<String, Any>)
+
         return destination.copy(id = destinationJson["_id"] as String, version = (destinationJson["_version"] as Int).toLong())
     }
 
@@ -305,6 +310,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
+        assertUserNull(destinationJson as HashMap<String, Any>)
         return (destinationJson["destinations"] as List<Any?>)[0] as Map<String, Any>
     }
 
@@ -386,7 +392,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun createAlert(alert: Alert): Alert {
         val response = adminClient().makeRequest(
             "POST", "/${AlertIndices.ALERT_INDEX}/_doc?refresh=true&routing=${alert.monitorId}",
-            emptyMap(), alert.toHttpEntity()
+            emptyMap(), alert.toHttpEntityWithUser()
         )
         assertEquals("Unable to create a new alert", RestStatus.CREATED, response.restStatus())
 
@@ -394,6 +400,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
+
+        assertNull(alertJson["monitor_user"])
         return alert.copy(id = alertJson["_id"] as String, version = (alertJson["_version"] as Int).toLong())
     }
 
@@ -412,6 +420,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             emptyMap(), monitor.toHttpEntity()
         )
         assertEquals("Unable to update a monitor", RestStatus.OK, response.restStatus())
+        assertUserNull(response.asMap()["monitor"] as Map<String, Any>)
         return getMonitor(monitorId = monitor.id)
     }
 
@@ -435,6 +444,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                 "monitor" -> monitor = Monitor.parse(parser)
             }
         }
+
+        assertUserNull(monitor)
         return monitor.copy(id = id, version = version)
     }
 
@@ -520,7 +531,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun executeMonitor(client: RestClient, monitor: Monitor, params: Map<String, String> = mapOf()): Response =
-        client.makeRequest("POST", "$ALERTING_BASE_URI/_execute", params, monitor.toHttpEntity())
+        client.makeRequest("POST", "$ALERTING_BASE_URI/_execute", params, monitor.toHttpEntityWithUser())
 
     protected fun indexDoc(index: String, id: String, doc: String, refresh: Boolean = true): Response {
         val requestBody = StringEntity(doc, APPLICATION_JSON)
@@ -595,7 +606,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     private fun Monitor.toJsonString(): String {
         val builder = XContentFactory.jsonBuilder()
-        return shuffleXContent(toXContent(builder)).string()
+        return shuffleXContent(toXContent(builder, ToXContent.EMPTY_PARAMS)).string()
+    }
+
+    protected fun Monitor.toHttpEntityWithUser(): HttpEntity {
+        return StringEntity(toJsonStringWithUser(), APPLICATION_JSON)
+    }
+
+    private fun Monitor.toJsonStringWithUser(): String {
+        val builder = XContentFactory.jsonBuilder()
+        return shuffleXContent(toXContentWithUser(builder, ToXContent.EMPTY_PARAMS)).string()
     }
 
     protected fun Destination.toHttpEntity(): HttpEntity {
@@ -625,13 +645,13 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return shuffleXContent(toXContent(builder)).string()
     }
 
-    private fun Alert.toHttpEntity(): HttpEntity {
-        return StringEntity(toJsonString(), APPLICATION_JSON)
+    private fun Alert.toHttpEntityWithUser(): HttpEntity {
+        return StringEntity(toJsonStringWithUser(), APPLICATION_JSON)
     }
 
-    private fun Alert.toJsonString(): String {
+    private fun Alert.toJsonStringWithUser(): String {
         val builder = XContentFactory.jsonBuilder()
-        return shuffleXContent(toXContent(builder, ToXContent.EMPTY_PARAMS)).string()
+        return shuffleXContent(toXContentWithUser(builder)).string()
     }
 
     protected fun Monitor.relativeUrl() = "$ALERTING_BASE_URI/$id"

@@ -52,6 +52,7 @@ import org.opensearch.alerting.randomMonitor
 import org.opensearch.alerting.randomThrottle
 import org.opensearch.alerting.randomTrigger
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.toJsonString
 import org.opensearch.client.ResponseException
 import org.opensearch.client.WarningFailureException
 import org.opensearch.common.bytes.BytesReference
@@ -93,7 +94,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     fun `test parsing monitor as a scheduled job`() {
         val monitor = createRandomMonitor()
 
-        val builder = monitor.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), USE_TYPED_KEYS)
+        val builder = monitor.toXContentWithUser(XContentBuilder.builder(XContentType.JSON.xContent()), USE_TYPED_KEYS)
         val string = BytesReference.bytes(builder).utf8ToString()
         val xcp = createParser(XContentType.JSON.xContent(), string)
         val scheduledJob = ScheduledJob.parse(xcp, monitor.id, monitor.version)
@@ -734,7 +735,11 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
         val historyAlerts = searchAlerts(monitor, AlertIndices.HISTORY_WRITE_INDEX)
         assertEquals("Alert was not moved to history", 1, historyAlerts.size)
-        assertEquals("Alert data incorrect", alert.copy(state = Alert.State.DELETED), historyAlerts.single())
+        assertEquals(
+            "Alert data incorrect",
+            alert.copy(state = Alert.State.DELETED).toJsonString(),
+            historyAlerts.single().toJsonString()
+        )
     }
 
     fun `test delete trigger moves alerts only for deleted trigger`() {
@@ -759,12 +764,16 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val alerts = searchAlerts(monitor)
         // We have two alerts from above, 1 for each trigger, there should be only 1 left in active index
         assertEquals("One alert should be in active index", 1, alerts.size)
-        assertEquals("Wrong alert in active index", alertKeep, alerts.single())
+        assertEquals("Wrong alert in active index", alertKeep.toJsonString(), alerts.single().toJsonString())
 
         val historyAlerts = searchAlerts(monitor, AlertIndices.HISTORY_WRITE_INDEX)
         // Only alertDelete should of been moved to history index
         assertEquals("One alert should be in history index", 1, historyAlerts.size)
-        assertEquals("Alert data incorrect", alertDelete.copy(state = Alert.State.DELETED), historyAlerts.single())
+        assertEquals(
+            "Alert data incorrect",
+            alertDelete.copy(state = Alert.State.DELETED).toJsonString(),
+            historyAlerts.single().toJsonString()
+        )
     }
 
     fun `test update monitor with wrong version`() {
