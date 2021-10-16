@@ -52,6 +52,7 @@ import org.opensearch.alerting.randomThrottle
 import org.opensearch.alerting.randomUser
 import org.opensearch.alerting.randomUserEmpty
 import org.opensearch.alerting.toJsonString
+import org.opensearch.alerting.toJsonStringWithUser
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.QueryBuilders
@@ -93,7 +94,7 @@ class XContentTests : OpenSearchTestCase() {
 
     fun `test action with per execution scope does not support throttling`() {
         try {
-            val action = randomActionWithPolicy().copy(
+            randomActionWithPolicy().copy(
                 throttleEnabled = true,
                 throttle = Throttle(value = 5, unit = ChronoUnit.MINUTES),
                 actionExecutionPolicy = ActionExecutionPolicy(PerExecutionActionScope())
@@ -128,7 +129,7 @@ class XContentTests : OpenSearchTestCase() {
     fun `test query-level monitor parsing`() {
         val monitor = randomQueryLevelMonitor()
 
-        val monitorString = monitor.toJsonString()
+        val monitorString = monitor.toJsonStringWithUser()
         val parsedMonitor = Monitor.parse(parser(monitorString))
         assertEquals("Round tripping QueryLevelMonitor doesn't work", monitor, parsedMonitor)
     }
@@ -154,7 +155,7 @@ class XContentTests : OpenSearchTestCase() {
     fun `test alert parsing`() {
         val alert = randomAlert()
 
-        val alertString = alert.toXContent(builder(), ToXContent.EMPTY_PARAMS).string()
+        val alertString = alert.toXContentWithUser(builder()).string()
         val parsedAlert = Alert.parse(parser(alertString))
 
         assertEquals("Round tripping alert doesn't work", alert, parsedAlert)

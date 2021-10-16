@@ -34,7 +34,6 @@ import org.opensearch.alerting.randomUser
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.commons.authuser.User
 import org.opensearch.test.OpenSearchTestCase
 import java.time.Instant
 import java.util.Collections
@@ -97,7 +96,7 @@ class GetAlertsResponseTests : OpenSearchTestCase() {
             "monitorId",
             "monitorName",
             0L,
-            User("admin", listOf(), listOf(), listOf()),
+            null,
             "triggerId",
             "triggerName",
             Alert.State.ACKNOWLEDGED,
@@ -115,8 +114,7 @@ class GetAlertsResponseTests : OpenSearchTestCase() {
         var actualXContentString = req.toXContent(builder(), ToXContent.EMPTY_PARAMS).string()
         val expectedXContentString = "{\"alerts\":[{\"id\":\"id\",\"version\":0,\"monitor_id\":\"monitorId\"," +
             "\"schema_version\":0,\"monitor_version\":0,\"monitor_name\":\"monitorName\"," +
-            "\"monitor_user\":{\"name\":\"admin\",\"backend_roles\":[],\"roles\":[]," +
-            "\"custom_attribute_names\":[],\"user_requested_tenant\":null},\"trigger_id\":\"triggerId\"," +
+            "\"trigger_id\":\"triggerId\"," +
             "\"trigger_name\":\"triggerName\",\"state\":\"ACKNOWLEDGED\",\"error_message\":null,\"alert_history\":[]," +
             "\"severity\":\"severity\",\"action_execution_results\":[],\"start_time\":" + now.toEpochMilli() +
             ",\"last_notification_time\":null,\"end_time\":null,\"acknowledged_time\":null}],\"totalAlerts\":1}"
