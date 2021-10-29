@@ -27,8 +27,6 @@
 package org.opensearch.alerting.util
 
 import inet.ipaddr.IPAddressString
-import org.opensearch.OpenSearchStatusException
-import org.opensearch.action.ActionListener
 import org.opensearch.alerting.destination.message.BaseMessage
 import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
@@ -37,8 +35,6 @@ import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.settings.DestinationSettings
-import org.opensearch.commons.authuser.User
-import org.opensearch.rest.RestStatus
 
 /**
  * RFC 5322 compliant pattern matching: https://www.ietf.org/rfc/rfc5322.txt
@@ -73,76 +69,6 @@ fun BaseMessage.isHostInDenylist(networks: List<String>): Boolean {
     }
 
     return false
-}
-
-/**
- 1. If filterBy is enabled
- a) Don't allow to create monitor/ destination (throw error) if the logged-on user has no backend roles configured.
- 2. If filterBy is enabled & monitors are created when filterBy is disabled:
- a) If backend_roles are saved with config, results will get filtered and data is shown
- b) If backend_roles are not saved with monitor config, results will get filtered and no monitors
- will be displayed.
- c) Users can edit and save the monitors to associate their backend_roles.
- 3. If filterBy is enabled & monitors are created by older version:
- a) No User details are present on monitor.
- b) No monitors will be displayed.
- c) Users can edit and save the monitors to associate their backend_roles.
- */
-fun <T : Any> checkFilterByUserBackendRoles(filterByEnabled: Boolean, user: User?, actionListener: ActionListener<T>): Boolean {
-    if (filterByEnabled) {
-        if (user == null) {
-            actionListener.onFailure(
-                AlertingException.wrap(
-                    OpenSearchStatusException(
-                        "Filter by user backend roles is not enabled with security disabled.", RestStatus.FORBIDDEN
-                    )
-                )
-            )
-            return false
-        } else if (user.backendRoles.isNullOrEmpty()) {
-            actionListener.onFailure(
-                AlertingException.wrap(
-                    OpenSearchStatusException("User doesn't have backend roles configured. Contact administrator.", RestStatus.FORBIDDEN)
-                )
-            )
-            return false
-        }
-    }
-    return true
-}
-
-/**
- * If FilterBy is enabled, this function verifies that the requester user has FilterBy permissions to access
- * the resource. If FilterBy is disabled, we will assume the user has permissions and return true.
- *
- * This check will later to moved to the security plugin.
- */
-fun <T : Any> checkUserFilterByPermissions(
-    filterByEnabled: Boolean,
-    requesterUser: User?,
-    resourceUser: User?,
-    actionListener: ActionListener<T>,
-    resourceType: String,
-    resourceId: String
-): Boolean {
-
-    if (!filterByEnabled) return true
-
-    val resourceBackendRoles = resourceUser?.backendRoles
-    val requesterBackendRoles = requesterUser?.backendRoles
-
-    if (resourceBackendRoles == null || requesterBackendRoles == null || resourceBackendRoles.intersect(requesterBackendRoles).isEmpty()) {
-        actionListener.onFailure(
-            AlertingException.wrap(
-                OpenSearchStatusException(
-                    "Do not have permissions to resource, $resourceType, with id, $resourceId",
-                    RestStatus.FORBIDDEN
-                )
-            )
-        )
-        return false
-    }
-    return true
 }
 
 fun Monitor.isBucketLevelMonitor(): Boolean = this.monitorType == Monitor.MonitorType.BUCKET_LEVEL_MONITOR
