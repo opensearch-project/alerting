@@ -77,7 +77,7 @@ class TransportGetAlertsAction @Inject constructor(
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
-        registerForUpdate(clusterService)
+        listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(
@@ -85,7 +85,7 @@ class TransportGetAlertsAction @Inject constructor(
         getAlertsRequest: GetAlertsRequest,
         actionListener: ActionListener<GetAlertsResponse>
     ) {
-        val user = resolveUser(client)
+        val user = readUserFromThreadContext(client)
 
         val tableProp = getAlertsRequest.table
         val sortBuilder = SortBuilders
@@ -139,7 +139,7 @@ class TransportGetAlertsAction @Inject constructor(
         if (user == null) {
             // user is null when: 1/ security is disabled. 2/when user is super-admin.
             search(searchSourceBuilder, actionListener)
-        } else if (!filterByRolesAndUser(user)) {
+        } else if (!doFilterForUser(user)) {
             // security is enabled and filterby is disabled.
             search(searchSourceBuilder, actionListener)
         } else {

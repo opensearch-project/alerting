@@ -72,15 +72,15 @@ class TransportDeleteMonitorAction @Inject constructor(
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
-        registerForUpdate(clusterService)
+        listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(task: Task, request: DeleteMonitorRequest, actionListener: ActionListener<DeleteResponse>) {
-        val user = resolveUser(client)
+        val user = readUserFromThreadContext(client)
         val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, request.monitorId)
             .setRefreshPolicy(request.refreshPolicy)
 
-        if (!checkFilterByUserBackendRoles(filterByRolesAndUser(user), user, actionListener)) {
+        if (!validateUserBackendRoles(user, actionListener)) {
             return
         }
         client.threadPool().threadContext.stashContext().use {
@@ -100,7 +100,7 @@ class TransportDeleteMonitorAction @Inject constructor(
             if (user == null) {
                 // Security is disabled, so we can delete the destination without issues
                 deleteMonitor()
-            } else if (!filterByRolesAndUser(user)) {
+            } else if (!doFilterForUser(user)) {
                 // security is enabled and filterby is disabled.
                 deleteMonitor()
             } else {
@@ -141,7 +141,7 @@ class TransportDeleteMonitorAction @Inject constructor(
         }
 
         private fun onGetResponse(monitor: Monitor) {
-            if (!checkUserFilterByPermissions(filterByRolesAndUser(user), user, monitor.user, actionListener, "monitor", monitorId)) {
+            if (!checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", monitorId)) {
                 return
             } else {
                 deleteMonitor()

@@ -70,7 +70,6 @@ import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestRequest
@@ -109,16 +108,13 @@ class TransportIndexMonitorAction @Inject constructor(
         clusterService.clusterSettings.addSettingsUpdateConsumer(INDEX_TIMEOUT) { indexTimeout = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_ACTION_THROTTLE_VALUE) { maxActionThrottle = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALLOW_LIST) { allowList = it }
-        registerForUpdate(clusterService)
+        listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(task: Task, request: IndexMonitorRequest, actionListener: ActionListener<IndexMonitorResponse>) {
+        val user = readUserFromThreadContext(client)
 
-        val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
-        log.debug("User and roles string from thread context: $userStr")
-        val user: User? = User.parse(userStr)
-
-        if (!checkFilterByUserBackendRoles(filterByRolesAndUser(user), user, actionListener)) {
+        if (!validateUserBackendRoles(user, actionListener)) {
             return
         }
 
@@ -456,7 +452,7 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         private fun onGetResponse(currentMonitor: Monitor) {
-            if (!checkUserFilterByPermissions(filterByRolesAndUser(user), user, currentMonitor.user, actionListener, "monitor", request.monitorId)) {
+            if (!checkUserPermissionsWithResource(user, currentMonitor.user, actionListener, "monitor", request.monitorId)) {
                 return
             }
 

@@ -73,13 +73,13 @@ class TransportIndexDestinationAction @Inject constructor(
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.INDEX_TIMEOUT) { indexTimeout = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(DestinationSettings.ALLOW_LIST) { allowList = it }
-        registerForUpdate(clusterService)
+        listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(task: Task, request: IndexDestinationRequest, actionListener: ActionListener<IndexDestinationResponse>) {
-        val user = resolveUser(client)
+        val user = readUserFromThreadContext(client)
 
-        if (!checkFilterByUserBackendRoles(filterByRolesAndUser(user), user, actionListener)) {
+        if (!validateUserBackendRoles(user, actionListener)) {
             return
         }
         client.threadPool().threadContext.stashContext().use {
@@ -263,8 +263,7 @@ class TransportIndexDestinationAction @Inject constructor(
         }
 
         private fun onGetResponse(destination: Destination) {
-            if (!checkUserFilterByPermissions(
-                    filterByRolesAndUser(user),
+            if (!checkUserPermissionsWithResource(
                     user,
                     destination.user,
                     actionListener,

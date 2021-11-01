@@ -69,17 +69,17 @@ class TransportGetMonitorAction @Inject constructor(
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
-        registerForUpdate(clusterService)
+        listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(task: Task, getMonitorRequest: GetMonitorRequest, actionListener: ActionListener<GetMonitorResponse>) {
-        val user = resolveUser(client)
+        val user = readUserFromThreadContext(client)
 
         val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, getMonitorRequest.monitorId)
             .version(getMonitorRequest.version)
             .fetchSourceContext(getMonitorRequest.srcContext)
 
-        if (!checkFilterByUserBackendRoles(filterByRolesAndUser(user), user, actionListener)) {
+        if (!validateUserBackendRoles(user, actionListener)) {
             return
         }
 
@@ -110,8 +110,7 @@ class TransportGetMonitorAction @Inject constructor(
                                 monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
 
                                 // security is enabled and filterby is enabled
-                                if (!checkUserFilterByPermissions(
-                                        filterByRolesAndUser(user),
+                                if (!checkUserPermissionsWithResource(
                                         user,
                                         monitor?.user,
                                         actionListener,

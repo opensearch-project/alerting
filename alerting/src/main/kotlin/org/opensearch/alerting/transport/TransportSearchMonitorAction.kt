@@ -60,11 +60,11 @@ class TransportSearchMonitorAction @Inject constructor(
     @Volatile
     override var filterByEnabled: Boolean = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
     init {
-        registerForUpdate(clusterService)
+        listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(task: Task, searchMonitorRequest: SearchMonitorRequest, actionListener: ActionListener<SearchResponse>) {
-        val user = resolveUser(client)
+        val user = readUserFromThreadContext(client)
         client.threadPool().threadContext.stashContext().use {
             resolve(searchMonitorRequest, actionListener, user)
         }
@@ -74,7 +74,7 @@ class TransportSearchMonitorAction @Inject constructor(
         if (user == null) {
             // user header is null when: 1/ security is disabled. 2/when user is super-admin.
             search(searchMonitorRequest.searchRequest, actionListener)
-        } else if (!filterByRolesAndUser(user)) {
+        } else if (!doFilterForUser(user)) {
             // security is enabled and filterby is disabled.
             search(searchMonitorRequest.searchRequest, actionListener)
         } else {
