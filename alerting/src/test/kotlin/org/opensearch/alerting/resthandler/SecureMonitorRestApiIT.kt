@@ -31,7 +31,10 @@ import org.opensearch.alerting.randomTemplateScript
 import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
 import org.opensearch.client.RestClient
+import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.rest.SecureRestClientBuilder
 import org.opensearch.index.query.QueryBuilders
@@ -473,6 +476,48 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             assertTrue("Missing monitor error message", (inputResults?.get("error") as String).isNotEmpty())
             assertTrue((inputResults.get("error") as String).contains("no permissions for [indices:data/read/search]"))
         } finally {
+            deleteRoleMapping("alerting_full_access")
+        }
+    }
+
+    fun `test admin all access with enable filter by`() {
+        if (!securityEnabled())
+            return
+
+        enableFilterBy()
+        createUserWithTestData(user, "hr_data", "hr_role", "HR")
+        createUserRolesMapping("alerting_full_access", arrayOf(user))
+        try {
+            // randomMonitor has a dummy user, api ignores the User passed as part of monitor, it picks user info from the logged-in user.
+            val monitor = randomQueryLevelMonitor().copy(
+                inputs = listOf(
+                    SearchInput(
+                        indices = listOf("hr_data"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                    )
+                )
+            )
+
+            val createResponse = userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+            assertEquals("Create monitor failed", RestStatus.CREATED, createResponse?.restStatus())
+            val monitorJson = JsonXContent.jsonXContent.createParser(
+                NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+                createResponse?.entity?.content
+            ).map()
+
+            val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", monitorJson["_id"])).toString()
+
+            // search as "admin" - must get 1 docs
+            val adminSearchResponse = client().makeRequest(
+                "POST",
+                "$ALERTING_BASE_URI/_search",
+                emptyMap(),
+                NStringEntity(search, ContentType.APPLICATION_JSON)
+            )
+            assertEquals("Search monitor failed", RestStatus.OK, adminSearchResponse.restStatus())
+            assertEquals("Monitor not found during search", 1, getDocs(adminSearchResponse))
+        } finally {
+            deleteRoleMapping("hr_role")
+            deleteRole("hr_role")
             deleteRoleMapping("alerting_full_access")
         }
     }
