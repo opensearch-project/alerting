@@ -41,7 +41,6 @@ import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
-import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.authuser.User
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -56,18 +55,16 @@ class TransportSearchMonitorAction @Inject constructor(
     actionFilters: ActionFilters
 ) : HandledTransportAction<SearchMonitorRequest, SearchResponse>(
     SearchMonitorAction.NAME, transportService, actionFilters, ::SearchMonitorRequest
-) {
-    @Volatile private var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
-
+),
+    SecureTransportAction {
+    @Volatile
+    override var filterByEnabled: Boolean = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
     init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.FILTER_BY_BACKEND_ROLES) { filterByEnabled = it }
+        listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(task: Task, searchMonitorRequest: SearchMonitorRequest, actionListener: ActionListener<SearchResponse>) {
-        val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
-        log.debug("User and roles string from thread context: $userStr")
-        val user: User? = User.parse(userStr)
-
+        val user = readUserFromThreadContext(client)
         client.threadPool().threadContext.stashContext().use {
             resolve(searchMonitorRequest, actionListener, user)
         }
@@ -77,7 +74,7 @@ class TransportSearchMonitorAction @Inject constructor(
         if (user == null) {
             // user header is null when: 1/ security is disabled. 2/when user is super-admin.
             search(searchMonitorRequest.searchRequest, actionListener)
-        } else if (!filterByEnabled) {
+        } else if (!doFilterForUser(user)) {
             // security is enabled and filterby is disabled.
             search(searchMonitorRequest.searchRequest, actionListener)
         } else {
