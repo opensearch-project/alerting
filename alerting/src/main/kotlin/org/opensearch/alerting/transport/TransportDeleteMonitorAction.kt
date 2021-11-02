@@ -41,8 +41,6 @@ import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
-import org.opensearch.alerting.util.checkFilterByUserBackendRoles
-import org.opensearch.alerting.util.checkUserFilterByPermissions
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -51,7 +49,6 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.authuser.User
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
@@ -69,22 +66,21 @@ class TransportDeleteMonitorAction @Inject constructor(
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<DeleteMonitorRequest, DeleteResponse>(
     DeleteMonitorAction.NAME, transportService, actionFilters, ::DeleteMonitorRequest
-) {
+),
+    SecureTransportAction {
 
-    @Volatile private var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.FILTER_BY_BACKEND_ROLES) { filterByEnabled = it }
+        listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(task: Task, request: DeleteMonitorRequest, actionListener: ActionListener<DeleteResponse>) {
-        val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
-        log.debug("User and roles string from thread context: $userStr")
-        val user: User? = User.parse(userStr)
+        val user = readUserFromThreadContext(client)
         val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, request.monitorId)
             .setRefreshPolicy(request.refreshPolicy)
 
-        if (!checkFilterByUserBackendRoles(filterByEnabled, user, actionListener)) {
+        if (!validateUserBackendRoles(user, actionListener)) {
             return
         }
         client.threadPool().threadContext.stashContext().use {
@@ -104,7 +100,7 @@ class TransportDeleteMonitorAction @Inject constructor(
             if (user == null) {
                 // Security is disabled, so we can delete the destination without issues
                 deleteMonitor()
-            } else if (!filterByEnabled) {
+            } else if (!doFilterForUser(user)) {
                 // security is enabled and filterby is disabled.
                 deleteMonitor()
             } else {
@@ -145,7 +141,7 @@ class TransportDeleteMonitorAction @Inject constructor(
         }
 
         private fun onGetResponse(monitor: Monitor) {
-            if (!checkUserFilterByPermissions(filterByEnabled, user, monitor.user, actionListener, "monitor", monitorId)) {
+            if (!checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", monitorId)) {
                 return
             } else {
                 deleteMonitor()

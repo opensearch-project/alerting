@@ -51,7 +51,6 @@ import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
-import org.opensearch.alerting.settings.AlertingSettings.Companion.FILTER_BY_BACKEND_ROLES
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTION_THROTTLE_VALUE
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
@@ -59,8 +58,6 @@ import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.addUserBackendRolesFilter
-import org.opensearch.alerting.util.checkFilterByUserBackendRoles
-import org.opensearch.alerting.util.checkUserFilterByPermissions
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
@@ -73,7 +70,6 @@ import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestRequest
@@ -96,14 +92,15 @@ class TransportIndexMonitorAction @Inject constructor(
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<IndexMonitorRequest, IndexMonitorResponse>(
     IndexMonitorAction.NAME, transportService, actionFilters, ::IndexMonitorRequest
-) {
+),
+    SecureTransportAction {
 
     @Volatile private var maxMonitors = ALERTING_MAX_MONITORS.get(settings)
     @Volatile private var requestTimeout = REQUEST_TIMEOUT.get(settings)
     @Volatile private var indexTimeout = INDEX_TIMEOUT.get(settings)
     @Volatile private var maxActionThrottle = MAX_ACTION_THROTTLE_VALUE.get(settings)
     @Volatile private var allowList = ALLOW_LIST.get(settings)
-    @Volatile private var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_MAX_MONITORS) { maxMonitors = it }
@@ -111,16 +108,13 @@ class TransportIndexMonitorAction @Inject constructor(
         clusterService.clusterSettings.addSettingsUpdateConsumer(INDEX_TIMEOUT) { indexTimeout = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_ACTION_THROTTLE_VALUE) { maxActionThrottle = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALLOW_LIST) { allowList = it }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(FILTER_BY_BACKEND_ROLES) { filterByEnabled = it }
+        listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(task: Task, request: IndexMonitorRequest, actionListener: ActionListener<IndexMonitorResponse>) {
+        val user = readUserFromThreadContext(client)
 
-        val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
-        log.debug("User and roles string from thread context: $userStr")
-        val user: User? = User.parse(userStr)
-
-        if (!checkFilterByUserBackendRoles(filterByEnabled, user, actionListener)) {
+        if (!validateUserBackendRoles(user, actionListener)) {
             return
         }
 
@@ -458,7 +452,7 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         private fun onGetResponse(currentMonitor: Monitor) {
-            if (!checkUserFilterByPermissions(filterByEnabled, user, currentMonitor.user, actionListener, "monitor", request.monitorId)) {
+            if (!checkUserPermissionsWithResource(user, currentMonitor.user, actionListener, "monitor", request.monitorId)) {
                 return
             }
 

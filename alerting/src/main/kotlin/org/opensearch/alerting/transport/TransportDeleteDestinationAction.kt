@@ -41,8 +41,6 @@ import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
-import org.opensearch.alerting.util.checkFilterByUserBackendRoles
-import org.opensearch.alerting.util.checkUserFilterByPermissions
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -53,7 +51,6 @@ import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.authuser.User
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
@@ -71,22 +68,21 @@ class TransportDeleteDestinationAction @Inject constructor(
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<DeleteDestinationRequest, DeleteResponse>(
     DeleteDestinationAction.NAME, transportService, actionFilters, ::DeleteDestinationRequest
-) {
+),
+    SecureTransportAction {
 
-    @Volatile private var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.FILTER_BY_BACKEND_ROLES) { filterByEnabled = it }
+        listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(task: Task, request: DeleteDestinationRequest, actionListener: ActionListener<DeleteResponse>) {
-        val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
-        log.debug("User and roles string from thread context: $userStr")
-        val user: User? = User.parse(userStr)
+        val user = readUserFromThreadContext(client)
         val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, request.destinationId)
             .setRefreshPolicy(request.refreshPolicy)
 
-        if (!checkFilterByUserBackendRoles(filterByEnabled, user, actionListener)) {
+        if (!validateUserBackendRoles(user, actionListener)) {
             return
         }
         client.threadPool().threadContext.stashContext().use {
@@ -106,7 +102,7 @@ class TransportDeleteDestinationAction @Inject constructor(
             if (user == null) {
                 // Security is disabled, so we can delete the destination without issues
                 deleteDestination()
-            } else if (!filterByEnabled) {
+            } else if (!doFilterForUser(user)) {
                 // security is enabled and filterby is disabled.
                 deleteDestination()
             } else {
@@ -153,7 +149,7 @@ class TransportDeleteDestinationAction @Inject constructor(
         }
 
         private fun onGetResponse(destination: Destination) {
-            if (!checkUserFilterByPermissions(filterByEnabled, user, destination.user, actionListener, "destination", destinationId)) {
+            if (!checkUserPermissionsWithResource(user, destination.user, actionListener, "destination", destinationId)) {
                 return
             } else {
                 deleteDestination()
