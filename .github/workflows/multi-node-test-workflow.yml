@@ -78,3 +78,8 @@ jobs:
           else
             echo "Security plugin is NOT available skipping this run as tests without security have already been run"
           fi
+
+      - name: Run Alerting Backwards Compatibility Tests
+        run: |
+          echo "Running backwards compatibility tests ..."
+          ./gradlew bwcTestSuite

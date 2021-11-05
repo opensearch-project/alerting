@@ -85,9 +85,10 @@ import javax.management.remote.JMXServiceURL
 
 abstract class AlertingRestTestCase : ODFERestTestCase() {
 
-    private val isDebuggingTest = DisableOnDebug(null).isDebugging
-    private val isDebuggingRemoteCluster = System.getProperty("cluster.debug", "false")!!.toBoolean()
-    val numberOfNodes = System.getProperty("cluster.number_of_nodes", "1")!!.toInt()
+    protected val isDebuggingTest = DisableOnDebug(null).isDebugging
+    protected val isDebuggingRemoteCluster = System.getProperty("cluster.debug", "false")!!.toBoolean()
+    protected val numberOfNodes = System.getProperty("cluster.number_of_nodes", "1")!!.toInt()
+    protected val isMultiNode = numberOfNodes > 1
 
     override fun xContentRegistry(): NamedXContentRegistry {
         return NamedXContentRegistry(

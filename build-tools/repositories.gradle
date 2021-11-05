@@ -29,5 +29,4 @@ repositories {
     maven { url "https://aws.oss.sonatype.org/content/repositories/snapshots" }
     mavenCentral()
     jcenter()
-    maven { url "https://aws.oss.sonatype.org/content/repositories/snapshots" }
 }
