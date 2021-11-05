@@ -28,14 +28,3 @@ Compatible with OpenSearch 1.2.0
 
 * Update copyright notice ([#222](https://github.com/opensearch-project/alerting/pull/222))
 
-
-    
-    
-    
-    
-    
-   
-    
-   
-   
-   
