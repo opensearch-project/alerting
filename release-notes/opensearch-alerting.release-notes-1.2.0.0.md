@@ -22,7 +22,7 @@ Compatible with OpenSearch 1.2.0
 
 ### Documentation
 
-* Add release notes for 1.2.0.0 release ([#]())
+* Add release notes for 1.2.0.0 release ([#225](https://github.com/opensearch-project/alerting/pull/225))
 
 ### Maintenance
 
