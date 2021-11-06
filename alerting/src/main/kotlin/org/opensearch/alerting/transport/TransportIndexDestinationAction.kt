@@ -32,8 +32,6 @@ import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
-import org.opensearch.alerting.util.checkFilterByUserBackendRoles
-import org.opensearch.alerting.util.checkUserFilterByPermissions
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -46,7 +44,6 @@ import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.authuser.User
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestStatus
@@ -66,24 +63,23 @@ class TransportIndexDestinationAction @Inject constructor(
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<IndexDestinationRequest, IndexDestinationResponse>(
     IndexDestinationAction.NAME, transportService, actionFilters, ::IndexDestinationRequest
-) {
+),
+    SecureTransportAction {
 
     @Volatile private var indexTimeout = AlertingSettings.INDEX_TIMEOUT.get(settings)
     @Volatile private var allowList = DestinationSettings.ALLOW_LIST.get(settings)
-    @Volatile private var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.INDEX_TIMEOUT) { indexTimeout = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(DestinationSettings.ALLOW_LIST) { allowList = it }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.FILTER_BY_BACKEND_ROLES) { filterByEnabled = it }
+        listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(task: Task, request: IndexDestinationRequest, actionListener: ActionListener<IndexDestinationResponse>) {
-        val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
-        log.debug("User and roles string from thread context: $userStr")
-        val user: User? = User.parse(userStr)
+        val user = readUserFromThreadContext(client)
 
-        if (!checkFilterByUserBackendRoles(filterByEnabled, user, actionListener)) {
+        if (!validateUserBackendRoles(user, actionListener)) {
             return
         }
         client.threadPool().threadContext.stashContext().use {
@@ -267,8 +263,7 @@ class TransportIndexDestinationAction @Inject constructor(
         }
 
         private fun onGetResponse(destination: Destination) {
-            if (!checkUserFilterByPermissions(
-                    filterByEnabled,
+            if (!checkUserPermissionsWithResource(
                     user,
                     destination.user,
                     actionListener,

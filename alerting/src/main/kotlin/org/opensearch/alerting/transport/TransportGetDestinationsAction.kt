@@ -51,7 +51,6 @@ import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
@@ -75,12 +74,13 @@ class TransportGetDestinationsAction @Inject constructor(
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<GetDestinationsRequest, GetDestinationsResponse> (
     GetDestinationsAction.NAME, transportService, actionFilters, ::GetDestinationsRequest
-) {
+),
+    SecureTransportAction {
 
-    @Volatile private var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.FILTER_BY_BACKEND_ROLES) { filterByEnabled = it }
+        listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(
@@ -88,12 +88,7 @@ class TransportGetDestinationsAction @Inject constructor(
         getDestinationsRequest: GetDestinationsRequest,
         actionListener: ActionListener<GetDestinationsResponse>
     ) {
-        val userStr = client.threadPool().threadContext.getTransient<String>(
-            ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT
-        )
-        log.debug("User and roles string from thread context: $userStr")
-        val user: User? = User.parse(userStr)
-
+        val user = readUserFromThreadContext(client)
         val tableProp = getDestinationsRequest.table
 
         val sortBuilder = SortBuilders
@@ -144,7 +139,7 @@ class TransportGetDestinationsAction @Inject constructor(
         if (user == null) {
             // user is null when: 1/ security is disabled. 2/when user is super-admin.
             search(searchSourceBuilder, actionListener)
-        } else if (!filterByEnabled) {
+        } else if (!doFilterForUser(user)) {
             // security is enabled and filterby is disabled.
             search(searchSourceBuilder, actionListener)
         } else {
