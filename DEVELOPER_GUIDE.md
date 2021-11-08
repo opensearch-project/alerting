@@ -44,6 +44,10 @@ Currently we just put RCF jar in lib as dependency. Plan to publish to Maven and
 6. `./gradlew :alerting:integTest -Dtests.class="*MonitorRunnerIT"` runs a single integ test class
 7. `./gradlew :alerting:integTest -Dtests.method="test execute monitor with dryrun"` runs a single integ test method
  (remember to quote the test method name if it contains spaces).
+8. `./gradlew alertingBwcCluster#mixedClusterTask` launches a cluster with three nodes of bwc version of OpenSearch with alerting and tests backwards compatibility by upgrading one of the nodes with the current version of OpenSearch with alerting, creating a mixed cluster.
+9. `./gradlew alertingBwcCluster#rollingUpgradeClusterTask` launches a cluster with three nodes of bwc version of OpenSearch with alerting and tests backwards compatibility by performing rolling upgrade of each node with the current version of OpenSearch with alerting.
+10. `./gradlew alertingBwcCluster#fullRestartClusterTask` launches a cluster with three nodes of bwc version of OpenSearch with alerting and tests backwards compatibility by performing a full restart on the cluster upgrading all the nodes with the current version of OpenSearch with alerting.
+11. `./gradlew bwcTestSuite` runs all the above bwc tests combined.
 
 When launching a cluster using one of the above commands, logs are placed in `alerting/build/testclusters/integTest-0/logs/`. Though the logs are teed to the console, in practices it's best to check the actual log file.
 
