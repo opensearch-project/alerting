@@ -58,6 +58,12 @@ task javadocJar(type: Jar) {
 }
 
 publishing {
+    repositories {
+        maven {
+            name = 'staging'
+            url = "${rootProject.buildDir}/local-staging-repo"
+        }
+    }
     publications {
         shadow(MavenPublication) {
             project.shadow.component(it)
@@ -94,23 +100,7 @@ publishing {
         }
     }
 
-    repositories {
-        maven {
-            name = "sonatype-staging"
-            url "https://aws.oss.sonatype.org/service/local/staging/deploy/maven2"
-            credentials {
-                username project.hasProperty('ossrhUsername') ? project.property('ossrhUsername') : ''
-                password project.hasProperty('ossrhPassword') ? project.property('ossrhPassword') : ''
-            }
-        }
-    }
-
     // TODO - enabled debug logging for the time being, remove this eventually
     gradle.startParameter.setShowStacktrace(ShowStacktrace.ALWAYS)
     gradle.startParameter.setLogLevel(LogLevel.DEBUG)
-
-    signing {
-        required { gradle.taskGraph.hasTask("publishShadowPublicationToSonatype-stagingRepository") }
-        sign publishing.publications.shadow
-    }
 }
