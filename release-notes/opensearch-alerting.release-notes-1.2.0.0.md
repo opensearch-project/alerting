@@ -27,4 +27,5 @@ Compatible with OpenSearch 1.2.0
 ### Maintenance
 
 * Update copyright notice ([#222](https://github.com/opensearch-project/alerting/pull/222))
+* Update copyright notice and add DCO workflow ([#229](https://github.com/opensearch-project/alerting/pull/229))
 
