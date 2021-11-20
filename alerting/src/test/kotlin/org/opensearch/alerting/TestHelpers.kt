@@ -130,7 +130,8 @@ fun randomBucketLevelMonitor(
     inputs: List<Input> = listOf(
         SearchInput(
             emptyList(),
-            SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).aggregation(TermsAggregationBuilder("test_agg"))
+            SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                .aggregation(TermsAggregationBuilder("test_agg").field("test_field"))
         )
     ),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
