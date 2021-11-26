@@ -1090,17 +1090,15 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     private fun isMonitorScheduled(monitorId: String, alertingStatsResponse: Map<String, Any>): Boolean {
-        var monitorScheduled = false
         val nodesInfo = alertingStatsResponse["nodes"] as Map<String, Any>
         for (nodeId in nodesInfo.keys) {
             val nodeInfo = nodesInfo[nodeId] as Map<String, Any>
             val jobsInfo = nodeInfo["jobs_info"] as Map<String, Any>
             if (jobsInfo.keys.contains(monitorId)) {
-                monitorScheduled = true
-                break
+                return true
             }
         }
 
-        return monitorScheduled
+        return false
     }
 }
