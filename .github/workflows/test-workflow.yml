@@ -31,7 +31,7 @@ jobs:
 
 
       - name: Build and run with Gradle
-        run: ./gradlew build -Dopensearch.version=1.2.0-SNAPSHOT
+        run: ./gradlew build -Dopensearch.version=1.3.0-SNAPSHOT
 
 #      - name: Create Artifact Path
 #        run: |
@@ -50,4 +50,4 @@ jobs:
 #          path: alerting-artifacts
       # Publish to local maven
       - name: Publish to Maven Local
-        run: ./gradlew publishToMavenLocal -Dopensearch.version=1.2.0-SNAPSHOT
+        run: ./gradlew publishToMavenLocal -Dopensearch.version=1.3.0-SNAPSHOT
