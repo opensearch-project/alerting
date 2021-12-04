@@ -39,8 +39,8 @@ afterEvaluate {
         task renameRpm(type: Copy) {
             from("$buildDir/distributions")
             into("$buildDir/distributions")
-            include archiveName
-            rename archiveName, "${packageName}-${version}.rpm"
+            include archiveFileName.get()
+            rename archiveFileName.get(), "${packageName}-${archiveVersion.get()}.rpm"
             doLast { delete file("$buildDir/distributions/$archiveName") }
         }
     }
@@ -52,8 +52,8 @@ afterEvaluate {
         task renameDeb(type: Copy) {
             from("$buildDir/distributions")
             into("$buildDir/distributions")
-            include archiveName
-            rename archiveName, "${packageName}-${version}.deb"
+            include archiveFileName.get()
+            rename archiveFileName.get(), "${packageName}-${archiveVersion.get()}.deb"
             doLast { delete file("$buildDir/distributions/$archiveName") }
         }
     }
