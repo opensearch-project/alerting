@@ -3,12 +3,10 @@ name: Test Workflow
 on:
   pull_request:
     branches:
-      - main
-      - opendistro-*
+      - "*"
   push:
     branches:
-      - main
-      - opendistro-*
+      - "*"
 
 jobs:
   build:
