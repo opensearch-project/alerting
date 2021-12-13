@@ -421,6 +421,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return getMonitor(monitorId = monitorId)
     }
 
+    @Suppress("UNCHECKED_CAST")
     protected fun updateMonitor(monitor: Monitor, refresh: Boolean = false): Monitor {
         val response = client().makeRequest(
             "PUT", "${monitor.relativeUrl()}?refresh=$refresh",
