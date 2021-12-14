@@ -32,7 +32,7 @@ jobs:
         run: |
           mkdir -p alerting-artifacts
           cp ./alerting/build/distributions/*.zip alerting-artifacts
-       This step uses the codecov-action Github action: https://github.com/codecov/codecov-action
+      # This step uses the codecov-action Github action: https://github.com/codecov/codecov-action
       - name: Upload Coverage Report
         uses: codecov/codecov-action@v1
         with:
