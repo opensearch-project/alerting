@@ -10,7 +10,7 @@
  */
 
 /*
- *   Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *   Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License").
  *   You may not use this file except in compliance with the License.
@@ -41,6 +41,7 @@ import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
+import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorRunResult
@@ -288,6 +289,36 @@ fun randomAlert(monitor: Monitor = randomQueryLevelMonitor()): Alert {
     return Alert(
         monitor, trigger, Instant.now().truncatedTo(ChronoUnit.MILLIS), null,
         actionExecutionResults = actionExecutionResults
+    )
+}
+
+fun randomFinding(
+    id: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    logEventId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    monitorId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    monitorName: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    monitorUser: User? = randomUser(),
+    monitorVersion: Long = OpenSearchRestTestCase.randomNonNegativeLong(),
+    ruleId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    ruleTags: MutableList<String> = mutableListOf(),
+    severity: String = "${randomInt(5)}",
+    timestamp: Instant = Instant.now(),
+    triggerId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    triggerName: String = OpenSearchRestTestCase.randomAlphaOfLength(10)
+): Finding {
+    return Finding(
+        id = id,
+        logEventId = logEventId,
+        monitorId = monitorId,
+        monitorName = monitorName,
+        monitorUser = monitorUser,
+        monitorVersion = monitorVersion,
+        ruleId = ruleId,
+        ruleTags = ruleTags,
+        severity = severity,
+        timestamp = timestamp,
+        triggerId = triggerId,
+        triggerName = triggerName
     )
 }
 
