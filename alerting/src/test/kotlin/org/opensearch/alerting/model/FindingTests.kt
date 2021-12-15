@@ -27,29 +27,9 @@
 package org.opensearch.alerting.model
 
 import org.opensearch.alerting.randomFinding
-import org.opensearch.alerting.randomUser
 import org.opensearch.test.OpenSearchTestCase
 
 class FindingTests : OpenSearchTestCase() {
-    fun `test can create finding with user`() {
-        // GIVEN
-        val user = randomUser()
-
-        // WHEN
-        val finding = randomFinding(monitorUser = user)
-
-        // THEN
-        assertEquals("Finding `monitorUser` field does not match:", user, finding.monitorUser)
-    }
-
-    fun `test can create finding without user`() {
-        // GIVEN + WHEN
-        val finding = randomFinding(monitorUser = null)
-
-        // THEN
-        assertNull("Finding `monitorUser` field should be null:", finding.monitorUser)
-    }
-
     fun `test finding asTemplateArgs`() {
         // GIVEN
         val finding = randomFinding()
@@ -62,7 +42,6 @@ class FindingTests : OpenSearchTestCase() {
         assertEquals("Template args 'logEventId' field does not match:", templateArgs[Finding.LOG_EVENT_ID_FIELD], finding.logEventId)
         assertEquals("Template args 'monitorId' field does not match:", templateArgs[Finding.MONITOR_ID_FIELD], finding.monitorId)
         assertEquals("Template args 'monitorName' field does not match:", templateArgs[Finding.MONITOR_NAME_FIELD], finding.monitorName)
-        assertEquals("Template args 'monitorVersion' field does not match:", templateArgs[Finding.MONITOR_VERSION_FIELD], finding.monitorVersion)
         assertEquals("Template args 'ruleId' field does not match:", templateArgs[Finding.RULE_ID_FIELD], finding.ruleId)
         assertEquals("Template args 'ruleTags' field does not match:", templateArgs[Finding.RULE_TAGS_FIELD], finding.ruleTags)
         assertEquals("Template args 'severity' field does not match:", templateArgs[Finding.SEVERITY_FIELD], finding.severity)
