@@ -30,7 +30,7 @@ jobs:
           java-version: ${{ matrix.java }}
 
       - name: Build and run with Gradle
-        run: ./gradlew build -Dopensearch.version=1.2.1-SNAPSHOT
+        run: ./gradlew build -Dopensearch.version=1.2.2-SNAPSHOT
 
 #      - name: Create Artifact Path
 #        run: |
@@ -49,4 +49,4 @@ jobs:
 #          path: alerting-artifacts
       # Publish to local maven
       - name: Publish to Maven Local
-        run: ./gradlew publishToMavenLocal -Dopensearch.version=1.2.1-SNAPSHOT
+        run: ./gradlew publishToMavenLocal -Dopensearch.version=1.2.2-SNAPSHOT
