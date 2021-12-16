@@ -147,10 +147,9 @@ class Finding(
                     RULE_ID_FIELD -> ruleId = xcp.text()
                     RULE_TAGS_FIELD -> {
                         ensureExpectedToken(XContentParser.Token.START_ARRAY, xcp.currentToken(), xcp)
-                        // TODO dev code: investigate implementing error logging
-//                        while (xcp.nextToken() != XContentParser.Token.END_ARRAY) {
-//                            errorHistory.add(FindingError.parse(xcp))
-//                        }
+                        while (xcp.nextToken() != XContentParser.Token.END_ARRAY) {
+                            ruleTags.add(xcp.text())
+                        }
                     }
                     SEVERITY_FIELD -> severity = xcp.text()
                     TIMESTAMP_FIELD -> timestamp = requireNotNull(xcp.instant())
