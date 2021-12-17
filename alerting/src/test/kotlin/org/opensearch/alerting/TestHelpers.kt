@@ -58,6 +58,8 @@ import org.opensearch.alerting.model.action.Throttle
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailEntry
 import org.opensearch.alerting.model.destination.email.EmailGroup
+import org.opensearch.alerting.model.docLevelInput.DocLevelMonitorInput
+import org.opensearch.alerting.model.docLevelInput.DocLevelQuery
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.Request
 import org.opensearch.client.RequestOptions
@@ -290,6 +292,24 @@ fun randomAlert(monitor: Monitor = randomQueryLevelMonitor()): Alert {
         monitor, trigger, Instant.now().truncatedTo(ChronoUnit.MILLIS), null,
         actionExecutionResults = actionExecutionResults
     )
+}
+
+fun randomDocLevelQuery(
+    id: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    query: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    severity: String = "${randomInt(5)}",
+    tags: List<String> = mutableListOf(0..randomInt(10)).map { OpenSearchRestTestCase.randomAlphaOfLength(10) },
+    actions: List<Action> = mutableListOf(0..randomInt(10)).map { randomAction() }
+): DocLevelQuery {
+    return DocLevelQuery(id = id, query =  query, severity = severity, tags = tags, actions = actions)
+}
+
+fun randomDocLevelMonitorInput(
+    description: String = OpenSearchRestTestCase.randomAlphaOfLength(randomInt(10)),
+    indices: List<String> = listOf(1..randomInt(10)).map { OpenSearchRestTestCase.randomAlphaOfLength(10) },
+    queries: List<DocLevelQuery> = listOf(1..randomInt(10)).map { randomDocLevelQuery() }
+) : DocLevelMonitorInput {
+    return DocLevelMonitorInput(description = description, indices = indices, queries = queries)
 }
 
 fun randomFinding(
