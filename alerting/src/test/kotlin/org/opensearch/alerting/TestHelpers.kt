@@ -301,14 +301,14 @@ fun randomDocLevelQuery(
     tags: List<String> = mutableListOf(0..randomInt(10)).map { OpenSearchRestTestCase.randomAlphaOfLength(10) },
     actions: List<Action> = mutableListOf(0..randomInt(10)).map { randomAction() }
 ): DocLevelQuery {
-    return DocLevelQuery(id = id, query =  query, severity = severity, tags = tags, actions = actions)
+    return DocLevelQuery(id = id, query = query, severity = severity, tags = tags, actions = actions)
 }
 
 fun randomDocLevelMonitorInput(
     description: String = OpenSearchRestTestCase.randomAlphaOfLength(randomInt(10)),
     indices: List<String> = listOf(1..randomInt(10)).map { OpenSearchRestTestCase.randomAlphaOfLength(10) },
     queries: List<DocLevelQuery> = listOf(1..randomInt(10)).map { randomDocLevelQuery() }
-) : DocLevelMonitorInput {
+): DocLevelMonitorInput {
     return DocLevelMonitorInput(description = description, indices = indices, queries = queries)
 }
 
