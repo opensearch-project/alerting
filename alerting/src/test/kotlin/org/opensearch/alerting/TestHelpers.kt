@@ -294,11 +294,13 @@ fun randomAlert(monitor: Monitor = randomQueryLevelMonitor()): Alert {
 
 fun randomFinding(
     id: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
-    logEventId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    logEvent: Map<String, Any> = mapOf(
+        OpenSearchRestTestCase.randomAlphaOfLength(5) to OpenSearchRestTestCase.randomAlphaOfLength(5)
+    ),
     monitorId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     monitorName: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
-    ruleId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
-    ruleTags: MutableList<String> = mutableListOf(),
+    queryId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    queryTags: MutableList<String> = mutableListOf(),
     severity: String = "${randomInt(5)}",
     timestamp: Instant = Instant.now(),
     triggerId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
@@ -306,11 +308,11 @@ fun randomFinding(
 ): Finding {
     return Finding(
         id = id,
-        logEventId = logEventId,
+        logEvent = logEvent,
         monitorId = monitorId,
         monitorName = monitorName,
-        ruleId = ruleId,
-        ruleTags = ruleTags,
+        queryId = queryId,
+        queryTags = queryTags,
         severity = severity,
         timestamp = timestamp,
         triggerId = triggerId,
