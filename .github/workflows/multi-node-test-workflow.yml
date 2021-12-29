@@ -1,12 +1,11 @@
-name: Multi node test workflow
-# This workflow is triggered on pull requests to main
+name: Multi Node Test
 on:
-  pull_request:
-    branches:
-      - main
   push:
     branches:
-      - main
+      - "*"
+  pull_request:
+    branches:
+      - "*"
 
 jobs:
   build:
