@@ -1,14 +1,5 @@
 name: Test Workflow
-# This workflow is triggered on pull requests and pushes to main or an opendistro release branch
-on:
-  pull_request:
-    branches:
-      - main
-      - opendistro-*
-  push:
-    branches:
-      - main
-      - opendistro-*
+on: [pull_request, push]
 
 jobs:
   build:
