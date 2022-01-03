@@ -586,10 +586,16 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val expectedAcknowledgedCount = alertsToAcknowledge.size
 
         val acknowledgedAlerts = responseMap["success"] as List<String>
-        assertTrue("Expected $expectedAcknowledgedCount alerts to be acknowledged successfully.", acknowledgedAlerts.size == expectedAcknowledgedCount)
+        assertTrue(
+            "Expected $expectedAcknowledgedCount alerts to be acknowledged successfully.",
+            acknowledgedAlerts.size == expectedAcknowledgedCount
+        )
 
         val acknowledgedAlertsList = acknowledgedAlerts.toString()
-        alertsToAcknowledge.forEach { alert -> assertTrue("Alert with ID ${alert.id} not found in failed list.", acknowledgedAlertsList.contains(alert.id)) }
+        alertsToAcknowledge.forEach {
+            alert ->
+            assertTrue("Alert with ID ${alert.id} not found in failed list.", acknowledgedAlertsList.contains(alert.id))
+        }
 
         val failedResponse = responseMap["failed"] as List<String>
         assertTrue("Expected 0 alerts to fail acknowledgment.", failedResponse.isEmpty())
@@ -604,7 +610,8 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
         val alertsGroup2 = (1..15).map { createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE)) }.toTypedArray()
 
-        val alertsToAcknowledge = arrayOf(*alertsGroup1, *alertsGroup2) // Creating an array of alerts that includes alerts that have been already acknowledged, and new alerts.
+        // Creating an array of alerts that includes alerts that have been already acknowledged, and new alerts.
+        val alertsToAcknowledge = arrayOf(*alertsGroup1, *alertsGroup2)
 
         // WHEN
         val response = acknowledgeAlerts(monitor, *alertsToAcknowledge)
@@ -614,18 +621,33 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val expectedAcknowledgedCount = alertsToAcknowledge.size - alertsGroup1.size
 
         val acknowledgedAlerts = responseMap["success"] as List<String>
-        assertTrue("Expected $expectedAcknowledgedCount alerts to be acknowledged successfully.", acknowledgedAlerts.size == expectedAcknowledgedCount)
+        assertTrue(
+            "Expected $expectedAcknowledgedCount alerts to be acknowledged successfully.",
+            acknowledgedAlerts.size == expectedAcknowledgedCount
+        )
 
         val acknowledgedAlertsList = acknowledgedAlerts.toString()
-        alertsGroup2.forEach { alert -> assertTrue("Alert with ID ${alert.id} not found in failed list.", acknowledgedAlertsList.contains(alert.id)) }
-        alertsGroup1.forEach { alert -> assertFalse("Alert with ID ${alert.id} found in failed list.", acknowledgedAlertsList.contains(alert.id)) }
+        alertsGroup2.forEach {
+            alert ->
+            assertTrue("Alert with ID ${alert.id} not found in failed list.", acknowledgedAlertsList.contains(alert.id))
+        }
+        alertsGroup1.forEach {
+            alert ->
+            assertFalse("Alert with ID ${alert.id} found in failed list.", acknowledgedAlertsList.contains(alert.id))
+        }
 
         val failedResponse = responseMap["failed"] as List<String>
         assertTrue("Expected ${alertsGroup1.size} alerts to fail acknowledgment.", failedResponse.size == alertsGroup1.size)
 
         val failedResponseList = failedResponse.toString()
-        alertsGroup1.forEach { alert -> assertTrue("Alert with ID ${alert.id} not found in failed list.", failedResponseList.contains(alert.id)) }
-        alertsGroup2.forEach { alert -> assertFalse("Alert with ID ${alert.id} found in failed list.", failedResponseList.contains(alert.id)) }
+        alertsGroup1.forEach {
+            alert ->
+            assertTrue("Alert with ID ${alert.id} not found in failed list.", failedResponseList.contains(alert.id))
+        }
+        alertsGroup2.forEach {
+            alert ->
+            assertFalse("Alert with ID ${alert.id} found in failed list.", failedResponseList.contains(alert.id))
+        }
     }
 
     @Throws(Exception::class)

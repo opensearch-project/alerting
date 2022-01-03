@@ -105,7 +105,6 @@ allprojects {
         compileKotlin.kotlinOptions.jvmTarget = compileTestKotlin.kotlinOptions.jvmTarget = "1.8"
         compileKotlin.dependsOn ktlint
     }
-
 }
 
 evaluationDependsOnChildren()
