@@ -84,18 +84,6 @@ allprojects {
         compileKotlin.kotlinOptions.jvmTarget = compileTestKotlin.kotlinOptions.jvmTarget = "1.8"
         compileKotlin.dependsOn ktlint
     }
-
-    // Force certain dependencies here so they reflect across all sub-projects
-    configurations.all {
-        if (it.state != Configuration.State.UNRESOLVED) return
-        resolutionStrategy {
-            force "com.google.guava:guava:30.0-jre"
-            force "commons-codec:commons-codec:1.13"
-            force "junit:junit:4.13.1"
-            force "org.apache.httpcomponents:httpclient:4.5.13"
-        }
-    }
-
 }
 
 evaluationDependsOnChildren()
