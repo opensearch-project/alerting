@@ -81,7 +81,7 @@ fun randomQueryLevelMonitor(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
-        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        lastRunContext = mapOf(), uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 
@@ -99,7 +99,7 @@ fun randomQueryLevelMonitorWithoutUser(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = null,
-        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        lastRunContext = mapOf(), uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 
@@ -122,7 +122,7 @@ fun randomBucketLevelMonitor(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.BUCKET_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
-        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        lastRunContext = mapOf(), uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 

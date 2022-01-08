@@ -1,6 +1,6 @@
 {
   "_meta" : {
-    "schema_version": 4
+    "schema_version": 5
   },
   "properties": {
     "monitor": {
@@ -243,6 +243,10 @@
               }
             }
           }
+        },
+        "last_run_context": {
+          "type": "object",
+          "enabled": false
         },
         "ui_metadata": {
           "type": "object",
