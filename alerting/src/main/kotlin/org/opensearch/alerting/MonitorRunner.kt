@@ -14,6 +14,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.bulk.BackoffPolicy
+import org.opensearch.action.search.SearchRequest
+import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.moveAlerts
 import org.opensearch.alerting.core.JobRunner
@@ -60,16 +62,24 @@ import org.opensearch.alerting.util.getCombinedTriggerRunResult
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isBucketLevelMonitor
+import org.opensearch.alerting.util.isDocLevelMonitor
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.Strings
 import org.opensearch.common.component.AbstractLifecycleComponent
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.index.query.BoolQueryBuilder
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
 import org.opensearch.script.TemplateScript
+import org.opensearch.search.SearchHits
+import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.search.sort.SortOrder
 import org.opensearch.threadpool.ThreadPool
+import java.io.IOException
 import java.time.Instant
 import kotlin.coroutines.CoroutineContext
 
@@ -247,6 +257,8 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         launch {
             if (job.isBucketLevelMonitor()) {
                 runBucketLevelMonitor(job, periodStart, periodEnd)
+            } else if (job.isDocLevelMonitor()) {
+                runDocLevelMonitor(job, periodStart, periodEnd)
             } else {
                 runQueryLevelMonitor(job, periodStart, periodEnd)
             }
@@ -706,5 +718,89 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         return scriptService.compile(template, TemplateScript.CONTEXT)
             .newInstance(template.params + mapOf("ctx" to ctx.asTemplateArg()))
             .execute()
+    }
+
+    fun runDocLevelMonitor(monitor: Monitor, periodStart: Instant, periodEnd: Instant, dryrun: Boolean = false) {
+        // 1. get monitor and lastRunInfo
+        // 2. do your stuff
+        // 3. same monitor with lastRunInfo
+        /**********************************************************************/
+        // Hard code all here
+        val index = "test-logs"
+        val conditions = ""
+        /**********************************************************************/
+
+        logger.info("In DOC LEVEL MONITOR RUNNER")
+
+        // 1. Read last-run details from monitor document.
+        var lastRunContext = monitor.lastRunContext
+        if (lastRunContext.isNullOrEmpty()) {
+            lastRunContext = HashMap<String, Any>()
+            lastRunContext["index"] = index
+            lastRunContext["shards_count"] = 2
+            lastRunContext["0"] = -1L
+            lastRunContext["1"] = -1L
+        }
+        // validate() todo
+
+        // 2. Search each shard to get SearchHits
+        val count: Int = lastRunContext["shards_count"] as Int
+        for (i: Int in 0 until count) {
+            val shard = i as String
+            logger.info("Searching Shard: $shard")
+            // get the lastest SeqNo for this shard and use that for all queries in current run.
+            val maxSeqNo = getCurrentSeqNo(index, shard)
+            logger.info("MaxSeqNo is $maxSeqNo for Shard: $shard")
+
+            val sh: SearchHits = searchShard(index, shard, lastRunContext[shard] as Long?, maxSeqNo)
+            logger.info("Shard: $shard, Search hits: ${sh.hits.size}")
+            // lastRunContext[i] = maxSeqNo
+            // 3. Create findings entre from SearchHits
+            // createFindings(sh)
+            // lastRun.setSeqNo(shard, newSeqNo)
+        }
+    }
+
+    open fun getCurrentSeqNo(index: String, shard: String): Long {
+        val request: SearchRequest = SearchRequest()
+            .indices(index)
+            .preference("_shards:$shard")
+            .source(
+                SearchSourceBuilder()
+                    .version(true)
+                    .sort("_seq_no", SortOrder.DESC)
+                    .seqNoAndPrimaryTerm(true)
+                    .query(QueryBuilders.matchAllQuery())
+                    .size(1)
+            )
+        val response: SearchResponse = client.search(request).actionGet()
+        if (response.status() !== RestStatus.OK) {
+            logger.error(String.format("Error searching shard %s", shard))
+            throw IOException("Failed to get max seq no for shard: $shard")
+        }
+        if (response.hits.hits.isEmpty())
+            return -1L
+
+        return response.hits.hits[0].seqNo
+    }
+
+    open fun searchShard(index: String, shard: String, prevSeqNo: Long?, maxSeqNo: Long): SearchHits {
+        val boolQueryBuilder = BoolQueryBuilder()
+        boolQueryBuilder.filter(QueryBuilders.rangeQuery("_seq_no").gt(prevSeqNo).lte(maxSeqNo))
+        val request: SearchRequest = SearchRequest()
+            .indices(index)
+            .preference("_shards:$shard")
+            .source(
+                SearchSourceBuilder()
+                    .version(true)
+                    .query(boolQueryBuilder)
+            )
+        logger.info("Request: $request")
+        val response: SearchResponse = client.search(request).actionGet()
+        if (response.status() !== RestStatus.OK) {
+            logger.error(String.format("Error searching shard %s", shard))
+            throw IOException("Failed to search shard: $shard")
+        }
+        return response.getHits()
     }
 }
