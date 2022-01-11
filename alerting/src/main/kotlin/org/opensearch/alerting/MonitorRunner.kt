@@ -8,9 +8,9 @@ package org.opensearch.alerting
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.bulk.BackoffPolicy
@@ -293,9 +293,9 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             if (triggerService.isQueryLevelTriggerActionable(triggerCtx, triggerResult)) {
                 val actionCtx = triggerCtx.copy(error = monitorResult.error ?: triggerResult.error)
                 var threshold = ALERTING_TRIGGER_MAX_ACTIONS.get(settings)
-                threshold = if(threshold < trigger.actions.size) threshold else trigger.actions.size
+                threshold = if (threshold < trigger.actions.size) threshold else trigger.actions.size
 
-                //val threshold = if(ALERTING_TRIGGER_MAX_ACTIONS.get(settings) < trigger.actions.size) ALERTING_TRIGGER_MAX_ACTIONS.get(settings) else trigger.actions.size
+                // val threshold = if(ALERTING_TRIGGER_MAX_ACTIONS.get(settings) < trigger.actions.size) ALERTING_TRIGGER_MAX_ACTIONS.get(settings) else trigger.actions.size
                 for (action in trigger.actions.slice(0 until threshold)) {
                     triggerResult.actionResults[action.id] = runAction(action, actionCtx, dryrun)
                 }
