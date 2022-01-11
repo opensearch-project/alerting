@@ -46,7 +46,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         executeMonitor(createRandomMonitor())
         assertIndexExists(AlertIndices.ALERT_INDEX)
         assertIndexExists(AlertIndices.HISTORY_WRITE_INDEX)
-        verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 4)
+        verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 5)
         verifyIndexSchemaVersion(AlertIndices.ALERT_INDEX, 3)
         verifyIndexSchemaVersion(AlertIndices.HISTORY_WRITE_INDEX, 3)
     }
