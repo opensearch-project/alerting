@@ -26,6 +26,12 @@ class LegacyOpenDistroAlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
         )
 
+        val ALERTING_TRIGGER_MAX_ACTIONS = Setting.intSetting(
+            "opendistro.alerting.trigger.max_actions",
+            -1,
+            Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
+        )
+
         val INPUT_TIMEOUT = Setting.positiveTimeSetting(
             "opendistro.alerting.input_timeout",
             TimeValue.timeValueSeconds(30),

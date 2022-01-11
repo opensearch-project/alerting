@@ -25,6 +25,12 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        val ALERTING_TRIGGER_MAX_ACTIONS = Setting.intSetting(
+            "plugins.alerting.trigger.max_actions",
+            LegacyOpenDistroAlertingSettings.ALERTING_TRIGGER_MAX_ACTIONS,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
         val INPUT_TIMEOUT = Setting.positiveTimeSetting(
             "plugins.alerting.input_timeout",
             LegacyOpenDistroAlertingSettings.INPUT_TIMEOUT,

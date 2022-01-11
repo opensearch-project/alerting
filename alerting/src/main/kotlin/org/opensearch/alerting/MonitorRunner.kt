@@ -44,6 +44,7 @@ import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_MILLIS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_TRIGGER_MAX_ACTIONS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.DEFAULT_MAX_ACTIONABLE_ALERT_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTIONABLE_ALERT_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MOVE_ALERTS_BACKOFF_COUNT
@@ -291,7 +292,11 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
 
             if (triggerService.isQueryLevelTriggerActionable(triggerCtx, triggerResult)) {
                 val actionCtx = triggerCtx.copy(error = monitorResult.error ?: triggerResult.error)
-                for (action in trigger.actions) {
+                var threshold = ALERTING_TRIGGER_MAX_ACTIONS.get(settings)
+                threshold = if(threshold < trigger.actions.size) threshold else trigger.actions.size
+
+                //val threshold = if(ALERTING_TRIGGER_MAX_ACTIONS.get(settings) < trigger.actions.size) ALERTING_TRIGGER_MAX_ACTIONS.get(settings) else trigger.actions.size
+                for (action in trigger.actions.slice(0 until threshold)) {
                     triggerResult.actionResults[action.id] = runAction(action, actionCtx, dryrun)
                 }
             }
