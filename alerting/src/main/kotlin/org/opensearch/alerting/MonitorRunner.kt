@@ -8,9 +8,9 @@ package org.opensearch.alerting
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.bulk.BackoffPolicy
@@ -42,9 +42,9 @@ import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_TRIGGER_MAX_ACTIONS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_MILLIS
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_TRIGGER_MAX_ACTIONS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.DEFAULT_MAX_ACTIONABLE_ALERT_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTIONABLE_ALERT_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MOVE_ALERTS_BACKOFF_COUNT
