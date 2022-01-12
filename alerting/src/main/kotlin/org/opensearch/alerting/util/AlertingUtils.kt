@@ -1,40 +1,31 @@
 /*
+ * Copyright OpenSearch Contributors
  * SPDX-License-Identifier: Apache-2.0
- *
- * The OpenSearch Contributors require contributions made to
- * this file be licensed under the Apache-2.0 license or a
- * compatible open source license.
- *
- * Modifications Copyright OpenSearch Contributors. See
- * GitHub history for details.
- */
-
-/*
- *   Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- *   Licensed under the Apache License, Version 2.0 (the "License").
- *   You may not use this file except in compliance with the License.
- *   A copy of the License is located at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *   or in the "license" file accompanying this file. This file is distributed
- *   on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- *   express or implied. See the License for the specific language governing
- *   permissions and limitations under the License.
  */
 
 package org.opensearch.alerting.util
 
 import inet.ipaddr.IPAddressString
+import org.opensearch.action.index.IndexRequest
+import org.opensearch.action.index.IndexResponse
+import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.destination.message.BaseMessage
+import org.opensearch.alerting.elasticapi.suspendUntil
 import org.opensearch.alerting.model.AggregationResultBucket
+import org.opensearch.alerting.model.AlertingConfigAccessor
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.alerting.model.destination.Destination
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
+import org.opensearch.client.Client
+import org.opensearch.common.settings.Settings
+import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentFactory
 
 /**
  * RFC 5322 compliant pattern matching: https://www.ietf.org/rfc/rfc5322.txt
@@ -105,4 +96,24 @@ fun BucketLevelTriggerRunResult.getCombinedTriggerRunResult(
     val error = this.error ?: prevTriggerRunResult.error
 
     return this.copy(aggregationResultBuckets = mergedAggregationResultBuckets, actionResultsMap = mergedActionResultsMap, error = error)
+}
+
+// TODO: Check if this can be more generic such that TransportIndexMonitorAction class can use this. Also see if this should be refactored
+// to another class. Include tests for this as well.
+suspend fun updateMonitor(client: Client, xContentRegistry: NamedXContentRegistry, settings: Settings, monitor: Monitor): IndexResponse {
+    val currentMonitor = AlertingConfigAccessor.getMonitorInfo(client, xContentRegistry, monitor.id)
+
+    var updateMonitor = monitor
+    // If both are enabled, use the current existing monitor enabled time, otherwise the next execution will be
+    // incorrect.
+    if (monitor.enabled && currentMonitor.enabled)
+        updateMonitor = monitor.copy(enabledTime = currentMonitor.enabledTime)
+
+    val indexRequest = IndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
+        .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+        .source(updateMonitor.toXContentWithUser(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+        .id(monitor.id)
+        .timeout(AlertingSettings.INDEX_TIMEOUT.get(settings))
+
+    return client.suspendUntil { client.index(indexRequest, it) }
 }
