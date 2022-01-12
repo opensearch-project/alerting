@@ -63,7 +63,9 @@ import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isBucketLevelMonitor
 import org.opensearch.alerting.util.isDocLevelMonitor
+import org.opensearch.alerting.util.updateMonitor
 import org.opensearch.client.Client
+import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.Strings
 import org.opensearch.common.component.AbstractLifecycleComponent
@@ -720,48 +722,67 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             .execute()
     }
 
-    fun runDocLevelMonitor(monitor: Monitor, periodStart: Instant, periodEnd: Instant, dryrun: Boolean = false) {
-        // 1. get monitor and lastRunInfo
-        // 2. do your stuff
-        // 3. same monitor with lastRunInfo
-        /**********************************************************************/
-        // Hard code all here
+    private suspend fun runDocLevelMonitor(monitor: Monitor, periodStart: Instant, periodEnd: Instant, dryrun: Boolean = false) {
+        logger.info("Document-level-monitor is running ...")
         val index = "test-logs"
-        val conditions = ""
-        /**********************************************************************/
-
-        logger.info("In DOC LEVEL MONITOR RUNNER")
+        val query = "region:\"us-west-2\""
 
         // 1. Read last-run details from monitor document.
-        var lastRunContext = monitor.lastRunContext
+        var lastRunContext = monitor.lastRunContext.toMutableMap()
         if (lastRunContext.isNullOrEmpty()) {
-            lastRunContext = HashMap<String, Any>()
-            lastRunContext["index"] = index
-            lastRunContext["shards_count"] = 2
-            lastRunContext["0"] = -1L
-            lastRunContext["1"] = -1L
+            lastRunContext = createRunContext(index).toMutableMap()
         }
-        // validate() todo
 
         // 2. Search each shard to get SearchHits
         val count: Int = lastRunContext["shards_count"] as Int
         for (i: Int in 0 until count) {
-            val shard = i as String
-            logger.info("Searching Shard: $shard")
-            // get the lastest SeqNo for this shard and use that for all queries in current run.
-            val maxSeqNo = getCurrentSeqNo(index, shard)
-            logger.info("MaxSeqNo is $maxSeqNo for Shard: $shard")
+            val shard = i.toString()
+            try {
+                logger.info("Monitor execution for shard: $shard")
 
-            val sh: SearchHits = searchShard(index, shard, lastRunContext[shard] as Long?, maxSeqNo)
-            logger.info("Shard: $shard, Search hits: ${sh.hits.size}")
-            // lastRunContext[i] = maxSeqNo
-            // 3. Create findings entre from SearchHits
-            // createFindings(sh)
-            // lastRun.setSeqNo(shard, newSeqNo)
+                val maxSeqNo: Long = getMaxSeqNo(index, shard)
+                logger.info("MaxSeqNo of shard_$shard is $maxSeqNo")
+
+                val sh: SearchHits = searchShard(index, shard, lastRunContext[shard].toString().toLongOrNull(), maxSeqNo, query)
+                logger.info("Search hits for shard_$shard is: ${sh.hits.size}")
+
+                createFindings(sh)
+
+                logger.info("Updating monitor: ${monitor.id}")
+                lastRunContext[shard] = maxSeqNo.toString()
+                val updatedMonitor = monitor.copy(lastRunContext = lastRunContext)
+                // note: update has to called in serial for shards of a given index.
+                updateMonitor(client, xContentRegistry, settings, updatedMonitor)
+            } catch (e: Exception) {
+                logger.info("Failed to run for shard $shard", e)
+            }
         }
     }
 
-    open fun getCurrentSeqNo(index: String, shard: String): Long {
+    private fun getShardsCount(index: String): Int {
+        val allShards: List<ShardRouting> = clusterService.state().routingTable().allShards(index)
+        return allShards.size
+    }
+
+    private fun createRunContext(index: String): HashMap<String, Any> {
+        val lastRunContext = HashMap<String, Any>()
+        lastRunContext["index"] = index
+        val count = getShardsCount(index)
+        lastRunContext["shards_count"] = count
+
+        for (i: Int in 0 until count) {
+            val shard = i.toString()
+            val maxSeqNo: Long = getMaxSeqNo(index, shard)
+            lastRunContext[shard] = maxSeqNo
+        }
+        return lastRunContext
+    }
+
+    /**
+     * Get the current max seq number of the shard. We find it by searching the last document
+     *  in the primary shard.
+     */
+    private fun getMaxSeqNo(index: String, shard: String): Long {
         val request: SearchRequest = SearchRequest()
             .indices(index)
             .preference("_shards:$shard")
@@ -775,7 +796,6 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             )
         val response: SearchResponse = client.search(request).actionGet()
         if (response.status() !== RestStatus.OK) {
-            logger.error(String.format("Error searching shard %s", shard))
             throw IOException("Failed to get max seq no for shard: $shard")
         }
         if (response.hits.hits.isEmpty())
@@ -784,9 +804,11 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         return response.hits.hits[0].seqNo
     }
 
-    open fun searchShard(index: String, shard: String, prevSeqNo: Long?, maxSeqNo: Long): SearchHits {
+    private fun searchShard(index: String, shard: String, prevSeqNo: Long?, maxSeqNo: Long, query: String): SearchHits {
         val boolQueryBuilder = BoolQueryBuilder()
         boolQueryBuilder.filter(QueryBuilders.rangeQuery("_seq_no").gt(prevSeqNo).lte(maxSeqNo))
+        boolQueryBuilder.must(QueryBuilders.queryStringQuery(query))
+
         val request: SearchRequest = SearchRequest()
             .indices(index)
             .preference("_shards:$shard")
@@ -794,13 +816,17 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 SearchSourceBuilder()
                     .version(true)
                     .query(boolQueryBuilder)
+                    .size(10000)
             )
         logger.info("Request: $request")
         val response: SearchResponse = client.search(request).actionGet()
         if (response.status() !== RestStatus.OK) {
-            logger.error(String.format("Error searching shard %s", shard))
             throw IOException("Failed to search shard: $shard")
         }
-        return response.getHits()
+        return response.hits
+    }
+
+    private fun createFindings(sh: SearchHits) {
+        // todo
     }
 }
