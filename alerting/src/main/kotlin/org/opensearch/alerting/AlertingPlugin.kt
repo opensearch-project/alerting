@@ -39,6 +39,7 @@ import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
+import org.opensearch.alerting.model.docLevelInput.DocLevelMonitorInput
 import org.opensearch.alerting.resthandler.RestAcknowledgeAlertAction
 import org.opensearch.alerting.resthandler.RestDeleteDestinationAction
 import org.opensearch.alerting.resthandler.RestDeleteEmailAccountAction
@@ -208,6 +209,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         return listOf(
             Monitor.XCONTENT_REGISTRY,
             SearchInput.XCONTENT_REGISTRY,
+            DocLevelMonitorInput.XCONTENT_REGISTRY,
             QueryLevelTrigger.XCONTENT_REGISTRY,
             BucketLevelTrigger.XCONTENT_REGISTRY
         )

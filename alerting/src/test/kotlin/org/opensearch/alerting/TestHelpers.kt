@@ -294,9 +294,7 @@ fun randomDocLevelMonitorInput(
 
 fun randomFinding(
     id: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
-    logEvent: Map<String, Any> = mapOf(
-        OpenSearchRestTestCase.randomAlphaOfLength(5) to OpenSearchRestTestCase.randomAlphaOfLength(5)
-    ),
+    relatedDocId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     monitorId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     monitorName: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     queryId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
@@ -308,7 +306,7 @@ fun randomFinding(
 ): Finding {
     return Finding(
         id = id,
-        logEvent = logEvent,
+        relatedDocId = relatedDocId,
         monitorId = monitorId,
         monitorName = monitorName,
         queryId = queryId,

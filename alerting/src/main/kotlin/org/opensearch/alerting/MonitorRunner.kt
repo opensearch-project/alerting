@@ -14,19 +14,23 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.bulk.BackoffPolicy
+import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
+import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.moveAlerts
 import org.opensearch.alerting.core.JobRunner
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.elasticapi.InjectorContextElement
 import org.opensearch.alerting.elasticapi.retry
+import org.opensearch.alerting.elasticapi.string
 import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.AlertingConfigAccessor
 import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
+import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorRunResult
@@ -41,6 +45,8 @@ import org.opensearch.alerting.model.action.AlertCategory
 import org.opensearch.alerting.model.action.PerAlertActionScope
 import org.opensearch.alerting.model.action.PerExecutionActionScope
 import org.opensearch.alerting.model.destination.DestinationContextFactory
+import org.opensearch.alerting.model.docLevelInput.DocLevelMonitorInput
+import org.opensearch.alerting.model.docLevelInput.DocLevelQuery
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
@@ -71,6 +77,9 @@ import org.opensearch.common.Strings
 import org.opensearch.common.component.AbstractLifecycleComponent
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.common.xcontent.XContentType
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
@@ -723,17 +732,35 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
     }
 
     private suspend fun runDocLevelMonitor(monitor: Monitor, periodStart: Instant, periodEnd: Instant, dryrun: Boolean = false) {
-        logger.info("Document-level-monitor is running ...")
-        val index = "test-logs"
-        val query = "region:\"us-west-2\""
 
-        // 1. Read last-run details from monitor document.
-        var lastRunContext = monitor.lastRunContext.toMutableMap()
-        if (lastRunContext.isNullOrEmpty()) {
-            lastRunContext = createRunContext(index).toMutableMap()
+        logger.info("Document-level-monitor is running ...")
+        try {
+            validate(monitor)
+        } catch (e: Exception) {
+            logger.info("Failed to start Document-level-monitor. Error: ${e.message}")
+            return
         }
 
-        // 2. Search each shard to get SearchHits
+        val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
+        val index = docLevelMonitorInput.indices[0]
+        val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
+
+        var lastRunContext = monitor.lastRunContext.toMutableMap()
+        try {
+            if (lastRunContext.isNullOrEmpty()) {
+                lastRunContext = createRunContext(index).toMutableMap()
+            }
+        } catch (e: Exception) {
+            logger.info("Failed to start Document-level-monitor $index. Error: ${e.message}")
+            return
+        }
+
+        for (query in queries) {
+            runForEachQuery(monitor, lastRunContext, index, query)
+        }
+    }
+
+    private suspend fun runForEachQuery(monitor: Monitor, lastRunContext: MutableMap<String, Any>, index: String, query: DocLevelQuery) {
         val count: Int = lastRunContext["shards_count"] as Int
         for (i: Int in 0 until count) {
             val shard = i.toString()
@@ -743,10 +770,12 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 val maxSeqNo: Long = getMaxSeqNo(index, shard)
                 logger.info("MaxSeqNo of shard_$shard is $maxSeqNo")
 
-                val sh: SearchHits = searchShard(index, shard, lastRunContext[shard].toString().toLongOrNull(), maxSeqNo, query)
-                logger.info("Search hits for shard_$shard is: ${sh.hits.size}")
+                val hits: SearchHits = searchShard(index, shard, lastRunContext[shard].toString().toLongOrNull(), maxSeqNo, query.query)
+                logger.info("Search hits for shard_$shard is: ${hits.hits.size}")
 
-                createFindings(sh)
+                if (hits.hits.isNotEmpty()) {
+                    createFindings(monitor, query, hits)
+                }
 
                 logger.info("Updating monitor: ${monitor.id}")
                 lastRunContext[shard] = maxSeqNo.toString()
@@ -754,8 +783,25 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 // note: update has to called in serial for shards of a given index.
                 updateMonitor(client, xContentRegistry, settings, updatedMonitor)
             } catch (e: Exception) {
-                logger.info("Failed to run for shard $shard", e)
+                logger.info("Failed to run for shard $shard. Error: ${e.message}")
+                logger.debug("Failed to run for shard $shard", e)
             }
+        }
+    }
+
+    // todo: add more validations.
+    private fun validate(monitor: Monitor) {
+        if (monitor.inputs.size > 1) {
+            throw IOException("Only one input is supported with document-level-monitor.")
+        }
+
+        if (monitor.inputs[0].name() != DocLevelMonitorInput.DOC_LEVEL_INPUT_FIELD) {
+            throw IOException("Invalid input with document-level-monitor.")
+        }
+
+        val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
+        if (docLevelMonitorInput.indices.size > 1) {
+            throw IOException("Only one index is supported with document-level-monitor.")
         }
     }
 
@@ -816,7 +862,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 SearchSourceBuilder()
                     .version(true)
                     .query(boolQueryBuilder)
-                    .size(10000)
+                    .size(10000) // fixme: make this configurable.
             )
         logger.info("Request: $request")
         val response: SearchResponse = client.search(request).actionGet()
@@ -826,7 +872,38 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         return response.hits
     }
 
-    private fun createFindings(sh: SearchHits) {
-        // todo
+    private fun createFindings(monitor: Monitor, docLevelQuery: DocLevelQuery, hits: SearchHits) {
+        val finding = Finding(
+            id = "123", // fixme : generate this.
+            relatedDocId = getAllDocIds(hits),
+            monitorId = monitor.id,
+            monitorName = monitor.name,
+            queryId = docLevelQuery.id,
+            queryTags = docLevelQuery.tags,
+            severity = docLevelQuery.severity,
+            timestamp = Instant.now(),
+            triggerId = null, // todo: add once integrated with actions/triggers
+            triggerName = null // todo: add once integrated with actions/triggers
+        )
+
+        val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
+        //change this to debug.
+        logger.info("Findings: $findingStr")
+
+        // todo: below is all hardcoded, temp code and added only to test. replace this with proper Findings index lifecycle management.
+        val indexRequest = IndexRequest(".opensearch-alerting-findings")
+            .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+            .source(findingStr, XContentType.JSON)
+
+        client.index(indexRequest).actionGet()
+    }
+
+    private fun getAllDocIds(hits: SearchHits): String {
+        var sb = StringBuilder()
+        for (hit in hits) {
+            sb.append(hit.docId())
+            sb.append(",")
+        }
+        return sb.substring(0, sb.length - 1)
     }
 }
