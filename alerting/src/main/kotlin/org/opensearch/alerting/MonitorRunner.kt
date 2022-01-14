@@ -92,6 +92,8 @@ import org.opensearch.search.sort.SortOrder
 import org.opensearch.threadpool.ThreadPool
 import java.io.IOException
 import java.time.Instant
+import java.util.UUID
+import kotlin.collections.HashMap
 import kotlin.coroutines.CoroutineContext
 
 object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
@@ -770,11 +772,12 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 val maxSeqNo: Long = getMaxSeqNo(index, shard)
                 logger.info("MaxSeqNo of shard_$shard is $maxSeqNo")
 
+                // todo: scope to optimize this: in prev seqno and current max seq no are same don't search.
                 val hits: SearchHits = searchShard(index, shard, lastRunContext[shard].toString().toLongOrNull(), maxSeqNo, query.query)
                 logger.info("Search hits for shard_$shard is: ${hits.hits.size}")
 
                 if (hits.hits.isNotEmpty()) {
-                    createFindings(monitor, query, hits)
+                    createFindings(monitor, index, query, hits)
                 }
 
                 logger.info("Updating monitor: ${monitor.id}")
@@ -872,12 +875,13 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         return response.hits
     }
 
-    private fun createFindings(monitor: Monitor, docLevelQuery: DocLevelQuery, hits: SearchHits) {
+    private fun createFindings(monitor: Monitor, index: String, docLevelQuery: DocLevelQuery, hits: SearchHits) {
         val finding = Finding(
-            id = "123", // fixme : generate this.
+            id = UUID.randomUUID().toString(),
             relatedDocId = getAllDocIds(hits),
             monitorId = monitor.id,
             monitorName = monitor.name,
+            index = index,
             queryId = docLevelQuery.id,
             queryTags = docLevelQuery.tags,
             severity = docLevelQuery.severity,
@@ -887,7 +891,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         )
 
         val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
-        //change this to debug.
+        // change this to debug.
         logger.info("Findings: $findingStr")
 
         // todo: below is all hardcoded, temp code and added only to test. replace this with proper Findings index lifecycle management.
@@ -901,7 +905,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
     private fun getAllDocIds(hits: SearchHits): String {
         var sb = StringBuilder()
         for (hit in hits) {
-            sb.append(hit.docId())
+            sb.append(hit.id)
             sb.append(",")
         }
         return sb.substring(0, sb.length - 1)

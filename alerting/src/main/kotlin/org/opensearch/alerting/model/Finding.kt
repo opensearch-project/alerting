@@ -24,6 +24,7 @@ class Finding(
     val relatedDocId: String,
     val monitorId: String,
     val monitorName: String,
+    val index: String,
     val queryId: String = NO_ID,
     val queryTags: List<String>,
     val severity: String,
@@ -37,6 +38,7 @@ class Finding(
         relatedDocId = sin.readString(),
         monitorId = sin.readString(),
         monitorName = sin.readString(),
+        index = sin.readString(),
         queryId = sin.readString(),
         queryTags = sin.readStringList(),
         severity = sin.readString(),
@@ -51,6 +53,7 @@ class Finding(
             RELATED_DOC_ID_FIELD to relatedDocId,
             MONITOR_ID_FIELD to monitorId,
             MONITOR_NAME_FIELD to monitorName,
+            INDEX_FIELD to index,
             QUERY_ID_FIELD to queryId,
             QUERY_TAGS_FIELD to queryTags,
             SEVERITY_FIELD to severity,
@@ -66,6 +69,7 @@ class Finding(
             .field(RELATED_DOC_ID_FIELD, relatedDocId)
             .field(MONITOR_ID_FIELD, monitorId)
             .field(MONITOR_NAME_FIELD, monitorName)
+            .field(INDEX_FIELD, index)
             .field(QUERY_ID_FIELD, queryId)
             .field(QUERY_TAGS_FIELD, queryTags.toTypedArray())
             .field(SEVERITY_FIELD, severity)
@@ -82,6 +86,7 @@ class Finding(
         out.writeString(relatedDocId)
         out.writeString(monitorId)
         out.writeString(monitorName)
+        out.writeString(index)
         out.writeString(queryId)
         out.writeStringCollection(queryTags)
         out.writeString(severity)
@@ -95,6 +100,7 @@ class Finding(
         const val RELATED_DOC_ID_FIELD = "related_doc_id"
         const val MONITOR_ID_FIELD = "monitor_id"
         const val MONITOR_NAME_FIELD = "monitor_name"
+        const val INDEX_FIELD = "index"
         const val QUERY_ID_FIELD = "query_id"
         const val QUERY_TAGS_FIELD = "query_tags"
         const val SEVERITY_FIELD = "severity"
@@ -109,6 +115,7 @@ class Finding(
             lateinit var relatedDocId: String
             lateinit var monitorId: String
             lateinit var monitorName: String
+            lateinit var index: String
             var queryId: String = NO_ID
             val queryTags: MutableList<String> = mutableListOf()
             lateinit var severity: String
@@ -125,6 +132,7 @@ class Finding(
                     RELATED_DOC_ID_FIELD -> relatedDocId = xcp.text()
                     MONITOR_ID_FIELD -> monitorId = xcp.text()
                     MONITOR_NAME_FIELD -> monitorName = xcp.text()
+                    INDEX_FIELD -> index = xcp.text()
                     QUERY_ID_FIELD -> queryId = xcp.text()
                     QUERY_TAGS_FIELD -> {
                         ensureExpectedToken(XContentParser.Token.START_ARRAY, xcp.currentToken(), xcp)
@@ -144,6 +152,7 @@ class Finding(
                 relatedDocId = relatedDocId,
                 monitorId = monitorId,
                 monitorName = monitorName,
+                index = index,
                 queryId = queryId,
                 queryTags = queryTags,
                 severity = severity,
