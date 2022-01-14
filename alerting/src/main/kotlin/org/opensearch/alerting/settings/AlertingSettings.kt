@@ -27,7 +27,7 @@ class AlertingSettings {
 
         val ALERTING_TRIGGER_MAX_ACTIONS = Setting.intSetting(
             "plugins.alerting.trigger.max_actions",
-            LegacyOpenDistroAlertingSettings.ALERTING_TRIGGER_MAX_ACTIONS,
+            -1,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 

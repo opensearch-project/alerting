@@ -293,9 +293,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             if (triggerService.isQueryLevelTriggerActionable(triggerCtx, triggerResult)) {
                 val actionCtx = triggerCtx.copy(error = monitorResult.error ?: triggerResult.error)
                 var threshold = ALERTING_TRIGGER_MAX_ACTIONS.get(settings)
-                threshold = if (threshold < trigger.actions.size) threshold else trigger.actions.size
-
-                // val threshold = if(ALERTING_TRIGGER_MAX_ACTIONS.get(settings) < trigger.actions.size) ALERTING_TRIGGER_MAX_ACTIONS.get(settings) else trigger.actions.size
+                threshold = if (threshold < trigger.actions.size && threshold >= 0) threshold else trigger.actions.size
                 for (action in trigger.actions.slice(0 until threshold)) {
                     triggerResult.actionResults[action.id] = runAction(action, actionCtx, dryrun)
                 }
@@ -470,7 +468,9 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 totalActionableAlertCount = dedupedAlerts.size + newAlerts.size + completedAlerts.size,
                 monitorOrTriggerError = monitorOrTriggerError
             )
-            for (action in trigger.actions) {
+            var threshold = ALERTING_TRIGGER_MAX_ACTIONS.get(settings)
+            threshold = if (threshold < trigger.actions.size && threshold >= 0) threshold else trigger.actions.size
+            for (action in trigger.actions.slice(0 until threshold)) {
                 // ActionExecutionPolicy should not be null for Bucket-Level Monitors since it has a default config when not set explicitly
                 val actionExecutionScope = action.getActionExecutionPolicy(monitor)!!.actionExecutionScope
                 if (actionExecutionScope is PerAlertActionScope && !shouldDefaultToPerExecution) {
