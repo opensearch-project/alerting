@@ -509,6 +509,25 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             )
             assertEquals("Search monitor failed", RestStatus.OK, adminSearchResponse.restStatus())
             assertEquals("Monitor not found during search", 1, getDocs(adminSearchResponse))
+
+            // get as "admin" - must get 1 docs
+            val id: String = monitorJson["_id"] as String
+            val adminGetResponse = client().makeRequest(
+                "GET",
+                "$ALERTING_BASE_URI/$id",
+                emptyMap(),
+                NStringEntity(search, ContentType.APPLICATION_JSON)
+            )
+            assertEquals("Get monitor failed", RestStatus.OK, adminGetResponse.restStatus())
+
+            // delete as "admin"
+            val adminDeleteResponse = client().makeRequest(
+                "DELETE",
+                "$ALERTING_BASE_URI/$id",
+                emptyMap(),
+                NStringEntity(search, ContentType.APPLICATION_JSON)
+            )
+            assertEquals("Delete monitor failed", RestStatus.OK, adminGetResponse.restStatus())
         } finally {
             deleteRoleMapping("hr_role")
             deleteRole("hr_role")
