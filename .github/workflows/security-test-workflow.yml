@@ -50,17 +50,20 @@ jobs:
             echo "RUN if [ -d /usr/share/opensearch/plugins/opensearch-alerting ]; then /usr/share/opensearch/bin/opensearch-plugin remove opensearch-alerting; fi" >> Dockerfile
             echo "ADD alerting/build/distributions/opensearch-alerting-$plugin_version-$candidate_version.zip /tmp/" >> Dockerfile
             echo "RUN /usr/share/opensearch/bin/opensearch-plugin install --batch file:/tmp/opensearch-alerting-$plugin_version-$candidate_version.zip" >> Dockerfile
+
             docker build -t opensearch-alerting:test .
             echo "imagePresent=true" >> $GITHUB_ENV
           else
             echo "imagePresent=false" >> $GITHUB_ENV
           fi
+
       - name: Run Docker Image
         if: env.imagePresent == 'true'
         run: |
           cd ..
           docker run -p 9200:9200 -d -p 9600:9600 -e "discovery.type=single-node" opensearch-alerting:test
           sleep 120
+
       - name: Run Alerting Test for security enabled test cases
         if: env.imagePresent == 'true'
         run: |
