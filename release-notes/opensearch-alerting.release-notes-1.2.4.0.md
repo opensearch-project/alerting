@@ -1,6 +1,6 @@
 ## Version 1.2.4.0 2022-01-18
 
-Compatible with OpenSearch 1.2.0
+Compatible with OpenSearch 1.2.4
 
 ### Bug Fixes
 
