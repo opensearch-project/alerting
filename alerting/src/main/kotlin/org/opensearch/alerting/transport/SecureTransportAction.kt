@@ -1,12 +1,6 @@
 /*
+ * Copyright OpenSearch Contributors
  * SPDX-License-Identifier: Apache-2.0
- *
- * The OpenSearch Contributors require contributions made to
- * this file be licensed under the Apache-2.0 license or a
- * compatible open source license.
- *
- * Modifications Copyright OpenSearch Contributors. See
- * GitHub history for details.
  */
 
 package org.opensearch.alerting.transport
@@ -92,6 +86,8 @@ interface SecureTransportAction {
                     )
                 )
                 return false
+            } else if (isAdmin(user)) {
+                return true
             } else if (user.backendRoles.isNullOrEmpty()) {
                 actionListener.onFailure(
                     AlertingException.wrap(
@@ -118,12 +114,14 @@ interface SecureTransportAction {
         resourceId: String
     ): Boolean {
 
-        if (!filterByEnabled) return true
+        if (!doFilterForUser(requesterUser)) return true
 
         val resourceBackendRoles = resourceUser?.backendRoles
         val requesterBackendRoles = requesterUser?.backendRoles
 
-        if (resourceBackendRoles == null || requesterBackendRoles == null ||
+        if (
+            resourceBackendRoles == null ||
+            requesterBackendRoles == null ||
             resourceBackendRoles.intersect(requesterBackendRoles).isEmpty()
         ) {
             actionListener.onFailure(

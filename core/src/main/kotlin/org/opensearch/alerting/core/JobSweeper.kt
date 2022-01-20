@@ -1,27 +1,6 @@
 /*
+ * Copyright OpenSearch Contributors
  * SPDX-License-Identifier: Apache-2.0
- *
- * The OpenSearch Contributors require contributions made to
- * this file be licensed under the Apache-2.0 license or a
- * compatible open source license.
- *
- * Modifications Copyright OpenSearch Contributors. See
- * GitHub history for details.
- */
-
-/*
- *   Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- *   Licensed under the Apache License, Version 2.0 (the "License").
- *   You may not use this file except in compliance with the License.
- *   A copy of the License is located at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *   or in the "license" file accompanying this file. This file is distributed
- *   on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- *   express or implied. See the License for the specific language governing
- *   permissions and limitations under the License.
  */
 
 package org.opensearch.alerting.core
@@ -253,6 +232,13 @@ class JobSweeper(
         // cancel existing background thread if present
         scheduledFullSweep?.cancel()
 
+        // Manually sweep all shards before scheduling the background sweep so it picks up any changes immediately
+        // since the first run of a task submitted with scheduleWithFixedDelay() happens after the interval has passed.
+        logger.debug("Performing sweep of scheduled jobs.")
+        fullSweepExecutor.submit {
+            sweepAllShards()
+        }
+
         // Setup an anti-entropy/self-healing background sweep, in case a sweep that was triggered by an event fails.
         val scheduledSweep = Runnable {
             val elapsedTime = getFullSweepElapsedTime()
@@ -372,13 +358,19 @@ class JobSweeper(
         sweptJobs.getOrPut(shardId) { ConcurrentHashMap() }
             // Use [compute] to update atomically in case another thread concurrently indexes/deletes the same job
             .compute(jobId) { _, currentVersion ->
+                val jobCurrentlyScheduled = scheduler.scheduledJobs().contains(jobId)
+
                 if (newVersion <= (currentVersion ?: Versions.NOT_FOUND)) {
-                    logger.debug("Skipping job $jobId, $newVersion <= $currentVersion")
-                    return@compute currentVersion
+                    if (unchangedJobToBeRescheduled(newVersion, currentVersion, jobCurrentlyScheduled, job)) {
+                        logger.debug("Not skipping job $jobId since it is an unchanged job slated to be rescheduled")
+                    } else {
+                        logger.debug("Skipping job $jobId, $newVersion <= $currentVersion")
+                        return@compute currentVersion
+                    }
                 }
 
                 // deschedule the currently scheduled version
-                if (scheduler.scheduledJobs().contains(jobId)) {
+                if (jobCurrentlyScheduled) {
                     scheduler.deschedule(jobId)
                 }
 
@@ -394,6 +386,29 @@ class JobSweeper(
                     return@compute null
                 }
             }
+    }
+
+    /*
+     * During the job sweep, normally jobs where the currentVersion is equal to the newVersion are skipped since
+     * there was no change.
+     *
+     * However, there exists an edge-case where a job could have been de-scheduled by flipping [SWEEPER_ENABLED]
+     * to false and then not have undergone any changes when the sweeper is re-enabled. In this case, the job should
+     * not be skipped so it can be re-scheduled. This utility method checks for this condition so the sweep() method
+     * can account for it.
+     */
+    private fun unchangedJobToBeRescheduled(
+        newVersion: JobVersion,
+        currentVersion: JobVersion?,
+        jobCurrentlyScheduled: Boolean,
+        job: ScheduledJob?
+    ): Boolean {
+        // newVersion should not be [Versions.NOT_FOUND] here since it's passed in from existing search hits
+        // or successful doc delete operations
+        val versionWasUnchanged = newVersion == (currentVersion ?: Versions.NOT_FOUND)
+        val jobEnabled = job?.enabled ?: false
+
+        return versionWasUnchanged && !jobCurrentlyScheduled && jobEnabled
     }
 
     private fun parseAndSweepJob(
