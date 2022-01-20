@@ -19,8 +19,8 @@ import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.DRYRUN_MONITOR
-import org.opensearch.alerting.assertUserNull
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
+import org.opensearch.alerting.assertUserNull
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.Alert
@@ -542,20 +542,26 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         createUserRolesMapping("alerting_full_access", arrayOf(user))
 
         // Add a doc that is accessible to the user
-        indexDoc(testIndex, "1", """
+        indexDoc(
+            testIndex, "1",
+            """
             {
               "test_field": "a",
               "accessible": true
             }
-        """.trimIndent())
+            """.trimIndent()
+        )
 
         // Add a second doc that is not accesible to the user
-        indexDoc(testIndex, "2", """
+        indexDoc(
+            testIndex, "2",
+            """
             {
               "test_field": "b",
               "accessible": false
             }
-        """.trimIndent())
+            """.trimIndent()
+        )
 
         val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
         val triggerScript = """
@@ -591,20 +597,26 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         createUserRolesMapping("alerting_full_access", arrayOf(user))
 
         // Add a doc that is accessible to the user
-        indexDoc(testIndex, "1", """
+        indexDoc(
+            testIndex, "1",
+            """
             {
               "test_field": "a",
               "accessible": true
             }
-        """.trimIndent())
+            """.trimIndent()
+        )
 
         // Add a second doc that is not accesible to the user
-        indexDoc(testIndex, "2", """
+        indexDoc(
+            testIndex, "2",
+            """
             {
               "test_field": "b",
               "accessible": false
             }
-        """.trimIndent())
+            """.trimIndent()
+        )
 
         val compositeSources = listOf(
             TermsValuesSourceBuilder("test_field").field("test_field")

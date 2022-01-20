@@ -123,7 +123,9 @@ interface SecureTransportAction {
         val resourceBackendRoles = resourceUser?.backendRoles
         val requesterBackendRoles = requesterUser?.backendRoles
 
-        if (resourceBackendRoles == null || requesterBackendRoles == null || resourceBackendRoles.intersect(requesterBackendRoles).isEmpty()) {
+        if (resourceBackendRoles == null || requesterBackendRoles == null ||
+            resourceBackendRoles.intersect(requesterBackendRoles).isEmpty()
+        ) {
             actionListener.onFailure(
                 AlertingException.wrap(
                     OpenSearchStatusException(
