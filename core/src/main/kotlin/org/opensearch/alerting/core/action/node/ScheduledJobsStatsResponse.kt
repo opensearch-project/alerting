@@ -7,6 +7,7 @@ package org.opensearch.alerting.core.action.node
 
 import org.opensearch.action.FailedNodeException
 import org.opensearch.action.support.nodes.BaseNodesResponse
+import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSettings
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.cluster.ClusterName
 import org.opensearch.cluster.health.ClusterIndexHealth
@@ -56,6 +57,7 @@ class ScheduledJobsStatsResponse : BaseNodesResponse<ScheduledJobStats>, ToXCont
     }
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+        builder.field(LegacyOpenDistroScheduledJobSettings.SWEEPER_ENABLED.key, scheduledJobEnabled)
         builder.field(ScheduledJobSettings.SWEEPER_ENABLED.key, scheduledJobEnabled)
         builder.field("scheduled_job_index_exists", indexExists)
         builder.field("scheduled_job_index_status", indexHealth?.status?.name?.toLowerCase())
