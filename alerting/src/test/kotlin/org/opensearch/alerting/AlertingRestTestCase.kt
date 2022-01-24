@@ -69,8 +69,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected val numberOfNodes = System.getProperty("cluster.number_of_nodes", "1")!!.toInt()
     protected val isMultiNode = numberOfNodes > 1
 
-    protected val statsResponseOpendistroSweeperEnabledSetting = "opendistro.scheduled_jobs.enabled"
-    protected val statsResponseOpenSearchSweeperEnabledSetting = "plugins.scheduled_jobs.enabled"
+    protected val statsResponseOpendistroSweeperEnabledField = "opendistro.scheduled_jobs.enabled"
+    protected val statsResponseOpenSearchSweeperEnabledField = "plugins.scheduled_jobs.enabled"
 
     override fun xContentRegistry(): NamedXContentRegistry {
         return NamedXContentRegistry(

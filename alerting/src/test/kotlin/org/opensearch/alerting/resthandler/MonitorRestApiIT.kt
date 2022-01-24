@@ -1103,12 +1103,12 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals(
             "Legacy scheduled job enabled field is not set to $expected",
             expected,
-            alertingStatsResponse[statsResponseOpendistroSweeperEnabledSetting]
+            alertingStatsResponse[statsResponseOpendistroSweeperEnabledField]
         )
         assertEquals(
             "Scheduled job is not ${if (expected) "enabled" else "disabled"}",
             expected,
-            alertingStatsResponse[statsResponseOpenSearchSweeperEnabledSetting]
+            alertingStatsResponse[statsResponseOpenSearchSweeperEnabledField]
         )
     }
 }
