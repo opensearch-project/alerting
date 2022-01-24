@@ -881,8 +881,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         disableScheduledJob()
 
         val responseMap = getAlertingStats()
-        // assertEquals("Cluster name is incorrect", responseMap["cluster_name"], "alerting_integTestCluster")
-        assertEquals("Scheduled job is not enabled", false, responseMap[ScheduledJobSettings.SWEEPER_ENABLED.key])
+        assertAlertingStatsSweeperEnabled(responseMap, false)
         assertEquals("Scheduled job index exists but there are no scheduled jobs.", false, responseMap["scheduled_job_index_exists"])
         val _nodes = responseMap["_nodes"] as Map<String, Int>
         validateAlertingStatsNodeResponse(_nodes)
@@ -894,7 +893,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val monitorId = createMonitor(randomQueryLevelMonitor(enabled = true), refresh = true).id
 
         var alertingStats = getAlertingStats()
-        assertEquals("Scheduled job is not enabled", true, alertingStats[ScheduledJobSettings.SWEEPER_ENABLED.key])
+        assertAlertingStatsSweeperEnabled(alertingStats, true)
         assertEquals("Scheduled job index does not exist", true, alertingStats["scheduled_job_index_exists"])
         assertEquals("Scheduled job index is not yellow", "yellow", alertingStats["scheduled_job_index_status"])
         assertEquals("Nodes are not on schedule", numberOfNodes, alertingStats["nodes_on_schedule"])
@@ -911,7 +910,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         disableScheduledJob()
 
         alertingStats = getAlertingStats()
-        assertEquals("Scheduled job is still enabled", false, alertingStats[ScheduledJobSettings.SWEEPER_ENABLED.key])
+        assertAlertingStatsSweeperEnabled(alertingStats, false)
         assertFalse(
             "Monitor [$monitorId] was still scheduled based on the alerting stats response: $alertingStats",
             isMonitorScheduled(monitorId, alertingStats)
@@ -924,7 +923,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         Thread.sleep(2000)
 
         alertingStats = getAlertingStats()
-        assertEquals("Scheduled job is not enabled", true, alertingStats[ScheduledJobSettings.SWEEPER_ENABLED.key])
+        assertAlertingStatsSweeperEnabled(alertingStats, true)
         assertTrue(
             "Monitor [$monitorId] was not re-scheduled based on the alerting stats response: $alertingStats",
             isMonitorScheduled(monitorId, alertingStats)
@@ -936,8 +935,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         enableScheduledJob()
 
         val responseMap = getAlertingStats()
-        // assertEquals("Cluster name is incorrect", responseMap["cluster_name"], "alerting_integTestCluster")
-        assertEquals("Scheduled job is not enabled", true, responseMap[ScheduledJobSettings.SWEEPER_ENABLED.key])
+        assertAlertingStatsSweeperEnabled(responseMap, true)
         assertEquals("Scheduled job index exists but there are no scheduled jobs.", false, responseMap["scheduled_job_index_exists"])
         val _nodes = responseMap["_nodes"] as Map<String, Int>
         validateAlertingStatsNodeResponse(_nodes)
@@ -949,8 +947,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         createRandomMonitor(refresh = true)
 
         val responseMap = getAlertingStats()
-        // assertEquals("Cluster name is incorrect", responseMap["cluster_name"], "alerting_integTestCluster")
-        assertEquals("Scheduled job is not enabled", true, responseMap[ScheduledJobSettings.SWEEPER_ENABLED.key])
+        assertAlertingStatsSweeperEnabled(responseMap, true)
         assertEquals("Scheduled job index does not exist", true, responseMap["scheduled_job_index_exists"])
         assertEquals("Scheduled job index is not yellow", "yellow", responseMap["scheduled_job_index_status"])
         assertEquals("Nodes are not on schedule", numberOfNodes, responseMap["nodes_on_schedule"])
@@ -978,8 +975,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         createRandomMonitor(refresh = true)
 
         val responseMap = getAlertingStats("/jobs_info")
-        // assertEquals("Cluster name is incorrect", responseMap["cluster_name"], "alerting_integTestCluster")
-        assertEquals("Scheduled job is not enabled", true, responseMap[ScheduledJobSettings.SWEEPER_ENABLED.key])
+        assertAlertingStatsSweeperEnabled(responseMap, true)
         assertEquals("Scheduled job index does not exist", true, responseMap["scheduled_job_index_exists"])
         assertEquals("Scheduled job index is not yellow", "yellow", responseMap["scheduled_job_index_status"])
         assertEquals("Nodes not on schedule", numberOfNodes, responseMap["nodes_on_schedule"])
@@ -1096,5 +1092,18 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         }
 
         return false
+    }
+
+    private fun assertAlertingStatsSweeperEnabled(alertingStatsResponse: Map<String, Any>, expected: Boolean) {
+        assertEquals(
+            "Legacy scheduled job enabled field is not set to $expected",
+            expected,
+            alertingStatsResponse[statsResponseOpendistroSweeperEnabledField]
+        )
+        assertEquals(
+            "Scheduled job is not ${if (expected) "enabled" else "disabled"}",
+            expected,
+            alertingStatsResponse[statsResponseOpenSearchSweeperEnabledField]
+        )
     }
 }
