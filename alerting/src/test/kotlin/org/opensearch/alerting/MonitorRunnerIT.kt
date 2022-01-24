@@ -990,7 +990,6 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
         val response = executeMonitor(monitor.id, params = DRYRUN_MONITOR)
         val output = entityAsMap(response)
-        // print("Output is: $output")
 
         assertEquals(monitor.name, output["monitor_name"])
         @Suppress("UNCHECKED_CAST")

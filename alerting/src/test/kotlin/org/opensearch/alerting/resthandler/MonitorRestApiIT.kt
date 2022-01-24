@@ -571,8 +571,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         )
 
         val acknowledgedAlertsList = acknowledgedAlerts.toString()
-        alertsToAcknowledge.forEach {
-            alert ->
+        alertsToAcknowledge.forEach { alert ->
             assertTrue("Alert with ID ${alert.id} not found in failed list.", acknowledgedAlertsList.contains(alert.id))
         }
 
@@ -606,12 +605,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         )
 
         val acknowledgedAlertsList = acknowledgedAlerts.toString()
-        alertsGroup2.forEach {
-            alert ->
+        alertsGroup2.forEach { alert ->
             assertTrue("Alert with ID ${alert.id} not found in failed list.", acknowledgedAlertsList.contains(alert.id))
         }
-        alertsGroup1.forEach {
-            alert ->
+        alertsGroup1.forEach { alert ->
             assertFalse("Alert with ID ${alert.id} found in failed list.", acknowledgedAlertsList.contains(alert.id))
         }
 
@@ -619,12 +616,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertTrue("Expected ${alertsGroup1.size} alerts to fail acknowledgment.", failedResponse.size == alertsGroup1.size)
 
         val failedResponseList = failedResponse.toString()
-        alertsGroup1.forEach {
-            alert ->
+        alertsGroup1.forEach { alert ->
             assertTrue("Alert with ID ${alert.id} not found in failed list.", failedResponseList.contains(alert.id))
         }
-        alertsGroup2.forEach {
-            alert ->
+        alertsGroup2.forEach { alert ->
             assertFalse("Alert with ID ${alert.id} found in failed list.", failedResponseList.contains(alert.id))
         }
     }

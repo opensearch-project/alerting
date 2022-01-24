@@ -13,12 +13,15 @@ import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.DRYRUN_MONITOR
+import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.alerting.assertUserNull
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomAlert
+import org.opensearch.alerting.randomBucketLevelMonitor
+import org.opensearch.alerting.randomBucketLevelTrigger
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.randomTemplateScript
@@ -33,6 +36,9 @@ import org.opensearch.commons.authuser.User
 import org.opensearch.commons.rest.SecureRestClientBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
+import org.opensearch.script.Script
+import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
+import org.opensearch.search.aggregations.bucket.composite.TermsValuesSourceBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.junit.annotations.TestLogging
 
@@ -528,6 +534,131 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 NStringEntity(search, ContentType.APPLICATION_JSON)
             )
             assertEquals("Delete monitor failed", RestStatus.OK, adminGetResponse.restStatus())
+        } finally {
+            deleteRoleMapping("hr_role")
+            deleteRole("hr_role")
+            deleteRoleMapping("alerting_full_access")
+        }
+    }
+
+    fun `test execute query-level monitor with user having partial index permissions`() {
+        if (!securityEnabled()) return
+
+        val testIndex = "hr_data"
+        createUserWithDocLevelSecurityTestData(
+            user,
+            testIndex,
+            "hr_role",
+            "HR",
+            "{\"term\": { \"accessible\": true}}"
+        )
+        createUserRolesMapping("alerting_full_access", arrayOf(user))
+
+        // Add a doc that is accessible to the user
+        indexDoc(
+            testIndex, "1",
+            """
+            {
+              "test_field": "a",
+              "accessible": true
+            }
+            """.trimIndent()
+        )
+
+        // Add a second doc that is not accesible to the user
+        indexDoc(
+            testIndex, "2",
+            """
+            {
+              "test_field": "b",
+              "accessible": false
+            }
+            """.trimIndent()
+        )
+
+        val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
+        val triggerScript = """
+            // make sure there is exactly one hit
+            return ctx.results[0].hits.hits.size() == 1
+        """.trimIndent()
+
+        val trigger = randomQueryLevelTrigger(condition = Script(triggerScript))
+        val monitor = randomQueryLevelMonitor(inputs = listOf(input), triggers = listOf(trigger))
+
+        try {
+            executeMonitor(monitor.id, params = DRYRUN_MONITOR)
+            val alerts = searchAlerts(monitor)
+            assertEquals("Incorrect number of alerts", 1, alerts.size)
+        } finally {
+            deleteRoleMapping("hr_role")
+            deleteRole("hr_role")
+            deleteRoleMapping("alerting_full_access")
+        }
+    }
+
+    fun `test execute bucket-level monitor with user having partial index permissions`() {
+        if (!securityEnabled()) return
+
+        val testIndex = "hr_data"
+        createUserWithDocLevelSecurityTestData(
+            user,
+            testIndex,
+            "hr_role",
+            "HR",
+            "{\"term\": { \"accessible\": true}}"
+        )
+        createUserRolesMapping("alerting_full_access", arrayOf(user))
+
+        // Add a doc that is accessible to the user
+        indexDoc(
+            testIndex, "1",
+            """
+            {
+              "test_field": "a",
+              "accessible": true
+            }
+            """.trimIndent()
+        )
+
+        // Add a second doc that is not accesible to the user
+        indexDoc(
+            testIndex, "2",
+            """
+            {
+              "test_field": "b",
+              "accessible": false
+            }
+            """.trimIndent()
+        )
+
+        val compositeSources = listOf(
+            TermsValuesSourceBuilder("test_field").field("test_field")
+        )
+        val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
+        val input = SearchInput(
+            indices = listOf(testIndex),
+            query = SearchSourceBuilder().size(0).query(QueryBuilders.matchAllQuery()).aggregation(compositeAgg)
+        )
+        val triggerScript = """
+            params.docCount > 0
+        """.trimIndent()
+
+        var trigger = randomBucketLevelTrigger()
+        trigger = trigger.copy(
+            bucketSelector = BucketSelectorExtAggregationBuilder(
+                name = trigger.id,
+                bucketsPathsMap = mapOf("docCount" to "_count"),
+                script = Script(triggerScript),
+                parentBucketPath = "composite_agg",
+                filter = null
+            )
+        )
+        val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
+
+        try {
+            executeMonitor(monitor.id, params = DRYRUN_MONITOR)
+            val alerts = searchAlerts(monitor)
+            assertEquals("Incorrect number of alerts", 1, alerts.size)
         } finally {
             deleteRoleMapping("hr_role")
             deleteRole("hr_role")

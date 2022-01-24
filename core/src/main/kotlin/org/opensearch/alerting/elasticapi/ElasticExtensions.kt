@@ -5,8 +5,10 @@
 
 package org.opensearch.alerting.elasticapi
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ThreadContextElement
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.Logger
 import org.opensearch.OpenSearchException
 import org.opensearch.action.ActionListener
@@ -195,5 +197,16 @@ class InjectorContextElement(id: String, settings: Settings, threadContext: Thre
 
     override fun restoreThreadContext(context: CoroutineContext, oldState: Unit) {
         rolesInjectorHelper.close()
+    }
+}
+
+suspend fun <T> withClosableContext(
+    context: InjectorContextElement,
+    block: suspend CoroutineScope.() -> T
+): T {
+    try {
+        return withContext(context) { block() }
+    } finally {
+        context.rolesInjectorHelper.close()
     }
 }
