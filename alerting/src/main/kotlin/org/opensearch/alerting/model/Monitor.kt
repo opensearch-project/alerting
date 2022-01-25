@@ -120,7 +120,8 @@ data class Monitor(
     enum class MonitorType(val value: String) {
         QUERY_LEVEL_MONITOR("query_level_monitor"),
         BUCKET_LEVEL_MONITOR("bucket_level_monitor"),
-        CLUSTER_METRICS_MONITOR("cluster_metrics_monitor");
+        CLUSTER_METRICS_MONITOR("cluster_metrics_monitor"),
+        DOC_LEVEL_MONITOR("doc_level_monitor");
 
         override fun toString(): String {
             return value

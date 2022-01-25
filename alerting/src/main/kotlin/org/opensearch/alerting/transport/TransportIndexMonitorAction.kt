@@ -115,6 +115,7 @@ class TransportIndexMonitorAction @Inject constructor(
         user: User?
     ) {
         val indices = mutableListOf<String>()
+        // todo: for doc level alerting: check if index is present before monitor is created.
         val searchInputs = request.monitor.inputs.filter { it.name() == SearchInput.SEARCH_FIELD }
         searchInputs.forEach {
             val searchInput = it as SearchInput

@@ -68,7 +68,10 @@ data class DocLevelMonitorInput(
 
         const val NO_DESCRIPTION = ""
 
-        val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(Input::class.java, ParseField(DOC_LEVEL_INPUT_FIELD), CheckedFunction { parse(it) })
+        val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(
+            Input::class.java,
+            ParseField(DOC_LEVEL_INPUT_FIELD), CheckedFunction { parse(it) }
+        )
 
         @JvmStatic @Throws(IOException::class)
         fun parse(xcp: XContentParser): DocLevelMonitorInput {
