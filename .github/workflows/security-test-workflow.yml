@@ -44,9 +44,9 @@ jobs:
           candidate_version=`echo $plugin|awk -F- '{print $4}'| cut -d. -f 1-1`
           echo $version $plugin_version $candidate_version
           echo $ls $list_of_all_files
-          if docker pull opensearchstaging/opensearch:$version
+          if docker pull opensearchproject/opensearch:$version
           then
-            echo "FROM opensearchstaging/opensearch:$version" >> Dockerfile
+            echo "FROM opensearchproject/opensearch:$version" >> Dockerfile
             echo "RUN if [ -d /usr/share/opensearch/plugins/opensearch-alerting ]; then /usr/share/opensearch/bin/opensearch-plugin remove opensearch-alerting; fi" >> Dockerfile
             echo "ADD alerting/build/distributions/opensearch-alerting-$plugin_version-$candidate_version.zip /tmp/" >> Dockerfile
             echo "RUN /usr/share/opensearch/bin/opensearch-plugin install --batch file:/tmp/opensearch-alerting-$plugin_version-$candidate_version.zip" >> Dockerfile
@@ -71,7 +71,7 @@ jobs:
           if [ $security -gt 0 ]
           then
             echo "Security plugin is available"
-            ./gradlew :alerting:integTest -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=docker-cluster -Dsecurity=true -Dhttps=true -Duser=admin -Dpassword=admin
+            ./gradlew :alerting:integTest -Dopensearch.version=1.1.0 -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=docker-cluster -Dsecurity=true -Dhttps=true -Duser=admin -Dpassword=admin
           else
             echo "Security plugin is NOT available skipping this run as tests without security have already been run"
           fi
