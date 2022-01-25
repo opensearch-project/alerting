@@ -115,7 +115,8 @@ data class Monitor(
     // This is different from 'type' which denotes the Scheduled Job type
     enum class MonitorType(val value: String) {
         QUERY_LEVEL_MONITOR("query_level_monitor"),
-        BUCKET_LEVEL_MONITOR("bucket_level_monitor");
+        BUCKET_LEVEL_MONITOR("bucket_level_monitor"),
+        DOC_LEVEL_MONITOR("doc_level_monitor");
 
         override fun toString(): String {
             return value
