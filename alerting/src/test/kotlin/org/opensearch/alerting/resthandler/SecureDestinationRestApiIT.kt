@@ -7,6 +7,7 @@ package org.opensearch.alerting.resthandler
 
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.DESTINATION_BASE_URI
+import org.opensearch.alerting.annotations.SecurityPlugin
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.Destination
@@ -20,6 +21,7 @@ import java.time.Instant
 
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
+@SecurityPlugin(false)
 class SecureDestinationRestApiIT : AlertingRestTestCase() {
 
     fun `test create destination with disable filter by`() {
