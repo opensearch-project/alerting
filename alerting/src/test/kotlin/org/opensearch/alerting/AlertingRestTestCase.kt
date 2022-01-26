@@ -87,8 +87,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return entityAsMap(this)
     }
 
-    protected fun createMonitor(monitor: Monitor, refresh: Boolean = true): Monitor {
-        val response = client().makeRequest(
+    protected fun createMonitorWithClient(client: RestClient, monitor: Monitor, refresh: Boolean = true): Monitor {
+        val response = client.makeRequest(
             "POST", "$ALERTING_BASE_URI?refresh=$refresh", emptyMap(),
             monitor.toHttpEntity()
         )
@@ -100,6 +100,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         ).map()
         assertUserNull(monitorJson as HashMap<String, Any>)
         return monitor.copy(id = monitorJson["_id"] as String, version = (monitorJson["_version"] as Int).toLong())
+    }
+
+    protected fun createMonitor(monitor: Monitor, refresh: Boolean = true): Monitor {
+        return createMonitorWithClient(client(), monitor, refresh)
     }
 
     protected fun deleteMonitor(monitor: Monitor, refresh: Boolean = true): Response {
