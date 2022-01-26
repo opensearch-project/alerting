@@ -537,7 +537,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             testIndex,
             "hr_role",
             "HR",
-            "{\"term\": { \"accessible\": true}}"
+            """{\"term\": { \"accessible\": true}}"""
         )
         createUserRolesMapping("alerting_full_access", arrayOf(user))
 
@@ -552,7 +552,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             """.trimIndent()
         )
 
-        // Add a second doc that is not accesible to the user
+        // Add a second doc that is not accessible to the user
         indexDoc(
             testIndex, "2",
             """
@@ -569,11 +569,14 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             return ctx.results[0].hits.hits.size() == 1
         """.trimIndent()
 
-        val trigger = randomQueryLevelTrigger(condition = Script(triggerScript))
-        val monitor = randomQueryLevelMonitor(inputs = listOf(input), triggers = listOf(trigger))
+        val trigger = randomQueryLevelTrigger(condition = Script(triggerScript)).copy(actions = listOf())
+        val monitor = createMonitorWithClient(
+            userClient!!,
+            randomQueryLevelMonitor(inputs = listOf(input), triggers = listOf(trigger))
+        )
 
         try {
-            executeMonitor(monitor.id, params = DRYRUN_MONITOR)
+            executeMonitor(monitor.id)
             val alerts = searchAlerts(monitor)
             assertEquals("Incorrect number of alerts", 1, alerts.size)
         } finally {
@@ -592,7 +595,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             testIndex,
             "hr_role",
             "HR",
-            "{\"term\": { \"accessible\": true}}"
+            """{\"term\": { \"accessible\": true}}"""
         )
         createUserRolesMapping("alerting_full_access", arrayOf(user))
 
@@ -607,7 +610,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             """.trimIndent()
         )
 
-        // Add a second doc that is not accesible to the user
+        // Add a second doc that is not accessible to the user
         indexDoc(
             testIndex, "2",
             """
@@ -638,12 +641,16 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 script = Script(triggerScript),
                 parentBucketPath = "composite_agg",
                 filter = null
-            )
+            ),
+            actions = listOf()
         )
-        val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
+        val monitor = createMonitorWithClient(
+            userClient!!,
+            randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger))
+        )
 
         try {
-            executeMonitor(monitor.id, params = DRYRUN_MONITOR)
+            executeMonitor(monitor.id)
             val alerts = searchAlerts(monitor)
             assertEquals("Incorrect number of alerts", 1, alerts.size)
         } finally {
