@@ -84,6 +84,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     private val isDebuggingRemoteCluster = System.getProperty("cluster.debug", "false")!!.toBoolean()
     val numberOfNodes = System.getProperty("cluster.number_of_nodes", "1")!!.toInt()
 
+    protected val statsResponseOpendistroSweeperEnabledField = "opendistro.scheduled_jobs.enabled"
+    protected val statsResponseOpenSearchSweeperEnabledField = "plugins.scheduled_jobs.enabled"
+
     override fun xContentRegistry(): NamedXContentRegistry {
         return NamedXContentRegistry(
             mutableListOf(
