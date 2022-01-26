@@ -89,6 +89,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     private val isDebuggingRemoteCluster = System.getProperty("cluster.debug", "false")!!.toBoolean()
     val numberOfNodes = System.getProperty("cluster.number_of_nodes", "1")!!.toInt()
 
+    protected val statsResponseOpendistroSweeperEnabledField = "opendistro.scheduled_jobs.enabled"
+    protected val statsResponseOpenSearchSweeperEnabledField = "plugins.scheduled_jobs.enabled"
+
     override fun xContentRegistry(): NamedXContentRegistry {
         return NamedXContentRegistry(
             mutableListOf(
@@ -844,6 +847,26 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client().performRequest(request)
     }
 
+    fun createIndexRoleWithDocLevelSecurity(name: String, index: String, dlsQuery: String) {
+        val request = Request("PUT", "/_plugins/_security/api/roles/$name")
+        val entity = """
+            {
+              "cluster_permissions": [],
+              "index_permissions": [{
+                "index_patterns": [
+                  "$index"
+                ],
+                "dls": "$dlsQuery",
+                "allowed_actions": [
+                  "read"
+                ]
+              }]
+            }
+        """.trimIndent()
+        request.setJsonEntity(entity)
+        client().performRequest(request)
+    }
+
     fun createUserRolesMapping(role: String, users: Array<String>) {
         val request = Request("PUT", "/_plugins/_security/api/rolesmapping/$role")
         val usersStr = users.joinToString { it -> "\"$it\"" }
@@ -872,6 +895,19 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         createUser(user, user, arrayOf(backendRole))
         createTestIndex(index)
         createIndexRole(role, index)
+        createUserRolesMapping(role, arrayOf(user))
+    }
+
+    fun createUserWithDocLevelSecurityTestData(
+        user: String,
+        index: String,
+        role: String,
+        backendRole: String,
+        dlsQuery: String
+    ) {
+        createUser(user, user, arrayOf(backendRole))
+        createTestIndex(index)
+        createIndexRoleWithDocLevelSecurity(role, index, dlsQuery)
         createUserRolesMapping(role, arrayOf(user))
     }
 

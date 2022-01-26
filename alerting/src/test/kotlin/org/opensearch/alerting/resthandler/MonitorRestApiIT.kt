@@ -584,10 +584,15 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val expectedAcknowledgedCount = alertsToAcknowledge.size
 
         val acknowledgedAlerts = responseMap["success"] as List<String>
-        assertTrue("Expected $expectedAcknowledgedCount alerts to be acknowledged successfully.", acknowledgedAlerts.size == expectedAcknowledgedCount)
+        assertTrue(
+            "Expected $expectedAcknowledgedCount alerts to be acknowledged successfully.",
+            acknowledgedAlerts.size == expectedAcknowledgedCount
+        )
 
         val acknowledgedAlertsList = acknowledgedAlerts.toString()
-        alertsToAcknowledge.forEach { alert -> assertTrue("Alert with ID ${alert.id} not found in failed list.", acknowledgedAlertsList.contains(alert.id)) }
+        alertsToAcknowledge.forEach { alert ->
+            assertTrue("Alert with ID ${alert.id} not found in failed list.", acknowledgedAlertsList.contains(alert.id))
+        }
 
         val failedResponse = responseMap["failed"] as List<String>
         assertTrue("Expected 0 alerts to fail acknowledgment.", failedResponse.isEmpty())
@@ -612,18 +617,29 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val expectedAcknowledgedCount = alertsToAcknowledge.size - alertsGroup1.size
 
         val acknowledgedAlerts = responseMap["success"] as List<String>
-        assertTrue("Expected $expectedAcknowledgedCount alerts to be acknowledged successfully.", acknowledgedAlerts.size == expectedAcknowledgedCount)
+        assertTrue(
+            "Expected $expectedAcknowledgedCount alerts to be acknowledged successfully.",
+            acknowledgedAlerts.size == expectedAcknowledgedCount
+        )
 
         val acknowledgedAlertsList = acknowledgedAlerts.toString()
-        alertsGroup2.forEach { alert -> assertTrue("Alert with ID ${alert.id} not found in failed list.", acknowledgedAlertsList.contains(alert.id)) }
-        alertsGroup1.forEach { alert -> assertFalse("Alert with ID ${alert.id} found in failed list.", acknowledgedAlertsList.contains(alert.id)) }
+        alertsGroup2.forEach { alert ->
+            assertTrue("Alert with ID ${alert.id} not found in failed list.", acknowledgedAlertsList.contains(alert.id))
+        }
+        alertsGroup1.forEach { alert ->
+            assertFalse("Alert with ID ${alert.id} found in failed list.", acknowledgedAlertsList.contains(alert.id))
+        }
 
         val failedResponse = responseMap["failed"] as List<String>
         assertTrue("Expected ${alertsGroup1.size} alerts to fail acknowledgment.", failedResponse.size == alertsGroup1.size)
 
         val failedResponseList = failedResponse.toString()
-        alertsGroup1.forEach { alert -> assertTrue("Alert with ID ${alert.id} not found in failed list.", failedResponseList.contains(alert.id)) }
-        alertsGroup2.forEach { alert -> assertFalse("Alert with ID ${alert.id} found in failed list.", failedResponseList.contains(alert.id)) }
+        alertsGroup1.forEach { alert ->
+            assertTrue("Alert with ID ${alert.id} not found in failed list.", failedResponseList.contains(alert.id))
+        }
+        alertsGroup2.forEach { alert ->
+            assertFalse("Alert with ID ${alert.id} found in failed list.", failedResponseList.contains(alert.id))
+        }
     }
 
     @Throws(Exception::class)
@@ -883,8 +899,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         disableScheduledJob()
 
         val responseMap = getAlertingStats()
-        // assertEquals("Cluster name is incorrect", responseMap["cluster_name"], "alerting_integTestCluster")
-        assertEquals("Scheduled job is not enabled", false, responseMap[ScheduledJobSettings.SWEEPER_ENABLED.key])
+        assertAlertingStatsSweeperEnabled(responseMap, false)
         assertEquals("Scheduled job index exists but there are no scheduled jobs.", false, responseMap["scheduled_job_index_exists"])
         val _nodes = responseMap["_nodes"] as Map<String, Int>
         assertEquals("Incorrect number of nodes", numberOfNodes, _nodes["total"])
@@ -897,8 +912,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         enableScheduledJob()
 
         val responseMap = getAlertingStats()
-        // assertEquals("Cluster name is incorrect", responseMap["cluster_name"], "alerting_integTestCluster")
-        assertEquals("Scheduled job is not enabled", true, responseMap[ScheduledJobSettings.SWEEPER_ENABLED.key])
+        assertAlertingStatsSweeperEnabled(responseMap, true)
         assertEquals("Scheduled job index exists but there are no scheduled jobs.", false, responseMap["scheduled_job_index_exists"])
         val _nodes = responseMap["_nodes"] as Map<String, Int>
         assertEquals("Incorrect number of nodes", numberOfNodes, _nodes["total"])
@@ -912,8 +926,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         createRandomMonitor(refresh = true)
 
         val responseMap = getAlertingStats()
-        // assertEquals("Cluster name is incorrect", responseMap["cluster_name"], "alerting_integTestCluster")
-        assertEquals("Scheduled job is not enabled", true, responseMap[ScheduledJobSettings.SWEEPER_ENABLED.key])
+        assertAlertingStatsSweeperEnabled(responseMap, true)
         assertEquals("Scheduled job index does not exist", true, responseMap["scheduled_job_index_exists"])
         assertEquals("Scheduled job index is not yellow", "yellow", responseMap["scheduled_job_index_status"])
         assertEquals("Nodes are not on schedule", numberOfNodes, responseMap["nodes_on_schedule"])
@@ -943,8 +956,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         createRandomMonitor(refresh = true)
 
         val responseMap = getAlertingStats("/jobs_info")
-        // assertEquals("Cluster name is incorrect", responseMap["cluster_name"], "alerting_integTestCluster")
-        assertEquals("Scheduled job is not enabled", true, responseMap[ScheduledJobSettings.SWEEPER_ENABLED.key])
+        assertAlertingStatsSweeperEnabled(responseMap, true)
         assertEquals("Scheduled job index does not exist", true, responseMap["scheduled_job_index_exists"])
         assertEquals("Scheduled job index is not yellow", "yellow", responseMap["scheduled_job_index_status"])
         assertEquals("Nodes not on schedule", numberOfNodes, responseMap["nodes_on_schedule"])
@@ -1044,5 +1056,18 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())
         }
+    }
+
+    private fun assertAlertingStatsSweeperEnabled(alertingStatsResponse: Map<String, Any>, expected: Boolean) {
+        assertEquals(
+            "Legacy scheduled job enabled field is not set to $expected",
+            expected,
+            alertingStatsResponse[statsResponseOpendistroSweeperEnabledField]
+        )
+        assertEquals(
+            "Scheduled job is not ${if (expected) "enabled" else "disabled"}",
+            expected,
+            alertingStatsResponse[statsResponseOpenSearchSweeperEnabledField]
+        )
     }
 }
