@@ -9,10 +9,18 @@ import org.apache.http.entity.ContentType
 import org.apache.http.nio.entity.NStringEntity
 import org.junit.After
 import org.junit.Before
+import org.opensearch.alerting.ADMIN
 import org.opensearch.alerting.ALERTING_BASE_URI
+import org.opensearch.alerting.ALERTING_FULL_ACCESS_ROLE
+import org.opensearch.alerting.ALL_ACCESS_ROLE
 import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.DRYRUN_MONITOR
+import org.opensearch.alerting.TERM_DLS_QUERY
+import org.opensearch.alerting.TEST_HR_BACKEND_ROLE
+import org.opensearch.alerting.TEST_HR_INDEX
+import org.opensearch.alerting.TEST_HR_ROLE
+import org.opensearch.alerting.TEST_NON_HR_INDEX
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.alerting.assertUserNull
 import org.opensearch.alerting.core.model.SearchInput
@@ -72,14 +80,14 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     fun `test create monitor with an user with alerting role`() {
         if (!securityEnabled()) return
 
-        createUserWithTestData(user, "hr_data", "hr_role", "HR")
-        createUserRolesMapping("alerting_full_access", arrayOf(user))
+        createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
+        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
         try {
             // randomMonitor has a dummy user, api ignores the User passed as part of monitor, it picks user info from the logged-in user.
             val monitor = randomQueryLevelMonitor().copy(
                 inputs = listOf(
                     SearchInput(
-                        indices = listOf("hr_data"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                        indices = listOf(TEST_HR_INDEX), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
                     )
                 )
             )
@@ -88,21 +96,19 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
             assertUserNull(createResponse?.asMap()!!["monitor"] as HashMap<String, Any>)
         } finally {
-            deleteRoleMapping("hr_role")
-            deleteRole("hr_role")
-            deleteRoleMapping("alerting_full_access")
+            deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_FULL_ACCESS_ROLE)
         }
     }
 
     fun `test create monitor with an user without alerting role`() {
         if (!securityEnabled()) return
 
-        createUserWithTestData(user, "hr_data", "hr_role", "HR")
+        createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
         try {
             val monitor = randomQueryLevelMonitor().copy(
                 inputs = listOf(
                     SearchInput(
-                        indices = listOf("hr_data"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                        indices = listOf(TEST_HR_INDEX), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
                     )
                 )
             )
@@ -111,21 +117,21 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         } finally {
-            deleteRoleMapping("hr_role")
-            deleteRole("hr_role")
+            deleteRoleMapping(TEST_HR_ROLE)
+            deleteRole(TEST_HR_ROLE)
         }
     }
 
     fun `test create monitor with an user without index read role`() {
         if (!securityEnabled()) return
 
-        createUserWithTestData(user, "hr_data", "hr_role", "HR")
-        createUserRolesMapping("alerting_full_access", arrayOf(user))
+        createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
+        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
         try {
             val monitor = randomQueryLevelMonitor().copy(
                 inputs = listOf(
                     SearchInput(
-                        indices = listOf("not_hr_data"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                        indices = listOf(TEST_NON_HR_INDEX), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
                     )
                 )
             )
@@ -135,9 +141,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         } finally {
-            deleteRoleMapping("hr_role")
-            deleteRole("hr_role")
-            deleteRoleMapping("alerting_full_access")
+            deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_FULL_ACCESS_ROLE)
         }
     }
 
@@ -308,7 +312,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
 
         // add alerting roles and search as userOne - must return 1 docs
-        createUserRolesMapping("alerting_full_access", arrayOf(user))
+        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
         try {
             val userOneSearchResponse = userClient?.makeRequest(
                 "POST",
@@ -319,7 +323,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             assertEquals("Search monitor failed", RestStatus.OK, userOneSearchResponse?.restStatus())
             assertEquals("Monitor not found during search", 1, getDocs(userOneSearchResponse))
         } finally {
-            deleteRoleMapping("alerting_full_access")
+            deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
         }
     }
 
@@ -355,7 +359,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
 
         // add alerting roles and search as userOne - must return 0 docs
-        createUserRolesMapping("alerting_full_access", arrayOf(user))
+        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
         try {
             val userOneSearchResponse = userClient?.makeRequest(
                 "POST",
@@ -366,7 +370,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             assertEquals("Search monitor failed", RestStatus.OK, userOneSearchResponse?.restStatus())
             assertEquals("Monitor not found during search", 0, getDocs(userOneSearchResponse))
         } finally {
-            deleteRoleMapping("alerting_full_access")
+            deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
         }
     }
 
@@ -398,12 +402,12 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
 
         // add alerting roles and search as userOne - must return 0 docs
-        createUserRolesMapping("alerting_full_access", arrayOf(user))
+        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
         try {
             val responseMap = getAlerts(userClient as RestClient, inputMap).asMap()
             assertEquals(4, responseMap["totalAlerts"])
         } finally {
-            deleteRoleMapping("alerting_full_access")
+            deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
         }
     }
 
@@ -414,7 +418,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         enableFilterBy()
         putAlertMappings()
-        val adminUser = User("admin", listOf("admin"), listOf("all_access"), listOf())
+        val adminUser = User(ADMIN, listOf(ADMIN), listOf(ALL_ACCESS_ROLE), listOf())
         var monitor = createRandomMonitor(refresh = true).copy(user = adminUser)
         createAlert(randomAlert(monitor).copy(state = Alert.State.ACKNOWLEDGED))
         createAlert(randomAlert(monitor).copy(state = Alert.State.COMPLETED))
@@ -438,12 +442,12 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
 
         // add alerting roles and search as userOne - must return 0 docs
-        createUserRolesMapping("alerting_full_access", arrayOf(user))
+        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
         try {
             val responseMap = getAlerts(userClient as RestClient, inputMap).asMap()
             assertEquals(0, responseMap["totalAlerts"])
         } finally {
-            deleteRoleMapping("alerting_full_access")
+            deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
         }
     }
 
@@ -455,7 +459,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
         val inputs = listOf(
             SearchInput(
-                indices = kotlin.collections.listOf("not_hr_data"),
+                indices = kotlin.collections.listOf(TEST_NON_HR_INDEX),
                 query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
             )
         )
@@ -465,9 +469,9 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         )
 
         // Make sure the elevating the permissions fails execute.
-        val adminUser = User("admin", listOf("admin"), listOf("all_access"), listOf())
+        val adminUser = User(ADMIN, listOf(ADMIN), listOf(ALL_ACCESS_ROLE), listOf())
         var modifiedMonitor = monitor.copy(user = adminUser)
-        createUserRolesMapping("alerting_full_access", arrayOf(user))
+        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
 
         try {
             val response = executeMonitor(userClient as RestClient, modifiedMonitor, params = DRYRUN_MONITOR)
@@ -476,7 +480,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             assertTrue("Missing monitor error message", (inputResults?.get("error") as String).isNotEmpty())
             assertTrue((inputResults.get("error") as String).contains("no permissions for [indices:data/read/search]"))
         } finally {
-            deleteRoleMapping("alerting_full_access")
+            deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
         }
     }
 
@@ -485,14 +489,14 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             return
 
         enableFilterBy()
-        createUserWithTestData(user, "hr_data", "hr_role", "HR")
-        createUserRolesMapping("alerting_full_access", arrayOf(user))
+        createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
+        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
         try {
             // randomMonitor has a dummy user, api ignores the User passed as part of monitor, it picks user info from the logged-in user.
             val monitor = randomQueryLevelMonitor().copy(
                 inputs = listOf(
                     SearchInput(
-                        indices = listOf("hr_data"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                        indices = listOf(TEST_HR_INDEX), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
                     )
                 )
             )
@@ -535,28 +539,25 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             )
             assertEquals("Delete monitor failed", RestStatus.OK, adminGetResponse.restStatus())
         } finally {
-            deleteRoleMapping("hr_role")
-            deleteRole("hr_role")
-            deleteRoleMapping("alerting_full_access")
+            deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_FULL_ACCESS_ROLE)
         }
     }
 
     fun `test execute query-level monitor with user having partial index permissions`() {
         if (!securityEnabled()) return
 
-        val testIndex = "hr_data"
         createUserWithDocLevelSecurityTestData(
             user,
-            testIndex,
-            "hr_role",
-            "HR",
-            "{\"term\": { \"accessible\": true}}"
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            TERM_DLS_QUERY
         )
-        createUserRolesMapping("alerting_full_access", arrayOf(user))
+        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
 
         // Add a doc that is accessible to the user
         indexDoc(
-            testIndex, "1",
+            TEST_HR_INDEX, "1",
             """
             {
               "test_field": "a",
@@ -567,7 +568,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         // Add a second doc that is not accesible to the user
         indexDoc(
-            testIndex, "2",
+            TEST_HR_INDEX, "2",
             """
             {
               "test_field": "b",
@@ -576,7 +577,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             """.trimIndent()
         )
 
-        val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
+        val input = SearchInput(indices = listOf(TEST_HR_INDEX), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
         val triggerScript = """
             // make sure there is exactly one hit
             return ctx.results[0].hits.hits.size() == 1
@@ -590,28 +591,25 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             val alerts = searchAlerts(monitor)
             assertEquals("Incorrect number of alerts", 1, alerts.size)
         } finally {
-            deleteRoleMapping("hr_role")
-            deleteRole("hr_role")
-            deleteRoleMapping("alerting_full_access")
+            deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_FULL_ACCESS_ROLE)
         }
     }
 
     fun `test execute bucket-level monitor with user having partial index permissions`() {
         if (!securityEnabled()) return
 
-        val testIndex = "hr_data"
         createUserWithDocLevelSecurityTestData(
             user,
-            testIndex,
-            "hr_role",
-            "HR",
-            "{\"term\": { \"accessible\": true}}"
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            TERM_DLS_QUERY
         )
-        createUserRolesMapping("alerting_full_access", arrayOf(user))
+        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
 
         // Add a doc that is accessible to the user
         indexDoc(
-            testIndex, "1",
+            TEST_HR_INDEX, "1",
             """
             {
               "test_field": "a",
@@ -622,7 +620,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         // Add a second doc that is not accesible to the user
         indexDoc(
-            testIndex, "2",
+            TEST_HR_INDEX, "2",
             """
             {
               "test_field": "b",
@@ -636,7 +634,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(
-            indices = listOf(testIndex),
+            indices = listOf(TEST_HR_INDEX),
             query = SearchSourceBuilder().size(0).query(QueryBuilders.matchAllQuery()).aggregation(compositeAgg)
         )
         val triggerScript = """
@@ -660,9 +658,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             val alerts = searchAlerts(monitor)
             assertEquals("Incorrect number of alerts", 1, alerts.size)
         } finally {
-            deleteRoleMapping("hr_role")
-            deleteRole("hr_role")
-            deleteRoleMapping("alerting_full_access")
+            deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_FULL_ACCESS_ROLE)
         }
     }
 }

@@ -206,13 +206,21 @@ fun randomEmailGroup(
 
 fun randomScript(source: String = "return " + OpenSearchRestTestCase.randomBoolean().toString()): Script = Script(source)
 
+val ADMIN = "admin"
 val ALERTING_BASE_URI = "/_plugins/_alerting/monitors"
+val ALERTING_FULL_ACCESS_ROLE = "alerting_full_access"
+val ALL_ACCESS_ROLE = "all_access"
 val DESTINATION_BASE_URI = "/_plugins/_alerting/destinations"
 val LEGACY_OPENDISTRO_ALERTING_BASE_URI = "/_opendistro/_alerting/monitors"
 val LEGACY_OPENDISTRO_DESTINATION_BASE_URI = "/_opendistro/_alerting/destinations"
 val ALWAYS_RUN = Script("return true")
 val NEVER_RUN = Script("return false")
 val DRYRUN_MONITOR = mapOf("dryrun" to "true")
+val TEST_HR_INDEX = "hr_data"
+val TEST_NON_HR_INDEX = "not_hr_data"
+val TEST_HR_ROLE = "hr_role"
+val TEST_HR_BACKEND_ROLE = "HR"
+val TERM_DLS_QUERY = "{\"term\": { \"accessible\": true}}"
 
 fun randomTemplateScript(
     source: String,
@@ -399,7 +407,7 @@ fun randomUser(): User {
             OpenSearchRestTestCase.randomAlphaOfLength(10),
             OpenSearchRestTestCase.randomAlphaOfLength(10)
         ),
-        listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), "all_access"),
+        listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), ALL_ACCESS_ROLE),
         listOf("test_attr=test")
     )
 }
