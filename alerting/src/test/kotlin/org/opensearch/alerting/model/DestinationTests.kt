@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.model
 
+import org.opensearch.alerting.ADMIN
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.CustomWebhook
 import org.opensearch.alerting.model.destination.Destination
@@ -172,8 +173,8 @@ class DestinationTests : OpenSearchTestCase() {
                 "POST",
                 mutableMapOf(),
                 mutableMapOf(),
-                "admin",
-                "admin"
+                ADMIN,
+                ADMIN
             ),
             null
         )

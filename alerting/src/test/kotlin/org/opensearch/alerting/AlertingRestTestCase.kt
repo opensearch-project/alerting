@@ -872,6 +872,12 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client().makeRequest("DELETE", "/_plugins/_security/api/rolesmapping/$name")
     }
 
+    fun deleteRoleAndRoleMapping(role: String, roleMapping: String) {
+        deleteRoleMapping(role)
+        deleteRole(role)
+        deleteRoleMapping(roleMapping)
+    }
+
     fun createUserWithTestData(user: String, index: String, role: String, backendRole: String) {
         createUser(user, user, arrayOf(backendRole))
         createTestIndex(index)
