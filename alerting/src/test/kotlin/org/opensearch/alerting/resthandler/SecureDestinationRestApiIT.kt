@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.junit.BeforeClass
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.DESTINATION_BASE_URI
 import org.opensearch.alerting.makeRequest
@@ -13,7 +14,6 @@ import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.Slack
 import org.opensearch.alerting.randomUser
 import org.opensearch.alerting.util.DestinationType
-import org.opensearch.client.ResponseException
 import org.opensearch.rest.RestStatus
 import org.opensearch.test.junit.annotations.TestLogging
 import java.time.Instant
@@ -21,6 +21,15 @@ import java.time.Instant
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
 class SecureDestinationRestApiIT : AlertingRestTestCase() {
+
+    companion object {
+
+        @BeforeClass
+        @JvmStatic fun setup() {
+            // things to execute once and keep around for the class
+            org.junit.Assume.assumeTrue(System.getProperty("security", "false")!!.toBoolean())
+        }
+    }
 
     fun `test create destination with disable filter by`() {
         disableFilterBy()
@@ -55,29 +64,13 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
             email = null
         )
 
-        if (securityEnabled()) {
-            // when security is enabled. No errors, must succeed.
-            val response = client().makeRequest(
-                "POST",
-                "$DESTINATION_BASE_URI?refresh=true",
-                emptyMap(),
-                destination.toHttpEntity()
-            )
-            assertEquals("Create monitor failed", RestStatus.CREATED, response.restStatus())
-        } else {
-            // when security is disable. Must return Forbidden.
-            try {
-                client().makeRequest(
-                    "POST",
-                    "$DESTINATION_BASE_URI?refresh=true",
-                    emptyMap(),
-                    destination.toHttpEntity()
-                )
-                fail("Expected 403 FORBIDDEN response")
-            } catch (e: ResponseException) {
-                assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
-            }
-        }
+        val response = client().makeRequest(
+            "POST",
+            "$DESTINATION_BASE_URI?refresh=true",
+            emptyMap(),
+            destination.toHttpEntity()
+        )
+        assertEquals("Create monitor failed", RestStatus.CREATED, response.restStatus())
     }
 
     fun `test update destination with disable filter by`() {
@@ -109,11 +102,6 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
 
     fun `test update destination with enable filter by`() {
         enableFilterBy()
-        if (!isHttps()) {
-            // if security is disabled and filter by is enabled, we can't create monitor
-            // refer: `test create destination with enable filter by`
-            return
-        }
 
         val chime = Chime("http://abc.com")
         val destination = Destination(
@@ -173,11 +161,6 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
 
     fun `test delete destination with enable filter by`() {
         enableFilterBy()
-        if (!isHttps()) {
-            // if security is disabled and filter by is enabled, we can't create monitor
-            // refer: `test create destination with enable filter by`
-            return
-        }
 
         val chime = Chime("http://abc.com")
         val destination = Destination(
@@ -236,11 +219,7 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
 
     fun `test get destinations with a destination type and filter by`() {
         enableFilterBy()
-        if (!securityEnabled()) {
-            // if security is disabled and filter by is enabled, we can't create monitor
-            // refer: `test create destination with enable filter by`
-            return
-        }
+
         val slack = Slack("url")
         val destination = Destination(
             type = DestinationType.SLACK,
