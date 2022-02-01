@@ -9,6 +9,7 @@ import org.apache.http.entity.ContentType
 import org.apache.http.nio.entity.NStringEntity
 import org.junit.After
 import org.junit.Before
+import org.junit.BeforeClass
 import org.opensearch.alerting.ADMIN
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ALERTING_FULL_ACCESS_ROLE
@@ -54,12 +55,20 @@ import org.opensearch.test.junit.annotations.TestLogging
 @Suppress("UNCHECKED_CAST")
 class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
+    companion object {
+
+        @BeforeClass
+        @JvmStatic fun setup() {
+            // things to execute once and keep around for the class
+            org.junit.Assume.assumeTrue(System.getProperty("security", "false")!!.toBoolean())
+        }
+    }
+
     val user = "userOne"
     var userClient: RestClient? = null
 
     @Before
     fun create() {
-        if (!securityEnabled()) return
 
         if (userClient == null) {
             createUser(user, user, arrayOf())
@@ -69,7 +78,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     @After
     fun cleanup() {
-        if (!securityEnabled()) return
 
         userClient?.close()
         deleteUser(user)
@@ -78,7 +86,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     // Create Monitor related security tests
 
     fun `test create monitor with an user with alerting role`() {
-        if (!securityEnabled()) return
 
         createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
         createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
@@ -101,7 +108,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test create monitor with an user without alerting role`() {
-        if (!securityEnabled()) return
 
         createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
         try {
@@ -123,7 +129,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test create monitor with an user without index read role`() {
-        if (!securityEnabled()) return
 
         createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
         createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
@@ -151,26 +156,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
         assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
         assertUserNull(createResponse.asMap()["monitor"] as HashMap<String, Any>)
-    }
-
-    fun `test create monitor with enable filter by`() {
-        enableFilterBy()
-        val monitor = randomQueryLevelMonitor()
-
-        if (securityEnabled()) {
-            // when security is enabled. No errors, must succeed.
-            val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
-            assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
-            assertUserNull(createResponse.asMap()["monitor"] as HashMap<String, Any>)
-        } else {
-            // when security is disable. Must return Forbidden.
-            try {
-                client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
-                fail("Expected 403 FORBIDDEN response")
-            } catch (e: ResponseException) {
-                assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
-            }
-        }
     }
 
     fun getDocs(response: Response?): Any? {
@@ -281,7 +266,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test query monitors with disable filter by`() {
-        if (!securityEnabled()) return
 
         disableFilterBy()
 
@@ -328,7 +312,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test query monitors with enable filter by`() {
-        if (!securityEnabled()) return
 
         enableFilterBy()
 
@@ -375,7 +358,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test query all alerts in all states with disabled filter by`() {
-        if (!securityEnabled()) return
 
         disableFilterBy()
         putAlertMappings()
@@ -412,9 +394,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test query all alerts in all states with filter by`() {
-        // if security is disabled and filter by is enabled, we can't create monitor
-        // refer: `test create monitor with enable filter by`
-        if (!securityEnabled()) return
 
         enableFilterBy()
         putAlertMappings()
@@ -454,7 +433,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     // Execute Monitor related security tests
 
     fun `test execute monitor with elevate permissions`() {
-        if (!securityEnabled()) return
 
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
         val inputs = listOf(
@@ -485,8 +463,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test admin all access with enable filter by`() {
-        if (!securityEnabled())
-            return
 
         enableFilterBy()
         createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
@@ -544,7 +520,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test execute query-level monitor with user having partial index permissions`() {
-        if (!securityEnabled()) return
 
         createUserWithDocLevelSecurityTestData(
             user,
@@ -596,7 +571,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test execute bucket-level monitor with user having partial index permissions`() {
-        if (!securityEnabled()) return
 
         createUserWithDocLevelSecurityTestData(
             user,
