@@ -208,10 +208,6 @@ fun randomScript(source: String = "return " + OpenSearchRestTestCase.randomBoole
 
 val ADMIN = "admin"
 val ALERTING_BASE_URI = "/_plugins/_alerting/monitors"
-val ALERTING_FULL_ACCESS_ROLE = "alerting_full_access"
-val ALERTING_READ_ONLY_ACCESS = "alerting_read_access"
-val ALERTING_ACK_ALERTS = "alerting_ack_alerts"
-val ALL_ACCESS_ROLE = "all_access"
 val DESTINATION_BASE_URI = "/_plugins/_alerting/destinations"
 val LEGACY_OPENDISTRO_ALERTING_BASE_URI = "/_opendistro/_alerting/monitors"
 val LEGACY_OPENDISTRO_DESTINATION_BASE_URI = "/_opendistro/_alerting/destinations"
