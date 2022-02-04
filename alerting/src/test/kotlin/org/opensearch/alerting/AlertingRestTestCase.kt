@@ -496,6 +496,38 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return getAlerts(client(), dataMap, header)
     }
 
+    protected fun indexEmailAccounts(client: RestClient, emailAccount: EmailAccount): Response {
+        var baseEndpoint = "$EMAIL_ACCOUNT_BASE_URI"
+        var header = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        val response = client.makeRequest("POST", baseEndpoint, emailAccount.toHttpEntity(), header)
+        return response
+    }
+
+    protected fun searchEmailAccounts(client: RestClient): Response {
+        var baseEndpoint = "$EMAIL_ACCOUNT_BASE_URI/_search"
+        var header = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+
+        val request = """
+        {
+          "from": 0,
+          "size": 20,
+          "sort": { "email_group.name.keyword": "desc" },
+          "query": {
+            "bool": {
+              "must": {
+                "match_all": {}
+              }
+            }
+          }
+        }
+        """.trimIndent()
+        return client.makeRequest("POST", baseEndpoint, StringEntity(request, APPLICATION_JSON), header)
+    }
+
+    protected fun getEmailAccounts(response: Response): Map<String, Any> {
+        return response.asMap()
+    }
+
     protected fun refreshIndex(index: String): Response {
         val response = client().makeRequest("POST", "/$index/_refresh")
         assertEquals("Unable to refresh index", RestStatus.OK, response.restStatus())
@@ -830,44 +862,47 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     fun createCustomIndexRole(name: String, index: String, clusterPermissions: String?) {
         val request = Request("PUT", "/_plugins/_security/api/roles/$name")
-        var entity = """
-            {
-              "cluster_permissions": [
-                $clusterPermissions
-              ],
-              "index_permissions": [{
-                "index_patterns": [
-                ],
-                "dls":,
-                "fls": [],
-                "masked_fields": [],
-                "allowed_actions": [
-                  "crud"
-                ]
-              }],
-              "tenant_permissions": []
-            }
-        """.trimIndent()
+        var entity = "{\n" +
+            "\"cluster_permissions\": [\n" +
+            "\"$clusterPermissions\"\n" +
+            "],\n" +
+            "\"index_permissions\": [\n" +
+            "{\n" +
+            "\"index_patterns\": [\n" +
+            "\"$index\"\n" +
+            "],\n" +
+            "\"dls\": \"\",\n" +
+            "\"fls\": [],\n" +
+            "\"masked_fields\": [],\n" +
+            "\"allowed_actions\": [\n" +
+            "\"crud\"\n" +
+            "]\n" +
+            "}\n" +
+            "],\n" +
+            "\"tenant_permissions\": []\n" +
+            "}"
+
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
 
     fun createIndexRoleWithDocLevelSecurity(name: String, index: String, dlsQuery: String) {
         val request = Request("PUT", "/_plugins/_security/api/roles/$name")
-        val entity = """
-            {
-              "cluster_permissions": [],
-              "index_permissions": [{
-                "index_patterns": [
-                  "$index"
-                ],
-                "dls": "$dlsQuery",
-                "allowed_actions": [
-                  "read"
-                ]
-              }]
-            }
-        """.trimIndent()
+        val entity =
+            "\"cluster_permissions\": [\n" +
+                "],\n" +
+                "\"index_permissions\": [\n" +
+                "{\n" +
+                "\"index_patterns\": [\n" +
+                "\"$index\"\n" +
+                "],\n" +
+                "\"dls\":\"$dlsQuery\",\n" +
+                "\"allowed_actions\": [\n" +
+                "\"read\"\n" +
+                "]\n" +
+                "}\n" +
+                "],\n" +
+                "}"
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
@@ -932,6 +967,21 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         createUser(user, user, arrayOf(backendRole))
         createTestIndex(index)
         createIndexRoleWithDocLevelSecurity(role, index, dlsQuery)
+        createUserRolesMapping(role, arrayOf(user))
+    }
+
+    fun createUserWithDocLevelSecurityTestDataAndCustomRole(
+        user: String,
+        index: String,
+        role: String,
+        backendRole: String,
+        dlsQuery: String,
+        clusterPermissions: String?
+    ) {
+        createUser(user, user, arrayOf(backendRole))
+        createTestIndex(index)
+        createIndexRoleWithDocLevelSecurity(role, index, dlsQuery)
+        createCustomIndexRole(role, index, clusterPermissions)
         createUserRolesMapping(role, arrayOf(user))
     }
 
