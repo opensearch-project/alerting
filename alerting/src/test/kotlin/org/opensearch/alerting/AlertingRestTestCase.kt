@@ -828,6 +828,30 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client().performRequest(request)
     }
 
+    fun createCustomIndexRole(name: String, index: String, clusterPermissions: String?) {
+        val request = Request("PUT", "/_plugins/_security/api/roles/$name")
+        var entity = """
+            {
+              "cluster_permissions": [
+                $clusterPermissions
+              ],
+              "index_permissions": [{
+                "index_patterns": [
+                ],
+                "dls":,
+                "fls": [],
+                "masked_fields": [],
+                "allowed_actions": [
+                  "crud"
+                ]
+              }],
+              "tenant_permissions": []
+            }
+        """.trimIndent()
+        request.setJsonEntity(entity)
+        client().performRequest(request)
+    }
+
     fun createIndexRoleWithDocLevelSecurity(name: String, index: String, dlsQuery: String) {
         val request = Request("PUT", "/_plugins/_security/api/roles/$name")
         val entity = """
@@ -885,6 +909,19 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         createUserRolesMapping(role, arrayOf(user))
     }
 
+    fun createUserWithTestDataAndCustomRole(
+        user: String,
+        index: String,
+        role: String,
+        backendRole: String,
+        clusterPermissions: String?
+    ) {
+        createUser(user, user, arrayOf(backendRole))
+        createTestIndex(index)
+        createCustomIndexRole(role, index, clusterPermissions)
+        createUserRolesMapping(role, arrayOf(user))
+    }
+
     fun createUserWithDocLevelSecurityTestData(
         user: String,
         index: String,
@@ -896,6 +933,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         createTestIndex(index)
         createIndexRoleWithDocLevelSecurity(role, index, dlsQuery)
         createUserRolesMapping(role, arrayOf(user))
+    }
+
+    fun getClusterPermissionsFromCustomRole(clusterPermissions: String): String? {
+        return ROLE_TO_PERMISSION_MAPPING.get(clusterPermissions)
     }
 
     companion object {

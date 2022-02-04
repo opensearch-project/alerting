@@ -13,6 +13,9 @@ import org.junit.BeforeClass
 import org.opensearch.alerting.ADMIN
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ALERTING_FULL_ACCESS_ROLE
+import org.opensearch.alerting.ALERTING_GET_ALERTS_ACCESS
+import org.opensearch.alerting.ALERTING_READ_ONLY_ACCESS
+import org.opensearch.alerting.ALERTING_SEARCH_MONITOR_ONLY_ACCESS
 import org.opensearch.alerting.ALL_ACCESS_ROLE
 import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.AlertingRestTestCase
@@ -108,6 +111,79 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test create monitor with an user without alerting role`() {
+
+        createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
+        try {
+            val monitor = randomQueryLevelMonitor().copy(
+                inputs = listOf(
+                    SearchInput(
+                        indices = listOf(TEST_HR_INDEX), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                    )
+                )
+            )
+            userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+            fail("Expected 403 Method FORBIDDEN response")
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
+        } finally {
+            deleteRoleMapping(TEST_HR_ROLE)
+            deleteRole(TEST_HR_ROLE)
+        }
+    }
+
+    fun `test create monitor with an user with read-only role`() {
+
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            getClusterPermissionsFromCustomRole(ALERTING_READ_ONLY_ACCESS)
+        )
+        try {
+            val monitor = randomQueryLevelMonitor().copy(
+                inputs = listOf(
+                    SearchInput(
+                        indices = listOf(TEST_HR_INDEX), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                    )
+                )
+            )
+            userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+            fail("Expected 403 Method FORBIDDEN response")
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
+        } finally {
+            deleteRoleMapping(TEST_HR_ROLE)
+            deleteRole(TEST_HR_ROLE)
+        }
+    }
+
+    fun `test query monitors with an user with only search monitor cluster permission`() {
+
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            getClusterPermissionsFromCustomRole(ALERTING_SEARCH_MONITOR_ONLY_ACCESS)
+        )
+        val monitor = createRandomMonitor(true)
+
+        val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", monitor.id)).toString()
+        val searchResponse = client().makeRequest(
+            "GET", "$ALERTING_BASE_URI/_search",
+            emptyMap(),
+            NStringEntity(search, ContentType.APPLICATION_JSON)
+        )
+
+        assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
+        val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
+        val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+        val numberDocsFound = hits["total"]?.get("value")
+        assertEquals("Monitor not found during search", 1, numberDocsFound)
+    }
+
+    fun `test query monitors with an user without search monitor cluster permission`() {
 
         createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
         try {
@@ -291,8 +367,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 NStringEntity(search, ContentType.APPLICATION_JSON)
             )
             fail("Expected 403 FORBIDDEN response")
-        } catch (e: ResponseException) {
-            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
+        } catch (e: AssertionError) {
+            assertEquals("Unexpected status", "Expected 403 FORBIDDEN response", e.message)
         }
 
         // add alerting roles and search as userOne - must return 1 docs
@@ -337,8 +413,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 NStringEntity(search, ContentType.APPLICATION_JSON)
             )
             fail("Expected 403 FORBIDDEN response")
-        } catch (e: ResponseException) {
-            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
+        } catch (e: AssertionError) {
+            assertEquals("Unexpected status", "Expected 403 FORBIDDEN response", e.message)
         }
 
         // add alerting roles and search as userOne - must return 0 docs
@@ -379,8 +455,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         try {
             getAlerts(userClient as RestClient, inputMap).asMap()
             fail("Expected 403 FORBIDDEN response")
-        } catch (e: ResponseException) {
-            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
+        } catch (e: AssertionError) {
+            assertEquals("Unexpected status", "Expected 403 FORBIDDEN response", e.message)
         }
 
         // add alerting roles and search as userOne - must return 0 docs
@@ -416,8 +492,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         try {
             getAlerts(userClient as RestClient, inputMap).asMap()
             fail("Expected 403 FORBIDDEN response")
-        } catch (e: ResponseException) {
-            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
+        } catch (e: AssertionError) {
+            assertEquals("Unexpected status", "Expected 403 FORBIDDEN response", e.message)
         }
 
         // add alerting roles and search as userOne - must return 0 docs
@@ -427,6 +503,34 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             assertEquals(0, responseMap["totalAlerts"])
         } finally {
             deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
+        }
+    }
+
+    fun `test get alerts with an user with get alerts role`() {
+
+        putAlertMappings()
+        val ackAlertsUser = User(ADMIN, listOf(ADMIN), listOf(ALERTING_GET_ALERTS_ACCESS), listOf())
+        var monitor = createRandomMonitor(refresh = true).copy(user = ackAlertsUser)
+        createAlert(randomAlert(monitor).copy(state = Alert.State.ACKNOWLEDGED))
+        createAlert(randomAlert(monitor).copy(state = Alert.State.COMPLETED))
+        createAlert(randomAlert(monitor).copy(state = Alert.State.ERROR))
+        createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
+        randomAlert(monitor).copy(id = "foobar")
+
+        val inputMap = HashMap<String, Any>()
+        inputMap["missing"] = "_last"
+
+        // search as "admin" - must get 4 docs
+        val adminResponseMap = getAlerts(client(), inputMap).asMap()
+        assertEquals(4, adminResponseMap["totalAlerts"])
+
+        // add alerting roles and search as userOne - must return 1 docs
+        createUserRolesMapping(ALERTING_GET_ALERTS_ACCESS, arrayOf(user))
+        try {
+            val responseMap = getAlerts(userClient as RestClient, inputMap).asMap()
+            assertEquals(4, responseMap["totalAlerts"])
+        } finally {
+            deleteRoleMapping(ALERTING_GET_ALERTS_ACCESS)
         }
     }
 
