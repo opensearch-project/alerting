@@ -849,10 +849,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             }
         """.trimIndent()
         request.setJsonEntity(entity)
-        logger.debug("Input Request to the Create Custom Role: $request")
-        logger.error("Input Request to the Create Custom Role: $request")
-        logger.info("Input Request to the Create Custom Role: $request")
-        logger.warn("Input Request to the Create Custom Role: $request")
         client().performRequest(request)
     }
 
