@@ -158,7 +158,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test query monitors with an user with read only role`() {
+    fun `test query monitors with an user with only search monitor cluster permission`() {
 
         createUserWithTestDataAndCustomRole(
             user,
@@ -183,7 +183,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Monitor not found during search", 1, numberDocsFound)
     }
 
-    fun `test query monitors with an user without read only role`() {
+    fun `test query monitors with an user without search monitor cluster permission`() {
 
         createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
         try {
