@@ -178,9 +178,10 @@ fun randomBucketSelectorScript(
 }
 
 fun randomEmailAccount(
-    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
-    email: String = OpenSearchRestTestCase.randomAlphaOfLength(5) + "@email.com",
-    host: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    salt: String = "",
+    name: String = salt + OpenSearchRestTestCase.randomAlphaOfLength(10),
+    email: String = salt + OpenSearchRestTestCase.randomAlphaOfLength(5) + "@email.com",
+    host: String = salt + OpenSearchRestTestCase.randomAlphaOfLength(10),
     port: Int = randomIntBetween(1, 100),
     method: EmailAccount.MethodType = randomEmailAccountMethod(),
     username: SecureString? = null,
@@ -198,8 +199,11 @@ fun randomEmailAccount(
 }
 
 fun randomEmailGroup(
-    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
-    emails: List<EmailEntry> = (1..randomInt(10)).map { EmailEntry(email = OpenSearchRestTestCase.randomAlphaOfLength(5) + "@email.com") }
+    salt: String = "",
+    name: String = salt + OpenSearchRestTestCase.randomAlphaOfLength(10),
+    emails: List<EmailEntry> = (1..randomInt(10)).map {
+        EmailEntry(email = salt + OpenSearchRestTestCase.randomAlphaOfLength(5) + "@email.com")
+    }
 ): EmailGroup {
     return EmailGroup(name = name, emails = emails)
 }
