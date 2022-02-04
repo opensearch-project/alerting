@@ -12,9 +12,14 @@ import org.junit.Before
 import org.junit.BeforeClass
 import org.opensearch.alerting.ADMIN
 import org.opensearch.alerting.ALERTING_BASE_URI
+import org.opensearch.alerting.ALERTING_DELETE_EMAIL_ACCOUNT_ACCESS
 import org.opensearch.alerting.ALERTING_FULL_ACCESS_ROLE
 import org.opensearch.alerting.ALERTING_GET_ALERTS_ACCESS
+import org.opensearch.alerting.ALERTING_GET_EMAIL_ACCOUNT_ACCESS
+import org.opensearch.alerting.ALERTING_INDEX_EMAIL_ACCOUNT_ACCESS
+import org.opensearch.alerting.ALERTING_NO_ACCESS_ROLE
 import org.opensearch.alerting.ALERTING_READ_ONLY_ACCESS
+import org.opensearch.alerting.ALERTING_SEARCH_EMAIL_ACCOUNT_ACCESS
 import org.opensearch.alerting.ALERTING_SEARCH_MONITOR_ONLY_ACCESS
 import org.opensearch.alerting.ALL_ACCESS_ROLE
 import org.opensearch.alerting.ALWAYS_RUN
@@ -112,7 +117,13 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test create monitor with an user without alerting role`() {
 
-        createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            getClusterPermissionsFromCustomRole(ALERTING_NO_ACCESS_ROLE)
+        )
         try {
             val monitor = randomQueryLevelMonitor().copy(
                 inputs = listOf(
@@ -122,12 +133,10 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 )
             )
             userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
-            fail("Expected 403 Method FORBIDDEN response")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         } finally {
-            deleteRoleMapping(TEST_HR_ROLE)
-            deleteRole(TEST_HR_ROLE)
+            deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_NO_ACCESS_ROLE)
         }
     }
 
@@ -149,12 +158,10 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 )
             )
             userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
-            fail("Expected 403 Method FORBIDDEN response")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         } finally {
-            deleteRoleMapping(TEST_HR_ROLE)
-            deleteRole(TEST_HR_ROLE)
+            deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_READ_ONLY_ACCESS)
         }
     }
 
@@ -185,7 +192,13 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test query monitors with an user without search monitor cluster permission`() {
 
-        createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            getClusterPermissionsFromCustomRole(ALERTING_NO_ACCESS_ROLE)
+        )
         try {
             val monitor = randomQueryLevelMonitor().copy(
                 inputs = listOf(
@@ -195,19 +208,22 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 )
             )
             userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
-            fail("Expected 403 Method FORBIDDEN response")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         } finally {
-            deleteRoleMapping(TEST_HR_ROLE)
-            deleteRole(TEST_HR_ROLE)
+            deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_NO_ACCESS_ROLE)
         }
     }
 
     fun `test create monitor with an user without index read role`() {
 
-        createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
-        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            getClusterPermissionsFromCustomRole(ALERTING_FULL_ACCESS_ROLE)
+        )
         try {
             val monitor = randomQueryLevelMonitor().copy(
                 inputs = listOf(
@@ -218,7 +234,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             )
             val createResponse = userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             assertEquals("Create monitor failed", RestStatus.CREATED, createResponse?.restStatus())
-            fail("Expected 403 Method FORBIDDEN response")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         } finally {
@@ -525,14 +540,212 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         assertEquals(4, adminResponseMap["totalAlerts"])
 
         // add alerting roles and search as userOne - must return 1 docs
-        createUserRolesMapping(ALERTING_GET_ALERTS_ACCESS, arrayOf(user))
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            getClusterPermissionsFromCustomRole(ALERTING_GET_ALERTS_ACCESS)
+        )
         try {
             val responseMap = getAlerts(userClient as RestClient, inputMap).asMap()
             assertEquals(4, responseMap["totalAlerts"])
         } finally {
-            deleteRoleMapping(ALERTING_GET_ALERTS_ACCESS)
+            deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_GET_ALERTS_ACCESS)
         }
     }
+
+    fun `test search email accounts with an user with search email account role`() {
+
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            getClusterPermissionsFromCustomRole(ALERTING_SEARCH_EMAIL_ACCOUNT_ACCESS)
+        )
+
+        createRandomEmailAccountWithGivenName(true, randomAlphaOfLength(10))
+
+        try {
+            val searchEmailAccountResponse = searchEmailAccounts(client())
+            assertEquals("Search Email failed", RestStatus.OK, searchEmailAccountResponse.restStatus())
+        } finally {
+            deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_SEARCH_EMAIL_ACCOUNT_ACCESS)
+        }
+    }
+
+    fun `test search email accounts with an user without search email account role`() {
+
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            getClusterPermissionsFromCustomRole(ALERTING_INDEX_EMAIL_ACCOUNT_ACCESS)
+        )
+
+        createRandomEmailAccountWithGivenName(true, randomAlphaOfLength(5))
+
+        try {
+            searchEmailAccounts(client())
+            fail("Expected 403 FORBIDDEN response")
+        } catch (e: AssertionError) {
+            assertEquals("Unexpected status", "Expected 403 FORBIDDEN response", e.message)
+        }
+    }
+
+    fun `test index email accounts with an user with index email account role `() {
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            getClusterPermissionsFromCustomRole(ALERTING_INDEX_EMAIL_ACCOUNT_ACCESS)
+        )
+
+        try {
+            val emailAccount = createRandomEmailAccountWithGivenName(true, randomAlphaOfLength(5))
+            assertEquals("Index Email failed", false, emailAccount.id.isEmpty())
+        } finally {
+            deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_INDEX_EMAIL_ACCOUNT_ACCESS)
+        }
+    }
+
+    fun `test index email accounts with an user without index email account role `() {
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            getClusterPermissionsFromCustomRole(ALERTING_SEARCH_EMAIL_ACCOUNT_ACCESS)
+        )
+
+        try {
+            createRandomEmailAccountWithGivenName(true, randomAlphaOfLength(5))
+            fail("Expected 403 FORBIDDEN response")
+        } catch (e: AssertionError) {
+            assertEquals("Unexpected status", "Expected 403 FORBIDDEN response", e.message)
+        }
+    }
+
+    fun `test get email accounts with an user with get email account role `() {
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            getClusterPermissionsFromCustomRole(ALERTING_GET_EMAIL_ACCOUNT_ACCESS)
+        )
+
+        val emailAccount = createRandomEmailAccountWithGivenName(true, randomAlphaOfLength(5))
+
+        try {
+            val getEmailAccounts = getEmailAccounts(client(), emailAccount)
+            assertEquals("Get Email failed", RestStatus.OK, getEmailAccounts.restStatus())
+        } finally {
+            deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_GET_EMAIL_ACCOUNT_ACCESS)
+        }
+    }
+
+    fun `test get email accounts with an user without get email account role `() {
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            getClusterPermissionsFromCustomRole(ALERTING_SEARCH_EMAIL_ACCOUNT_ACCESS)
+        )
+
+        val emailAccount = createRandomEmailAccountWithGivenName(true, randomAlphaOfLength(5))
+
+        try {
+            getEmailAccounts(client(), emailAccount)
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.NOT_FOUND, e.response.restStatus())
+        }
+    }
+
+    fun `test delete email accounts with an user with delete email account role `() {
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            getClusterPermissionsFromCustomRole(ALERTING_DELETE_EMAIL_ACCOUNT_ACCESS)
+        )
+
+        val emailAccount = createRandomEmailAccountWithGivenName(true, randomAlphaOfLength(5))
+
+        try {
+            val deleteEmailAccounts = deleteEmailAccounts(client(), emailAccount.id)
+            assertEquals("Get Email failed", RestStatus.OK, deleteEmailAccounts.restStatus())
+        } finally {
+            deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_DELETE_EMAIL_ACCOUNT_ACCESS)
+        }
+    }
+
+    fun `test delete email accounts with an user without delete email account role `() {
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            getClusterPermissionsFromCustomRole(ALERTING_SEARCH_EMAIL_ACCOUNT_ACCESS)
+        )
+
+        val emailAccount = createRandomEmailAccountWithGivenName(true, randomAlphaOfLength(5))
+
+        try {
+            deleteEmailAccounts(client(), emailAccount.id)
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.NOT_FOUND, e.response.restStatus())
+        }
+    }
+
+//    fun `test search and index email groups with an user with search and index email group role`() {
+//        createUserWithTestDataAndCustomRole(
+//            user,
+//            TEST_HR_INDEX,
+//            TEST_HR_ROLE,
+//            TEST_HR_BACKEND_ROLE,
+//            getClusterPermissionsFromCustomRole(ALERTING_SEARCH_AND_INDEX_EMAIL_GROUP_ACCESS)
+//        )
+//
+//        val emailGroup = createRandomEmailGroupWithGivenName(true, randomAlphaOfLength(5))
+//
+//        emailGroup.name = emailGroup.name + randomAlphaOfLength(5)
+//
+//        try {
+//            val indexEmailGroupResponse = indexEmailGroups(client(), emailGroup)
+//            assertEquals("Index Email Group failed", RestStatus.OK, indexEmailGroupResponse.restStatus())
+//            val searchEmailGroupsResponse = searchEmailGroups(client())
+//            assertEquals("Search Email Group failed", RestStatus.OK, searchEmailGroupsResponse.restStatus())
+//        } finally {
+//            deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_SEARCH_AND_INDEX_EMAIL_GROUP_ACCESS)
+//        }
+//    }
+
+//    fun `test search and index email groups with an user without search and index email group role`() {
+//        createUserWithTestDataAndCustomRole(
+//            user,
+//            TEST_HR_INDEX,
+//            TEST_HR_ROLE,
+//            TEST_HR_BACKEND_ROLE,
+//            getClusterPermissionsFromCustomRole(ALERTING_DELETE_EMAIL_ACCOUNT_ACCESS)
+//        )
+//
+//        val emailAccount = createRandomEmailAccountWithGivenName(true, randomAlphaOfLength(5))
+//
+//        emailAccount.name = emailAccount.name + randomAlphaOfLength(5)
+//        indexEmailAccounts(client(), emailAccount)
+//
+//        try {
+//            deleteEmailAccounts(client(), emailAccount.id)
+//        } catch (e: ResponseException) {
+//            assertEquals("Unexpected status", RestStatus.NOT_FOUND, e.response.restStatus())
+//        }
+//    }
 
     // Execute Monitor related security tests
 
@@ -617,7 +830,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 emptyMap(),
                 NStringEntity(search, ContentType.APPLICATION_JSON)
             )
-            assertEquals("Delete monitor failed", RestStatus.OK, adminGetResponse.restStatus())
+            assertEquals("Delete monitor failed", RestStatus.OK, adminDeleteResponse.restStatus())
         } finally {
             deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_FULL_ACCESS_ROLE)
         }
@@ -625,14 +838,14 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test execute query-level monitor with user having partial index permissions`() {
 
-        createUserWithDocLevelSecurityTestData(
+        createUserWithDocLevelSecurityTestDataAndCustomRole(
             user,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             TEST_HR_BACKEND_ROLE,
-            TERM_DLS_QUERY
+            TERM_DLS_QUERY,
+            getClusterPermissionsFromCustomRole(ALERTING_FULL_ACCESS_ROLE)
         )
-        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
 
         // Add a doc that is accessible to the user
         indexDoc(
@@ -676,14 +889,14 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test execute bucket-level monitor with user having partial index permissions`() {
 
-        createUserWithDocLevelSecurityTestData(
+        createUserWithDocLevelSecurityTestDataAndCustomRole(
             user,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             TEST_HR_BACKEND_ROLE,
-            TERM_DLS_QUERY
+            TERM_DLS_QUERY,
+            getClusterPermissionsFromCustomRole(ALERTING_FULL_ACCESS_ROLE)
         )
-        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
 
         // Add a doc that is accessible to the user
         indexDoc(
