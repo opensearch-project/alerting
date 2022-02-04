@@ -11,9 +11,9 @@ import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
 import org.opensearch.alerting.ADMIN
-import org.opensearch.alerting.ALERTING_ACK_ALERTS
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ALERTING_FULL_ACCESS_ROLE
+import org.opensearch.alerting.ALERTING_GET_ALERTS_ACCESS
 import org.opensearch.alerting.ALERTING_READ_ONLY_ACCESS
 import org.opensearch.alerting.ALERTING_SEARCH_MONITOR_ONLY_ACCESS
 import org.opensearch.alerting.ALL_ACCESS_ROLE
@@ -506,10 +506,10 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test ack alerts with an user with ack alerts role`() {
+    fun `test get alerts with an user with get alerts role`() {
 
         putAlertMappings()
-        val ackAlertsUser = User(ADMIN, listOf(ADMIN), listOf(ALERTING_ACK_ALERTS), listOf())
+        val ackAlertsUser = User(ADMIN, listOf(ADMIN), listOf(ALERTING_GET_ALERTS_ACCESS), listOf())
         var monitor = createRandomMonitor(refresh = true).copy(user = ackAlertsUser)
         createAlert(randomAlert(monitor).copy(state = Alert.State.ACKNOWLEDGED))
         createAlert(randomAlert(monitor).copy(state = Alert.State.COMPLETED))
@@ -525,12 +525,12 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         assertEquals(4, adminResponseMap["totalAlerts"])
 
         // add alerting roles and search as userOne - must return 1 docs
-        createUserRolesMapping(ALERTING_ACK_ALERTS, arrayOf(user))
+        createUserRolesMapping(ALERTING_GET_ALERTS_ACCESS, arrayOf(user))
         try {
             val responseMap = getAlerts(userClient as RestClient, inputMap).asMap()
             assertEquals(4, responseMap["totalAlerts"])
         } finally {
-            deleteRoleMapping(ALERTING_ACK_ALERTS)
+            deleteRoleMapping(ALERTING_GET_ALERTS_ACCESS)
         }
     }
 
