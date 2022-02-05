@@ -41,6 +41,7 @@ import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.randomTemplateScript
 import org.opensearch.client.Response
+import org.opensearch.client.ResponseException
 import org.opensearch.client.RestClient
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
@@ -130,9 +131,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 )
             )
             userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
-            fail("Expected 403 Method FORBIDDEN response")
-        } catch (e: AssertionError) {
-            assertEquals("Unexpected status", "Expected 403 Method FORBIDDEN response", e.message)
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         } finally {
             deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_NO_ACCESS_ROLE)
         }
@@ -156,12 +156,10 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 )
             )
             userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
-            fail("Expected 403 Method FORBIDDEN response")
-        } catch (e: AssertionError) {
-            assertEquals("Unexpected status", "Expected 403 Method FORBIDDEN response", e.message)
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         } finally {
-            deleteRoleMapping(TEST_HR_ROLE)
-            deleteRole(TEST_HR_ROLE)
+            deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_READ_ONLY_ACCESS)
         }
     }
 
@@ -208,9 +206,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 )
             )
             userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
-            fail("Expected 403 Method FORBIDDEN response")
-        } catch (e: AssertionError) {
-            assertEquals("Unexpected status", "Expected 403 Method FORBIDDEN response", e.message)
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         } finally {
             deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_NO_ACCESS_ROLE)
         }
@@ -235,9 +232,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             )
             val createResponse = userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             assertEquals("Create monitor failed", RestStatus.CREATED, createResponse?.restStatus())
-            fail("Expected 403 Method FORBIDDEN response")
-        } catch (e: AssertionError) {
-            assertEquals("Unexpected status", "Expected 403 Method FORBIDDEN response", e.message)
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         } finally {
             deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_FULL_ACCESS_ROLE)
         }
@@ -567,7 +563,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             getClusterPermissionsFromCustomRole(ALERTING_SEARCH_EMAIL_ACCOUNT_ACCESS)
         )
 
-        val emailAccount = createRandomEmailAccount()
+        val emailAccount = createRandomEmailAccount(true)
 
         indexEmailAccounts(client(), emailAccount)
 
@@ -590,7 +586,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             ALERTING_DELETE_EMAIL_ACCOUNT_ACCESS
         )
 
-        val emailAccount = createRandomEmailAccount()
+        val emailAccount = createRandomEmailAccount(true)
 
         indexEmailAccounts(client(), emailAccount)
 

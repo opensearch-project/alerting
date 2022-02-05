@@ -888,21 +888,21 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     fun createIndexRoleWithDocLevelSecurity(name: String, index: String, dlsQuery: String) {
         val request = Request("PUT", "/_plugins/_security/api/roles/$name")
-        val entity =
+        val entity = "{\n" +
             "\"cluster_permissions\": [\n" +
-                "],\n" +
-                "\"index_permissions\": [\n" +
-                "{\n" +
-                "\"index_patterns\": [\n" +
-                "\"$index\"\n" +
-                "],\n" +
-                "\"dls\":\"$dlsQuery\",\n" +
-                "\"allowed_actions\": [\n" +
-                "\"read\"\n" +
-                "]\n" +
-                "}\n" +
-                "],\n" +
-                "}"
+            "],\n" +
+            "\"index_permissions\": [\n" +
+            "{\n" +
+            "\"index_patterns\": [\n" +
+            "\"$index\"\n" +
+            "],\n" +
+            "\"dls\":\"$dlsQuery\",\n" +
+            "\"allowed_actions\": [\n" +
+            "\"read\"\n" +
+            "]\n" +
+            "}\n" +
+            "],\n" +
+            "}"
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
