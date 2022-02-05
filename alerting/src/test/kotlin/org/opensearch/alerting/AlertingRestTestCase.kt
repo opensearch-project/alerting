@@ -934,7 +934,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     fun deleteRoleAndRoleMapping(role: String, roleMapping: String) {
         deleteRoleMapping(role)
         deleteRole(role)
-        deleteRoleMapping(roleMapping)
     }
 
     fun createUserWithTestData(user: String, index: String, role: String, backendRole: String) {

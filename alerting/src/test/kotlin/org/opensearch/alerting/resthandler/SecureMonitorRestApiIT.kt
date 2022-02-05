@@ -553,7 +553,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             val responseMap = getAlerts(userClient as RestClient, inputMap).asMap()
             assertEquals(4, responseMap["totalAlerts"])
         } finally {
-            deleteRoleMapping(ALERTING_GET_ALERTS_ACCESS)
+            deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_GET_ALERTS_ACCESS)
         }
     }
 
@@ -564,7 +564,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             TEST_HR_BACKEND_ROLE,
-            ALERTING_SEARCH_EMAIL_ACCOUNT_ACCESS
+            getClusterPermissionsFromCustomRole(ALERTING_SEARCH_EMAIL_ACCOUNT_ACCESS)
         )
 
         val emailAccount = createRandomEmailAccount()
@@ -576,7 +576,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             assertEquals("Search monitor failed", RestStatus.OK, searchEmailAccountResponse.restStatus())
             assertEquals("Email Account created exists", emailAccount.email, getEmailAccounts(searchEmailAccountResponse)["hits"])
         } finally {
-            deleteRoleMapping(ALERTING_SEARCH_EMAIL_ACCOUNT_ACCESS)
+            deleteRoleAndRoleMapping(TEST_HR_ROLE, ALERTING_SEARCH_EMAIL_ACCOUNT_ACCESS)
         }
     }
 
