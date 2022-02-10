@@ -7,6 +7,7 @@ package org.opensearch.alerting.model
 
 import org.opensearch.alerting.core.model.CronSchedule
 import org.opensearch.alerting.core.model.Input
+import org.opensearch.alerting.core.model.LocalUriInput
 import org.opensearch.alerting.core.model.Schedule
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
@@ -15,6 +16,7 @@ import org.opensearch.alerting.elasticapi.optionalTimeField
 import org.opensearch.alerting.elasticapi.optionalUserField
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MONITOR_MAX_INPUTS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MONITOR_MAX_TRIGGERS
+import org.opensearch.alerting.settings.SupportedApiSettings
 import org.opensearch.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
 import org.opensearch.alerting.util._ID
 import org.opensearch.alerting.util._VERSION
@@ -250,7 +252,10 @@ data class Monitor(
                     INPUTS_FIELD -> {
                         ensureExpectedToken(Token.START_ARRAY, xcp.currentToken(), xcp)
                         while (xcp.nextToken() != Token.END_ARRAY) {
-                            inputs.add(Input.parse(xcp))
+                            val input = Input.parse(xcp)
+                            if (input is LocalUriInput)
+                                SupportedApiSettings.validateApiType(input)
+                            inputs.add(input)
                         }
                     }
                     TRIGGERS_FIELD -> {

@@ -2,6 +2,7 @@
  * Copyright OpenSearch Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
+
 package org.opensearch.alerting
 
 import junit.framework.TestCase.assertNull
@@ -11,6 +12,7 @@ import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAg
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtFilter
 import org.opensearch.alerting.core.model.Input
 import org.opensearch.alerting.core.model.IntervalSchedule
+import org.opensearch.alerting.core.model.LocalUriInput
 import org.opensearch.alerting.core.model.Schedule
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.elasticapi.string
@@ -335,6 +337,16 @@ fun randomQueryLevelTriggerRunResult(): QueryLevelTriggerRunResult {
     map.plus(Pair("key1", randomActionRunResult()))
     map.plus(Pair("key2", randomActionRunResult()))
     return QueryLevelTriggerRunResult("trigger-name", true, null, map)
+}
+
+fun randomLocalUriInput(
+    path: String,
+    pathParams: String = "",
+    url: String = "",
+    connectionTimeout: Int = 1 + randomInt(LocalUriInput.MAX_CONNECTION_TIMEOUT - 1),
+    socketTimeout: Int = 1 + randomInt(LocalUriInput.MAX_SOCKET_TIMEOUT - 1)
+): LocalUriInput {
+    return LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
 }
 
 fun randomBucketLevelTriggerRunResult(): BucketLevelTriggerRunResult {

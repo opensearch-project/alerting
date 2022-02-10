@@ -1,0 +1,34 @@
+{
+  "/_cat/pending_tasks": {},
+  "/_cat/recovery": {},
+  "/_cat/repositories": {},
+  "/_cat/snapshots": {},
+  "/_cat/tasks": {},
+  "/_cluster/health": {},
+  "/_cluster/settings": {
+    "transient": [
+      "indices.breaker.fielddata.limit",
+      "indices.breaker.request.limit",
+      "indices.breaker.total.limit",
+      "threadpool.get.queue_size",
+      "threadpool.search.queue_size",
+      "threadpool.suggest.queue_size",
+      "threadpool.index.queue_size",
+      "threadpool.bulk.queue_size",
+      "threadpool.percolate.queue_size"
+    ],
+    "persistent": [
+      "indices.breaker.fielddata.limit",
+      "indices.breaker.request.limit",
+      "indices.breaker.total.limit",
+      "threadpool.get.queue_size",
+      "threadpool.search.queue_size",
+      "threadpool.suggest.queue_size",
+      "threadpool.index.queue_size",
+      "threadpool.bulk.queue_size",
+      "threadpool.percolate.queue_size"
+    ]
+  },
+  "/_cluster/stats": {},
+  "/_nodes/stats": {}
+}
