@@ -9,13 +9,13 @@ apply plugin: 'jacoco'
 
 dependencies {
     compileOnly "org.opensearch:opensearch:${opensearch_version}"
-    compile "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
-    compile 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.1.1'
-    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlin_version}"
-    compile "com.cronutils:cron-utils:9.1.6"
-    compile "org.opensearch.client:opensearch-rest-client:${opensearch_version}"
-    compile 'com.google.googlejavaformat:google-java-format:1.10.0'
-    compile "org.opensearch:common-utils:${common_utils_version}"
+    api "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
+    api 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.1.1'
+    api "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlin_version}"
+    api "com.cronutils:cron-utils:9.1.6"
+    api "org.opensearch.client:opensearch-rest-client:${opensearch_version}"
+    api 'com.google.googlejavaformat:google-java-format:1.10.0'
+    api "org.opensearch:common-utils:${common_utils_version}"
 
     testImplementation "org.opensearch.test:framework:${opensearch_version}"
     testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlin_version}"
