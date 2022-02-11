@@ -105,7 +105,6 @@ class IndexUtils {
         @JvmStatic
         fun updateIndexMapping(
             index: String,
-            type: String,
             mapping: String,
             clusterState: ClusterState,
             client: IndicesAdminClient,
@@ -113,7 +112,7 @@ class IndexUtils {
         ) {
             if (clusterState.metadata.indices.containsKey(index)) {
                 if (shouldUpdateIndex(clusterState.metadata.indices[index], mapping)) {
-                    val putMappingRequest: PutMappingRequest = PutMappingRequest(index).type(type).source(mapping, XContentType.JSON)
+                    val putMappingRequest: PutMappingRequest = PutMappingRequest(index).source(mapping, XContentType.JSON)
                     client.putMapping(putMappingRequest, actionListener)
                 } else {
                     actionListener.onResponse(AcknowledgedResponse(true))
