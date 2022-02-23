@@ -28,7 +28,7 @@ class AlertingSettings {
         val ALERTING_TRIGGER_MAX_ACTIONS = Setting.intSetting(
             "plugins.alerting.trigger.max_actions",
             -1,
-            Setting.Property.NodeScope, Setting.Property.Dynamic
+            Setting.Property.NodeScope, Setting.Property.Dynamic //Setting.Validator<List<T>> validator
         )
 
         val INPUT_TIMEOUT = Setting.positiveTimeSetting(

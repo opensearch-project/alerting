@@ -42,6 +42,7 @@ import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_TRIGGER_MAX_ACTIONS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_MILLIS
@@ -468,7 +469,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 totalActionableAlertCount = dedupedAlerts.size + newAlerts.size + completedAlerts.size,
                 monitorOrTriggerError = monitorOrTriggerError
             )
-            var threshold = ALERTING_TRIGGER_MAX_ACTIONS.get(settings)
+            var threshold = AlertingSettings.ALERTING_TRIGGER_MAX_ACTIONS.get(settings)
             threshold = if (threshold < trigger.actions.size && threshold >= 0) threshold else trigger.actions.size
             for (action in trigger.actions.slice(0 until threshold)) {
                 // ActionExecutionPolicy should not be null for Bucket-Level Monitors since it has a default config when not set explicitly
