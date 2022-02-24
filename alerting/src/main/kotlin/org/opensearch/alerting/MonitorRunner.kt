@@ -101,6 +101,8 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
 
     @Volatile private var maxActionableAlertCount = DEFAULT_MAX_ACTIONABLE_ALERT_COUNT
 
+    @Volatile private var triggerMaxActions: Int = -1
+
     private lateinit var runnerSupervisor: Job
     override val coroutineContext: CoroutineContext
         get() = Dispatchers.Default + runnerSupervisor
@@ -179,6 +181,11 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         maxActionableAlertCount = MAX_ACTIONABLE_ALERT_COUNT.get(settings)
         clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_ACTIONABLE_ALERT_COUNT) {
             maxActionableAlertCount = it
+        }
+
+        triggerMaxActions = ALERTING_TRIGGER_MAX_ACTIONS.get(settings)
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_TRIGGER_MAX_ACTIONS) {
+            triggerMaxActions = it
         }
 
         return this
@@ -293,8 +300,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
 
             if (triggerService.isQueryLevelTriggerActionable(triggerCtx, triggerResult)) {
                 val actionCtx = triggerCtx.copy(error = monitorResult.error ?: triggerResult.error)
-                var threshold = ALERTING_TRIGGER_MAX_ACTIONS.get(settings)
-                threshold = if (threshold < trigger.actions.size && threshold >= 0) threshold else trigger.actions.size
+                var threshold = if (triggerMaxActions < trigger.actions.size && triggerMaxActions >= 0) triggerMaxActions else trigger.actions.size
                 for (action in trigger.actions.slice(0 until threshold)) {
                     triggerResult.actionResults[action.id] = runAction(action, actionCtx, dryrun)
                 }
@@ -469,7 +475,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 totalActionableAlertCount = dedupedAlerts.size + newAlerts.size + completedAlerts.size,
                 monitorOrTriggerError = monitorOrTriggerError
             )
-            var threshold = AlertingSettings.ALERTING_TRIGGER_MAX_ACTIONS.get(settings)
+            var threshold = if (triggerMaxActions < trigger.actions.size && triggerMaxActions >= 0) triggerMaxActions else trigger.actions.size
             threshold = if (threshold < trigger.actions.size && threshold >= 0) threshold else trigger.actions.size
             for (action in trigger.actions.slice(0 until threshold)) {
                 // ActionExecutionPolicy should not be null for Bucket-Level Monitors since it has a default config when not set explicitly
