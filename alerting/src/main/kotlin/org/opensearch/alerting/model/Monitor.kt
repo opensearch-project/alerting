@@ -216,11 +216,11 @@ data class Monitor(
         @JvmOverloads
         @Throws(IOException::class)
         fun parse(xcp: XContentParser, id: String = NO_ID, version: Long = NO_VERSION): Monitor {
-            lateinit var name: String
+            var name: String? = null
             // Default to QUERY_LEVEL_MONITOR to cover Monitors that existed before the addition of MonitorType
             var monitorType: String = MonitorType.QUERY_LEVEL_MONITOR.toString()
             var user: User? = null
-            lateinit var schedule: Schedule
+            var schedule: Schedule? = null
             var lastUpdateTime: Instant? = null
             var enabledTime: Instant? = null
             var uiMetadata: Map<String, Any> = mapOf()
