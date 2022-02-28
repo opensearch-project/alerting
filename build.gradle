@@ -62,7 +62,7 @@ task ktlintFormat(type: JavaExec, group: "formatting") {
     args "-F", "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
 }
 
-//check.dependsOn ktlint
+check.dependsOn ktlint
 
 ext {
     isSnapshot = "true" == System.getProperty("build.snapshot", "true")
@@ -82,7 +82,7 @@ allprojects {
     }
     plugins.withId('org.jetbrains.kotlin.jvm') {
         compileKotlin.kotlinOptions.jvmTarget = compileTestKotlin.kotlinOptions.jvmTarget = "1.8"
-        //compileKotlin.dependsOn ktlint
+        compileKotlin.dependsOn ktlint
     }
 }
 
