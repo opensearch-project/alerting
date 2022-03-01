@@ -35,8 +35,6 @@ data class DocumentLevelTrigger(
     override val severity: String,
     override val actions: List<Action>,
     val condition: Script
-//    // which queries need to be true from the doc monitor input
-//    val queryIds: List<String>
 ) : Trigger {
 
     @Throws(IOException::class)
@@ -57,7 +55,6 @@ data class DocumentLevelTrigger(
             .startObject(CONDITION_FIELD)
             .field(SCRIPT_FIELD, condition)
             .endObject()
-//            .field(QUERY_IDS_FIELD, queryIds.toTypedArray())
             .field(ACTIONS_FIELD, actions.toTypedArray())
             .endObject()
             .endObject()
@@ -83,7 +80,6 @@ data class DocumentLevelTrigger(
         out.writeString(severity)
         out.writeCollection(actions)
         condition.writeTo(out)
-//        out.writeStringCollection(queryIds)
     }
 
     companion object {
