@@ -103,6 +103,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
     @Volatile private var maxActionableAlertCount = DEFAULT_MAX_ACTIONABLE_ALERT_COUNT
 
     @Volatile private var triggerMaxActions: Int = -1
+
     @Volatile private var triggerTotalMaxActions: Int = -1
 
     private lateinit var runnerSupervisor: Job
@@ -194,7 +195,6 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             this.triggerMaxActions = maxActions
             this.triggerTotalMaxActions = totalMaxActions
         }
-
         return this
     }
 
@@ -308,7 +308,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
 
             if (triggerService.isQueryLevelTriggerActionable(triggerCtx, triggerResult)) {
                 val actionCtx = triggerCtx.copy(error = monitorResult.error ?: triggerResult.error)
-                for (action in trigger.actions.slice(0 until getThreshold(triggersThresholdParams, trigger.actions.size))) {
+                for (action in trigger.actions.slice(0 until getThreshold(triggersThresholdParams, trigger.actions.size))){
                     triggerResult.actionResults[action.id] = runAction(action, actionCtx, dryrun)
                 }
             }
@@ -482,7 +482,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 totalActionableAlertCount = dedupedAlerts.size + newAlerts.size + completedAlerts.size,
                 monitorOrTriggerError = monitorOrTriggerError
             )
-            for (action in trigger.actions.slice(0 until getThreshold(triggersThresholdParams, trigger.actions.size))) {
+            for (action in trigger.actions.slice(0 until getThreshold(triggersThresholdParams,trigger.actions.size))){
                 // ActionExecutionPolicy should not be null for Bucket-Level Monitors since it has a default config when not set explicitly
                 val actionExecutionScope = action.getActionExecutionPolicy(monitor)!!.actionExecutionScope
                 if (actionExecutionScope is PerAlertActionScope && !shouldDefaultToPerExecution) {
@@ -724,11 +724,9 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             .newInstance(template.params + mapOf("ctx" to ctx.asTemplateArg()))
             .execute()
     }
-
-
-/**
- *getting threshold value
- */
+    /*
+    *getting threshold value
+    */
     private fun getThreshold(p: TriggersThresholdParams, currentTriggerActionSize: Int): Int {
         var threshold = currentTriggerActionSize
         if  (triggerTotalMaxActions == 0) {
@@ -744,12 +742,11 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         p.surplusActionCount -= threshold
         return threshold
     }
-
-    /**
-     * The class's construction and use here are available for a separate limit for each method of a runBucketLevelMonitor or runQueryLevelMonitor.
-     * if we want to limit the two sets, we can input the same object during execution.
-     * The current default is two methods individually limited
-     **/
+    /*
+     *The class's construction and use here are available for a separate limit for each method of a runBucketLevelMonitor or runQueryLevelMonitor.
+     *if we want to limit the two sets, we can input the same object during execution.
+     *The current default is two methods individually limited
+     */
     data class TriggersThresholdParams(
         var surplusActionCount: Int
     )
