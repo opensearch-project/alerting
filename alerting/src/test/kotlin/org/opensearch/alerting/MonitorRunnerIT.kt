@@ -818,9 +818,8 @@ class MonitorRunnerIT : AlertingRestTestCase() {
     fun `test create ClusterMetricsInput monitor with ClusterHealth API`() {
         // GIVEN
         val path = "/_cluster/health"
-        val clusterIndex = randomInt(clusterHosts.size - 1)
         val input = randomClusterMetricsInput(path = path)
-        val monitor = createMonitor(randomQueryLevelMonitor(inputs = listOf(input)))
+        val monitor = createMonitor(randomClusterMetricsMonitor(inputs = listOf(input)))
 
         // WHEN
         val response = executeMonitor(monitor.id)
@@ -842,9 +841,8 @@ class MonitorRunnerIT : AlertingRestTestCase() {
     fun `test create ClusterMetricsInput monitor with ClusterStats API`() {
         // GIVEN
         val path = "/_cluster/stats"
-        val clusterIndex = randomInt(clusterHosts.size - 1)
         val input = randomClusterMetricsInput(path = path)
-        val monitor = createMonitor(randomQueryLevelMonitor(inputs = listOf(input)))
+        val monitor = createMonitor(randomClusterMetricsMonitor(inputs = listOf(input)))
 
         // WHEN
         val response = executeMonitor(monitor.id)
@@ -875,9 +873,8 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             destinationId = createDestination().id
         )
         val path = "/_cluster/health"
-        val clusterIndex = randomInt(clusterHosts.size - 1)
         val input = randomClusterMetricsInput(path = path)
-        val monitor = createMonitor(randomQueryLevelMonitor(inputs = listOf(input), triggers = listOf(trigger)))
+        val monitor = createMonitor(randomClusterMetricsMonitor(inputs = listOf(input), triggers = listOf(trigger)))
 
         // WHEN
         val response = executeMonitor(monitor.id)
@@ -910,9 +907,8 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             )
         )
         val path = "/_cluster/stats"
-        val clusterIndex = randomInt(clusterHosts.size - 1)
         val input = randomClusterMetricsInput(path = path)
-        val monitor = createMonitor(randomQueryLevelMonitor(inputs = listOf(input), triggers = listOf(trigger)))
+        val monitor = createMonitor(randomClusterMetricsMonitor(inputs = listOf(input), triggers = listOf(trigger)))
 
         // WHEN
         val response = executeMonitor(monitor.id)
@@ -938,12 +934,11 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         val indices = (1..5).map { createTestIndex() }.toTypedArray()
         val pathParams = indices.joinToString(",")
         val path = "/_cluster/health/"
-        val clusterIndex = randomInt(clusterHosts.size - 1)
         val input = randomClusterMetricsInput(
             path = path,
             pathParams = pathParams
         )
-        val monitor = createMonitor(randomQueryLevelMonitor(inputs = listOf(input)))
+        val monitor = createMonitor(randomClusterMetricsMonitor(inputs = listOf(input)))
 
         // WHEN
         val response = executeMonitor(monitor.id)
