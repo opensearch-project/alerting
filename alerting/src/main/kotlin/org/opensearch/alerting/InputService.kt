@@ -8,7 +8,7 @@ package org.opensearch.alerting
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.alerting.core.model.LocalUriInput
+import org.opensearch.alerting.core.model.ClusterMetricsInput
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.elasticapi.convertToMap
 import org.opensearch.alerting.elasticapi.suspendUntil
@@ -88,8 +88,8 @@ class InputService(
                         )
                         results += searchResponse.convertToMap()
                     }
-                    is LocalUriInput -> {
-                        logger.debug("LocalUriInput ApiType: ${input.apiType}")
+                    is ClusterMetricsInput -> {
+                        logger.debug("ClusterMetricsInput ApiType: ${input.apiType}")
                         val response = executeTransportAction(input, client)
                         results += response.toMap()
                     }

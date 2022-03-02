@@ -9,7 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-class LocalUriInputTests {
+class ClusterMetricsInputTests {
     private var path = "/_cluster/health"
     private var pathParams = ""
     private var url = ""
@@ -17,45 +17,45 @@ class LocalUriInputTests {
     private var socketTimeout = 5
 
     @Test
-    fun `test valid LocalUriInput creation using HTTP URI component fields`() {
+    fun `test valid ClusterMetricsInput creation using HTTP URI component fields`() {
         // GIVEN
         val testUrl = "http://localhost:9200/_cluster/health"
 
         // WHEN
-        val localUriInput = LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
         // THEN
-        assertEquals(path, localUriInput.path)
-        assertEquals(pathParams, localUriInput.pathParams)
-        assertEquals(testUrl, localUriInput.url)
-        assertEquals(connectionTimeout, localUriInput.connectionTimeout)
-        assertEquals(socketTimeout, localUriInput.socketTimeout)
+        assertEquals(path, clusterMetricsInput.path)
+        assertEquals(pathParams, clusterMetricsInput.pathParams)
+        assertEquals(testUrl, clusterMetricsInput.url)
+        assertEquals(connectionTimeout, clusterMetricsInput.connectionTimeout)
+        assertEquals(socketTimeout, clusterMetricsInput.socketTimeout)
     }
 
     @Test
-    fun `test valid LocalUriInput creation using HTTP url field`() {
+    fun `test valid ClusterMetricsInput creation using HTTP url field`() {
         // GIVEN
         path = ""
         url = "http://localhost:9200/_cluster/health"
 
         // WHEN
-        val localUriInput = LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
         // THEN
-        assertEquals(url, localUriInput.url)
+        assertEquals(url, clusterMetricsInput.url)
     }
 
     @Test
-    fun `test valid LocalUriInput creation using HTTPS url field`() {
+    fun `test valid ClusterMetricsInput creation using HTTPS url field`() {
         // GIVEN
         path = ""
         url = "https://localhost:9200/_cluster/health"
 
         // WHEN
-        val localUriInput = LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
         // THEN
-        assertEquals(url, localUriInput.url)
+        assertEquals(url, clusterMetricsInput.url)
     }
 
     @Test
@@ -65,59 +65,59 @@ class LocalUriInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("Invalid URL.") {
-            LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
         }
     }
 
     @Test
     fun `test invalid connection timeout that's too low`() {
         // GIVEN
-        connectionTimeout = LocalUriInput.MIN_CONNECTION_TIMEOUT - 1
+        connectionTimeout = ClusterMetricsInput.MIN_CONNECTION_TIMEOUT - 1
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>(
-            "Connection timeout: $connectionTimeout is not in the range of ${LocalUriInput.MIN_CONNECTION_TIMEOUT} - ${LocalUriInput.MIN_CONNECTION_TIMEOUT}."
+            "Connection timeout: $connectionTimeout is not in the range of ${ClusterMetricsInput.MIN_CONNECTION_TIMEOUT} - ${ClusterMetricsInput.MIN_CONNECTION_TIMEOUT}."
         ) {
-            LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
         }
     }
 
     @Test
     fun `test invalid connection timeout that's too high`() {
         // GIVEN
-        connectionTimeout = LocalUriInput.MAX_CONNECTION_TIMEOUT + 1
+        connectionTimeout = ClusterMetricsInput.MAX_CONNECTION_TIMEOUT + 1
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>(
-            "Connection timeout: $connectionTimeout is not in the range of ${LocalUriInput.MIN_CONNECTION_TIMEOUT} - ${LocalUriInput.MIN_CONNECTION_TIMEOUT}."
+            "Connection timeout: $connectionTimeout is not in the range of ${ClusterMetricsInput.MIN_CONNECTION_TIMEOUT} - ${ClusterMetricsInput.MIN_CONNECTION_TIMEOUT}."
         ) {
-            LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
         }
     }
 
     @Test
     fun `test invalid socket timeout that's too low`() {
         // GIVEN
-        socketTimeout = LocalUriInput.MIN_SOCKET_TIMEOUT - 1
+        socketTimeout = ClusterMetricsInput.MIN_SOCKET_TIMEOUT - 1
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>(
-            "Socket timeout: $socketTimeout is not in the range of ${LocalUriInput.MIN_SOCKET_TIMEOUT} - ${LocalUriInput.MAX_SOCKET_TIMEOUT}."
+            "Socket timeout: $socketTimeout is not in the range of ${ClusterMetricsInput.MIN_SOCKET_TIMEOUT} - ${ClusterMetricsInput.MAX_SOCKET_TIMEOUT}."
         ) {
-            LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
         }
     }
 
     @Test
     fun `test invalid socket timeout that's too high`() {
         // GIVEN
-        socketTimeout = LocalUriInput.MAX_SOCKET_TIMEOUT + 1
+        socketTimeout = ClusterMetricsInput.MAX_SOCKET_TIMEOUT + 1
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>(
-            "Socket timeout: $socketTimeout is not in the range of ${LocalUriInput.MIN_SOCKET_TIMEOUT} - ${LocalUriInput.MAX_SOCKET_TIMEOUT}."
+            "Socket timeout: $socketTimeout is not in the range of ${ClusterMetricsInput.MIN_SOCKET_TIMEOUT} - ${ClusterMetricsInput.MAX_SOCKET_TIMEOUT}."
         ) {
-            LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
         }
     }
 
@@ -128,7 +128,7 @@ class LocalUriInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("Invalid URL.") {
-            LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
         }
     }
 
@@ -138,15 +138,15 @@ class LocalUriInputTests {
         url = "http://localhost:9200/_cluster/health"
 
         // WHEN
-        val localUriInput = LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
         // THEN
-        assertEquals(path, localUriInput.path)
-        assertEquals(pathParams, localUriInput.pathParams)
-        assertEquals(url, localUriInput.url)
-        assertEquals(connectionTimeout, localUriInput.connectionTimeout)
-        assertEquals(socketTimeout, localUriInput.socketTimeout)
-        assertEquals(url, localUriInput.constructedUri.toString())
+        assertEquals(path, clusterMetricsInput.path)
+        assertEquals(pathParams, clusterMetricsInput.pathParams)
+        assertEquals(url, clusterMetricsInput.url)
+        assertEquals(connectionTimeout, clusterMetricsInput.connectionTimeout)
+        assertEquals(socketTimeout, clusterMetricsInput.socketTimeout)
+        assertEquals(url, clusterMetricsInput.constructedUri.toString())
     }
 
     @Test
@@ -157,15 +157,15 @@ class LocalUriInputTests {
         url = "http://localhost:9200/_cluster/health/index1,index2,index3,index4,index5"
 
         // WHEN
-        val localUriInput = LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
         // THEN
-        assertEquals(path, localUriInput.path)
-        assertEquals(pathParams, localUriInput.pathParams)
-        assertEquals(url, localUriInput.url)
-        assertEquals(connectionTimeout, localUriInput.connectionTimeout)
-        assertEquals(socketTimeout, localUriInput.socketTimeout)
-        assertEquals(url, localUriInput.constructedUri.toString())
+        assertEquals(path, clusterMetricsInput.path)
+        assertEquals(pathParams, clusterMetricsInput.pathParams)
+        assertEquals(url, clusterMetricsInput.url)
+        assertEquals(connectionTimeout, clusterMetricsInput.connectionTimeout)
+        assertEquals(socketTimeout, clusterMetricsInput.socketTimeout)
+        assertEquals(url, clusterMetricsInput.constructedUri.toString())
     }
 
     @Test
@@ -175,7 +175,7 @@ class LocalUriInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The provided URL and URI fields form different URLs.") {
-            LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
         }
     }
 
@@ -187,12 +187,12 @@ class LocalUriInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The provided URL and URI fields form different URLs.") {
-            LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
         }
     }
 
     @Test
-    fun `test LocalUriInput creation when all inputs are empty`() {
+    fun `test ClusterMetricsInput creation when all inputs are empty`() {
         // GIVEN
         path = ""
         pathParams = ""
@@ -200,12 +200,12 @@ class LocalUriInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The uri.api_type field, uri.path field, or uri.uri field must be defined.") {
-            LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
         }
     }
 
     @Test
-    fun `test LocalUriInput creation when all inputs but path params are empty`() {
+    fun `test ClusterMetricsInput creation when all inputs but path params are empty`() {
         // GIVEN
         path = ""
         pathParams = "index1,index2,index3,index4,index5"
@@ -213,7 +213,7 @@ class LocalUriInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The uri.api_type field, uri.path field, or uri.uri field must be defined.") {
-            LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
         }
     }
 
@@ -225,7 +225,7 @@ class LocalUriInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("Invalid URL.") {
-            LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
         }
     }
 
@@ -236,8 +236,8 @@ class LocalUriInputTests {
         url = "http://127.0.0.1:9200/_cluster/health"
 
         // WHEN + THEN
-        assertFailsWith<IllegalArgumentException>("Only host '${LocalUriInput.SUPPORTED_HOST}' is supported.") {
-            LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        assertFailsWith<IllegalArgumentException>("Only host '${ClusterMetricsInput.SUPPORTED_HOST}' is supported.") {
+            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
         }
     }
 
@@ -245,11 +245,11 @@ class LocalUriInputTests {
     fun `test invalid port in url field`() {
         // GIVEN
         path = ""
-        url = "http://localhost:${LocalUriInput.SUPPORTED_PORT + 1}/_cluster/health"
+        url = "http://localhost:${ClusterMetricsInput.SUPPORTED_PORT + 1}/_cluster/health"
 
         // WHEN + THEN
-        assertFailsWith<IllegalArgumentException>("Only port '${LocalUriInput.SUPPORTED_PORT}' is supported.") {
-            LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        assertFailsWith<IllegalArgumentException>("Only port '${ClusterMetricsInput.SUPPORTED_PORT}' is supported.") {
+            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
         }
     }
 
@@ -257,14 +257,14 @@ class LocalUriInputTests {
     fun `test parsePathParams with no path params`() {
         // GIVEN
         val testUrl = "http://localhost:9200/_cluster/health"
-        val localUriInput = LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
         // WHEN
-        val params = localUriInput.parsePathParams()
+        val params = clusterMetricsInput.parsePathParams()
 
         // THEN
         assertEquals(pathParams, params)
-        assertEquals(testUrl, localUriInput.constructedUri.toString())
+        assertEquals(testUrl, clusterMetricsInput.constructedUri.toString())
     }
 
     @Test
@@ -273,14 +273,14 @@ class LocalUriInputTests {
         path = "/_cluster/health/"
         pathParams = "index1,index2,index3,index4,index5"
         val testUrl = "http://localhost:9200/_cluster/health/index1,index2,index3,index4,index5"
-        val localUriInput = LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
         // WHEN
-        val params = localUriInput.parsePathParams()
+        val params = clusterMetricsInput.parsePathParams()
 
         // THEN
         assertEquals(pathParams, params)
-        assertEquals(testUrl, localUriInput.constructedUri.toString())
+        assertEquals(testUrl, clusterMetricsInput.constructedUri.toString())
     }
 
     @Test
@@ -289,14 +289,14 @@ class LocalUriInputTests {
         path = ""
         val testParams = "index1,index2,index3,index4,index5"
         url = "http://localhost:9200/_cluster/health/index1,index2,index3,index4,index5"
-        val localUriInput = LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
         // WHEN
-        val params = localUriInput.parsePathParams()
+        val params = clusterMetricsInput.parsePathParams()
 
         // THEN
         assertEquals(testParams, params)
-        assertEquals(url, localUriInput.constructedUri.toString())
+        assertEquals(url, clusterMetricsInput.constructedUri.toString())
     }
 
     @Test
@@ -306,7 +306,7 @@ class LocalUriInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The API requires path parameters.") {
-            LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
         }
     }
 
@@ -315,11 +315,11 @@ class LocalUriInputTests {
         // GIVEN
         path = "/_cluster/settings"
         pathParams = "index1,index2,index3,index4,index5"
-        val localUriInput = LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The API does not use path parameters.") {
-            localUriInput.parsePathParams()
+            clusterMetricsInput.parsePathParams()
         }
     }
 
@@ -329,13 +329,13 @@ class LocalUriInputTests {
         ILLEGAL_PATH_PARAMETER_CHARACTERS.forEach { character ->
             // GIVEN
             pathParams = "index1,index2,$character,index4,index5"
-            val localUriInput = LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
             // WHEN + THEN
             assertFailsWith<IllegalArgumentException>(
                 "The provided path parameters contain invalid characters or spaces. Please omit: ${ILLEGAL_PATH_PARAMETER_CHARACTERS.joinToString(" ")}"
             ) {
-                localUriInput.parsePathParams()
+                clusterMetricsInput.parsePathParams()
             }
             testCount++
         }
@@ -343,50 +343,50 @@ class LocalUriInputTests {
     }
 
     @Test
-    fun `test LocalUriInput correctly determines ApiType when path is provided as URI component`() {
+    fun `test ClusterMetricsInput correctly determines ApiType when path is provided as URI component`() {
         var testCount = 1 // Start off with count of 1 to account for ApiType.BLANK
-        LocalUriInput.ApiType.values()
-            .filter { enum -> enum != LocalUriInput.ApiType.BLANK }
+        ClusterMetricsInput.ApiType.values()
+            .filter { enum -> enum != ClusterMetricsInput.ApiType.BLANK }
             .forEach { testApiType ->
                 // GIVEN
                 path = testApiType.defaultPath
                 pathParams = if (testApiType.supportsPathParams) "index1,index2,index3,index4,index5" else ""
 
                 // WHEN
-                val localUriInput = LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+                val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
                 // THEN
-                assertEquals(testApiType, localUriInput.apiType)
+                assertEquals(testApiType, clusterMetricsInput.apiType)
                 testCount++
             }
-        assertEquals(LocalUriInput.ApiType.values().size, testCount)
+        assertEquals(ClusterMetricsInput.ApiType.values().size, testCount)
     }
 
     @Test
-    fun `test LocalUriInput correctly determines ApiType when path and path params are provided as URI components`() {
+    fun `test ClusterMetricsInput correctly determines ApiType when path and path params are provided as URI components`() {
         var testCount = 1 // Start off with count of 1 to account for ApiType.BLANK
-        LocalUriInput.ApiType.values()
-            .filter { enum -> enum != LocalUriInput.ApiType.BLANK }
+        ClusterMetricsInput.ApiType.values()
+            .filter { enum -> enum != ClusterMetricsInput.ApiType.BLANK }
             .forEach { testApiType ->
                 // GIVEN
                 path = testApiType.defaultPath
                 pathParams = "index1,index2,index3,index4,index5"
 
                 // WHEN
-                val localUriInput = LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+                val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
                 // THEN
-                assertEquals(testApiType, localUriInput.apiType)
+                assertEquals(testApiType, clusterMetricsInput.apiType)
                 testCount++
             }
-        assertEquals(LocalUriInput.ApiType.values().size, testCount)
+        assertEquals(ClusterMetricsInput.ApiType.values().size, testCount)
     }
 
     @Test
-    fun `test LocalUriInput correctly determines ApiType when path is provided in URL field`() {
+    fun `test ClusterMetricsInput correctly determines ApiType when path is provided in URL field`() {
         var testCount = 1 // Start off with count of 1 to account for ApiType.BLANK
-        LocalUriInput.ApiType.values()
-            .filter { enum -> enum != LocalUriInput.ApiType.BLANK }
+        ClusterMetricsInput.ApiType.values()
+            .filter { enum -> enum != ClusterMetricsInput.ApiType.BLANK }
             .forEach { testApiType ->
                 // GIVEN
                 path = ""
@@ -394,20 +394,20 @@ class LocalUriInputTests {
                 url = "http://localhost:9200${testApiType.defaultPath}"
 
                 // WHEN
-                val localUriInput = LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+                val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
                 // THEN
-                assertEquals(testApiType, localUriInput.apiType)
+                assertEquals(testApiType, clusterMetricsInput.apiType)
                 testCount++
             }
-        assertEquals(LocalUriInput.ApiType.values().size, testCount)
+        assertEquals(ClusterMetricsInput.ApiType.values().size, testCount)
     }
 
     @Test
-    fun `test LocalUriInput correctly determines ApiType when path and path params are provided in URL field`() {
+    fun `test ClusterMetricsInput correctly determines ApiType when path and path params are provided in URL field`() {
         var testCount = 1 // Start off with count of 1 to account for ApiType.BLANK
-        LocalUriInput.ApiType.values()
-            .filter { enum -> enum != LocalUriInput.ApiType.BLANK }
+        ClusterMetricsInput.ApiType.values()
+            .filter { enum -> enum != ClusterMetricsInput.ApiType.BLANK }
             .forEach { testApiType ->
                 // GIVEN
                 path = ""
@@ -415,59 +415,59 @@ class LocalUriInputTests {
                 url = "http://localhost:9200${testApiType.defaultPath}$pathParams"
 
                 // WHEN
-                val localUriInput = LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+                val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
                 // THEN
-                assertEquals(testApiType, localUriInput.apiType)
+                assertEquals(testApiType, clusterMetricsInput.apiType)
                 testCount++
             }
-        assertEquals(LocalUriInput.ApiType.values().size, testCount)
+        assertEquals(ClusterMetricsInput.ApiType.values().size, testCount)
     }
 
     @Test
-    fun `test LocalUriInput cannot determine ApiType when invalid path is provided as URI component`() {
+    fun `test ClusterMetricsInput cannot determine ApiType when invalid path is provided as URI component`() {
         // GIVEN
         path = "/_cat/paws"
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The API could not be determined from the provided URI.") {
-            LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
         }
     }
 
     @Test
-    fun `test LocalUriInput cannot determine ApiType when invalid path and path params are provided as URI components`() {
+    fun `test ClusterMetricsInput cannot determine ApiType when invalid path and path params are provided as URI components`() {
         // GIVEN
         path = "/_cat/paws"
         pathParams = "index1,index2,index3,index4,index5"
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The API could not be determined from the provided URI.") {
-            LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
         }
     }
 
     @Test
-    fun `test LocalUriInput cannot determine ApiType when invaid path is provided in URL`() {
+    fun `test ClusterMetricsInput cannot determine ApiType when invaid path is provided in URL`() {
         // GIVEN
         path = ""
         url = "http://localhost:9200/_cat/paws"
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The API could not be determined from the provided URI.") {
-            LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
         }
     }
 
     @Test
-    fun `test LocalUriInput cannot determine ApiType when invaid path and path params are provided in URL`() {
+    fun `test ClusterMetricsInput cannot determine ApiType when invaid path and path params are provided in URL`() {
         // GIVEN
         path = ""
         url = "http://localhost:9200/_cat/paws/index1,index2,index3,index4,index5"
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The API could not be determined from the provided URI.") {
-            LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
         }
     }
 
@@ -481,12 +481,12 @@ class LocalUriInputTests {
         url = "http://localhost:9200$testPath$testPathParams"
 
         // WHEN
-        val localUriInput = LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
         // THEN
-        assertEquals(testPath, localUriInput.path)
-        assertEquals(testPathParams, localUriInput.pathParams)
-        assertEquals(url, localUriInput.url)
+        assertEquals(testPath, clusterMetricsInput.path)
+        assertEquals(testPathParams, clusterMetricsInput.pathParams)
+        assertEquals(url, clusterMetricsInput.url)
     }
 
     @Test
@@ -497,11 +497,11 @@ class LocalUriInputTests {
         val testUrl = "http://localhost:9200$path$pathParams"
 
         // WHEN
-        val localUriInput = LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
         // THEN
-        assertEquals(path, localUriInput.path)
-        assertEquals(pathParams, localUriInput.pathParams)
-        assertEquals(testUrl, localUriInput.url)
+        assertEquals(path, clusterMetricsInput.path)
+        assertEquals(pathParams, clusterMetricsInput.pathParams)
+        assertEquals(testUrl, clusterMetricsInput.url)
     }
 }

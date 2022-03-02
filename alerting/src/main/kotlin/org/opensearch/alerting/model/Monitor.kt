@@ -7,7 +7,7 @@ package org.opensearch.alerting.model
 
 import org.opensearch.alerting.core.model.CronSchedule
 import org.opensearch.alerting.core.model.Input
-import org.opensearch.alerting.core.model.LocalUriInput
+import org.opensearch.alerting.core.model.ClusterMetricsInput
 import org.opensearch.alerting.core.model.Schedule
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
@@ -71,6 +71,8 @@ data class Monitor(
                     require(trigger is QueryLevelTrigger) { "Incompatible trigger [$trigger.id] for monitor type [$monitorType]" }
                 MonitorType.BUCKET_LEVEL_MONITOR ->
                     require(trigger is BucketLevelTrigger) { "Incompatible trigger [$trigger.id] for monitor type [$monitorType]" }
+                MonitorType.CLUSTER_METRICS_MONITOR ->
+                    require(trigger is QueryLevelTrigger) { "Incompatible trigger [$trigger.id] for monitor type [$monitorType]" }
             }
         }
         if (enabled) {
@@ -115,7 +117,8 @@ data class Monitor(
     // This is different from 'type' which denotes the Scheduled Job type
     enum class MonitorType(val value: String) {
         QUERY_LEVEL_MONITOR("query_level_monitor"),
-        BUCKET_LEVEL_MONITOR("bucket_level_monitor");
+        BUCKET_LEVEL_MONITOR("bucket_level_monitor"),
+        CLUSTER_METRICS_MONITOR("cluster_metrics_monitor");
 
         override fun toString(): String {
             return value
@@ -253,7 +256,7 @@ data class Monitor(
                         ensureExpectedToken(Token.START_ARRAY, xcp.currentToken(), xcp)
                         while (xcp.nextToken() != Token.END_ARRAY) {
                             val input = Input.parse(xcp)
-                            if (input is LocalUriInput)
+                            if (input is ClusterMetricsInput)
                                 SupportedApiSettings.validateApiType(input)
                             inputs.add(input)
                         }

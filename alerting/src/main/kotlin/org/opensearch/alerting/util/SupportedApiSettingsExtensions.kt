@@ -24,8 +24,8 @@ import org.opensearch.action.admin.cluster.tasks.PendingClusterTasksRequest
 import org.opensearch.action.admin.cluster.tasks.PendingClusterTasksResponse
 import org.opensearch.action.admin.indices.recovery.RecoveryRequest
 import org.opensearch.action.admin.indices.recovery.RecoveryResponse
-import org.opensearch.alerting.core.model.LocalUriInput
-import org.opensearch.alerting.core.model.LocalUriInput.ApiType
+import org.opensearch.alerting.core.model.ClusterMetricsInput
+import org.opensearch.alerting.core.model.ClusterMetricsInput.ApiType
 import org.opensearch.alerting.elasticapi.convertToMap
 import org.opensearch.alerting.settings.SupportedApiSettings
 import org.opensearch.alerting.settings.SupportedApiSettings.Companion.resolveToActionRequest
@@ -34,14 +34,14 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.support.XContentMapValues
 
 /**
- * Calls the appropriate transport action for the API requested in the [localUriInput].
- * @param localUriInput The [LocalUriInput] to resolve.
+ * Calls the appropriate transport action for the API requested in the [clusterMetricsInput].
+ * @param clusterMetricsInput The [ClusterMetricsInput] to resolve.
  * @param client The [Client] used to call the respective transport action.
  * @throws IllegalArgumentException When the requested API is not supported by this feature.
  */
-fun executeTransportAction(localUriInput: LocalUriInput, client: Client): ActionResponse {
-    val request = resolveToActionRequest(localUriInput)
-    return when (localUriInput.apiType) {
+fun executeTransportAction(clusterMetricsInput: ClusterMetricsInput, client: Client): ActionResponse {
+    val request = resolveToActionRequest(clusterMetricsInput)
+    return when (clusterMetricsInput.apiType) {
         ApiType.CAT_PENDING_TASKS -> client.admin().cluster().pendingClusterTasks(request as PendingClusterTasksRequest).get()
         ApiType.CAT_RECOVERY -> client.admin().indices().recoveries(request as RecoveryRequest).get()
         ApiType.CAT_REPOSITORIES -> client.admin().cluster().getRepositories(request as GetRepositoriesRequest).get()
@@ -107,7 +107,7 @@ fun ActionResponse.toMap(): Map<String, Any> {
 
 /**
  * Populates a [HashMap] with only the values that support being exposed to users.
- * @param mappedActionResponse The response from the [LocalUriInput] API call.
+ * @param mappedActionResponse The response from the [ClusterMetricsInput] API call.
  * @param supportedJsonPayload The JSON payload as configured in [SupportedApiSettings.RESOURCE_FILE].
  * @return The response values [HashMap] without the redacted fields.
  */

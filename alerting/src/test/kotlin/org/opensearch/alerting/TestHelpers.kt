@@ -12,7 +12,7 @@ import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAg
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtFilter
 import org.opensearch.alerting.core.model.Input
 import org.opensearch.alerting.core.model.IntervalSchedule
-import org.opensearch.alerting.core.model.LocalUriInput
+import org.opensearch.alerting.core.model.ClusterMetricsInput
 import org.opensearch.alerting.core.model.Schedule
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.elasticapi.string
@@ -339,14 +339,14 @@ fun randomQueryLevelTriggerRunResult(): QueryLevelTriggerRunResult {
     return QueryLevelTriggerRunResult("trigger-name", true, null, map)
 }
 
-fun randomLocalUriInput(
+fun randomClusterMetricsInput(
     path: String,
     pathParams: String = "",
     url: String = "",
-    connectionTimeout: Int = 1 + randomInt(LocalUriInput.MAX_CONNECTION_TIMEOUT - 1),
-    socketTimeout: Int = 1 + randomInt(LocalUriInput.MAX_SOCKET_TIMEOUT - 1)
-): LocalUriInput {
-    return LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+    connectionTimeout: Int = 1 + randomInt(ClusterMetricsInput.MAX_CONNECTION_TIMEOUT - 1),
+    socketTimeout: Int = 1 + randomInt(ClusterMetricsInput.MAX_SOCKET_TIMEOUT - 1)
+): ClusterMetricsInput {
+    return ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 }
 
 fun randomBucketLevelTriggerRunResult(): BucketLevelTriggerRunResult {

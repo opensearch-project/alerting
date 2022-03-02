@@ -815,11 +815,11 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         Assert.assertTrue(alerts.single().errorMessage?.contains("Connect timed out") as Boolean)
     }
 
-    fun `test create LocalUriInput monitor with ClusterHealth API`() {
+    fun `test create ClusterMetricsInput monitor with ClusterHealth API`() {
         // GIVEN
         val path = "/_cluster/health"
         val clusterIndex = randomInt(clusterHosts.size - 1)
-        val input = randomLocalUriInput(path = path)
+        val input = randomClusterMetricsInput(path = path)
         val monitor = createMonitor(randomQueryLevelMonitor(inputs = listOf(input)))
 
         // WHEN
@@ -839,11 +839,11 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         assertNull("There should not be an error message, but found: $errorMessage", errorMessage)
     }
 
-    fun `test create LocalUriInput monitor with ClusterStats API`() {
+    fun `test create ClusterMetricsInput monitor with ClusterStats API`() {
         // GIVEN
         val path = "/_cluster/stats"
         val clusterIndex = randomInt(clusterHosts.size - 1)
-        val input = randomLocalUriInput(path = path)
+        val input = randomClusterMetricsInput(path = path)
         val monitor = createMonitor(randomQueryLevelMonitor(inputs = listOf(input)))
 
         // WHEN
@@ -863,7 +863,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         assertNull("There should not be an error message, but found: $errorMessage", errorMessage)
     }
 
-    fun `test create LocalUriInput monitor with alert triggered`() {
+    fun `test create ClusterMetricsInput monitor with alert triggered`() {
         // GIVEN
         putAlertMappings()
         val trigger = randomQueryLevelTrigger(
@@ -876,7 +876,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         )
         val path = "/_cluster/health"
         val clusterIndex = randomInt(clusterHosts.size - 1)
-        val input = randomLocalUriInput(path = path)
+        val input = randomClusterMetricsInput(path = path)
         val monitor = createMonitor(randomQueryLevelMonitor(inputs = listOf(input), triggers = listOf(trigger)))
 
         // WHEN
@@ -899,7 +899,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         verifyAlert(alerts.single(), monitor, ACTIVE)
     }
 
-    fun `test create LocalUriInput monitor with no alert triggered`() {
+    fun `test create ClusterMetricsInput monitor with no alert triggered`() {
         // GIVEN
         putAlertMappings()
         val trigger = randomQueryLevelTrigger(
@@ -911,7 +911,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         )
         val path = "/_cluster/stats"
         val clusterIndex = randomInt(clusterHosts.size - 1)
-        val input = randomLocalUriInput(path = path)
+        val input = randomClusterMetricsInput(path = path)
         val monitor = createMonitor(randomQueryLevelMonitor(inputs = listOf(input), triggers = listOf(trigger)))
 
         // WHEN
@@ -933,13 +933,13 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         assertEquals("Alert saved for test monitor, output: $output", 0, alerts.size)
     }
 
-    fun `test create LocalUriInput monitor for ClusterHealth API with path parameters`() {
+    fun `test create ClusterMetricsInput monitor for ClusterHealth API with path parameters`() {
         // GIVEN
         val indices = (1..5).map { createTestIndex() }.toTypedArray()
         val pathParams = indices.joinToString(",")
         val path = "/_cluster/health/"
         val clusterIndex = randomInt(clusterHosts.size - 1)
-        val input = randomLocalUriInput(
+        val input = randomClusterMetricsInput(
             path = path,
             pathParams = pathParams
         )
@@ -964,7 +964,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
 
     // TODO: Once an API is implemented that supports adding/removing entries on the
     //  SupportedApiSettings::supportedApiList, create an test that simulates executing
-    //  a preexisting LocalUriInput monitor for an API that has been removed from the supportedApiList.
+    //  a preexisting ClusterMetricsInput monitor for an API that has been removed from the supportedApiList.
     //  This will likely involve adding an API to the list before creating the monitor, and then removing
     //  the API from the list before executing the monitor.
 

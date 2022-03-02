@@ -23,7 +23,7 @@ val ILLEGAL_PATH_PARAMETER_CHARACTERS = arrayOf(':', '"', '+', '\\', '|', '?', '
 /**
  * This is a data class for a URI type of input for Monitors specifically for local clusters.
  */
-data class LocalUriInput(
+data class ClusterMetricsInput(
     var path: String,
     var pathParams: String = "",
     var url: String,
@@ -118,10 +118,10 @@ data class LocalUriInput(
         val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(Input::class.java, ParseField("uri"), CheckedFunction { parseInner(it) })
 
         /**
-         * This parse function uses [XContentParser] to parse JSON input and store corresponding fields to create a [LocalUriInput] object
+         * This parse function uses [XContentParser] to parse JSON input and store corresponding fields to create a [ClusterMetricsInput] object
          */
         @JvmStatic @Throws(IOException::class)
-        private fun parseInner(xcp: XContentParser): LocalUriInput {
+        private fun parseInner(xcp: XContentParser): ClusterMetricsInput {
             var path = ""
             var pathParams = ""
             var url = ""
@@ -141,7 +141,7 @@ data class LocalUriInput(
                     SOCKET_TIMEOUT_FIELD -> socketTimeout = xcp.intValue()
                 }
             }
-            return LocalUriInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            return ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
         }
     }
 
@@ -160,8 +160,8 @@ data class LocalUriInput(
     }
 
     /**
-     * Isolates just the path parameters from the [LocalUriInput] URI.
-     * @return The path parameters portion of the [LocalUriInput] URI.
+     * Isolates just the path parameters from the [ClusterMetricsInput] URI.
+     * @return The path parameters portion of the [ClusterMetricsInput] URI.
      * @throws IllegalArgumentException if the [ApiType] requires path parameters, but none are supplied;
      * or when path parameters are provided for an [ApiType] that does not use path parameters.
      */
@@ -195,9 +195,9 @@ data class LocalUriInput(
     }
 
     /**
-     * Examines the path of a [LocalUriInput] to determine which API is being called.
+     * Examines the path of a [ClusterMetricsInput] to determine which API is being called.
      * @param uriPath The path to examine.
-     * @return The [ApiType] associated with the [LocalUriInput] monitor.
+     * @return The [ApiType] associated with the [ClusterMetricsInput] monitor.
      * @throws IllegalArgumentException when the API to call cannot be determined from the URI.
      */
     private fun findApiType(uriPath: String): ApiType {

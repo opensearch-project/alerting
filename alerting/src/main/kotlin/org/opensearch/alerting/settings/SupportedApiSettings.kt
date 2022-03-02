@@ -15,8 +15,8 @@ import org.opensearch.action.admin.cluster.state.ClusterStateRequest
 import org.opensearch.action.admin.cluster.stats.ClusterStatsRequest
 import org.opensearch.action.admin.cluster.tasks.PendingClusterTasksRequest
 import org.opensearch.action.admin.indices.recovery.RecoveryRequest
-import org.opensearch.alerting.core.model.LocalUriInput
-import org.opensearch.alerting.core.model.LocalUriInput.ApiType
+import org.opensearch.alerting.core.model.ClusterMetricsInput
+import org.opensearch.alerting.core.model.ClusterMetricsInput.ApiType
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.json.JsonXContent
 
@@ -76,13 +76,13 @@ class SupportedApiSettings {
         /**
          * Will return an [ActionRequest] for the API associated with that path.
          * Will otherwise throw an exception.
-         * @param localUriInput The [LocalUriInput] to resolve.
+         * @param clusterMetricsInput The [ClusterMetricsInput] to resolve.
          * @throws IllegalArgumentException when the requested API is not supported.
-         * @return The [ActionRequest] for the API associated with the provided [LocalUriInput].
+         * @return The [ActionRequest] for the API associated with the provided [ClusterMetricsInput].
          */
-        fun resolveToActionRequest(localUriInput: LocalUriInput): ActionRequest {
-            val pathParams = localUriInput.parsePathParams()
-            return when (localUriInput.apiType) {
+        fun resolveToActionRequest(clusterMetricsInput: ClusterMetricsInput): ActionRequest {
+            val pathParams = clusterMetricsInput.parsePathParams()
+            return when (clusterMetricsInput.apiType) {
                 ApiType.CAT_PENDING_TASKS -> PendingClusterTasksRequest()
                 ApiType.CAT_RECOVERY -> {
                     if (pathParams.isEmpty()) return RecoveryRequest()
@@ -113,11 +113,11 @@ class SupportedApiSettings {
         /**
          * Confirms whether the provided path is in [supportedApiList].
          * Throws an exception if the provided path is not on the list; otherwise performs no action.
-         * @param localUriInput The [LocalUriInput] to validate.
+         * @param clusterMetricsInput The [ClusterMetricsInput] to validate.
          * @throws IllegalArgumentException when supportedApiList does not contain the provided path.
          */
-        fun validateApiType(localUriInput: LocalUriInput) {
-            if (!supportedApiList.keys.contains(localUriInput.apiType.defaultPath))
+        fun validateApiType(clusterMetricsInput: ClusterMetricsInput) {
+            if (!supportedApiList.keys.contains(clusterMetricsInput.apiType.defaultPath))
                 throw IllegalArgumentException("API path not in supportedApiList.")
         }
     }
