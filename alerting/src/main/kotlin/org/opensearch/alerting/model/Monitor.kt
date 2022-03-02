@@ -5,9 +5,9 @@
 
 package org.opensearch.alerting.model
 
+import org.opensearch.alerting.core.model.ClusterMetricsInput
 import org.opensearch.alerting.core.model.CronSchedule
 import org.opensearch.alerting.core.model.Input
-import org.opensearch.alerting.core.model.ClusterMetricsInput
 import org.opensearch.alerting.core.model.Schedule
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
