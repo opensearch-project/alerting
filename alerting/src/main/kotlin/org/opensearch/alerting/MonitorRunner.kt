@@ -44,6 +44,7 @@ import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_TRIGGER_MAX_ACTIONS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_TRIGGER_TOTAL_MAX_ACTIONS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_MILLIS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.DEFAULT_MAX_ACTIONABLE_ALERT_COUNT
@@ -102,6 +103,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
     @Volatile private var maxActionableAlertCount = DEFAULT_MAX_ACTIONABLE_ALERT_COUNT
 
     @Volatile private var triggerMaxActions: Int = -1
+    @Volatile private var triggerTotalMaxActions: Int = -1
 
     private lateinit var runnerSupervisor: Job
     override val coroutineContext: CoroutineContext
@@ -184,8 +186,13 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         }
 
         triggerMaxActions = ALERTING_TRIGGER_MAX_ACTIONS.get(settings)
-        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_TRIGGER_MAX_ACTIONS) {
-            triggerMaxActions = it
+        triggerTotalMaxActions = ALERTING_TRIGGER_TOTAL_MAX_ACTIONS.get(settings)
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_TRIGGER_MAX_ACTIONS, ALERTING_TRIGGER_TOTAL_MAX_ACTIONS) { maxActions: Int, totalMaxActions: Int ->
+            if (maxActions > totalMaxActions){
+                throw IllegalArgumentException("The limit number of a single trigger should not be greater than that of the overall trigger $maxActions $totalMaxActions")
+            }
+            this.triggerMaxActions = maxActions
+            this.triggerTotalMaxActions = totalMaxActions
         }
 
         return this
@@ -292,6 +299,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
 
         val updatedAlerts = mutableListOf<Alert>()
         val triggerResults = mutableMapOf<String, QueryLevelTriggerRunResult>()
+        val triggersThresholdParams = TriggersThresholdParams(triggerTotalMaxActions)
         for (trigger in monitor.triggers) {
             val currentAlert = currentAlerts[trigger]
             val triggerCtx = QueryLevelTriggerExecutionContext(monitor, trigger as QueryLevelTrigger, monitorResult, currentAlert)
@@ -300,8 +308,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
 
             if (triggerService.isQueryLevelTriggerActionable(triggerCtx, triggerResult)) {
                 val actionCtx = triggerCtx.copy(error = monitorResult.error ?: triggerResult.error)
-                var threshold = if (triggerMaxActions < trigger.actions.size && triggerMaxActions >= 0) triggerMaxActions else trigger.actions.size
-                for (action in trigger.actions.slice(0 until threshold)) {
+                for (action in trigger.actions.slice(0 until getThreshold(triggersThresholdParams, trigger.actions.size))) {
                     triggerResult.actionResults[action.id] = runAction(action, actionCtx, dryrun)
                 }
             }
@@ -447,7 +454,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             if (triggerResults[trigger.id]?.error == null)
                 nextAlerts[trigger.id]?.get(AlertCategory.COMPLETED)?.addAll(alertService.convertToCompletedAlerts(keysToAlertsMap))
         }
-
+        val triggersThresholdParams = TriggersThresholdParams(triggerTotalMaxActions)
         for (trigger in monitor.triggers) {
             val alertsToUpdate = mutableSetOf<Alert>()
             val completedAlertsToUpdate = mutableSetOf<Alert>()
@@ -475,9 +482,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 totalActionableAlertCount = dedupedAlerts.size + newAlerts.size + completedAlerts.size,
                 monitorOrTriggerError = monitorOrTriggerError
             )
-            var threshold = if (triggerMaxActions < trigger.actions.size && triggerMaxActions >= 0) triggerMaxActions else trigger.actions.size
-            threshold = if (threshold < trigger.actions.size && threshold >= 0) threshold else trigger.actions.size
-            for (action in trigger.actions.slice(0 until threshold)) {
+            for (action in trigger.actions.slice(0 until getThreshold(triggersThresholdParams, trigger.actions.size))) {
                 // ActionExecutionPolicy should not be null for Bucket-Level Monitors since it has a default config when not set explicitly
                 val actionExecutionScope = action.getActionExecutionPolicy(monitor)!!.actionExecutionScope
                 if (actionExecutionScope is PerAlertActionScope && !shouldDefaultToPerExecution) {
@@ -719,4 +724,33 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             .newInstance(template.params + mapOf("ctx" to ctx.asTemplateArg()))
             .execute()
     }
+
+
+/**
+ *getting threshold value
+ */
+    private fun getThreshold(p: TriggersThresholdParams, currentTriggerActionSize: Int): Int {
+        var threshold = currentTriggerActionSize
+        if  (triggerTotalMaxActions == 0) {
+            threshold = 0
+        } else if (triggerTotalMaxActions > 0) {
+            threshold = if (triggerMaxActions >= 0) {
+                val temporaryThreshold = if (triggerMaxActions < p.surplusActionCount) triggerMaxActions else p.surplusActionCount
+                if (temporaryThreshold < currentTriggerActionSize) temporaryThreshold else currentTriggerActionSize
+            } else {
+                currentTriggerActionSize
+            }
+        }
+        p.surplusActionCount -= threshold
+        return threshold
+    }
+
+    /**
+     * The class's construction and use here are available for a separate limit for each method of a runBucketLevelMonitor or runQueryLevelMonitor.
+     * if we want to limit the two sets, we can input the same object during execution.
+     * The current default is two methods individually limited
+     **/
+    data class TriggersThresholdParams(
+        var surplusActionCount: Int
+    )
 }

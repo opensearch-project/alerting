@@ -266,6 +266,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             LegacyOpenDistroScheduledJobSettings.SWEEPER_ENABLED,
             AlertingSettings.INPUT_TIMEOUT,
             AlertingSettings.ALERTING_TRIGGER_MAX_ACTIONS,
+            AlertingSettings.ALERTING_TRIGGER_TOTAL_MAX_ACTIONS,
             AlertingSettings.INDEX_TIMEOUT,
             AlertingSettings.BULK_TIMEOUT,
             AlertingSettings.ALERT_BACKOFF_MILLIS,
