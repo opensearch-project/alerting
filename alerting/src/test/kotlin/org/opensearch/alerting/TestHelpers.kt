@@ -157,9 +157,12 @@ fun randomBucketLevelTrigger(
         name = name,
         severity = severity,
         bucketSelector = bucketSelector,
-        actions = if (actions.isEmpty()) (0..randomInt(10)).map { randomActionWithPolicy(destinationId = destinationId) } else actions
+        actions = if (actions.isEmpty()) randomActionsForBucketLevelTrigger(destinationId = destinationId) else actions
     )
 }
+
+fun randomActionsForBucketLevelTrigger(min: Int = 0, max: Int = 10, destinationId: String = ""): List<Action> =
+    (min..randomInt(max)).map { randomActionWithPolicy(destinationId = destinationId) }
 
 fun randomBucketSelectorExtAggregationBuilder(
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),

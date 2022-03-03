@@ -1040,7 +1040,10 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         var alerts = searchAlerts(monitor)
         assertEquals("Alerts not saved", 2, alerts.size)
         alerts.forEach {
-            verifyAlert(it, monitor, ACTIVE)
+            // Given the random configuration of the Bucket-Level Trigger for the test, it's possible to get
+            // an action configuration that leads to no notifications (meaning the field for the Alert is null).
+            // Since testing action execution is not relevant to this test, verifyAlert is asked to ignore it.
+            verifyAlert(it, monitor, ACTIVE, expectNotification = false)
         }
 
         // Delete documents of a particular value
@@ -1086,7 +1089,21 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             params.docCount > 0
         """.trimIndent()
 
-        var trigger = randomBucketLevelTrigger()
+        // For the Actions ensure that there is at least one and any PER_ALERT actions contain ACTIVE, DEDUPED and COMPLETED in its policy
+        // so that the assertions done later in this test don't fail.
+        // The config is being mutated this way to still maintain the randomness in configuration (like including other ActionExecutionScope).
+        val actions = randomActionsForBucketLevelTrigger(min = 1).map {
+            if (it.actionExecutionPolicy?.actionExecutionScope is PerAlertActionScope) {
+                it.copy(
+                    actionExecutionPolicy = ActionExecutionPolicy(
+                        PerAlertActionScope(setOf(AlertCategory.NEW, AlertCategory.DEDUPED, AlertCategory.COMPLETED))
+                    )
+                )
+            } else {
+                it
+            }
+        }
+        var trigger = randomBucketLevelTrigger(actions = actions)
         trigger = trigger.copy(
             bucketSelector = BucketSelectorExtAggregationBuilder(
                 name = trigger.id,
@@ -1142,11 +1159,6 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         assertEquals("Incorrect number of completed alerts", 2, completedAlerts.size)
         val previouslyAcknowledgedAlert = completedAlerts.single { it.aggregationResultBucket?.getBucketKeysHash().equals("test_value_1") }
         val previouslyActiveAlert = completedAlerts.single { it.aggregationResultBucket?.getBucketKeysHash().equals("test_value_2") }
-        // Note: Given the randomization of the Actions and ActionExecutionPolicy for the Bucket-Level Monitor
-        // there is a very small chance we could end up with COMPLETED Alerts that never had lastNotificationTime updated
-        // (This would occur if the Trigger contained Actions with ActionExecutionScope of PER_ALERT that all somehow excluded the
-        // same Alert categories being tested in this test)
-        // In such a rare case, the tests can just be rerun
         assertTrue(
             "Previously acknowledged alert was not updated when it moved to completed",
             previouslyAcknowledgedAlert.lastNotificationTime!! > acknowledgedAlert2.lastNotificationTime
@@ -1572,10 +1584,17 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         }
     }
 
-    private fun verifyAlert(alert: Alert, monitor: Monitor, expectedState: Alert.State = ACTIVE) {
+    private fun verifyAlert(
+        alert: Alert,
+        monitor: Monitor,
+        expectedState: Alert.State = ACTIVE,
+        expectNotification: Boolean = true
+    ) {
         assertNotNull(alert.id)
         assertNotNull(alert.startTime)
-        assertNotNull(alert.lastNotificationTime)
+        if (expectNotification) {
+            assertNotNull(alert.lastNotificationTime)
+        }
         assertEquals("Alert in wrong state", expectedState, alert.state)
         if (expectedState == ERROR) {
             assertNotNull("Missing error message", alert.errorMessage)
