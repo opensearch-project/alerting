@@ -42,7 +42,6 @@ import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
-import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_TRIGGER_MAX_ACTIONS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_TRIGGER_TOTAL_MAX_ACTIONS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
@@ -188,9 +187,14 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
 
         triggerMaxActions = ALERTING_TRIGGER_MAX_ACTIONS.get(settings)
         triggerTotalMaxActions = ALERTING_TRIGGER_TOTAL_MAX_ACTIONS.get(settings)
-        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_TRIGGER_MAX_ACTIONS, ALERTING_TRIGGER_TOTAL_MAX_ACTIONS) { maxActions: Int, totalMaxActions: Int ->
-            if (maxActions > totalMaxActions){
-                throw IllegalArgumentException("The limit number of a single trigger should not be greater than that of the overall trigger $maxActions $totalMaxActions")
+        clusterService.clusterSettings.addSettingsUpdateConsumer(
+            ALERTING_TRIGGER_MAX_ACTIONS,
+            ALERTING_TRIGGER_TOTAL_MAX_ACTIONS
+        ) { maxActions: Int, totalMaxActions: Int ->
+            if (maxActions > totalMaxActions) {
+                throw IllegalArgumentException(
+                    "The limit number of a single trigger shouldn't be greater than the overall trigger $maxActions $totalMaxActions"
+                )
             }
             this.triggerMaxActions = maxActions
             this.triggerTotalMaxActions = totalMaxActions
@@ -308,7 +312,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
 
             if (triggerService.isQueryLevelTriggerActionable(triggerCtx, triggerResult)) {
                 val actionCtx = triggerCtx.copy(error = monitorResult.error ?: triggerResult.error)
-                for (action in trigger.actions.slice(0 until getThreshold(triggersThresholdParams, trigger.actions.size))){
+                for (action in trigger.actions.slice(0 until getThreshold(triggersThresholdParams, trigger.actions.size))) {
                     triggerResult.actionResults[action.id] = runAction(action, actionCtx, dryrun)
                 }
             }
@@ -482,7 +486,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 totalActionableAlertCount = dedupedAlerts.size + newAlerts.size + completedAlerts.size,
                 monitorOrTriggerError = monitorOrTriggerError
             )
-            for (action in trigger.actions.slice(0 until getThreshold(triggersThresholdParams,trigger.actions.size))){
+            for (action in trigger.actions.slice(0 until getThreshold(triggersThresholdParams, trigger.actions.size))) {
                 // ActionExecutionPolicy should not be null for Bucket-Level Monitors since it has a default config when not set explicitly
                 val actionExecutionScope = action.getActionExecutionPolicy(monitor)!!.actionExecutionScope
                 if (actionExecutionScope is PerAlertActionScope && !shouldDefaultToPerExecution) {
@@ -729,7 +733,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
     */
     private fun getThreshold(p: TriggersThresholdParams, currentTriggerActionSize: Int): Int {
         var threshold = currentTriggerActionSize
-        if  (triggerTotalMaxActions == 0) {
+        if (triggerTotalMaxActions == 0) {
             threshold = 0
         } else if (triggerTotalMaxActions > 0) {
             threshold = if (triggerMaxActions >= 0) {
