@@ -69,6 +69,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected val numberOfNodes = System.getProperty("cluster.number_of_nodes", "1")!!.toInt()
     protected val isMultiNode = numberOfNodes > 1
 
+    protected val statsResponseOpendistroSweeperEnabledField = "opendistro.scheduled_jobs.enabled"
+    protected val statsResponseOpenSearchSweeperEnabledField = "plugins.scheduled_jobs.enabled"
+
     override fun xContentRegistry(): NamedXContentRegistry {
         return NamedXContentRegistry(
             mutableListOf(
@@ -84,8 +87,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return entityAsMap(this)
     }
 
-    protected fun createMonitor(monitor: Monitor, refresh: Boolean = true): Monitor {
-        val response = client().makeRequest(
+    protected fun createMonitorWithClient(client: RestClient, monitor: Monitor, refresh: Boolean = true): Monitor {
+        val response = client.makeRequest(
             "POST", "$ALERTING_BASE_URI?refresh=$refresh", emptyMap(),
             monitor.toHttpEntity()
         )
@@ -97,6 +100,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         ).map()
         assertUserNull(monitorJson as HashMap<String, Any>)
         return monitor.copy(id = monitorJson["_id"] as String, version = (monitorJson["_version"] as Int).toLong())
+    }
+
+    protected fun createMonitor(monitor: Monitor, refresh: Boolean = true): Monitor {
+        return createMonitorWithClient(client(), monitor, refresh)
     }
 
     protected fun deleteMonitor(monitor: Monitor, refresh: Boolean = true): Response {
@@ -207,6 +214,12 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return getEmailAccount(emailAccountID = emailAccountID)
     }
 
+    protected fun createRandomEmailAccountWithGivenName(refresh: Boolean = true, randomName: String): EmailAccount {
+        val emailAccount = randomEmailAccount(salt = randomName)
+        val emailAccountID = createEmailAccount(emailAccount, refresh).id
+        return getEmailAccount(emailAccountID = emailAccountID)
+    }
+
     protected fun updateEmailAccount(emailAccount: EmailAccount, refresh: Boolean = true): EmailAccount {
         val response = client().makeRequest(
             "PUT",
@@ -266,6 +279,12 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun createRandomEmailGroup(refresh: Boolean = true): EmailGroup {
         val emailGroup = randomEmailGroup()
+        val emailGroupID = createEmailGroup(emailGroup, refresh).id
+        return getEmailGroup(emailGroupID = emailGroupID)
+    }
+
+    protected fun createRandomEmailGroupWithGivenName(refresh: Boolean = true, randomName: String): EmailGroup {
+        val emailGroup = randomEmailGroup(salt = randomName)
         val emailGroupID = createEmailGroup(emailGroup, refresh).id
         return getEmailGroup(emailGroupID = emailGroupID)
     }
@@ -331,10 +350,23 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return destinationJson["destinations"] as List<Map<String, Any>>
     }
 
-    private fun getTestDestination(): Destination {
+    protected fun getTestDestination(): Destination {
         return Destination(
             type = DestinationType.TEST_ACTION,
             name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = null,
+            slack = null,
+            customWebhook = null,
+            email = null
+        )
+    }
+
+    protected fun getRandomDestination(salt: String): Destination {
+        return Destination(
+            type = DestinationType.TEST_ACTION,
+            name = salt + "test",
             user = randomUser(),
             lastUpdateTime = Instant.now(),
             chime = null,
@@ -647,7 +679,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return StringEntity(toJsonString(), APPLICATION_JSON)
     }
 
-    private fun EmailAccount.toJsonString(): String {
+    protected fun EmailAccount.toJsonString(): String {
         val builder = jsonBuilder()
         return shuffleXContent(toXContent(builder)).string()
     }
@@ -656,12 +688,12 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return StringEntity(toJsonString(), APPLICATION_JSON)
     }
 
-    private fun EmailGroup.toJsonString(): String {
+    protected fun EmailGroup.toJsonString(): String {
         val builder = jsonBuilder()
         return shuffleXContent(toXContent(builder)).string()
     }
 
-    private fun Alert.toHttpEntityWithUser(): HttpEntity {
+    protected fun Alert.toHttpEntityWithUser(): HttpEntity {
         return StringEntity(toJsonStringWithUser(), APPLICATION_JSON)
     }
 
@@ -825,6 +857,55 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client().performRequest(request)
     }
 
+    fun createCustomIndexRole(name: String, index: String, clusterPermissions: String?) {
+        val request = Request("PUT", "/_plugins/_security/api/roles/$name")
+        var entity = "{\n" +
+            "\"cluster_permissions\": [\n" +
+            "\"$clusterPermissions\"\n" +
+            "],\n" +
+            "\"index_permissions\": [\n" +
+            "{\n" +
+            "\"index_patterns\": [\n" +
+            "\"$index\"\n" +
+            "],\n" +
+            "\"dls\": \"\",\n" +
+            "\"fls\": [],\n" +
+            "\"masked_fields\": [],\n" +
+            "\"allowed_actions\": [\n" +
+            "\"crud\"\n" +
+            "]\n" +
+            "}\n" +
+            "],\n" +
+            "\"tenant_permissions\": []\n" +
+            "}"
+        request.setJsonEntity(entity)
+        client().performRequest(request)
+    }
+
+    fun createIndexRoleWithDocLevelSecurity(name: String, index: String, dlsQuery: String) {
+        val request = Request("PUT", "/_plugins/_security/api/roles/$name")
+        var entity = "{\n" +
+            "\"cluster_permissions\": [\n" +
+            "],\n" +
+            "\"index_permissions\": [\n" +
+            "{\n" +
+            "\"index_patterns\": [\n" +
+            "\"$index\"\n" +
+            "],\n" +
+            "\"dls\": \"$dlsQuery\",\n" +
+            "\"fls\": [],\n" +
+            "\"masked_fields\": [],\n" +
+            "\"allowed_actions\": [\n" +
+            "\"crud\"\n" +
+            "]\n" +
+            "}\n" +
+            "],\n" +
+            "\"tenant_permissions\": []\n" +
+            "}"
+        request.setJsonEntity(entity)
+        client().performRequest(request)
+    }
+
     fun createUserRolesMapping(role: String, users: Array<String>) {
         val request = Request("PUT", "/_plugins/_security/api/rolesmapping/$role")
         val usersStr = users.joinToString { it -> "\"$it\"" }
@@ -849,11 +930,61 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client().makeRequest("DELETE", "/_plugins/_security/api/rolesmapping/$name")
     }
 
+    fun deleteRoleAndRoleMapping(role: String) {
+        deleteRoleMapping(role)
+        deleteRole(role)
+    }
+
     fun createUserWithTestData(user: String, index: String, role: String, backendRole: String) {
         createUser(user, user, arrayOf(backendRole))
         createTestIndex(index)
         createIndexRole(role, index)
         createUserRolesMapping(role, arrayOf(user))
+    }
+
+    fun createUserWithTestDataAndCustomRole(
+        user: String,
+        index: String,
+        role: String,
+        backendRole: String,
+        clusterPermissions: String?
+    ) {
+        createUser(user, user, arrayOf(backendRole))
+        createTestIndex(index)
+        createCustomIndexRole(role, index, clusterPermissions)
+        createUserRolesMapping(role, arrayOf(user))
+    }
+
+    fun createUserWithDocLevelSecurityTestData(
+        user: String,
+        index: String,
+        role: String,
+        backendRole: String,
+        dlsQuery: String
+    ) {
+        createUser(user, user, arrayOf(backendRole))
+        createTestIndex(index)
+        createIndexRoleWithDocLevelSecurity(role, index, dlsQuery)
+        createUserRolesMapping(role, arrayOf(user))
+    }
+
+    fun createUserWithDocLevelSecurityTestDataAndCustomRole(
+        user: String,
+        index: String,
+        role: String,
+        backendRole: String,
+        dlsQuery: String,
+        clusterPermissions: String?
+    ) {
+        createUser(user, user, arrayOf(backendRole))
+        createTestIndex(index)
+        createIndexRoleWithDocLevelSecurity(role, index, dlsQuery)
+        createCustomIndexRole(role, index, clusterPermissions)
+        createUserRolesMapping(role, arrayOf(user))
+    }
+
+    fun getClusterPermissionsFromCustomRole(clusterPermissions: String): String? {
+        return ROLE_TO_PERMISSION_MAPPING.get(clusterPermissions)
     }
 
     companion object {

@@ -113,6 +113,49 @@ class XContentTests : OpenSearchTestCase() {
         assertEquals("Round tripping QueryLevelMonitor doesn't work", monitor, parsedMonitor)
     }
 
+    fun `test monitor parsing with no name`() {
+        val monitorStringWithoutName = """
+            {
+              "type": "monitor",
+              "enabled": false,
+              "schedule": {
+                "period": {
+                  "interval": 1,
+                  "unit": "MINUTES"
+                }
+              },
+              "inputs": [],
+              "triggers": []
+            }
+        """.trimIndent()
+
+        assertFailsWith<IllegalArgumentException>("Monitor name is null") { Monitor.parse(parser(monitorStringWithoutName)) }
+    }
+
+    fun `test monitor parsing with no schedule`() {
+        val monitorStringWithoutSchedule = """
+            {
+              "type": "monitor",
+              "name": "asdf",
+              "enabled": false,
+              "inputs": [],
+              "triggers": []
+            }
+        """.trimIndent()
+
+        assertFailsWith<IllegalArgumentException>("Monitor schedule is null") {
+            Monitor.parse(parser(monitorStringWithoutSchedule))
+        }
+    }
+
+    fun `test bucket-level monitor parsing`() {
+        val monitor = randomBucketLevelMonitor()
+
+        val monitorString = monitor.toJsonStringWithUser()
+        val parsedMonitor = Monitor.parse(parser(monitorString))
+        assertEquals("Round tripping BucketLevelMonitor doesn't work", monitor, parsedMonitor)
+    }
+
     fun `test query-level trigger parsing`() {
         val trigger = randomQueryLevelTrigger()
 

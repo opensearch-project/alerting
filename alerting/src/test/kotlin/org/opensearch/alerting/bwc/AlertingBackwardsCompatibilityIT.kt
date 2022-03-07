@@ -59,11 +59,6 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
                 ClusterType.MIXED -> {
                     assertTrue(pluginNames.contains("opensearch-alerting"))
                     verifyMonitorExists(LEGACY_OPENDISTRO_ALERTING_BASE_URI)
-                    // Waiting a minute to ensure the Monitor ran again at least once before checking if the job is running
-                    // on time
-                    // TODO: Should probably change the next execution time of the Monitor manually instead since this inflates
-                    //  the test execution by a lot
-                    Thread.sleep(60000)
                     // TODO: Need to move the base URI being used here into a constant and rename ALERTING_BASE_URI to
                     //  MONITOR_BASE_URI
                     verifyMonitorStats("/_opendistro/_alerting")
@@ -71,6 +66,10 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
                 ClusterType.UPGRADED -> {
                     assertTrue(pluginNames.contains("opensearch-alerting"))
                     verifyMonitorExists(ALERTING_BASE_URI)
+                    // TODO: Change the next execution time of the Monitor manually instead since this inflates
+                    //  the test execution by a lot (might have to wait for Job Scheduler plugin integration first)
+                    // Waiting a minute to ensure the Monitor ran again at least once before checking if the job is running
+                    // on time
                     Thread.sleep(60000)
                     verifyMonitorStats("/_plugins/_alerting")
                 }
