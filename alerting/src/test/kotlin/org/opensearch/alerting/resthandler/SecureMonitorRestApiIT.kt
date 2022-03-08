@@ -75,7 +75,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         if (userClient == null) {
             createUser(user, user, arrayOf())
             userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user).setSocketTimeout(60000).build()
-            Thread.sleep(5000)
         }
     }
 
@@ -84,7 +83,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         userClient?.close()
         deleteUser(user)
-        Thread.sleep(5000)
     }
 
     // Create Monitor related security tests
@@ -239,6 +237,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             )
             val createResponse = userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             assertEquals("Create monitor failed", RestStatus.CREATED, createResponse?.restStatus())
+            Thread.sleep(1000)
             fail("Expected 403 Method FORBIDDEN response")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
@@ -440,6 +439,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 emptyMap(),
                 NStringEntity(search, ContentType.APPLICATION_JSON)
             )
+            Thread.sleep(1000)
             fail("Expected 403 FORBIDDEN response")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
@@ -486,6 +486,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 emptyMap(),
                 NStringEntity(search, ContentType.APPLICATION_JSON)
             )
+            Thread.sleep(1000)
             fail("Expected 403 FORBIDDEN response")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
@@ -603,6 +604,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 emptyMap(),
                 monitor.toHttpEntity()
             )
+            Thread.sleep(1000)
             fail("Expected 403 Method FORBIDDEN response")
         } catch (e: ResponseException) {
             assertEquals("Get monitor failed", RestStatus.FORBIDDEN, e.response.restStatus())
@@ -632,6 +634,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         // search as userOne without alerting roles - must return 403 Forbidden
         try {
             getAlerts(userClient as RestClient, inputMap).asMap()
+            Thread.sleep(1000)
             fail("Expected 403 FORBIDDEN response")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
@@ -669,6 +672,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         // search as userOne without alerting roles - must return 403 Forbidden
         try {
             getAlerts(userClient as RestClient, inputMap).asMap()
+            Thread.sleep(1000)
             fail("Expected 403 FORBIDDEN response")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
