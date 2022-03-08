@@ -75,7 +75,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         if (userClient == null) {
             createUser(user, user, arrayOf())
             userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user).setSocketTimeout(60000).build()
-            Thread.sleep(1000)
+            Thread.sleep(5000)
         }
     }
 
@@ -84,7 +84,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         userClient?.close()
         deleteUser(user)
-        Thread.sleep(1000)
+        Thread.sleep(5000)
     }
 
     // Create Monitor related security tests
