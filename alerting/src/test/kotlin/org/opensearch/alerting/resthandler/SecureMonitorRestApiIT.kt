@@ -75,6 +75,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         if (userClient == null) {
             createUser(user, user, arrayOf())
             userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user).setSocketTimeout(60000).build()
+            Thread.sleep(1000)
         }
     }
 
@@ -83,6 +84,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         userClient?.close()
         deleteUser(user)
+        Thread.sleep(1000)
     }
 
     // Create Monitor related security tests
@@ -439,8 +441,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 NStringEntity(search, ContentType.APPLICATION_JSON)
             )
             fail("Expected 403 FORBIDDEN response")
-        } catch (e: AssertionError) {
-            assertEquals("Unexpected status", "Expected 403 FORBIDDEN response", e.message)
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         }
 
         // add alerting roles and search as userOne - must return 1 docs
@@ -485,8 +487,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 NStringEntity(search, ContentType.APPLICATION_JSON)
             )
             fail("Expected 403 FORBIDDEN response")
-        } catch (e: AssertionError) {
-            assertEquals("Unexpected status", "Expected 403 FORBIDDEN response", e.message)
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         }
 
         // add alerting roles and search as userOne - must return 0 docs
@@ -631,8 +633,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         try {
             getAlerts(userClient as RestClient, inputMap).asMap()
             fail("Expected 403 FORBIDDEN response")
-        } catch (e: AssertionError) {
-            assertEquals("Unexpected status", "Expected 403 FORBIDDEN response", e.message)
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         }
 
         // add alerting roles and search as userOne - must return 0 docs
@@ -668,8 +670,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         try {
             getAlerts(userClient as RestClient, inputMap).asMap()
             fail("Expected 403 FORBIDDEN response")
-        } catch (e: AssertionError) {
-            assertEquals("Unexpected status", "Expected 403 FORBIDDEN response", e.message)
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         }
 
         // add alerting roles and search as userOne - must return 0 docs
