@@ -30,7 +30,7 @@ data class ClusterMetricsInput(
     val connectionTimeout: Int,
     val socketTimeout: Int
 ) : Input {
-    val apiType: ApiType
+    val clusterMetricType: ClusterMetricType
     val constructedUri: URI
 
     // Verify parameters are valid during creation
@@ -67,14 +67,14 @@ data class ClusterMetricsInput(
             "Only port '$SUPPORTED_PORT' is supported."
         }
 
-        apiType = findApiType(constructedUri.path)
+        clusterMetricType = findApiType(constructedUri.path)
         this.parseEmptyFields()
     }
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         return builder.startObject()
             .startObject(URI_FIELD)
-            .field(API_TYPE_FIELD, apiType)
+            .field(API_TYPE_FIELD, clusterMetricType)
             .field(PATH_FIELD, path)
             .field(PATH_PARAMS_FIELD, pathParams)
             .field(URL_FIELD, url)
@@ -89,7 +89,7 @@ data class ClusterMetricsInput(
     }
 
     override fun writeTo(out: StreamOutput) {
-        out.writeString(apiType.toString())
+        out.writeString(clusterMetricType.toString())
         out.writeString(path)
         out.writeString(pathParams)
         out.writeString(url)
@@ -162,12 +162,12 @@ data class ClusterMetricsInput(
     /**
      * Isolates just the path parameters from the [ClusterMetricsInput] URI.
      * @return The path parameters portion of the [ClusterMetricsInput] URI.
-     * @throws IllegalArgumentException if the [ApiType] requires path parameters, but none are supplied;
-     * or when path parameters are provided for an [ApiType] that does not use path parameters.
+     * @throws IllegalArgumentException if the [ClusterMetricType] requires path parameters, but none are supplied;
+     * or when path parameters are provided for an [ClusterMetricType] that does not use path parameters.
      */
     fun parsePathParams(): String {
         val path = this.constructedUri.path
-        val apiType = this.apiType
+        val apiType = this.clusterMetricType
 
         var pathParams: String
         if (this.pathParams.isNotEmpty()) {
@@ -197,13 +197,13 @@ data class ClusterMetricsInput(
     /**
      * Examines the path of a [ClusterMetricsInput] to determine which API is being called.
      * @param uriPath The path to examine.
-     * @return The [ApiType] associated with the [ClusterMetricsInput] monitor.
+     * @return The [ClusterMetricType] associated with the [ClusterMetricsInput] monitor.
      * @throws IllegalArgumentException when the API to call cannot be determined from the URI.
      */
-    private fun findApiType(uriPath: String): ApiType {
-        var apiType = ApiType.BLANK
-        ApiType.values()
-            .filter { option -> option != ApiType.BLANK }
+    private fun findApiType(uriPath: String): ClusterMetricType {
+        var apiType = ClusterMetricType.BLANK
+        ClusterMetricType.values()
+            .filter { option -> option != ClusterMetricType.BLANK }
             .forEach { option ->
                 if (uriPath.startsWith(option.prependPath) || uriPath.startsWith(option.defaultPath))
                     apiType = option
@@ -234,7 +234,7 @@ data class ClusterMetricsInput(
         if (pathParams.isEmpty())
             pathParams = this.parsePathParams()
         if (path.isEmpty())
-            path = if (pathParams.isEmpty()) apiType.defaultPath else apiType.prependPath
+            path = if (pathParams.isEmpty()) clusterMetricType.defaultPath else clusterMetricType.prependPath
         if (url.isEmpty())
             url = constructedUri.toString()
     }
@@ -259,7 +259,7 @@ data class ClusterMetricsInput(
     /**
      * An enum class to quickly reference various supported API.
      */
-    enum class ApiType(
+    enum class ClusterMetricType(
         val defaultPath: String,
         val prependPath: String,
         val appendPath: String,
@@ -332,7 +332,7 @@ data class ClusterMetricsInput(
         );
 
         /**
-         * @return TRUE if the [ApiType] is [BLANK]; otherwise FALSE.
+         * @return TRUE if the [ClusterMetricType] is [BLANK]; otherwise FALSE.
          */
         fun isBlank(): Boolean {
             return this === BLANK

@@ -375,7 +375,7 @@ fun randomQueryLevelTriggerRunResult(): QueryLevelTriggerRunResult {
 }
 
 fun randomClusterMetricsInput(
-    path: String = ClusterMetricsInput.ApiType.CLUSTER_HEALTH.defaultPath,
+    path: String = ClusterMetricsInput.ClusterMetricType.CLUSTER_HEALTH.defaultPath,
     pathParams: String = "",
     url: String = "",
     connectionTimeout: Int = 1 + randomInt(ClusterMetricsInput.MAX_CONNECTION_TIMEOUT - 1),

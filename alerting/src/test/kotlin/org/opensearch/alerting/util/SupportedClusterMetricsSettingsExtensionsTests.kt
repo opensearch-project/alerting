@@ -7,7 +7,7 @@ package org.opensearch.alerting.util
 
 import org.opensearch.test.OpenSearchTestCase
 
-class SupportedApiSettingsExtensionsTests : OpenSearchTestCase() {
+class SupportedClusterMetricsSettingsExtensionsTests : OpenSearchTestCase() {
     private var expectedResponse = hashMapOf<String, Any>()
     private var mappedResponse = hashMapOf<String, Any>()
     private var supportedJsonPayload = hashMapOf<String, ArrayList<String>>()

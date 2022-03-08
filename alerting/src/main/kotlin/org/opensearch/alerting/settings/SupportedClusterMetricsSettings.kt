@@ -16,14 +16,14 @@ import org.opensearch.action.admin.cluster.stats.ClusterStatsRequest
 import org.opensearch.action.admin.cluster.tasks.PendingClusterTasksRequest
 import org.opensearch.action.admin.indices.recovery.RecoveryRequest
 import org.opensearch.alerting.core.model.ClusterMetricsInput
-import org.opensearch.alerting.core.model.ClusterMetricsInput.ApiType
+import org.opensearch.alerting.core.model.ClusterMetricsInput.ClusterMetricType
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.json.JsonXContent
 
 /**
  * A class that supports storing a unique set of API paths that can be accessed by general users.
  */
-class SupportedApiSettings {
+class SupportedClusterMetricsSettings {
     companion object {
         const val RESOURCE_FILE = "supported_json_payloads.json"
 
@@ -56,7 +56,7 @@ class SupportedApiSettings {
         private var supportedApiList = HashMap<String, Map<String, ArrayList<String>>>()
 
         init {
-            val supportedJsonPayloads = SupportedApiSettings::class.java.getResource(RESOURCE_FILE)
+            val supportedJsonPayloads = SupportedClusterMetricsSettings::class.java.getResource(RESOURCE_FILE)
 
             @Suppress("UNCHECKED_CAST")
             if (supportedJsonPayloads != null)
@@ -82,30 +82,30 @@ class SupportedApiSettings {
          */
         fun resolveToActionRequest(clusterMetricsInput: ClusterMetricsInput): ActionRequest {
             val pathParams = clusterMetricsInput.parsePathParams()
-            return when (clusterMetricsInput.apiType) {
-                ApiType.CAT_PENDING_TASKS -> PendingClusterTasksRequest()
-                ApiType.CAT_RECOVERY -> {
+            return when (clusterMetricsInput.clusterMetricType) {
+                ClusterMetricType.CAT_PENDING_TASKS -> PendingClusterTasksRequest()
+                ClusterMetricType.CAT_RECOVERY -> {
                     if (pathParams.isEmpty()) return RecoveryRequest()
                     val pathParamsArray = pathParams.split(",").toTypedArray()
                     return RecoveryRequest(*pathParamsArray)
                 }
-                ApiType.CAT_REPOSITORIES -> GetRepositoriesRequest()
-                ApiType.CAT_SNAPSHOTS -> {
+                ClusterMetricType.CAT_REPOSITORIES -> GetRepositoriesRequest()
+                ClusterMetricType.CAT_SNAPSHOTS -> {
                     return GetSnapshotsRequest(pathParams, arrayOf(GetSnapshotsRequest.ALL_SNAPSHOTS))
                 }
-                ApiType.CAT_TASKS -> ListTasksRequest()
-                ApiType.CLUSTER_HEALTH -> {
+                ClusterMetricType.CAT_TASKS -> ListTasksRequest()
+                ClusterMetricType.CLUSTER_HEALTH -> {
                     if (pathParams.isEmpty()) return ClusterHealthRequest()
                     val pathParamsArray = pathParams.split(",").toTypedArray()
                     return ClusterHealthRequest(*pathParamsArray)
                 }
-                ApiType.CLUSTER_SETTINGS -> ClusterStateRequest().routingTable(false).nodes(false)
-                ApiType.CLUSTER_STATS -> {
+                ClusterMetricType.CLUSTER_SETTINGS -> ClusterStateRequest().routingTable(false).nodes(false)
+                ClusterMetricType.CLUSTER_STATS -> {
                     if (pathParams.isEmpty()) return ClusterStatsRequest()
                     val pathParamsArray = pathParams.split(",").toTypedArray()
                     return ClusterStatsRequest(*pathParamsArray)
                 }
-                ApiType.NODES_STATS -> NodesStatsRequest()
+                ClusterMetricType.NODES_STATS -> NodesStatsRequest()
                 else -> throw IllegalArgumentException("Unsupported API.")
             }
         }
@@ -117,7 +117,7 @@ class SupportedApiSettings {
          * @throws IllegalArgumentException when supportedApiList does not contain the provided path.
          */
         fun validateApiType(clusterMetricsInput: ClusterMetricsInput) {
-            if (!supportedApiList.keys.contains(clusterMetricsInput.apiType.defaultPath))
+            if (!supportedApiList.keys.contains(clusterMetricsInput.clusterMetricType.defaultPath))
                 throw IllegalArgumentException("API path not in supportedApiList.")
         }
     }

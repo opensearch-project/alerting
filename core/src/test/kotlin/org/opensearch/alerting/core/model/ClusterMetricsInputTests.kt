@@ -345,8 +345,8 @@ class ClusterMetricsInputTests {
     @Test
     fun `test ClusterMetricsInput correctly determines ApiType when path is provided as URI component`() {
         var testCount = 1 // Start off with count of 1 to account for ApiType.BLANK
-        ClusterMetricsInput.ApiType.values()
-            .filter { enum -> enum != ClusterMetricsInput.ApiType.BLANK }
+        ClusterMetricsInput.ClusterMetricType.values()
+            .filter { enum -> enum != ClusterMetricsInput.ClusterMetricType.BLANK }
             .forEach { testApiType ->
                 // GIVEN
                 path = testApiType.defaultPath
@@ -356,17 +356,17 @@ class ClusterMetricsInputTests {
                 val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
                 // THEN
-                assertEquals(testApiType, clusterMetricsInput.apiType)
+                assertEquals(testApiType, clusterMetricsInput.clusterMetricType)
                 testCount++
             }
-        assertEquals(ClusterMetricsInput.ApiType.values().size, testCount)
+        assertEquals(ClusterMetricsInput.ClusterMetricType.values().size, testCount)
     }
 
     @Test
     fun `test ClusterMetricsInput correctly determines ApiType when path and path params are provided as URI components`() {
         var testCount = 1 // Start off with count of 1 to account for ApiType.BLANK
-        ClusterMetricsInput.ApiType.values()
-            .filter { enum -> enum != ClusterMetricsInput.ApiType.BLANK }
+        ClusterMetricsInput.ClusterMetricType.values()
+            .filter { enum -> enum != ClusterMetricsInput.ClusterMetricType.BLANK }
             .forEach { testApiType ->
                 // GIVEN
                 path = testApiType.defaultPath
@@ -376,17 +376,17 @@ class ClusterMetricsInputTests {
                 val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
                 // THEN
-                assertEquals(testApiType, clusterMetricsInput.apiType)
+                assertEquals(testApiType, clusterMetricsInput.clusterMetricType)
                 testCount++
             }
-        assertEquals(ClusterMetricsInput.ApiType.values().size, testCount)
+        assertEquals(ClusterMetricsInput.ClusterMetricType.values().size, testCount)
     }
 
     @Test
     fun `test ClusterMetricsInput correctly determines ApiType when path is provided in URL field`() {
         var testCount = 1 // Start off with count of 1 to account for ApiType.BLANK
-        ClusterMetricsInput.ApiType.values()
-            .filter { enum -> enum != ClusterMetricsInput.ApiType.BLANK }
+        ClusterMetricsInput.ClusterMetricType.values()
+            .filter { enum -> enum != ClusterMetricsInput.ClusterMetricType.BLANK }
             .forEach { testApiType ->
                 // GIVEN
                 path = ""
@@ -397,17 +397,17 @@ class ClusterMetricsInputTests {
                 val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
                 // THEN
-                assertEquals(testApiType, clusterMetricsInput.apiType)
+                assertEquals(testApiType, clusterMetricsInput.clusterMetricType)
                 testCount++
             }
-        assertEquals(ClusterMetricsInput.ApiType.values().size, testCount)
+        assertEquals(ClusterMetricsInput.ClusterMetricType.values().size, testCount)
     }
 
     @Test
     fun `test ClusterMetricsInput correctly determines ApiType when path and path params are provided in URL field`() {
         var testCount = 1 // Start off with count of 1 to account for ApiType.BLANK
-        ClusterMetricsInput.ApiType.values()
-            .filter { enum -> enum != ClusterMetricsInput.ApiType.BLANK }
+        ClusterMetricsInput.ClusterMetricType.values()
+            .filter { enum -> enum != ClusterMetricsInput.ClusterMetricType.BLANK }
             .forEach { testApiType ->
                 // GIVEN
                 path = ""
@@ -418,10 +418,10 @@ class ClusterMetricsInputTests {
                 val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
 
                 // THEN
-                assertEquals(testApiType, clusterMetricsInput.apiType)
+                assertEquals(testApiType, clusterMetricsInput.clusterMetricType)
                 testCount++
             }
-        assertEquals(ClusterMetricsInput.ApiType.values().size, testCount)
+        assertEquals(ClusterMetricsInput.ClusterMetricType.values().size, testCount)
     }
 
     @Test

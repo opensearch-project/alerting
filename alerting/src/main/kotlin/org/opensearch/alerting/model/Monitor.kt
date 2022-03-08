@@ -16,7 +16,7 @@ import org.opensearch.alerting.elasticapi.optionalTimeField
 import org.opensearch.alerting.elasticapi.optionalUserField
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MONITOR_MAX_INPUTS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MONITOR_MAX_TRIGGERS
-import org.opensearch.alerting.settings.SupportedApiSettings
+import org.opensearch.alerting.settings.SupportedClusterMetricsSettings
 import org.opensearch.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
 import org.opensearch.alerting.util._ID
 import org.opensearch.alerting.util._VERSION
@@ -257,7 +257,7 @@ data class Monitor(
                         while (xcp.nextToken() != Token.END_ARRAY) {
                             val input = Input.parse(xcp)
                             if (input is ClusterMetricsInput)
-                                SupportedApiSettings.validateApiType(input)
+                                SupportedClusterMetricsSettings.validateApiType(input)
                             inputs.add(input)
                         }
                     }
