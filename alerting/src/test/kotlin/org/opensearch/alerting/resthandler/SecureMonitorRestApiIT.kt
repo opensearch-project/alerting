@@ -412,6 +412,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Monitor found during search", 0, adminDocsFound)
     }
 
+    /*
+    TODO: https://github.com/opensearch-project/alerting/issues/300
     fun `test query monitors with disable filter by`() {
 
         disableFilterBy()
@@ -458,8 +460,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    /*
-    TODO: https://github.com/opensearch-project/alerting/issues/300
     fun `test query monitors with enable filter by`() {
 
         enableFilterBy()
