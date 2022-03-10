@@ -10,7 +10,11 @@ import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.IndexMonitorAction
 import org.opensearch.alerting.action.IndexMonitorRequest
 import org.opensearch.alerting.action.IndexMonitorResponse
+import org.opensearch.alerting.model.BucketLevelTrigger
+import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.QueryLevelTrigger
+import org.opensearch.alerting.model.QueryLevelTrigger.Companion.QUERY_LEVEL_TRIGGER_FIELD
 import org.opensearch.alerting.util.IF_PRIMARY_TERM
 import org.opensearch.alerting.util.IF_SEQ_NO
 import org.opensearch.alerting.util.REFRESH
@@ -79,6 +83,33 @@ class RestIndexMonitorAction : BaseRestHandler() {
         val xcp = request.contentParser()
         ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
         val monitor = Monitor.parse(xcp, id).copy(lastUpdateTime = Instant.now())
+
+        val monitorType = monitor.monitorType
+        val triggers = monitor.triggers
+        when (monitorType) {
+            Monitor.MonitorType.QUERY_LEVEL_MONITOR -> {
+                triggers.forEach {
+                    if (it !is QueryLevelTrigger) {
+                        throw IllegalArgumentException("illegal trigger time")
+                    }
+                }
+            }
+            Monitor.MonitorType.BUCKET_LEVEL_MONITOR -> {
+                triggers.forEach {
+                    if (it !is BucketLevelTrigger) {
+                        throw IllegalArgumentException("illegal trigger time")
+                    }
+                }
+            }
+            Monitor.MonitorType.DOC_LEVEL_MONITOR -> {
+                triggers.forEach {
+                    if (it !is DocumentLevelTrigger) {
+                        throw IllegalArgumentException("illegal trigger time")
+                    }
+                }
+            }
+        }
+
         val seqNo = request.paramAsLong(IF_SEQ_NO, SequenceNumbers.UNASSIGNED_SEQ_NO)
         val primaryTerm = request.paramAsLong(IF_PRIMARY_TERM, SequenceNumbers.UNASSIGNED_PRIMARY_TERM)
         val refreshPolicy = if (request.hasParam(REFRESH)) {
