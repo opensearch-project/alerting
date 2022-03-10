@@ -1,7 +1,7 @@
 - [Developer Guide](#developer-guide)
   - [Forking and Cloning](#forking-and-cloning)
   - [Install Prerequisites](#install-prerequisites)
-    - [JDK 14](#jdk-14)
+    - [JDK 8](#jdk-8)
   - [Setup](#setup)
   - [Build](#build)
     - [Building from the command line](#building-from-the-command-line)
@@ -18,14 +18,14 @@ Fork this repository on GitHub, and clone locally with `git clone`.
 
 ### Install Prerequisites
 
-#### JDK 14
+#### JDK 8
 
-OpenSearch components build using Java 14 at a minimum. This means you must have a JDK 14 installed with the environment variable `JAVA_HOME` referencing the path to Java home for your JDK 14 installation, e.g. `JAVA_HOME=/usr/lib/jvm/jdk-14`.
+OpenSearch components build using Java 8 at a minimum. This means you must have a JDK 8 installed with the environment variable `JAVA_HOME` referencing the path to Java home for your JDK 8 installation, e.g. `JAVA_HOME=/usr/lib/jvm/jdk-8`.
 
 ### Setup
 
 1. Clone the repository (see [Forking and Cloning](#forking-and-cloning))
-2. Make sure `JAVA_HOME` is pointing to a Java 14 JDK (see [Install Prerequisites](#install-prerequisites))
+2. Make sure `JAVA_HOME` is pointing to a Java 8 JDK (see [Install Prerequisites](#install-prerequisites))
 3. Launch Intellij IDEA, Choose Import Project and select the settings.gradle file in the root of this package.
 
 ### Build
@@ -47,7 +47,7 @@ Currently we just put RCF jar in lib as dependency. Plan to publish to Maven and
 8. `./gradlew alertingBwcCluster#mixedClusterTask` launches a cluster with three nodes of bwc version of OpenSearch with alerting and tests backwards compatibility by upgrading one of the nodes with the current version of OpenSearch with alerting, creating a mixed cluster.
 9. `./gradlew alertingBwcCluster#rollingUpgradeClusterTask` launches a cluster with three nodes of bwc version of OpenSearch with alerting and tests backwards compatibility by performing rolling upgrade of each node with the current version of OpenSearch with alerting.
 10. `./gradlew alertingBwcCluster#fullRestartClusterTask` launches a cluster with three nodes of bwc version of OpenSearch with alerting and tests backwards compatibility by performing a full restart on the cluster upgrading all the nodes with the current version of OpenSearch with alerting.
-11. `./gradlew bwcTestSuite` runs all the above bwc tests combined.
+8. `./gradlew bwcTestSuite` runs all the above bwc tests combined.
 
 When launching a cluster using one of the above commands, logs are placed in `alerting/build/testclusters/integTest-0/logs/`. Though the logs are teed to the console, in practices it's best to check the actual log file.
 
