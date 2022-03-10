@@ -2,6 +2,9 @@
 
 Compatible with OpenSearch 1.3.0
 
+### Enhancements
+* Implemented support for ClusterMetrics monitors. ([#221](https://github.com/opensearch-project/alerting/pull/221))
+
 ### Maintenance
 * Bumps to version 1.3. ([#248](https://github.com/opensearch-project/alerting/pull/248))
 * Update GitHub Actions to run on all branches. ([#256](https://github.com/opensearch-project/alerting/pull/256))
