@@ -296,7 +296,7 @@ class AlertIndices(
         )
     }
 
-    private fun rolloverFindingIndex(){
+    private fun rolloverFindingIndex() {
         val request = RolloverRequest(AlertIndices.FINDING_INDEX, null)
         request.createIndexRequest.index(AlertIndices.FINDING_INDEX_PATTERN)
             .mapping(AlertIndices.MAPPING_TYPE, AlertIndices.alertMapping(), XContentType.JSON)
@@ -308,7 +308,9 @@ class AlertIndices(
             object : ActionListener<RolloverResponse> {
                 override fun onResponse(response: RolloverResponse) {
                     if (!response.isRolledOver) {
-                        AlertIndices.logger.info("${AlertIndices.HISTORY_WRITE_INDEX} not rolled over. Conditions were: ${response.conditionStatus}")
+                        AlertIndices.logger.info(
+                            "${AlertIndices.HISTORY_WRITE_INDEX} not rolled over. Conditions were: ${response.conditionStatus}"
+                        )
                     } else {
                         lastRolloverTime = TimeValue.timeValueMillis(threadPool.absoluteTimeInMillis())
                     }
