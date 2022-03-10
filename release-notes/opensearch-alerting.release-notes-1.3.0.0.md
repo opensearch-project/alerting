@@ -11,4 +11,4 @@ Compatible with OpenSearch 1.3.0
 * Fix running Alerting security tests in GitHub Actions. ([#252](https://github.com/opensearch-project/alerting/pull/252))
 
 ### Documentation
-* 
+* Added 1.3 release notes. ([#336](https://github.com/opensearch-project/alerting/pull/336))
