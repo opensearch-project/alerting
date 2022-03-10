@@ -1,0 +1,10 @@
+{
+  "/_cat/pending_tasks": {},
+  "/_cat/recovery": {},
+  "/_cat/snapshots": {},
+  "/_cat/tasks": {},
+  "/_cluster/health": {},
+  "/_cluster/settings": {},
+  "/_cluster/stats": {},
+  "/_nodes/stats": {}
+}
