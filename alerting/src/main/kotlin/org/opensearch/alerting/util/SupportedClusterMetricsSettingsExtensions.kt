@@ -12,8 +12,6 @@ import org.opensearch.action.admin.cluster.node.stats.NodesStatsRequest
 import org.opensearch.action.admin.cluster.node.stats.NodesStatsResponse
 import org.opensearch.action.admin.cluster.node.tasks.list.ListTasksRequest
 import org.opensearch.action.admin.cluster.node.tasks.list.ListTasksResponse
-import org.opensearch.action.admin.cluster.repositories.get.GetRepositoriesRequest
-import org.opensearch.action.admin.cluster.repositories.get.GetRepositoriesResponse
 import org.opensearch.action.admin.cluster.settings.ClusterGetSettingsResponse
 import org.opensearch.action.admin.cluster.snapshots.get.GetSnapshotsRequest
 import org.opensearch.action.admin.cluster.snapshots.get.GetSnapshotsResponse
@@ -44,7 +42,6 @@ fun executeTransportAction(clusterMetricsInput: ClusterMetricsInput, client: Cli
     return when (clusterMetricsInput.clusterMetricType) {
         ClusterMetricType.CAT_PENDING_TASKS -> client.admin().cluster().pendingClusterTasks(request as PendingClusterTasksRequest).get()
         ClusterMetricType.CAT_RECOVERY -> client.admin().indices().recoveries(request as RecoveryRequest).get()
-        ClusterMetricType.CAT_REPOSITORIES -> client.admin().cluster().getRepositories(request as GetRepositoriesRequest).get()
         ClusterMetricType.CAT_SNAPSHOTS -> client.admin().cluster().getSnapshots(request as GetSnapshotsRequest).get()
         ClusterMetricType.CAT_TASKS -> client.admin().cluster().listTasks(request as ListTasksRequest).get()
         ClusterMetricType.CLUSTER_HEALTH -> client.admin().cluster().health(request as ClusterHealthRequest).get()
@@ -88,10 +85,6 @@ fun ActionResponse.toMap(): Map<String, Any> {
         is RecoveryResponse -> redactFieldsFromResponse(
             this.convertToMap(),
             SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricType.CAT_RECOVERY.defaultPath)
-        )
-        is GetRepositoriesResponse -> redactFieldsFromResponse(
-            this.convertToMap(),
-            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricType.CAT_REPOSITORIES.defaultPath)
         )
         is GetSnapshotsResponse -> redactFieldsFromResponse(
             this.convertToMap(),

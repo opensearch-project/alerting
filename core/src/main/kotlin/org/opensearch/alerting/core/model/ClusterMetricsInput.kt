@@ -281,13 +281,6 @@ data class ClusterMetricsInput(
             true,
             false
         ),
-        CAT_REPOSITORIES(
-            "/_cat/repositories",
-            "/_cat/repositories",
-            "",
-            false,
-            false
-        ),
         CAT_SNAPSHOTS(
             "/_cat/snapshots",
             "/_cat/snapshots",

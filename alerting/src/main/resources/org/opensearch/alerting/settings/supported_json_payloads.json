@@ -1,7 +1,6 @@
 {
   "/_cat/pending_tasks": {},
   "/_cat/recovery": {},
-  "/_cat/repositories": {},
   "/_cat/snapshots": {},
   "/_cat/tasks": {},
   "/_cluster/health": {},

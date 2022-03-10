@@ -9,7 +9,6 @@ import org.opensearch.action.ActionRequest
 import org.opensearch.action.admin.cluster.health.ClusterHealthRequest
 import org.opensearch.action.admin.cluster.node.stats.NodesStatsRequest
 import org.opensearch.action.admin.cluster.node.tasks.list.ListTasksRequest
-import org.opensearch.action.admin.cluster.repositories.get.GetRepositoriesRequest
 import org.opensearch.action.admin.cluster.snapshots.get.GetSnapshotsRequest
 import org.opensearch.action.admin.cluster.state.ClusterStateRequest
 import org.opensearch.action.admin.cluster.stats.ClusterStatsRequest
@@ -89,7 +88,6 @@ class SupportedClusterMetricsSettings {
                     val pathParamsArray = pathParams.split(",").toTypedArray()
                     return RecoveryRequest(*pathParamsArray)
                 }
-                ClusterMetricType.CAT_REPOSITORIES -> GetRepositoriesRequest()
                 ClusterMetricType.CAT_SNAPSHOTS -> {
                     return GetSnapshotsRequest(pathParams, arrayOf(GetSnapshotsRequest.ALL_SNAPSHOTS))
                 }

@@ -89,7 +89,7 @@ class InputService(
                         results += searchResponse.convertToMap()
                     }
                     is ClusterMetricsInput -> {
-                        logger.debug("ClusterMetricsInput ApiType: ${input.clusterMetricType}")
+                        logger.debug("ClusterMetricsInput clusterMetricType: ${input.clusterMetricType}")
                         val response = executeTransportAction(input, client)
                         results += response.toMap()
                     }
