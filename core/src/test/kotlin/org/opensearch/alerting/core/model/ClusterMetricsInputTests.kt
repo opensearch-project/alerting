@@ -13,8 +13,6 @@ class ClusterMetricsInputTests {
     private var path = "/_cluster/health"
     private var pathParams = ""
     private var url = ""
-    private var connectionTimeout = 5
-    private var socketTimeout = 5
 
     @Test
     fun `test valid ClusterMetricsInput creation using HTTP URI component fields`() {
@@ -22,14 +20,12 @@ class ClusterMetricsInputTests {
         val testUrl = "http://localhost:9200/_cluster/health"
 
         // WHEN
-        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url)
 
         // THEN
         assertEquals(path, clusterMetricsInput.path)
         assertEquals(pathParams, clusterMetricsInput.pathParams)
         assertEquals(testUrl, clusterMetricsInput.url)
-        assertEquals(connectionTimeout, clusterMetricsInput.connectionTimeout)
-        assertEquals(socketTimeout, clusterMetricsInput.socketTimeout)
     }
 
     @Test
@@ -39,7 +35,7 @@ class ClusterMetricsInputTests {
         url = "http://localhost:9200/_cluster/health"
 
         // WHEN
-        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url)
 
         // THEN
         assertEquals(url, clusterMetricsInput.url)
@@ -52,7 +48,7 @@ class ClusterMetricsInputTests {
         url = "https://localhost:9200/_cluster/health"
 
         // WHEN
-        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url)
 
         // THEN
         assertEquals(url, clusterMetricsInput.url)
@@ -65,59 +61,7 @@ class ClusterMetricsInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("Invalid URL.") {
-            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
-        }
-    }
-
-    @Test
-    fun `test invalid connection timeout that's too low`() {
-        // GIVEN
-        connectionTimeout = ClusterMetricsInput.MIN_CONNECTION_TIMEOUT - 1
-
-        // WHEN + THEN
-        assertFailsWith<IllegalArgumentException>(
-            "Connection timeout: $connectionTimeout is not in the range of ${ClusterMetricsInput.MIN_CONNECTION_TIMEOUT} - ${ClusterMetricsInput.MIN_CONNECTION_TIMEOUT}."
-        ) {
-            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
-        }
-    }
-
-    @Test
-    fun `test invalid connection timeout that's too high`() {
-        // GIVEN
-        connectionTimeout = ClusterMetricsInput.MAX_CONNECTION_TIMEOUT + 1
-
-        // WHEN + THEN
-        assertFailsWith<IllegalArgumentException>(
-            "Connection timeout: $connectionTimeout is not in the range of ${ClusterMetricsInput.MIN_CONNECTION_TIMEOUT} - ${ClusterMetricsInput.MIN_CONNECTION_TIMEOUT}."
-        ) {
-            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
-        }
-    }
-
-    @Test
-    fun `test invalid socket timeout that's too low`() {
-        // GIVEN
-        socketTimeout = ClusterMetricsInput.MIN_SOCKET_TIMEOUT - 1
-
-        // WHEN + THEN
-        assertFailsWith<IllegalArgumentException>(
-            "Socket timeout: $socketTimeout is not in the range of ${ClusterMetricsInput.MIN_SOCKET_TIMEOUT} - ${ClusterMetricsInput.MAX_SOCKET_TIMEOUT}."
-        ) {
-            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
-        }
-    }
-
-    @Test
-    fun `test invalid socket timeout that's too high`() {
-        // GIVEN
-        socketTimeout = ClusterMetricsInput.MAX_SOCKET_TIMEOUT + 1
-
-        // WHEN + THEN
-        assertFailsWith<IllegalArgumentException>(
-            "Socket timeout: $socketTimeout is not in the range of ${ClusterMetricsInput.MIN_SOCKET_TIMEOUT} - ${ClusterMetricsInput.MAX_SOCKET_TIMEOUT}."
-        ) {
-            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url)
         }
     }
 
@@ -128,7 +72,7 @@ class ClusterMetricsInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("Invalid URL.") {
-            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url)
         }
     }
 
@@ -138,14 +82,12 @@ class ClusterMetricsInputTests {
         url = "http://localhost:9200/_cluster/health"
 
         // WHEN
-        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url)
 
         // THEN
         assertEquals(path, clusterMetricsInput.path)
         assertEquals(pathParams, clusterMetricsInput.pathParams)
         assertEquals(url, clusterMetricsInput.url)
-        assertEquals(connectionTimeout, clusterMetricsInput.connectionTimeout)
-        assertEquals(socketTimeout, clusterMetricsInput.socketTimeout)
         assertEquals(url, clusterMetricsInput.constructedUri.toString())
     }
 
@@ -157,14 +99,12 @@ class ClusterMetricsInputTests {
         url = "http://localhost:9200/_cluster/health/index1,index2,index3,index4,index5"
 
         // WHEN
-        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url)
 
         // THEN
         assertEquals(path, clusterMetricsInput.path)
         assertEquals(pathParams, clusterMetricsInput.pathParams)
         assertEquals(url, clusterMetricsInput.url)
-        assertEquals(connectionTimeout, clusterMetricsInput.connectionTimeout)
-        assertEquals(socketTimeout, clusterMetricsInput.socketTimeout)
         assertEquals(url, clusterMetricsInput.constructedUri.toString())
     }
 
@@ -175,7 +115,7 @@ class ClusterMetricsInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The provided URL and URI fields form different URLs.") {
-            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url)
         }
     }
 
@@ -187,7 +127,7 @@ class ClusterMetricsInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The provided URL and URI fields form different URLs.") {
-            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url)
         }
     }
 
@@ -200,7 +140,7 @@ class ClusterMetricsInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The uri.api_type field, uri.path field, or uri.uri field must be defined.") {
-            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url)
         }
     }
 
@@ -213,7 +153,7 @@ class ClusterMetricsInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The uri.api_type field, uri.path field, or uri.uri field must be defined.") {
-            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url)
         }
     }
 
@@ -225,7 +165,7 @@ class ClusterMetricsInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("Invalid URL.") {
-            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url)
         }
     }
 
@@ -237,7 +177,7 @@ class ClusterMetricsInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("Only host '${ClusterMetricsInput.SUPPORTED_HOST}' is supported.") {
-            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url)
         }
     }
 
@@ -249,7 +189,7 @@ class ClusterMetricsInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("Only port '${ClusterMetricsInput.SUPPORTED_PORT}' is supported.") {
-            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url)
         }
     }
 
@@ -257,7 +197,7 @@ class ClusterMetricsInputTests {
     fun `test parsePathParams with no path params`() {
         // GIVEN
         val testUrl = "http://localhost:9200/_cluster/health"
-        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url)
 
         // WHEN
         val params = clusterMetricsInput.parsePathParams()
@@ -273,7 +213,7 @@ class ClusterMetricsInputTests {
         path = "/_cluster/health/"
         pathParams = "index1,index2,index3,index4,index5"
         val testUrl = "http://localhost:9200/_cluster/health/index1,index2,index3,index4,index5"
-        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url)
 
         // WHEN
         val params = clusterMetricsInput.parsePathParams()
@@ -289,7 +229,7 @@ class ClusterMetricsInputTests {
         path = ""
         val testParams = "index1,index2,index3,index4,index5"
         url = "http://localhost:9200/_cluster/health/index1,index2,index3,index4,index5"
-        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url)
 
         // WHEN
         val params = clusterMetricsInput.parsePathParams()
@@ -306,7 +246,7 @@ class ClusterMetricsInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The API requires path parameters.") {
-            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url)
         }
     }
 
@@ -315,7 +255,7 @@ class ClusterMetricsInputTests {
         // GIVEN
         path = "/_cluster/settings"
         pathParams = "index1,index2,index3,index4,index5"
-        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url)
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The API does not use path parameters.") {
@@ -329,7 +269,7 @@ class ClusterMetricsInputTests {
         ILLEGAL_PATH_PARAMETER_CHARACTERS.forEach { character ->
             // GIVEN
             pathParams = "index1,index2,$character,index4,index5"
-            val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url)
 
             // WHEN + THEN
             assertFailsWith<IllegalArgumentException>(
@@ -353,7 +293,7 @@ class ClusterMetricsInputTests {
                 pathParams = if (testApiType.supportsPathParams) "index1,index2,index3,index4,index5" else ""
 
                 // WHEN
-                val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+                val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url)
 
                 // THEN
                 assertEquals(testApiType, clusterMetricsInput.clusterMetricType)
@@ -373,7 +313,7 @@ class ClusterMetricsInputTests {
                 pathParams = "index1,index2,index3,index4,index5"
 
                 // WHEN
-                val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+                val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url)
 
                 // THEN
                 assertEquals(testApiType, clusterMetricsInput.clusterMetricType)
@@ -394,7 +334,7 @@ class ClusterMetricsInputTests {
                 url = "http://localhost:9200${testApiType.defaultPath}"
 
                 // WHEN
-                val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+                val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url)
 
                 // THEN
                 assertEquals(testApiType, clusterMetricsInput.clusterMetricType)
@@ -415,7 +355,7 @@ class ClusterMetricsInputTests {
                 url = "http://localhost:9200${testApiType.defaultPath}$pathParams"
 
                 // WHEN
-                val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+                val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url)
 
                 // THEN
                 assertEquals(testApiType, clusterMetricsInput.clusterMetricType)
@@ -431,7 +371,7 @@ class ClusterMetricsInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The API could not be determined from the provided URI.") {
-            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url)
         }
     }
 
@@ -443,7 +383,7 @@ class ClusterMetricsInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The API could not be determined from the provided URI.") {
-            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url)
         }
     }
 
@@ -455,7 +395,7 @@ class ClusterMetricsInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The API could not be determined from the provided URI.") {
-            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url)
         }
     }
 
@@ -467,7 +407,7 @@ class ClusterMetricsInputTests {
 
         // WHEN + THEN
         assertFailsWith<IllegalArgumentException>("The API could not be determined from the provided URI.") {
-            ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            ClusterMetricsInput(path, pathParams, url)
         }
     }
 
@@ -481,7 +421,7 @@ class ClusterMetricsInputTests {
         url = "http://localhost:9200$testPath$testPathParams"
 
         // WHEN
-        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url)
 
         // THEN
         assertEquals(testPath, clusterMetricsInput.path)
@@ -497,7 +437,7 @@ class ClusterMetricsInputTests {
         val testUrl = "http://localhost:9200$path$pathParams"
 
         // WHEN
-        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+        val clusterMetricsInput = ClusterMetricsInput(path, pathParams, url)
 
         // THEN
         assertEquals(path, clusterMetricsInput.path)

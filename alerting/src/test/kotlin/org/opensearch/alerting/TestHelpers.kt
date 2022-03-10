@@ -377,11 +377,9 @@ fun randomQueryLevelTriggerRunResult(): QueryLevelTriggerRunResult {
 fun randomClusterMetricsInput(
     path: String = ClusterMetricsInput.ClusterMetricType.CLUSTER_HEALTH.defaultPath,
     pathParams: String = "",
-    url: String = "",
-    connectionTimeout: Int = 1 + randomInt(ClusterMetricsInput.MAX_CONNECTION_TIMEOUT - 1),
-    socketTimeout: Int = 1 + randomInt(ClusterMetricsInput.MAX_SOCKET_TIMEOUT - 1)
+    url: String = ""
 ): ClusterMetricsInput {
-    return ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+    return ClusterMetricsInput(path, pathParams, url)
 }
 
 fun randomBucketLevelTriggerRunResult(): BucketLevelTriggerRunResult {

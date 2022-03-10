@@ -26,9 +26,7 @@ val ILLEGAL_PATH_PARAMETER_CHARACTERS = arrayOf(':', '"', '+', '\\', '|', '?', '
 data class ClusterMetricsInput(
     var path: String,
     var pathParams: String = "",
-    var url: String,
-    val connectionTimeout: Int,
-    val socketTimeout: Int
+    var url: String
 ) : Input {
     val clusterMetricType: ClusterMetricType
     val constructedUri: URI
@@ -37,12 +35,6 @@ data class ClusterMetricsInput(
     init {
         require(validateFields()) {
             "The uri.api_type field, uri.path field, or uri.uri field must be defined."
-        }
-        require(connectionTimeout in MIN_CONNECTION_TIMEOUT..MAX_CONNECTION_TIMEOUT) {
-            "Connection timeout: $connectionTimeout is not in the range of $MIN_CONNECTION_TIMEOUT - $MAX_CONNECTION_TIMEOUT."
-        }
-        require(socketTimeout in MIN_SOCKET_TIMEOUT..MAX_SOCKET_TIMEOUT) {
-            "Socket timeout: $socketTimeout is not in the range of $MIN_SOCKET_TIMEOUT - $MAX_SOCKET_TIMEOUT."
         }
 
         // Create an UrlValidator that only accepts "http" and "https" as valid scheme and allows local URLs.
@@ -78,8 +70,6 @@ data class ClusterMetricsInput(
             .field(PATH_FIELD, path)
             .field(PATH_PARAMS_FIELD, pathParams)
             .field(URL_FIELD, url)
-            .field(CONNECTION_TIMEOUT_FIELD, connectionTimeout)
-            .field(SOCKET_TIMEOUT_FIELD, socketTimeout)
             .endObject()
             .endObject()
     }
@@ -93,16 +83,9 @@ data class ClusterMetricsInput(
         out.writeString(path)
         out.writeString(pathParams)
         out.writeString(url)
-        out.writeInt(connectionTimeout)
-        out.writeInt(socketTimeout)
     }
 
     companion object {
-        const val MIN_CONNECTION_TIMEOUT = 1
-        const val MAX_CONNECTION_TIMEOUT = 5
-        const val MIN_SOCKET_TIMEOUT = 1
-        const val MAX_SOCKET_TIMEOUT = 60
-
         const val SUPPORTED_SCHEME = "http"
         const val SUPPORTED_HOST = "localhost"
         const val SUPPORTED_PORT = 9200
@@ -111,8 +94,6 @@ data class ClusterMetricsInput(
         const val PATH_FIELD = "path"
         const val PATH_PARAMS_FIELD = "path_params"
         const val URL_FIELD = "url"
-        const val CONNECTION_TIMEOUT_FIELD = "connection_timeout"
-        const val SOCKET_TIMEOUT_FIELD = "socket_timeout"
         const val URI_FIELD = "uri"
 
         val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(Input::class.java, ParseField("uri"), CheckedFunction { parseInner(it) })
@@ -125,8 +106,6 @@ data class ClusterMetricsInput(
             var path = ""
             var pathParams = ""
             var url = ""
-            var connectionTimeout = MAX_CONNECTION_TIMEOUT
-            var socketTimeout = MAX_SOCKET_TIMEOUT
 
             XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.currentToken(), xcp)
 
@@ -137,11 +116,9 @@ data class ClusterMetricsInput(
                     PATH_FIELD -> path = xcp.text()
                     PATH_PARAMS_FIELD -> pathParams = xcp.text()
                     URL_FIELD -> url = xcp.text()
-                    CONNECTION_TIMEOUT_FIELD -> connectionTimeout = xcp.intValue()
-                    SOCKET_TIMEOUT_FIELD -> socketTimeout = xcp.intValue()
                 }
             }
-            return ClusterMetricsInput(path, pathParams, url, connectionTimeout, socketTimeout)
+            return ClusterMetricsInput(path, pathParams, url)
         }
     }
 
