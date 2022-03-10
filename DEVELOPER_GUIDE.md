@@ -44,7 +44,7 @@ To run the full suite of tests, download and install [JDK 14](https://jdk.java.n
 ### Setup
 
 1. Clone the repository (see [Forking and Cloning](#forking-and-cloning))
-2. Make sure `JAVA_HOME` is pointing to a Java 8 JDK (see [Install Prerequisites](#install-prerequisites))
+2. Make sure `JAVA_HOME` is pointing to a Java 11 JDK (see [Install Prerequisites](#install-prerequisites))
 3. Launch Intellij IDEA, Choose Import Project and select the settings.gradle file in the root of this package.
 
 ### Build
