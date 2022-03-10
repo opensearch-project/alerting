@@ -103,7 +103,23 @@ class SupportedClusterMetricsSettings {
                     val pathParamsArray = pathParams.split(",").toTypedArray()
                     return ClusterStatsRequest(*pathParamsArray)
                 }
-                ClusterMetricType.NODES_STATS -> NodesStatsRequest().addMetric("_all")
+                ClusterMetricType.NODES_STATS -> NodesStatsRequest().addMetrics(
+                    "os",
+                    "process",
+                    "jvm",
+                    "thread_pool",
+                    "fs",
+                    "transport",
+                    "http",
+                    "breaker",
+                    "script",
+                    "discovery",
+                    "ingest",
+                    "adaptive_selection",
+                    "script_cache",
+                    "indexing_pressure",
+                    "shard_indexing_pressure"
+                )
                 else -> throw IllegalArgumentException("Unsupported API.")
             }
         }
