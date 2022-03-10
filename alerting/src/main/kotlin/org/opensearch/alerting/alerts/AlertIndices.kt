@@ -94,6 +94,12 @@ class AlertIndices(
         /** The index name pattern to query all alerts, history and current alerts. */
         const val ALL_INDEX_PATTERN = ".opendistro-alerting-alert*"
 
+        /** The alias of the index in which to write alert finding */
+        const val FINDING_INDEX = ".opendistro-alerting-alert-finding"
+
+        /** todo the index name pattern to query finding */
+        const val FINDING_INDEX_PATTERN = "<.opensearch-alerting-findings-{now/d}-1>"
+
         @JvmStatic
         fun alertMapping() =
             AlertIndices::class.java.getResource("alert_mapping.json").readText()
@@ -104,8 +110,10 @@ class AlertIndices(
     @Volatile private var historyEnabled = AlertingSettings.ALERT_HISTORY_ENABLED.get(settings)
 
     @Volatile private var historyMaxDocs = AlertingSettings.ALERT_HISTORY_MAX_DOCS.get(settings)
+    @Volatile private var findingMaxDocs = AlertingSettings.ALERT_FINDING_MAX_DOCS.get(settings)
 
     @Volatile private var historyMaxAge = AlertingSettings.ALERT_HISTORY_INDEX_MAX_AGE.get(settings)
+    @Volatile private var findingMaxAge = AlertingSettings.ALERT_HISTORY_FINDING_MAX_AGE.get(settings)
 
     @Volatile private var historyRolloverPeriod = AlertingSettings.ALERT_HISTORY_ROLLOVER_PERIOD.get(settings)
 
@@ -283,6 +291,30 @@ class AlertIndices(
                 }
                 override fun onFailure(e: Exception) {
                     logger.error("$HISTORY_WRITE_INDEX not roll over failed.")
+                }
+            }
+        )
+    }
+
+    private fun rolloverFindingIndex(){
+        val request = RolloverRequest(AlertIndices.FINDING_INDEX, null)
+        request.createIndexRequest.index(AlertIndices.FINDING_INDEX_PATTERN)
+            .mapping(AlertIndices.MAPPING_TYPE, AlertIndices.alertMapping(), XContentType.JSON)
+            .settings(Settings.builder().put("index.hidden", true).build())
+        request.addMaxIndexDocsCondition(findingMaxDocs)
+        request.addMaxIndexAgeCondition(findingMaxAge)
+        client.admin().indices().rolloverIndex(
+            request,
+            object : ActionListener<RolloverResponse> {
+                override fun onResponse(response: RolloverResponse) {
+                    if (!response.isRolledOver) {
+                        AlertIndices.logger.info("${AlertIndices.HISTORY_WRITE_INDEX} not rolled over. Conditions were: ${response.conditionStatus}")
+                    } else {
+                        lastRolloverTime = TimeValue.timeValueMillis(threadPool.absoluteTimeInMillis())
+                    }
+                }
+                override fun onFailure(e: Exception) {
+                    AlertIndices.logger.error("${AlertIndices.HISTORY_WRITE_INDEX} not roll over failed.")
                 }
             }
         )

@@ -85,9 +85,21 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        val ALERT_HISTORY_FINDING_MAX_AGE = Setting.positiveTimeSetting(
+            "plugins.alerting.alert_finding_max_age",
+            LegacyOpenDistroAlertingSettings.ALERT_FINDING_INDEX_MAX_AGE,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
         val ALERT_HISTORY_MAX_DOCS = Setting.longSetting(
             "plugins.alerting.alert_history_max_docs",
             LegacyOpenDistroAlertingSettings.ALERT_HISTORY_MAX_DOCS,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val ALERT_FINDING_MAX_DOCS = Setting.longSetting(
+            "plugins.alerting.alert_finding_max_docs",
+            LegacyOpenDistroAlertingSettings.ALERT_FINDING_MAX_DOCS,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
