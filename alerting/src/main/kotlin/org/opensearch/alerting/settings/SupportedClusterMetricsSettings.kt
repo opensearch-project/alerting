@@ -103,7 +103,7 @@ class SupportedClusterMetricsSettings {
                     val pathParamsArray = pathParams.split(",").toTypedArray()
                     return ClusterStatsRequest(*pathParamsArray)
                 }
-                ClusterMetricType.NODES_STATS -> NodesStatsRequest()
+                ClusterMetricType.NODES_STATS -> NodesStatsRequest().addMetric("_all")
                 else -> throw IllegalArgumentException("Unsupported API.")
             }
         }
