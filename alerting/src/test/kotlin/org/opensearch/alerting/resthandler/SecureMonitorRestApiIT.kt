@@ -20,7 +20,6 @@ import org.opensearch.alerting.ALERTING_FULL_ACCESS_ROLE
 import org.opensearch.alerting.ALERTING_GET_ALERTS_ACCESS
 import org.opensearch.alerting.ALERTING_GET_MONITOR_ACCESS
 import org.opensearch.alerting.ALERTING_INDEX_MONITOR_ACCESS
-import org.opensearch.alerting.ALERTING_NO_ACCESS_ROLE
 import org.opensearch.alerting.ALERTING_SEARCH_MONITOR_ONLY_ACCESS
 import org.opensearch.alerting.ALL_ACCESS_ROLE
 import org.opensearch.alerting.ALWAYS_RUN
@@ -413,6 +412,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Monitor found during search", 0, adminDocsFound)
     }
 
+    /*
+    TODO: https://github.com/opensearch-project/alerting/issues/300
     fun `test query monitors with disable filter by`() {
 
         disableFilterBy()
@@ -505,6 +506,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
+     */
+
     fun `test execute monitor with an user with execute monitor access`() {
         createUserWithTestDataAndCustomRole(
             user,
@@ -582,6 +585,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    /*
+    TODO: https://github.com/opensearch-project/alerting/issues/300
     fun `test delete monitor with an user without delete monitor access`() {
         createUserWithTestDataAndCustomRole(
             user,
@@ -681,6 +686,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
         }
     }
+
+     */
 
     fun `test get alerts with an user with get alerts role`() {
 
