@@ -1,28 +1,8 @@
 /*
+ * Copyright OpenSearch Contributors
  * SPDX-License-Identifier: Apache-2.0
- *
- * The OpenSearch Contributors require contributions made to
- * this file be licensed under the Apache-2.0 license or a
- * compatible open source license.
- *
- * Modifications Copyright OpenSearch Contributors. See
- * GitHub history for details.
  */
 
-/*
- *   Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- *   Licensed under the Apache License, Version 2.0 (the "License").
- *   You may not use this file except in compliance with the License.
- *   A copy of the License is located at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *   or in the "license" file accompanying this file. This file is distributed
- *   on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- *   express or implied. See the License for the specific language governing
- *   permissions and limitations under the License.
- */
 package org.opensearch.alerting
 
 import junit.framework.TestCase.assertNull
@@ -41,6 +21,7 @@ import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
+import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorRunResult
@@ -57,6 +38,8 @@ import org.opensearch.alerting.model.action.Throttle
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailEntry
 import org.opensearch.alerting.model.destination.email.EmailGroup
+import org.opensearch.alerting.model.docLevelInput.DocLevelMonitorInput
+import org.opensearch.alerting.model.docLevelInput.DocLevelQuery
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.Request
 import org.opensearch.client.RequestOptions
@@ -102,7 +85,7 @@ fun randomQueryLevelMonitor(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
-        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        lastRunContext = mapOf(), uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 
@@ -120,7 +103,7 @@ fun randomQueryLevelMonitorWithoutUser(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = null,
-        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        lastRunContext = mapOf(), uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 
@@ -143,7 +126,7 @@ fun randomBucketLevelMonitor(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.BUCKET_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
-        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        lastRunContext = mapOf(), uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 
@@ -288,6 +271,52 @@ fun randomAlert(monitor: Monitor = randomQueryLevelMonitor()): Alert {
     return Alert(
         monitor, trigger, Instant.now().truncatedTo(ChronoUnit.MILLIS), null,
         actionExecutionResults = actionExecutionResults
+    )
+}
+
+fun randomDocLevelQuery(
+    id: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    query: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    severity: String = "${randomInt(5)}",
+    tags: List<String> = mutableListOf(0..randomInt(10)).map { OpenSearchRestTestCase.randomAlphaOfLength(10) },
+    actions: List<Action> = mutableListOf(0..randomInt(10)).map { randomAction() }
+): DocLevelQuery {
+    return DocLevelQuery(id = id, query = query, severity = severity, tags = tags, actions = actions)
+}
+
+fun randomDocLevelMonitorInput(
+    description: String = OpenSearchRestTestCase.randomAlphaOfLength(randomInt(10)),
+    indices: List<String> = listOf(1..randomInt(10)).map { OpenSearchRestTestCase.randomAlphaOfLength(10) },
+    queries: List<DocLevelQuery> = listOf(1..randomInt(10)).map { randomDocLevelQuery() }
+): DocLevelMonitorInput {
+    return DocLevelMonitorInput(description = description, indices = indices, queries = queries)
+}
+
+fun randomFinding(
+    id: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    relatedDocId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    monitorId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    monitorName: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    index: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    queryId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    queryTags: MutableList<String> = mutableListOf(),
+    severity: String = "${randomInt(5)}",
+    timestamp: Instant = Instant.now(),
+    triggerId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    triggerName: String = OpenSearchRestTestCase.randomAlphaOfLength(10)
+): Finding {
+    return Finding(
+        id = id,
+        relatedDocId = relatedDocId,
+        monitorId = monitorId,
+        monitorName = monitorName,
+        index = index,
+        queryId = queryId,
+        queryTags = queryTags,
+        severity = severity,
+        timestamp = timestamp,
+        triggerId = triggerId,
+        triggerName = triggerName
     )
 }
 
