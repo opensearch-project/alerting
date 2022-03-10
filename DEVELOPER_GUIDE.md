@@ -18,9 +18,27 @@ Fork this repository on GitHub, and clone locally with `git clone`.
 
 ### Install Prerequisites
 
-#### JDK 8
+#### JDK 11
 
-OpenSearch components build using Java 8 at a minimum. This means you must have a JDK 8 installed with the environment variable `JAVA_HOME` referencing the path to Java home for your JDK 8 installation, e.g. `JAVA_HOME=/usr/lib/jvm/jdk-8`.
+OpenSearch builds using Java 11 at a minimum, using the Adoptium distribution. This means you must have a JDK 11 installed with the environment variable `JAVA_HOME` referencing the path to Java home for your JDK 11 installation, e.g. `JAVA_HOME=/usr/lib/jvm/jdk-11`. This is configured in [buildSrc/build.gradle](buildSrc/build.gradle) and [distribution/tools/java-version-checker/build.gradle](distribution/tools/java-version-checker/build.gradle).
+
+```
+allprojects {
+  targetCompatibility = JavaVersion.VERSION_11
+  sourceCompatibility = JavaVersion.VERSION_11
+}
+```
+
+```
+sourceCompatibility = JavaVersion.VERSION_11
+targetCompatibility = JavaVersion.VERSION_11
+```
+
+Download Java 11 from [here](https://adoptium.net/releases.html?variant=openjdk11).
+
+#### JDK 14
+
+To run the full suite of tests, download and install [JDK 14](https://jdk.java.net/archive/) and set `JAVA11_HOME`, and `JAVA14_HOME`. They are required by the [backwards compatibility test](./TESTING.md#testing-backwards-compatibility).
 
 ### Setup
 
