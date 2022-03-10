@@ -790,6 +790,8 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         Assert.assertTrue(alerts.single().errorMessage?.contains("Failed running action") as Boolean)
     }
 
+    /*
+    TODO: https://github.com/opensearch-project/alerting/issues/300
     fun `test execute monitor with custom webhook destination`() {
         val customWebhook = CustomWebhook("http://15.16.17.18", null, null, 80, null, "PUT", emptyMap(), emptyMap(), null, null)
         val destination = createDestination(
@@ -814,6 +816,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         verifyAlert(alerts.single(), monitor, ERROR)
         Assert.assertTrue(alerts.single().errorMessage?.contains("Connect timed out") as Boolean)
     }
+     */
 
     fun `test execute monitor with custom webhook destination and denied host`() {
 
