@@ -16,6 +16,7 @@ dependencies {
     compile "org.opensearch.client:opensearch-rest-client:${opensearch_version}"
     compile 'com.google.googlejavaformat:google-java-format:1.10.0'
     compile "org.opensearch:common-utils:${common_utils_version}"
+    compile 'commons-validator:commons-validator:1.7'
 
     testImplementation "org.opensearch.test:framework:${opensearch_version}"
     testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlin_version}"
