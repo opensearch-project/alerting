@@ -15,3 +15,4 @@ Compatible with OpenSearch 1.3.0
 
 ### Documentation
 * Added 1.3 release notes. ([#336](https://github.com/opensearch-project/alerting/pull/336))
+* Updated DEVELOPER_GUIDE.md to reference changes to the supported JDKs. ([#338](https://github.com/opensearch-project/alerting/pull/338))
