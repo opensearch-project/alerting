@@ -35,6 +35,7 @@ import org.opensearch.client.Request
 import org.opensearch.client.Response
 import org.opensearch.client.RestClient
 import org.opensearch.client.WarningFailureException
+import org.opensearch.common.io.PathUtils
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
@@ -51,7 +52,6 @@ import org.opensearch.rest.RestStatus
 import org.opensearch.search.SearchModule
 import java.net.URLEncoder
 import java.nio.file.Files
-import java.nio.file.Path
 import java.time.Instant
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -1020,7 +1020,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                     false
                 )
                 proxy.getExecutionData(false)?.let {
-                    val path = Path.of("$jacocoBuildPath/integTest.exec")
+                    val path = PathUtils.get("$jacocoBuildPath/integTest.exec")
                     Files.write(path, it)
                 }
             }

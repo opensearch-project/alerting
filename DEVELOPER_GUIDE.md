@@ -1,6 +1,7 @@
 - [Developer Guide](#developer-guide)
   - [Forking and Cloning](#forking-and-cloning)
   - [Install Prerequisites](#install-prerequisites)
+    - [JDK 11](#jdk-11)
     - [JDK 14](#jdk-14)
   - [Setup](#setup)
   - [Build](#build)
@@ -18,14 +19,32 @@ Fork this repository on GitHub, and clone locally with `git clone`.
 
 ### Install Prerequisites
 
+#### JDK 11
+
+OpenSearch builds using Java 11 at a minimum, using the Adoptium distribution. This means you must have a JDK 11 installed with the environment variable `JAVA_HOME` referencing the path to Java home for your JDK 11 installation, e.g. `JAVA_HOME=/usr/lib/jvm/jdk-11`. This is configured in [buildSrc/build.gradle](buildSrc/build.gradle) and [distribution/tools/java-version-checker/build.gradle](distribution/tools/java-version-checker/build.gradle).
+
+```
+allprojects {
+  targetCompatibility = JavaVersion.VERSION_11
+  sourceCompatibility = JavaVersion.VERSION_11
+}
+```
+
+```
+sourceCompatibility = JavaVersion.VERSION_11
+targetCompatibility = JavaVersion.VERSION_11
+```
+
+Download Java 11 from [here](https://adoptium.net/releases.html?variant=openjdk11).
+
 #### JDK 14
 
-OpenSearch components build using Java 14 at a minimum. This means you must have a JDK 14 installed with the environment variable `JAVA_HOME` referencing the path to Java home for your JDK 14 installation, e.g. `JAVA_HOME=/usr/lib/jvm/jdk-14`.
+To run the full suite of tests, download and install [JDK 14](https://jdk.java.net/archive/) and set `JAVA11_HOME`, and `JAVA14_HOME`. They are required by the [backwards compatibility test](./TESTING.md#testing-backwards-compatibility).
 
 ### Setup
 
 1. Clone the repository (see [Forking and Cloning](#forking-and-cloning))
-2. Make sure `JAVA_HOME` is pointing to a Java 14 JDK (see [Install Prerequisites](#install-prerequisites))
+2. Make sure `JAVA_HOME` is pointing to a Java 11 JDK (see [Install Prerequisites](#install-prerequisites))
 3. Launch Intellij IDEA, Choose Import Project and select the settings.gradle file in the root of this package.
 
 ### Build
@@ -105,4 +124,9 @@ You can do this by running `./gradlew :alerting:run -PnumNodes=<numberOfNodesYou
 You can also run the integration tests against a multi-node cluster by running `./gradlew :alerting:integTest -PnumNodes=<numberOfNodesYouWant>`
 
 You can also debug a multi-node cluster, by using a combination of above multi-node and debug steps.
-But, you must set up debugger configurations to listen on each port starting from `5005` and increasing by 1 for each node.  
+But, you must set up debugger configurations to listen on each port starting from `5005` and increasing by 1 for each node.
+
+### Backport
+
+- [Link to backport documentation](https://github.com/opensearch-project/opensearch-plugins/blob/main/BACKPORT.md)
+  
