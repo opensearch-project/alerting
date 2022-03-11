@@ -2,6 +2,7 @@
  * Copyright OpenSearch Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
+
 package org.opensearch.alerting
 
 import junit.framework.TestCase.assertNull
@@ -9,6 +10,7 @@ import org.apache.http.Header
 import org.apache.http.HttpEntity
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtFilter
+import org.opensearch.alerting.core.model.ClusterMetricsInput
 import org.opensearch.alerting.core.model.Input
 import org.opensearch.alerting.core.model.IntervalSchedule
 import org.opensearch.alerting.core.model.Schedule
@@ -122,6 +124,24 @@ fun randomBucketLevelMonitor(
 ): Monitor {
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.BUCKET_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
+        schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
+        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+    )
+}
+
+fun randomClusterMetricsMonitor(
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    user: User = randomUser(),
+    inputs: List<Input> = listOf(randomClusterMetricsInput()),
+    schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
+    enabled: Boolean = randomBoolean(),
+    triggers: List<Trigger> = (1..randomInt(10)).map { randomQueryLevelTrigger() },
+    enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
+    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+    withMetadata: Boolean = false
+): Monitor {
+    return Monitor(
+        name = name, monitorType = Monitor.MonitorType.CLUSTER_METRICS_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
         uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
@@ -352,6 +372,14 @@ fun randomQueryLevelTriggerRunResult(): QueryLevelTriggerRunResult {
     map.plus(Pair("key1", randomActionRunResult()))
     map.plus(Pair("key2", randomActionRunResult()))
     return QueryLevelTriggerRunResult("trigger-name", true, null, map)
+}
+
+fun randomClusterMetricsInput(
+    path: String = ClusterMetricsInput.ClusterMetricType.CLUSTER_HEALTH.defaultPath,
+    pathParams: String = "",
+    url: String = ""
+): ClusterMetricsInput {
+    return ClusterMetricsInput(path, pathParams, url)
 }
 
 fun randomBucketLevelTriggerRunResult(): BucketLevelTriggerRunResult {

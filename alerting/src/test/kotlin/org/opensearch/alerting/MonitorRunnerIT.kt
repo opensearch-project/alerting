@@ -818,6 +818,154 @@ class MonitorRunnerIT : AlertingRestTestCase() {
     }
      */
 
+    fun `test create ClusterMetricsInput monitor with ClusterHealth API`() {
+        // GIVEN
+        val path = "/_cluster/health"
+        val input = randomClusterMetricsInput(path = path)
+        val monitor = createMonitor(randomClusterMetricsMonitor(inputs = listOf(input)))
+
+        // WHEN
+        val response = executeMonitor(monitor.id)
+
+        // THEN
+        val output = entityAsMap(response)
+        val inputResults = output.stringMap("input_results")
+        val resultsContent = (inputResults?.get("results") as ArrayList<*>)[0]
+        val errorMessage = inputResults["error"]
+
+        assertEquals(monitor.name, output["monitor_name"])
+        assertTrue(
+            "Monitor results should contain cluster_name, but found: $resultsContent",
+            resultsContent.toString().contains("cluster_name")
+        )
+        assertNull("There should not be an error message, but found: $errorMessage", errorMessage)
+    }
+
+    fun `test create ClusterMetricsInput monitor with ClusterStats API`() {
+        // GIVEN
+        val path = "/_cluster/stats"
+        val input = randomClusterMetricsInput(path = path)
+        val monitor = createMonitor(randomClusterMetricsMonitor(inputs = listOf(input)))
+
+        // WHEN
+        val response = executeMonitor(monitor.id)
+
+        // THEN
+        val output = entityAsMap(response)
+        val inputResults = output.stringMap("input_results")
+        val resultsContent = (inputResults?.get("results") as ArrayList<*>)[0]
+        val errorMessage = inputResults["error"]
+
+        assertEquals(monitor.name, output["monitor_name"])
+        assertTrue(
+            "Monitor results should contain monitor_name, but found: $resultsContent",
+            resultsContent.toString().contains("memory_size_in_bytes")
+        )
+        assertNull("There should not be an error message, but found: $errorMessage", errorMessage)
+    }
+
+    fun `test create ClusterMetricsInput monitor with alert triggered`() {
+        // GIVEN
+        putAlertMappings()
+        val trigger = randomQueryLevelTrigger(
+            condition = Script(
+                """
+            return ctx.results[0].number_of_pending_tasks < 1
+                """.trimIndent()
+            ),
+            destinationId = createDestination().id
+        )
+        val path = "/_cluster/health"
+        val input = randomClusterMetricsInput(path = path)
+        val monitor = createMonitor(randomClusterMetricsMonitor(inputs = listOf(input), triggers = listOf(trigger)))
+
+        // WHEN
+        val response = executeMonitor(monitor.id)
+
+        // THEN
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        val triggerResults = output.objectMap("trigger_results").values
+        for (triggerResult in triggerResults) {
+            assertTrue(
+                "This triggerResult should be triggered: $triggerResult",
+                triggerResult.objectMap("action_results").isNotEmpty()
+            )
+        }
+
+        val alerts = searchAlerts(monitor)
+        assertEquals("Alert not saved, $output", 1, alerts.size)
+        verifyAlert(alerts.single(), monitor, ACTIVE)
+    }
+
+    fun `test create ClusterMetricsInput monitor with no alert triggered`() {
+        // GIVEN
+        putAlertMappings()
+        val trigger = randomQueryLevelTrigger(
+            condition = Script(
+                """
+            return ctx.results[0].status.equals("red")
+                """.trimIndent()
+            )
+        )
+        val path = "/_cluster/stats"
+        val input = randomClusterMetricsInput(path = path)
+        val monitor = createMonitor(randomClusterMetricsMonitor(inputs = listOf(input), triggers = listOf(trigger)))
+
+        // WHEN
+        val response = executeMonitor(monitor.id)
+
+        // THEN
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        val triggerResults = output.objectMap("trigger_results").values
+        for (triggerResult in triggerResults) {
+            assertTrue(
+                "This triggerResult should not be triggered: $triggerResult",
+                triggerResult.objectMap("action_results").isEmpty()
+            )
+        }
+
+        val alerts = searchAlerts(monitor)
+        assertEquals("Alert saved for test monitor, output: $output", 0, alerts.size)
+    }
+
+    fun `test create ClusterMetricsInput monitor for ClusterHealth API with path parameters`() {
+        // GIVEN
+        val indices = (1..5).map { createTestIndex() }.toTypedArray()
+        val pathParams = indices.joinToString(",")
+        val path = "/_cluster/health/"
+        val input = randomClusterMetricsInput(
+            path = path,
+            pathParams = pathParams
+        )
+        val monitor = createMonitor(randomClusterMetricsMonitor(inputs = listOf(input)))
+
+        // WHEN
+        val response = executeMonitor(monitor.id)
+
+        // THEN
+        val output = entityAsMap(response)
+        val inputResults = output.stringMap("input_results")
+        val resultsContent = (inputResults?.get("results") as ArrayList<*>)[0]
+        val errorMessage = inputResults["error"]
+
+        assertEquals(monitor.name, output["monitor_name"])
+        assertTrue(
+            "Monitor results should contain cluster_name, but found: $resultsContent",
+            resultsContent.toString().contains("cluster_name")
+        )
+        assertNull("There should not be an error message, but found: $errorMessage", errorMessage)
+    }
+
+    // TODO: Once an API is implemented that supports adding/removing entries on the
+    //  SupportedApiSettings::supportedApiList, create an test that simulates executing
+    //  a preexisting ClusterMetricsInput monitor for an API that has been removed from the supportedApiList.
+    //  This will likely involve adding an API to the list before creating the monitor, and then removing
+    //  the API from the list before executing the monitor.
+
     fun `test execute monitor with custom webhook destination and denied host`() {
 
         listOf("http://10.1.1.1", "127.0.0.1").forEach {
