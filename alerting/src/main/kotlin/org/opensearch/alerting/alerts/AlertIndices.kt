@@ -308,9 +308,7 @@ class AlertIndices(
             object : ActionListener<RolloverResponse> {
                 override fun onResponse(response: RolloverResponse) {
                     if (!response.isRolledOver) {
-                        AlertIndices.logger.info(
-                            "${AlertIndices.HISTORY_WRITE_INDEX} not rolled over. Conditions were: ${response.conditionStatus}"
-                        )
+                        AlertIndices.logger.info("${AlertIndices.HISTORY_WRITE_INDEX} not rolled over. Conditions were: ${response.conditionStatus}")
                     } else {
                         lastRolloverTime = TimeValue.timeValueMillis(threadPool.absoluteTimeInMillis())
                     }
