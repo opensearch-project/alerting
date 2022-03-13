@@ -1147,4 +1147,15 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val getResponse = client().makeRequest("HEAD", monitor.relativeUrl())
         assertEquals("Deleted monitor still exists", RestStatus.NOT_FOUND, getResponse.restStatus())
     }
+
+    @Throws(Exception::class)
+    fun `test creating a document monitor with error trigger`() {
+        val trigger = randomQueryLevelTrigger()
+        val monitor = randomDocumentLevelMonitor(triggers = listOf(trigger))
+        try {
+            client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+        }catch (e:java.lang.Exception){
+            assertNotEquals("illegal trigger time",e.message,"illegal trigger time")
+        }
+    }
 }
