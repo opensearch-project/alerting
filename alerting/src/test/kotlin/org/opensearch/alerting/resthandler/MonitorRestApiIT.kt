@@ -8,42 +8,25 @@ import org.apache.http.HttpHeaders
 import org.apache.http.entity.ContentType
 import org.apache.http.message.BasicHeader
 import org.apache.http.nio.entity.NStringEntity
-import org.opensearch.alerting.ALERTING_BASE_URI
-import org.opensearch.alerting.ANOMALY_DETECTOR_INDEX
-import org.opensearch.alerting.AlertingRestTestCase
-import org.opensearch.alerting.DESTINATION_BASE_URI
-import org.opensearch.alerting.LEGACY_OPENDISTRO_ALERTING_BASE_URI
+import org.opensearch.alerting.*
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.anomalyDetectorIndexMapping
 import org.opensearch.alerting.core.model.CronSchedule
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
-import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.Destination
-import org.opensearch.alerting.randomADMonitor
-import org.opensearch.alerting.randomAction
-import org.opensearch.alerting.randomAlert
-import org.opensearch.alerting.randomAnomalyDetector
-import org.opensearch.alerting.randomAnomalyDetectorWithUser
-import org.opensearch.alerting.randomQueryLevelMonitor
-import org.opensearch.alerting.randomQueryLevelTrigger
-import org.opensearch.alerting.randomThrottle
-import org.opensearch.alerting.randomUser
 import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.toJsonString
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.client.ResponseException
 import org.opensearch.client.WarningFailureException
 import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.unit.TimeValue
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentBuilder
-import org.opensearch.common.xcontent.XContentType
+import org.opensearch.common.xcontent.*
+import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
@@ -1101,5 +1084,67 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         }
 
         return false
+    }
+
+    @Throws(Exception::class)
+    fun `test creating a document monitor`() {
+        val monitor = randomDocumentLevelMonitor()
+
+        val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+
+        assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
+        val responseBody = createResponse.asMap()
+        val createdId = responseBody["_id"] as String
+        val createdVersion = responseBody["_version"] as Int
+        assertNotEquals("response is missing Id", Monitor.NO_ID, createdId)
+        assertTrue("incorrect version", createdVersion > 0)
+        val actualLocation = createResponse.getHeader("Location")
+        assertEquals("Incorrect Location header", "$ALERTING_BASE_URI/$createdId", actualLocation)
+    }
+
+    @Throws(Exception::class)
+    fun `test getting a document level monitor`() {
+        val monitor = createRandomDocumentMonitor()
+
+        val storedMonitor = getMonitor(monitor.id)
+
+        assertEquals("Indexed and retrieved monitor differ", monitor, storedMonitor)
+    }
+
+    @Throws(Exception::class)
+    fun `test updating conditions for a document level monitor`() {
+        val monitor = createRandomDocumentMonitor()
+
+        val updatedTriggers = listOf(
+            QueryLevelTrigger(
+                name = "foo",
+                severity = "1",
+                condition = Script("return true"),
+                actions = emptyList()
+            )
+        )
+        val updateResponse = OpenSearchRestTestCase.client().makeRequest(
+            "PUT", monitor.relativeUrl(),
+            emptyMap(), monitor.copy(triggers = updatedTriggers).toHttpEntity()
+        )
+
+        OpenSearchRestTestCase.assertEquals("Update monitor failed", RestStatus.OK, updateResponse.restStatus())
+        val responseBody = updateResponse.asMap()
+        OpenSearchRestTestCase.assertEquals("Updated monitor id doesn't match", monitor.id, responseBody["_id"] as String)
+        OpenSearchRestTestCase.assertEquals("Version not incremented", (monitor.version + 1).toInt(), responseBody["_version"] as Int)
+
+        val updatedMonitor = getMonitor(monitor.id)
+        OpenSearchRestTestCase.assertEquals("Monitor trigger not updated", updatedTriggers, updatedMonitor.triggers)
+    }
+
+    @Throws(Exception::class)
+    fun `test deleting a document level monitor`() {
+        val monitor = createRandomDocumentMonitor()
+
+        val deleteResponse = client().makeRequest("DELETE", monitor.relativeUrl())
+        assertEquals("Delete failed", RestStatus.OK, deleteResponse.restStatus())
+
+        val getResponse = client().makeRequest("HEAD", monitor.relativeUrl())
+        assertEquals("Deleted monitor still exists", RestStatus.NOT_FOUND, getResponse.restStatus())
     }
 }

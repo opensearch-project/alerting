@@ -400,6 +400,15 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return getMonitor(monitorId = monitorId)
     }
 
+    protected fun createRandomDocumentMonitor(refresh: Boolean = false, withMetadata: Boolean = false): Monitor {
+        val monitor = randomDocumentLevelMonitor(withMetadata = withMetadata)
+        val monitorId = createMonitor(monitor, refresh).id
+        if (withMetadata) {
+            return getMonitor(monitorId = monitorId, header = BasicHeader(HttpHeaders.USER_AGENT, "OpenSearch-Dashboards"))
+        }
+        return getMonitor(monitorId = monitorId)
+    }
+
     @Suppress("UNCHECKED_CAST")
     protected fun updateMonitor(monitor: Monitor, refresh: Boolean = false): Monitor {
         val response = client().makeRequest(
