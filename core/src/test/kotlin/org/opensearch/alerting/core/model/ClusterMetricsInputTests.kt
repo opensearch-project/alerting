@@ -273,7 +273,8 @@ class ClusterMetricsInputTests {
 
             // WHEN + THEN
             assertFailsWith<IllegalArgumentException>(
-                "The provided path parameters contain invalid characters or spaces. Please omit: ${ILLEGAL_PATH_PARAMETER_CHARACTERS.joinToString(" ")}"
+                "The provided path parameters contain invalid characters or spaces. Please omit: " +
+                    "${ILLEGAL_PATH_PARAMETER_CHARACTERS.joinToString(" ")}"
             ) {
                 clusterMetricsInput.parsePathParams()
             }
