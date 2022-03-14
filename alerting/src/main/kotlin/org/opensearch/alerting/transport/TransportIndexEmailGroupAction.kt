@@ -21,7 +21,6 @@ import org.opensearch.alerting.action.IndexEmailGroupRequest
 import org.opensearch.alerting.action.IndexEmailGroupResponse
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
-import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOB_TYPE
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.AlertingException
@@ -86,7 +85,7 @@ class TransportIndexEmailGroupAction @Inject constructor(
                 })
             } else if (!IndexUtils.scheduledJobIndexUpdated) {
                 IndexUtils.updateIndexMapping(
-                    SCHEDULED_JOBS_INDEX, SCHEDULED_JOB_TYPE,
+                    SCHEDULED_JOBS_INDEX,
                     ScheduledJobIndices.scheduledJobMappings(), clusterService.state(), client.admin().indices(),
                     object : ActionListener<AcknowledgedResponse> {
                         override fun onResponse(response: AcknowledgedResponse) {

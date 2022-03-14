@@ -236,7 +236,7 @@ class AlertIndices(
             return
         }
 
-        var putMappingRequest: PutMappingRequest = PutMappingRequest(targetIndex).type(MAPPING_TYPE)
+        var putMappingRequest: PutMappingRequest = PutMappingRequest(targetIndex)
             .source(mapping, XContentType.JSON)
         val updateResponse: AcknowledgedResponse = client.admin().indices().suspendUntil { putMapping(putMappingRequest, it) }
         if (updateResponse.isAcknowledged) {

@@ -25,7 +25,6 @@ import org.opensearch.alerting.action.IndexMonitorResponse
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
-import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOB_TYPE
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.settings.AlertingSettings
@@ -243,7 +242,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 })
             } else if (!IndexUtils.scheduledJobIndexUpdated) {
                 IndexUtils.updateIndexMapping(
-                    SCHEDULED_JOBS_INDEX, SCHEDULED_JOB_TYPE,
+                    SCHEDULED_JOBS_INDEX,
                     ScheduledJobIndices.scheduledJobMappings(), clusterService.state(), client.admin().indices(),
                     object : ActionListener<AcknowledgedResponse> {
                         override fun onResponse(response: AcknowledgedResponse) {
