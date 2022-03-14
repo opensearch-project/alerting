@@ -109,7 +109,8 @@ fun randomBucketLevelMonitor(
     inputs: List<Input> = listOf(
         SearchInput(
             emptyList(),
-            SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).aggregation(TermsAggregationBuilder("test_agg"))
+            SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                .aggregation(TermsAggregationBuilder("test_agg").field("test_field"))
         )
     ),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
@@ -156,9 +157,12 @@ fun randomBucketLevelTrigger(
         name = name,
         severity = severity,
         bucketSelector = bucketSelector,
-        actions = if (actions.isEmpty()) (0..randomInt(10)).map { randomActionWithPolicy(destinationId = destinationId) } else actions
+        actions = if (actions.isEmpty()) randomActionsForBucketLevelTrigger(destinationId = destinationId) else actions
     )
 }
+
+fun randomActionsForBucketLevelTrigger(min: Int = 0, max: Int = 10, destinationId: String = ""): List<Action> =
+    (min..randomInt(max)).map { randomActionWithPolicy(destinationId = destinationId) }
 
 fun randomBucketSelectorExtAggregationBuilder(
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
@@ -222,7 +226,10 @@ val TEST_HR_INDEX = "hr_data"
 val TEST_NON_HR_INDEX = "not_hr_data"
 val TEST_HR_ROLE = "hr_role"
 val TEST_HR_BACKEND_ROLE = "HR"
-val TERM_DLS_QUERY = "{\"term\": { \"accessible\": true}}"
+// Using a triple-quote string for the query so escaped quotes are kept as-is
+// in the request made using triple-quote strings (i.e. createIndexRoleWithDocLevelSecurity).
+// Removing the escape slash in the request causes the security API role request to fail with parsing exception.
+val TERM_DLS_QUERY = """{\"term\": { \"accessible\": true}}"""
 
 fun randomTemplateScript(
     source: String,
