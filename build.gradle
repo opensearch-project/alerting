@@ -11,7 +11,7 @@ buildscript {
         // 1.0.0 -> 1.0.0.0, and 1.0.0-SNAPSHOT -> 1.0.0.0-SNAPSHOT
         opensearch_build = opensearch_version.replaceAll(/(\.\d)([^\d]*)$/, '$1.0$2')
         common_utils_version = System.getProperty("common_utils.version", opensearch_build)
-        kotlin_version = '1.3.72'
+        kotlin_version = '1.6.10'
     }
 
     repositories {
@@ -77,10 +77,10 @@ allprojects {
     apply from: "$rootDir/build-tools/repositories.gradle"
 
     plugins.withId('java') {
-        sourceCompatibility = targetCompatibility = "1.8"
+        sourceCompatibility = targetCompatibility = JavaVersion.VERSION_11
     }
     plugins.withId('org.jetbrains.kotlin.jvm') {
-        compileKotlin.kotlinOptions.jvmTarget = compileTestKotlin.kotlinOptions.jvmTarget = "1.8"
+        compileKotlin.kotlinOptions.jvmTarget = compileTestKotlin.kotlinOptions.jvmTarget = JavaVersion.VERSION_11
         compileKotlin.dependsOn ktlint
     }
 }
