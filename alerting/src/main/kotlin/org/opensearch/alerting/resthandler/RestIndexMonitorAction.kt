@@ -90,21 +90,21 @@ class RestIndexMonitorAction : BaseRestHandler() {
             Monitor.MonitorType.QUERY_LEVEL_MONITOR -> {
                 triggers.forEach {
                     if (it !is QueryLevelTrigger) {
-                        throw IllegalArgumentException("illegal trigger time")
+                        throw IllegalArgumentException("Illegal trigger type")
                     }
                 }
             }
             Monitor.MonitorType.BUCKET_LEVEL_MONITOR -> {
                 triggers.forEach {
                     if (it !is BucketLevelTrigger) {
-                        throw IllegalArgumentException("illegal trigger time")
+                        throw IllegalArgumentException("Illegal trigger type")
                     }
                 }
             }
             Monitor.MonitorType.DOC_LEVEL_MONITOR -> {
                 triggers.forEach {
                     if (it !is DocumentLevelTrigger) {
-                        throw IllegalArgumentException("illegal trigger time")
+                        throw IllegalArgumentException("Illegal trigger type")
                     }
                 }
             }
