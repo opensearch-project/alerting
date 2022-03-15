@@ -25,7 +25,9 @@ import org.opensearch.client.ResponseException
 import org.opensearch.client.WarningFailureException
 import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.unit.TimeValue
-import org.opensearch.common.xcontent.*
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
@@ -1154,8 +1156,20 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val monitor = randomDocumentLevelMonitor(triggers = listOf(trigger))
         try {
             client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+            fail("Monitor with illegal trigger should be rejected.")
         }catch (e:java.lang.Exception){
-            assertNotEquals("illegal trigger time",e.message,"illegal trigger time")
+            assertNotEquals("Illegal trigger type",e.message,"Illegal trigger type")
+        }
+    }
+    @Throws(Exception::class)
+    fun `test creating a query monitor with error trigger`() {
+        val trigger = randomBucketLevelTrigger()
+        val monitor = randomQueryLevelMonitor(triggers = listOf(trigger))
+        try {
+            client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+            fail("Monitor with illegal trigger should be rejected.")
+        } catch (e: java.lang.Exception) {
+            assertNotEquals("Illegal trigger type", e.message, "Illegal trigger type")
         }
     }
 }
