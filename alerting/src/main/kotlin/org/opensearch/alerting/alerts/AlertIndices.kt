@@ -95,10 +95,10 @@ class AlertIndices(
         const val ALL_INDEX_PATTERN = ".opendistro-alerting-alert*"
 
         /** The alias of the index in which to write alert finding */
-        const val FINDING_INDEX = ".opendistro-alerting-alert-finding"
+        const val FINDING_WRITE_INDEX = ".opendistro-alerting-finding-write"
 
         /** todo the index name pattern to query finding */
-        const val FINDING_INDEX_PATTERN = "<.opensearch-alerting-findings-{now/d}-1>"
+        const val FINDING_INDEX_PATTERN = "<.opendistro-alerting-finding-history-{now/d}-1>"
 
         @JvmStatic
         fun alertMapping() =
@@ -108,6 +108,7 @@ class AlertIndices(
     }
 
     @Volatile private var historyEnabled = AlertingSettings.ALERT_HISTORY_ENABLED.get(settings)
+    @Volatile private var findingEnabled = AlertingSettings.ALERT_FINDING_ENABLED.get(settings)
 
     @Volatile private var historyMaxDocs = AlertingSettings.ALERT_HISTORY_MAX_DOCS.get(settings)
     @Volatile private var findingMaxDocs = AlertingSettings.ALERT_FINDING_MAX_DOCS.get(settings)
@@ -116,6 +117,7 @@ class AlertIndices(
     @Volatile private var findingMaxAge = AlertingSettings.ALERT_HISTORY_FINDING_MAX_AGE.get(settings)
 
     @Volatile private var historyRolloverPeriod = AlertingSettings.ALERT_HISTORY_ROLLOVER_PERIOD.get(settings)
+    @Volatile private var findingRolloverPeriod = AlertingSettings.ALERT_FINDING_ROLLOVER_PERIOD.get(settings)
 
     @Volatile private var historyRetentionPeriod = AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD.get(settings)
 
@@ -144,6 +146,24 @@ class AlertIndices(
             logger.error(
                 "Error creating alert indices. " +
                     "Alerts can't be recorded until master node is restarted.",
+                e
+            )
+        }
+    }
+
+    fun onMaster2() {
+
+        try {
+            // try to rollover immediately as we might be restarting the cluster
+            rolloverFindingIndex()
+            // schedule the next rollover for approx MAX_AGE later
+            scheduledRollover = threadPool
+                .scheduleWithFixedDelay({ rolloverAndDeleteHistoryIndices() }, findingRolloverPeriod, executorName())
+        } catch (e: Exception) {
+            // This should be run on cluster startup
+            logger.error(
+                "Error creating alert indices. " +
+                        "Alerts can't be recorded until master node is restarted.",
                 e
             )
         }
@@ -308,14 +328,14 @@ class AlertIndices(
             object : ActionListener<RolloverResponse> {
                 override fun onResponse(response: RolloverResponse) {
                     if (!response.isRolledOver) {
-                        val log = "${AlertIndices.HISTORY_WRITE_INDEX} not rolled over. Conditions were: ${response.conditionStatus}"
+                        val log = "${AlertIndices.FINDING_INDEX} not rolled over. Conditions were: ${response.conditionStatus}"
                         AlertIndices.logger.info(log)
                     } else {
                         lastRolloverTime = TimeValue.timeValueMillis(threadPool.absoluteTimeInMillis())
                     }
                 }
                 override fun onFailure(e: Exception) {
-                    AlertIndices.logger.error("${AlertIndices.HISTORY_WRITE_INDEX} not roll over failed.")
+                    AlertIndices.logger.error("${AlertIndices.FINDING_INDEX} not roll over failed.")
                 }
             }
         )

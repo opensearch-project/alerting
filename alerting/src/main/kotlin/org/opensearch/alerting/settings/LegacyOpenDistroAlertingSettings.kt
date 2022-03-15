@@ -86,21 +86,8 @@ class LegacyOpenDistroAlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
         )
 
-        val ALERT_FINDING_INDEX_MAX_AGE = Setting.positiveTimeSetting(
-            "opendistro.alerting.alert_finding_max_age",
-            TimeValue(30, TimeUnit.DAYS),
-            Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
-        )
-
         val ALERT_HISTORY_MAX_DOCS = Setting.longSetting(
             "opendistro.alerting.alert_history_max_docs",
-            1000L,
-            0L,
-            Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
-        )
-
-        val ALERT_FINDING_MAX_DOCS = Setting.longSetting(
-            "opendistro.alerting.alert_finding_max_docs",
             1000L,
             0L,
             Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
