@@ -88,6 +88,9 @@ class AlertIndices(
         /** The index name pattern referring to all alert history indices */
         const val HISTORY_ALL = ".opendistro-alerting-alert-history*"
 
+        /** The index name pattern referring to all alert history indices */
+        const val FINDING_ALL = ".opendistro-alerting-finding-history*"
+
         /** The index name pattern to create alert history indices */
         const val HISTORY_INDEX_PATTERN = "<.opendistro-alerting-alert-history-{now/d}-1>"
 
@@ -130,6 +133,8 @@ class AlertIndices(
 
     private var historyIndexInitialized: Boolean = false
 
+    private var findingIndexInitialized: Boolean = false
+
     private var alertIndexInitialized: Boolean = false
 
     private var scheduledRollover: Cancellable? = null
@@ -137,33 +142,24 @@ class AlertIndices(
     fun onMaster() {
         try {
             // try to rollover immediately as we might be restarting the cluster
-            rolloverHistoryIndex()
+            rolloverIndex(
+                    historyIndexInitialized,HISTORY_WRITE_INDEX,HISTORY_INDEX_PATTERN,alertMapping(),
+                    historyMaxDocs,historyMaxAge,HISTORY_WRITE_INDEX
+            )
+            rolloverIndex(
+                    findingIndexInitialized,AlertIndices.FINDING_WRITE_INDEX,AlertIndices.FINDING_INDEX_PATTERN,
+                    AlertIndices.alertMapping(),findingMaxDocs,findingMaxAge,AlertIndices.FINDING_WRITE_INDEX
+            )
             // schedule the next rollover for approx MAX_AGE later
             scheduledRollover = threadPool
-                .scheduleWithFixedDelay({ rolloverAndDeleteHistoryIndices() }, historyRolloverPeriod, executorName())
+                    .scheduleWithFixedDelay({ rolloverAndDeleteHistoryIndices() }, historyRolloverPeriod, executorName())
+            scheduledRollover = threadPool
+                    .scheduleWithFixedDelay({ rolloverAndDeleteHistoryIndices() }, findingRolloverPeriod, executorName())
         } catch (e: Exception) {
             // This should be run on cluster startup
             logger.error(
                 "Error creating alert indices. " +
                     "Alerts can't be recorded until master node is restarted.",
-                e
-            )
-        }
-    }
-
-    fun onMaster2() {
-
-        try {
-            // try to rollover immediately as we might be restarting the cluster
-            rolloverFindingIndex()
-            // schedule the next rollover for approx MAX_AGE later
-            scheduledRollover = threadPool
-                .scheduleWithFixedDelay({ rolloverAndDeleteHistoryIndices() }, findingRolloverPeriod, executorName())
-        } catch (e: Exception) {
-            // This should be run on cluster startup
-            logger.error(
-                "Error creating alert indices. " +
-                        "Alerts can't be recorded until master node is restarted.",
                 e
             )
         }
@@ -193,6 +189,7 @@ class AlertIndices(
         // if the indexes have been deleted they need to be reinitialized
         alertIndexInitialized = event.state().routingTable().hasIndex(ALERT_INDEX)
         historyIndexInitialized = event.state().metadata().hasAlias(HISTORY_WRITE_INDEX)
+        findingIndexInitialized = event.state().metadata().hasAlias(FINDING_WRITE_INDEX)
     }
 
     private fun rescheduleRollover() {
@@ -287,6 +284,11 @@ class AlertIndices(
         deleteOldHistoryIndices()
     }
 
+    private fun rolloverAndDeleteFindingIndices() {
+        if (historyEnabled) rolloverFindingIndex()
+        deleteOldFindingIndices()
+    }
+
     private fun rolloverHistoryIndex() {
         if (!historyIndexInitialized) {
             return
@@ -317,7 +319,10 @@ class AlertIndices(
     }
 
     private fun rolloverFindingIndex() {
-        val request = RolloverRequest(AlertIndices.FINDING_INDEX, null)
+        if (!findingIndexInitialized) {
+            return
+        }
+        val request = RolloverRequest(AlertIndices.FINDING_WRITE_INDEX, null)
         request.createIndexRequest.index(AlertIndices.FINDING_INDEX_PATTERN)
             .mapping(AlertIndices.MAPPING_TYPE, AlertIndices.alertMapping(), XContentType.JSON)
             .settings(Settings.builder().put("index.hidden", true).build())
@@ -328,16 +333,46 @@ class AlertIndices(
             object : ActionListener<RolloverResponse> {
                 override fun onResponse(response: RolloverResponse) {
                     if (!response.isRolledOver) {
-                        val log = "${AlertIndices.FINDING_INDEX} not rolled over. Conditions were: ${response.conditionStatus}"
+                        val log = "${AlertIndices.FINDING_WRITE_INDEX} not rolled over. Conditions were: ${response.conditionStatus}"
                         AlertIndices.logger.info(log)
                     } else {
                         lastRolloverTime = TimeValue.timeValueMillis(threadPool.absoluteTimeInMillis())
                     }
                 }
                 override fun onFailure(e: Exception) {
-                    AlertIndices.logger.error("${AlertIndices.FINDING_INDEX} not roll over failed.")
+                    AlertIndices.logger.error("${AlertIndices.FINDING_WRITE_INDEX} not roll over failed.")
                 }
             }
+        )
+    }
+
+    private fun rolloverIndex(initialized:Boolean,index: String,pattern:String,map:String,
+                              docsCondition:Long,ageCondition: TimeValue,tag:String) {
+        if (!initialized) {
+            return
+        }
+
+        // We have to pass null for newIndexName in order to get Elastic to increment the index count.
+        val request = RolloverRequest(index, null)
+        request.createIndexRequest.index(pattern)
+                .mapping(MAPPING_TYPE, map, XContentType.JSON)
+                .settings(Settings.builder().put("index.hidden", true).build())
+        request.addMaxIndexDocsCondition(docsCondition)
+        request.addMaxIndexAgeCondition(ageCondition)
+        client.admin().indices().rolloverIndex(
+                request,
+                object : ActionListener<RolloverResponse> {
+                    override fun onResponse(response: RolloverResponse) {
+                        if (!response.isRolledOver) {
+                            logger.info("$tag not rolled over. Conditions were: ${response.conditionStatus}")
+                        } else {
+                            lastRolloverTime = TimeValue.timeValueMillis(threadPool.absoluteTimeInMillis())
+                        }
+                    }
+                    override fun onFailure(e: Exception) {
+                        logger.error("$tag not roll over failed.")
+                    }
+                }
         )
     }
 
@@ -366,6 +401,32 @@ class AlertIndices(
                     logger.error("Error fetching cluster state")
                 }
             }
+        )
+    }
+
+    private fun deleteOldFindingIndices() {
+        val clusterStateRequest = ClusterStateRequest()
+                .clear()
+                .indices(FINDING_ALL)
+                .metadata(true)
+                .local(true)
+                .indicesOptions(IndicesOptions.strictExpand())
+        client.admin().cluster().state(
+                clusterStateRequest,
+                object : ActionListener<ClusterStateResponse> {
+                    override fun onResponse(clusterStateResponse: ClusterStateResponse) {
+                        if (!clusterStateResponse.state.metadata.indices.isEmpty) {
+                            val indicesToDelete = getIndicesToDelete(clusterStateResponse)
+                            logger.info("Deleting old findings indices viz $indicesToDelete")
+                            deleteAllOldHistoryIndices(indicesToDelete)
+                        } else {
+                            logger.info("No Old History Indices to delete")
+                        }
+                    }
+                    override fun onFailure(e: Exception) {
+                        logger.error("Error fetching cluster state")
+                    }
+                }
         )
     }
 
