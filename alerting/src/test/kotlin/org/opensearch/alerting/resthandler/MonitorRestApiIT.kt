@@ -1175,8 +1175,8 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         try {
             client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             fail("Monitor with illegal trigger should be rejected.")
-        }catch (e:java.lang.Exception){
-            assertNotEquals("Illegal trigger type",e.message,"Illegal trigger type")
+        } catch (e: java.lang.Exception) {
+            assertNotEquals("Illegal trigger type", e.message, "Illegal trigger type")
         }
     }
     @Throws(Exception::class)
