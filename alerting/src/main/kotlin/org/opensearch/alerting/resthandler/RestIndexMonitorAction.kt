@@ -14,7 +14,6 @@ import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
-import org.opensearch.alerting.model.QueryLevelTrigger.Companion.QUERY_LEVEL_TRIGGER_FIELD
 import org.opensearch.alerting.util.IF_PRIMARY_TERM
 import org.opensearch.alerting.util.IF_SEQ_NO
 import org.opensearch.alerting.util.REFRESH
