@@ -30,6 +30,7 @@ import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.AlertingConfigAccessor
 import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
+import org.opensearch.alerting.model.DocumentExecutionContext
 import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.InputRunResults
@@ -767,37 +768,22 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             updatedLastRunContext[shard] = maxSeqNo.toString()
         }
 
-        val queryDocIds = mutableMapOf<DocLevelQuery, Set<String>>()
+        val queryToDocIds = mutableMapOf<DocLevelQuery, Set<String>>()
         val docsToQueries = mutableMapOf<String, MutableList<String>>()
-        for (query in queries) {
-            val matchingDocIds = runForEachQuery(monitor, lastRunContext, updatedLastRunContext, index, query)
-            queryDocIds[query] = matchingDocIds
+        val docExecutionContext = DocumentExecutionContext(queries, lastRunContext, updatedLastRunContext)
+        queries.forEach { query ->
+            val matchingDocIds = runForEachQuery(docExecutionContext, query, index)
+            queryToDocIds[query] = matchingDocIds
             matchingDocIds.forEach {
-                if (docsToQueries.containsKey(it)) {
-                    docsToQueries[it]?.add(query.id)
-                } else {
-                    docsToQueries[it] = mutableListOf(query.id)
-                }
+                docsToQueries.putIfAbsent(it, mutableListOf())
+                docsToQueries[it]?.add(query.id)
             }
         }
 
         val queryIds = queries.map { it.id }
 
-        for (trigger in monitor.triggers) {
-            val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger as DocumentLevelTrigger)
-            val triggerResult = triggerService.runDocLevelTrigger(monitor, trigger, triggerCtx, docsToQueries, queryIds)
-
-            logger.info("trigger results")
-            logger.info(triggerResult.triggeredDocs.toString())
-
-            queryDocIds.forEach {
-                val queryTriggeredDocs = it.value.intersect(triggerResult.triggeredDocs)
-                if (queryTriggeredDocs.isNotEmpty()) {
-                    val findingId = createFindings(monitor, index, it.key, queryTriggeredDocs, trigger)
-                    // TODO: check if need to create alert, if so create it and point it to FindingId
-                    // TODO: run action as well, but this mat need to be throttled based on Mo's comment for bucket level alerting
-                }
-            }
+        monitor.triggers.forEach {
+            runForEachDocTrigger(it as DocumentLevelTrigger, monitor, docsToQueries, queryIds, queryToDocIds)
         }
 
         // TODO: Check for race condition against the update monitor api
@@ -806,6 +792,31 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         // note: update has to called in serial for shards of a given index.
         // make sure this is just updated for the specific query or at the end of all the queries
         updateMonitor(client, xContentRegistry, settings, updatedMonitor)
+    }
+
+    private fun runForEachDocTrigger(
+        trigger: DocumentLevelTrigger,
+        monitor: Monitor,
+        docsToQueries: Map<String, List<String>>,
+        queryIds: List<String>,
+        queryToDocIds: Map<DocLevelQuery, Set<String>>
+    ) {
+        val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger)
+        val triggerResult = triggerService.runDocLevelTrigger(monitor, trigger, triggerCtx, docsToQueries, queryIds)
+
+        logger.info("trigger results")
+        logger.info(triggerResult.triggeredDocs.toString())
+
+        val index = (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
+
+        queryToDocIds.forEach {
+            val queryTriggeredDocs = it.value.intersect(triggerResult.triggeredDocs)
+            if (queryTriggeredDocs.isNotEmpty()) {
+                val findingId = createFindings(monitor, index, it.key, queryTriggeredDocs, trigger)
+                // TODO: check if need to create alert, if so create it and point it to FindingId
+                // TODO: run action as well, but this mat need to be throttled based on Mo's comment for bucket level alerting
+            }
+        }
     }
 
     private fun createFindings(
@@ -842,24 +853,28 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         return finding.id
     }
 
-    private suspend fun runForEachQuery(
-        monitor: Monitor,
-        lastRunContext: MutableMap<String, Any>,
-        updatedLastRunContext: MutableMap<String, Any>,
-        index: String,
-        query: DocLevelQuery
+    private fun runForEachQuery(
+        docExecutionCtx: DocumentExecutionContext,
+        query: DocLevelQuery,
+        index: String
     ): Set<String> {
-        val count: Int = lastRunContext["shards_count"] as Int
+        val count: Int = docExecutionCtx.lastRunContext["shards_count"] as Int
         val matchingDocs = mutableSetOf<String>()
         for (i: Int in 0 until count) {
             val shard = i.toString()
             try {
                 logger.info("Monitor execution for shard: $shard")
 
-                val maxSeqNo: Long = updatedLastRunContext[shard].toString().toLong()
+                val maxSeqNo: Long = docExecutionCtx.updatedLastRunContext[shard].toString().toLong()
                 logger.info("MaxSeqNo of shard_$shard is $maxSeqNo")
 
-                val hits: SearchHits = searchShard(index, shard, lastRunContext[shard].toString().toLongOrNull(), maxSeqNo, query.query)
+                val hits: SearchHits = searchShard(
+                    index,
+                    shard,
+                    docExecutionCtx.lastRunContext[shard].toString().toLongOrNull(),
+                    maxSeqNo,
+                    query.query
+                )
                 logger.info("Search hits for shard_$shard is: ${hits.hits.size}")
 
                 if (hits.hits.isNotEmpty()) {
