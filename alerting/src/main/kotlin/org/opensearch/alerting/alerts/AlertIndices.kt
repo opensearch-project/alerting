@@ -142,21 +142,13 @@ class AlertIndices(
     fun onMaster() {
         try {
             // try to rollover immediately as we might be restarting the cluster
-            rolloverIndex(
-                historyIndexInitialized, HISTORY_WRITE_INDEX,
-                HISTORY_INDEX_PATTERN, alertMapping(),
-                historyMaxDocs, historyMaxAge, HISTORY_WRITE_INDEX
-            )
-            rolloverIndex(
-                findingIndexInitialized, AlertIndices.FINDING_WRITE_INDEX,
-                AlertIndices.FINDING_INDEX_PATTERN, AlertIndices.alertMapping(),
-                findingMaxDocs, findingMaxAge, AlertIndices.FINDING_WRITE_INDEX
-            )
+            rolloverHistoryIndex()
+            rolloverFindingIndex()
             // schedule the next rollover for approx MAX_AGE later
             scheduledRollover = threadPool
                 .scheduleWithFixedDelay({ rolloverAndDeleteHistoryIndices() }, historyRolloverPeriod, executorName())
             scheduledRollover = threadPool
-                .scheduleWithFixedDelay({ rolloverAndDeleteHistoryIndices() }, findingRolloverPeriod, executorName())
+                .scheduleWithFixedDelay({ rolloverAndDeleteFindingIndices() }, findingRolloverPeriod, executorName())
         } catch (e: Exception) {
             // This should be run on cluster startup
             logger.error(
@@ -283,16 +275,24 @@ class AlertIndices(
 
     private fun rolloverAndDeleteHistoryIndices() {
         if (historyEnabled) rolloverHistoryIndex()
-        deleteOldHistoryIndices()
+        deleteOldIndices("History", HISTORY_ALL)
     }
 
     private fun rolloverAndDeleteFindingIndices() {
-        if (historyEnabled) rolloverFindingIndex()
-        deleteOldFindingIndices()
+        if (findingEnabled) rolloverFindingIndex()
+        deleteOldIndices("Finding", FINDING_ALL)
     }
 
-    private fun rolloverHistoryIndex() {
-        if (!historyIndexInitialized) {
+    private fun rolloverFindingIndex() {
+        rolloverIndex(
+            findingIndexInitialized, FINDING_WRITE_INDEX,
+            FINDING_INDEX_PATTERN, alertMapping(),
+            findingMaxDocs, findingMaxAge, FINDING_WRITE_INDEX
+        )
+    }
+
+    private fun rolloverIndex(initialized: Boolean) {
+        if (!initialized) {
             return
         }
 
@@ -315,34 +315,6 @@ class AlertIndices(
                 }
                 override fun onFailure(e: Exception) {
                     logger.error("$HISTORY_WRITE_INDEX not roll over failed.")
-                }
-            }
-        )
-    }
-
-    private fun rolloverFindingIndex() {
-        if (!findingIndexInitialized) {
-            return
-        }
-        val request = RolloverRequest(AlertIndices.FINDING_WRITE_INDEX, null)
-        request.createIndexRequest.index(AlertIndices.FINDING_INDEX_PATTERN)
-            .mapping(AlertIndices.MAPPING_TYPE, AlertIndices.alertMapping(), XContentType.JSON)
-            .settings(Settings.builder().put("index.hidden", true).build())
-        request.addMaxIndexDocsCondition(findingMaxDocs)
-        request.addMaxIndexAgeCondition(findingMaxAge)
-        client.admin().indices().rolloverIndex(
-            request,
-            object : ActionListener<RolloverResponse> {
-                override fun onResponse(response: RolloverResponse) {
-                    if (!response.isRolledOver) {
-                        val log = "${AlertIndices.FINDING_WRITE_INDEX} not rolled over. Conditions were: ${response.conditionStatus}"
-                        AlertIndices.logger.info(log)
-                    } else {
-                        lastRolloverTime = TimeValue.timeValueMillis(threadPool.absoluteTimeInMillis())
-                    }
-                }
-                override fun onFailure(e: Exception) {
-                    AlertIndices.logger.error("${AlertIndices.FINDING_WRITE_INDEX} not roll over failed.")
                 }
             }
         )
@@ -385,38 +357,18 @@ class AlertIndices(
         )
     }
 
-    private fun deleteOldHistoryIndices() {
-
-        val clusterStateRequest = ClusterStateRequest()
-            .clear()
-            .indices(HISTORY_ALL)
-            .metadata(true)
-            .local(true)
-            .indicesOptions(IndicesOptions.strictExpand())
-
-        client.admin().cluster().state(
-            clusterStateRequest,
-            object : ActionListener<ClusterStateResponse> {
-                override fun onResponse(clusterStateResponse: ClusterStateResponse) {
-                    if (!clusterStateResponse.state.metadata.indices.isEmpty) {
-                        val indicesToDelete = getIndicesToDelete(clusterStateResponse)
-                        logger.info("Deleting old history indices viz $indicesToDelete")
-                        deleteAllOldHistoryIndices(indicesToDelete)
-                    } else {
-                        logger.info("No Old History Indices to delete")
-                    }
-                }
-                override fun onFailure(e: Exception) {
-                    logger.error("Error fetching cluster state")
-                }
-            }
+    private fun rolloverHistoryIndex() {
+        rolloverIndex(
+            historyIndexInitialized, HISTORY_WRITE_INDEX,
+            HISTORY_INDEX_PATTERN, alertMapping(),
+            historyMaxDocs, historyMaxAge, HISTORY_WRITE_INDEX
         )
     }
 
-    private fun deleteOldFindingIndices() {
+    private fun deleteOldIndices(tag: String, indices: String) {
         val clusterStateRequest = ClusterStateRequest()
             .clear()
-            .indices(FINDING_ALL)
+            .indices(indices)
             .metadata(true)
             .local(true)
             .indicesOptions(IndicesOptions.strictExpand())
@@ -426,10 +378,10 @@ class AlertIndices(
                 override fun onResponse(clusterStateResponse: ClusterStateResponse) {
                     if (!clusterStateResponse.state.metadata.indices.isEmpty) {
                         val indicesToDelete = getIndicesToDelete(clusterStateResponse)
-                        logger.info("Deleting old findings indices viz $indicesToDelete")
+                        logger.info("Deleting old $tag indices viz $indicesToDelete")
                         deleteAllOldHistoryIndices(indicesToDelete)
                     } else {
-                        logger.info("No Old History Indices to delete")
+                        logger.info("No Old $tag Indices to delete")
                     }
                 }
                 override fun onFailure(e: Exception) {

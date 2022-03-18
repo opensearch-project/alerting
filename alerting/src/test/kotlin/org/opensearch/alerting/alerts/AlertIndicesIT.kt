@@ -82,6 +82,19 @@ class AlertIndicesIT : AlertingRestTestCase() {
         assertTrue("Did not find 3 alert indices", getAlertIndices().size >= 3)
     }
 
+    fun `test rollover finding index`() {
+        // Update the rollover check to be every 1 second and the index max age to be 1 second
+        client().updateSettings(AlertingSettings.ALERT_FINDING_ROLLOVER_PERIOD.key, "1s")
+        client().updateSettings(AlertingSettings.ALERT_FINDING_INDEX_MAX_AGE.key, "1s")
+
+        val trueMonitor = randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN)))
+        executeMonitor(trueMonitor)
+
+        // Allow for a rollover index.
+        Thread.sleep(2000)
+        assertTrue("Did not find 3 alert indices", getAlertIndices().size >= 3)
+    }
+
     fun `test history disabled`() {
         resetHistorySettings()
 
