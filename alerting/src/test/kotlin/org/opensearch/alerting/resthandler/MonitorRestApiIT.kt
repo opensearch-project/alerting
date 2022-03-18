@@ -21,6 +21,7 @@ import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.Alert
+import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.destination.Chime
@@ -1175,7 +1176,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             fail("Monitor with illegal trigger should be rejected.")
         } catch (e: java.lang.Exception) {
-            assertNotEquals("Illegal trigger type", e.message, "Illegal trigger type")
+            assertNotEquals(e.message, e.message, "Illegal trigger type, ${QueryLevelTrigger::javaClass.name}, for bucket level monitor")
         }
     }
     @Throws(Exception::class)
@@ -1186,7 +1187,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             fail("Monitor with illegal trigger should be rejected.")
         } catch (e: java.lang.Exception) {
-            assertNotEquals("Illegal trigger type", e.message, "Illegal trigger type")
+            assertNotEquals(e.message, e.message, "Illegal trigger type, ${BucketLevelTrigger::javaClass.name}, for bucket level monitor")
         }
     }
 }
