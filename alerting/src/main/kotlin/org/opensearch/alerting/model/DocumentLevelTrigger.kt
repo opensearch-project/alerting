@@ -86,50 +86,20 @@ data class DocumentLevelTrigger(
         const val DOCUMENT_LEVEL_TRIGGER_FIELD = "document_level_trigger"
         const val CONDITION_FIELD = "condition"
         const val SCRIPT_FIELD = "script"
+        const val QUERY_IDS_FIELD = "query_ids"
 
         val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(
             Trigger::class.java, ParseField(DOCUMENT_LEVEL_TRIGGER_FIELD),
             CheckedFunction { parseInner(it) }
         )
 
-        /**
-         * This parse method needs to account for both the old and new Trigger format.
-         * In the old format, only one Trigger existed (which is now QueryLevelTrigger) and it was
-         * not a named object.
-         *
-         * The parse() method in the Trigger interface needs to consume the outer START_OBJECT to be able
-         * to infer whether it is dealing with the old or new Trigger format. This means that the currentToken at
-         * the time this parseInner method is called could differ based on which format is being dealt with.
-         *
-         * Old Format
-         * ----------
-         * {
-         *   "id": ...,
-         *    ^
-         *    Current token starts here
-         *   "name" ...,
-         *   ...
-         * }
-         *
-         * New Format
-         * ----------
-         * {
-         *   "query_level_trigger": {
-         *     "id": ...,           ^ Current token starts here
-         *     "name": ...,
-         *     ...
-         *   }
-         * }
-         *
-         * It isn't typically conventional but this parse method will account for both START_OBJECT
-         * and FIELD_NAME as the starting token to cover both cases.
-         */
         @JvmStatic @Throws(IOException::class)
         fun parseInner(xcp: XContentParser): DocumentLevelTrigger {
             var id = UUIDs.base64UUID() // assign a default triggerId if one is not specified
             lateinit var name: String
             lateinit var severity: String
             lateinit var condition: Script
+            val queryIds: MutableList<String> = mutableListOf()
             val actions: MutableList<Action> = mutableListOf()
 
             if (xcp.currentToken() != Token.START_OBJECT && xcp.currentToken() != Token.FIELD_NAME) {
@@ -155,6 +125,12 @@ data class DocumentLevelTrigger(
                             "Invalid script language. Allowed languages are [${Script.DEFAULT_SCRIPT_LANG}]"
                         }
                         xcp.nextToken()
+                    }
+                    QUERY_IDS_FIELD -> {
+                        ensureExpectedToken(Token.START_ARRAY, xcp.currentToken(), xcp)
+                        while (xcp.nextToken() != Token.END_ARRAY) {
+                            queryIds.add(xcp.text())
+                        }
                     }
                     ACTIONS_FIELD -> {
                         ensureExpectedToken(Token.START_ARRAY, xcp.currentToken(), xcp)
