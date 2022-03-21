@@ -59,7 +59,8 @@ class SupportedClusterMetricsSettings {
 
             @Suppress("UNCHECKED_CAST")
             if (supportedJsonPayloads != null)
-                supportedApiList = XContentHelper.convertToMap(JsonXContent.jsonXContent, supportedJsonPayloads.readText(), false) as HashMap<String, Map<String, ArrayList<String>>>
+                supportedApiList = XContentHelper.convertToMap(JsonXContent.jsonXContent, supportedJsonPayloads.readText(), false)
+                    as HashMap<String, Map<String, ArrayList<String>>>
         }
 
         /**
