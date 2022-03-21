@@ -11,6 +11,6 @@ import org.opensearch.action.search.SearchResponse
 class SearchEmailAccountAction private constructor() : ActionType<SearchResponse>(NAME, ::SearchResponse) {
     companion object {
         val INSTANCE = SearchEmailAccountAction()
-        val NAME = "cluster:admin/opendistro/alerting/destination/email_account/search"
+        const val NAME = "cluster:admin/opendistro/alerting/destination/email_account/search"
     }
 }
