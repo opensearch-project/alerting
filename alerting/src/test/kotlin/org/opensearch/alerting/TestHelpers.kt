@@ -527,7 +527,7 @@ fun xContentRegistry(): NamedXContentRegistry {
     return NamedXContentRegistry(
         listOf(
             SearchInput.XCONTENT_REGISTRY, QueryLevelTrigger.XCONTENT_REGISTRY, BucketLevelTrigger.XCONTENT_REGISTRY
-        ) + SearchModule(Settings.EMPTY, false, emptyList()).namedXContents
+        ) + SearchModule(Settings.EMPTY, emptyList()).namedXContents
     )
 }
 

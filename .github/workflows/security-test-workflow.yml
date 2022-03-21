@@ -33,7 +33,7 @@ jobs:
           java-version: 11
       - name: Build Alerting
         # Only assembling since the full build is governed by other workflows
-        run: ./gradlew assemble -Dopensearch.version=1.3.0-SNAPSHOT
+        run: ./gradlew assemble -Dopensearch.version=2.0.0-SNAPSHOT
       - name: Pull and Run Docker
         run: |
           plugin=`ls alerting/build/distributions/*.zip`

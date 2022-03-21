@@ -159,7 +159,10 @@ data class ClusterMetricsInput(
             pathParams = pathParams.trim('/')
             ILLEGAL_PATH_PARAMETER_CHARACTERS.forEach { character ->
                 if (pathParams.contains(character))
-                    throw IllegalArgumentException("The provided path parameters contain invalid characters or spaces. Please omit: ${ILLEGAL_PATH_PARAMETER_CHARACTERS.joinToString(" ")}")
+                    throw IllegalArgumentException(
+                        "The provided path parameters contain invalid characters or spaces. Please omit: " +
+                            "${ILLEGAL_PATH_PARAMETER_CHARACTERS.joinToString(" ")}"
+                    )
             }
         }
 
