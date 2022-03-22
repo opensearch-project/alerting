@@ -30,6 +30,8 @@ import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.AlertingConfigAccessor
 import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
+import org.opensearch.alerting.model.DocumentExecutionContext
+import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.Monitor
@@ -48,6 +50,7 @@ import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.model.docLevelInput.DocLevelMonitorInput
 import org.opensearch.alerting.model.docLevelInput.DocLevelQuery
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
+import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
@@ -757,39 +760,133 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             return
         }
 
-        for (query in queries) {
-            runForEachQuery(monitor, lastRunContext, index, query)
+        val count: Int = lastRunContext["shards_count"] as Int
+        val updatedLastRunContext = lastRunContext.toMutableMap()
+        for (i: Int in 0 until count) {
+            val shard = i.toString()
+            val maxSeqNo: Long = getMaxSeqNo(index, shard)
+            updatedLastRunContext[shard] = maxSeqNo.toString()
+        }
+
+        val queryToDocIds = mutableMapOf<DocLevelQuery, Set<String>>()
+        val docsToQueries = mutableMapOf<String, MutableList<String>>()
+        val docExecutionContext = DocumentExecutionContext(queries, lastRunContext, updatedLastRunContext)
+        queries.forEach { query ->
+            val matchingDocIds = runForEachQuery(docExecutionContext, query, index)
+            queryToDocIds[query] = matchingDocIds
+            matchingDocIds.forEach {
+                docsToQueries.putIfAbsent(it, mutableListOf())
+                docsToQueries[it]?.add(query.id)
+            }
+        }
+
+        val queryIds = queries.map { it.id }
+
+        monitor.triggers.forEach {
+            runForEachDocTrigger(it as DocumentLevelTrigger, monitor, docsToQueries, queryIds, queryToDocIds)
+        }
+
+        // TODO: Check for race condition against the update monitor api
+        // This does the update at the end in case of errors and makes sure all the queries are executed
+        val updatedMonitor = monitor.copy(lastRunContext = updatedLastRunContext)
+        // note: update has to called in serial for shards of a given index.
+        // make sure this is just updated for the specific query or at the end of all the queries
+        updateMonitor(client, xContentRegistry, settings, updatedMonitor)
+    }
+
+    private fun runForEachDocTrigger(
+        trigger: DocumentLevelTrigger,
+        monitor: Monitor,
+        docsToQueries: Map<String, List<String>>,
+        queryIds: List<String>,
+        queryToDocIds: Map<DocLevelQuery, Set<String>>
+    ) {
+        val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger)
+        val triggerResult = triggerService.runDocLevelTrigger(monitor, trigger, triggerCtx, docsToQueries, queryIds)
+
+        logger.info("trigger results")
+        logger.info(triggerResult.triggeredDocs.toString())
+
+        val index = (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
+
+        queryToDocIds.forEach {
+            val queryTriggeredDocs = it.value.intersect(triggerResult.triggeredDocs)
+            if (queryTriggeredDocs.isNotEmpty()) {
+                val findingId = createFindings(monitor, index, it.key, queryTriggeredDocs, trigger)
+                // TODO: check if need to create alert, if so create it and point it to FindingId
+                // TODO: run action as well, but this mat need to be throttled based on Mo's comment for bucket level alerting
+            }
         }
     }
 
-    private suspend fun runForEachQuery(monitor: Monitor, lastRunContext: MutableMap<String, Any>, index: String, query: DocLevelQuery) {
-        val count: Int = lastRunContext["shards_count"] as Int
+    private fun createFindings(
+        monitor: Monitor,
+        index: String,
+        docLevelQuery: DocLevelQuery,
+        matchingDocIds: Set<String>,
+        trigger: DocumentLevelTrigger
+    ): String {
+        val finding = Finding(
+            id = UUID.randomUUID().toString(),
+            relatedDocId = matchingDocIds.joinToString(","),
+            monitorId = monitor.id,
+            monitorName = monitor.name,
+            index = index,
+            queryId = docLevelQuery.id,
+            queryTags = docLevelQuery.tags,
+            severity = docLevelQuery.severity,
+            timestamp = Instant.now(),
+            triggerId = trigger.id,
+            triggerName = trigger.name
+        )
+
+        val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
+        // change this to debug.
+        logger.info("Findings: $findingStr")
+
+        // todo: below is all hardcoded, temp code and added only to test. replace this with proper Findings index lifecycle management.
+        val indexRequest = IndexRequest(".opensearch-alerting-findings")
+            .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+            .source(findingStr, XContentType.JSON)
+
+        client.index(indexRequest).actionGet()
+        return finding.id
+    }
+
+    private fun runForEachQuery(
+        docExecutionCtx: DocumentExecutionContext,
+        query: DocLevelQuery,
+        index: String
+    ): Set<String> {
+        val count: Int = docExecutionCtx.lastRunContext["shards_count"] as Int
+        val matchingDocs = mutableSetOf<String>()
         for (i: Int in 0 until count) {
             val shard = i.toString()
             try {
                 logger.info("Monitor execution for shard: $shard")
 
-                val maxSeqNo: Long = getMaxSeqNo(index, shard)
+                val maxSeqNo: Long = docExecutionCtx.updatedLastRunContext[shard].toString().toLong()
                 logger.info("MaxSeqNo of shard_$shard is $maxSeqNo")
 
-                // todo: scope to optimize this: in prev seqno and current max seq no are same don't search.
-                val hits: SearchHits = searchShard(index, shard, lastRunContext[shard].toString().toLongOrNull(), maxSeqNo, query.query)
+                val hits: SearchHits = searchShard(
+                    index,
+                    shard,
+                    docExecutionCtx.lastRunContext[shard].toString().toLongOrNull(),
+                    maxSeqNo,
+                    query.query
+                )
                 logger.info("Search hits for shard_$shard is: ${hits.hits.size}")
 
                 if (hits.hits.isNotEmpty()) {
-                    createFindings(monitor, index, query, hits)
+                    logger.info("found matches")
+                    matchingDocs.addAll(getAllDocIds(hits))
                 }
-
-                logger.info("Updating monitor: ${monitor.id}")
-                lastRunContext[shard] = maxSeqNo.toString()
-                val updatedMonitor = monitor.copy(lastRunContext = lastRunContext)
-                // note: update has to called in serial for shards of a given index.
-                updateMonitor(client, xContentRegistry, settings, updatedMonitor)
             } catch (e: Exception) {
                 logger.info("Failed to run for shard $shard. Error: ${e.message}")
                 logger.debug("Failed to run for shard $shard", e)
             }
         }
+        return matchingDocs
     }
 
     // todo: add more validations.
@@ -810,7 +907,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
 
     private fun getShardsCount(index: String): Int {
         val allShards: List<ShardRouting> = clusterService.state().routingTable().allShards(index)
-        return allShards.size
+        return allShards.filter { it.primary() }.size
     }
 
     private fun createRunContext(index: String): HashMap<String, Any> {
@@ -854,6 +951,9 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
     }
 
     private fun searchShard(index: String, shard: String, prevSeqNo: Long?, maxSeqNo: Long, query: String): SearchHits {
+        if (prevSeqNo?.equals(maxSeqNo) == true) {
+            return SearchHits.empty()
+        }
         val boolQueryBuilder = BoolQueryBuilder()
         boolQueryBuilder.filter(QueryBuilders.rangeQuery("_seq_no").gt(prevSeqNo).lte(maxSeqNo))
         boolQueryBuilder.must(QueryBuilders.queryStringQuery(query))
@@ -875,39 +975,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         return response.hits
     }
 
-    private fun createFindings(monitor: Monitor, index: String, docLevelQuery: DocLevelQuery, hits: SearchHits) {
-        val finding = Finding(
-            id = UUID.randomUUID().toString(),
-            relatedDocId = getAllDocIds(hits),
-            monitorId = monitor.id,
-            monitorName = monitor.name,
-            index = index,
-            queryId = docLevelQuery.id,
-            queryTags = docLevelQuery.tags,
-            severity = docLevelQuery.severity,
-            timestamp = Instant.now(),
-            triggerId = null, // todo: add once integrated with actions/triggers
-            triggerName = null // todo: add once integrated with actions/triggers
-        )
-
-        val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
-        // change this to debug.
-        logger.info("Findings: $findingStr")
-
-        // todo: below is all hardcoded, temp code and added only to test. replace this with proper Findings index lifecycle management.
-        val indexRequest = IndexRequest(".opensearch-alerting-findings")
-            .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-            .source(findingStr, XContentType.JSON)
-
-        client.index(indexRequest).actionGet()
-    }
-
-    private fun getAllDocIds(hits: SearchHits): String {
-        var sb = StringBuilder()
-        for (hit in hits) {
-            sb.append(hit.id)
-            sb.append(",")
-        }
-        return sb.substring(0, sb.length - 1)
+    private fun getAllDocIds(hits: SearchHits): List<String> {
+        return hits.map { hit -> hit.id }
     }
 }

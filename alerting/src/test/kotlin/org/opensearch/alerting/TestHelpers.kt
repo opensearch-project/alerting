@@ -22,6 +22,8 @@ import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
+import org.opensearch.alerting.model.DocumentLevelTrigger
+import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.Monitor
@@ -202,6 +204,23 @@ fun randomBucketSelectorScript(
     params: Map<String, String> = mutableMapOf("avg" to "10")
 ): Script {
     return Script(Script.DEFAULT_SCRIPT_TYPE, Script.DEFAULT_SCRIPT_LANG, idOrCode, emptyMap<String, String>(), params)
+}
+
+fun randomDocLevelTrigger(
+    id: String = UUIDs.base64UUID(),
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    severity: String = "1",
+    condition: Script = randomScript(),
+    actions: List<Action> = mutableListOf(),
+    destinationId: String = ""
+): DocumentLevelTrigger {
+    return DocumentLevelTrigger(
+        id = id,
+        name = name,
+        severity = severity,
+        condition = condition,
+        actions = if (actions.isEmpty()) (0..randomInt(10)).map { randomAction(destinationId = destinationId) } else actions
+    )
 }
 
 fun randomEmailAccount(
@@ -412,6 +431,21 @@ fun randomBucketLevelMonitorRunResult(): MonitorRunResult<BucketLevelTriggerRunR
     )
 }
 
+fun randomDocumentLevelMonitorRunResult(): MonitorRunResult<DocumentLevelTriggerRunResult> {
+    val triggerResults = mutableMapOf<String, DocumentLevelTriggerRunResult>()
+    val triggerRunResult = randomDocumentLevelTriggerRunResult()
+    triggerResults.plus(Pair("test", triggerRunResult))
+
+    return MonitorRunResult(
+        "test-monitor",
+        Instant.now(),
+        Instant.now(),
+        null,
+        randomInputRunResults(),
+        triggerResults
+    )
+}
+
 fun randomInputRunResults(): InputRunResults {
     return InputRunResults(listOf(), null)
 }
@@ -459,6 +493,13 @@ fun randomBucketLevelTriggerRunResult(): BucketLevelTriggerRunResult {
         ),
         actionResultsMap
     )
+}
+
+fun randomDocumentLevelTriggerRunResult(): DocumentLevelTriggerRunResult {
+    val map = mutableMapOf<String, ActionRunResult>()
+    map.plus(Pair("key1", randomActionRunResult()))
+    map.plus(Pair("key2", randomActionRunResult()))
+    return DocumentLevelTriggerRunResult("trigger-name", mutableListOf(UUIDs.randomBase64UUID().toString()), null, map)
 }
 
 fun randomActionRunResult(): ActionRunResult {

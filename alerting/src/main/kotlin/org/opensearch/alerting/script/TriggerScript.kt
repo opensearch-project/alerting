@@ -37,7 +37,7 @@ abstract class TriggerScript(_scriptParams: Map<String, Any>) {
      *
      * @param ctx - the trigger execution context
      */
-    abstract fun execute(ctx: QueryLevelTriggerExecutionContext): Boolean
+    abstract fun execute(ctx: TriggerExecutionContext): Boolean
 
     interface Factory {
         fun newInstance(scriptParams: Map<String, Any>): TriggerScript
