@@ -18,6 +18,7 @@ import java.io.IOException
 interface Trigger : Writeable, ToXContentObject {
 
     enum class Type(val value: String) {
+        DOCUMENT_LEVEL_TRIGGER(DocumentLevelTrigger.DOCUMENT_LEVEL_TRIGGER_FIELD),
         QUERY_LEVEL_TRIGGER(QueryLevelTrigger.QUERY_LEVEL_TRIGGER_FIELD),
         BUCKET_LEVEL_TRIGGER(BucketLevelTrigger.BUCKET_LEVEL_TRIGGER_FIELD);
 
@@ -58,6 +59,7 @@ interface Trigger : Writeable, ToXContentObject {
             return when (val type = sin.readEnum(Trigger.Type::class.java)) {
                 Type.QUERY_LEVEL_TRIGGER -> QueryLevelTrigger(sin)
                 Type.BUCKET_LEVEL_TRIGGER -> BucketLevelTrigger(sin)
+                Type.DOCUMENT_LEVEL_TRIGGER -> DocumentLevelTrigger(sin)
                 // This shouldn't be reachable but ensuring exhaustiveness as Kotlin warns
                 // enum can be null in Java
                 else -> throw IllegalStateException("Unexpected input [$type] when reading Trigger")
