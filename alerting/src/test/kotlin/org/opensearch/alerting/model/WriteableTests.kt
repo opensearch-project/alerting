@@ -17,6 +17,9 @@ import org.opensearch.alerting.randomActionRunResult
 import org.opensearch.alerting.randomBucketLevelMonitorRunResult
 import org.opensearch.alerting.randomBucketLevelTrigger
 import org.opensearch.alerting.randomBucketLevelTriggerRunResult
+import org.opensearch.alerting.randomDocLevelTrigger
+import org.opensearch.alerting.randomDocumentLevelMonitorRunResult
+import org.opensearch.alerting.randomDocumentLevelTriggerRunResult
 import org.opensearch.alerting.randomEmailAccount
 import org.opensearch.alerting.randomEmailGroup
 import org.opensearch.alerting.randomInputRunResults
@@ -107,6 +110,15 @@ class WriteableTests : OpenSearchTestCase() {
         assertEquals("Round tripping BucketLevelTrigger doesn't work", trigger, newTrigger)
     }
 
+    fun `test doc-level trigger as stream`() {
+        val trigger = randomDocLevelTrigger()
+        val out = BytesStreamOutput()
+        trigger.writeTo(out)
+        val sin = StreamInput.wrap(out.bytes().toBytesRef().bytes)
+        val newTrigger = DocumentLevelTrigger.readFrom(sin)
+        assertEquals("Round tripping DocumentLevelTrigger doesn't work", trigger, newTrigger)
+    }
+
     fun `test actionrunresult as stream`() {
         val actionRunResult = randomActionRunResult()
         val out = BytesStreamOutput()
@@ -134,6 +146,15 @@ class WriteableTests : OpenSearchTestCase() {
         assertEquals("Round tripping ActionRunResult doesn't work", runResult, newRunResult)
     }
 
+    fun `test doc-level triggerrunresult as stream`() {
+        val runResult = randomDocumentLevelTriggerRunResult()
+        val out = BytesStreamOutput()
+        runResult.writeTo(out)
+        val sin = StreamInput.wrap(out.bytes().toBytesRef().bytes)
+        val newRunResult = DocumentLevelTriggerRunResult(sin)
+        assertEquals("Round tripping ActionRunResult doesn't work", runResult, newRunResult)
+    }
+
     fun `test inputrunresult as stream`() {
         val runResult = randomInputRunResults()
         val out = BytesStreamOutput()
@@ -158,6 +179,15 @@ class WriteableTests : OpenSearchTestCase() {
         runResult.writeTo(out)
         val sin = StreamInput.wrap(out.bytes().toBytesRef().bytes)
         val newRunResult = MonitorRunResult<BucketLevelTriggerRunResult>(sin)
+        assertEquals("Round tripping MonitorRunResult doesn't work", runResult, newRunResult)
+    }
+
+    fun `test doc-level monitorrunresult as stream`() {
+        val runResult = randomDocumentLevelMonitorRunResult()
+        val out = BytesStreamOutput()
+        runResult.writeTo(out)
+        val sin = StreamInput.wrap(out.bytes().toBytesRef().bytes)
+        val newRunResult = MonitorRunResult<DocumentLevelTriggerRunResult>(sin)
         assertEquals("Round tripping MonitorRunResult doesn't work", runResult, newRunResult)
     }
 
