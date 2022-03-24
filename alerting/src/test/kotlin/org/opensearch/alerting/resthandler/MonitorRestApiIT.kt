@@ -1136,16 +1136,16 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val monitor = createRandomDocumentMonitor()
 
         val updatedTriggers = listOf(
-                QueryLevelTrigger(
-                        name = "foo",
-                        severity = "1",
-                        condition = Script("return true"),
-                        actions = emptyList()
-                )
+            QueryLevelTrigger(
+                name = "foo",
+                severity = "1",
+                condition = Script("return true"),
+                actions = emptyList()
+            )
         )
         val updateResponse = OpenSearchRestTestCase.client().makeRequest(
-                "PUT", monitor.relativeUrl(),
-                emptyMap(), monitor.copy(triggers = updatedTriggers).toHttpEntity()
+            "PUT", monitor.relativeUrl(),
+            emptyMap(), monitor.copy(triggers = updatedTriggers).toHttpEntity()
         )
 
         OpenSearchRestTestCase.assertEquals("Update monitor failed", RestStatus.OK, updateResponse.restStatus())
