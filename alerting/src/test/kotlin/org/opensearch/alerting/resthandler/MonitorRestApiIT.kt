@@ -21,6 +21,7 @@ import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.Alert
+import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.destination.Chime
@@ -30,6 +31,8 @@ import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomAlert
 import org.opensearch.alerting.randomAnomalyDetector
 import org.opensearch.alerting.randomAnomalyDetectorWithUser
+import org.opensearch.alerting.randomBucketLevelTrigger
+import org.opensearch.alerting.randomDocumentLevelMonitor
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.randomThrottle
@@ -1101,5 +1104,91 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         }
 
         return false
+    }
+
+    @Throws(Exception::class)
+    fun `test creating a document monitor`() {
+        val monitor = randomDocumentLevelMonitor()
+
+        val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+
+        assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
+        val responseBody = createResponse.asMap()
+        val createdId = responseBody["_id"] as String
+        val createdVersion = responseBody["_version"] as Int
+        assertNotEquals("response is missing Id", Monitor.NO_ID, createdId)
+        assertTrue("incorrect version", createdVersion > 0)
+        val actualLocation = createResponse.getHeader("Location")
+        assertEquals("Incorrect Location header", "$ALERTING_BASE_URI/$createdId", actualLocation)
+    }
+
+    @Throws(Exception::class)
+    fun `test getting a document level monitor`() {
+        val monitor = createRandomDocumentMonitor()
+
+        val storedMonitor = getMonitor(monitor.id)
+
+        assertEquals("Indexed and retrieved monitor differ", monitor, storedMonitor)
+    }
+
+    @Throws(Exception::class)
+    fun `test updating conditions for a document level monitor`() {
+        val monitor = createRandomDocumentMonitor()
+
+        val updatedTriggers = listOf(
+                QueryLevelTrigger(
+                        name = "foo",
+                        severity = "1",
+                        condition = Script("return true"),
+                        actions = emptyList()
+                )
+        )
+        val updateResponse = OpenSearchRestTestCase.client().makeRequest(
+                "PUT", monitor.relativeUrl(),
+                emptyMap(), monitor.copy(triggers = updatedTriggers).toHttpEntity()
+        )
+
+        OpenSearchRestTestCase.assertEquals("Update monitor failed", RestStatus.OK, updateResponse.restStatus())
+        val responseBody = updateResponse.asMap()
+        OpenSearchRestTestCase.assertEquals("Updated monitor id doesn't match", monitor.id, responseBody["_id"] as String)
+        OpenSearchRestTestCase.assertEquals("Version not incremented", (monitor.version + 1).toInt(), responseBody["_version"] as Int)
+
+        val updatedMonitor = getMonitor(monitor.id)
+        OpenSearchRestTestCase.assertEquals("Monitor trigger not updated", updatedTriggers, updatedMonitor.triggers)
+    }
+
+    @Throws(Exception::class)
+    fun `test deleting a document level monitor`() {
+        val monitor = createRandomDocumentMonitor()
+
+        val deleteResponse = client().makeRequest("DELETE", monitor.relativeUrl())
+        assertEquals("Delete failed", RestStatus.OK, deleteResponse.restStatus())
+
+        val getResponse = client().makeRequest("HEAD", monitor.relativeUrl())
+        assertEquals("Deleted monitor still exists", RestStatus.NOT_FOUND, getResponse.restStatus())
+    }
+
+    @Throws(Exception::class)
+    fun `test creating a document monitor with error trigger`() {
+        val trigger = randomQueryLevelTrigger()
+        val monitor = randomDocumentLevelMonitor(triggers = listOf(trigger))
+        try {
+            client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+            fail("Monitor with illegal trigger should be rejected.")
+        } catch (e: IllegalArgumentException) {
+            assertNotEquals(e.message, "Illegal trigger type, ${QueryLevelTrigger::javaClass.name}, for bucket level monitor")
+        }
+    }
+
+    @Throws(Exception::class)
+    fun `test creating a query monitor with error trigger`() {
+        val trigger = randomBucketLevelTrigger()
+        val monitor = randomQueryLevelMonitor(triggers = listOf(trigger))
+        try {
+            client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+            fail("Monitor with illegal trigger should be rejected.")
+        } catch (e: IllegalArgumentException) {
+            assertNotEquals(e.message, "Illegal trigger type, ${BucketLevelTrigger::javaClass.name}, for bucket level monitor")
+        }
     }
 }
