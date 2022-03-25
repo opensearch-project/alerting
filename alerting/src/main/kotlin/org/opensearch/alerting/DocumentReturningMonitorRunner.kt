@@ -7,8 +7,8 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.elasticapi.string
 import org.opensearch.alerting.model.ActionRunResult
-import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.DocumentExecutionContext
+import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.Monitor
@@ -34,11 +34,11 @@ import java.time.Instant
 import java.util.UUID
 import kotlin.collections.HashMap
 
-object DocumentReturningMonitorRunner: MonitorRunner {
+object DocumentReturningMonitorRunner : MonitorRunner {
     private val logger = LogManager.getLogger(javaClass)
 
     override suspend fun runMonitor(monitor: Monitor, monitorCtx: MonitorRunnerExecutionContext, periodStart: Instant, periodEnd: Instant, dryrun: Boolean):
-            MonitorRunResult<DocumentLevelTriggerRunResult> {
+        MonitorRunResult<DocumentLevelTriggerRunResult> {
         logger.info("Document-level-monitor is running ...")
         val monitorResult = MonitorRunResult<DocumentLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
         try {
@@ -105,13 +105,13 @@ object DocumentReturningMonitorRunner: MonitorRunner {
     }
 
     private fun runForEachDocTrigger(
-            monitorCtx: MonitorRunnerExecutionContext,
-            trigger: DocumentLevelTrigger,
-            monitor: Monitor,
-            docsToQueries: Map<String, List<String>>,
-            queryIds: List<String>,
-            queryToDocIds: Map<DocLevelQuery, Set<String>>,
-            dryrun: Boolean
+        monitorCtx: MonitorRunnerExecutionContext,
+        trigger: DocumentLevelTrigger,
+        monitor: Monitor,
+        docsToQueries: Map<String, List<String>>,
+        queryIds: List<String>,
+        queryToDocIds: Map<DocLevelQuery, Set<String>>,
+        dryrun: Boolean
     ) {
         val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger)
         val triggerResult = monitorCtx.triggerService!!.runDocLevelTrigger(monitor, trigger, triggerCtx, docsToQueries, queryIds)
@@ -133,25 +133,25 @@ object DocumentReturningMonitorRunner: MonitorRunner {
     }
 
     fun createFindings(
-            monitor: Monitor,
-            monitorCtx: MonitorRunnerExecutionContext,
-            index: String,
-            docLevelQuery: DocLevelQuery,
-            matchingDocIds: Set<String>,
-            trigger: DocumentLevelTrigger
+        monitor: Monitor,
+        monitorCtx: MonitorRunnerExecutionContext,
+        index: String,
+        docLevelQuery: DocLevelQuery,
+        matchingDocIds: Set<String>,
+        trigger: DocumentLevelTrigger
     ): String {
         val finding = Finding(
-                id = UUID.randomUUID().toString(),
-                relatedDocId = matchingDocIds.joinToString(","),
-                monitorId = monitor.id,
-                monitorName = monitor.name,
-                index = index,
-                queryId = docLevelQuery.id,
-                queryTags = docLevelQuery.tags,
-                severity = docLevelQuery.severity,
-                timestamp = Instant.now(),
-                triggerId = trigger.id,
-                triggerName = trigger.name
+            id = UUID.randomUUID().toString(),
+            relatedDocId = matchingDocIds.joinToString(","),
+            monitorId = monitor.id,
+            monitorName = monitor.name,
+            index = index,
+            queryId = docLevelQuery.id,
+            queryTags = docLevelQuery.tags,
+            severity = docLevelQuery.severity,
+            timestamp = Instant.now(),
+            triggerId = trigger.id,
+            triggerName = trigger.name
         )
 
         val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
@@ -160,8 +160,8 @@ object DocumentReturningMonitorRunner: MonitorRunner {
 
         // todo: below is all hardcoded, temp code and added only to test. replace this with proper Findings index lifecycle management.
         val indexRequest = IndexRequest(".opensearch-alerting-findings")
-                .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-                .source(findingStr, XContentType.JSON)
+            .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+            .source(findingStr, XContentType.JSON)
 
         monitorCtx.client!!.index(indexRequest).actionGet()
         return finding.id
@@ -207,16 +207,16 @@ object DocumentReturningMonitorRunner: MonitorRunner {
      */
     private fun getMaxSeqNo(monitorCtx: MonitorRunnerExecutionContext, index: String, shard: String): Long {
         val request: SearchRequest = SearchRequest()
-                .indices(index)
-                .preference("_shards:$shard")
-                .source(
-                        SearchSourceBuilder()
-                                .version(true)
-                                .sort("_seq_no", SortOrder.DESC)
-                                .seqNoAndPrimaryTerm(true)
-                                .query(QueryBuilders.matchAllQuery())
-                                .size(1)
-                )
+            .indices(index)
+            .preference("_shards:$shard")
+            .source(
+                SearchSourceBuilder()
+                    .version(true)
+                    .sort("_seq_no", SortOrder.DESC)
+                    .seqNoAndPrimaryTerm(true)
+                    .query(QueryBuilders.matchAllQuery())
+                    .size(1)
+            )
         val response: SearchResponse = monitorCtx.client!!.search(request).actionGet()
         if (response.status() !== RestStatus.OK) {
             throw IOException("Failed to get max seq no for shard: $shard")
@@ -233,10 +233,10 @@ object DocumentReturningMonitorRunner: MonitorRunner {
     }
 
     private fun runForEachQuery(
-            monitorCtx: MonitorRunnerExecutionContext,
-            docExecutionCtx: DocumentExecutionContext,
-            query: DocLevelQuery,
-            index: String
+        monitorCtx: MonitorRunnerExecutionContext,
+        docExecutionCtx: DocumentExecutionContext,
+        query: DocLevelQuery,
+        index: String
     ): Set<String> {
         val count: Int = docExecutionCtx.lastRunContext["shards_count"] as Int
         val matchingDocs = mutableSetOf<String>()
@@ -249,12 +249,12 @@ object DocumentReturningMonitorRunner: MonitorRunner {
                 logger.info("MaxSeqNo of shard_$shard is $maxSeqNo")
 
                 val hits: SearchHits = searchShard(
-                        monitorCtx,
-                        index,
-                        shard,
-                        docExecutionCtx.lastRunContext[shard].toString().toLongOrNull(),
-                        maxSeqNo,
-                        query.query
+                    monitorCtx,
+                    index,
+                    shard,
+                    docExecutionCtx.lastRunContext[shard].toString().toLongOrNull(),
+                    maxSeqNo,
+                    query.query
                 )
                 logger.info("Search hits for shard_$shard is: ${hits.hits.size}")
 
@@ -279,14 +279,14 @@ object DocumentReturningMonitorRunner: MonitorRunner {
         boolQueryBuilder.must(QueryBuilders.queryStringQuery(query))
 
         val request: SearchRequest = SearchRequest()
-                .indices(index)
-                .preference("_shards:$shard")
-                .source(
-                        SearchSourceBuilder()
-                                .version(true)
-                                .query(boolQueryBuilder)
-                                .size(10000) // fixme: make this configurable.
-                )
+            .indices(index)
+            .preference("_shards:$shard")
+            .source(
+                SearchSourceBuilder()
+                    .version(true)
+                    .query(boolQueryBuilder)
+                    .size(10000) // fixme: make this configurable.
+            )
         logger.info("Request: $request")
         val response: SearchResponse = monitorCtx.client!!.search(request).actionGet()
         if (response.status() !== RestStatus.OK) {

@@ -5,16 +5,16 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.elasticapi.InjectorContextElement
-import org.opensearch.alerting.model.InputRunResults
-import org.opensearch.alerting.model.BucketLevelTrigger
+import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.AlertingConfigAccessor
-import org.opensearch.alerting.model.ActionRunResult
+import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
+import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.model.action.ActionExecutionScope
 import org.opensearch.alerting.model.action.Action
+import org.opensearch.alerting.model.action.ActionExecutionScope
 import org.opensearch.alerting.model.action.AlertCategory
 import org.opensearch.alerting.model.action.PerAlertActionScope
 import org.opensearch.alerting.model.action.PerExecutionActionScope
@@ -27,11 +27,11 @@ import org.opensearch.alerting.util.isAllowed
 import org.opensearch.common.Strings
 import java.time.Instant
 
-object BucketLevelMonitorRunner: MonitorRunner {
+object BucketLevelMonitorRunner : MonitorRunner {
     private val logger = LogManager.getLogger(javaClass)
 
     override suspend fun runMonitor(monitor: Monitor, monitorCtx: MonitorRunnerExecutionContext, periodStart: Instant, periodEnd: Instant, dryrun: Boolean):
-            MonitorRunResult<BucketLevelTriggerRunResult> {
+        MonitorRunResult<BucketLevelTriggerRunResult> {
         val roles = MonitorRunnerService.getRolesForMonitor(monitor)
         logger.debug("Running monitor: ${monitor.name} with roles: $roles Thread: ${Thread.currentThread().name}")
 
@@ -112,7 +112,7 @@ object BucketLevelMonitorRunner: MonitorRunner {
                 // TODO: Should triggerResult's aggregationResultBucket be a list? If not, getCategorizedAlertsForBucketLevelMonitor can
                 //  be refactored to use a map instead
                 val categorizedAlerts = monitorCtx.alertService!!.getCategorizedAlertsForBucketLevelMonitor(
-                        monitor, trigger, currentAlertsForTrigger, triggerResult.aggregationResultBuckets.values.toList()
+                    monitor, trigger, currentAlertsForTrigger, triggerResult.aggregationResultBuckets.values.toList()
                 ).toMutableMap()
                 val dedupedAlerts = categorizedAlerts.getOrDefault(AlertCategory.DEDUPED, emptyList())
                 var newAlerts = categorizedAlerts.getOrDefault(AlertCategory.NEW, emptyList())
@@ -134,9 +134,9 @@ object BucketLevelMonitorRunner: MonitorRunner {
                 // Store deduped and new Alerts to accumulate across pages
                 if (!nextAlerts.containsKey(trigger.id)) {
                     nextAlerts[trigger.id] = mutableMapOf(
-                            AlertCategory.DEDUPED to mutableListOf(),
-                            AlertCategory.NEW to mutableListOf(),
-                            AlertCategory.COMPLETED to mutableListOf()
+                        AlertCategory.DEDUPED to mutableListOf(),
+                        AlertCategory.NEW to mutableListOf(),
+                        AlertCategory.COMPLETED to mutableListOf()
                     )
                 }
                 nextAlerts[trigger.id]?.get(AlertCategory.DEDUPED)?.addAll(dedupedAlerts)
@@ -158,8 +158,8 @@ object BucketLevelMonitorRunner: MonitorRunner {
             // Filter ACKNOWLEDGED Alerts from the deduped list so they do not have Actions executed for them.
             // New Alerts are ignored since they cannot be acknowledged yet.
             val dedupedAlerts = nextAlerts[trigger.id]?.get(AlertCategory.DEDUPED)
-                    ?.filterNot { it.state == Alert.State.ACKNOWLEDGED }?.toMutableList()
-                    ?: mutableListOf()
+                ?.filterNot { it.state == Alert.State.ACKNOWLEDGED }?.toMutableList()
+                ?: mutableListOf()
             // Update nextAlerts so the filtered DEDUPED Alerts are reflected for PER_ALERT Action execution
             nextAlerts[trigger.id]?.set(AlertCategory.DEDUPED, dedupedAlerts)
             val newAlerts = nextAlerts[trigger.id]?.get(AlertCategory.NEW) ?: mutableListOf()
@@ -174,11 +174,11 @@ object BucketLevelMonitorRunner: MonitorRunner {
             val triggerResult = triggerResults[trigger.id]!!
             val monitorOrTriggerError = monitorResult.error ?: triggerResult.error
             val shouldDefaultToPerExecution = defaultToPerExecutionAction(
-                    monitorCtx,
-                    monitorId = monitor.id,
-                    triggerId = trigger.id,
-                    totalActionableAlertCount = dedupedAlerts.size + newAlerts.size + completedAlerts.size,
-                    monitorOrTriggerError = monitorOrTriggerError
+                monitorCtx,
+                monitorId = monitor.id,
+                triggerId = trigger.id,
+                totalActionableAlertCount = dedupedAlerts.size + newAlerts.size + completedAlerts.size,
+                monitorOrTriggerError = monitorOrTriggerError
             )
             for (action in trigger.actions) {
                 // ActionExecutionPolicy should not be null for Bucket-Level Monitors since it has a default config when not set explicitly
@@ -188,7 +188,7 @@ object BucketLevelMonitorRunner: MonitorRunner {
                         val alertsToExecuteActionsFor = nextAlerts[trigger.id]?.get(alertCategory) ?: mutableListOf()
                         for (alert in alertsToExecuteActionsFor) {
                             val actionCtx = getActionContextForAlertCategory(
-                                    alertCategory, alert, triggerCtx, monitorOrTriggerError
+                                alertCategory, alert, triggerCtx, monitorOrTriggerError
                             )
                             // AggregationResultBucket should not be null here
                             val alertBucketKeysHash = alert.aggregationResultBucket!!.getBucketKeysHash()
@@ -218,10 +218,10 @@ object BucketLevelMonitorRunner: MonitorRunner {
                         continue
 
                     val actionCtx = triggerCtx.copy(
-                            dedupedAlerts = dedupedAlerts,
-                            newAlerts = newAlerts,
-                            completedAlerts = completedAlerts,
-                            error = monitorResult.error ?: triggerResult.error
+                        dedupedAlerts = dedupedAlerts,
+                        newAlerts = newAlerts,
+                        completedAlerts = completedAlerts,
+                        error = monitorResult.error ?: triggerResult.error
                     )
                     val actionResult = this.runAction(action, actionCtx, monitorCtx, dryrun)
                     // If there was an error during trigger execution then the Alerts to be updated are the current Alerts since the state
@@ -250,10 +250,10 @@ object BucketLevelMonitorRunner: MonitorRunner {
                 val bucketKeysHash = alert.aggregationResultBucket!!.getBucketKeysHash()
                 val actionResults = triggerResult.actionResultsMap.getOrDefault(bucketKeysHash, emptyMap<String, ActionRunResult>())
                 monitorCtx.alertService!!.updateActionResultsForBucketLevelAlert(
-                        alert.copy(lastNotificationTime = MonitorRunnerService.currentTime()),
-                        actionResults,
-                        // TODO: Update BucketLevelTriggerRunResult.alertError() to retrieve error based on the first failed Action
-                        monitorResult.alertError() ?: triggerResult.alertError()
+                    alert.copy(lastNotificationTime = MonitorRunnerService.currentTime()),
+                    actionResults,
+                    // TODO: Update BucketLevelTriggerRunResult.alertError() to retrieve error based on the first failed Action
+                    monitorResult.alertError() ?: triggerResult.alertError()
                 )
             }
 
@@ -286,10 +286,10 @@ object BucketLevelMonitorRunner: MonitorRunner {
 
                     val destinationCtx = monitorCtx.destinationContextFactory!!.getDestinationContext(destination)
                     actionOutput[Action.MESSAGE_ID] = destination.publish(
-                            actionOutput[Action.SUBJECT],
-                            actionOutput[Action.MESSAGE]!!,
-                            destinationCtx,
-                            monitorCtx.hostDenyList
+                        actionOutput[Action.SUBJECT],
+                        actionOutput[Action.MESSAGE]!!,
+                        destinationCtx,
+                        monitorCtx.hostDenyList
                     )
                 }
             }
@@ -300,17 +300,17 @@ object BucketLevelMonitorRunner: MonitorRunner {
     }
 
     private fun defaultToPerExecutionAction(
-            monitorCtx: MonitorRunnerExecutionContext,
-            monitorId: String,
-            triggerId: String,
-            totalActionableAlertCount: Int,
-            monitorOrTriggerError: Exception?
+        monitorCtx: MonitorRunnerExecutionContext,
+        monitorId: String,
+        triggerId: String,
+        totalActionableAlertCount: Int,
+        monitorOrTriggerError: Exception?
     ): Boolean {
         // If the monitorId or triggerResult has an error, then also default to PER_EXECUTION to communicate the error
         if (monitorOrTriggerError != null) {
             logger.debug(
-                    "Trigger [$triggerId] in monitor [$monitorId] encountered an error. Defaulting to " +
-                            "[${ActionExecutionScope.Type.PER_EXECUTION}] for action execution to communicate error."
+                "Trigger [$triggerId] in monitor [$monitorId] encountered an error. Defaulting to " +
+                    "[${ActionExecutionScope.Type.PER_EXECUTION}] for action execution to communicate error."
             )
             return true
         }
@@ -322,9 +322,9 @@ object BucketLevelMonitorRunner: MonitorRunner {
         // PER_EXECUTION for less intrusive Actions
         if (totalActionableAlertCount > monitorCtx.maxActionableAlertCount) {
             logger.debug(
-                    "The total actionable alerts for trigger [$triggerId] in monitor [$monitorId] is [$totalActionableAlertCount] " +
-                            "which exceeds the maximum of [$(monitorCtx.maxActionableAlertCount)]. Defaulting to [${ActionExecutionScope.Type.PER_EXECUTION}] " +
-                            "for action execution."
+                "The total actionable alerts for trigger [$triggerId] in monitor [$monitorId] is [$totalActionableAlertCount] " +
+                    "which exceeds the maximum of [$(monitorCtx.maxActionableAlertCount)]. Defaulting to [${ActionExecutionScope.Type.PER_EXECUTION}] " +
+                    "for action execution."
             )
             return true
         }
@@ -333,10 +333,10 @@ object BucketLevelMonitorRunner: MonitorRunner {
     }
 
     private fun getActionContextForAlertCategory(
-            alertCategory: AlertCategory,
-            alert: Alert,
-            ctx: BucketLevelTriggerExecutionContext,
-            error: Exception?
+        alertCategory: AlertCategory,
+        alert: Alert,
+        ctx: BucketLevelTriggerExecutionContext,
+        error: Exception?
     ): BucketLevelTriggerExecutionContext {
         return when (alertCategory) {
             AlertCategory.DEDUPED ->

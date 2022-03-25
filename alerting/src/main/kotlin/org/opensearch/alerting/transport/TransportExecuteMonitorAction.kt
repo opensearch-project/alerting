@@ -22,7 +22,6 @@ import org.opensearch.alerting.action.ExecuteMonitorResponse
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.util.AlertingException
-import org.opensearch.alerting.util.isBucketLevelMonitor
 import org.opensearch.client.Client
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
@@ -39,11 +38,11 @@ import java.time.Instant
 private val log = LogManager.getLogger(TransportGetMonitorAction::class.java)
 
 class TransportExecuteMonitorAction @Inject constructor(
-        transportService: TransportService,
-        private val client: Client,
-        private val runner: MonitorRunnerService,
-        actionFilters: ActionFilters,
-        val xContentRegistry: NamedXContentRegistry
+    transportService: TransportService,
+    private val client: Client,
+    private val runner: MonitorRunnerService,
+    actionFilters: ActionFilters,
+    val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<ExecuteMonitorRequest, ExecuteMonitorResponse> (
     ExecuteMonitorAction.NAME, transportService, actionFilters, ::ExecuteMonitorRequest
 ) {

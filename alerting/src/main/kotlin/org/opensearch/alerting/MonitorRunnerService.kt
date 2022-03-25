@@ -209,10 +209,9 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         } else {
             QueryLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         }
-
     }
 
-    //TODO: See if we can move below methods (or few of these) to a common utils
+    // TODO: See if we can move below methods (or few of these) to a common utils
     internal fun getRolesForMonitor(monitor: Monitor): List<String> {
         /*
          * We need to handle 3 cases:

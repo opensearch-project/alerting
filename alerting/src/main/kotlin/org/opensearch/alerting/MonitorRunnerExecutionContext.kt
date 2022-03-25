@@ -15,26 +15,25 @@ import org.opensearch.threadpool.ThreadPool
 
 data class MonitorRunnerExecutionContext(
 
-        var clusterService: ClusterService? = null,
-        var client: Client? = null,
-        var xContentRegistry: NamedXContentRegistry? = null,
-        var scriptService: ScriptService? = null,
-        var settings: Settings? = null,
-        var threadPool: ThreadPool? =  null,
-        var alertIndices: AlertIndices? = null,
-        var inputService: InputService? = null,
-        var triggerService: TriggerService? = null,
-        var alertService: AlertService? =  null,
+    var clusterService: ClusterService? = null,
+    var client: Client? = null,
+    var xContentRegistry: NamedXContentRegistry? = null,
+    var scriptService: ScriptService? = null,
+    var settings: Settings? = null,
+    var threadPool: ThreadPool? = null,
+    var alertIndices: AlertIndices? = null,
+    var inputService: InputService? = null,
+    var triggerService: TriggerService? = null,
+    var alertService: AlertService? = null,
 
-        @Volatile var retryPolicy: BackoffPolicy? = null,
-        @Volatile var moveAlertsRetryPolicy: BackoffPolicy? = null,
+    @Volatile var retryPolicy: BackoffPolicy? = null,
+    @Volatile var moveAlertsRetryPolicy: BackoffPolicy? = null,
 
-        @Volatile var allowList: List<String> = DestinationSettings.ALLOW_LIST_NONE,
-        @Volatile var hostDenyList: List<String> = LegacyOpenDistroDestinationSettings.HOST_DENY_LIST_NONE,
+    @Volatile var allowList: List<String> = DestinationSettings.ALLOW_LIST_NONE,
+    @Volatile var hostDenyList: List<String> = LegacyOpenDistroDestinationSettings.HOST_DENY_LIST_NONE,
 
-        @Volatile var destinationSettings: Map<String, DestinationSettings.Companion.SecureDestinationSettings>? = null,
-        @Volatile var destinationContextFactory: DestinationContextFactory? = null,
+    @Volatile var destinationSettings: Map<String, DestinationSettings.Companion.SecureDestinationSettings>? = null,
+    @Volatile var destinationContextFactory: DestinationContextFactory? = null,
 
-        @Volatile var maxActionableAlertCount: Long = AlertingSettings.DEFAULT_MAX_ACTIONABLE_ALERT_COUNT
-) {
-}
+    @Volatile var maxActionableAlertCount: Long = AlertingSettings.DEFAULT_MAX_ACTIONABLE_ALERT_COUNT
+)

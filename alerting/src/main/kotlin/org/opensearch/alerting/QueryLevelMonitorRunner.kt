@@ -5,12 +5,12 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.elasticapi.InjectorContextElement
-import org.opensearch.alerting.model.QueryLevelTrigger
-import org.opensearch.alerting.model.AlertingConfigAccessor
 import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.Alert
+import org.opensearch.alerting.model.AlertingConfigAccessor
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorRunResult
+import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
@@ -24,7 +24,7 @@ object QueryLevelMonitorRunner : MonitorRunner {
     private val logger = LogManager.getLogger(javaClass)
 
     override suspend fun runMonitor(monitor: Monitor, monitorCtx: MonitorRunnerExecutionContext, periodStart: Instant, periodEnd: Instant, dryrun: Boolean):
-            MonitorRunResult<QueryLevelTriggerRunResult> {
+        MonitorRunResult<QueryLevelTriggerRunResult> {
         val roles = MonitorRunnerService.getRolesForMonitor(monitor)
         logger.debug("Running monitor: ${monitor.name} with roles: $roles Thread: ${Thread.currentThread().name}")
 
@@ -67,8 +67,8 @@ object QueryLevelMonitorRunner : MonitorRunner {
             }
 
             val updatedAlert = monitorCtx.alertService!!.composeQueryLevelAlert(
-                    triggerCtx, triggerResult,
-                    monitorResult.alertError() ?: triggerResult.alertError()
+                triggerCtx, triggerResult,
+                monitorResult.alertError() ?: triggerResult.alertError()
             )
             if (updatedAlert != null) updatedAlerts += updatedAlert
         }
@@ -100,10 +100,10 @@ object QueryLevelMonitorRunner : MonitorRunner {
 
                     val destinationCtx = monitorCtx.destinationContextFactory!!.getDestinationContext(destination)
                     actionOutput[Action.MESSAGE_ID] = destination.publish(
-                            actionOutput[Action.SUBJECT],
-                            actionOutput[Action.MESSAGE]!!,
-                            destinationCtx,
-                            monitorCtx.hostDenyList
+                        actionOutput[Action.SUBJECT],
+                        actionOutput[Action.MESSAGE]!!,
+                        destinationCtx,
+                        monitorCtx.hostDenyList
                     )
                 }
             }
