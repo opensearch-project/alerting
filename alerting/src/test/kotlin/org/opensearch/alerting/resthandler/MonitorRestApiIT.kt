@@ -1168,7 +1168,6 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Deleted monitor still exists", RestStatus.NOT_FOUND, getResponse.restStatus())
     }
 
-    @Throws(Exception::class)
     fun `test creating a document monitor with error trigger`() {
         val trigger = randomQueryLevelTrigger()
         val monitor = randomDocumentLevelMonitor(triggers = listOf(trigger))
@@ -1179,8 +1178,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             assertNotEquals(e.message, "Illegal trigger type, ${QueryLevelTrigger::javaClass.name}, for bucket level monitor")
         }
     }
-
-    @Throws(Exception::class)
+    
     fun `test creating a query monitor with error trigger`() {
         val trigger = randomBucketLevelTrigger()
         val monitor = randomQueryLevelMonitor(triggers = listOf(trigger))
