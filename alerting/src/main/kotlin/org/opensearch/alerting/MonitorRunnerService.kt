@@ -50,9 +50,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     private val logger = LogManager.getLogger(javaClass)
 
     var monitorCtx: MonitorRunnerExecutionContext = MonitorRunnerExecutionContext()
-    val queryLevelMonitor: QueryLevelMonitor = QueryLevelMonitor()
-    var bucketLevelMonitor: BucketLevelMonitor = BucketLevelMonitor()
-    var documentReturningMonitor: DocumentReturningMonitor = DocumentReturningMonitor()
 
     private lateinit var runnerSupervisor: Job
     override val coroutineContext: CoroutineContext
@@ -206,11 +203,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     suspend fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant, dryrun: Boolean): MonitorRunResult<*> {
         val monitor = job as Monitor
         return if (monitor.isBucketLevelMonitor()) {
-            bucketLevelMonitor.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
+            BucketLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         } else if (monitor.isDocLevelMonitor()) {
-            documentReturningMonitor.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
+            DocumentReturningMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         } else {
-            queryLevelMonitor.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
+            QueryLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         }
 
     }

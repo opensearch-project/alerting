@@ -27,7 +27,7 @@ import org.opensearch.alerting.util.isAllowed
 import org.opensearch.common.Strings
 import java.time.Instant
 
-class BucketLevelMonitor: MonitorRunner {
+object BucketLevelMonitorRunner: MonitorRunner {
     private val logger = LogManager.getLogger(javaClass)
 
     override suspend fun runMonitor(monitor: Monitor, monitorCtx: MonitorRunnerExecutionContext, periodStart: Instant, periodEnd: Instant, dryrun: Boolean):

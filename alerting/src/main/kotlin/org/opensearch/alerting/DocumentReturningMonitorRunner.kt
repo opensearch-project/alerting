@@ -34,7 +34,7 @@ import java.time.Instant
 import java.util.UUID
 import kotlin.collections.HashMap
 
-class DocumentReturningMonitor: MonitorRunner {
+object DocumentReturningMonitorRunner: MonitorRunner {
     private val logger = LogManager.getLogger(javaClass)
 
     override suspend fun runMonitor(monitor: Monitor, monitorCtx: MonitorRunnerExecutionContext, periodStart: Instant, periodEnd: Instant, dryrun: Boolean):
