@@ -1175,7 +1175,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             fail("Monitor with illegal trigger should be rejected.")
         } catch (e: IllegalArgumentException) {
-            assertNotEquals(e.message, "Illegal trigger type, ${QueryLevelTrigger::javaClass.name}, for bucket level monitor")
+            assertEquals(
+                "document monitor with error trigger",
+                e.message, "Illegal trigger type, ${QueryLevelTrigger::javaClass.name}, for bucket level monitor"
+            )
         }
     }
 
@@ -1186,7 +1189,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             fail("Monitor with illegal trigger should be rejected.")
         } catch (e: IllegalArgumentException) {
-            assertNotEquals(e.message, "Illegal trigger type, ${BucketLevelTrigger::javaClass.name}, for bucket level monitor")
+            assertEquals(
+                "query monitor with error trigger",
+                e.message, "Illegal trigger type, ${BucketLevelTrigger::javaClass.name}, for bucket level monitor"
+            )
         }
     }
 }
