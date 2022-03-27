@@ -67,11 +67,11 @@ data class Monitor(
             // Verify Trigger type based on Monitor type
             when (monitorType) {
                 MonitorType.QUERY_LEVEL_MONITOR ->
-                    require(trigger is QueryLevelTrigger) { "Incompatible trigger [$trigger.id] for monitor type [$monitorType]" }
+                    require(trigger is QueryLevelTrigger) { "Incompatible trigger [${trigger.id}] for monitor type [$monitorType]" }
                 MonitorType.BUCKET_LEVEL_MONITOR ->
-                    require(trigger is BucketLevelTrigger) { "Incompatible trigger [$trigger.id] for monitor type [$monitorType]" }
+                    require(trigger is BucketLevelTrigger) { "Incompatible trigger [${trigger.id}] for monitor type [$monitorType]" }
                 MonitorType.DOC_LEVEL_MONITOR ->
-                    require(trigger is DocumentLevelTrigger) { "Incompatible trigger [$trigger.id] for monitor type [$monitorType]" }
+                    require(trigger is DocumentLevelTrigger) { "Incompatible trigger [${trigger.id}] for monitor type [$monitorType]" }
             }
         }
         if (enabled) {
