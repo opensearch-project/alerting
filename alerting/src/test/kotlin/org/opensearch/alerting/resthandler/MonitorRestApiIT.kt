@@ -1176,8 +1176,9 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             fail("Monitor with illegal trigger should be rejected.")
         } catch (e: IllegalArgumentException) {
             assertEquals(
-                "document monitor with error trigger",
-                e.message, "Illegal trigger type, ${QueryLevelTrigger::javaClass.name}, for bucket level monitor"
+                "a document monitor with error trigger",
+                "Incompatible trigger [${trigger.id}] for monitor type [${Monitor.MonitorType.DOC_LEVEL_MONITOR}]",
+                e.message
             )
         }
     }
