@@ -1178,7 +1178,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             assertNotEquals(e.message, "Illegal trigger type, ${QueryLevelTrigger::javaClass.name}, for bucket level monitor")
         }
     }
-    
+
     fun `test creating a query monitor with error trigger`() {
         val trigger = randomBucketLevelTrigger()
         val monitor = randomQueryLevelMonitor(triggers = listOf(trigger))
