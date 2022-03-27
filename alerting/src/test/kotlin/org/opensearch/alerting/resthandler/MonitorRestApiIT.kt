@@ -1134,6 +1134,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     @Throws(Exception::class)
     fun `test updating conditions for a document level monitor`() {
         val monitor = createRandomDocumentMonitor()
+
+        val storedMonitor = getMonitor(monitor.id)
+
+        assertEquals("Indexed and retrieved monitor differ", monitor, storedMonitor)
     }
 
     @Throws(Exception::class)
