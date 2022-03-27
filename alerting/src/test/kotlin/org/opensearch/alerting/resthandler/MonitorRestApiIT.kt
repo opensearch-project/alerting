@@ -1133,7 +1133,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
-    fun `test updating conditions for a document level monitor`() {
+    fun `test updating conditions for a doc-level monitor`() {
         val monitor = createRandomDocumentMonitor()
         val updatedTriggers = listOf(
             DocumentLevelTrigger(
