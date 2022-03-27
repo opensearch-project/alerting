@@ -589,12 +589,7 @@ fun assertUserNull(monitor: Monitor) {
 fun randomDocumentLevelMonitor(
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     user: User = randomUser(),
-    inputs: List<Input> = listOf(
-        SearchInput(
-            emptyList(),
-            SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).aggregation(TermsAggregationBuilder("test_agg"))
-        )
-    ),
+    inputs: List<Input> = listOf(SearchInput(emptyList(), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
     enabled: Boolean = randomBoolean(),
     triggers: List<Trigger> = (1..randomInt(10)).map { randomDocLevelTrigger() },
