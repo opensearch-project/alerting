@@ -572,7 +572,10 @@ fun parser(xc: String): XContentParser {
 fun xContentRegistry(): NamedXContentRegistry {
     return NamedXContentRegistry(
         listOf(
-            SearchInput.XCONTENT_REGISTRY, QueryLevelTrigger.XCONTENT_REGISTRY, BucketLevelTrigger.XCONTENT_REGISTRY
+            SearchInput.XCONTENT_REGISTRY,
+            QueryLevelTrigger.XCONTENT_REGISTRY,
+            BucketLevelTrigger.XCONTENT_REGISTRY,
+            DocumentLevelTrigger.XCONTENT_REGISTRY
         ) + SearchModule(Settings.EMPTY, false, emptyList()).namedXContents
     )
 }
@@ -592,7 +595,7 @@ fun randomDocumentLevelMonitor(
     inputs: List<Input> = listOf(SearchInput(emptyList(), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
     enabled: Boolean = randomBoolean(),
-    triggers: List<Trigger> = listOf(),
+    triggers: List<Trigger> = (1..randomInt(10)).map { randomDocLevelTrigger() },
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     withMetadata: Boolean = false

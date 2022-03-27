@@ -23,6 +23,7 @@ import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.elasticapi.string
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
+import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.destination.Destination
@@ -75,7 +76,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                 Monitor.XCONTENT_REGISTRY,
                 SearchInput.XCONTENT_REGISTRY,
                 QueryLevelTrigger.XCONTENT_REGISTRY,
-                BucketLevelTrigger.XCONTENT_REGISTRY
+                BucketLevelTrigger.XCONTENT_REGISTRY,
+                DocumentLevelTrigger.XCONTENT_REGISTRY
             ) + SearchModule(Settings.EMPTY, false, emptyList()).namedXContents
         )
     }
