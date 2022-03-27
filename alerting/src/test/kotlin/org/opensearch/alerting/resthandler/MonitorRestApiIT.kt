@@ -1185,14 +1185,15 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test creating a query monitor with error trigger`() {
         val trigger = randomBucketLevelTrigger()
-        val monitor = randomQueryLevelMonitor(triggers = listOf(trigger))
         try {
+            val monitor = randomQueryLevelMonitor(triggers = listOf(trigger))
             client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             fail("Monitor with illegal trigger should be rejected.")
         } catch (e: IllegalArgumentException) {
             assertEquals(
-                "query monitor with error trigger",
-                e.message, "Illegal trigger type, ${BucketLevelTrigger::javaClass.name}, for bucket level monitor"
+                "a query monitor with error trigger",
+                "Incompatible trigger [${trigger.id}] for monitor type [${Monitor.MonitorType.QUERY_LEVEL_MONITOR}]",
+                e.message
             )
         }
     }
