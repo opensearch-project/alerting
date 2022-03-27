@@ -597,7 +597,7 @@ fun randomDocumentLevelMonitor(
     ),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
     enabled: Boolean = randomBoolean(),
-    triggers: List<Trigger> = (1..randomInt(10)).map { randomBucketLevelTrigger() },
+    triggers: List<Trigger> = listOf(),
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     withMetadata: Boolean = false
