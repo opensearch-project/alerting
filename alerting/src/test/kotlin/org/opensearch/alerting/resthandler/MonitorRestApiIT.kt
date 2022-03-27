@@ -22,6 +22,7 @@ import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
+import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.destination.Chime
@@ -1134,10 +1135,26 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     @Throws(Exception::class)
     fun `test updating conditions for a document level monitor`() {
         val monitor = createRandomDocumentMonitor()
+        val updatedTriggers = listOf(
+            DocumentLevelTrigger(
+                name = "foo",
+                severity = "1",
+                condition = Script("return true"),
+                actions = emptyList()
+            )
+        )
+        val updateResponse = client().makeRequest(
+            "PUT", monitor.relativeUrl(),
+            emptyMap(), monitor.copy(triggers = updatedTriggers).toHttpEntity()
+        )
 
-        val storedMonitor = getMonitor(monitor.id)
+        assertEquals("Update monitor failed", RestStatus.OK, updateResponse.restStatus())
+        val responseBody = updateResponse.asMap()
+        assertEquals("Updated monitor id doesn't match", monitor.id, responseBody["_id"] as String)
+        assertEquals("Version not incremented", (monitor.version + 1).toInt(), responseBody["_version"] as Int)
 
-        assertEquals("Indexed and retrieved monitor differ", monitor, storedMonitor)
+        val updatedMonitor = getMonitor(monitor.id)
+        assertEquals("Monitor trigger not updated", updatedTriggers, updatedMonitor.triggers)
     }
 
     @Throws(Exception::class)
