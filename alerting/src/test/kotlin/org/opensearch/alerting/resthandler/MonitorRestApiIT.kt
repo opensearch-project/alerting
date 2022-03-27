@@ -1170,8 +1170,8 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test creating a document monitor with error trigger`() {
         val trigger = randomQueryLevelTrigger()
-        val monitor = randomDocumentLevelMonitor(triggers = listOf(trigger))
         try {
+            val monitor = randomDocumentLevelMonitor(triggers = listOf(trigger))
             client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             fail("Monitor with illegal trigger should be rejected.")
         } catch (e: IllegalArgumentException) {
