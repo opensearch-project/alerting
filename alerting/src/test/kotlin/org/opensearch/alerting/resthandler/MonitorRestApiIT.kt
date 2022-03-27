@@ -1135,27 +1135,6 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     @Throws(Exception::class)
     fun `test updating conditions for a document level monitor`() {
         val monitor = createRandomDocumentMonitor()
-
-        val updatedTriggers = listOf(
-            DocumentLevelTrigger(
-                name = "foo",
-                severity = "1",
-                condition = Script("return true"),
-                actions = emptyList()
-            )
-        )
-        val updateResponse = client().makeRequest(
-            "PUT", monitor.relativeUrl(),
-            emptyMap(), monitor.copy(triggers = updatedTriggers).toHttpEntity()
-        )
-
-        assertEquals("Update monitor failed", RestStatus.OK, updateResponse.restStatus())
-        val responseBody = updateResponse.asMap()
-        assertEquals("Updated monitor id doesn't match", monitor.id, responseBody["_id"] as String)
-        assertEquals("Version not incremented", (monitor.version + 1).toInt(), responseBody["_version"] as Int)
-
-        val updatedMonitor = getMonitor(monitor.id)
-        assertEquals("Monitor trigger not updated", updatedTriggers, updatedMonitor.triggers)
     }
 
     @Throws(Exception::class)
