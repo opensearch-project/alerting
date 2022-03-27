@@ -70,6 +70,8 @@ data class Monitor(
                     require(trigger is QueryLevelTrigger) { "Incompatible trigger [$trigger.id] for monitor type [$monitorType]" }
                 MonitorType.BUCKET_LEVEL_MONITOR ->
                     require(trigger is BucketLevelTrigger) { "Incompatible trigger [$trigger.id] for monitor type [$monitorType]" }
+                MonitorType.DOC_LEVEL_MONITOR ->
+                    require(trigger is DocumentLevelTrigger) { "Incompatible trigger [$trigger.id] for monitor type [$monitorType]" }
             }
         }
         if (enabled) {
@@ -185,6 +187,7 @@ data class Monitor(
         out.writeVInt(triggers.size)
         triggers.forEach {
             if (it is QueryLevelTrigger) out.writeEnum(Trigger.Type.QUERY_LEVEL_TRIGGER)
+            else if(it is DocumentLevelTrigger) out.writeEnum(Trigger.Type.DOCUMENT_LEVEL_TRIGGER)
             else out.writeEnum(Trigger.Type.BUCKET_LEVEL_TRIGGER)
             it.writeTo(out)
         }
