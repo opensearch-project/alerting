@@ -572,7 +572,10 @@ fun parser(xc: String): XContentParser {
 fun xContentRegistry(): NamedXContentRegistry {
     return NamedXContentRegistry(
         listOf(
-            SearchInput.XCONTENT_REGISTRY, QueryLevelTrigger.XCONTENT_REGISTRY, BucketLevelTrigger.XCONTENT_REGISTRY
+            SearchInput.XCONTENT_REGISTRY,
+            QueryLevelTrigger.XCONTENT_REGISTRY,
+            BucketLevelTrigger.XCONTENT_REGISTRY,
+            DocumentLevelTrigger.XCONTENT_REGISTRY
         ) + SearchModule(Settings.EMPTY, false, emptyList()).namedXContents
     )
 }
@@ -584,4 +587,22 @@ fun assertUserNull(map: Map<String, Any?>) {
 
 fun assertUserNull(monitor: Monitor) {
     assertNull("User is not null", monitor.user)
+}
+
+fun randomDocumentLevelMonitor(
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    user: User = randomUser(),
+    inputs: List<Input> = listOf(SearchInput(emptyList(), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))),
+    schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
+    enabled: Boolean = randomBoolean(),
+    triggers: List<Trigger> = (1..randomInt(10)).map { randomDocLevelTrigger() },
+    enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
+    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+    withMetadata: Boolean = false
+): Monitor {
+    return Monitor(
+        name = name, monitorType = Monitor.MonitorType.DOC_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
+        schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
+        lastRunContext = mapOf(), uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+    )
 }

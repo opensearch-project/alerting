@@ -23,6 +23,7 @@ import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.elasticapi.string
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
+import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.destination.Destination
@@ -75,7 +76,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                 Monitor.XCONTENT_REGISTRY,
                 SearchInput.XCONTENT_REGISTRY,
                 QueryLevelTrigger.XCONTENT_REGISTRY,
-                BucketLevelTrigger.XCONTENT_REGISTRY
+                BucketLevelTrigger.XCONTENT_REGISTRY,
+                DocumentLevelTrigger.XCONTENT_REGISTRY
             ) + SearchModule(Settings.EMPTY, false, emptyList()).namedXContents
         )
     }
@@ -393,6 +395,15 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun createRandomMonitor(refresh: Boolean = false, withMetadata: Boolean = false): Monitor {
         val monitor = randomQueryLevelMonitor(withMetadata = withMetadata)
+        val monitorId = createMonitor(monitor, refresh).id
+        if (withMetadata) {
+            return getMonitor(monitorId = monitorId, header = BasicHeader(HttpHeaders.USER_AGENT, "OpenSearch-Dashboards"))
+        }
+        return getMonitor(monitorId = monitorId)
+    }
+
+    protected fun createRandomDocumentMonitor(refresh: Boolean = false, withMetadata: Boolean = false): Monitor {
+        val monitor = randomDocumentLevelMonitor(withMetadata = withMetadata)
         val monitorId = createMonitor(monitor, refresh).id
         if (withMetadata) {
             return getMonitor(monitorId = monitorId, header = BasicHeader(HttpHeaders.USER_AGENT, "OpenSearch-Dashboards"))
