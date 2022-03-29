@@ -603,7 +603,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val indicesMap = mutableMapOf<String, Boolean>()
         val indicesJson = jsonBuilder().startObject().startArray("actions")
         indices.keys.map {
-            val indexName = createTestIndex(index = it.toLowerCase(), mapping = "")
+            val indexName = createTestIndex(index = it.toLowerCase(Locale.ROOT), mapping = "")
             val isWriteIndex = indices.getOrDefault(indexName, false)
             indicesMap[indexName] = isWriteIndex
             val indexMap = mapOf(
