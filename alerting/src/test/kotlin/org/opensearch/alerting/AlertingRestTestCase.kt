@@ -29,6 +29,7 @@ import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
+import org.opensearch.alerting.model.docLevelInput.DocLevelMonitorInput
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.DestinationType
@@ -75,6 +76,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             mutableListOf(
                 Monitor.XCONTENT_REGISTRY,
                 SearchInput.XCONTENT_REGISTRY,
+                DocLevelMonitorInput.XCONTENT_REGISTRY,
                 QueryLevelTrigger.XCONTENT_REGISTRY,
                 BucketLevelTrigger.XCONTENT_REGISTRY,
                 DocumentLevelTrigger.XCONTENT_REGISTRY

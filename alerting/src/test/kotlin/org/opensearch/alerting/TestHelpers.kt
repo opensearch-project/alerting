@@ -591,6 +591,7 @@ fun xContentRegistry(): NamedXContentRegistry {
     return NamedXContentRegistry(
         listOf(
             SearchInput.XCONTENT_REGISTRY,
+            DocLevelMonitorInput.XCONTENT_REGISTRY,
             QueryLevelTrigger.XCONTENT_REGISTRY,
             BucketLevelTrigger.XCONTENT_REGISTRY,
             DocumentLevelTrigger.XCONTENT_REGISTRY
