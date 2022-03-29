@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
+import org.opensearch.action.admin.indices.alias.get.GetAliasesRequest
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchRequest
@@ -48,6 +49,7 @@ import org.opensearch.alerting.model.action.PerAlertActionScope
 import org.opensearch.alerting.model.action.PerExecutionActionScope
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.model.docLevelInput.DocLevelMonitorInput
+import org.opensearch.alerting.model.docLevelInput.DocLevelMonitorInput.Companion.ALIAS_INDICES_FIELD
 import org.opensearch.alerting.model.docLevelInput.DocLevelQuery
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
@@ -70,10 +72,9 @@ import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.alerting.util.getCombinedTriggerRunResult
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.isAllowed
-import org.opensearch.alerting.util.isBucketLevelMonitor
-import org.opensearch.alerting.util.isDocLevelMonitor
 import org.opensearch.alerting.util.updateMonitor
 import org.opensearch.client.Client
+import org.opensearch.cluster.metadata.AliasMetadata
 import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.Strings
@@ -271,12 +272,13 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         }
 
         launch {
-            if (job.isBucketLevelMonitor()) {
-                runBucketLevelMonitor(job, periodStart, periodEnd)
-            } else if (job.isDocLevelMonitor()) {
-                runDocLevelMonitor(job, periodStart, periodEnd)
-            } else {
-                runQueryLevelMonitor(job, periodStart, periodEnd)
+            when (job.monitorType) {
+                Monitor.MonitorType.BUCKET_LEVEL_MONITOR ->
+                    runBucketLevelMonitor(job, periodStart, periodEnd)
+                Monitor.MonitorType.DOC_LEVEL_MONITOR ->
+                    runDocLevelMonitor(job, periodStart, periodEnd)
+                else ->
+                    runQueryLevelMonitor(job, periodStart, periodEnd)
             }
         }
     }
@@ -736,8 +738,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             .execute()
     }
 
-    private suspend fun runDocLevelMonitor(monitor: Monitor, periodStart: Instant, periodEnd: Instant, dryrun: Boolean = false) {
-
+    suspend fun runDocLevelMonitor(monitor: Monitor, periodStart: Instant, periodEnd: Instant, dryrun: Boolean = false) {
         logger.info("Document-level-monitor is running ...")
         try {
             validate(monitor)
@@ -747,37 +748,119 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         }
 
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
-        val index = docLevelMonitorInput.indices[0]
+        var index = docLevelMonitorInput.indices[0]
         val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
 
-        var lastRunContext = monitor.lastRunContext.toMutableMap()
-        try {
-            if (lastRunContext.isNullOrEmpty()) {
-                lastRunContext = createRunContext(index).toMutableMap()
-            }
-        } catch (e: Exception) {
-            logger.info("Failed to start Document-level-monitor $index. Error: ${e.message}")
-            return
-        }
-
-        val count: Int = lastRunContext["shards_count"] as Int
-        val updatedLastRunContext = lastRunContext.toMutableMap()
-        for (i: Int in 0 until count) {
-            val shard = i.toString()
-            val maxSeqNo: Long = getMaxSeqNo(index, shard)
-            updatedLastRunContext[shard] = maxSeqNo.toString()
-        }
+        var lastRunContext = mutableMapOf<String, Any>()
+        var updatedLastRunContext = lastRunContext.toMutableMap()
 
         val queryToDocIds = mutableMapOf<DocLevelQuery, Set<String>>()
         val docsToQueries = mutableMapOf<String, MutableList<String>>()
-        val docExecutionContext = DocumentExecutionContext(queries, lastRunContext, updatedLastRunContext)
-        queries.forEach { query ->
-            val matchingDocIds = runForEachQuery(docExecutionContext, query, index)
-            queryToDocIds[query] = matchingDocIds
-            matchingDocIds.forEach {
-                docsToQueries.putIfAbsent(it, mutableListOf())
-                docsToQueries[it]?.add(query.id)
+
+        // TODO: Add log message if index is/is not alias?
+        try {
+            val isAlias: Boolean
+            var aliasWriteIndex = index
+
+            val getAliasesRequest = GetAliasesRequest(index)
+            val getAliasesResponse = client.admin().indices().getAliases(getAliasesRequest).actionGet()
+
+            val aliasIndices = getAliasesResponse.aliases.keys()
+
+            isAlias = !aliasIndices.isEmpty
+            val aliasIndicesLastRunContext = mutableMapOf<String, Any>()
+            val aliasIndicesUpdatedContext = mutableMapOf<String, Any>()
+
+            if (isAlias) {
+                /* Alias-handling logic */
+
+                var aliasMetadata: AliasMetadata? = null
+                aliasIndices.forEach { aliasIndex ->
+                    val aliasIndexName = aliasIndex.value
+
+                    // Find the write index for the alias
+                    getAliasesResponse.aliases.get(aliasIndexName).forEach findWriteIndex@{
+                        if (it.alias == index && it.writeIndex() != null && it.writeIndex()) {
+                            aliasMetadata = it
+                            return@findWriteIndex
+                        }
+                    }
+
+                    // Prepare lastRunContext for each index in the alias
+                    val aliasIndexLastRunContext = getlastRunContext(monitor, aliasIndexName)
+                    aliasIndicesLastRunContext[aliasIndexName] = aliasIndexLastRunContext
+
+                    // Prepare updatedLastRunContext for each index in the alias
+                    val aliasIndexUpdatedRunContext = updateLastRunContext(
+                        aliasIndexLastRunContext.toMutableMap(),
+                        aliasIndexName
+                    ) as MutableMap<String, Any>
+                    aliasIndicesUpdatedContext[aliasIndexName] = aliasIndexUpdatedRunContext
+
+                    // Prepare DocumentExecutionContext for each index in the alias
+                    val aliasIndexDocExecutionContext = DocumentExecutionContext(queries, aliasIndexLastRunContext, aliasIndexUpdatedRunContext)
+                    if (aliasMetadata != null) {
+                        // Setting the write index for the alias
+                        aliasWriteIndex = aliasIndexName
+
+                        // Setting lastRunContext to the context of the write index
+                        lastRunContext = aliasIndexLastRunContext
+
+                        // Setting updatedLastRunContext to the context of the write index
+                        updatedLastRunContext = aliasIndexUpdatedRunContext.toMutableMap()
+                    }
+
+                    val queryResults = getDocLevelQueryResults(
+                        aliasIndexDocExecutionContext,
+                        aliasIndexName,
+                        queries
+                    )
+
+                    val newQueryToDocIds = mutableMapOf<DocLevelQuery, Set<String>>()
+                    queryResults["queryDocIds"]?.forEach {
+                        val docLevelQuery = it.key
+                        val matchingDocIds = it.value
+                        val existingQueryToDocIds = queryToDocIds.getOrDefault(docLevelQuery, setOf()).toMutableSet()
+                        existingQueryToDocIds.addAll(matchingDocIds)
+                        newQueryToDocIds[it.key as DocLevelQuery] = existingQueryToDocIds
+                    }
+
+                    val newDocsToQueries = mutableMapOf<String, MutableList<String>>()
+                    queryResults["docsToQueries"]?.forEach {
+                        val docId = it.key
+                        val queryIds = it.value
+                        val existingQueryIds = docsToQueries.getOrDefault(docId, mutableListOf())
+                        existingQueryIds.addAll(queryIds)
+                        newDocsToQueries[docId as String] = existingQueryIds
+                    }
+
+                    queryToDocIds.putAll(newQueryToDocIds)
+                    docsToQueries.putAll(queryResults["docsToQueries"] as MutableMap<String, MutableList<String>>)
+                }
+
+                // Return if no write index is found for the alias
+                if (aliasMetadata == null) {
+                    logger.info("Failed to start Document-level-monitor $index. Input is an alias without a write index.")
+                    return
+                    // TODO: Should we throw an exception here instead?
+//                    throw IOException("Failed to start Document-level-monitor $index. Input is an alias without a write index.")
+                }
+
+                updatedLastRunContext[ALIAS_INDICES_FIELD] = aliasIndicesUpdatedContext
+
+                // Updating 'index' to the alias' write index for the remainder of the monitor execution logic
+                index = aliasWriteIndex
+            } else {
+                /* Standard index-handling logic */
+                lastRunContext = getlastRunContext(monitor, index)
+                updatedLastRunContext = updateLastRunContext(lastRunContext.toMutableMap(), index) as MutableMap<String, Any>
+                val docExecutionContext = DocumentExecutionContext(queries, lastRunContext, updatedLastRunContext)
+                val queryResults = getDocLevelQueryResults(docExecutionContext, index, queries)
+                queryToDocIds.putAll(queryResults["queryDocIds"] as MutableMap<DocLevelQuery, Set<String>>)
+                docsToQueries.putAll(queryResults["docsToQueries"] as MutableMap<String, MutableList<String>>)
             }
+        } catch (e: Exception) {
+            logger.info("Failed to start Document-level-monitor $index. Error: ${e.message}")
         }
 
         val queryIds = queries.map { it.id }
@@ -817,6 +900,27 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 // TODO: run action as well, but this mat need to be throttled based on Mo's comment for bucket level alerting
             }
         }
+    }
+
+    private fun getDocLevelQueryResults(
+        documentExecutionContext: DocumentExecutionContext,
+        index: String,
+        queries: List<DocLevelQuery>
+    ): MutableMap<String, MutableMap<out Any, out Collection<String>>> {
+        val queryDocIds = mutableMapOf<DocLevelQuery, Set<String>>()
+        val docsToQueries = mutableMapOf<String, MutableList<String>>()
+        for (query in queries) {
+            val matchingDocIds = runForEachQuery(documentExecutionContext, query, index)
+            queryDocIds[query] = matchingDocIds
+            matchingDocIds.forEach {
+                docsToQueries.putIfAbsent(it, mutableListOf())
+                docsToQueries[it]?.add(query.id)
+            }
+        }
+        return mutableMapOf(
+            ("queryDocIds" to queryDocIds),
+            ("docsToQueries" to docsToQueries)
+        )
     }
 
     private fun createFindings(
@@ -910,6 +1014,24 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         return allShards.filter { it.primary() }.size
     }
 
+    private fun getlastRunContext(monitor: Monitor, index: String): MutableMap<String, Any> {
+        var lastRunContext = monitor.lastRunContext.toMutableMap()
+        /*
+        If the monitor is configured with an alias as its index, the
+        following logic will pull the lastRunContext for the alias' index
+        */
+        lastRunContext = lastRunContext.getOrDefault(ALIAS_INDICES_FIELD, lastRunContext) as MutableMap<String, Any>
+        lastRunContext = lastRunContext.getOrDefault(index, lastRunContext) as MutableMap<String, Any>
+        try {
+            if (lastRunContext.isNullOrEmpty()) {
+                lastRunContext = createRunContext(index).toMutableMap()
+            }
+        } catch (e: Exception) {
+            logger.info("Failed to start Document-level-monitor $index. Error: ${e.message}")
+        }
+        return lastRunContext
+    }
+
     private fun createRunContext(index: String): HashMap<String, Any> {
         val lastRunContext = HashMap<String, Any>()
         lastRunContext["index"] = index
@@ -922,6 +1044,17 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             lastRunContext[shard] = maxSeqNo
         }
         return lastRunContext
+    }
+
+    private fun updateLastRunContext(lastRunContext: Map<String, Any>, index: String): Map<String, Any> {
+        val count: Int = lastRunContext["shards_count"] as Int
+        val updatedLastRunContext = lastRunContext.toMutableMap()
+        for (i: Int in 0 until count) {
+            val shard = i.toString()
+            val maxSeqNo: Long = getMaxSeqNo(index, shard)
+            updatedLastRunContext[shard] = maxSeqNo.toString()
+        }
+        return updatedLastRunContext
     }
 
     /**
