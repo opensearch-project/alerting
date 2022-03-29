@@ -27,7 +27,7 @@ jobs:
         with:
           java-version: ${{ matrix.java }}
       - name: Build and run with Gradle
-        run: ./gradlew build -Dopensearch.version=2.0.0-SNAPSHOT
+        run: ./gradlew build
       - name: Create Artifact Path
         run: |
           mkdir -p alerting-artifacts
