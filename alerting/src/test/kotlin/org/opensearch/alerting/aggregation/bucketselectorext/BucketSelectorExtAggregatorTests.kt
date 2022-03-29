@@ -9,9 +9,9 @@ import org.apache.lucene.document.Document
 import org.apache.lucene.document.SortedNumericDocValuesField
 import org.apache.lucene.document.SortedSetDocValuesField
 import org.apache.lucene.index.DirectoryReader
-import org.apache.lucene.index.RandomIndexWriter
 import org.apache.lucene.search.MatchAllDocsQuery
 import org.apache.lucene.search.Query
+import org.apache.lucene.tests.index.RandomIndexWriter
 import org.apache.lucene.util.BytesRef
 import org.hamcrest.CoreMatchers
 import org.opensearch.common.CheckedConsumer

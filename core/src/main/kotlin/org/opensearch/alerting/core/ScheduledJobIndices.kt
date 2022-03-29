@@ -13,7 +13,6 @@ import org.opensearch.client.AdminClient
 import org.opensearch.cluster.health.ClusterIndexHealth
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
-import org.opensearch.common.xcontent.XContentType
 
 /**
  * Initialize the OpenSearch components required to run [ScheduledJobs].
@@ -38,7 +37,7 @@ class ScheduledJobIndices(private val client: AdminClient, private val clusterSe
     fun initScheduledJobIndex(actionListener: ActionListener<CreateIndexResponse>) {
         if (!scheduledJobIndexExists()) {
             var indexRequest = CreateIndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
-                .mapping(ScheduledJob.SCHEDULED_JOB_TYPE, scheduledJobMappings(), XContentType.JSON)
+                .mapping(scheduledJobMappings())
                 .settings(Settings.builder().put("index.hidden", true).build())
             client.indices().create(indexRequest, actionListener)
         }
