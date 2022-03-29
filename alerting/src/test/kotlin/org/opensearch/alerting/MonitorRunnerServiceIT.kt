@@ -50,7 +50,7 @@ import java.time.temporal.ChronoUnit.MILLIS
 import java.time.temporal.ChronoUnit.MINUTES
 import kotlin.collections.HashMap
 
-class MonitorRunnerIT : AlertingRestTestCase() {
+class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
     fun `test execute monitor with dryrun`() {
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)

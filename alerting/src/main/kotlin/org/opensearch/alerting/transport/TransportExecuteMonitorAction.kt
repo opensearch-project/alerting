@@ -15,14 +15,12 @@ import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.alerting.MonitorRunner
+import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorResponse
 import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
 import org.opensearch.common.inject.Inject
@@ -42,7 +40,7 @@ private val log = LogManager.getLogger(TransportGetMonitorAction::class.java)
 class TransportExecuteMonitorAction @Inject constructor(
     transportService: TransportService,
     private val client: Client,
-    private val runner: MonitorRunner,
+    private val runner: MonitorRunnerService,
     actionFilters: ActionFilters,
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<ExecuteMonitorRequest, ExecuteMonitorResponse> (
@@ -64,18 +62,7 @@ class TransportExecuteMonitorAction @Inject constructor(
                     val (periodStart, periodEnd) =
                         monitor.schedule.getPeriodEndingAt(Instant.ofEpochMilli(execMonitorRequest.requestEnd.millis))
                     try {
-                        val monitorRunResult = when (monitor.monitorType) {
-                            Monitor.MonitorType.BUCKET_LEVEL_MONITOR ->
-                                runner.runBucketLevelMonitor(monitor, periodStart, periodEnd, execMonitorRequest.dryrun)
-                            Monitor.MonitorType.DOC_LEVEL_MONITOR -> {
-                                runner.runDocLevelMonitor(monitor, periodStart, periodEnd, execMonitorRequest.dryrun)
-                                // TODO: Remove this empty DocumentLevelTriggerRunResult once runDocLevelMonitor is refactored to return results.
-                                MonitorRunResult<DocumentLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
-                            }
-                            else ->
-                                runner.runQueryLevelMonitor(monitor, periodStart, periodEnd, execMonitorRequest.dryrun)
-                        }
-
+                        val monitorRunResult = runner.runJob(monitor, periodStart, periodEnd, execMonitorRequest.dryrun)
                         withContext(Dispatchers.IO) {
                             actionListener.onResponse(ExecuteMonitorResponse(monitorRunResult))
                         }
