@@ -65,6 +65,7 @@ data class DocLevelMonitorInput(
         const val INDICES_FIELD = "indices"
         const val DOC_LEVEL_INPUT_FIELD = "doc_level_input"
         const val QUERIES_FIELD = "queries"
+        const val ALIAS_INDICES_FIELD = "aliasIndices"
 
         const val NO_DESCRIPTION = ""
 
