@@ -31,6 +31,7 @@ class Finding(
     val triggerId: String?,
     val triggerName: String?
 ) : Writeable, ToXContent {
+
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
         id = sin.readString(),
@@ -126,7 +127,9 @@ class Finding(
                             queries.add(DocLevelQuery.parse(xcp))
                         }
                     }
-                    TIMESTAMP_FIELD -> timestamp = requireNotNull(xcp.instant())
+                    TIMESTAMP_FIELD -> {
+                        timestamp = requireNotNull(xcp.instant())
+                    }
                     TRIGGER_ID_FIELD -> triggerId = xcp.text()
                     TRIGGER_NAME_FIELD -> triggerName = xcp.text()
                 }
