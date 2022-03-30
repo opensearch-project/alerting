@@ -5,10 +5,9 @@
 
 package org.opensearch.alerting.model
 
+import org.opensearch.alerting.core.model.DocLevelMonitorInput
+import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.elasticapi.string
-import org.opensearch.alerting.model.action.Action
-import org.opensearch.alerting.model.docLevelInput.DocLevelMonitorInput
-import org.opensearch.alerting.model.docLevelInput.DocLevelQuery
 import org.opensearch.alerting.randomDocLevelMonitorInput
 import org.opensearch.alerting.randomDocLevelQuery
 import org.opensearch.common.xcontent.ToXContent
@@ -29,9 +28,6 @@ class DocLevelMonitorInputTests : OpenSearchTestCase() {
         assertEquals("Template args 'query' field does not match:", templateArgs[DocLevelQuery.QUERY_FIELD], query.query)
         assertEquals("Template args 'severity' field does not match:", templateArgs[DocLevelQuery.SEVERITY_FIELD], query.severity)
         assertEquals("Template args 'tags' field does not match:", templateArgs[DocLevelQuery.TAGS_FIELD], query.tags)
-
-        val expectedActions = query.actions.map { mapOf(Action.NAME_FIELD to it.name) }
-        assertEquals("Template args 'actions' field does not match:", templateArgs[DocLevelQuery.ACTIONS_FIELD], expectedActions)
     }
 
     fun `testing DocLevelMonitorInput asTemplateArgs`() {

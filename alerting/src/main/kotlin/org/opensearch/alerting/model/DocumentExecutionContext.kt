@@ -1,6 +1,6 @@
 package org.opensearch.alerting.model
 
-import org.opensearch.alerting.model.docLevelInput.DocLevelQuery
+import org.opensearch.alerting.core.model.DocLevelQuery
 
 data class DocumentExecutionContext(
     val queries: List<DocLevelQuery>,

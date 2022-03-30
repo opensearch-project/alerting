@@ -25,10 +25,12 @@ import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
+import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.model.Trigger
 import org.opensearch.alerting.model.action.AlertCategory
+import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.getBucketKeysHash
@@ -164,6 +166,56 @@ class AlertService(
                 schemaVersion = IndexUtils.alertIndexSchemaVersion
             )
         }
+    }
+
+    // TODO: clean this up so it follows the proper alert management for doc monitors
+    fun composeDocLevelAlert(
+        ctx: DocumentLevelTriggerExecutionContext,
+        result: DocumentLevelTriggerRunResult,
+        alertError: AlertError?
+    ): Alert {
+        val currentTime = Instant.now()
+        val currentAlert = ctx.alert
+
+        val updatedActionExecutionResults = mutableListOf<ActionExecutionResult>()
+        val currentActionIds = mutableSetOf<String>()
+        if (currentAlert != null) {
+            // update current alert's action execution results
+            for (actionExecutionResult in currentAlert.actionExecutionResults) {
+                val actionId = actionExecutionResult.actionId
+                currentActionIds.add(actionId)
+                val actionRunResult = result.actionResults[actionId]
+                when {
+                    actionRunResult == null -> updatedActionExecutionResults.add(actionExecutionResult)
+                    actionRunResult.throttled ->
+                        updatedActionExecutionResults.add(
+                            actionExecutionResult.copy(
+                                throttledCount = actionExecutionResult.throttledCount + 1
+                            )
+                        )
+                    else -> updatedActionExecutionResults.add(actionExecutionResult.copy(lastExecutionTime = actionRunResult.executionTime))
+                }
+            }
+            // add action execution results which not exist in current alert
+            updatedActionExecutionResults.addAll(
+                result.actionResults.filter { !currentActionIds.contains(it.key) }
+                    .map { ActionExecutionResult(it.key, it.value.executionTime, if (it.value.throttled) 1 else 0) }
+            )
+        } else {
+            updatedActionExecutionResults.addAll(
+                result.actionResults.map {
+                    ActionExecutionResult(it.key, it.value.executionTime, if (it.value.throttled) 1 else 0)
+                }
+            )
+        }
+
+        val alertState = if (alertError == null) Alert.State.ACTIVE else Alert.State.ERROR
+        return Alert(
+            monitor = ctx.monitor, trigger = ctx.trigger, startTime = currentTime,
+            lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
+            actionExecutionResults = updatedActionExecutionResults, schemaVersion = IndexUtils.alertIndexSchemaVersion,
+            findingIds = ctx.relatedFindings, relatedDocIds = ctx.triggeredDocs
+        )
     }
 
     fun updateActionResultsForBucketLevelAlert(

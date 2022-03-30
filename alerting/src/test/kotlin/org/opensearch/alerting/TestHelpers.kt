@@ -10,6 +10,8 @@ import org.apache.http.Header
 import org.apache.http.HttpEntity
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtFilter
+import org.opensearch.alerting.core.model.DocLevelMonitorInput
+import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.core.model.Input
 import org.opensearch.alerting.core.model.IntervalSchedule
 import org.opensearch.alerting.core.model.Schedule
@@ -40,8 +42,6 @@ import org.opensearch.alerting.model.action.Throttle
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailEntry
 import org.opensearch.alerting.model.destination.email.EmailGroup
-import org.opensearch.alerting.model.docLevelInput.DocLevelMonitorInput
-import org.opensearch.alerting.model.docLevelInput.DocLevelQuery
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.Request
 import org.opensearch.client.RequestOptions
@@ -132,6 +132,24 @@ fun randomBucketLevelMonitor(
     )
 }
 
+fun randomDocumentReturningMonitor(
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    user: User? = randomUser(),
+    inputs: List<Input> = listOf(DocLevelMonitorInput("description", listOf("index"), emptyList())),
+    schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
+    enabled: Boolean = randomBoolean(),
+    triggers: List<Trigger> = (1..randomInt(10)).map { randomQueryLevelTrigger() },
+    enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
+    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+    withMetadata: Boolean = false
+): Monitor {
+    return Monitor(
+        name = name, monitorType = Monitor.MonitorType.DOC_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
+        schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
+        lastRunContext = mapOf(), uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+    )
+}
+
 fun randomQueryLevelTrigger(
     id: String = UUIDs.base64UUID(),
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
@@ -163,6 +181,25 @@ fun randomBucketLevelTrigger(
         severity = severity,
         bucketSelector = bucketSelector,
         actions = if (actions.isEmpty()) (0..randomInt(10)).map { randomActionWithPolicy(destinationId = destinationId) } else actions
+    )
+}
+
+fun randomDocumentReturningTrigger(
+    id: String = UUIDs.base64UUID(),
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    severity: String = "1",
+    condition: Script = randomScript(),
+    actions: List<Action> = mutableListOf(),
+    destinationId: String = ""
+): DocumentLevelTrigger {
+    return DocumentLevelTrigger(
+        id = id,
+        name = name,
+        severity = severity,
+        condition = condition,
+        actions = if (actions.isEmpty() && destinationId.isNotBlank())
+            (0..randomInt(10)).map { randomAction(destinationId = destinationId) }
+        else actions
     )
 }
 
@@ -297,10 +334,9 @@ fun randomDocLevelQuery(
     id: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     query: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     severity: String = "${randomInt(5)}",
-    tags: List<String> = mutableListOf(0..randomInt(10)).map { OpenSearchRestTestCase.randomAlphaOfLength(10) },
-    actions: List<Action> = mutableListOf(0..randomInt(10)).map { randomAction() }
+    tags: List<String> = mutableListOf(0..randomInt(10)).map { OpenSearchRestTestCase.randomAlphaOfLength(10) }
 ): DocLevelQuery {
-    return DocLevelQuery(id = id, query = query, severity = severity, tags = tags, actions = actions)
+    return DocLevelQuery(id = id, query = query, severity = severity, tags = tags)
 }
 
 fun randomDocLevelMonitorInput(
@@ -587,22 +623,4 @@ fun assertUserNull(map: Map<String, Any?>) {
 
 fun assertUserNull(monitor: Monitor) {
     assertNull("User is not null", monitor.user)
-}
-
-fun randomDocumentLevelMonitor(
-    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
-    user: User = randomUser(),
-    inputs: List<Input> = listOf(SearchInput(emptyList(), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))),
-    schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
-    enabled: Boolean = randomBoolean(),
-    triggers: List<Trigger> = (1..randomInt(10)).map { randomDocLevelTrigger() },
-    enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
-    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
-    withMetadata: Boolean = false
-): Monitor {
-    return Monitor(
-        name = name, monitorType = Monitor.MonitorType.DOC_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
-        schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
-        lastRunContext = mapOf(), uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
-    )
 }

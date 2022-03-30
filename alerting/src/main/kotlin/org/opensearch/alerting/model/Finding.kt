@@ -73,7 +73,7 @@ class Finding(
             .field(QUERY_ID_FIELD, queryId)
             .field(QUERY_TAGS_FIELD, queryTags.toTypedArray())
             .field(SEVERITY_FIELD, severity)
-            .field(TIMESTAMP_FIELD, timestamp)
+            .field(TIMESTAMP_FIELD, timestamp.toEpochMilli())
             .field(TRIGGER_ID_FIELD, triggerId)
             .field(TRIGGER_NAME_FIELD, triggerName)
         builder.endObject()
