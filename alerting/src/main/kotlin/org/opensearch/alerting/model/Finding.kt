@@ -32,6 +32,7 @@ class Finding(
     val triggerId: String?,
     val triggerName: String?
 ) : Writeable, ToXContent {
+
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
         id = sin.readString(),
@@ -73,7 +74,7 @@ class Finding(
             .field(QUERY_ID_FIELD, queryId)
             .field(QUERY_TAGS_FIELD, queryTags.toTypedArray())
             .field(SEVERITY_FIELD, severity)
-            .field(TIMESTAMP_FIELD, timestamp)
+            .field(TIMESTAMP_FIELD, timestamp.toEpochMilli())
             .field(TRIGGER_ID_FIELD, triggerId)
             .field(TRIGGER_NAME_FIELD, triggerName)
         builder.endObject()
@@ -141,7 +142,9 @@ class Finding(
                         }
                     }
                     SEVERITY_FIELD -> severity = xcp.text()
-                    TIMESTAMP_FIELD -> timestamp = requireNotNull(xcp.instant())
+                    TIMESTAMP_FIELD -> {
+                        timestamp = requireNotNull(xcp.instant())
+                    }
                     TRIGGER_ID_FIELD -> triggerId = xcp.text()
                     TRIGGER_NAME_FIELD -> triggerName = xcp.text()
                 }
