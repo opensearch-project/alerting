@@ -34,4 +34,4 @@ jobs:
       - name: Run Alerting Backwards Compatibility Tests
         run: |
           echo "Running backwards compatibility tests..."
-          ./gradlew bwcTestSuite
+          ./gradlew bwcTestSuite -Dbuild.qualifier=alpha1

@@ -79,9 +79,6 @@ class AlertIndices(
         /** The in progress alert history index. */
         const val ALERT_INDEX = ".opendistro-alerting-alerts"
 
-        /** The Elastic mapping type */
-        const val MAPPING_TYPE = "_doc"
-
         /** The alias of the index in which to write alert history */
         const val HISTORY_WRITE_INDEX = ".opendistro-alerting-alert-history-write"
 
@@ -212,7 +209,7 @@ class AlertIndices(
         if (existsResponse.isExists) return true
 
         val request = CreateIndexRequest(index)
-            .mapping(MAPPING_TYPE, alertMapping(), XContentType.JSON)
+            .mapping(alertMapping())
             .settings(Settings.builder().put("index.hidden", true).build())
 
         if (alias != null) request.alias(Alias(alias))
@@ -267,7 +264,7 @@ class AlertIndices(
         // We have to pass null for newIndexName in order to get Elastic to increment the index count.
         val request = RolloverRequest(HISTORY_WRITE_INDEX, null)
         request.createIndexRequest.index(HISTORY_INDEX_PATTERN)
-            .mapping(MAPPING_TYPE, alertMapping(), XContentType.JSON)
+            .mapping(alertMapping())
             .settings(Settings.builder().put("index.hidden", true).build())
         request.addMaxIndexDocsCondition(historyMaxDocs)
         request.addMaxIndexAgeCondition(historyMaxAge)

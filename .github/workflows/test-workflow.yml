@@ -27,7 +27,7 @@ jobs:
         with:
           java-version: ${{ matrix.java }}
       - name: Build and run with Gradle
-        run: ./gradlew build
+        run: ./gradlew build -Dbuild.qualifier=alpha1
       - name: Create Artifact Path
         run: |
           mkdir -p alerting-artifacts

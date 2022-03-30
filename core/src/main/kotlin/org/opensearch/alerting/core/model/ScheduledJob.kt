@@ -37,14 +37,6 @@ interface ScheduledJob : Writeable, ToXContentObject {
         /** The name of the ElasticSearch index in which we store jobs */
         const val SCHEDULED_JOBS_INDEX = ".opendistro-alerting-config"
 
-        /**
-         * The mapping type of [ScheduledJob]s in the OpenSearch index. Unrelated to [ScheduledJob.type].
-         *
-         * This should go away starting ES 7. We use "_doc" for future compatibility as described here:
-         * https://www.elastic.co/guide/en/elasticsearch/reference/6.x/removal-of-types.html#_schedule_for_removal_of_mapping_types
-         */
-        const val SCHEDULED_JOB_TYPE = "_doc"
-
         const val NO_ID = ""
 
         const val NO_VERSION = 1L
