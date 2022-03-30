@@ -27,4 +27,4 @@ jobs:
       - name: Checkout Branch
         uses: actions/checkout@v2
       - name: Run integration tests with multi node config
-        run: ./gradlew integTest -PnumNodes=3
+        run: ./gradlew integTest -PnumNodes=3 -Dbuild.qualifier=alpha1
