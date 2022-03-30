@@ -190,11 +190,6 @@ class TransportGetFindingsSearchAction @Inject constructor(
                             findingDocument = FindingDocument.parse(xcp)
                             // TODO: remove debug log
                             log.info("Response not empty")
-                            val docStr = findingDocument?.toXContent(
-                                XContentBuilder.builder(XContentType.JSON.xContent()),
-                                ToXContent.EMPTY_PARAMS
-                            ).string()
-                            log.info("findingDocument: $docStr")
                         }
                     }
 
