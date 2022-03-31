@@ -36,7 +36,7 @@ jobs:
         run: ./gradlew assemble
       - name: Pull and Run Docker
         run: |
-          plugin=`ls alerting/build/distributions/*.zip`
+          plugin=`basename $(ls alerting/build/distributions/*.zip)`
           list_of_files=`ls`
           list_of_all_files=`ls alerting/build/distributions/`
           version=`echo $plugin|awk -F- '{print $3}'| cut -d. -f 1-3`
