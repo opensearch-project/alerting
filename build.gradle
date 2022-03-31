@@ -8,7 +8,7 @@ buildscript {
 
     ext {
         opensearch_version = System.getProperty("opensearch.version", "2.0.0-alpha1-SNAPSHOT")
-        buildVersionQualifier = System.getProperty("build.version_qualifier")
+        buildVersionQualifier = System.getProperty("build.version_qualifier", "alpha1")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         // 2.0.0-alpha1-SNAPSHOT -> 2.0.0.0-alpha1-SNAPSHOT
         version_tokens = opensearch_version.tokenize('-')
