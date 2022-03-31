@@ -33,7 +33,7 @@ jobs:
           java-version: 11
       - name: Build Alerting
         # Only assembling since the full build is governed by other workflows
-        run: ./gradlew assemble -Dbuild.qualifier=alpha1
+        run: ./gradlew assemble
       - name: Pull and Run Docker
         run: |
           plugin=`ls alerting/build/distributions/*.zip`
