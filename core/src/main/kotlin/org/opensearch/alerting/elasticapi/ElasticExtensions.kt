@@ -67,6 +67,29 @@ fun <T> BackoffPolicy.retry(block: () -> T): T {
 }
 
 /**
+ * Backs off and retries a lambda that makes a request. This retries on any Exception unless it detects the
+ * Notification plugin is not installed. This should not be called on any of the [standard][ThreadPool] executors
+ * since those executors are not meant to be blocked by sleeping.
+ */
+fun <T> BackoffPolicy.retryForNotification(block: () -> T): T {
+    val iter = iterator()
+    do {
+        try {
+            return block()
+        } catch (e: java.lang.Exception) {
+            val isMissingNotificationPlugin = e.message?.contains("failed to find action") ?: false
+            if (isMissingNotificationPlugin) {
+                throw OpenSearchException("Notification plugin is not installed. Please install the Notification plugin.", e)
+            } else if (iter.hasNext()) {
+                Thread.sleep(iter.next().millis)
+            } else {
+                throw e
+            }
+        }
+    } while (true)
+}
+
+/**
  * Retries the given [block] of code as specified by the receiver [BackoffPolicy], if [block] throws an [OpenSearchException]
  * that is retriable (502, 503, 504).
  *
