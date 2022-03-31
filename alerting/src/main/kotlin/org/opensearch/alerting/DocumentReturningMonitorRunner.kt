@@ -37,7 +37,13 @@ import kotlin.collections.HashMap
 object DocumentReturningMonitorRunner : MonitorRunner {
     private val logger = LogManager.getLogger(javaClass)
 
-    override suspend fun runMonitor(monitor: Monitor, monitorCtx: MonitorRunnerExecutionContext, periodStart: Instant, periodEnd: Instant, dryrun: Boolean):
+    override suspend fun runMonitor(
+        monitor: Monitor,
+        monitorCtx: MonitorRunnerExecutionContext,
+        periodStart: Instant,
+        periodEnd: Instant,
+        dryrun: Boolean
+    ):
         MonitorRunResult<DocumentLevelTriggerRunResult> {
         logger.info("Document-level-monitor is running ...")
         val monitorResult = MonitorRunResult<DocumentLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
@@ -168,7 +174,12 @@ object DocumentReturningMonitorRunner : MonitorRunner {
     }
 
     // TODO: Implement action for triggers
-    override suspend fun runAction(action: Action, ctx: TriggerExecutionContext, monitorCtx: MonitorRunnerExecutionContext, dryrun: Boolean): ActionRunResult {
+    override suspend fun runAction(
+        action: Action,
+        ctx: TriggerExecutionContext,
+        monitorCtx: MonitorRunnerExecutionContext,
+        dryrun: Boolean
+    ): ActionRunResult {
         return ActionRunResult(action.id, action.name, mapOf(), false, MonitorRunnerService.currentTime(), null)
     }
 
@@ -270,7 +281,14 @@ object DocumentReturningMonitorRunner : MonitorRunner {
         return matchingDocs
     }
 
-    private fun searchShard(monitorCtx: MonitorRunnerExecutionContext, index: String, shard: String, prevSeqNo: Long?, maxSeqNo: Long, query: String): SearchHits {
+    private fun searchShard(
+        monitorCtx: MonitorRunnerExecutionContext,
+        index: String,
+        shard: String,
+        prevSeqNo: Long?,
+        maxSeqNo: Long,
+        query: String
+    ): SearchHits {
         if (prevSeqNo?.equals(maxSeqNo) == true) {
             return SearchHits.empty()
         }

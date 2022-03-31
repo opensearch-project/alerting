@@ -30,7 +30,13 @@ import java.time.Instant
 object BucketLevelMonitorRunner : MonitorRunner {
     private val logger = LogManager.getLogger(javaClass)
 
-    override suspend fun runMonitor(monitor: Monitor, monitorCtx: MonitorRunnerExecutionContext, periodStart: Instant, periodEnd: Instant, dryrun: Boolean):
+    override suspend fun runMonitor(
+        monitor: Monitor,
+        monitorCtx: MonitorRunnerExecutionContext,
+        periodStart: Instant,
+        periodEnd: Instant,
+        dryrun: Boolean
+    ):
         MonitorRunResult<BucketLevelTriggerRunResult> {
         val roles = MonitorRunnerService.getRolesForMonitor(monitor)
         logger.debug("Running monitor: ${monitor.name} with roles: $roles Thread: ${Thread.currentThread().name}")
@@ -82,7 +88,12 @@ object BucketLevelMonitorRunner : MonitorRunner {
                 // in the final output of monitorResult which occurs when all pages have been exhausted.
                 // If it's favorable to return the last page, will need to check how to accomplish that with multiple aggregation paths
                 // with different page counts.
-                val inputResults = monitorCtx.inputService!!.collectInputResults(monitor, periodStart, periodEnd, monitorResult.inputResults)
+                val inputResults = monitorCtx.inputService!!.collectInputResults(
+                    monitor,
+                    periodStart,
+                    periodEnd,
+                    monitorResult.inputResults
+                )
                 if (firstIteration) {
                     firstPageOfInputResults = inputResults
                     firstIteration = false
@@ -149,7 +160,8 @@ object BucketLevelMonitorRunner : MonitorRunner {
         // in favor of just using the currentAlerts as-is.
         currentAlerts.forEach { (trigger, keysToAlertsMap) ->
             if (triggerResults[trigger.id]?.error == null)
-                nextAlerts[trigger.id]?.get(AlertCategory.COMPLETED)?.addAll(monitorCtx.alertService!!.convertToCompletedAlerts(keysToAlertsMap))
+                nextAlerts[trigger.id]
+                    ?.get(AlertCategory.COMPLETED)?.addAll(monitorCtx.alertService!!.convertToCompletedAlerts(keysToAlertsMap))
         }
 
         for (trigger in monitor.triggers) {
@@ -262,24 +274,33 @@ object BucketLevelMonitorRunner : MonitorRunner {
             if (!dryrun && monitor.id != Monitor.NO_ID) {
                 monitorCtx.alertService!!.saveAlerts(updatedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = false)
                 // Save any COMPLETED Alerts that were not covered in updatedAlerts
-                monitorCtx.alertService!!.saveAlerts(completedAlertsToUpdate.toList(), monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = false)
+                monitorCtx.alertService!!.saveAlerts(
+                    completedAlertsToUpdate.toList(), monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = false
+                )
             }
         }
 
         return monitorResult.copy(inputResults = firstPageOfInputResults, triggerResults = triggerResults)
     }
 
-    override suspend fun runAction(action: Action, ctx: TriggerExecutionContext, monitorCtx: MonitorRunnerExecutionContext, dryrun: Boolean): ActionRunResult {
+    override suspend fun runAction(
+        action: Action,
+        ctx: TriggerExecutionContext,
+        monitorCtx: MonitorRunnerExecutionContext,
+        dryrun: Boolean
+    ): ActionRunResult {
         return try {
             val actionOutput = mutableMapOf<String, String>()
-            actionOutput[Action.SUBJECT] = if (action.subjectTemplate != null) MonitorRunnerService.compileTemplate(action.subjectTemplate, ctx) else ""
+            actionOutput[Action.SUBJECT] = if (action.subjectTemplate != null) MonitorRunnerService
+                .compileTemplate(action.subjectTemplate, ctx) else ""
             actionOutput[Action.MESSAGE] = MonitorRunnerService.compileTemplate(action.messageTemplate, ctx)
             if (Strings.isNullOrEmpty(actionOutput[Action.MESSAGE])) {
                 throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
             }
             if (!dryrun) {
                 withContext(Dispatchers.IO) {
-                    val destination = AlertingConfigAccessor.getDestinationInfo(monitorCtx.client!!, monitorCtx.xContentRegistry!!, action.destinationId)
+                    val destination = AlertingConfigAccessor
+                        .getDestinationInfo(monitorCtx.client!!, monitorCtx.xContentRegistry!!, action.destinationId)
                     if (!destination.isAllowed(monitorCtx.allowList)) {
                         throw IllegalStateException("Monitor contains a Destination type that is not allowed: ${destination.type}")
                     }
@@ -323,8 +344,8 @@ object BucketLevelMonitorRunner : MonitorRunner {
         if (totalActionableAlertCount > monitorCtx.maxActionableAlertCount) {
             logger.debug(
                 "The total actionable alerts for trigger [$triggerId] in monitor [$monitorId] is [$totalActionableAlertCount] " +
-                    "which exceeds the maximum of [$(monitorCtx.maxActionableAlertCount)]. Defaulting to [${ActionExecutionScope.Type.PER_EXECUTION}] " +
-                    "for action execution."
+                    "which exceeds the maximum of [$(monitorCtx.maxActionableAlertCount)]. " +
+                    "Defaulting to [${ActionExecutionScope.Type.PER_EXECUTION}] for action execution."
             )
             return true
         }

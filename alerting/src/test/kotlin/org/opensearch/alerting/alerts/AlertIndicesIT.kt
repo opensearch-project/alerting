@@ -13,6 +13,8 @@ import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.NEVER_RUN
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.makeRequest
+import org.opensearch.alerting.randomDocLevelTrigger
+import org.opensearch.alerting.randomDocumentLevelMonitor
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.settings.AlertingSettings
@@ -87,7 +89,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         client().updateSettings(AlertingSettings.ALERT_FINDING_ROLLOVER_PERIOD.key, "1s")
         client().updateSettings(AlertingSettings.ALERT_FINDING_INDEX_MAX_AGE.key, "1s")
 
-        val trueMonitor = randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN)))
+        val trueMonitor = randomDocumentLevelMonitor(triggers = listOf(randomDocLevelTrigger(condition = ALWAYS_RUN)))
         executeMonitor(trueMonitor)
 
         // Allow for a rollover index.
