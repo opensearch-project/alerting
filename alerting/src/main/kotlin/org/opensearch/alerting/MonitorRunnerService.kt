@@ -19,6 +19,7 @@ import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.elasticapi.retry
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.Monitor.MonitorType
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.destination.DestinationContextFactory
@@ -31,8 +32,6 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.MOVE_ALERTS_B
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.HOST_DENY_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.loadDestinationSettings
-import org.opensearch.alerting.util.isBucketLevelMonitor
-import org.opensearch.alerting.util.isDocLevelMonitor
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.component.AbstractLifecycleComponent
@@ -202,12 +201,13 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
     suspend fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant, dryrun: Boolean): MonitorRunResult<*> {
         val monitor = job as Monitor
-        return if (monitor.isBucketLevelMonitor()) {
-            BucketLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
-        } else if (monitor.isDocLevelMonitor()) {
-            DocumentReturningMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
-        } else {
-            QueryLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
+        return when (monitor.monitorType) {
+            MonitorType.BUCKET_LEVEL_MONITOR ->
+                BucketLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
+            MonitorType.DOC_LEVEL_MONITOR ->
+                DocumentReturningMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
+            else ->
+                QueryLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         }
     }
 
