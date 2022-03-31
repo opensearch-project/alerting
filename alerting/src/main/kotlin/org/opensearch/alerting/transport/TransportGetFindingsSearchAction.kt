@@ -18,7 +18,6 @@ import org.opensearch.alerting.action.GetFindingsSearchRequest
 import org.opensearch.alerting.action.GetFindingsSearchResponse
 import org.opensearch.alerting.elasticapi.addFilter
 import org.opensearch.alerting.model.Finding
-// import org.opensearch.alerting.model.FindingDocument
 import org.opensearch.alerting.model.FindingWithDocs
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
