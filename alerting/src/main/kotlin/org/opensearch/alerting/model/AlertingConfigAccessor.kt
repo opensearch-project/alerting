@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.elasticapi.suspendUntil
+import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup

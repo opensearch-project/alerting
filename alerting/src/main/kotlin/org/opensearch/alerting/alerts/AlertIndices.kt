@@ -23,7 +23,7 @@ import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
 import org.opensearch.alerting.alerts.AlertIndices.Companion.HISTORY_WRITE_INDEX
-import org.opensearch.alerting.elasticapi.suspendUntil
+import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_HISTORY_ENABLED
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_HISTORY_INDEX_MAX_AGE

@@ -6,9 +6,9 @@
 package org.opensearch.alerting.model
 
 import org.opensearch.alerting.alerts.AlertError
-import org.opensearch.alerting.elasticapi.instant
-import org.opensearch.alerting.elasticapi.optionalTimeField
-import org.opensearch.alerting.elasticapi.optionalUserField
+import org.opensearch.alerting.opensearchapi.instant
+import org.opensearch.alerting.opensearchapi.optionalTimeField
+import org.opensearch.alerting.opensearchapi.optionalUserField
 import org.opensearch.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput

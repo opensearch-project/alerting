@@ -8,7 +8,7 @@ package org.opensearch.alerting.util.destinationmigration
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionListener
 import org.opensearch.action.bulk.BackoffPolicy
-import org.opensearch.alerting.elasticapi.retryForNotification
+import org.opensearch.alerting.opensearchapi.retryForNotification
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.ConfigConstants

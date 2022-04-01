@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting.elasticapi
+package org.opensearch.alerting.opensearchapi
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ThreadContextElement
@@ -28,6 +28,7 @@ import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.InjectSecurity
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.notifications.NotificationsPluginInterface
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
@@ -177,6 +178,20 @@ fun XContentBuilder.string(): String = BytesReference.bytes(this).utf8ToString()
  * @param block - a block of code that is passed an [ActionListener] that should be passed to the OpenSearch client API.
  */
 suspend fun <C : OpenSearchClient, T> C.suspendUntil(block: C.(ActionListener<T>) -> Unit): T =
+    suspendCoroutine { cont ->
+        block(object : ActionListener<T> {
+            override fun onResponse(response: T) = cont.resume(response)
+
+            override fun onFailure(e: Exception) = cont.resumeWithException(e)
+        })
+    }
+
+/**
+ * Converts [NotificationsPluginInterface] methods that take a callback into a kotlin suspending function.
+ *
+ * @param block - a block of code that is passed an [ActionListener] that should be passed to the NotificationsPluginInterface API.
+ */
+suspend fun <T> NotificationsPluginInterface.suspendUntil(block: NotificationsPluginInterface.(ActionListener<T>) -> Unit): T =
     suspendCoroutine { cont ->
         block(object : ActionListener<T> {
             override fun onResponse(response: T) = cont.resume(response)

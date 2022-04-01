@@ -20,7 +20,7 @@ import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
-import org.opensearch.alerting.elasticapi.string
+import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.Monitor

@@ -7,7 +7,7 @@ package org.opensearch.alerting.action
 
 import org.junit.Assert
 import org.opensearch.alerting.builder
-import org.opensearch.alerting.elasticapi.string
+import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.randomUser
 import org.opensearch.common.io.stream.BytesStreamOutput

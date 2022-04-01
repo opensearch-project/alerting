@@ -15,7 +15,7 @@ import org.opensearch.alerting.core.model.Input
 import org.opensearch.alerting.core.model.IntervalSchedule
 import org.opensearch.alerting.core.model.Schedule
 import org.opensearch.alerting.core.model.SearchInput
-import org.opensearch.alerting.elasticapi.string
+import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.model.ActionExecutionResult
 import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.AggregationResultBucket

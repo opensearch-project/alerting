@@ -13,7 +13,7 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
 import org.opensearch.alerting.alerts.AlertIndices.Companion.HISTORY_WRITE_INDEX
-import org.opensearch.alerting.elasticapi.suspendUntil
+import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.client.Client
