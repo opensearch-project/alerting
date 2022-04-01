@@ -20,7 +20,6 @@ import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
-import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.Monitor
@@ -31,6 +30,7 @@ import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.Slack
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
+import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.DestinationType

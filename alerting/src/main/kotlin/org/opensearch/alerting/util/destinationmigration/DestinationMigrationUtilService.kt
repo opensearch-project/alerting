@@ -6,7 +6,6 @@
 package org.opensearch.alerting.util.destinationmigration
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.action.ActionListener
 import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.delete.DeleteRequest

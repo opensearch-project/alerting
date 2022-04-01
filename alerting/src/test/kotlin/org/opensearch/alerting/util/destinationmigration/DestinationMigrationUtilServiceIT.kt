@@ -76,7 +76,6 @@ class DestinationMigrationUtilServiceIT : AlertingRestTestCase() {
                     }
                 """.trimIndent()
                 indexDoc(SCHEDULED_JOBS_INDEX, destination.id, dest)
-                logger.info("Destination: ${destination.type} - ${destination.id}")
                 ids.add(destination.id)
             }
 
