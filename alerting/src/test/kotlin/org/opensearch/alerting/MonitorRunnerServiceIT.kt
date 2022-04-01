@@ -1496,27 +1496,6 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         }
     }
 
-    // TODO: Enable this test once MonitorRunner::runDocLevelMonitor is
-    //  refactored to return a DocumentLevelTriggerRunResult containing exceptions.
-//    fun `test document-level monitor when alias has no write index`() {
-//        // Monitor should not execute.
-//        val alias = createTestAlias(includeWriteIndex = false)
-//        val indices = alias[alias.keys.first()]?.keys?.toList() as List<String>
-//        val query = randomDocLevelQuery(tags = listOf(), actions = listOf())
-//        val input = randomDocumentLevelMonitorInput(indices = indices, queries = listOf(query))
-//        val trigger = randomDocLevelTrigger(condition = Script("params${query.id}"))
-//        val monitor = createMonitor(randomDocumentLevelMonitor(enabled = false, inputs = listOf(input), triggers = listOf(trigger)))
-//
-//        val response = executeMonitor(monitor.id)
-//
-//        val output = entityAsMap(response)
-//        val inputResults = output.stringMap("input_results")
-//        val errorMessage = inputResults?.get("error")
-//
-//        assertEquals(monitor.name, output["monitor_name"])
-//        assertNotNull("Expected monitor execution to fail, but error message was: $errorMessage")
-//    }
-
     fun `test document-level monitor when alias only has write index with 0 docs`() {
         // Monitor should execute, but create 0 findings.
         val alias = createTestAlias(includeWriteIndex = false)
