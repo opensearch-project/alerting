@@ -18,7 +18,7 @@ function usage() {
     echo -e "-h help"
 }
 
-while getopts ":h:v:s:o:p:a:" arg; do
+while getopts ":h:v:q:s:o:p:a:" arg; do
     case $arg in
         h)
             usage
@@ -78,6 +78,6 @@ cp ${distributions}/*.zip ./$OUTPUT/plugins
 ./gradlew publishShadowPublicationToStagingRepository -Dopensearch.version=$VERSION -Dbuild.version_qualifier=$QUALIFIER -Dbuild.snapshot=$SNAPSHOT
 
 mkdir -p $OUTPUT/maven/org/opensearch
-cp -r ./build/local-staging-repo/org/opensearch/notification $OUTPUT/maven/org/opensearch/notification
+cp -r ./build/local-staging-repo/org/opensearch/. $OUTPUT/maven/org/opensearch
 
 
