@@ -69,10 +69,15 @@ fun <T> BackoffPolicy.retry(block: () -> T): T {
 
 /**
  * Backs off and retries a lambda that makes a request. This retries on any Exception unless it detects the
- * Notification plugin is not installed. This should not be called on any of the [standard][ThreadPool] executors
- * since those executors are not meant to be blocked by sleeping.
+ * Notification plugin is not installed.
+ *
+ * @param logger - logger used to log intermediate failures
+ * @param block - the block of code to retry. This should be a suspend function.
  */
-fun <T> BackoffPolicy.retryForNotification(block: () -> T): T {
+suspend fun <T> BackoffPolicy.retryForNotification(
+    logger: Logger,
+    block: suspend () -> T
+): T {
     val iter = iterator()
     do {
         try {
@@ -82,7 +87,9 @@ fun <T> BackoffPolicy.retryForNotification(block: () -> T): T {
             if (isMissingNotificationPlugin) {
                 throw OpenSearchException("Notification plugin is not installed. Please install the Notification plugin.", e)
             } else if (iter.hasNext()) {
-                Thread.sleep(iter.next().millis)
+                val backoff = iter.next()
+                logger.warn("Notification operation failed. Retrying in $backoff.", e)
+                delay(backoff.millis)
             } else {
                 throw e
             }

@@ -17,6 +17,7 @@ import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
+import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.util.destinationmigration.DestinationConversionUtils.Companion.convertDestinationToNotificationConfig
 import org.opensearch.alerting.util.destinationmigration.DestinationConversionUtils.Companion.convertEmailAccountToNotificationConfig
 import org.opensearch.alerting.util.destinationmigration.DestinationConversionUtils.Companion.convertEmailGroupToNotificationConfig
@@ -34,6 +35,7 @@ import org.opensearch.commons.notifications.action.CreateNotificationConfigReque
 import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.rest.RestStatus
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.fetch.subphase.FetchSourceContext
 import java.time.Instant
@@ -52,7 +54,7 @@ class DestinationMigrationUtilService {
         var finishFlag = false
             internal set
 
-        fun migrateDestinations(client: NodeClient) {
+        suspend fun migrateDestinations(client: NodeClient) {
             if (runningLock) {
                 logger.info("There is already a migrate destination process running...")
                 return
@@ -79,36 +81,25 @@ class DestinationMigrationUtilService {
             }
         }
 
-        private fun deleteOldDestinations(client: NodeClient, destinationIds: List<String>): List<String> {
+        private suspend fun deleteOldDestinations(client: NodeClient, destinationIds: List<String>): List<String> {
             val bulkDeleteRequest = BulkRequest().setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
             destinationIds.forEach {
                 val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, it)
                 bulkDeleteRequest.add(deleteRequest)
             }
-            val failedToDeleteDestinations = mutableListOf<String>()
-            var finishedExecution = false
-            client.bulk(
-                bulkDeleteRequest,
-                object : ActionListener<BulkResponse> {
-                    override fun onResponse(response: BulkResponse) {
-                        failedToDeleteDestinations.addAll(response.items.filter { it.isFailed }.map { it.id })
-                        finishedExecution = true
-                    }
 
-                    override fun onFailure(t: Exception) {
-                        failedToDeleteDestinations.addAll(destinationIds)
-                        finishedExecution = true
-                        logger.error("Failed to delete destinations", t)
-                    }
-                }
-            )
-            while (!finishedExecution) {
-                Thread.sleep(100)
+            val failedToDeleteDestinations = mutableListOf<String>()
+            try {
+                val bulkResponse: BulkResponse = client.suspendUntil { client.bulk(bulkDeleteRequest, it) }
+                failedToDeleteDestinations.addAll(bulkResponse.items.filter { it.isFailed }.map { it.id })
+            } catch (e: Exception) {
+                logger.error("Failed to delete all destinations", e)
+                failedToDeleteDestinations.addAll(destinationIds)
             }
             return failedToDeleteDestinations
         }
 
-        private fun createNotificationChannelIfNotExists(
+        private suspend fun createNotificationChannelIfNotExists(
             client: NodeClient,
             notificationConfigInfoList: List<Pair<NotificationConfigInfo, String>>
         ): List<String> {
@@ -146,7 +137,7 @@ class DestinationMigrationUtilService {
             return migratedNotificationConfigs
         }
 
-        private fun retrieveDestinationsToMigrate(client: NodeClient): List<Pair<NotificationConfigInfo, String>> {
+        private suspend fun retrieveDestinationsToMigrate(client: NodeClient): List<Pair<NotificationConfigInfo, String>> {
             var start = 0
             val size = 100
             val notificationConfigInfoList = mutableListOf<Pair<NotificationConfigInfo, String>>()
@@ -164,77 +155,67 @@ class DestinationMigrationUtilService {
                     .should(QueryBuilders.existsQuery("email_group"))
                     .should(QueryBuilders.existsQuery("destination"))
                 searchSourceBuilder.query(queryBuilder)
-                logger.info("Query running is: ${client.prepareSearch().setQuery(queryBuilder)}")
 
                 val searchRequest = SearchRequest()
                     .source(searchSourceBuilder)
                     .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
-                var finishedExecution = false
-                client.search(
-                    searchRequest,
-                    object : ActionListener<SearchResponse> {
-                        override fun onResponse(response: SearchResponse) {
-                            if (response.hits.hits.isEmpty()) {
-                                hasMoreResults = false
-                            }
-                            for (hit in response.hits) {
-                                logger.info("Migration, found results: ${hit.sourceAsString}")
-                                val xcp = XContentFactory.xContent(XContentType.JSON)
-                                    .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
-                                var notificationConfig: NotificationConfig?
-                                var userStr = ""
-                                when {
-                                    hit.sourceAsString.contains("\"email_group\"") -> {
-                                        val emailGroup = EmailGroup.parseWithType(xcp, hit.id, hit.version)
-                                        notificationConfig = convertEmailGroupToNotificationConfig(emailGroup)
-                                    }
-                                    hit.sourceAsString.contains("\"email_account\"") -> {
-                                        val emailAccount = EmailAccount.parseWithType(xcp, hit.id, hit.version)
-                                        notificationConfig = convertEmailAccountToNotificationConfig(emailAccount)
-                                    }
-                                    else -> {
-                                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
-                                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                                        val destination = Destination.parse(
-                                            xcp,
-                                            hit.id,
-                                            hit.version,
-                                            hit.seqNo.toInt(),
-                                            hit.primaryTerm.toInt()
-                                        )
-                                        userStr = destination.user.toString()
-                                        notificationConfig = convertDestinationToNotificationConfig(destination)
-                                    }
-                                }
+                val response: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
 
-                                if (notificationConfig != null)
-                                    notificationConfigInfoList.add(
-                                        Pair(
-                                            NotificationConfigInfo(
-                                                hit.id,
-                                                Instant.now(),
-                                                Instant.now(),
-                                                notificationConfig
-                                            ),
-                                            userStr
-                                        )
-                                    )
-                            }
-                            finishedExecution = true
-                        }
-
-                        override fun onFailure(t: Exception) {
-                            hasMoreResults = false
-                            finishedExecution = true
-                        }
+                if (response.status() != RestStatus.OK) {
+                    logger.error("Failed to retrieve destinations to migrate")
+                    hasMoreResults = false
+                } else {
+                    if (response.hits.hits.isEmpty()) {
+                        hasMoreResults = false
                     }
-                )
-                while (!finishedExecution) {
-                    Thread.sleep(100)
+                    for (hit in response.hits) {
+                        val xcp = XContentFactory.xContent(XContentType.JSON)
+                            .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
+                        var notificationConfig: NotificationConfig?
+                        var userStr = ""
+                        when {
+                            hit.sourceAsString.contains("\"email_group\"") -> {
+                                val emailGroup = EmailGroup.parseWithType(xcp, hit.id, hit.version)
+                                notificationConfig = convertEmailGroupToNotificationConfig(emailGroup)
+                            }
+                            hit.sourceAsString.contains("\"email_account\"") -> {
+                                val emailAccount = EmailAccount.parseWithType(xcp, hit.id, hit.version)
+                                notificationConfig = convertEmailAccountToNotificationConfig(emailAccount)
+                            }
+                            else -> {
+                                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                                XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
+                                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                                val destination = Destination.parse(
+                                    xcp,
+                                    hit.id,
+                                    hit.version,
+                                    hit.seqNo.toInt(),
+                                    hit.primaryTerm.toInt()
+                                )
+                                userStr = destination.user.toString()
+                                notificationConfig = convertDestinationToNotificationConfig(destination)
+                            }
+                        }
+
+                        if (notificationConfig != null)
+                            notificationConfigInfoList.add(
+                                Pair(
+                                    NotificationConfigInfo(
+                                        hit.id,
+                                        Instant.now(),
+                                        Instant.now(),
+                                        notificationConfig
+                                    ),
+                                    userStr
+                                )
+                            )
+                    }
                 }
+
                 start += size
             }
+
             return notificationConfigInfoList
         }
     }
