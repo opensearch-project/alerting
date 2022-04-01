@@ -289,7 +289,7 @@ data class Monitor(
                 requireNotNull(schedule) { "Monitor schedule is null" },
                 lastUpdateTime ?: Instant.now(),
                 enabledTime,
-                MonitorType.valueOf(monitorType.toUpperCase(Locale.ROOT)),
+                MonitorType.valueOf(monitorType.uppercase(Locale.ROOT)),
                 user,
                 schemaVersion,
                 inputs.toList(),

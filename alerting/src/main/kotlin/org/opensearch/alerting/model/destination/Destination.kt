@@ -193,7 +193,7 @@ data class Destination(
                 schemaVersion,
                 seqNo,
                 primaryTerm,
-                DestinationType.valueOf(type.toUpperCase(Locale.ROOT)),
+                DestinationType.valueOf(type.uppercase(Locale.ROOT)),
                 requireNotNull(name) { "Destination name is null" },
                 user,
                 lastUpdateTime ?: Instant.now(),

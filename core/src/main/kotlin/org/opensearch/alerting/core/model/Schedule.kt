@@ -25,6 +25,7 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import java.time.zone.ZoneRulesException
+import java.util.Locale
 
 sealed class Schedule : Writeable, ToXContentObject {
     enum class TYPE { CRON, INTERVAL }
@@ -73,7 +74,7 @@ sealed class Schedule : Writeable, ToXContentObject {
                             xcp.nextToken()
                             when (cronFieldName) {
                                 INTERVAL_FIELD -> interval = xcp.intValue()
-                                UNIT_FIELD -> unit = ChronoUnit.valueOf(xcp.text().toUpperCase())
+                                UNIT_FIELD -> unit = ChronoUnit.valueOf(xcp.text().uppercase(Locale.getDefault()))
                             }
                         }
                     }
