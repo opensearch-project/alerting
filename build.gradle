@@ -49,7 +49,7 @@ configurations {
 }
 
 dependencies {
-    add("ktlint", "com.pinterest:ktlint:0.41.0") {
+    add("ktlint", "com.pinterest:ktlint:0.45.1") {
         attributes {
             attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling, Bundling.EXTERNAL))
         }
