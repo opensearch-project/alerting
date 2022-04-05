@@ -38,7 +38,7 @@ data class BucketLevelTriggerRunResult(
     override fun writeTo(out: StreamOutput) {
         super.writeTo(out)
         out.writeMap(aggregationResultBuckets, StreamOutput::writeString) {
-            valueOut: StreamOutput, aggResultBucket: AggregationResultBucket ->
+                valueOut: StreamOutput, aggResultBucket: AggregationResultBucket ->
             aggResultBucket.writeTo(valueOut)
         }
         out.writeMap(actionResultsMap as Map<String, Any>)
