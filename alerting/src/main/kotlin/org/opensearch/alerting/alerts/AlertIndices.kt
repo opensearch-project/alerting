@@ -25,6 +25,10 @@ import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
 import org.opensearch.alerting.alerts.AlertIndices.Companion.HISTORY_WRITE_INDEX
 import org.opensearch.alerting.elasticapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_FINDING_ENABLED
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_FINDING_INDEX_MAX_AGE
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_FINDING_MAX_DOCS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_FINDING_ROLLOVER_PERIOD
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_HISTORY_ENABLED
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_HISTORY_INDEX_MAX_AGE
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_HISTORY_MAX_DOCS
@@ -72,6 +76,17 @@ class AlertIndices(
             historyRetentionPeriod = it
         }
         clusterService.clusterSettings.addSettingsUpdateConsumer(REQUEST_TIMEOUT) { requestTimeout = it }
+
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERT_FINDING_ENABLED) { findingEnabled = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERT_FINDING_MAX_DOCS) { findingMaxDocs = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERT_FINDING_INDEX_MAX_AGE) { findingMaxAge = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERT_FINDING_ROLLOVER_PERIOD) {
+            findingRolloverPeriod = it
+            rescheduleRolloverFinding()
+        }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD) {
+            historyRetentionPeriod = it
+        }
     }
 
     companion object {
@@ -89,19 +104,19 @@ class AlertIndices(
         const val HISTORY_ALL = ".opendistro-alerting-alert-history*"
 
         /** The index name pattern referring to all alert history indices */
-        const val FINDING_ALL = ".opendistro-alerting-finding-history*"
+        const val FINDING_ALL = ".opendistro-alerting-alert-finding-history*"
 
         /** The index name pattern to create alert history indices */
         const val HISTORY_INDEX_PATTERN = "<.opendistro-alerting-alert-history-{now/d}-1>"
 
         /** The index name pattern to query all alerts, history and current alerts. */
-        const val ALL_INDEX_PATTERN = ".opendistro-alerting-alert*"
+        const val ALL_INDEX_PATTERN = ".opendistro-alerting-alert-alert*"
 
         /** The alias of the index in which to write alert finding */
-        const val FINDING_WRITE_INDEX = ".opendistro-alerting-finding-write"
+        const val FINDING_WRITE_INDEX = ".opendistro-alerting-alert-finding-write"
 
         /** todo the index name pattern to query finding */
-        const val FINDING_INDEX_PATTERN = "<.opendistro-alerting-finding-history-{now/d}-1>"
+        const val FINDING_INDEX_PATTERN = "<.opendistro-alerting-alert-finding-history-{now/d}-1>"
 
         @JvmStatic
         fun alertMapping() =
@@ -191,6 +206,14 @@ class AlertIndices(
             scheduledRollover?.cancel()
             scheduledRollover = threadPool
                 .scheduleWithFixedDelay({ rolloverAndDeleteHistoryIndices() }, historyRolloverPeriod, executorName())
+        }
+    }
+
+    private fun rescheduleRolloverFinding() {
+        if (clusterService.state().nodes.isLocalNodeElectedMaster) {
+            scheduledRollover?.cancel()
+            scheduledRollover = threadPool
+                .scheduleWithFixedDelay({ rolloverAndDeleteFindingIndices() }, findingRolloverPeriod, executorName())
         }
     }
 
