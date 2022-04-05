@@ -306,7 +306,7 @@ class TransportIndexDestinationAction @Inject constructor(
             var failureReasons = StringBuilder()
             if (response.shardInfo.failed > 0) {
                 response.shardInfo.failures.forEach {
-                    entry ->
+                        entry ->
                     failureReasons.append(entry.reason())
                 }
                 return failureReasons.toString()

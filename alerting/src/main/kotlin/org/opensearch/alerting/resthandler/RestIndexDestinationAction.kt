@@ -86,7 +86,7 @@ class RestIndexDestinationAction : BaseRestHandler() {
         }
         val indexDestinationRequest = IndexDestinationRequest(id, seqNo, primaryTerm, refreshPolicy, request.method(), destination)
         return RestChannelConsumer {
-            channel ->
+                channel ->
             client.execute(
                 IndexDestinationAction.INSTANCE, indexDestinationRequest,
                 indexDestinationResponse(channel, request.method())

@@ -300,7 +300,7 @@ class TransportIndexEmailAccountAction @Inject constructor(
             val failureReasons = StringBuilder()
             if (response.shardInfo.failed > 0) {
                 response.shardInfo.failures.forEach {
-                    entry ->
+                        entry ->
                     failureReasons.append(entry.reason())
                 }
 
