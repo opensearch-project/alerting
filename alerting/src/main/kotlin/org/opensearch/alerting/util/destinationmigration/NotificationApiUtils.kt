@@ -6,12 +6,17 @@
 package org.opensearch.alerting.util.destinationmigration
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.bulk.BackoffPolicy
+import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.opensearchapi.retryForNotification
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.client.Client
 import org.opensearch.client.node.NodeClient
+import org.opensearch.common.Strings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.ConfigConstants
+import org.opensearch.commons.destination.message.LegacyBaseMessage
 import org.opensearch.commons.notifications.NotificationsPluginInterface
 import org.opensearch.commons.notifications.action.CreateNotificationConfigRequest
 import org.opensearch.commons.notifications.action.CreateNotificationConfigResponse
@@ -19,10 +24,17 @@ import org.opensearch.commons.notifications.action.DeleteNotificationConfigReque
 import org.opensearch.commons.notifications.action.DeleteNotificationConfigResponse
 import org.opensearch.commons.notifications.action.GetNotificationConfigRequest
 import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
+import org.opensearch.commons.notifications.action.LegacyPublishNotificationRequest
+import org.opensearch.commons.notifications.action.LegacyPublishNotificationResponse
 import org.opensearch.commons.notifications.action.SendNotificationRequest
 import org.opensearch.commons.notifications.action.SendNotificationResponse
 import org.opensearch.commons.notifications.action.UpdateNotificationConfigRequest
 import org.opensearch.commons.notifications.action.UpdateNotificationConfigResponse
+import org.opensearch.commons.notifications.model.ChannelMessage
+import org.opensearch.commons.notifications.model.EventSource
+import org.opensearch.commons.notifications.model.NotificationConfigInfo
+import org.opensearch.commons.notifications.model.SeverityType
+import org.opensearch.rest.RestStatus
 
 class NotificationApiUtils {
 
@@ -33,7 +45,15 @@ class NotificationApiUtils {
         private val defaultRetryPolicy =
             BackoffPolicy.constantBackoff(TimeValue.timeValueMillis(100), 2)
 
-        suspend fun getNotificationConfig(
+        /**
+         * Gets a NotificationConfigInfo object by ID if it exists.
+         */
+        suspend fun getNotificationConfigInfo(client: NodeClient, id: String): NotificationConfigInfo? {
+            val res: GetNotificationConfigResponse = getNotificationConfig(client, GetNotificationConfigRequest(setOf(id)))
+            return res.searchResult.objectList.firstOrNull()
+        }
+
+        private suspend fun getNotificationConfig(
             client: NodeClient,
             getNotificationConfigRequest: GetNotificationConfigRequest,
             retryPolicy: BackoffPolicy = defaultRetryPolicy
@@ -151,3 +171,73 @@ class NotificationApiUtils {
         }
     }
 }
+
+/**
+ * Similar to Destinations, this is a generic utility method for constructing message content from
+ * a subject and message body when sending through Notifications since the Action definition in Monitors can have both.
+ */
+fun constructMessageContent(subject: String?, message: String): String {
+    return if (Strings.isNullOrEmpty(subject)) message else "$subject \n\n $message"
+}
+
+/**
+ * Extension function for publishing a notification to a legacy destination.
+ *
+ * We now support the new channels from the Notification plugin. However, we still need to support
+ * the old legacy destinations that have not been migrated to Notification configs. To accommodate this even after removing the
+ * notification logic in Alerting, we have a separate API in the NotificationsPluginInterface that allows
+ * us to publish these old legacy ones directly.
+ */
+suspend fun LegacyBaseMessage.publishLegacyNotification(client: Client): String {
+    val baseMessage = this
+    val res: LegacyPublishNotificationResponse = NotificationsPluginInterface.suspendUntil {
+        this.publishLegacyNotification(
+            (client as NodeClient),
+            LegacyPublishNotificationRequest(baseMessage),
+            it
+        )
+    }
+    validateResponseStatus(RestStatus.fromCode(res.destinationResponse.statusCode), res.destinationResponse.responseContent)
+    return res.destinationResponse.responseContent
+}
+
+/**
+ * Extension function for publishing a notification to a channel in the Notification plugin.
+ */
+suspend fun NotificationConfigInfo.sendNotification(client: Client, title: String, compiledMessage: String) {
+    val config = this
+    val res: SendNotificationResponse = NotificationsPluginInterface.suspendUntil {
+        this.sendNotification(
+            (client as NodeClient),
+            EventSource(title, config.configId, SeverityType.INFO),
+            ChannelMessage(compiledMessage, null, null),
+            listOf(config.configId),
+            it
+        )
+    }
+    validateResponseStatus(res.getStatus(), res.notificationId)
+}
+
+/**
+ * All valid response statuses.
+ */
+private val VALID_RESPONSE_STATUS = setOf(
+    RestStatus.OK.status, RestStatus.CREATED.status, RestStatus.ACCEPTED.status,
+    RestStatus.NON_AUTHORITATIVE_INFORMATION.status, RestStatus.NO_CONTENT.status,
+    RestStatus.RESET_CONTENT.status, RestStatus.PARTIAL_CONTENT.status,
+    RestStatus.MULTI_STATUS.status
+)
+
+@Throws(OpenSearchStatusException::class)
+fun validateResponseStatus(restStatus: RestStatus, responseContent: String) {
+    if (!VALID_RESPONSE_STATUS.contains(restStatus.status)) {
+        throw OpenSearchStatusException("Failed: $responseContent", restStatus)
+    }
+}
+
+/**
+ * Small data class used to hold either a Destination or a Notification channel config.
+ * This is used since an ID being referenced in a Monitor action could be either config depending on if
+ * it's prior to or after migration.
+ */
+data class NotificationActionConfigs(val destination: Destination?, val channel: NotificationConfigInfo?)
