@@ -82,9 +82,9 @@ class AlertIndicesIT : AlertingRestTestCase() {
         // Allow for a rollover index.
         Thread.sleep(2000)
         val alertIndices = getAlertIndices()
-        var info=""
+        var info = ""
         alertIndices.forEach {
-            info+= "$it|"
+            info += "$it|"
         }
         assertTrue("Did not find 3 alert indices", alertIndices.size >= 3)
         assertTrue(info, false)
