@@ -89,7 +89,7 @@ class AlertIndices(
         const val HISTORY_ALL = ".opendistro-alerting-alert-history*"
 
         /** The index name pattern referring to all alert history indices */
-        const val FINDING_ALL = ".opendistro-alerting-alert-finding-history*"
+        const val FINDING_ALL = ".opendistro-alerting-finding-history*"
 
         /** The index name pattern to create alert history indices */
         const val HISTORY_INDEX_PATTERN = "<.opendistro-alerting-alert-history-{now/d}-1>"
@@ -98,10 +98,10 @@ class AlertIndices(
         const val ALL_INDEX_PATTERN = ".opendistro-alerting-alert*"
 
         /** The alias of the index in which to write alert finding */
-        const val FINDING_WRITE_INDEX = ".opendistro-alerting-alert-finding-write"
+        const val FINDING_WRITE_INDEX = ".opendistro-alerting-finding-write"
 
         /** todo the index name pattern to query finding */
-        const val FINDING_INDEX_PATTERN = "<.opendistro-alerting-alert-finding-history-{now/d}-1>"
+        const val FINDING_INDEX_PATTERN = "<.opendistro-alerting-finding-history-{now/d}-1>"
 
         @JvmStatic
         fun alertMapping() =
