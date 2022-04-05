@@ -35,6 +35,7 @@ import org.opensearch.alerting.model.action.ActionExecutionScope
 import org.opensearch.alerting.model.action.AlertCategory
 import org.opensearch.alerting.model.action.PerAlertActionScope
 import org.opensearch.alerting.model.action.PerExecutionActionScope
+import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.retry
@@ -54,6 +55,11 @@ import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.HOST_DENY_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.loadDestinationSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings.Companion.HOST_DENY_LIST_NONE
+import org.opensearch.alerting.util.destinationmigration.NotificationActionConfigs
+import org.opensearch.alerting.util.destinationmigration.NotificationApiUtils.Companion.getNotificationConfigInfo
+import org.opensearch.alerting.util.destinationmigration.constructMessageContent
+import org.opensearch.alerting.util.destinationmigration.publishLegacyNotification
+import org.opensearch.alerting.util.destinationmigration.sendNotification
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.alerting.util.getCombinedTriggerRunResult
@@ -61,11 +67,13 @@ import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isBucketLevelMonitor
 import org.opensearch.client.Client
+import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.Strings
 import org.opensearch.common.component.AbstractLifecycleComponent
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
 import org.opensearch.script.TemplateScript
@@ -650,18 +658,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             }
             if (!dryrun) {
                 withContext(Dispatchers.IO) {
-                    val destination = AlertingConfigAccessor.getDestinationInfo(client, xContentRegistry, action.destinationId)
-                    if (!destination.isAllowed(allowList)) {
-                        throw IllegalStateException("Monitor contains a Destination type that is not allowed: ${destination.type}")
-                    }
-
-                    val destinationCtx = destinationContextFactory.getDestinationContext(destination)
-                    actionOutput[MESSAGE_ID] = destination.publish(
-                        actionOutput[SUBJECT],
-                        actionOutput[MESSAGE]!!,
-                        destinationCtx,
-                        hostDenyList
-                    )
+                    actionOutput[MESSAGE_ID] = getConfigAndSendNotification(action, actionOutput[SUBJECT], actionOutput[MESSAGE]!!)
                 }
             }
             ActionRunResult(action.id, action.name, actionOutput, false, currentTime(), null)
@@ -682,18 +679,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             }
             if (!dryrun) {
                 withContext(Dispatchers.IO) {
-                    val destination = AlertingConfigAccessor.getDestinationInfo(client, xContentRegistry, action.destinationId)
-                    if (!destination.isAllowed(allowList)) {
-                        throw IllegalStateException("Monitor contains a Destination type that is not allowed: ${destination.type}")
-                    }
-
-                    val destinationCtx = destinationContextFactory.getDestinationContext(destination)
-                    actionOutput[MESSAGE_ID] = destination.publish(
-                        actionOutput[SUBJECT],
-                        actionOutput[MESSAGE]!!,
-                        destinationCtx,
-                        hostDenyList
-                    )
+                    actionOutput[MESSAGE_ID] = getConfigAndSendNotification(action, actionOutput[SUBJECT], actionOutput[MESSAGE]!!)
                 }
             }
             ActionRunResult(action.id, action.name, actionOutput, false, currentTime(), null)
@@ -702,9 +688,67 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         }
     }
 
+    private suspend fun getConfigAndSendNotification(action: Action, subject: String?, message: String): String {
+        val config = getConfigForNotificationAction(action)
+        if (config.destination == null && config.channel == null) {
+            throw IllegalStateException("Unable to find a Notification Channel or Destination config with id [${action.id}]")
+        }
+
+        if (config.destination?.isAllowed(allowList) == false) {
+            throw IllegalStateException(
+                "Monitor contains a Destination type that is not allowed: ${config.destination.type}"
+            )
+        }
+
+        // TODO: Refactor getDestinationContext() to take in null
+        //  (it might be possible to just remove this if the Notification plugin retrieves the same information)
+        val destinationCtx = destinationContextFactory.getDestinationContext(config.destination!!)
+        var actionResponseContent = ""
+
+        // TODO: For now, the sendNotification just returns an event ID. If the response changes to return
+        //  some form of response content, similar to Alerting's legacy Destination, use it for the actionOutput
+        config.channel
+            ?.sendNotification(
+                client,
+                "Alerting-Notification Action",
+                constructMessageContent(subject, message)
+            )
+
+        actionResponseContent = config.destination
+            ?.buildLegacyBaseMessage(subject, message, destinationCtx)
+            ?.publishLegacyNotification(client)
+            ?: actionResponseContent
+
+        return actionResponseContent
+    }
+
     private fun compileTemplate(template: Script, ctx: TriggerExecutionContext): String {
         return scriptService.compile(template, TemplateScript.CONTEXT)
             .newInstance(template.params + mapOf("ctx" to ctx.asTemplateArg()))
             .execute()
+    }
+
+    /**
+     * The "destination" ID referenced in a Monitor Action could either be a Notification config or a Destination config
+     * depending on whether the background migration process has already migrated it from a Destination to a Notification config.
+     *
+     * To cover both of these cases, the Notification config will take precedence and if it is not found, the Destination will be retrieved.
+     */
+    private suspend fun getConfigForNotificationAction(action: Action): NotificationActionConfigs {
+        // TODO: Inject user here so only Destination/Notifications that the user has permissions to are retrieved
+        var destination: Destination? = null
+        val channel: NotificationConfigInfo? = getNotificationConfigInfo(client as NodeClient, action.destinationId)
+
+        // If the channel was not found, try to retrieve the Destination
+        if (channel == null) {
+            destination = try {
+                AlertingConfigAccessor.getDestinationInfo(client, xContentRegistry, action.destinationId)
+            } catch (e: IllegalStateException) {
+                // Catching the exception thrown when the Destination was not found so the NotificationActionConfigs object can be returned
+                null
+            }
+        }
+
+        return NotificationActionConfigs(destination, channel)
     }
 }
