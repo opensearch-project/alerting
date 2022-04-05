@@ -94,7 +94,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
 
         // Allow for a rollover index.
         Thread.sleep(2000)
-        assertTrue("Did not find 3 alert indices", getAlertIndices().size >= 3)
+        assertTrue("Did not find 3 alert indices" + getAlertIndices().size, getAlertIndices().size >= 3)
     }
 
     fun `test history disabled`() {
