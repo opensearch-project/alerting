@@ -353,9 +353,7 @@ fun randomFinding(
     monitorId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     monitorName: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     index: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
-    queryId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
-    queryTags: MutableList<String> = mutableListOf(),
-    severity: String = "${randomInt(5)}",
+    docLevelQueries: List<DocLevelQuery> = listOf(randomDocLevelQuery()),
     timestamp: Instant = Instant.now(),
     triggerId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     triggerName: String = OpenSearchRestTestCase.randomAlphaOfLength(10)
@@ -366,9 +364,7 @@ fun randomFinding(
         monitorId = monitorId,
         monitorName = monitorName,
         index = index,
-        queryId = queryId,
-        queryTags = queryTags,
-        severity = severity,
+        docLevelQueries = docLevelQueries,
         timestamp = timestamp,
         triggerId = triggerId,
         triggerName = triggerName

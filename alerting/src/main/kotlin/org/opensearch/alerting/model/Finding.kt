@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.model
 
+import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.elasticapi.instant
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
@@ -25,9 +26,7 @@ class Finding(
     val monitorId: String,
     val monitorName: String,
     val index: String,
-    val queryId: String = NO_ID,
-    val queryTags: List<String>,
-    val severity: String,
+    val docLevelQueries: List<DocLevelQuery>,
     val timestamp: Instant,
     val triggerId: String?,
     val triggerName: String?
@@ -39,9 +38,7 @@ class Finding(
         monitorId = sin.readString(),
         monitorName = sin.readString(),
         index = sin.readString(),
-        queryId = sin.readString(),
-        queryTags = sin.readStringList(),
-        severity = sin.readString(),
+        docLevelQueries = sin.readList((DocLevelQuery)::readFrom),
         timestamp = sin.readInstant(),
         triggerId = sin.readOptionalString(),
         triggerName = sin.readOptionalString()
@@ -54,9 +51,7 @@ class Finding(
             MONITOR_ID_FIELD to monitorId,
             MONITOR_NAME_FIELD to monitorName,
             INDEX_FIELD to index,
-            QUERY_ID_FIELD to queryId,
-            QUERY_TAGS_FIELD to queryTags,
-            SEVERITY_FIELD to severity,
+            QUERIES_FIELD to docLevelQueries,
             TIMESTAMP_FIELD to timestamp.toEpochMilli(),
             TRIGGER_ID_FIELD to triggerId,
             TRIGGER_NAME_FIELD to triggerName
@@ -70,9 +65,7 @@ class Finding(
             .field(MONITOR_ID_FIELD, monitorId)
             .field(MONITOR_NAME_FIELD, monitorName)
             .field(INDEX_FIELD, index)
-            .field(QUERY_ID_FIELD, queryId)
-            .field(QUERY_TAGS_FIELD, queryTags.toTypedArray())
-            .field(SEVERITY_FIELD, severity)
+            .field(QUERIES_FIELD, docLevelQueries.toTypedArray())
             .field(TIMESTAMP_FIELD, timestamp.toEpochMilli())
             .field(TRIGGER_ID_FIELD, triggerId)
             .field(TRIGGER_NAME_FIELD, triggerName)
@@ -87,9 +80,7 @@ class Finding(
         out.writeString(monitorId)
         out.writeString(monitorName)
         out.writeString(index)
-        out.writeString(queryId)
-        out.writeStringCollection(queryTags)
-        out.writeString(severity)
+        out.writeCollection(docLevelQueries)
         out.writeInstant(timestamp)
         out.writeOptionalString(triggerId)
         out.writeOptionalString(triggerName)
@@ -101,9 +92,7 @@ class Finding(
         const val MONITOR_ID_FIELD = "monitor_id"
         const val MONITOR_NAME_FIELD = "monitor_name"
         const val INDEX_FIELD = "index"
-        const val QUERY_ID_FIELD = "query_id"
-        const val QUERY_TAGS_FIELD = "query_tags"
-        const val SEVERITY_FIELD = "severity"
+        const val QUERIES_FIELD = "queries"
         const val TIMESTAMP_FIELD = "timestamp"
         const val TRIGGER_ID_FIELD = "trigger_id"
         const val TRIGGER_NAME_FIELD = "trigger_name"
@@ -116,9 +105,7 @@ class Finding(
             lateinit var monitorId: String
             lateinit var monitorName: String
             lateinit var index: String
-            var queryId: String = NO_ID
-            val queryTags: MutableList<String> = mutableListOf()
-            lateinit var severity: String
+            val queries: MutableList<DocLevelQuery> = mutableListOf()
             lateinit var timestamp: Instant
             lateinit var triggerId: String
             lateinit var triggerName: String
@@ -133,14 +120,12 @@ class Finding(
                     MONITOR_ID_FIELD -> monitorId = xcp.text()
                     MONITOR_NAME_FIELD -> monitorName = xcp.text()
                     INDEX_FIELD -> index = xcp.text()
-                    QUERY_ID_FIELD -> queryId = xcp.text()
-                    QUERY_TAGS_FIELD -> {
+                    QUERIES_FIELD -> {
                         ensureExpectedToken(XContentParser.Token.START_ARRAY, xcp.currentToken(), xcp)
                         while (xcp.nextToken() != XContentParser.Token.END_ARRAY) {
-                            queryTags.add(xcp.text())
+                            queries.add(DocLevelQuery.parse(xcp))
                         }
                     }
-                    SEVERITY_FIELD -> severity = xcp.text()
                     TIMESTAMP_FIELD -> timestamp = requireNotNull(xcp.instant())
                     TRIGGER_ID_FIELD -> triggerId = xcp.text()
                     TRIGGER_NAME_FIELD -> triggerName = xcp.text()
@@ -153,9 +138,7 @@ class Finding(
                 monitorId = monitorId,
                 monitorName = monitorName,
                 index = index,
-                queryId = queryId,
-                queryTags = queryTags,
-                severity = severity,
+                docLevelQueries = queries,
                 timestamp = timestamp,
                 triggerId = triggerId,
                 triggerName = triggerName

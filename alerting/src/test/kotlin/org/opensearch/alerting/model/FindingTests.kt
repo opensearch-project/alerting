@@ -25,9 +25,7 @@ class FindingTests : OpenSearchTestCase() {
             templateArgs[Finding.MONITOR_NAME_FIELD],
             finding.monitorName
         )
-        assertEquals("Template args 'queryId' field does not match:", templateArgs[Finding.QUERY_ID_FIELD], finding.queryId)
-        assertEquals("Template args 'queryTags' field does not match:", templateArgs[Finding.QUERY_TAGS_FIELD], finding.queryTags)
-        assertEquals("Template args 'severity' field does not match:", templateArgs[Finding.SEVERITY_FIELD], finding.severity)
+        assertEquals("Template args 'queries' field does not match:", templateArgs[Finding.QUERIES_FIELD], finding.docLevelQueries)
         assertEquals(
             "Template args 'timestamp' field does not match:",
             templateArgs[Finding.TIMESTAMP_FIELD],

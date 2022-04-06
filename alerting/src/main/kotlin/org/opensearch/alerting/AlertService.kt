@@ -170,51 +170,24 @@ class AlertService(
 
     // TODO: clean this up so it follows the proper alert management for doc monitors
     fun composeDocLevelAlert(
+        findings: List<String>,
+        relatedDocIds: List<String>,
         ctx: DocumentLevelTriggerExecutionContext,
         result: DocumentLevelTriggerRunResult,
         alertError: AlertError?
     ): Alert {
         val currentTime = Instant.now()
-        val currentAlert = ctx.alert
 
-        val updatedActionExecutionResults = mutableListOf<ActionExecutionResult>()
-        val currentActionIds = mutableSetOf<String>()
-        if (currentAlert != null) {
-            // update current alert's action execution results
-            for (actionExecutionResult in currentAlert.actionExecutionResults) {
-                val actionId = actionExecutionResult.actionId
-                currentActionIds.add(actionId)
-                val actionRunResult = result.actionResults[actionId]
-                when {
-                    actionRunResult == null -> updatedActionExecutionResults.add(actionExecutionResult)
-                    actionRunResult.throttled ->
-                        updatedActionExecutionResults.add(
-                            actionExecutionResult.copy(
-                                throttledCount = actionExecutionResult.throttledCount + 1
-                            )
-                        )
-                    else -> updatedActionExecutionResults.add(actionExecutionResult.copy(lastExecutionTime = actionRunResult.executionTime))
-                }
-            }
-            // add action execution results which not exist in current alert
-            updatedActionExecutionResults.addAll(
-                result.actionResults.filter { !currentActionIds.contains(it.key) }
-                    .map { ActionExecutionResult(it.key, it.value.executionTime, if (it.value.throttled) 1 else 0) }
-            )
-        } else {
-            updatedActionExecutionResults.addAll(
-                result.actionResults.map {
-                    ActionExecutionResult(it.key, it.value.executionTime, if (it.value.throttled) 1 else 0)
-                }
-            )
+        val actionExecutionResults = result.actionResults.map {
+            ActionExecutionResult(it.key, it.value.executionTime, if (it.value.throttled) 1 else 0)
         }
 
         val alertState = if (alertError == null) Alert.State.ACTIVE else Alert.State.ERROR
         return Alert(
             monitor = ctx.monitor, trigger = ctx.trigger, startTime = currentTime,
             lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
-            actionExecutionResults = updatedActionExecutionResults, schemaVersion = IndexUtils.alertIndexSchemaVersion,
-            findingIds = ctx.relatedFindings, relatedDocIds = ctx.triggeredDocs
+            actionExecutionResults = actionExecutionResults, schemaVersion = IndexUtils.alertIndexSchemaVersion,
+            findingIds = findings, relatedDocIds = relatedDocIds
         )
     }
 

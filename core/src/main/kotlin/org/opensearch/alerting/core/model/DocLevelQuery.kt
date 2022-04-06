@@ -99,8 +99,8 @@ data class DocLevelQuery(
         }
 
         @JvmStatic @Throws(IOException::class)
-        fun readFrom(sin: StreamInput): DocLevelMonitorInput {
-            return DocLevelMonitorInput(sin)
+        fun readFrom(sin: StreamInput): DocLevelQuery {
+            return DocLevelQuery(sin)
         }
     }
 }

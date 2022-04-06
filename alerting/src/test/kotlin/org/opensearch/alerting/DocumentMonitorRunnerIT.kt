@@ -135,12 +135,13 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertTrue("Incorrect search result", matchingDocsToQuery.containsAll(listOf("1", "5")))
 
         val alerts = searchAlertsWithFilter(monitor)
-        assertEquals("Alert saved for test monitor", 1, alerts.size)
+        assertEquals("Alert saved for test monitor", 2, alerts.size)
 
         // TODO: modify findings such that there is a finding per document, so this test will need to be modified
         val findings = searchFindings(monitor)
-        assertEquals("Findings saved for test monitor", 1, findings.size)
-        assertEquals("Findings saved for test monitor", "1,5", findings[0].relatedDocId)
+        assertEquals("Findings saved for test monitor", 2, findings.size)
+        assertEquals("Findings saved for test monitor", "1", findings[0].relatedDocId)
+        assertEquals("Findings saved for test monitor", "5", findings[1].relatedDocId)
     }
 
     @Suppress("UNCHECKED_CAST")
