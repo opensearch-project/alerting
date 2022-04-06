@@ -101,15 +101,16 @@ class Finding(
 
         @JvmStatic @JvmOverloads
         @Throws(IOException::class)
-        fun parse(xcp: XContentParser, id: String = NO_ID): Finding {
+        fun parse(xcp: XContentParser): Finding {
+            var id: String = NO_ID
             lateinit var relatedDocId: String
             lateinit var monitorId: String
             lateinit var monitorName: String
             lateinit var index: String
             val queries: MutableList<DocLevelQuery> = mutableListOf()
             lateinit var timestamp: Instant
-            lateinit var triggerId: String
-            lateinit var triggerName: String
+            var triggerId: String? = null
+            var triggerName: String? = null
 
             ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.currentToken(), xcp)
             while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
@@ -117,6 +118,7 @@ class Finding(
                 xcp.nextToken()
 
                 when (fieldName) {
+                    FINDING_ID_FIELD -> id = xcp.text()
                     RELATED_DOC_ID_FIELD -> relatedDocId = xcp.text()
                     MONITOR_ID_FIELD -> monitorId = xcp.text()
                     MONITOR_NAME_FIELD -> monitorName = xcp.text()
@@ -130,8 +132,8 @@ class Finding(
                     TIMESTAMP_FIELD -> {
                         timestamp = requireNotNull(xcp.instant())
                     }
-                    TRIGGER_ID_FIELD -> triggerId = xcp.text()
-                    TRIGGER_NAME_FIELD -> triggerName = xcp.text()
+                    TRIGGER_ID_FIELD -> triggerId = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) null else xcp.text()
+                    TRIGGER_NAME_FIELD -> triggerName = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) null else xcp.text()
                 }
             }
 

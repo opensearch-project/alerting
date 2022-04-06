@@ -16,7 +16,7 @@ class FindingDocument(
     val index: String,
     val id: String,
     val found: Boolean,
-    val document: MutableMap<String, Any>
+    val document: Map<String, Any>
 ) : Writeable, ToXContent {
 
     @Throws(IOException::class)
@@ -28,14 +28,16 @@ class FindingDocument(
     )
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        builder.startObject()
+        return builder.startObject()
             .field(INDEX_FIELD, index)
             .field(FINDING_DOCUMENT_ID_FIELD, id)
             .field(FOUND_FIELD, found)
-
-        if (document.isEmpty()) builder.field(DOCUMENT_FIELD, document)
-        builder.endObject()
-        return builder
+            .field(DOCUMENT_FIELD, document)
+            .endObject()
+//
+//        if (document.isEmpty()) builder.field(DOCUMENT_FIELD, document)
+//        builder.endObject()
+//        return builder
     }
 
     @Throws(IOException::class)

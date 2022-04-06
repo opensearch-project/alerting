@@ -16,6 +16,7 @@ import org.junit.rules.DisableOnDebug
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
+import org.opensearch.alerting.action.GetFindingsSearchResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
@@ -25,6 +26,7 @@ import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.Finding
+import org.opensearch.alerting.model.FindingWithDocs
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.destination.Destination
@@ -577,6 +579,41 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun executeMonitor(client: RestClient, monitor: Monitor, params: Map<String, String> = mapOf()): Response =
         client.makeRequest("POST", "$ALERTING_BASE_URI/_execute", params, monitor.toHttpEntityWithUser())
+
+    protected fun searchFindings(params: Map<String, String> = mutableMapOf()
+    ): GetFindingsSearchResponse {
+
+        var baseEndpoint = "${AlertingPlugin.FINDING_BASE_URI}/_search?"
+        for (entry in params.entries) {
+            baseEndpoint += "${entry.key}=${entry.value}&"
+        }
+
+        val response = client().makeRequest("GET", baseEndpoint)
+
+        assertEquals("Unable to retrieve findings", RestStatus.OK, response.restStatus())
+
+        val parser = createParser(XContentType.JSON.xContent(), response.entity.content)
+        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser)
+
+        var totalFindings = 0
+        val findings = mutableListOf<FindingWithDocs>()
+
+        while (parser.nextToken() != XContentParser.Token.END_OBJECT) {
+            parser.nextToken()
+
+            when (parser.currentName()) {
+                "total_findings" -> totalFindings = parser.intValue()
+                "findings" -> {
+                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_ARRAY, parser.currentToken(), parser)
+                    while (parser.nextToken() != XContentParser.Token.END_ARRAY) {
+                        findings.add(FindingWithDocs.parse(parser))
+                    }
+                }
+            }
+        }
+
+        return GetFindingsSearchResponse(response.restStatus(), totalFindings, findings)
+    }
 
     protected fun indexDoc(index: String, id: String, doc: String, refresh: Boolean = true): Response {
         val requestBody = StringEntity(doc, APPLICATION_JSON)

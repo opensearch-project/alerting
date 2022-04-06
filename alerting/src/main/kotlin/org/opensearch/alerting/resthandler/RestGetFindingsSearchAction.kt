@@ -35,7 +35,6 @@ class RestGetFindingsSearchAction : BaseRestHandler() {
 
     override fun routes(): List<Route> {
         return listOf(
-            Route(POST, "${AlertingPlugin.FINDING_BASE_URI}/_search"),
             Route(GET, "${AlertingPlugin.FINDING_BASE_URI}/_search")
         )
     }
@@ -44,7 +43,7 @@ class RestGetFindingsSearchAction : BaseRestHandler() {
         log.info("Entering RestGetFindingsSearchAction.kt.")
         log.info("${request.method()} ${request.path()}")
 
-        val findingID: String? = request.param("findingID")
+        val findingID: String? = request.param("findingId")
 
         var srcContext = context(request)
         if (request.method() == RestRequest.Method.HEAD) {

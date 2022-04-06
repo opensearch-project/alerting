@@ -55,7 +55,7 @@ class GetFindingsSearchResponse : ActionResponse, ToXContentObject {
     @Throws(IOException::class)
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         builder.startObject()
-            .field("totalFindings", totalFindings)
+            .field("total_findings", totalFindings)
             .field("findings", findings)
 
         return builder.endObject()
