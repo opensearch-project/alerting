@@ -10,6 +10,7 @@ import org.opensearch.OpenSearchSecurityException
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
+import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.index.IndexRequest
@@ -18,6 +19,7 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.DocumentReturningMonitorRunner
 import org.opensearch.alerting.action.IndexMonitorAction
@@ -36,6 +38,7 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTION_TH
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.isADMonitor
@@ -52,6 +55,9 @@ import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.index.reindex.BulkByScrollResponse
+import org.opensearch.index.reindex.DeleteByQueryAction
+import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.builder.SearchSourceBuilder
@@ -67,6 +73,7 @@ class TransportIndexMonitorAction @Inject constructor(
     val client: Client,
     actionFilters: ActionFilters,
     val scheduledJobIndices: ScheduledJobIndices,
+    val docLevelMonitorQueries: DocLevelMonitorQueries,
     val clusterService: ClusterService,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry
@@ -395,6 +402,11 @@ class TransportIndexMonitorAction @Inject constructor(
                             )
                             return
                         }
+
+                        if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                            indexDocLevelMonitorQueries(request.monitor, response.id, request.refreshPolicy)
+                        }
+
                         actionListener.onResponse(
                             IndexMonitorResponse(
                                 response.id, response.version, response.seqNo,
@@ -407,6 +419,58 @@ class TransportIndexMonitorAction @Inject constructor(
                     }
                 }
             )
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        private fun indexDocLevelMonitorQueries(monitor: Monitor, monitorId: String, refreshPolicy: RefreshPolicy) {
+            if (!docLevelMonitorQueries.docLevelQueryIndexExists()) {
+                docLevelMonitorQueries.initDocLevelQueryIndex(object : ActionListener<CreateIndexResponse> {
+                    override fun onResponse(response: CreateIndexResponse) {
+                        log.info("Central Percolation index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX} created")
+                        docLevelMonitorQueries.indexDocLevelQueries(
+                            client,
+                            monitor,
+                            monitorId,
+                            refreshPolicy,
+                            indexTimeout,
+                            actionListener,
+                            null,
+                            object : ActionListener<BulkResponse> {
+                                override fun onResponse(response: BulkResponse) {
+                                    log.info("Queries inserted into Percolate index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}")
+                                }
+
+                                override fun onFailure(t: Exception) {
+                                    actionListener.onFailure(AlertingException.wrap(t))
+                                }
+                            }
+                        )
+                    }
+
+                    override fun onFailure(t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                    }
+                })
+            } else {
+                docLevelMonitorQueries.indexDocLevelQueries(
+                    client,
+                    monitor,
+                    monitorId,
+                    refreshPolicy,
+                    indexTimeout,
+                    actionListener,
+                    null,
+                    object : ActionListener<BulkResponse> {
+                        override fun onResponse(response: BulkResponse) {
+                            log.info("Queries inserted into Percolate index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}")
+                        }
+
+                        override fun onFailure(t: Exception) {
+                            actionListener.onFailure(AlertingException.wrap(t))
+                        }
+                    }
+                )
+            }
         }
 
         private fun updateMonitor() {
@@ -475,6 +539,22 @@ class TransportIndexMonitorAction @Inject constructor(
                                 AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), response.status()))
                             )
                             return
+                        }
+
+                        if (currentMonitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                            DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+                                .source(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
+                                .filter(QueryBuilders.matchQuery("monitor_id", currentMonitor.id))
+                                .execute(
+                                    object : ActionListener<BulkByScrollResponse> {
+                                        override fun onResponse(response: BulkByScrollResponse) {
+                                            indexDocLevelMonitorQueries(request.monitor, currentMonitor.id, request.refreshPolicy)
+                                        }
+
+                                        override fun onFailure(t: Exception) {
+                                        }
+                                    }
+                                )
                         }
                         actionListener.onResponse(
                             IndexMonitorResponse(
