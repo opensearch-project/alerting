@@ -73,7 +73,7 @@ class AlertIndices(
             rescheduleRollover()
         }
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD) {
-            historyRetentionPeriod = it
+            alertHistoryRetentionPeriod = it
         }
         clusterService.clusterSettings.addSettingsUpdateConsumer(REQUEST_TIMEOUT) { requestTimeout = it }
 
@@ -83,9 +83,10 @@ class AlertIndices(
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERT_FINDING_ROLLOVER_PERIOD) {
             findingRolloverPeriod = it
             rescheduleRolloverFinding()
+            logger.error("info ALERT_HISTORY_ROLLOVER_PERIOD")
         }
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD) {
-            historyRetentionPeriod = it
+            findingHistoryRetentionPeriod = it
         }
     }
 
@@ -104,19 +105,21 @@ class AlertIndices(
         const val HISTORY_ALL = ".opendistro-alerting-alert-history*"
 
         /** The index name pattern referring to all alert history indices */
-        const val FINDING_ALL = ".opendistro-alerting-finding-history*"
+        const val FINDING_HISTORY_ALL = ".opendistro-alerting-finding-history*"
 
         /** The index name pattern to create alert history indices */
         const val HISTORY_INDEX_PATTERN = "<.opendistro-alerting-alert-history-{now/d}-1>"
 
         /** The index name pattern to query all alerts, history and current alerts. */
-        const val ALL_INDEX_PATTERN = ".opendistro-alerting-alert*"
+        const val ALL_ALERT_INDEX_PATTERN = ".opendistro-alerting-alert*"
+
+        const val ALL_FINDING_INDEX_PATTERN = ".opendistro-alerting-finding*"
 
         /** The alias of the index in which to write alert finding */
         const val FINDING_WRITE_INDEX = ".opendistro-alerting-finding-write"
 
         /** todo the index name pattern to query finding */
-        const val FINDING_INDEX_PATTERN = "<.opendistro-alerting-finding-history-{now/d}-1>"
+        const val FINDING_HISTORY_INDEX_PATTERN = "<.opendistro-alerting-finding-history-{now/d}-1>"
 
         @JvmStatic
         fun alertMapping() =
@@ -137,7 +140,8 @@ class AlertIndices(
     @Volatile private var historyRolloverPeriod = AlertingSettings.ALERT_HISTORY_ROLLOVER_PERIOD.get(settings)
     @Volatile private var findingRolloverPeriod = AlertingSettings.ALERT_FINDING_ROLLOVER_PERIOD.get(settings)
 
-    @Volatile private var historyRetentionPeriod = AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD.get(settings)
+    @Volatile private var alertHistoryRetentionPeriod = AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD.get(settings)
+    @Volatile private var findingHistoryRetentionPeriod = AlertingSettings.ALERT_FINDING_RETENTION_PERIOD.get(settings)
 
     @Volatile private var requestTimeout = AlertingSettings.REQUEST_TIMEOUT.get(settings)
 
@@ -146,9 +150,9 @@ class AlertIndices(
     // for JobsMonitor to report
     var lastRolloverTime: TimeValue? = null
 
-    private var historyIndexInitialized: Boolean = false
+    private var alertHistoryIndexInitialized: Boolean = false
 
-    private var findingIndexInitialized: Boolean = false
+    private var findingHistoryIndexInitialized: Boolean = false
 
     private var alertIndexInitialized: Boolean = false
 
@@ -197,8 +201,8 @@ class AlertIndices(
 
         // if the indexes have been deleted they need to be reinitialized
         alertIndexInitialized = event.state().routingTable().hasIndex(ALERT_INDEX)
-        historyIndexInitialized = event.state().metadata().hasAlias(HISTORY_WRITE_INDEX)
-        findingIndexInitialized = event.state().metadata().hasAlias(FINDING_WRITE_INDEX)
+        alertHistoryIndexInitialized = event.state().metadata().hasAlias(HISTORY_WRITE_INDEX)
+        findingHistoryIndexInitialized = event.state().metadata().hasAlias(FINDING_WRITE_INDEX)
     }
 
     private fun rescheduleRollover() {
@@ -218,7 +222,7 @@ class AlertIndices(
     }
 
     fun isInitialized(): Boolean {
-        return alertIndexInitialized && historyIndexInitialized
+        return alertIndexInitialized && alertHistoryIndexInitialized
     }
 
     fun isHistoryEnabled(): Boolean = historyEnabled
@@ -234,14 +238,25 @@ class AlertIndices(
     }
 
     suspend fun createOrUpdateInitialHistoryIndex() {
-        if (!historyIndexInitialized) {
-            historyIndexInitialized = createIndex(HISTORY_INDEX_PATTERN, HISTORY_WRITE_INDEX)
-            if (historyIndexInitialized)
+        if (!alertHistoryIndexInitialized) {
+            alertHistoryIndexInitialized = createIndex(HISTORY_INDEX_PATTERN, HISTORY_WRITE_INDEX)
+            if (alertHistoryIndexInitialized)
                 IndexUtils.lastUpdatedHistoryIndex = IndexUtils.getIndexNameWithAlias(clusterService.state(), HISTORY_WRITE_INDEX)
         } else {
             updateIndexMapping(HISTORY_WRITE_INDEX, true)
         }
-        historyIndexInitialized
+        alertHistoryIndexInitialized
+    }
+
+    suspend fun createOrUpdateInitialFindingHistoryIndex() {
+        if (!findingHistoryIndexInitialized) {
+            findingHistoryIndexInitialized = createIndex(FINDING_HISTORY_INDEX_PATTERN, FINDING_WRITE_INDEX)
+            if (findingHistoryIndexInitialized)
+                IndexUtils.lastUpdatedHistoryIndex = IndexUtils.getIndexNameWithAlias(clusterService.state(), FINDING_WRITE_INDEX)
+        } else {
+            updateIndexMapping(FINDING_WRITE_INDEX, true)
+        }
+        findingHistoryIndexInitialized
     }
 
     private suspend fun createIndex(index: String, alias: String? = null): Boolean {
@@ -303,43 +318,14 @@ class AlertIndices(
 
     private fun rolloverAndDeleteFindingIndices() {
         if (findingEnabled) rolloverFindingIndex()
-        deleteOldIndices("Finding", FINDING_ALL)
+        deleteOldIndices("Finding", FINDING_HISTORY_ALL)
     }
 
     private fun rolloverFindingIndex() {
         rolloverIndex(
-            findingIndexInitialized, FINDING_WRITE_INDEX,
-            FINDING_INDEX_PATTERN, alertMapping(),
+            findingHistoryIndexInitialized, FINDING_WRITE_INDEX,
+            FINDING_HISTORY_INDEX_PATTERN, alertMapping(),
             findingMaxDocs, findingMaxAge, FINDING_WRITE_INDEX
-        )
-    }
-
-    private fun rolloverIndex(initialized: Boolean) {
-        if (!initialized) {
-            return
-        }
-
-        // We have to pass null for newIndexName in order to get Elastic to increment the index count.
-        val request = RolloverRequest(HISTORY_WRITE_INDEX, null)
-        request.createIndexRequest.index(HISTORY_INDEX_PATTERN)
-            .mapping(MAPPING_TYPE, alertMapping(), XContentType.JSON)
-            .settings(Settings.builder().put("index.hidden", true).build())
-        request.addMaxIndexDocsCondition(historyMaxDocs)
-        request.addMaxIndexAgeCondition(historyMaxAge)
-        client.admin().indices().rolloverIndex(
-            request,
-            object : ActionListener<RolloverResponse> {
-                override fun onResponse(response: RolloverResponse) {
-                    if (!response.isRolledOver) {
-                        logger.info("$HISTORY_WRITE_INDEX not rolled over. Conditions were: ${response.conditionStatus}")
-                    } else {
-                        lastRolloverTime = TimeValue.timeValueMillis(threadPool.absoluteTimeInMillis())
-                    }
-                }
-                override fun onFailure(e: Exception) {
-                    logger.error("$HISTORY_WRITE_INDEX not roll over failed.")
-                }
-            }
         )
     }
 
@@ -352,9 +338,11 @@ class AlertIndices(
         ageCondition: TimeValue,
         tag: String
     ) {
+        logger.error("info rolloverIndex1")
         if (!initialized) {
             return
         }
+        logger.error("info rolloverIndex2")
 
         // We have to pass null for newIndexName in order to get Elastic to increment the index count.
         val request = RolloverRequest(index, null)
@@ -382,13 +370,14 @@ class AlertIndices(
 
     private fun rolloverHistoryIndex() {
         rolloverIndex(
-            historyIndexInitialized, HISTORY_WRITE_INDEX,
+            alertHistoryIndexInitialized, HISTORY_WRITE_INDEX,
             HISTORY_INDEX_PATTERN, alertMapping(),
             historyMaxDocs, historyMaxAge, HISTORY_WRITE_INDEX
         )
     }
 
     private fun deleteOldIndices(tag: String, indices: String) {
+        logger.error("info deleteOldIndices")
         val clusterStateRequest = ClusterStateRequest()
             .clear()
             .indices(indices)
@@ -420,7 +409,7 @@ class AlertIndices(
             val indexMetaData = entry.value
             val creationTime = indexMetaData.creationDate
 
-            if ((Instant.now().toEpochMilli() - creationTime) > historyRetentionPeriod.millis) {
+            if ((Instant.now().toEpochMilli() - creationTime) > alertHistoryRetentionPeriod.millis) {
                 val alias = indexMetaData.aliases.firstOrNull { HISTORY_WRITE_INDEX == it.value.alias }
                 if (alias != null) {
                     if (historyEnabled) {
@@ -428,7 +417,7 @@ class AlertIndices(
                         continue
                     } else {
                         // Otherwise reset historyIndexInitialized since index will be deleted
-                        historyIndexInitialized = false
+                        alertHistoryIndexInitialized = false
                     }
                 }
 

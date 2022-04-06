@@ -68,6 +68,15 @@ object DocumentReturningMonitorRunner : MonitorRunner {
             return monitorResult.copy(error = e)
         }
 
+        val currentAlerts = try {
+            monitorCtx.alertIndices!!.createOrUpdateAlertIndex()
+            monitorCtx.alertIndices!!.createOrUpdateInitialFindingHistoryIndex()
+        } catch (e: Exception) {
+            val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
+            logger.error("Error loading alerts for monitor: $id", e)
+            return monitorResult.copy(error = e)
+        }
+
         val count: Int = lastRunContext["shards_count"] as Int
         val updatedLastRunContext = lastRunContext.toMutableMap()
         for (i: Int in 0 until count) {

@@ -100,13 +100,13 @@ class AlertIndicesIT : AlertingRestTestCase() {
 
         // Allow for a rollover index.
         Thread.sleep(5000)
-        val alertIndices = getAlertIndices()
+        val alertIndices = getFindingIndices()
         var info = ""
         alertIndices.forEach {
             info += "$it|"
         }
+        logger.error("info $info")
         assertTrue("Did not find 3 alert indices", alertIndices.size >= 3)
-        assertTrue("detail:$info", false)
     }
 
     fun `test history disabled`() {
@@ -124,7 +124,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         updateMonitor(monitor1.copy(triggers = listOf(trigger1.copy(condition = NEVER_RUN)), id = monitor1.id), true)
         executeMonitor(monitor1.id)
 
-        val completedAlert1 = searchAlerts(monitor1, AlertIndices.ALL_INDEX_PATTERN).single()
+        val completedAlert1 = searchAlerts(monitor1, AlertIndices.ALL_ALERT_INDEX_PATTERN).single()
         assertNotNull("Alert is not completed", completedAlert1.endTime)
 
         assertEquals(1, getHistoryDocCount())
@@ -146,7 +146,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
 
         // For the second alert, since history is now disabled, searching for the completed alert should return an empty List
         // since a COMPLETED alert will be removed from the alert index and not added to the history index
-        val completedAlert2 = searchAlerts(monitor2, AlertIndices.ALL_INDEX_PATTERN)
+        val completedAlert2 = searchAlerts(monitor2, AlertIndices.ALL_ALERT_INDEX_PATTERN)
         assertTrue("Alert is not completed", completedAlert2.isEmpty())
 
         // Get history entry count again and ensure the new alert was not added
@@ -173,7 +173,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         executeMonitor(monitor.id)
 
         // Verify alert is completed
-        val completedAlert = searchAlerts(monitor, AlertIndices.ALL_INDEX_PATTERN).single()
+        val completedAlert = searchAlerts(monitor, AlertIndices.ALL_ALERT_INDEX_PATTERN).single()
         assertNotNull("Alert is not completed", completedAlert.endTime)
 
         // The completed alert should be removed from the active alert index and added to the history index
@@ -210,7 +210,17 @@ class AlertIndicesIT : AlertingRestTestCase() {
     }
 
     private fun getAlertIndices(): List<String> {
-        val response = client().makeRequest("GET", "/_cat/indices/${AlertIndices.ALL_INDEX_PATTERN}?format=json")
+        val response = client().makeRequest("GET", "/_cat/indices/${AlertIndices.ALL_ALERT_INDEX_PATTERN}?format=json")
+        val xcp = createParser(XContentType.JSON.xContent(), response.entity.content)
+        val responseList = xcp.list()
+        val indices = mutableListOf<String>()
+        responseList.filterIsInstance<Map<String, Any>>().forEach { indices.add(it["index"] as String) }
+
+        return indices
+    }
+
+    private fun getFindingIndices(): List<String> {
+        val response = client().makeRequest("GET", "/_cat/indices/${AlertIndices.ALL_FINDING_INDEX_PATTERN}?format=json")
         val xcp = createParser(XContentType.JSON.xContent(), response.entity.content)
         val responseList = xcp.list()
         val indices = mutableListOf<String>()
