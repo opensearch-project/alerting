@@ -105,6 +105,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         // Allow for a rollover index.
         Thread.sleep(5000)
         val alertIndices = getFindingIndices()
+        logger.error("info ${alertIndices.size}")
         var info = ""
         alertIndices.forEach {
             info += "$it|"
