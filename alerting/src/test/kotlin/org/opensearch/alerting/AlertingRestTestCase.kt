@@ -580,8 +580,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun executeMonitor(client: RestClient, monitor: Monitor, params: Map<String, String> = mapOf()): Response =
         client.makeRequest("POST", "$ALERTING_BASE_URI/_execute", params, monitor.toHttpEntityWithUser())
 
-    protected fun searchFindings(params: Map<String, String> = mutableMapOf()
-    ): GetFindingsSearchResponse {
+    protected fun searchFindings(params: Map<String, String> = mutableMapOf()): GetFindingsSearchResponse {
 
         var baseEndpoint = "${AlertingPlugin.FINDING_BASE_URI}/_search?"
         for (entry in params.entries) {

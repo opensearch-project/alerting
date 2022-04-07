@@ -188,7 +188,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
             // TODO: REMOVE DEBUG LOG
             val key = "${it.index}|${it.id}"
             val docData = if (it.isFailed) emptyMap<String, Any>() else it.response.sourceAsMap
-            val findingDocument = FindingDocument(it.index, it.id, !it.isFailed,  docData)
+            val findingDocument = FindingDocument(it.index, it.id, !it.isFailed, docData)
             documents[key] = findingDocument
         }
 
