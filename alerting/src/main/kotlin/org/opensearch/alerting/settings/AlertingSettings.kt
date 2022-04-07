@@ -131,9 +131,9 @@ class AlertingSettings {
         )
 
         val ALERT_FINDING_RETENTION_PERIOD = Setting.positiveTimeSetting(
-                "plugins.alerting.alert_finding_retention_period",
-                LegacyOpenDistroAlertingSettings.ALERT_FINDING_RETENTION_PERIOD,
-                Setting.Property.NodeScope, Setting.Property.Dynamic
+            "plugins.alerting.alert_finding_retention_period",
+            LegacyOpenDistroAlertingSettings.ALERT_FINDING_RETENTION_PERIOD,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         val REQUEST_TIMEOUT = Setting.positiveTimeSetting(
