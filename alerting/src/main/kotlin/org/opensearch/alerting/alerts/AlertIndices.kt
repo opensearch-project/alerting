@@ -249,10 +249,14 @@ class AlertIndices(
     }
 
     suspend fun createOrUpdateInitialFindingHistoryIndex() {
+        logger.error("my test createOrUpdateInitialFindingHistoryIndex1")
         if (!findingHistoryIndexInitialized) {
+            logger.error("my test createOrUpdateInitialFindingHistoryIndex2")
             findingHistoryIndexInitialized = createIndex(FINDING_HISTORY_INDEX_PATTERN, FINDING_WRITE_INDEX)
-            if (findingHistoryIndexInitialized)
+            if (findingHistoryIndexInitialized) {
+                logger.error("my test createOrUpdateInitialFindingHistoryIndex3")
                 IndexUtils.lastUpdatedHistoryIndex = IndexUtils.getIndexNameWithAlias(clusterService.state(), FINDING_WRITE_INDEX)
+            }
         } else {
             updateIndexMapping(FINDING_WRITE_INDEX, true)
         }
