@@ -87,6 +87,7 @@ object DocumentReturningMonitorRunner : MonitorRunner {
             updatedLastRunContext[shard] = maxSeqNo
 
             // update lastRunContext if its a temp monitor as we only want to view the last bit of data then
+            // TODO: If dryrun, we should make it so we limit the search as this could still potentially give us lots of data
             if (isTempMonitor) {
                 lastRunContext[shard] = max(-1, maxSeqNo - 1)
             }
