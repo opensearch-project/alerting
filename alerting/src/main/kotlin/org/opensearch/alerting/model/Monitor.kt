@@ -107,7 +107,7 @@ data class Monitor(
             User(sin)
         } else null,
         schemaVersion = sin.readInt(),
-        inputs = sin.readList(::SearchInput),
+        inputs = sin.readList((Input)::readFrom),
         triggers = sin.readList((Trigger)::readFrom),
         lastRunContext = suppressWarning(sin.readMap()),
         uiMetadata = suppressWarning(sin.readMap())
@@ -182,7 +182,13 @@ data class Monitor(
         out.writeBoolean(user != null)
         user?.writeTo(out)
         out.writeInt(schemaVersion)
-        out.writeCollection(inputs)
+        // Outputting type with each Input so that the generic Input.readFrom() can read it
+        out.writeVInt(inputs.size)
+        inputs.forEach {
+            if (it is SearchInput) out.writeEnum(Input.Type.SEARCH_INPUT)
+            else out.writeEnum(Input.Type.DOCUMENT_LEVEL_INPUT)
+            it.writeTo(out)
+        }
         // Outputting type with each Trigger so that the generic Trigger.readFrom() can read it
         out.writeVInt(triggers.size)
         triggers.forEach {

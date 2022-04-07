@@ -9,7 +9,18 @@ import java.time.Instant
 
 interface MonitorRunner {
 
-    suspend fun runMonitor(monitor: Monitor, monitorCtx: MonitorRunnerExecutionContext, periodStart: Instant, periodEnd: Instant, dryRun: Boolean): MonitorRunResult<*>
+    suspend fun runMonitor(
+        monitor: Monitor,
+        monitorCtx: MonitorRunnerExecutionContext,
+        periodStart: Instant,
+        periodEnd: Instant,
+        dryRun: Boolean
+    ): MonitorRunResult<*>
 
-    suspend fun runAction(action: Action, ctx: TriggerExecutionContext, monitorCtx: MonitorRunnerExecutionContext, dryRun: Boolean): ActionRunResult
+    suspend fun runAction(
+        action: Action,
+        ctx: TriggerExecutionContext,
+        monitorCtx: MonitorRunnerExecutionContext,
+        dryRun: Boolean
+    ): ActionRunResult
 }

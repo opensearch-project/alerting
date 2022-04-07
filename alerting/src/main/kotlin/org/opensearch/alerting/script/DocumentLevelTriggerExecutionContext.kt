@@ -17,6 +17,8 @@ data class DocumentLevelTriggerExecutionContext(
     override val periodStart: Instant,
     override val periodEnd: Instant,
     val alert: Alert? = null,
+    val triggeredDocs: List<String>,
+    val relatedFindings: List<String>,
     override val error: Exception? = null
 ) : TriggerExecutionContext(monitor, results, periodStart, periodEnd, error) {
 
@@ -26,7 +28,7 @@ data class DocumentLevelTriggerExecutionContext(
         alert: Alert? = null
     ) : this(
         monitor, trigger, emptyList(), Instant.now(), Instant.now(),
-        alert, null
+        alert, emptyList(), emptyList(), null
     )
 
     /**

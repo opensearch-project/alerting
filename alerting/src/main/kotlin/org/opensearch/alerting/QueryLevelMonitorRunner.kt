@@ -23,8 +23,13 @@ import java.time.Instant
 object QueryLevelMonitorRunner : MonitorRunner {
     private val logger = LogManager.getLogger(javaClass)
 
-    override suspend fun runMonitor(monitor: Monitor, monitorCtx: MonitorRunnerExecutionContext, periodStart: Instant, periodEnd: Instant, dryrun: Boolean):
-        MonitorRunResult<QueryLevelTriggerRunResult> {
+    override suspend fun runMonitor(
+        monitor: Monitor,
+        monitorCtx: MonitorRunnerExecutionContext,
+        periodStart: Instant,
+        periodEnd: Instant,
+        dryrun: Boolean
+    ): MonitorRunResult<QueryLevelTriggerRunResult> {
         val roles = MonitorRunnerService.getRolesForMonitor(monitor)
         logger.debug("Running monitor: ${monitor.name} with roles: $roles Thread: ${Thread.currentThread().name}")
 
@@ -45,10 +50,14 @@ object QueryLevelMonitorRunner : MonitorRunner {
         }
         if (!isADMonitor(monitor)) {
             runBlocking(InjectorContextElement(monitor.id, monitorCtx.settings!!, monitorCtx.threadPool!!.threadContext, roles)) {
-                monitorResult = monitorResult.copy(inputResults = monitorCtx.inputService!!.collectInputResults(monitor, periodStart, periodEnd))
+                monitorResult = monitorResult.copy(
+                    inputResults = monitorCtx.inputService!!.collectInputResults(monitor, periodStart, periodEnd)
+                )
             }
         } else {
-            monitorResult = monitorResult.copy(inputResults = monitorCtx.inputService!!.collectInputResultsForADMonitor(monitor, periodStart, periodEnd))
+            monitorResult = monitorResult.copy(
+                inputResults = monitorCtx.inputService!!.collectInputResultsForADMonitor(monitor, periodStart, periodEnd)
+            )
         }
 
         val updatedAlerts = mutableListOf<Alert>()
@@ -80,20 +89,31 @@ object QueryLevelMonitorRunner : MonitorRunner {
         return monitorResult.copy(triggerResults = triggerResults)
     }
 
-    override suspend fun runAction(action: Action, ctx: TriggerExecutionContext, monitorCtx: MonitorRunnerExecutionContext, dryrun: Boolean): ActionRunResult {
+    override suspend fun runAction(
+        action: Action,
+        ctx: TriggerExecutionContext,
+        monitorCtx: MonitorRunnerExecutionContext,
+        dryrun: Boolean
+    ): ActionRunResult {
         return try {
             if (!MonitorRunnerService.isActionActionable(action, (ctx as QueryLevelTriggerExecutionContext).alert)) {
                 return ActionRunResult(action.id, action.name, mapOf(), true, null, null)
             }
             val actionOutput = mutableMapOf<String, String>()
-            actionOutput[Action.SUBJECT] = if (action.subjectTemplate != null) MonitorRunnerService.compileTemplate(action.subjectTemplate, ctx) else ""
+            actionOutput[Action.SUBJECT] = if (action.subjectTemplate != null)
+                MonitorRunnerService.compileTemplate(action.subjectTemplate, ctx)
+            else ""
             actionOutput[Action.MESSAGE] = MonitorRunnerService.compileTemplate(action.messageTemplate, ctx)
             if (Strings.isNullOrEmpty(actionOutput[Action.MESSAGE])) {
                 throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
             }
             if (!dryrun) {
                 withContext(Dispatchers.IO) {
-                    val destination = AlertingConfigAccessor.getDestinationInfo(monitorCtx.client!!, monitorCtx.xContentRegistry!!, action.destinationId)
+                    val destination = AlertingConfigAccessor.getDestinationInfo(
+                        monitorCtx.client!!,
+                        monitorCtx.xContentRegistry!!,
+                        action.destinationId
+                    )
                     if (!destination.isAllowed(monitorCtx.allowList)) {
                         throw IllegalStateException("Monitor contains a Destination type that is not allowed: ${destination.type}")
                     }
