@@ -32,6 +32,7 @@ import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsAction
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsTransportAction
 import org.opensearch.alerting.core.model.ClusterMetricsInput
+import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler
@@ -42,7 +43,6 @@ import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
-import org.opensearch.alerting.model.docLevelInput.DocLevelMonitorInput
 import org.opensearch.alerting.resthandler.RestAcknowledgeAlertAction
 import org.opensearch.alerting.resthandler.RestDeleteDestinationAction
 import org.opensearch.alerting.resthandler.RestDeleteEmailAccountAction

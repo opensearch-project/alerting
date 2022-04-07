@@ -3,9 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting.model.docLevelInput
+package org.opensearch.alerting.core.model
 
-import org.opensearch.alerting.model.action.Action
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.io.stream.Writeable
@@ -20,8 +19,7 @@ data class DocLevelQuery(
     val id: String = NO_ID,
     val query: String,
     val severity: String,
-    val tags: List<String> = mutableListOf(),
-    val actions: List<Action> = mutableListOf()
+    val tags: List<String> = mutableListOf()
 ) : Writeable, ToXContentObject {
 
     @Throws(IOException::class)
@@ -29,8 +27,7 @@ data class DocLevelQuery(
         sin.readString(), // id
         sin.readString(), // query
         sin.readString(), // severity
-        sin.readStringList(), // tags
-        sin.readList(::Action) // actions
+        sin.readStringList() // tags
     )
 
     fun asTemplateArg(): Map<String, Any> {
@@ -38,8 +35,7 @@ data class DocLevelQuery(
             QUERY_ID_FIELD to id,
             QUERY_FIELD to query,
             SEVERITY_FIELD to severity,
-            TAGS_FIELD to tags,
-            ACTIONS_FIELD to actions.map { it.asTemplateArg() }
+            TAGS_FIELD to tags
         )
     }
 
@@ -49,7 +45,6 @@ data class DocLevelQuery(
         out.writeString(query)
         out.writeString(severity)
         out.writeStringCollection(tags)
-        out.writeCollection(actions)
     }
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
@@ -58,7 +53,6 @@ data class DocLevelQuery(
             .field(QUERY_FIELD, query)
             .field(SEVERITY_FIELD, severity)
             .field(TAGS_FIELD, tags.toTypedArray())
-            .field(ACTIONS_FIELD, actions.toTypedArray())
             .endObject()
         return builder
     }
@@ -68,7 +62,6 @@ data class DocLevelQuery(
         const val QUERY_FIELD = "query"
         const val SEVERITY_FIELD = "severity"
         const val TAGS_FIELD = "tags"
-        const val ACTIONS_FIELD = "actions"
 
         const val NO_ID = ""
 
@@ -78,7 +71,6 @@ data class DocLevelQuery(
             lateinit var query: String
             lateinit var severity: String
             val tags: MutableList<String> = mutableListOf()
-            val actions: MutableList<Action> = mutableListOf()
 
             ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.currentToken(), xcp)
             while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
@@ -95,12 +87,6 @@ data class DocLevelQuery(
                             tags.add(xcp.text())
                         }
                     }
-                    ACTIONS_FIELD -> {
-                        ensureExpectedToken(XContentParser.Token.START_ARRAY, xcp.currentToken(), xcp)
-                        while (xcp.nextToken() != XContentParser.Token.END_ARRAY) {
-                            actions.add(Action.parse(xcp))
-                        }
-                    }
                 }
             }
 
@@ -108,14 +94,13 @@ data class DocLevelQuery(
                 id = id,
                 query = query,
                 severity = severity,
-                tags = tags,
-                actions = actions
+                tags = tags
             )
         }
 
         @JvmStatic @Throws(IOException::class)
-        fun readFrom(sin: StreamInput): DocLevelMonitorInput {
-            return DocLevelMonitorInput(sin)
+        fun readFrom(sin: StreamInput): DocLevelQuery {
+            return DocLevelQuery(sin)
         }
     }
 }

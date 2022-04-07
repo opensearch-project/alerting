@@ -24,6 +24,7 @@ import org.opensearch.alerting.elasticapi.string
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.DocumentLevelTrigger
+import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.destination.Destination
@@ -101,7 +102,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             response.entity.content
         ).map()
         assertUserNull(monitorJson as HashMap<String, Any>)
-        return monitor.copy(id = monitorJson["_id"] as String, version = (monitorJson["_version"] as Int).toLong())
+
+        return getMonitor(monitorId = monitorJson["_id"] as String)
     }
 
     protected fun createMonitor(monitor: Monitor, refresh: Boolean = true): Monitor {
@@ -435,7 +437,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun createRandomDocumentMonitor(refresh: Boolean = false, withMetadata: Boolean = false): Monitor {
-        val monitor = randomDocumentLevelMonitor(withMetadata = withMetadata)
+        val monitor = randomDocumentReturningMonitor(withMetadata = withMetadata)
         val monitorId = createMonitor(monitor, refresh).id
         if (withMetadata) {
             return getMonitor(monitorId = monitorId, header = BasicHeader(HttpHeaders.USER_AGENT, "OpenSearch-Dashboards"))
@@ -477,6 +479,51 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
         assertUserNull(monitor)
         return monitor.copy(id = id, version = version)
+    }
+
+    // TODO: understand why doc alerts wont work with the normal search Alerts function
+    protected fun searchAlertsWithFilter(
+        monitor: Monitor,
+        indices: String = AlertIndices.ALERT_INDEX,
+        refresh: Boolean = true
+    ): List<Alert> {
+        if (refresh) refreshIndex(indices)
+
+        val request = """
+                { "version" : true,
+                  "query": { "match_all": {} }
+                }
+        """.trimIndent()
+        val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", StringEntity(request, APPLICATION_JSON))
+        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
+
+        val searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        return searchResponse.hits.hits.map {
+            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
+            Alert.parse(xcp, it.id, it.version)
+        }.filter { alert -> alert.monitorId == monitor.id }
+    }
+
+    protected fun searchFindings(
+        monitor: Monitor,
+        indices: String = ".opensearch-alerting-findings",
+        refresh: Boolean = true
+    ): List<Finding> {
+        if (refresh) refreshIndex(indices)
+
+        val request = """
+                { "version" : true,
+                  "query": { "match_all": {} }
+                }
+        """.trimIndent()
+        val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", StringEntity(request, APPLICATION_JSON))
+        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
+
+        val searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        return searchResponse.hits.hits.map {
+            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
+            Finding.parse(xcp, it.id)
+        }.filter { finding -> finding.monitorId == monitor.id }
     }
 
     protected fun searchAlerts(monitor: Monitor, indices: String = AlertIndices.ALERT_INDEX, refresh: Boolean = true): List<Alert> {

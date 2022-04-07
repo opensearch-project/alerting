@@ -3,9 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting.model.docLevelInput
+package org.opensearch.alerting.core.model
 
-import org.opensearch.alerting.core.model.Input
 import org.opensearch.common.CheckedFunction
 import org.opensearch.common.ParseField
 import org.opensearch.common.io.stream.StreamInput
