@@ -85,13 +85,13 @@ class TransportGetFindingsSearchAction @Inject constructor(
             .fetchSource(FetchSourceContext(true, Strings.EMPTY_ARRAY, Strings.EMPTY_ARRAY))
             .seqNoAndPrimaryTerm(true)
             .version(true)
-        // TODO: Update query to support other parameters of search
 
         val queryBuilder = QueryBuilders.boolQuery()
 
         if (!getFindingsSearchRequest.findingId.isNullOrBlank())
             queryBuilder.filter(QueryBuilders.termQuery("_id", getFindingsSearchRequest.findingId))
 
+        // TODO: Update query to properly support search string
         if (!tableProp.searchString.isNullOrBlank()) {
             queryBuilder
                 .must(
@@ -185,7 +185,6 @@ class TransportGetFindingsSearchAction @Inject constructor(
         val response = client.multiGet(mgetRequest).actionGet()
         val documents: MutableMap<String, FindingDocument> = mutableMapOf()
         response.responses.forEach {
-            // TODO: REMOVE DEBUG LOG
             val key = "${it.index}|${it.id}"
             val docData = if (it.isFailed) emptyMap<String, Any>() else it.response.sourceAsMap
             val findingDocument = FindingDocument(it.index, it.id, !it.isFailed, docData)

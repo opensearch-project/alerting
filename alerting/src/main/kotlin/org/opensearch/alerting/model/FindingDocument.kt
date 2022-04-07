@@ -34,10 +34,6 @@ class FindingDocument(
             .field(FOUND_FIELD, found)
             .field(DOCUMENT_FIELD, document)
             .endObject()
-//
-//        if (document.isEmpty()) builder.field(DOCUMENT_FIELD, document)
-//        builder.endObject()
-//        return builder
     }
 
     @Throws(IOException::class)
