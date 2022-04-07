@@ -1,6 +1,7 @@
 package org.opensearch.alerting.resthandler
 
 import org.opensearch.alerting.AlertingRestTestCase
+import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.elasticapi.string
 import org.opensearch.alerting.model.Finding
 import org.opensearch.common.xcontent.ToXContent
@@ -86,8 +87,7 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         monitorId: String = "NO_ID",
         monitorName: String = "NO_NAME",
         index: String = "testIndex",
-        docLevelQueryId: String = "NO_ID",
-        docLevelQueryTags: List<String> = emptyList(),
+        docLevelQueries: List<DocLevelQuery> = listOf(DocLevelQuery(query = "test_field:\"us-west-2\"", severity = "3")),
         matchingDocIds: Set<String>
     ): String {
         val finding = Finding(
@@ -96,9 +96,7 @@ class FindingsRestApiIT : AlertingRestTestCase() {
             monitorId = monitorId,
             monitorName = monitorName,
             index = index,
-            queryId = docLevelQueryId,
-            queryTags = docLevelQueryTags,
-            severity = "sev3",
+            docLevelQueries = docLevelQueries,
             timestamp = Instant.now(),
             triggerId = null,
             triggerName = null

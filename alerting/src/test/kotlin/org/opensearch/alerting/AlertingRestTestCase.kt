@@ -492,7 +492,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
         return searchResponse.hits.hits.map {
             val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
-            Finding.parse(xcp, it.id)
+            Finding.parse(xcp)
         }.filter { finding -> finding.monitorId == monitor.id }
     }
 
