@@ -12,10 +12,9 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.alerting.action.GetFindingsSearchAction
-import org.opensearch.alerting.action.GetFindingsSearchRequest
-import org.opensearch.alerting.action.GetFindingsSearchResponse
-import org.opensearch.alerting.elasticapi.addFilter
+import org.opensearch.alerting.action.GetFindingsAction
+import org.opensearch.alerting.action.GetFindingsRequest
+import org.opensearch.alerting.action.GetFindingsResponse
 import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.FindingDocument
 import org.opensearch.alerting.model.FindingWithDocs
@@ -32,7 +31,6 @@ import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
@@ -41,7 +39,6 @@ import org.opensearch.search.sort.SortBuilders
 import org.opensearch.search.sort.SortOrder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
-import java.io.IOException
 
 private val log = LogManager.getLogger(TransportGetFindingsSearchAction::class.java)
 
@@ -52,8 +49,8 @@ class TransportGetFindingsSearchAction @Inject constructor(
     actionFilters: ActionFilters,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry
-) : HandledTransportAction<GetFindingsSearchRequest, GetFindingsSearchResponse> (
-    GetFindingsSearchAction.NAME, transportService, actionFilters, ::GetFindingsSearchRequest
+) : HandledTransportAction<GetFindingsRequest, GetFindingsResponse> (
+    GetFindingsAction.NAME, transportService, actionFilters, ::GetFindingsRequest
 ),
     SecureTransportAction {
 
@@ -65,11 +62,10 @@ class TransportGetFindingsSearchAction @Inject constructor(
 
     override fun doExecute(
         task: Task,
-        getFindingsSearchRequest: GetFindingsSearchRequest,
-        actionListener: ActionListener<GetFindingsSearchResponse>
+        getFindingsRequest: GetFindingsRequest,
+        actionListener: ActionListener<GetFindingsResponse>
     ) {
-        val user = readUserFromThreadContext(client)
-        val tableProp = getFindingsSearchRequest.table
+        val tableProp = getFindingsRequest.table
 
         val sortBuilder = SortBuilders
             .fieldSort(tableProp.sortString)
@@ -88,10 +84,9 @@ class TransportGetFindingsSearchAction @Inject constructor(
 
         val queryBuilder = QueryBuilders.boolQuery()
 
-        if (!getFindingsSearchRequest.findingId.isNullOrBlank())
-            queryBuilder.filter(QueryBuilders.termQuery("_id", getFindingsSearchRequest.findingId))
+        if (!getFindingsRequest.findingId.isNullOrBlank())
+            queryBuilder.filter(QueryBuilders.termQuery("_id", getFindingsRequest.findingId))
 
-        // TODO: Update query to properly support search string
         if (!tableProp.searchString.isNullOrBlank()) {
             queryBuilder
                 .must(
@@ -99,41 +94,18 @@ class TransportGetFindingsSearchAction @Inject constructor(
                         .queryStringQuery(tableProp.searchString)
                         .defaultOperator(Operator.AND)
                         .field("queries.tags")
-                        .field("queries.query")
+                        .field("queries.name")
                 )
         }
 
         searchSourceBuilder.query(queryBuilder)
 
         client.threadPool().threadContext.stashContext().use {
-            resolve(searchSourceBuilder, actionListener, user)
+            search(searchSourceBuilder, actionListener)
         }
     }
 
-    fun resolve(
-        searchSourceBuilder: SearchSourceBuilder,
-        actionListener: ActionListener<GetFindingsSearchResponse>,
-        user: User?
-    ) {
-        if (user == null) {
-            // user is null when: 1/ security is disabled. 2/when user is super-admin.
-            search(searchSourceBuilder, actionListener)
-        } else if (!doFilterForUser(user)) {
-            // security is enabled and filterby is disabled.
-            search(searchSourceBuilder, actionListener)
-        } else {
-            // security is enabled and filterby is enabled.
-            try {
-                log.info("Filtering result by: ${user.backendRoles}")
-                addFilter(user, searchSourceBuilder, "finding.user.backend_roles.keyword")
-                search(searchSourceBuilder, actionListener)
-            } catch (ex: IOException) {
-                actionListener.onFailure(AlertingException.wrap(ex))
-            }
-        }
-    }
-
-    fun search(searchSourceBuilder: SearchSourceBuilder, actionListener: ActionListener<GetFindingsSearchResponse>) {
+    fun search(searchSourceBuilder: SearchSourceBuilder, actionListener: ActionListener<GetFindingsResponse>) {
         val searchRequest = SearchRequest()
             .source(searchSourceBuilder)
             .indices(".opensearch-alerting-findings")
@@ -169,7 +141,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
                         }
                         findingsWithDocs.add(FindingWithDocs(it, relatedDocs))
                     }
-                    actionListener.onResponse(GetFindingsSearchResponse(response.status(), totalFindingCount, findingsWithDocs))
+                    actionListener.onResponse(GetFindingsResponse(response.status(), totalFindingCount, findingsWithDocs))
                 }
 
                 override fun onFailure(t: Exception) {

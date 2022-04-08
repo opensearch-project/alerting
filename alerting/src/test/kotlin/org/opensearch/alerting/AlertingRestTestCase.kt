@@ -16,8 +16,9 @@ import org.junit.rules.DisableOnDebug
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
-import org.opensearch.alerting.action.GetFindingsSearchResponse
+import org.opensearch.alerting.action.GetFindingsResponse
 import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
@@ -44,6 +45,7 @@ import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentParser
@@ -61,10 +63,12 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+import java.util.UUID
 import javax.management.MBeanServerInvocationHandler
 import javax.management.ObjectName
 import javax.management.remote.JMXConnectorFactory
 import javax.management.remote.JMXServiceURL
+import kotlin.collections.HashMap
 
 abstract class AlertingRestTestCase : ODFERestTestCase() {
 
@@ -474,6 +478,29 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         }.filter { alert -> alert.monitorId == monitor.id }
     }
 
+    protected fun createFinding(
+        monitorId: String = "NO_ID",
+        monitorName: String = "NO_NAME",
+        index: String = "testIndex",
+        docLevelQueries: List<DocLevelQuery> = listOf(DocLevelQuery(query = "test_field:\"us-west-2\"", name = "testQuery")),
+        matchingDocIds: Set<String>
+    ): String {
+        val finding = Finding(
+            id = UUID.randomUUID().toString(),
+            relatedDocId = matchingDocIds.joinToString(","),
+            monitorId = monitorId,
+            monitorName = monitorName,
+            index = index,
+            docLevelQueries = docLevelQueries,
+            timestamp = Instant.now()
+        )
+
+        val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
+
+        indexDoc(".opensearch-alerting-findings", finding.id, findingStr)
+        return finding.id
+    }
+
     protected fun searchFindings(
         monitor: Monitor,
         indices: String = ".opensearch-alerting-findings",
@@ -580,7 +607,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun executeMonitor(client: RestClient, monitor: Monitor, params: Map<String, String> = mapOf()): Response =
         client.makeRequest("POST", "$ALERTING_BASE_URI/_execute", params, monitor.toHttpEntityWithUser())
 
-    protected fun searchFindings(params: Map<String, String> = mutableMapOf()): GetFindingsSearchResponse {
+    protected fun searchFindings(params: Map<String, String> = mutableMapOf()): GetFindingsResponse {
 
         var baseEndpoint = "${AlertingPlugin.FINDING_BASE_URI}/_search?"
         for (entry in params.entries) {
@@ -611,7 +638,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             }
         }
 
-        return GetFindingsSearchResponse(response.restStatus(), totalFindings, findings)
+        return GetFindingsResponse(response.restStatus(), totalFindings, findings)
     }
 
     protected fun indexDoc(index: String, id: String, doc: String, refresh: Boolean = true): Response {

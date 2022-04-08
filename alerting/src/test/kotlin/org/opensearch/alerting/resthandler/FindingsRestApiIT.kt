@@ -2,14 +2,7 @@ package org.opensearch.alerting.resthandler
 
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.core.model.DocLevelQuery
-import org.opensearch.alerting.elasticapi.string
-import org.opensearch.alerting.model.Finding
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentBuilder
-import org.opensearch.common.xcontent.XContentType
 import org.opensearch.test.junit.annotations.TestLogging
-import java.time.Instant
-import java.util.UUID
 
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
@@ -83,28 +76,63 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         assertEquals("This is an error2 from IAD region", response.findings[0].documents[1].document["message"])
     }
 
-    private fun createFinding(
-        monitorId: String = "NO_ID",
-        monitorName: String = "NO_NAME",
-        index: String = "testIndex",
-        docLevelQueries: List<DocLevelQuery> = listOf(DocLevelQuery(query = "test_field:\"us-west-2\"", severity = "3")),
-        matchingDocIds: Set<String>
-    ): String {
-        val finding = Finding(
-            id = UUID.randomUUID().toString(),
-            relatedDocId = matchingDocIds.joinToString(","),
-            monitorId = monitorId,
-            monitorName = monitorName,
-            index = index,
-            docLevelQueries = docLevelQueries,
-            timestamp = Instant.now(),
-            triggerId = null,
-            triggerName = null
+    fun `test find Finding by tag`() {
+        val testIndex = createTestIndex()
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_field" : "us-west-2"
+        }"""
+        indexDoc(testIndex, "someId", testDoc)
+        val testDoc2 = """{
+            "message" : "This is an error2 from IAD region",
+            "test_field" : "us-west-3"
+        }"""
+        indexDoc(testIndex, "someId2", testDoc2)
+
+        val docLevelQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "realQuery", tags = listOf("sigma"))
+        createFinding(matchingDocIds = setOf("someId"), index = testIndex)
+        val findingId = createFinding(
+            matchingDocIds = setOf("someId", "someId2"),
+            index = testIndex,
+            docLevelQueries = listOf(docLevelQuery)
         )
+        val response = searchFindings(mapOf(Pair("searchString", "sigma")))
+        assertEquals(1, response.totalFindings)
+        assertEquals(findingId, response.findings[0].finding.id)
+        assertEquals(2, response.findings[0].documents.size)
+        assertTrue(response.findings[0].documents[0].found)
+        assertTrue(response.findings[0].documents[1].found)
+        assertEquals("This is an error from IAD region", response.findings[0].documents[0].document["message"])
+        assertEquals("This is an error2 from IAD region", response.findings[0].documents[1].document["message"])
+    }
 
-        val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
+    fun `test find Finding by name`() {
+        val testIndex = createTestIndex()
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_field" : "us-west-2"
+        }"""
+        indexDoc(testIndex, "someId", testDoc)
+        val testDoc2 = """{
+            "message" : "This is an error2 from IAD region",
+            "test_field" : "us-west-3"
+        }"""
+        indexDoc(testIndex, "someId2", testDoc2)
 
-        indexDoc(".opensearch-alerting-findings", finding.id, findingStr)
-        return finding.id
+        val docLevelQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "realQuery", tags = listOf("sigma"))
+        createFinding(matchingDocIds = setOf("someId"), index = testIndex)
+        val findingId = createFinding(
+            matchingDocIds = setOf("someId", "someId2"),
+            index = testIndex,
+            docLevelQueries = listOf(docLevelQuery)
+        )
+        val response = searchFindings(mapOf(Pair("searchString", "realQuery")))
+        assertEquals(1, response.totalFindings)
+        assertEquals(findingId, response.findings[0].finding.id)
+        assertEquals(2, response.findings[0].documents.size)
+        assertTrue(response.findings[0].documents[0].found)
+        assertTrue(response.findings[0].documents[1].found)
+        assertEquals("This is an error from IAD region", response.findings[0].documents[0].document["message"])
+        assertEquals("This is an error2 from IAD region", response.findings[0].documents[1].document["message"])
     }
 }

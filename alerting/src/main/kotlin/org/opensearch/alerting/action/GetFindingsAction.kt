@@ -7,9 +7,9 @@ package org.opensearch.alerting.action
 
 import org.opensearch.action.ActionType
 
-class GetFindingsSearchAction private constructor() : ActionType<GetFindingsSearchResponse>(NAME, ::GetFindingsSearchResponse) {
+class GetFindingsAction private constructor() : ActionType<GetFindingsResponse>(NAME, ::GetFindingsResponse) {
     companion object {
-        val INSTANCE = GetFindingsSearchAction()
+        val INSTANCE = GetFindingsAction()
         val NAME = "cluster:admin/opendistro/alerting/findings/get"
     }
 }

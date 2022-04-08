@@ -31,11 +31,5 @@ class FindingTests : OpenSearchTestCase() {
             templateArgs[Finding.TIMESTAMP_FIELD],
             finding.timestamp.toEpochMilli()
         )
-        assertEquals("Template args 'triggerId' field does not match:", templateArgs[Finding.TRIGGER_ID_FIELD], finding.triggerId)
-        assertEquals(
-            "Template args 'triggerName' field does not match:",
-            templateArgs[Finding.TRIGGER_NAME_FIELD],
-            finding.triggerName
-        )
     }
 }

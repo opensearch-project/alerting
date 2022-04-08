@@ -30,59 +30,27 @@
     "index": {
       "type": "keyword"
     },
-    "query_id": {
-      "type": "keyword"
-    },
-    "query_tags": {
-      "type" : "text",
-      "fields" : {
-        "keyword" : {
-          "type" : "keyword"
+    "queries" : {
+      "type": "nested",
+      "properties": {
+        "id": {
+          "type": "keyword"
+        },
+        "name": {
+          "type": "text"
+        },
+        "tags": {
+          "type": "text",
+          "fields" : {
+            "keyword" : {
+              "type" : "keyword"
+            }
+          }
         }
       }
-    },
-    "severity": {
-      "type": "keyword"
     },
     "timestamp": {
       "type": "date"
-    },
-    "monitor_user": {
-      "properties": {
-        "name": {
-          "type": "text",
-          "fields": {
-            "keyword": {
-              "type": "keyword",
-              "ignore_above": 256
-            }
-          }
-        },
-        "backend_roles": {
-          "type" : "text",
-          "fields" : {
-            "keyword" : {
-              "type" : "keyword"
-            }
-          }
-        },
-        "roles": {
-          "type" : "text",
-          "fields" : {
-            "keyword" : {
-              "type" : "keyword"
-            }
-          }
-        },
-        "custom_attribute_names": {
-          "type" : "text",
-          "fields" : {
-            "keyword" : {
-              "type" : "keyword"
-            }
-          }
-        }
-      }
     }
   }
 }

@@ -27,9 +27,7 @@ class Finding(
     val monitorName: String,
     val index: String,
     val docLevelQueries: List<DocLevelQuery>,
-    val timestamp: Instant,
-    val triggerId: String?,
-    val triggerName: String?
+    val timestamp: Instant
 ) : Writeable, ToXContent {
 
     @Throws(IOException::class)
@@ -40,9 +38,7 @@ class Finding(
         monitorName = sin.readString(),
         index = sin.readString(),
         docLevelQueries = sin.readList((DocLevelQuery)::readFrom),
-        timestamp = sin.readInstant(),
-        triggerId = sin.readOptionalString(),
-        triggerName = sin.readOptionalString()
+        timestamp = sin.readInstant()
     )
 
     fun asTemplateArg(): Map<String, Any?> {
@@ -53,9 +49,7 @@ class Finding(
             MONITOR_NAME_FIELD to monitorName,
             INDEX_FIELD to index,
             QUERIES_FIELD to docLevelQueries,
-            TIMESTAMP_FIELD to timestamp.toEpochMilli(),
-            TRIGGER_ID_FIELD to triggerId,
-            TRIGGER_NAME_FIELD to triggerName
+            TIMESTAMP_FIELD to timestamp.toEpochMilli()
         )
     }
 
@@ -68,8 +62,6 @@ class Finding(
             .field(INDEX_FIELD, index)
             .field(QUERIES_FIELD, docLevelQueries.toTypedArray())
             .field(TIMESTAMP_FIELD, timestamp.toEpochMilli())
-            .field(TRIGGER_ID_FIELD, triggerId)
-            .field(TRIGGER_NAME_FIELD, triggerName)
         builder.endObject()
         return builder
     }
@@ -83,8 +75,6 @@ class Finding(
         out.writeString(index)
         out.writeCollection(docLevelQueries)
         out.writeInstant(timestamp)
-        out.writeOptionalString(triggerId)
-        out.writeOptionalString(triggerName)
     }
 
     companion object {
@@ -95,8 +85,6 @@ class Finding(
         const val INDEX_FIELD = "index"
         const val QUERIES_FIELD = "queries"
         const val TIMESTAMP_FIELD = "timestamp"
-        const val TRIGGER_ID_FIELD = "trigger_id"
-        const val TRIGGER_NAME_FIELD = "trigger_name"
         const val NO_ID = ""
 
         @JvmStatic @JvmOverloads
@@ -109,8 +97,6 @@ class Finding(
             lateinit var index: String
             val queries: MutableList<DocLevelQuery> = mutableListOf()
             lateinit var timestamp: Instant
-            var triggerId: String? = null
-            var triggerName: String? = null
 
             ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.currentToken(), xcp)
             while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
@@ -132,8 +118,6 @@ class Finding(
                     TIMESTAMP_FIELD -> {
                         timestamp = requireNotNull(xcp.instant())
                     }
-                    TRIGGER_ID_FIELD -> triggerId = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) null else xcp.text()
-                    TRIGGER_NAME_FIELD -> triggerName = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) null else xcp.text()
                 }
             }
 
@@ -144,9 +128,7 @@ class Finding(
                 monitorName = monitorName,
                 index = index,
                 docLevelQueries = queries,
-                timestamp = timestamp,
-                triggerId = triggerId,
-                triggerName = triggerName
+                timestamp = timestamp
             )
         }
 

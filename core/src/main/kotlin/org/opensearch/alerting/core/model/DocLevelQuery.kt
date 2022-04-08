@@ -17,24 +17,24 @@ import java.io.IOException
 
 data class DocLevelQuery(
     val id: String = NO_ID,
+    val name: String,
     val query: String,
-    val severity: String,
     val tags: List<String> = mutableListOf()
 ) : Writeable, ToXContentObject {
 
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
         sin.readString(), // id
+        sin.readString(), // name
         sin.readString(), // query
-        sin.readString(), // severity
         sin.readStringList() // tags
     )
 
     fun asTemplateArg(): Map<String, Any> {
         return mapOf(
             QUERY_ID_FIELD to id,
+            NAME_FIELD to name,
             QUERY_FIELD to query,
-            SEVERITY_FIELD to severity,
             TAGS_FIELD to tags
         )
     }
@@ -42,16 +42,16 @@ data class DocLevelQuery(
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {
         out.writeString(id)
+        out.writeString(name)
         out.writeString(query)
-        out.writeString(severity)
         out.writeStringCollection(tags)
     }
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         builder.startObject()
             .field(QUERY_ID_FIELD, id)
+            .field(NAME_FIELD, name)
             .field(QUERY_FIELD, query)
-            .field(SEVERITY_FIELD, severity)
             .field(TAGS_FIELD, tags.toTypedArray())
             .endObject()
         return builder
@@ -59,8 +59,8 @@ data class DocLevelQuery(
 
     companion object {
         const val QUERY_ID_FIELD = "id"
+        const val NAME_FIELD = "name"
         const val QUERY_FIELD = "query"
-        const val SEVERITY_FIELD = "severity"
         const val TAGS_FIELD = "tags"
 
         const val NO_ID = ""
@@ -69,7 +69,7 @@ data class DocLevelQuery(
         fun parse(xcp: XContentParser): DocLevelQuery {
             var id: String = NO_ID
             lateinit var query: String
-            lateinit var severity: String
+            lateinit var name: String
             val tags: MutableList<String> = mutableListOf()
 
             ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.currentToken(), xcp)
@@ -79,8 +79,8 @@ data class DocLevelQuery(
 
                 when (fieldName) {
                     QUERY_ID_FIELD -> id = xcp.text()
+                    NAME_FIELD -> name = xcp.text()
                     QUERY_FIELD -> query = xcp.text()
-                    SEVERITY_FIELD -> severity = xcp.text()
                     TAGS_FIELD -> {
                         ensureExpectedToken(XContentParser.Token.START_ARRAY, xcp.currentToken(), xcp)
                         while (xcp.nextToken() != XContentParser.Token.END_ARRAY) {
@@ -92,8 +92,8 @@ data class DocLevelQuery(
 
             return DocLevelQuery(
                 id = id,
+                name = name,
                 query = query,
-                severity = severity,
                 tags = tags
             )
         }

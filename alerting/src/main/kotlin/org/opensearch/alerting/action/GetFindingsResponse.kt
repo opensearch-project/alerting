@@ -15,7 +15,7 @@ import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.rest.RestStatus
 import java.io.IOException
 
-class GetFindingsSearchResponse : ActionResponse, ToXContentObject {
+class GetFindingsResponse : ActionResponse, ToXContentObject {
     var status: RestStatus
     var totalFindings: Int?
     var findings: List<FindingWithDocs>

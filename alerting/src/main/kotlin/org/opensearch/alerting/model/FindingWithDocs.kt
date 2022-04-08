@@ -41,7 +41,7 @@ class FindingWithDocs(
 
     companion object {
         const val FINDING_FIELD = "finding"
-        const val DOCUMENTS_FIELD = "documents"
+        const val DOCUMENTS_FIELD = "document_list"
 
         @JvmStatic
         @Throws(IOException::class)
