@@ -1113,7 +1113,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     @Throws(Exception::class)
     fun `test creating a document monitor`() {
         val testIndex = createTestIndex()
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", severity = "3")
+        val docQuery = DocLevelQuery(name = "queryName", query = "test_field:\"us-west-2\"", severity = "3")
         val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
@@ -1134,7 +1134,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     @Throws(Exception::class)
     fun `test getting a document level monitor`() {
         val testIndex = createTestIndex()
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", severity = "3")
+        val docQuery = DocLevelQuery(name = "queryName", query = "test_field:\"us-west-2\"", severity = "3")
         val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
@@ -1150,7 +1150,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     @Throws(Exception::class)
     fun `test updating conditions for a doc-level monitor`() {
         val testIndex = createTestIndex()
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", severity = "3")
+        val docQuery = DocLevelQuery(name = "queryName", query = "test_field:\"us-west-2\"", severity = "3")
         val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
@@ -1181,7 +1181,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     @Throws(Exception::class)
     fun `test deleting a document level monitor`() {
         val testIndex = createTestIndex()
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", severity = "3")
+        val docQuery = DocLevelQuery(name = "queryName", query = "test_field:\"us-west-2\"", severity = "3")
         val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)

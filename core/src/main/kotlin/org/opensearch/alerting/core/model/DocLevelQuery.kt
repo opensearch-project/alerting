@@ -35,6 +35,7 @@ data class DocLevelQuery(
     fun asTemplateArg(): Map<String, Any> {
         return mapOf(
             QUERY_ID_FIELD to id,
+            NAME_FIELD to name,
             QUERY_FIELD to query,
             SEVERITY_FIELD to severity,
             TAGS_FIELD to tags
@@ -44,6 +45,7 @@ data class DocLevelQuery(
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {
         out.writeString(id)
+        out.writeString(name)
         out.writeString(query)
         out.writeString(severity)
         out.writeStringCollection(tags)
