@@ -25,6 +25,7 @@ class DocLevelMonitorInputTests : OpenSearchTestCase() {
 
         // THEN
         assertEquals("Template args 'id' field does not match:", templateArgs[DocLevelQuery.QUERY_ID_FIELD], query.id)
+        assertEquals("Template args 'name' field does not match:", templateArgs[DocLevelQuery.NAME_FIELD], query.name)
         assertEquals("Template args 'query' field does not match:", templateArgs[DocLevelQuery.QUERY_FIELD], query.query)
         assertEquals("Template args 'severity' field does not match:", templateArgs[DocLevelQuery.SEVERITY_FIELD], query.severity)
         assertEquals("Template args 'tags' field does not match:", templateArgs[DocLevelQuery.TAGS_FIELD], query.tags)

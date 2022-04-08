@@ -332,11 +332,12 @@ fun randomAlert(monitor: Monitor = randomQueryLevelMonitor()): Alert {
 
 fun randomDocLevelQuery(
     id: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     query: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     severity: String = "${randomInt(5)}",
     tags: List<String> = mutableListOf(0..randomInt(10)).map { OpenSearchRestTestCase.randomAlphaOfLength(10) }
 ): DocLevelQuery {
-    return DocLevelQuery(id = id, query = query, severity = severity, tags = tags)
+    return DocLevelQuery(id = id, name = name, query = query, severity = severity, tags = tags)
 }
 
 fun randomDocLevelMonitorInput(

@@ -17,6 +17,7 @@ import java.io.IOException
 
 data class DocLevelQuery(
     val id: String = NO_ID,
+    val name: String,
     val query: String,
     val severity: String,
     val tags: List<String> = mutableListOf()
@@ -25,6 +26,7 @@ data class DocLevelQuery(
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
         sin.readString(), // id
+        sin.readString(), // name
         sin.readString(), // query
         sin.readString(), // severity
         sin.readStringList() // tags
@@ -50,6 +52,7 @@ data class DocLevelQuery(
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         builder.startObject()
             .field(QUERY_ID_FIELD, id)
+            .field(NAME_FIELD, name)
             .field(QUERY_FIELD, query)
             .field(SEVERITY_FIELD, severity)
             .field(TAGS_FIELD, tags.toTypedArray())
@@ -60,6 +63,7 @@ data class DocLevelQuery(
     companion object {
         const val QUERY_ID_FIELD = "id"
         const val QUERY_FIELD = "query"
+        const val NAME_FIELD = "name"
         const val SEVERITY_FIELD = "severity"
         const val TAGS_FIELD = "tags"
 
@@ -68,6 +72,7 @@ data class DocLevelQuery(
         @JvmStatic @Throws(IOException::class)
         fun parse(xcp: XContentParser): DocLevelQuery {
             var id: String = NO_ID
+            lateinit var name: String
             lateinit var query: String
             lateinit var severity: String
             val tags: MutableList<String> = mutableListOf()
@@ -79,6 +84,7 @@ data class DocLevelQuery(
 
                 when (fieldName) {
                     QUERY_ID_FIELD -> id = xcp.text()
+                    NAME_FIELD -> name = xcp.text()
                     QUERY_FIELD -> query = xcp.text()
                     SEVERITY_FIELD -> severity = xcp.text()
                     TAGS_FIELD -> {
@@ -92,6 +98,7 @@ data class DocLevelQuery(
 
             return DocLevelQuery(
                 id = id,
+                name = name,
                 query = query,
                 severity = severity,
                 tags = tags
