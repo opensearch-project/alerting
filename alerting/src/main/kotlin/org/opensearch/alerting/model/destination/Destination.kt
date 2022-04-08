@@ -6,12 +6,6 @@
 package org.opensearch.alerting.model.destination
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.alerting.destination.Notification
-import org.opensearch.alerting.destination.message.BaseMessage
-import org.opensearch.alerting.destination.message.ChimeMessage
-import org.opensearch.alerting.destination.message.CustomWebhookMessage
-import org.opensearch.alerting.destination.message.EmailMessage
-import org.opensearch.alerting.destination.message.SlackMessage
 import org.opensearch.alerting.model.destination.email.Email
 import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.instant
@@ -19,7 +13,6 @@ import org.opensearch.alerting.opensearchapi.optionalTimeField
 import org.opensearch.alerting.opensearchapi.optionalUserField
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
-import org.opensearch.alerting.util.isHostInDenylist
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.ToXContent
@@ -32,7 +25,6 @@ import org.opensearch.commons.destination.message.LegacyChimeMessage
 import org.opensearch.commons.destination.message.LegacyCustomWebhookMessage
 import org.opensearch.commons.destination.message.LegacySlackMessage
 import java.io.IOException
-import java.net.InetAddress
 import java.time.Instant
 import java.util.Locale
 

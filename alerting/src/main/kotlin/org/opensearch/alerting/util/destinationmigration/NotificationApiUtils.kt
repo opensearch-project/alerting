@@ -49,8 +49,15 @@ class NotificationApiUtils {
          * Gets a NotificationConfigInfo object by ID if it exists.
          */
         suspend fun getNotificationConfigInfo(client: NodeClient, id: String): NotificationConfigInfo? {
-            val res: GetNotificationConfigResponse = getNotificationConfig(client, GetNotificationConfigRequest(setOf(id)))
-            return res.searchResult.objectList.firstOrNull()
+            return try {
+                val res: GetNotificationConfigResponse = getNotificationConfig(client, GetNotificationConfigRequest(setOf(id)))
+                res.searchResult.objectList.firstOrNull()
+            } catch (e: OpenSearchStatusException) {
+                if (e.status() == RestStatus.NOT_FOUND) {
+                    logger.debug("Notification config [$id] was not found")
+                }
+                null
+            }
         }
 
         private suspend fun getNotificationConfig(
@@ -63,14 +70,12 @@ class NotificationApiUtils {
                 .getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
             client.threadPool().threadContext.stashContext().use {
                 client.threadPool().threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
-                retryPolicy.retryForNotification(logger) {
-                    getNotificationConfigResponse = NotificationsPluginInterface.suspendUntil {
-                        this.getNotificationConfig(
-                            client,
-                            getNotificationConfigRequest,
-                            it
-                        )
-                    }
+                getNotificationConfigResponse = NotificationsPluginInterface.suspendUntil {
+                    this.getNotificationConfig(
+                        client,
+                        getNotificationConfigRequest,
+                        it
+                    )
                 }
             }
             return getNotificationConfigResponse

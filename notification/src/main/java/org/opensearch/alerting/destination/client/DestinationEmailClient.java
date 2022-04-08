@@ -9,8 +9,6 @@ import org.opensearch.alerting.destination.message.BaseMessage;
 import org.opensearch.alerting.destination.message.EmailMessage;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.opensearch.alerting.destination.message.BaseMessage;
-import org.opensearch.alerting.destination.message.EmailMessage;
 
 import java.util.ArrayList;
 import java.util.List;

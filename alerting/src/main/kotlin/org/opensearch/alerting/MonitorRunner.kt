@@ -66,6 +66,7 @@ import org.opensearch.alerting.util.getCombinedTriggerRunResult
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isBucketLevelMonitor
+import org.opensearch.alerting.util.isTestAction
 import org.opensearch.client.Client
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
@@ -690,8 +691,15 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
 
     private suspend fun getConfigAndSendNotification(action: Action, subject: String?, message: String): String {
         val config = getConfigForNotificationAction(action)
+
         if (config.destination == null && config.channel == null) {
             throw IllegalStateException("Unable to find a Notification Channel or Destination config with id [${action.id}]")
+        }
+
+        // Adding a check on TEST_ACTION Destination type here to avoid supporting it as a LegacyBaseMessage type
+        // just for Alerting integration tests
+        if (config.destination?.isTestAction() == true) {
+            return "test action"
         }
 
         if (config.destination?.isAllowed(allowList) == false) {
@@ -700,11 +708,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             )
         }
 
-        // TODO: Refactor getDestinationContext() to take in null
-        //  (it might be possible to just remove this if the Notification plugin retrieves the same information)
-        val destinationCtx = destinationContextFactory.getDestinationContext(config.destination!!)
         var actionResponseContent = ""
-
         // TODO: For now, the sendNotification just returns an event ID. If the response changes to return
         //  some form of response content, similar to Alerting's legacy Destination, use it for the actionOutput
         config.channel
@@ -715,7 +719,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
             )
 
         actionResponseContent = config.destination
-            ?.buildLegacyBaseMessage(subject, message, destinationCtx)
+            ?.buildLegacyBaseMessage(subject, message, destinationContextFactory.getDestinationContext(config.destination))
             ?.publishLegacyNotification(client)
             ?: actionResponseContent
 
