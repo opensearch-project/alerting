@@ -411,7 +411,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun createRandomDocumentMonitor(refresh: Boolean = false, withMetadata: Boolean = false): Monitor {
-        val monitor = randomDocumentReturningMonitor(withMetadata = withMetadata)
+        val monitor = randomDocumentLevelMonitor(withMetadata = withMetadata)
         val monitorId = createMonitor(monitor, refresh).id
         if (withMetadata) {
             return getMonitor(monitorId = monitorId, header = BasicHeader(HttpHeaders.USER_AGENT, "OpenSearch-Dashboards"))

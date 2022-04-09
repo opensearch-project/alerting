@@ -315,7 +315,11 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             LegacyOpenDistroDestinationSettings.EMAIL_USERNAME,
             LegacyOpenDistroDestinationSettings.EMAIL_PASSWORD,
             LegacyOpenDistroDestinationSettings.ALLOW_LIST,
-            LegacyOpenDistroDestinationSettings.HOST_DENY_LIST
+            LegacyOpenDistroDestinationSettings.HOST_DENY_LIST,
+            AlertingSettings.ALERT_FINDING_ENABLED,
+            AlertingSettings.ALERT_FINDING_MAX_DOCS,
+            AlertingSettings.ALERT_FINDING_INDEX_MAX_AGE,
+            AlertingSettings.ALERT_FINDING_ROLLOVER_PERIOD
         )
     }
 

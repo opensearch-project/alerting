@@ -132,7 +132,7 @@ fun randomBucketLevelMonitor(
     )
 }
 
-fun randomDocumentReturningMonitor(
+fun randomDocumentLevelMonitor(
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     user: User? = randomUser(),
     inputs: List<Input> = listOf(DocLevelMonitorInput("description", listOf("index"), emptyList())),

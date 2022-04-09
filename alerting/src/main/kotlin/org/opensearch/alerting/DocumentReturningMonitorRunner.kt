@@ -57,6 +57,17 @@ object DocumentReturningMonitorRunner : MonitorRunner {
     ): MonitorRunResult<DocumentLevelTriggerRunResult> {
         logger.info("Document-level-monitor is running ...")
         var monitorResult = MonitorRunResult<DocumentLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
+
+        // TODO: is this needed from Charlie?
+        val currentAlerts = try {
+            monitorCtx.alertIndices!!.createOrUpdateAlertIndex()
+            monitorCtx.alertIndices!!.createOrUpdateInitialFindingHistoryIndex()
+        } catch (e: Exception) {
+            val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
+            logger.error("Error loading alerts for monitor: $id", e)
+            return monitorResult.copy(error = e)
+        }
+
         try {
             validate(monitor)
         } catch (e: Exception) {

@@ -46,7 +46,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val docReturningInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
 
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
-        val monitor = randomDocumentReturningMonitor(
+        val monitor = randomDocumentLevelMonitor(
             inputs = listOf(docReturningInput),
             triggers = listOf(randomDocumentReturningTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
         )
@@ -86,7 +86,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
-        val monitor = randomDocumentReturningMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger))
+        val monitor = randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger))
 
         indexDoc(testIndex, "1", testDoc)
         indexDoc(testIndex, "5", testDoc)
@@ -117,7 +117,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
-        val monitor = createMonitor(randomDocumentReturningMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
 
         indexDoc(testIndex, "1", testDoc)
         indexDoc(testIndex, "5", testDoc)

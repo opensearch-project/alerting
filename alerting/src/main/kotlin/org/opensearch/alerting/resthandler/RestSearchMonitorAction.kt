@@ -11,7 +11,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.SearchMonitorAction
 import org.opensearch.alerting.action.SearchMonitorRequest
-import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_INDEX_PATTERN
+import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.alerting.model.Monitor
@@ -89,7 +89,7 @@ class RestSearchMonitorAction(
         log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/_search")
 
         val index = request.param("index", SCHEDULED_JOBS_INDEX)
-        if (index != SCHEDULED_JOBS_INDEX && index != ALL_INDEX_PATTERN) {
+        if (index != SCHEDULED_JOBS_INDEX && index != ALL_ALERT_INDEX_PATTERN) {
             throw IllegalArgumentException("Invalid index name.")
         }
 

@@ -35,7 +35,7 @@ import org.opensearch.alerting.randomAlert
 import org.opensearch.alerting.randomAnomalyDetector
 import org.opensearch.alerting.randomAnomalyDetectorWithUser
 import org.opensearch.alerting.randomBucketLevelTrigger
-import org.opensearch.alerting.randomDocumentReturningMonitor
+import org.opensearch.alerting.randomDocumentLevelMonitor
 import org.opensearch.alerting.randomDocumentReturningTrigger
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelTrigger
@@ -1117,7 +1117,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
-        val monitor = createMonitor(randomDocumentReturningMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
 
         val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
 
@@ -1139,7 +1139,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
         val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
         val monitor = createMonitor(
-            randomDocumentReturningMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger), user = null)
+            randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger), user = null)
         )
 
         val storedMonitor = getMonitor(monitor.id)
@@ -1154,7 +1154,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
-        val monitor = createMonitor(randomDocumentReturningMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
 
         val updatedTriggers = listOf(
             DocumentLevelTrigger(
@@ -1185,7 +1185,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
-        val monitor = createMonitor(randomDocumentReturningMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
 
         val deleteResponse = client().makeRequest("DELETE", monitor.relativeUrl())
         assertEquals("Delete failed", RestStatus.OK, deleteResponse.restStatus())
@@ -1197,7 +1197,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     fun `test creating a document monitor with error trigger`() {
         val trigger = randomQueryLevelTrigger()
         try {
-            val monitor = randomDocumentReturningMonitor(triggers = listOf(trigger))
+            val monitor = randomDocumentLevelMonitor(triggers = listOf(trigger))
             client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             fail("Monitor with illegal trigger should be rejected.")
         } catch (e: IllegalArgumentException) {
