@@ -27,10 +27,9 @@ class Finding(
     val monitorName: String,
     val index: String,
     val docLevelQueries: List<DocLevelQuery>,
-    val timestamp: Instant,
-    val triggerId: String?,
-    val triggerName: String?
+    val timestamp: Instant
 ) : Writeable, ToXContent {
+
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
         id = sin.readString(),
@@ -39,9 +38,7 @@ class Finding(
         monitorName = sin.readString(),
         index = sin.readString(),
         docLevelQueries = sin.readList((DocLevelQuery)::readFrom),
-        timestamp = sin.readInstant(),
-        triggerId = sin.readOptionalString(),
-        triggerName = sin.readOptionalString()
+        timestamp = sin.readInstant()
     )
 
     fun asTemplateArg(): Map<String, Any?> {
@@ -52,9 +49,7 @@ class Finding(
             MONITOR_NAME_FIELD to monitorName,
             INDEX_FIELD to index,
             QUERIES_FIELD to docLevelQueries,
-            TIMESTAMP_FIELD to timestamp.toEpochMilli(),
-            TRIGGER_ID_FIELD to triggerId,
-            TRIGGER_NAME_FIELD to triggerName
+            TIMESTAMP_FIELD to timestamp.toEpochMilli()
         )
     }
 
@@ -67,8 +62,6 @@ class Finding(
             .field(INDEX_FIELD, index)
             .field(QUERIES_FIELD, docLevelQueries.toTypedArray())
             .field(TIMESTAMP_FIELD, timestamp.toEpochMilli())
-            .field(TRIGGER_ID_FIELD, triggerId)
-            .field(TRIGGER_NAME_FIELD, triggerName)
         builder.endObject()
         return builder
     }
@@ -82,8 +75,6 @@ class Finding(
         out.writeString(index)
         out.writeCollection(docLevelQueries)
         out.writeInstant(timestamp)
-        out.writeOptionalString(triggerId)
-        out.writeOptionalString(triggerName)
     }
 
     companion object {
@@ -94,21 +85,18 @@ class Finding(
         const val INDEX_FIELD = "index"
         const val QUERIES_FIELD = "queries"
         const val TIMESTAMP_FIELD = "timestamp"
-        const val TRIGGER_ID_FIELD = "trigger_id"
-        const val TRIGGER_NAME_FIELD = "trigger_name"
         const val NO_ID = ""
 
         @JvmStatic @JvmOverloads
         @Throws(IOException::class)
-        fun parse(xcp: XContentParser, id: String = NO_ID): Finding {
+        fun parse(xcp: XContentParser): Finding {
+            var id: String = NO_ID
             lateinit var relatedDocId: String
             lateinit var monitorId: String
             lateinit var monitorName: String
             lateinit var index: String
             val queries: MutableList<DocLevelQuery> = mutableListOf()
             lateinit var timestamp: Instant
-            lateinit var triggerId: String
-            lateinit var triggerName: String
 
             ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.currentToken(), xcp)
             while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
@@ -116,6 +104,7 @@ class Finding(
                 xcp.nextToken()
 
                 when (fieldName) {
+                    FINDING_ID_FIELD -> id = xcp.text()
                     RELATED_DOC_ID_FIELD -> relatedDocId = xcp.text()
                     MONITOR_ID_FIELD -> monitorId = xcp.text()
                     MONITOR_NAME_FIELD -> monitorName = xcp.text()
@@ -126,9 +115,9 @@ class Finding(
                             queries.add(DocLevelQuery.parse(xcp))
                         }
                     }
-                    TIMESTAMP_FIELD -> timestamp = requireNotNull(xcp.instant())
-                    TRIGGER_ID_FIELD -> triggerId = xcp.text()
-                    TRIGGER_NAME_FIELD -> triggerName = xcp.text()
+                    TIMESTAMP_FIELD -> {
+                        timestamp = requireNotNull(xcp.instant())
+                    }
                 }
             }
 
@@ -139,9 +128,7 @@ class Finding(
                 monitorName = monitorName,
                 index = index,
                 docLevelQueries = queries,
-                timestamp = timestamp,
-                triggerId = triggerId,
-                triggerName = triggerName
+                timestamp = timestamp
             )
         }
 

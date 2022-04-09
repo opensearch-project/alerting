@@ -165,7 +165,7 @@ object DocumentReturningMonitorRunner : MonitorRunner {
         if (!dryrun && monitor.id != Monitor.NO_ID) {
             docsToQueries.forEach {
                 val triggeredQueries = it.value.map { queryId -> idQueryMap[queryId]!! }
-                val findingId = createFindings(monitor, monitorCtx, index, triggeredQueries, listOf(it.key), trigger)
+                val findingId = createFindings(monitor, monitorCtx, index, triggeredQueries, listOf(it.key))
                 findings.add(findingId)
 
                 if (triggerResult.triggeredDocs.contains(it.key)) {
@@ -208,8 +208,7 @@ object DocumentReturningMonitorRunner : MonitorRunner {
         monitorCtx: MonitorRunnerExecutionContext,
         index: String,
         docLevelQueries: List<DocLevelQuery>,
-        matchingDocIds: List<String>,
-        trigger: DocumentLevelTrigger
+        matchingDocIds: List<String>
     ): String {
         val finding = Finding(
             id = UUID.randomUUID().toString(),
@@ -218,9 +217,7 @@ object DocumentReturningMonitorRunner : MonitorRunner {
             monitorName = monitor.name,
             index = index,
             docLevelQueries = docLevelQueries,
-            timestamp = Instant.now(),
-            triggerId = trigger.id,
-            triggerName = trigger.name
+            timestamp = Instant.now()
         )
 
         val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
