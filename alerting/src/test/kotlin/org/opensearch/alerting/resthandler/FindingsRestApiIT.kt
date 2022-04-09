@@ -38,13 +38,13 @@ class FindingsRestApiIT : AlertingRestTestCase() {
             if (findingWithDoc.finding.id == findingWith1) {
                 assertEquals(1, findingWithDoc.documents.size)
                 assertTrue(findingWithDoc.documents[0].found)
-                assertEquals("This is an error from IAD region", findingWithDoc.documents[0].document["message"])
+                assertEquals(testDoc, findingWithDoc.documents[0].document)
             } else if (findingWithDoc.finding.id == findingWith2) {
                 assertEquals(2, findingWithDoc.documents.size)
                 assertTrue(findingWithDoc.documents[0].found)
                 assertTrue(findingWithDoc.documents[1].found)
-                assertEquals("This is an error from IAD region", findingWithDoc.documents[0].document["message"])
-                assertEquals("This is an error2 from IAD region", findingWithDoc.documents[1].document["message"])
+                assertEquals(testDoc, findingWithDoc.documents[0].document)
+                assertEquals(testDoc2, findingWithDoc.documents[1].document)
             } else {
                 fail("Found a finding that should not have been retrieved")
             }
@@ -72,8 +72,8 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         assertEquals(2, response.findings[0].documents.size)
         assertTrue(response.findings[0].documents[0].found)
         assertTrue(response.findings[0].documents[1].found)
-        assertEquals("This is an error from IAD region", response.findings[0].documents[0].document["message"])
-        assertEquals("This is an error2 from IAD region", response.findings[0].documents[1].document["message"])
+        assertEquals(testDoc, response.findings[0].documents[0].document)
+        assertEquals(testDoc2, response.findings[0].documents[1].document)
     }
 
     fun `test find Finding by tag`() {
@@ -102,8 +102,8 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         assertEquals(2, response.findings[0].documents.size)
         assertTrue(response.findings[0].documents[0].found)
         assertTrue(response.findings[0].documents[1].found)
-        assertEquals("This is an error from IAD region", response.findings[0].documents[0].document["message"])
-        assertEquals("This is an error2 from IAD region", response.findings[0].documents[1].document["message"])
+        assertEquals(testDoc, response.findings[0].documents[0].document)
+        assertEquals(testDoc2, response.findings[0].documents[1].document)
     }
 
     fun `test find Finding by name`() {
@@ -132,7 +132,7 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         assertEquals(2, response.findings[0].documents.size)
         assertTrue(response.findings[0].documents[0].found)
         assertTrue(response.findings[0].documents[1].found)
-        assertEquals("This is an error from IAD region", response.findings[0].documents[0].document["message"])
-        assertEquals("This is an error2 from IAD region", response.findings[0].documents[1].document["message"])
+        assertEquals(testDoc, response.findings[0].documents[0].document)
+        assertEquals(testDoc2, response.findings[0].documents[1].document)
     }
 }

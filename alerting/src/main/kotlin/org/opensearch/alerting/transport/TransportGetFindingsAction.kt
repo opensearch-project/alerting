@@ -126,7 +126,6 @@ class TransportGetFindingsSearchAction @Inject constructor(
                         val documentIds = finding.relatedDocId.split(",").toTypedArray()
                         // Add getRequests to mget request
                         documentIds.forEach {
-                            // TODO: check if we want to add individual get document request, or use documentIds array for a single finding related_docs
                             docId ->
                             mgetRequest.add(MultiGetRequest.Item(finding.index, docId))
                         }
@@ -151,6 +150,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
         )
     }
 
+    // TODO: Verify what happens if indices are closed/deleted
     fun searchDocument(
         mgetRequest: MultiGetRequest
     ): Map<String, FindingDocument> {
@@ -158,7 +158,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
         val documents: MutableMap<String, FindingDocument> = mutableMapOf()
         response.responses.forEach {
             val key = "${it.index}|${it.id}"
-            val docData = if (it.isFailed) emptyMap<String, Any>() else it.response.sourceAsMap
+            val docData = if (it.isFailed) "" else it.response.sourceAsString
             val findingDocument = FindingDocument(it.index, it.id, !it.isFailed, docData)
             documents[key] = findingDocument
         }
