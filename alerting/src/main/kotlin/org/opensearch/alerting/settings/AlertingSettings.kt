@@ -75,6 +75,8 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        // TODO: Do we want to let users to disable this? If so, we need to fix the rollover logic
+        //  such that the main index is findings and rolls over to the finding history index
         val FINDING_HISTORY_ENABLED = Setting.boolSetting(
             "plugins.alerting.alert_finding_enabled",
             true,

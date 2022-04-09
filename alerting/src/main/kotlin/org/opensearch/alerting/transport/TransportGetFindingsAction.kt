@@ -15,6 +15,7 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.GetFindingsAction
 import org.opensearch.alerting.action.GetFindingsRequest
 import org.opensearch.alerting.action.GetFindingsResponse
+import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_FINDING_INDEX_PATTERN
 import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.FindingDocument
 import org.opensearch.alerting.model.FindingWithDocs
@@ -108,7 +109,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
     fun search(searchSourceBuilder: SearchSourceBuilder, actionListener: ActionListener<GetFindingsResponse>) {
         val searchRequest = SearchRequest()
             .source(searchSourceBuilder)
-            .indices(".opensearch-alerting-findings")
+            .indices(ALL_FINDING_INDEX_PATTERN)
         client.search(
             searchRequest,
             object : ActionListener<SearchResponse> {
@@ -123,7 +124,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
                         XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
                         val finding = Finding.parse(xcp)
                         findings.add(finding)
-                        val documentIds = finding.relatedDocId.split(",").toTypedArray()
+                        val documentIds = finding.relatedDocIds
                         // Add getRequests to mget request
                         documentIds.forEach {
                             docId ->
@@ -132,7 +133,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
                     }
                     val documents = searchDocument(mgetRequest)
                     findings.forEach {
-                        val documentIds = it.relatedDocId.split(",").toTypedArray()
+                        val documentIds = it.relatedDocIds
                         val relatedDocs = mutableListOf<FindingDocument>()
                         for (docId in documentIds) {
                             val key = "${it.index}|$docId"

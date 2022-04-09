@@ -483,11 +483,11 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         monitorName: String = "NO_NAME",
         index: String = "testIndex",
         docLevelQueries: List<DocLevelQuery> = listOf(DocLevelQuery(query = "test_field:\"us-west-2\"", name = "testQuery")),
-        matchingDocIds: Set<String>
+        matchingDocIds: List<String>
     ): String {
         val finding = Finding(
             id = UUID.randomUUID().toString(),
-            relatedDocId = matchingDocIds.joinToString(","),
+            relatedDocIds = matchingDocIds,
             monitorId = monitorId,
             monitorName = monitorName,
             index = index,
@@ -503,7 +503,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun searchFindings(
         monitor: Monitor,
-        indices: String = ".opensearch-alerting-findings",
+        indices: String = AlertIndices.ALL_FINDING_INDEX_PATTERN,
         refresh: Boolean = true
     ): List<Finding> {
         if (refresh) refreshIndex(indices)
@@ -524,7 +524,12 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun searchAlerts(monitor: Monitor, indices: String = AlertIndices.ALERT_INDEX, refresh: Boolean = true): List<Alert> {
-        if (refresh) refreshIndex(indices)
+        try {
+            if (refresh) refreshIndex(indices)
+        } catch (e: Exception) {
+            logger.warn("Could not refresh index $indices because: ${e.message}")
+            return emptyList()
+        }
 
         // If this is a test monitor (it doesn't have an ID) and no alerts will be saved for it.
         val searchParams = if (monitor.id != Monitor.NO_ID) mapOf("routing" to monitor.id) else mapOf()
@@ -721,6 +726,14 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val settings = Settings.builder().put("index.hidden", true).build()
         createIndex(AlertIndices.ALERT_INDEX, settings, mappingHack)
         createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertIndices.ALERT_HISTORY_WRITE_INDEX}\" : {}")
+    }
+
+    fun putFindingMappings(mapping: String? = null) {
+        val mappingHack = if (mapping != null) mapping else AlertIndices.findingMapping().trimStart('{').trimEnd('}')
+        val encodedHistoryIndex = URLEncoder.encode(AlertIndices.FINDING_HISTORY_INDEX_PATTERN, Charsets.UTF_8.toString())
+        val settings = Settings.builder().put("index.hidden", true).build()
+//        createIndex(AlertIndices.FINDING_HISTORY_WRITE_INDEX, settings, mappingHack)
+        createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertIndices.FINDING_HISTORY_WRITE_INDEX}\" : {}")
     }
 
     fun scheduledJobMappings(): String {

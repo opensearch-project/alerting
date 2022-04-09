@@ -36,7 +36,7 @@ import org.opensearch.alerting.randomAnomalyDetector
 import org.opensearch.alerting.randomAnomalyDetectorWithUser
 import org.opensearch.alerting.randomBucketLevelTrigger
 import org.opensearch.alerting.randomDocumentLevelMonitor
-import org.opensearch.alerting.randomDocumentReturningTrigger
+import org.opensearch.alerting.randomDocumentLevelTrigger
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.randomThrottle
@@ -1116,7 +1116,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
-        val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
 
         val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
@@ -1137,7 +1137,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
-        val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val monitor = createMonitor(
             randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger), user = null)
         )
@@ -1153,7 +1153,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
-        val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
 
         val updatedTriggers = listOf(
@@ -1184,7 +1184,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
-        val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
 
         val deleteResponse = client().makeRequest("DELETE", monitor.relativeUrl())

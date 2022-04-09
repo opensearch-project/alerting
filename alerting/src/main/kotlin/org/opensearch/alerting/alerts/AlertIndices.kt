@@ -59,6 +59,7 @@ import java.time.Instant
  * initiated on the master node to ensure only a single node tries to roll it over.  Once we have a curator functionality
  * in Scheduled Jobs we can migrate to using that to rollover the index.
  */
+// TODO: reafactor to make a generic version of this class for finding and alerts
 class AlertIndices(
     settings: Settings,
     private val client: Client,
@@ -96,8 +97,6 @@ class AlertIndices(
 
         /** The in progress alert history index. */
         const val ALERT_INDEX = ".opendistro-alerting-alerts"
-
-        const val FINDING_INDEX = ".opensearch-alerting-findings"
 
         /** The Elastic mapping type */
         const val MAPPING_TYPE = "_doc"
@@ -165,8 +164,6 @@ class AlertIndices(
 
     private var alertIndexInitialized: Boolean = false
 
-    private var findingIndexInitialized: Boolean = false
-
     private var scheduledRollover: Cancellable? = null
 
     fun onMaster() {
@@ -213,7 +210,6 @@ class AlertIndices(
         // if the indexes have been deleted they need to be reinitialized
         alertIndexInitialized = event.state().routingTable().hasIndex(ALERT_INDEX)
         alertHistoryIndexInitialized = event.state().metadata().hasAlias(ALERT_HISTORY_WRITE_INDEX)
-        findingIndexInitialized = event.state().routingTable().hasIndex(FINDING_INDEX)
         findingHistoryIndexInitialized = event.state().metadata().hasAlias(FINDING_HISTORY_WRITE_INDEX)
     }
 
@@ -243,41 +239,31 @@ class AlertIndices(
 
     suspend fun createOrUpdateAlertIndex() {
         if (!alertIndexInitialized) {
-            alertIndexInitialized = createIndex(ALERT_INDEX)
+            alertIndexInitialized = createIndex(ALERT_INDEX, alertMapping())
             if (alertIndexInitialized) IndexUtils.alertIndexUpdated()
         } else {
-            if (!IndexUtils.alertIndexUpdated) updateIndexMapping(ALERT_INDEX)
+            if (!IndexUtils.alertIndexUpdated) updateIndexMapping(ALERT_INDEX, alertMapping())
         }
         alertIndexInitialized
     }
 
-    suspend fun createOrUpdateFindingIndex() {
-        if (!findingIndexInitialized) {
-            findingIndexInitialized = createIndex(FINDING_INDEX)
-            if (findingIndexInitialized) IndexUtils.findingIndexUpdated()
-        } else {
-            if (!IndexUtils.findingIndexUpdated) updateIndexMapping(FINDING_INDEX)
-        }
-        findingIndexInitialized
-    }
-
     suspend fun createOrUpdateInitialAlertHistoryIndex() {
         if (!alertHistoryIndexInitialized) {
-            alertHistoryIndexInitialized = createIndex(ALERT_HISTORY_INDEX_PATTERN, ALERT_HISTORY_WRITE_INDEX)
+            alertHistoryIndexInitialized = createIndex(ALERT_HISTORY_INDEX_PATTERN, alertMapping(), ALERT_HISTORY_WRITE_INDEX)
             if (alertHistoryIndexInitialized)
                 IndexUtils.lastUpdatedAlertHistoryIndex = IndexUtils.getIndexNameWithAlias(
                     clusterService.state(),
                     ALERT_HISTORY_WRITE_INDEX
                 )
         } else {
-            updateIndexMapping(ALERT_HISTORY_WRITE_INDEX, true)
+            updateIndexMapping(ALERT_HISTORY_WRITE_INDEX, alertMapping(), true)
         }
         alertHistoryIndexInitialized
     }
 
     suspend fun createOrUpdateInitialFindingHistoryIndex() {
         if (!findingHistoryIndexInitialized) {
-            findingHistoryIndexInitialized = createIndex(FINDING_HISTORY_INDEX_PATTERN, FINDING_HISTORY_WRITE_INDEX)
+            findingHistoryIndexInitialized = createIndex(FINDING_HISTORY_INDEX_PATTERN, findingMapping(), FINDING_HISTORY_WRITE_INDEX)
             if (findingHistoryIndexInitialized) {
                 IndexUtils.lastUpdatedFindingHistoryIndex = IndexUtils.getIndexNameWithAlias(
                     clusterService.state(),
@@ -285,12 +271,12 @@ class AlertIndices(
                 )
             }
         } else {
-            updateIndexMapping(FINDING_HISTORY_WRITE_INDEX, true)
+            updateIndexMapping(FINDING_HISTORY_WRITE_INDEX, findingMapping(), true)
         }
         findingHistoryIndexInitialized
     }
 
-    private suspend fun createIndex(index: String, alias: String? = null): Boolean {
+    private suspend fun createIndex(index: String, schemaMapping: String, alias: String? = null): Boolean {
         // This should be a fast check of local cluster state. Should be exceedingly rare that the local cluster
         // state does not contain the index and multiple nodes concurrently try to create the index.
         // If it does happen that error is handled we catch the ResourceAlreadyExistsException
@@ -300,7 +286,7 @@ class AlertIndices(
         if (existsResponse.isExists) return true
 
         val request = CreateIndexRequest(index)
-            .mapping(MAPPING_TYPE, alertMapping(), XContentType.JSON)
+            .mapping(MAPPING_TYPE, schemaMapping, XContentType.JSON)
             .settings(Settings.builder().put("index.hidden", true).build())
 
         if (alias != null) request.alias(Alias(alias))
@@ -312,9 +298,8 @@ class AlertIndices(
         }
     }
 
-    private suspend fun updateIndexMapping(index: String, alias: Boolean = false) {
+    private suspend fun updateIndexMapping(index: String, mapping: String, alias: Boolean = false) {
         val clusterState = clusterService.state()
-        val mapping = alertMapping()
         var targetIndex = index
         if (alias) {
             targetIndex = IndexUtils.getIndexNameWithAlias(clusterState, index)
@@ -339,7 +324,6 @@ class AlertIndices(
         when (index) {
             ALERT_INDEX -> IndexUtils.alertIndexUpdated()
             ALERT_HISTORY_WRITE_INDEX -> IndexUtils.lastUpdatedAlertHistoryIndex = targetIndex
-            FINDING_INDEX -> IndexUtils.findingIndexUpdated()
             FINDING_HISTORY_WRITE_INDEX -> IndexUtils.lastUpdatedFindingHistoryIndex = targetIndex
         }
     }
@@ -352,14 +336,6 @@ class AlertIndices(
     private fun rolloverAndDeleteFindingHistoryIndices() {
         if (findingHistoryEnabled) rolloverFindingHistoryIndex()
         deleteOldIndices("Finding", FINDING_HISTORY_ALL)
-    }
-
-    private fun rolloverFindingHistoryIndex() {
-        rolloverIndex(
-            findingHistoryIndexInitialized, FINDING_HISTORY_WRITE_INDEX,
-            FINDING_HISTORY_INDEX_PATTERN, findingMapping(),
-            findingHistoryMaxDocs, findingHistoryMaxAge, FINDING_HISTORY_WRITE_INDEX
-        )
     }
 
     private fun rolloverIndex(
@@ -406,6 +382,14 @@ class AlertIndices(
             alertHistoryIndexInitialized, ALERT_HISTORY_WRITE_INDEX,
             ALERT_HISTORY_INDEX_PATTERN, alertMapping(),
             alertHistoryMaxDocs, alertHistoryMaxAge, ALERT_HISTORY_WRITE_INDEX
+        )
+    }
+
+    private fun rolloverFindingHistoryIndex() {
+        rolloverIndex(
+            findingHistoryIndexInitialized, FINDING_HISTORY_WRITE_INDEX,
+            FINDING_HISTORY_INDEX_PATTERN, findingMapping(),
+            findingHistoryMaxDocs, findingHistoryMaxAge, FINDING_HISTORY_WRITE_INDEX
         )
     }
 

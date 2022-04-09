@@ -7,8 +7,6 @@ package org.opensearch.alerting
 
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
-import org.opensearch.alerting.model.Alert
-import java.time.Instant
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit.MILLIS
@@ -16,22 +14,6 @@ import java.time.temporal.ChronoUnit.MILLIS
 class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
     fun `test execute monitor with dryrun`() {
-        val alert = Alert(
-            monitorId = "monitorId",
-            monitorName = "monitorName",
-            monitorVersion = 1L,
-            monitorUser = null,
-            triggerId = "triggerId",
-            triggerName = "triggerName",
-            findingIds = emptyList(),
-            relatedDocIds = emptyList(),
-            state = Alert.State.COMPLETED,
-            startTime = Instant.now(),
-            errorHistory = emptyList(),
-            severity = "sev3",
-            actionExecutionResults = emptyList()
-        )
-        createAlert(alert)
 
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -48,7 +30,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
         val monitor = randomDocumentLevelMonitor(
             inputs = listOf(docReturningInput),
-            triggers = listOf(randomDocumentReturningTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
+            triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
         )
 
         indexDoc(index, "1", testDoc)
@@ -85,7 +67,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
-        val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val monitor = randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger))
 
         indexDoc(testIndex, "1", testDoc)
@@ -105,6 +87,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
     }
 
     fun `test execute monitor generates alerts and findings`() {
+        putFindingMappings()
         val testIndex = createTestIndex()
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -116,7 +99,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
-        val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
         assertNotNull(monitor.id)
 
@@ -141,8 +124,8 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         // TODO: modify findings such that there is a finding per document, so this test will need to be modified
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 2, findings.size)
-        assertEquals("Findings saved for test monitor", "1", findings[0].relatedDocId)
-        assertEquals("Findings saved for test monitor", "5", findings[1].relatedDocId)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
+        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("5"))
     }
 
     @Suppress("UNCHECKED_CAST")
