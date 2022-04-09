@@ -369,10 +369,10 @@ fun randomAlert(monitor: Monitor = randomQueryLevelMonitor()): Alert {
 fun randomDocLevelQuery(
     id: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     query: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
-    severity: String = "${randomInt(5)}",
+    name: String = "${randomInt(5)}",
     tags: List<String> = mutableListOf(0..randomInt(10)).map { OpenSearchRestTestCase.randomAlphaOfLength(10) }
 ): DocLevelQuery {
-    return DocLevelQuery(id = id, query = query, severity = severity, tags = tags)
+    return DocLevelQuery(id = id, query = query, name = name, tags = tags)
 }
 
 fun randomDocLevelMonitorInput(
@@ -390,9 +390,7 @@ fun randomFinding(
     monitorName: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     index: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     docLevelQueries: List<DocLevelQuery> = listOf(randomDocLevelQuery()),
-    timestamp: Instant = Instant.now(),
-    triggerId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
-    triggerName: String = OpenSearchRestTestCase.randomAlphaOfLength(10)
+    timestamp: Instant = Instant.now()
 ): Finding {
     return Finding(
         id = id,
@@ -401,9 +399,7 @@ fun randomFinding(
         monitorName = monitorName,
         index = index,
         docLevelQueries = docLevelQueries,
-        timestamp = timestamp,
-        triggerId = triggerId,
-        triggerName = triggerName
+        timestamp = timestamp
     )
 }
 
