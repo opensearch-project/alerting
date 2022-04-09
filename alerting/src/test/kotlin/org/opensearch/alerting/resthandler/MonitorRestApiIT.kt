@@ -803,7 +803,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val alerts = searchAlerts(monitor)
         assertEquals("Active alert was not deleted", 0, alerts.size)
 
-        val historyAlerts = searchAlerts(monitor, AlertIndices.HISTORY_WRITE_INDEX)
+        val historyAlerts = searchAlerts(monitor, AlertIndices.ALERT_HISTORY_WRITE_INDEX)
         assertEquals("Alert was not moved to history", 1, historyAlerts.size)
         assertEquals(
             "Alert data incorrect",
@@ -832,7 +832,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val alerts = searchAlerts(monitor)
         assertEquals("Active alert was not deleted", 0, alerts.size)
 
-        val historyAlerts = searchAlerts(monitor, AlertIndices.HISTORY_WRITE_INDEX)
+        val historyAlerts = searchAlerts(monitor, AlertIndices.ALERT_HISTORY_WRITE_INDEX)
         assertEquals("Alert was not moved to history", 1, historyAlerts.size)
         assertEquals(
             "Alert data incorrect",
@@ -865,7 +865,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("One alert should be in active index", 1, alerts.size)
         assertEquals("Wrong alert in active index", alertKeep.toJsonString(), alerts.single().toJsonString())
 
-        val historyAlerts = searchAlerts(monitor, AlertIndices.HISTORY_WRITE_INDEX)
+        val historyAlerts = searchAlerts(monitor, AlertIndices.ALERT_HISTORY_WRITE_INDEX)
         // Only alertDelete should of been moved to history index
         assertEquals("One alert should be in history index", 1, historyAlerts.size)
         assertEquals(

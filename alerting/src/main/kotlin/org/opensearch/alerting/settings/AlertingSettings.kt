@@ -75,9 +75,9 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val ALERT_FINDING_ENABLED = Setting.boolSetting(
+        val FINDING_HISTORY_ENABLED = Setting.boolSetting(
             "plugins.alerting.alert_finding_enabled",
-            LegacyOpenDistroAlertingSettings.ALERT_HISTORY_ENABLED,
+            true,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
@@ -87,9 +87,9 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val ALERT_FINDING_ROLLOVER_PERIOD = Setting.positiveTimeSetting(
+        val FINDING_HISTORY_ROLLOVER_PERIOD = Setting.positiveTimeSetting(
             "plugins.alerting.alert_finding_rollover_period",
-            LegacyOpenDistroAlertingSettings.ALERT_HISTORY_ROLLOVER_PERIOD,
+            TimeValue.timeValueHours(12),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
@@ -99,15 +99,9 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val ALERT_FINDING_INDEX_MAX_AGE = Setting.positiveTimeSetting(
-            "opendistro.alerting.alert_finding_max_age",
+        val FINDING_HISTORY_INDEX_MAX_AGE = Setting.positiveTimeSetting(
+            "plugins.alerting.finding_history_max_age",
             TimeValue(30, TimeUnit.DAYS),
-            Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
-        )
-
-        val ALERT_HISTORY_FINDING_MAX_AGE = Setting.positiveTimeSetting(
-            "plugins.alerting.alert_finding_max_age",
-            AlertingSettings.ALERT_FINDING_INDEX_MAX_AGE,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
@@ -117,8 +111,8 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val ALERT_FINDING_MAX_DOCS = Setting.longSetting(
-            "opendistro.alerting.alert_finding_max_docs",
+        val FINDING_HISTORY_MAX_DOCS = Setting.longSetting(
+            "plugins.alerting.alert_finding_max_docs",
             1000L,
             0L,
             Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
@@ -130,9 +124,9 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val ALERT_FINDING_RETENTION_PERIOD = Setting.positiveTimeSetting(
-            "plugins.alerting.alert_finding_retention_period",
-            LegacyOpenDistroAlertingSettings.ALERT_FINDING_RETENTION_PERIOD,
+        val FINDING_HISTORY_RETENTION_PERIOD = Setting.positiveTimeSetting(
+            "plugins.alerting.finding_history_retention_period",
+            TimeValue(60, TimeUnit.DAYS),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 

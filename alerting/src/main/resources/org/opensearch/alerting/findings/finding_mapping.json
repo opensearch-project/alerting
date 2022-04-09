@@ -50,7 +50,7 @@
       }
     },
     "timestamp": {
-      "type": "date"
+      "type": "long"
     }
   }
 }

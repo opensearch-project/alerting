@@ -316,10 +316,11 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             LegacyOpenDistroDestinationSettings.EMAIL_PASSWORD,
             LegacyOpenDistroDestinationSettings.ALLOW_LIST,
             LegacyOpenDistroDestinationSettings.HOST_DENY_LIST,
-            AlertingSettings.ALERT_FINDING_ENABLED,
-            AlertingSettings.ALERT_FINDING_MAX_DOCS,
-            AlertingSettings.ALERT_FINDING_INDEX_MAX_AGE,
-            AlertingSettings.ALERT_FINDING_ROLLOVER_PERIOD
+            AlertingSettings.FINDING_HISTORY_ENABLED,
+            AlertingSettings.FINDING_HISTORY_MAX_DOCS,
+            AlertingSettings.FINDING_HISTORY_INDEX_MAX_AGE,
+            AlertingSettings.FINDING_HISTORY_ROLLOVER_PERIOD,
+            AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD
         )
     }
 

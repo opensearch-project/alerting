@@ -34,7 +34,10 @@ class IndexUtils {
             private set
         var alertIndexUpdated: Boolean = false
             private set
-        var lastUpdatedHistoryIndex: String? = null
+        var findingIndexUpdated: Boolean = false
+            private set
+        var lastUpdatedAlertHistoryIndex: String? = null
+        var lastUpdatedFindingHistoryIndex: String? = null
 
         init {
             scheduledJobIndexSchemaVersion = getSchemaVersion(ScheduledJobIndices.scheduledJobMappings())
@@ -49,6 +52,11 @@ class IndexUtils {
         @JvmStatic
         fun alertIndexUpdated() {
             alertIndexUpdated = true
+        }
+
+        @JvmStatic
+        fun findingIndexUpdated() {
+            findingIndexUpdated = true
         }
 
         @JvmStatic

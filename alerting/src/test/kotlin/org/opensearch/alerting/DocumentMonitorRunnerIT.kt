@@ -118,6 +118,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
         val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        assertNotNull(monitor.id)
 
         indexDoc(testIndex, "1", testDoc)
         indexDoc(testIndex, "5", testDoc)

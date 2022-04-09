@@ -717,10 +717,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     fun putAlertMappings(mapping: String? = null) {
         val mappingHack = if (mapping != null) mapping else AlertIndices.alertMapping().trimStart('{').trimEnd('}')
-        val encodedHistoryIndex = URLEncoder.encode(AlertIndices.HISTORY_INDEX_PATTERN, Charsets.UTF_8.toString())
+        val encodedHistoryIndex = URLEncoder.encode(AlertIndices.ALERT_HISTORY_INDEX_PATTERN, Charsets.UTF_8.toString())
         val settings = Settings.builder().put("index.hidden", true).build()
         createIndex(AlertIndices.ALERT_INDEX, settings, mappingHack)
-        createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertIndices.HISTORY_WRITE_INDEX}\" : {}")
+        createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertIndices.ALERT_HISTORY_WRITE_INDEX}\" : {}")
     }
 
     fun scheduledJobMappings(): String {

@@ -29,29 +29,29 @@ class AlertIndicesIT : AlertingRestTestCase() {
         executeMonitor(randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN))))
 
         assertIndexExists(AlertIndices.ALERT_INDEX)
-        assertIndexExists(AlertIndices.HISTORY_WRITE_INDEX)
+        assertIndexExists(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
     }
 
     fun `test update alert index mapping with new schema version`() {
         wipeAllODFEIndices()
         assertIndexDoesNotExist(AlertIndices.ALERT_INDEX)
-        assertIndexDoesNotExist(AlertIndices.HISTORY_WRITE_INDEX)
+        assertIndexDoesNotExist(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
 
         putAlertMappings(
             AlertIndices.alertMapping().trimStart('{').trimEnd('}')
                 .replace("\"schema_version\": 3", "\"schema_version\": 0")
         )
         assertIndexExists(AlertIndices.ALERT_INDEX)
-        assertIndexExists(AlertIndices.HISTORY_WRITE_INDEX)
+        assertIndexExists(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
         verifyIndexSchemaVersion(AlertIndices.ALERT_INDEX, 0)
-        verifyIndexSchemaVersion(AlertIndices.HISTORY_WRITE_INDEX, 0)
+        verifyIndexSchemaVersion(AlertIndices.ALERT_HISTORY_WRITE_INDEX, 0)
         wipeAllODFEIndices()
         executeMonitor(createRandomMonitor())
         assertIndexExists(AlertIndices.ALERT_INDEX)
-        assertIndexExists(AlertIndices.HISTORY_WRITE_INDEX)
+        assertIndexExists(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
         verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 5)
         verifyIndexSchemaVersion(AlertIndices.ALERT_INDEX, 3)
-        verifyIndexSchemaVersion(AlertIndices.HISTORY_WRITE_INDEX, 3)
+        verifyIndexSchemaVersion(AlertIndices.ALERT_HISTORY_WRITE_INDEX, 3)
     }
 
     fun `test alert index gets recreated automatically if deleted`() {
@@ -61,10 +61,10 @@ class AlertIndicesIT : AlertingRestTestCase() {
 
         executeMonitor(trueMonitor)
         assertIndexExists(AlertIndices.ALERT_INDEX)
-        assertIndexExists(AlertIndices.HISTORY_WRITE_INDEX)
+        assertIndexExists(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
         wipeAllODFEIndices()
         assertIndexDoesNotExist(AlertIndices.ALERT_INDEX)
-        assertIndexDoesNotExist(AlertIndices.HISTORY_WRITE_INDEX)
+        assertIndexDoesNotExist(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
 
         val executeResponse = executeMonitor(trueMonitor)
         val xcp = createParser(XContentType.JSON.xContent(), executeResponse.entity.content)
@@ -93,8 +93,8 @@ class AlertIndicesIT : AlertingRestTestCase() {
 
     fun `test rollover finding index`() {
         // Update the rollover check to be every 1 second and the index max age to be 1 second
-        client().updateSettings(AlertingSettings.ALERT_FINDING_ROLLOVER_PERIOD.key, "1s")
-        client().updateSettings(AlertingSettings.ALERT_FINDING_INDEX_MAX_AGE.key, "1s")
+        client().updateSettings(AlertingSettings.FINDING_HISTORY_ROLLOVER_PERIOD.key, "1s")
+        client().updateSettings(AlertingSettings.FINDING_HISTORY_INDEX_MAX_AGE.key, "1s")
 
         val trueMonitor = randomDocumentLevelMonitor(
             triggers = listOf(randomDocLevelTrigger(condition = ALWAYS_RUN)),
@@ -103,7 +103,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         executeMonitor(trueMonitor)
 
         // Allow for a rollover index.
-        Thread.sleep(5000)
+        Thread.sleep(2000)
         val alertIndices = getFindingIndices()
         logger.error("info ${alertIndices.size}")
         var info = ""
@@ -243,7 +243,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
             }
         """.trimIndent()
         val response = adminClient().makeRequest(
-            "POST", "${AlertIndices.HISTORY_ALL}/_search", emptyMap(),
+            "POST", "${AlertIndices.ALERT_HISTORY_ALL}/_search", emptyMap(),
             StringEntity(request, APPLICATION_JSON)
         )
         assertEquals("Request to get history failed", RestStatus.OK, response.restStatus())

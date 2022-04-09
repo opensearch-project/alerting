@@ -11,8 +11,8 @@ import org.opensearch.action.delete.DeleteRequest
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
+import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_HISTORY_WRITE_INDEX
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
-import org.opensearch.alerting.alerts.AlertIndices.Companion.HISTORY_WRITE_INDEX
 import org.opensearch.alerting.elasticapi.suspendUntil
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.Monitor
@@ -37,7 +37,7 @@ import org.opensearch.search.builder.SearchSourceBuilder
  * 1. Find active alerts:
  *      a. matching monitorId if no monitor is provided (postDelete)
  *      b. matching monitorId and no triggerIds if monitor is provided (postIndex)
- * 2. Move alerts over to [HISTORY_WRITE_INDEX] as DELETED
+ * 2. Move alerts over to [ALERT_HISTORY_WRITE_INDEX] as DELETED
  * 3. Delete alerts from [ALERT_INDEX]
  * 4. Schedule a retry if there were any failures
  */
@@ -61,7 +61,7 @@ suspend fun moveAlerts(client: Client, monitorId: String, monitor: Monitor? = nu
     // If no alerts are found, simply return
     if (response.hits.totalHits?.value == 0L) return
     val indexRequests = response.hits.map { hit ->
-        IndexRequest(AlertIndices.HISTORY_WRITE_INDEX)
+        IndexRequest(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
             .routing(monitorId)
             .source(
                 Alert.parse(alertContentParser(hit.sourceRef), hit.id, hit.version)
