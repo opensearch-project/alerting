@@ -92,9 +92,12 @@ class AlertIndicesIT : AlertingRestTestCase() {
     }
 
     fun `test rollover finding index`() {
-        // Update the rollover check to be every 1 second and the index max age to be 1 second
-        client().updateSettings(AlertingSettings.ALERT_FINDING_ROLLOVER_PERIOD.key, "1s")
-        client().updateSettings(AlertingSettings.ALERT_FINDING_INDEX_MAX_AGE.key, "1s")
+        try {
+            // Update the rollover check to be every 1 second and the index max age to be 1 second
+            client().updateSettings(AlertingSettings.ALERT_FINDING_ROLLOVER_PERIOD.key, "1s")
+            client().updateSettings(AlertingSettings.ALERT_FINDING_INDEX_MAX_AGE.key, "1s")
+        } catch (e: Exception) {
+        }
 
         val trueMonitor = randomDocumentLevelMonitor(
             triggers = listOf(randomDocLevelTrigger(condition = ALWAYS_RUN)),
