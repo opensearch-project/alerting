@@ -173,7 +173,7 @@ class DestinationConversionUtils {
             }
         }
 
-        private fun convertAlertingToNotificationMethodType(alertMethodType: EmailAccount.MethodType): MethodType {
+        fun convertAlertingToNotificationMethodType(alertMethodType: EmailAccount.MethodType): MethodType {
             return when (alertMethodType) {
                 EmailAccount.MethodType.NONE -> MethodType.NONE
                 EmailAccount.MethodType.SSL -> MethodType.SSL

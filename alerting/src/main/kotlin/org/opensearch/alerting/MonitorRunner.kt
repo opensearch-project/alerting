@@ -658,6 +658,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
             }
             if (!dryrun) {
+                // TODO: Inject user here so only Destination/Notifications that the user has permissions to are retrieved
                 withContext(Dispatchers.IO) {
                     actionOutput[MESSAGE_ID] = getConfigAndSendNotification(action, actionOutput[SUBJECT], actionOutput[MESSAGE]!!)
                 }
@@ -679,6 +680,7 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
                 throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
             }
             if (!dryrun) {
+                // TODO: Inject user here so only Destination/Notifications that the user has permissions to are retrieved
                 withContext(Dispatchers.IO) {
                     actionOutput[MESSAGE_ID] = getConfigAndSendNotification(action, actionOutput[SUBJECT], actionOutput[MESSAGE]!!)
                 }
@@ -709,14 +711,12 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         }
 
         var actionResponseContent = ""
-        // TODO: For now, the sendNotification just returns an event ID. If the response changes to return
-        //  some form of response content, similar to Alerting's legacy Destination, use it for the actionOutput
-        config.channel
+        actionResponseContent = config.channel
             ?.sendNotification(
                 client,
                 "Alerting-Notification Action",
                 constructMessageContent(subject, message)
-            )
+            ) ?: actionResponseContent
 
         actionResponseContent = config.destination
             ?.buildLegacyBaseMessage(subject, message, destinationContextFactory.getDestinationContext(config.destination))
@@ -739,7 +739,6 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
      * To cover both of these cases, the Notification config will take precedence and if it is not found, the Destination will be retrieved.
      */
     private suspend fun getConfigForNotificationAction(action: Action): NotificationActionConfigs {
-        // TODO: Inject user here so only Destination/Notifications that the user has permissions to are retrieved
         var destination: Destination? = null
         val channel: NotificationConfigInfo? = getNotificationConfigInfo(client as NodeClient, action.destinationId)
 

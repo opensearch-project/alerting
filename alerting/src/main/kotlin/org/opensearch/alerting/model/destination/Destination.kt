@@ -6,6 +6,9 @@
 package org.opensearch.alerting.model.destination
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.alerting.destination.Notification
+import org.opensearch.alerting.destination.message.BaseMessage
+import org.opensearch.alerting.destination.message.EmailMessage
 import org.opensearch.alerting.model.destination.email.Email
 import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.instant
@@ -13,6 +16,7 @@ import org.opensearch.alerting.opensearchapi.optionalTimeField
 import org.opensearch.alerting.opensearchapi.optionalUserField
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
+import org.opensearch.alerting.util.destinationmigration.DestinationConversionUtils.Companion.convertAlertingToNotificationMethodType
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.ToXContent
@@ -23,6 +27,7 @@ import org.opensearch.commons.authuser.User
 import org.opensearch.commons.destination.message.LegacyBaseMessage
 import org.opensearch.commons.destination.message.LegacyChimeMessage
 import org.opensearch.commons.destination.message.LegacyCustomWebhookMessage
+import org.opensearch.commons.destination.message.LegacyEmailMessage
 import org.opensearch.commons.destination.message.LegacySlackMessage
 import java.io.IOException
 import java.time.Instant
@@ -263,29 +268,24 @@ data class Destination(
                     .withMessage(compiledMessage).build()
             }
             // TODO: Need to update common-utils to support EMAIL as a legacy destination before adding this
-//            DestinationType.EMAIL -> {
-//                val emailAccount = destinationCtx.emailAccount
-//                destinationMessage = EmailMessage.Builder(name)
-//                    .withHost(emailAccount?.host)
-//                    .withPort(emailAccount?.port)
-//                    .withMethod(emailAccount?.method?.value)
-//                    .withUserName(emailAccount?.username)
-//                    .withPassword(emailAccount?.password)
-//                    .withFrom(emailAccount?.email)
-//                    .withRecipients(destinationCtx.recipients)
-//                    .withSubject(compiledSubject)
-//                    .withMessage(compiledMessage).build()
-//            }
-            // TODO: Need to remove any tests hitting this scenario since test destinations won't be supported anymore
-//            DestinationType.TEST_ACTION -> {
-//                return "test action"
-//            }
+            DestinationType.EMAIL -> {
+                val emailAccount = destinationCtx.emailAccount
+                // Use the account name as the Destination name here, Notifications will use it to resolve credentials
+                destinationMessage = LegacyEmailMessage.Builder(emailAccount?.name ?: name)
+                    .withHost(emailAccount?.host)
+                    .withPort(emailAccount?.port)
+                    .withMethod(emailAccount?.method?.let { convertAlertingToNotificationMethodType(it).toString() })
+                    .withFrom(emailAccount?.email)
+                    .withRecipients(destinationCtx.recipients)
+                    .withSubject(compiledSubject)
+                    .withMessage(compiledMessage).build()
+            }
             else -> throw IllegalArgumentException("Unsupported Destination type [$type] for building legacy message")
         }
         return destinationMessage
     }
 
-    fun constructResponseForDestinationType(type: DestinationType): Any {
+    private fun constructResponseForDestinationType(type: DestinationType): Any {
         var content: Any? = null
         when (type) {
             DestinationType.CHIME -> content = chime?.convertToMap()?.get(type.value)

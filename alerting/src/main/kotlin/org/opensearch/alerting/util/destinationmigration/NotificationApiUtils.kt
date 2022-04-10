@@ -209,7 +209,7 @@ suspend fun LegacyBaseMessage.publishLegacyNotification(client: Client): String 
 /**
  * Extension function for publishing a notification to a channel in the Notification plugin.
  */
-suspend fun NotificationConfigInfo.sendNotification(client: Client, title: String, compiledMessage: String) {
+suspend fun NotificationConfigInfo.sendNotification(client: Client, title: String, compiledMessage: String): String {
     val config = this
     val res: SendNotificationResponse = NotificationsPluginInterface.suspendUntil {
         this.sendNotification(
@@ -220,7 +220,8 @@ suspend fun NotificationConfigInfo.sendNotification(client: Client, title: Strin
             it
         )
     }
-    validateResponseStatus(res.getStatus(), res.notificationId)
+    validateResponseStatus(res.getStatus(), res.notificationEvent.toString())
+    return res.notificationEvent.toString()
 }
 
 /**
