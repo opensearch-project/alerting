@@ -105,13 +105,16 @@ class AlertIndicesIT : AlertingRestTestCase() {
         // Allow for a rollover index.
         Thread.sleep(5000)
         val alertIndices = getFindingIndices()
-        logger.error("info ${alertIndices.size}")
+        val size = alertIndices.size
+        val condition = size >= 3
+        logger.error("info $size")
+        logger.error("info $condition")
         var info = ""
         alertIndices.forEach {
             info += "$it|"
         }
         logger.error("info $info")
-        assertTrue("Did not find 3 alert indices", alertIndices.size >= 3)
+        assertTrue("Did not find 3 alert indices", condition)
     }
 
     fun `test history disabled`() {
