@@ -88,7 +88,6 @@ class AlertIndicesIT : AlertingRestTestCase() {
             info += "$it|"
         }
         assertTrue("Did not find 3 alert indices", alertIndices.size >= 3)
-        assertTrue(info, false)
     }
 
     fun `test rollover finding index`() {
