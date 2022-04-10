@@ -83,7 +83,7 @@ class AlertIndices(
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERT_FINDING_ROLLOVER_PERIOD) {
             findingRolloverPeriod = it
             rescheduleRolloverFinding()
-            logger.error("info ALERT_HISTORY_ROLLOVER_PERIOD")
+            logger.info("info ALERT_HISTORY_ROLLOVER_PERIOD")
         }
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD) {
             findingHistoryRetentionPeriod = it
@@ -249,12 +249,12 @@ class AlertIndices(
     }
 
     suspend fun createOrUpdateInitialFindingHistoryIndex() {
-        logger.error("my test createOrUpdateInitialFindingHistoryIndex1")
+        logger.info("my test createOrUpdateInitialFindingHistoryIndex1")
         if (!findingHistoryIndexInitialized) {
-            logger.error("my test createOrUpdateInitialFindingHistoryIndex2")
+            logger.info("my test createOrUpdateInitialFindingHistoryIndex2")
             findingHistoryIndexInitialized = createIndex(FINDING_HISTORY_INDEX_PATTERN, FINDING_WRITE_INDEX)
             if (findingHistoryIndexInitialized) {
-                logger.error("my test createOrUpdateInitialFindingHistoryIndex3")
+                logger.info("my test createOrUpdateInitialFindingHistoryIndex3")
                 IndexUtils.lastUpdatedHistoryIndex = IndexUtils.getIndexNameWithAlias(clusterService.state(), FINDING_WRITE_INDEX)
             }
         } else {
@@ -342,11 +342,11 @@ class AlertIndices(
         ageCondition: TimeValue,
         tag: String
     ) {
-        logger.error("info rolloverIndex1")
+        logger.info("info rolloverIndex1")
         if (!initialized) {
             return
         }
-        logger.error("info rolloverIndex2")
+        logger.info("info rolloverIndex2")
 
         // We have to pass null for newIndexName in order to get Elastic to increment the index count.
         val request = RolloverRequest(index, null)
@@ -381,7 +381,7 @@ class AlertIndices(
     }
 
     private fun deleteOldIndices(tag: String, indices: String) {
-        logger.error("info deleteOldIndices")
+        logger.info("info deleteOldIndices")
         val clusterStateRequest = ClusterStateRequest()
             .clear()
             .indices(indices)

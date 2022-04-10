@@ -107,13 +107,13 @@ class AlertIndicesIT : AlertingRestTestCase() {
         val alertIndices = getFindingIndices()
         val size = alertIndices.size
         val condition = size >= 3
-        logger.error("info $size")
-        logger.error("info $condition")
+        logger.info("info $size")
+        logger.info("info $condition")
         var info = ""
         alertIndices.forEach {
             info += "$it|"
         }
-        logger.error("info $info")
+        logger.info("info $info")
         assertTrue("Did not find 3 alert indices", condition)
     }
 

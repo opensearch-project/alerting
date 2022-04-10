@@ -53,7 +53,7 @@ object DocumentReturningMonitorRunner : MonitorRunner {
             monitorCtx.alertIndices!!.createOrUpdateInitialFindingHistoryIndex()
         } catch (e: Exception) {
             val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
-            logger.error("Error loading alerts for monitor: $id", e)
+            logger.info("Error loading alerts for monitor: $id", e)
             return monitorResult.copy(error = e)
         }
 
