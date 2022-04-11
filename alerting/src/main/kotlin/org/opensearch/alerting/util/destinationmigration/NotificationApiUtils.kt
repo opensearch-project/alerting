@@ -20,16 +20,11 @@ import org.opensearch.commons.destination.message.LegacyBaseMessage
 import org.opensearch.commons.notifications.NotificationsPluginInterface
 import org.opensearch.commons.notifications.action.CreateNotificationConfigRequest
 import org.opensearch.commons.notifications.action.CreateNotificationConfigResponse
-import org.opensearch.commons.notifications.action.DeleteNotificationConfigRequest
-import org.opensearch.commons.notifications.action.DeleteNotificationConfigResponse
 import org.opensearch.commons.notifications.action.GetNotificationConfigRequest
 import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
 import org.opensearch.commons.notifications.action.LegacyPublishNotificationRequest
 import org.opensearch.commons.notifications.action.LegacyPublishNotificationResponse
-import org.opensearch.commons.notifications.action.SendNotificationRequest
 import org.opensearch.commons.notifications.action.SendNotificationResponse
-import org.opensearch.commons.notifications.action.UpdateNotificationConfigRequest
-import org.opensearch.commons.notifications.action.UpdateNotificationConfigResponse
 import org.opensearch.commons.notifications.model.ChannelMessage
 import org.opensearch.commons.notifications.model.EventSource
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
@@ -62,8 +57,7 @@ class NotificationApiUtils {
 
         private suspend fun getNotificationConfig(
             client: NodeClient,
-            getNotificationConfigRequest: GetNotificationConfigRequest,
-            retryPolicy: BackoffPolicy = defaultRetryPolicy
+            getNotificationConfigRequest: GetNotificationConfigRequest
         ): GetNotificationConfigResponse {
             lateinit var getNotificationConfigResponse: GetNotificationConfigResponse
             val userStr = client.threadPool().threadContext
@@ -102,77 +96,6 @@ class NotificationApiUtils {
                 }
             }
             return createNotificationConfigResponse
-        }
-
-        suspend fun updateNotificationConfig(
-            client: NodeClient,
-            updateNotificationConfigRequest: UpdateNotificationConfigRequest,
-            retryPolicy: BackoffPolicy = defaultRetryPolicy
-        ): UpdateNotificationConfigResponse {
-            lateinit var updateNotificationConfigResponse: UpdateNotificationConfigResponse
-            val userStr = client.threadPool()
-                .threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
-            client.threadPool().threadContext.stashContext().use {
-                client.threadPool().threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
-                retryPolicy.retryForNotification(logger) {
-                    updateNotificationConfigResponse = NotificationsPluginInterface.suspendUntil {
-                        this.updateNotificationConfig(
-                            client,
-                            updateNotificationConfigRequest,
-                            it
-                        )
-                    }
-                }
-            }
-            return updateNotificationConfigResponse
-        }
-
-        suspend fun deleteNotificationConfig(
-            client: NodeClient,
-            deleteNotificationConfigRequest: DeleteNotificationConfigRequest,
-            retryPolicy: BackoffPolicy = defaultRetryPolicy
-        ): DeleteNotificationConfigResponse {
-            lateinit var deleteNotificationConfigResponse: DeleteNotificationConfigResponse
-            val userStr = client.threadPool()
-                .threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
-            client.threadPool().threadContext.stashContext().use {
-                client.threadPool().threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
-                retryPolicy.retryForNotification(logger) {
-                    deleteNotificationConfigResponse = NotificationsPluginInterface.suspendUntil {
-                        this.deleteNotificationConfig(
-                            client,
-                            deleteNotificationConfigRequest,
-                            it
-                        )
-                    }
-                }
-            }
-            return deleteNotificationConfigResponse
-        }
-
-        suspend fun sendNotification(
-            client: NodeClient,
-            sendNotificationRequest: SendNotificationRequest,
-            retryPolicy: BackoffPolicy = defaultRetryPolicy
-        ): SendNotificationResponse {
-            lateinit var sendNotificationResponse: SendNotificationResponse
-            val userStr = client.threadPool().threadContext
-                .getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
-            client.threadPool().threadContext.stashContext().use {
-                client.threadPool().threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
-                retryPolicy.retryForNotification(logger) {
-                    sendNotificationResponse = NotificationsPluginInterface.suspendUntil {
-                        this.sendNotification(
-                            client,
-                            sendNotificationRequest.eventSource,
-                            sendNotificationRequest.channelMessage,
-                            sendNotificationRequest.channelIds,
-                            it
-                        )
-                    }
-                }
-            }
-            return sendNotificationResponse
         }
     }
 }
