@@ -15,8 +15,8 @@ import org.opensearch.alerting.action.GetAlertsAction
 import org.opensearch.alerting.action.GetAlertsRequest
 import org.opensearch.alerting.action.GetAlertsResponse
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.elasticapi.addFilter
 import org.opensearch.alerting.model.Alert
+import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client

@@ -16,8 +16,8 @@ import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEE
 import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEEP_BACKOFF_RETRY_COUNT
 import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEEP_PAGE_SIZE
 import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEEP_PERIOD
-import org.opensearch.alerting.elasticapi.firstFailureOrNull
-import org.opensearch.alerting.elasticapi.retry
+import org.opensearch.alerting.opensearchapi.firstFailureOrNull
+import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.client.Client
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener

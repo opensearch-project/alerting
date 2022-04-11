@@ -7,13 +7,13 @@ package org.opensearch.alerting.model
 
 import org.opensearch.alerting.builder
 import org.opensearch.alerting.core.model.SearchInput
-import org.opensearch.alerting.elasticapi.string
 import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.alerting.model.action.PerExecutionActionScope
 import org.opensearch.alerting.model.action.Throttle
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
+import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.parser
 import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomActionExecutionPolicy

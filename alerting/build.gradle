@@ -111,6 +111,20 @@ testClusters.integTest {
             debugPort += 1
         }
     }
+
+    plugin(provider({
+        new RegularFile() {
+            @Override
+            File getAsFile() { fileTree("src/test/resources/notifications-core").getSingleFile() }
+        }
+    }))
+
+    plugin(provider({
+        new RegularFile() {
+            @Override
+            File getAsFile() { fileTree("src/test/resources/notifications").getSingleFile() }
+        }
+    }))
 }
 
 testClusters.integTest.nodes.each { node ->
@@ -187,7 +201,19 @@ task prepareBwcTests {
     dependsOn bundle
     doLast {
         plugins = [
-                project.getObjects().fileProperty().value(bundle.getArchiveFile())
+                project.getObjects().fileProperty().value(bundle.getArchiveFile()),
+                provider({
+                    new RegularFile() {
+                        @Override
+                        File getAsFile() { fileTree("src/test/resources/notifications-core").getSingleFile() }
+                    }
+                }),
+                provider({
+                    new RegularFile() {
+                        @Override
+                        File getAsFile() { fileTree("src/test/resources/notifications").getSingleFile() }
+                    }
+                })
         ]
     }
 }

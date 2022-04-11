@@ -24,7 +24,7 @@ import org.opensearch.action.admin.indices.recovery.RecoveryRequest
 import org.opensearch.action.admin.indices.recovery.RecoveryResponse
 import org.opensearch.alerting.core.model.ClusterMetricsInput
 import org.opensearch.alerting.core.model.ClusterMetricsInput.ClusterMetricType
-import org.opensearch.alerting.elasticapi.convertToMap
+import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.settings.SupportedClusterMetricsSettings
 import org.opensearch.alerting.settings.SupportedClusterMetricsSettings.Companion.resolveToActionRequest
 import org.opensearch.client.Client
