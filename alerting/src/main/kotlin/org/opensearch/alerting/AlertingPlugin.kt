@@ -82,6 +82,7 @@ import org.opensearch.alerting.transport.TransportIndexMonitorAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
+import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
 import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.node.DiscoveryNodes
@@ -149,6 +150,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     lateinit var threadPool: ThreadPool
     lateinit var alertIndices: AlertIndices
     lateinit var clusterService: ClusterService
+    lateinit var destinationMigrationCoordinator: DestinationMigrationCoordinator
 
     override fun getRestHandlers(
         settings: Settings,
@@ -248,9 +250,10 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         scheduledJobIndices = ScheduledJobIndices(client.admin(), clusterService)
         scheduler = JobScheduler(threadPool, runner)
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
+        destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool)
         this.threadPool = threadPool
         this.clusterService = clusterService
-        return listOf(sweeper, scheduler, runner, scheduledJobIndices)
+        return listOf(sweeper, scheduler, runner, scheduledJobIndices, destinationMigrationCoordinator)
     }
 
     override fun getSettings(): List<Setting<*>> {

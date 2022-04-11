@@ -20,14 +20,17 @@ import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
-import org.opensearch.alerting.elasticapi.string
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
+import org.opensearch.alerting.model.destination.Chime
+import org.opensearch.alerting.model.destination.CustomWebhook
 import org.opensearch.alerting.model.destination.Destination
+import org.opensearch.alerting.model.destination.Slack
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
+import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.DestinationType
@@ -363,15 +366,55 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         )
     }
 
-    protected fun getRandomDestination(salt: String): Destination {
+    fun getSlackDestination(): Destination {
+        val slack = Slack("https://hooks.slack.com/services/slackId")
         return Destination(
-            type = DestinationType.TEST_ACTION,
-            name = salt + "test",
+            type = DestinationType.SLACK,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = null,
+            slack = slack,
+            customWebhook = null,
+            email = null
+        )
+    }
+
+    fun getChimeDestination(): Destination {
+        val chime = Chime("https://hooks.chime.aws/incomingwebhooks/chimeId")
+        return Destination(
+            type = DestinationType.CHIME,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = chime,
+            slack = null,
+            customWebhook = null,
+            email = null
+        )
+    }
+
+    fun getCustomWebhookDestination(): Destination {
+        val customWebhook = CustomWebhook(
+            "https://hooks.slack.com/services/customWebhookId",
+            null,
+            null,
+            80,
+            null,
+            null,
+            emptyMap(),
+            emptyMap(),
+            null,
+            null
+        )
+        return Destination(
+            type = DestinationType.CUSTOM_WEBHOOK,
+            name = "test",
             user = randomUser(),
             lastUpdateTime = Instant.now(),
             chime = null,
             slack = null,
-            customWebhook = null,
+            customWebhook = customWebhook,
             email = null
         )
     }
@@ -670,7 +713,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return StringEntity(toJsonString(), APPLICATION_JSON)
     }
 
-    private fun Destination.toJsonString(): String {
+    protected fun Destination.toJsonString(): String {
         val builder = XContentFactory.jsonBuilder()
         return shuffleXContent(toXContent(builder)).string()
     }

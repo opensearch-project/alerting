@@ -173,7 +173,7 @@ data class Recipient(
             }
 
             return Recipient(
-                RecipientType.valueOf(type.toUpperCase(Locale.ROOT)),
+                RecipientType.valueOf(type.uppercase(Locale.ROOT)),
                 emailGroupID,
                 email
             )

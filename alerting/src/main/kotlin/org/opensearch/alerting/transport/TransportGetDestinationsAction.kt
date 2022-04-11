@@ -15,8 +15,8 @@ import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetDestinationsRequest
 import org.opensearch.alerting.action.GetDestinationsResponse
 import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.elasticapi.addFilter
 import org.opensearch.alerting.model.destination.Destination
+import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client

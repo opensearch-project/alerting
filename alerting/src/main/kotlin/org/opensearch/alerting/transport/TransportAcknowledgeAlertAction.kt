@@ -18,8 +18,8 @@ import org.opensearch.alerting.action.AcknowledgeAlertAction
 import org.opensearch.alerting.action.AcknowledgeAlertRequest
 import org.opensearch.alerting.action.AcknowledgeAlertResponse
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.elasticapi.optionalTimeField
 import org.opensearch.alerting.model.Alert
+import org.opensearch.alerting.opensearchapi.optionalTimeField
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
 import org.opensearch.common.inject.Inject

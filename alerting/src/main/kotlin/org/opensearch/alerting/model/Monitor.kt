@@ -11,9 +11,9 @@ import org.opensearch.alerting.core.model.Input
 import org.opensearch.alerting.core.model.Schedule
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
-import org.opensearch.alerting.elasticapi.instant
-import org.opensearch.alerting.elasticapi.optionalTimeField
-import org.opensearch.alerting.elasticapi.optionalUserField
+import org.opensearch.alerting.opensearchapi.instant
+import org.opensearch.alerting.opensearchapi.optionalTimeField
+import org.opensearch.alerting.opensearchapi.optionalUserField
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MONITOR_MAX_INPUTS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MONITOR_MAX_TRIGGERS
 import org.opensearch.alerting.settings.SupportedClusterMetricsSettings
@@ -289,7 +289,7 @@ data class Monitor(
                 requireNotNull(schedule) { "Monitor schedule is null" },
                 lastUpdateTime ?: Instant.now(),
                 enabledTime,
-                MonitorType.valueOf(monitorType.toUpperCase(Locale.ROOT)),
+                MonitorType.valueOf(monitorType.uppercase(Locale.ROOT)),
                 user,
                 schemaVersion,
                 inputs.toList(),
