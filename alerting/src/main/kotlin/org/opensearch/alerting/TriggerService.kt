@@ -26,6 +26,7 @@ import org.opensearch.script.ScriptService
 import org.opensearch.search.aggregations.Aggregation
 import org.opensearch.search.aggregations.Aggregations
 import org.opensearch.search.aggregations.support.AggregationPath
+import java.time.Instant
 
 /** Service that handles executing Triggers */
 class TriggerService(val scriptService: ScriptService) {
@@ -66,6 +67,14 @@ class TriggerService(val scriptService: ScriptService) {
         return try {
             val triggeredDocs = mutableListOf<String>()
 
+            val dummyTrigger = QueryLevelTrigger(
+                name = trigger.name,
+                severity = trigger.severity,
+                actions = trigger.actions,
+                condition = trigger.condition
+            )
+            val dummyExecutionContext = QueryLevelTriggerExecutionContext(monitor, dummyTrigger, emptyList(), Instant.now(), Instant.now())
+
             for (doc in docsToQueries.keys) {
                 val params = trigger.condition.params.toMutableMap()
                 for (queryId in queryIds) {
@@ -73,7 +82,7 @@ class TriggerService(val scriptService: ScriptService) {
                 }
                 val triggered = scriptService.compile(trigger.condition, TriggerScript.CONTEXT)
                     .newInstance(params)
-                    .execute(ctx)
+                    .execute(dummyExecutionContext)
                 logger.info("trigger val: $triggered")
                 if (triggered) triggeredDocs.add(doc)
             }

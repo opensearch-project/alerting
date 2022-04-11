@@ -5,7 +5,7 @@
 
 class org.opensearch.alerting.script.TriggerScript {
     Map getParams()
-    boolean execute(TriggerExecutionContext)
+    boolean execute(QueryLevelTriggerExecutionContext)
     String[] PARAMETERS
 }
 

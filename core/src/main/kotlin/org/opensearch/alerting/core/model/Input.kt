@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.core.model
 
+import org.opensearch.alerting.core.model.ClusterMetricsInput.Companion.URI_FIELD
 import org.opensearch.alerting.core.model.DocLevelMonitorInput.Companion.DOC_LEVEL_INPUT_FIELD
 import org.opensearch.alerting.core.model.SearchInput.Companion.SEARCH_FIELD
 import org.opensearch.common.io.stream.StreamInput
@@ -19,6 +20,7 @@ interface Input : Writeable, ToXContentObject {
 
     enum class Type(val value: String) {
         DOCUMENT_LEVEL_INPUT(DOC_LEVEL_INPUT_FIELD),
+        CLUSTER_METRICS_INPUT(URI_FIELD),
         SEARCH_INPUT(SEARCH_FIELD);
 
         override fun toString(): String {
@@ -35,6 +37,8 @@ interface Input : Writeable, ToXContentObject {
             ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
             val input = if (xcp.currentName() == Type.SEARCH_INPUT.value) {
                 SearchInput.parseInner(xcp)
+            } else if (xcp.currentName() == Type.CLUSTER_METRICS_INPUT.value) {
+                ClusterMetricsInput.parseInner(xcp)
             } else {
                 DocLevelMonitorInput.parse(xcp)
             }
@@ -47,6 +51,7 @@ interface Input : Writeable, ToXContentObject {
         fun readFrom(sin: StreamInput): Input {
             return when (val type = sin.readEnum(Input.Type::class.java)) {
                 Type.DOCUMENT_LEVEL_INPUT -> DocLevelMonitorInput(sin)
+                Type.CLUSTER_METRICS_INPUT -> ClusterMetricsInput(sin)
                 Type.SEARCH_INPUT -> SearchInput(sin)
                 // This shouldn't be reachable but ensuring exhaustiveness as Kotlin warns
                 // enum can be null in Java
