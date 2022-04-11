@@ -57,7 +57,8 @@ import org.opensearch.alerting.settings.DestinationSettings.Companion.loadDestin
 import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings.Companion.HOST_DENY_LIST_NONE
 import org.opensearch.alerting.util.destinationmigration.NotificationActionConfigs
 import org.opensearch.alerting.util.destinationmigration.NotificationApiUtils.Companion.getNotificationConfigInfo
-import org.opensearch.alerting.util.destinationmigration.constructMessageContent
+import org.opensearch.alerting.util.destinationmigration.createMessageContent
+import org.opensearch.alerting.util.destinationmigration.getTitle
 import org.opensearch.alerting.util.destinationmigration.publishLegacyNotification
 import org.opensearch.alerting.util.destinationmigration.sendNotification
 import org.opensearch.alerting.util.getActionExecutionPolicy
@@ -714,8 +715,8 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         actionResponseContent = config.channel
             ?.sendNotification(
                 client,
-                "Alerting-Notification Action",
-                constructMessageContent(subject, message)
+                config.channel.getTitle(subject),
+                config.channel.createMessageContent(subject, message)
             ) ?: actionResponseContent
 
         actionResponseContent = config.destination

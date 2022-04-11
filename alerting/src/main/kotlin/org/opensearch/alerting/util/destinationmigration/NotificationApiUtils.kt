@@ -26,6 +26,7 @@ import org.opensearch.commons.notifications.action.LegacyPublishNotificationRequ
 import org.opensearch.commons.notifications.action.LegacyPublishNotificationResponse
 import org.opensearch.commons.notifications.action.SendNotificationResponse
 import org.opensearch.commons.notifications.model.ChannelMessage
+import org.opensearch.commons.notifications.model.ConfigType
 import org.opensearch.commons.notifications.model.EventSource
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import org.opensearch.commons.notifications.model.SeverityType
@@ -101,14 +102,6 @@ class NotificationApiUtils {
 }
 
 /**
- * Similar to Destinations, this is a generic utility method for constructing message content from
- * a subject and message body when sending through Notifications since the Action definition in Monitors can have both.
- */
-fun constructMessageContent(subject: String?, message: String): String {
-    return if (Strings.isNullOrEmpty(subject)) message else "$subject \n\n $message"
-}
-
-/**
  * Extension function for publishing a notification to a legacy destination.
  *
  * We now support the new channels from the Notification plugin. However, we still need to support
@@ -145,6 +138,36 @@ suspend fun NotificationConfigInfo.sendNotification(client: Client, title: Strin
     }
     validateResponseStatus(res.getStatus(), res.notificationEvent.toString())
     return res.notificationEvent.toString()
+}
+
+/**
+ * For most channel types, a placeholder Alerting title will be used but the email channel will
+ * use the subject, so it appears as the actual subject of the email.
+ */
+fun NotificationConfigInfo.getTitle(subject: String?): String {
+    val defaultTitle = "Alerting-Notification Action"
+    if (this.notificationConfig.configType == ConfigType.EMAIL) {
+        return if (subject.isNullOrEmpty()) defaultTitle else subject
+    }
+
+    return defaultTitle
+}
+
+fun NotificationConfigInfo.createMessageContent(subject: String?, message: String): String {
+    // For Email Channels, the subject is not passed in the main message since it's used as the title
+    if (this.notificationConfig.configType == ConfigType.EMAIL) {
+        return constructMessageContent("", message)
+    }
+
+    return constructMessageContent(subject, message)
+}
+
+/**
+ * Similar to Destinations, this is a generic utility method for constructing message content from
+ * a subject and message body when sending through Notifications since the Action definition in Monitors can have both.
+ */
+private fun constructMessageContent(subject: String?, message: String): String {
+    return if (Strings.isNullOrEmpty(subject)) message else "$subject \n\n $message"
 }
 
 /**
