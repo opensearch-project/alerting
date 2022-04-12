@@ -6,14 +6,25 @@
 package org.opensearch.alerting.util
 
 import inet.ipaddr.IPAddressString
+import org.opensearch.action.index.IndexRequest
+import org.opensearch.action.index.IndexResponse
+import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.destination.message.BaseMessage
+import org.opensearch.alerting.elasticapi.suspendUntil
 import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.alerting.model.destination.Destination
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
+import org.opensearch.client.Client
+import org.opensearch.common.settings.Settings
+import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentFactory
 
 /**
  * RFC 5322 compliant pattern matching: https://www.ietf.org/rfc/rfc5322.txt
@@ -52,6 +63,8 @@ fun BaseMessage.isHostInDenylist(networks: List<String>): Boolean {
 
 fun Monitor.isBucketLevelMonitor(): Boolean = this.monitorType == Monitor.MonitorType.BUCKET_LEVEL_MONITOR
 
+fun Monitor.isDocLevelMonitor(): Boolean = this.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR
+
 /**
  * Since buckets can have multi-value keys, this converts the bucket key values to a string that can be used
  * as the key for a HashMap to easily retrieve [AggregationResultBucket] based on the bucket key values.
@@ -84,4 +97,24 @@ fun BucketLevelTriggerRunResult.getCombinedTriggerRunResult(
     val error = this.error ?: prevTriggerRunResult.error
 
     return this.copy(aggregationResultBuckets = mergedAggregationResultBuckets, actionResultsMap = mergedActionResultsMap, error = error)
+}
+
+// TODO: Check if this can be more generic such that TransportIndexMonitorAction class can use this. Also see if this should be refactored
+// to another class. Include tests for this as well.
+suspend fun updateMonitor(client: Client, xContentRegistry: NamedXContentRegistry, settings: Settings, monitor: Monitor): IndexResponse {
+    /*val currentMonitor = AlertingConfigAccessor.getMonitorInfo(client, xContentRegistry, monitor.id)
+
+    var updateMonitor = monitor
+    // If both are enabled, use the current existing monitor enabled time, otherwise the next execution will be
+    // incorrect.
+    if (monitor.enabled && currentMonitor.enabled)
+        updateMonitor = monitor.copy(enabledTime = currentMonitor.enabledTime)*/
+
+    val indexRequest = IndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
+        .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+        .source(monitor.toXContentWithUser(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+        .id(monitor.id)
+        .timeout(AlertingSettings.INDEX_TIMEOUT.get(settings))
+
+    return client.suspendUntil { client.index(indexRequest, it) }
 }

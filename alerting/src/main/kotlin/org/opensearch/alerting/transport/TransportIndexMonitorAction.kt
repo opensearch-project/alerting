@@ -19,10 +19,12 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.alerting.DocumentReturningMonitorRunner
 import org.opensearch.alerting.action.IndexMonitorAction
 import org.opensearch.alerting.action.IndexMonitorRequest
 import org.opensearch.alerting.action.IndexMonitorResponse
 import org.opensearch.alerting.core.ScheduledJobIndices
+import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.alerting.core.model.SearchInput
@@ -115,6 +117,7 @@ class TransportIndexMonitorAction @Inject constructor(
         user: User?
     ) {
         val indices = mutableListOf<String>()
+        // todo: for doc level alerting: check if index is present before monitor is created.
         val searchInputs = request.monitor.inputs.filter { it.name() == SearchInput.SEARCH_FIELD }
         searchInputs.forEach {
             val searchInput = it as SearchInput
@@ -369,6 +372,11 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         private fun indexMonitor() {
+            if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                val monitorIndex = (request.monitor.inputs[0] as DocLevelMonitorInput).indices[0]
+                val lastRunContext = DocumentReturningMonitorRunner.createRunContext(clusterService, client, monitorIndex).toMutableMap()
+                request.monitor = request.monitor.copy(lastRunContext = lastRunContext)
+            }
             request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
             val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
                 .setRefreshPolicy(request.refreshPolicy)
@@ -432,6 +440,15 @@ class TransportIndexMonitorAction @Inject constructor(
         private fun onGetResponse(currentMonitor: Monitor) {
             if (!checkUserPermissionsWithResource(user, currentMonitor.user, actionListener, "monitor", request.monitorId)) {
                 return
+            }
+
+            if (
+                request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR &&
+                request.monitor.lastRunContext.toMutableMap().isNullOrEmpty()
+            ) {
+                val monitorIndex = (request.monitor.inputs[0] as DocLevelMonitorInput).indices[0]
+                val lastRunContext = DocumentReturningMonitorRunner.createRunContext(clusterService, client, monitorIndex).toMutableMap()
+                request.monitor = request.monitor.copy(lastRunContext = lastRunContext)
             }
 
             // If both are enabled, use the current existing monitor enabled time, otherwise the next execution will be

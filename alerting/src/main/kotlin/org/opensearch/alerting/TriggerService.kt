@@ -12,10 +12,13 @@ import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
+import org.opensearch.alerting.model.DocumentLevelTrigger
+import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
+import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.util.getBucketKeysHash
@@ -23,7 +26,7 @@ import org.opensearch.script.ScriptService
 import org.opensearch.search.aggregations.Aggregation
 import org.opensearch.search.aggregations.Aggregations
 import org.opensearch.search.aggregations.support.AggregationPath
-import java.lang.IllegalArgumentException
+import java.time.Instant
 
 /** Service that handles executing Triggers */
 class TriggerService(val scriptService: ScriptService) {
@@ -50,6 +53,45 @@ class TriggerService(val scriptService: ScriptService) {
             logger.info("Error running script for monitor ${monitor.id}, trigger: ${trigger.id}", e)
             // if the script fails we need to send an alert so set triggered = true
             QueryLevelTriggerRunResult(trigger.name, true, e)
+        }
+    }
+
+    // TODO: improve performance and support match all and match any
+    fun runDocLevelTrigger(
+        monitor: Monitor,
+        trigger: DocumentLevelTrigger,
+        ctx: DocumentLevelTriggerExecutionContext,
+        docsToQueries: Map<String, List<String>>,
+        queryIds: List<String>
+    ): DocumentLevelTriggerRunResult {
+        return try {
+            val triggeredDocs = mutableListOf<String>()
+
+            val dummyTrigger = QueryLevelTrigger(
+                name = trigger.name,
+                severity = trigger.severity,
+                actions = trigger.actions,
+                condition = trigger.condition
+            )
+            val dummyExecutionContext = QueryLevelTriggerExecutionContext(monitor, dummyTrigger, emptyList(), Instant.now(), Instant.now())
+
+            for (doc in docsToQueries.keys) {
+                val params = trigger.condition.params.toMutableMap()
+                for (queryId in queryIds) {
+                    params[queryId] = docsToQueries[doc]!!.contains(queryId)
+                }
+                val triggered = scriptService.compile(trigger.condition, TriggerScript.CONTEXT)
+                    .newInstance(params)
+                    .execute(dummyExecutionContext)
+                logger.info("trigger val: $triggered")
+                if (triggered) triggeredDocs.add(doc)
+            }
+
+            DocumentLevelTriggerRunResult(trigger.name, triggeredDocs, null)
+        } catch (e: Exception) {
+            logger.info("Error running script for monitor ${monitor.id}, trigger: ${trigger.id}", e)
+            // if the script fails we need to send an alert so set triggered = true
+            DocumentLevelTriggerRunResult(trigger.name, emptyList(), e)
         }
     }
 
