@@ -10,6 +10,7 @@ import org.opensearch.OpenSearchSecurityException
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
+import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.index.IndexRequest
@@ -23,8 +24,10 @@ import org.opensearch.alerting.DocumentReturningMonitorRunner
 import org.opensearch.alerting.action.IndexMonitorAction
 import org.opensearch.alerting.action.IndexMonitorRequest
 import org.opensearch.alerting.action.IndexMonitorResponse
+import org.opensearch.alerting.core.DocLevelMonitorQueries
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
+import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.alerting.core.model.SearchInput
@@ -52,6 +55,8 @@ import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.index.reindex.DeleteByQueryAction
+import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.builder.SearchSourceBuilder
@@ -67,6 +72,7 @@ class TransportIndexMonitorAction @Inject constructor(
     val client: Client,
     actionFilters: ActionFilters,
     val scheduledJobIndices: ScheduledJobIndices,
+    val docLevelMonitorQueries: DocLevelMonitorQueries,
     val clusterService: ClusterService,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry
@@ -259,6 +265,10 @@ class TransportIndexMonitorAction @Inject constructor(
             } else {
                 prepareMonitorIndexing()
             }
+
+            if (!docLevelMonitorQueries.docLevelQueryIndexExists()) {
+                docLevelMonitorQueries.initDocLevelQueryIndex()
+            }
         }
 
         /**
@@ -395,6 +405,11 @@ class TransportIndexMonitorAction @Inject constructor(
                             )
                             return
                         }
+
+                        if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                            indexDocLevelMonitorQueries(request.monitor, response.id)
+                        }
+                        log.info("call return")
                         actionListener.onResponse(
                             IndexMonitorResponse(
                                 response.id, response.version, response.seqNo,
@@ -407,6 +422,71 @@ class TransportIndexMonitorAction @Inject constructor(
                     }
                 }
             )
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        private fun indexDocLevelMonitorQueries(monitor: Monitor, monitorId: String) {
+            val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
+            val index = docLevelMonitorInput.indices[0]
+            val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
+
+            val clusterState = clusterService.state()
+            if (clusterState.routingTable.hasIndex(index)) {
+                val indexMetadata = clusterState.metadata.index(index)
+
+                if (indexMetadata.mapping() != null) {
+                    val properties =
+                        ((indexMetadata.mapping()?.sourceAsMap?.get("properties")) as Map<String, Map<String, Any>>)
+                    val updatedProperties =
+                        properties.entries.associate { "${it.key}_$monitorId" to it.value }.toMutableMap()
+
+                    if (clusterState.routingTable.hasIndex(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)) {
+                        val updateMappingRequest = PutMappingRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
+                        updateMappingRequest.source(mapOf<String, Any>("properties" to updatedProperties))
+
+                        client.admin().indices().putMapping(
+                            updateMappingRequest,
+                            object : ActionListener<AcknowledgedResponse> {
+                                override fun onResponse(response: AcknowledgedResponse) {
+/*                                log.info("Percolation index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX} updated with new mappings")
+
+                                val request = BulkRequest()
+
+                                queries.forEach {
+                                    var query = it.query
+
+                                    properties.forEach { prop ->
+                                        query = query.replace(prop.key, "${prop.key}_$monitorId")
+                                    }
+                                    val indexRequest = IndexRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
+                                        .id(it.id + "_$monitorId")
+                                        .source(mapOf("query" to mapOf("query_string" to mapOf("query" to query)), "monitor_id" to monitorId))
+                                    request.add(indexRequest)
+                                }
+
+                                client.bulk(
+                                    request,
+                                    object : ActionListener<BulkResponse> {
+                                        override fun onResponse(response: BulkResponse) {
+                                            log.info("Queries inserted into Percolate index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}")
+                                            client.admin().indices().refresh(RefreshRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)).get()
+                                        }
+
+                                        override fun onFailure(t: Exception) {
+                                            actionListener.onFailure(AlertingException.wrap(t))
+                                        }
+                                    }
+                                )*/
+                                }
+
+                                override fun onFailure(e: Exception) {
+                                    actionListener.onFailure(AlertingException.wrap(e))
+                                }
+                            }
+                        )
+                    }
+                }
+            }
         }
 
         private fun updateMonitor() {
@@ -475,6 +555,14 @@ class TransportIndexMonitorAction @Inject constructor(
                                 AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), response.status()))
                             )
                             return
+                        }
+
+                        if (currentMonitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                            DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+                                .source(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
+                                .filter(QueryBuilders.matchQuery("monitor_id", currentMonitor.id))
+                                .get()
+                            indexDocLevelMonitorQueries(request.monitor, currentMonitor.id)
                         }
                         actionListener.onResponse(
                             IndexMonitorResponse(

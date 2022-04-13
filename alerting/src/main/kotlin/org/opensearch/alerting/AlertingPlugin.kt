@@ -28,6 +28,7 @@ import org.opensearch.alerting.action.SearchEmailGroupAction
 import org.opensearch.alerting.action.SearchMonitorAction
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.core.DocLevelMonitorQueries
 import org.opensearch.alerting.core.JobSweeper
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsAction
@@ -106,8 +107,8 @@ import org.opensearch.index.IndexModule
 import org.opensearch.painless.spi.PainlessExtension
 import org.opensearch.painless.spi.Whitelist
 import org.opensearch.painless.spi.WhitelistLoader
+import org.opensearch.percolator.PercolatorPluginExt
 import org.opensearch.plugins.ActionPlugin
-import org.opensearch.plugins.Plugin
 import org.opensearch.plugins.ReloadablePlugin
 import org.opensearch.plugins.ScriptPlugin
 import org.opensearch.plugins.SearchPlugin
@@ -126,7 +127,7 @@ import java.util.function.Supplier
  * It also adds [Monitor.XCONTENT_REGISTRY], [SearchInput.XCONTENT_REGISTRY], [QueryLevelTrigger.XCONTENT_REGISTRY],
  * [BucketLevelTrigger.XCONTENT_REGISTRY], [ClusterMetricsInput.XCONTENT_REGISTRY] to the [NamedXContentRegistry] so that we are able to deserialize the custom named objects.
  */
-internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, ReloadablePlugin, SearchPlugin, Plugin() {
+internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, ReloadablePlugin, SearchPlugin, PercolatorPluginExt() {
 
     override fun getContextWhitelists(): Map<ScriptContext<*>, List<Whitelist>> {
         val whitelist = WhitelistLoader.loadFromResourceFiles(javaClass, "org.opensearch.alerting.txt")
@@ -152,6 +153,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     lateinit var scheduler: JobScheduler
     lateinit var sweeper: JobSweeper
     lateinit var scheduledJobIndices: ScheduledJobIndices
+    lateinit var docLevelMonitorQueries: DocLevelMonitorQueries
     lateinit var threadPool: ThreadPool
     lateinit var alertIndices: AlertIndices
     lateinit var clusterService: ClusterService
@@ -257,11 +259,12 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerConsumers()
             .registerDestinationSettings()
         scheduledJobIndices = ScheduledJobIndices(client.admin(), clusterService)
+        docLevelMonitorQueries = DocLevelMonitorQueries(client.admin(), clusterService)
         scheduler = JobScheduler(threadPool, runner)
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
         this.threadPool = threadPool
         this.clusterService = clusterService
-        return listOf(sweeper, scheduler, runner, scheduledJobIndices)
+        return listOf(sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries)
     }
 
     override fun getSettings(): List<Setting<*>> {

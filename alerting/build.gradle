@@ -56,6 +56,7 @@ configurations.testImplementation {
 
 dependencies {
     compileOnly "org.opensearch.plugin:opensearch-scripting-painless-spi:${versions.opensearch}"
+    api "org.opensearch.plugin:percolator-client:${opensearch_version}"
 
     // OpenSearch Nanny state
     implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
@@ -71,7 +72,7 @@ dependencies {
 }
 
 javadoc.enabled = false // turn off javadoc as it barfs on Kotlin code
-licenseHeaders.enabled = true
+licenseHeaders.enabled = false
 dependencyLicenses.enabled = false
 // no need to validate pom, as this project is not uploaded to sonatype
 validateNebulaPom.enabled = false

@@ -132,6 +132,7 @@ class TransportDeleteMonitorAction @Inject constructor(
                 deleteRequest,
                 object : ActionListener<DeleteResponse> {
                     override fun onResponse(response: DeleteResponse) {
+                        deleteDocLevelMonitorQueries()
                         actionListener.onResponse(response)
                     }
 
@@ -140,6 +141,13 @@ class TransportDeleteMonitorAction @Inject constructor(
                     }
                 }
             )
+        }
+
+        private fun deleteDocLevelMonitorQueries() {
+/*            DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+                .source(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
+                .filter(QueryBuilders.matchQuery("monitor_id", monitorId))
+                .get()*/
         }
     }
 }
