@@ -264,11 +264,10 @@ data class Destination(
                     .withHeaderParams(customWebhook?.headerParams)
                     .withMessage(compiledMessage).build()
             }
-            // TODO: Need to update common-utils to support EMAIL as a legacy destination before adding this
             DestinationType.EMAIL -> {
                 val emailAccount = destinationCtx.emailAccount
-                // Use the account name as the Destination name here, Notifications will use it to resolve credentials
-                destinationMessage = LegacyEmailMessage.Builder(emailAccount?.name ?: name)
+                destinationMessage = LegacyEmailMessage.Builder(name)
+                    .withAccountName(emailAccount?.name)
                     .withHost(emailAccount?.host)
                     .withPort(emailAccount?.port)
                     .withMethod(emailAccount?.method?.let { convertAlertingToNotificationMethodType(it).toString() })
