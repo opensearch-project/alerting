@@ -6,9 +6,6 @@
 package org.opensearch.alerting.model.destination
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.alerting.destination.Notification
-import org.opensearch.alerting.destination.message.BaseMessage
-import org.opensearch.alerting.destination.message.EmailMessage
 import org.opensearch.alerting.model.destination.email.Email
 import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.instant

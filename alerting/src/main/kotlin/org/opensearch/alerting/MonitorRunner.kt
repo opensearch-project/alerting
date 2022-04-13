@@ -647,33 +647,12 @@ object MonitorRunner : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
         }
     }
 
-    private suspend fun runAction(action: Action, ctx: QueryLevelTriggerExecutionContext, dryrun: Boolean): ActionRunResult {
+    private suspend fun runAction(action: Action, ctx: TriggerExecutionContext, dryrun: Boolean): ActionRunResult {
         return try {
-            if (!isActionActionable(action, ctx.alert)) {
+            if (ctx is QueryLevelTriggerExecutionContext && !isActionActionable(action, ctx.alert)) {
                 return ActionRunResult(action.id, action.name, mapOf(), true, null, null)
             }
-            val actionOutput = mutableMapOf<String, String>()
-            actionOutput[SUBJECT] = if (action.subjectTemplate != null) compileTemplate(action.subjectTemplate, ctx) else ""
-            actionOutput[MESSAGE] = compileTemplate(action.messageTemplate, ctx)
-            if (Strings.isNullOrEmpty(actionOutput[MESSAGE])) {
-                throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
-            }
-            if (!dryrun) {
-                // TODO: Inject user here so only Destination/Notifications that the user has permissions to are retrieved
-                withContext(Dispatchers.IO) {
-                    actionOutput[MESSAGE_ID] = getConfigAndSendNotification(action, actionOutput[SUBJECT], actionOutput[MESSAGE]!!)
-                }
-            }
-            ActionRunResult(action.id, action.name, actionOutput, false, currentTime(), null)
-        } catch (e: Exception) {
-            ActionRunResult(action.id, action.name, mapOf(), false, currentTime(), e)
-        }
-    }
 
-    // TODO: This is largely a duplicate of runAction above for BucketLevelTriggerExecutionContext for now.
-    //   After suppression logic implementation, if this remains mostly the same, it can be refactored.
-    private suspend fun runAction(action: Action, ctx: BucketLevelTriggerExecutionContext, dryrun: Boolean): ActionRunResult {
-        return try {
             val actionOutput = mutableMapOf<String, String>()
             actionOutput[SUBJECT] = if (action.subjectTemplate != null) compileTemplate(action.subjectTemplate, ctx) else ""
             actionOutput[MESSAGE] = compileTemplate(action.messageTemplate, ctx)
