@@ -15,7 +15,7 @@ class FindingsRestApiIT : AlertingRestTestCase() {
 
     fun `test find Finding where doc is not retrieved`() {
 
-        createFinding(matchingDocIds = setOf("someId"))
+        createFinding(matchingDocIds = listOf("someId"))
         val response = searchFindings()
         assertEquals(1, response.totalFindings)
         assertEquals(1, response.findings[0].documents.size)
@@ -35,8 +35,8 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         }"""
         indexDoc(testIndex, "someId2", testDoc2)
 
-        val findingWith1 = createFinding(matchingDocIds = setOf("someId"), index = testIndex)
-        val findingWith2 = createFinding(matchingDocIds = setOf("someId", "someId2"), index = testIndex)
+        val findingWith1 = createFinding(matchingDocIds = listOf("someId"), index = testIndex)
+        val findingWith2 = createFinding(matchingDocIds = listOf("someId", "someId2"), index = testIndex)
         val response = searchFindings()
         assertEquals(2, response.totalFindings)
         for (findingWithDoc in response.findings) {
@@ -69,8 +69,8 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         }"""
         indexDoc(testIndex, "someId2", testDoc2)
 
-        createFinding(matchingDocIds = setOf("someId"), index = testIndex)
-        val findingId = createFinding(matchingDocIds = setOf("someId", "someId2"), index = testIndex)
+        createFinding(matchingDocIds = listOf("someId"), index = testIndex)
+        val findingId = createFinding(matchingDocIds = listOf("someId", "someId2"), index = testIndex)
         val response = searchFindings(mapOf(Pair("findingId", findingId)))
         assertEquals(1, response.totalFindings)
         assertEquals(findingId, response.findings[0].finding.id)
@@ -95,9 +95,9 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         indexDoc(testIndex, "someId2", testDoc2)
 
         val docLevelQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "realQuery", tags = listOf("sigma"))
-        createFinding(matchingDocIds = setOf("someId"), index = testIndex)
+        createFinding(matchingDocIds = listOf("someId"), index = testIndex)
         val findingId = createFinding(
-            matchingDocIds = setOf("someId", "someId2"),
+            matchingDocIds = listOf("someId", "someId2"),
             index = testIndex,
             docLevelQueries = listOf(docLevelQuery)
         )
@@ -125,9 +125,9 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         indexDoc(testIndex, "someId2", testDoc2)
 
         val docLevelQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "realQuery", tags = listOf("sigma"))
-        createFinding(matchingDocIds = setOf("someId"), index = testIndex)
+        createFinding(matchingDocIds = listOf("someId"), index = testIndex)
         val findingId = createFinding(
-            matchingDocIds = setOf("someId", "someId2"),
+            matchingDocIds = listOf("someId", "someId2"),
             index = testIndex,
             docLevelQueries = listOf(docLevelQuery)
         )
