@@ -1,8 +1,5 @@
 {
   "dynamic": "strict",
-  "_routing": {
-    "required": true
-  },
   "_meta" : {
     "schema_version": 1
   },
@@ -37,6 +34,9 @@
           "type": "keyword"
         },
         "name": {
+          "type": "keyword"
+        },
+        "query": {
           "type": "text"
         },
         "tags": {
@@ -50,7 +50,7 @@
       }
     },
     "timestamp": {
-      "type": "date"
+      "type": "long"
     }
   }
 }

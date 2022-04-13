@@ -35,8 +35,8 @@ import org.opensearch.alerting.randomAlert
 import org.opensearch.alerting.randomAnomalyDetector
 import org.opensearch.alerting.randomAnomalyDetectorWithUser
 import org.opensearch.alerting.randomBucketLevelTrigger
-import org.opensearch.alerting.randomDocumentReturningMonitor
-import org.opensearch.alerting.randomDocumentReturningTrigger
+import org.opensearch.alerting.randomDocumentLevelMonitor
+import org.opensearch.alerting.randomDocumentLevelTrigger
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.randomThrottle
@@ -803,7 +803,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val alerts = searchAlerts(monitor)
         assertEquals("Active alert was not deleted", 0, alerts.size)
 
-        val historyAlerts = searchAlerts(monitor, AlertIndices.HISTORY_WRITE_INDEX)
+        val historyAlerts = searchAlerts(monitor, AlertIndices.ALERT_HISTORY_WRITE_INDEX)
         assertEquals("Alert was not moved to history", 1, historyAlerts.size)
         assertEquals(
             "Alert data incorrect",
@@ -832,7 +832,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val alerts = searchAlerts(monitor)
         assertEquals("Active alert was not deleted", 0, alerts.size)
 
-        val historyAlerts = searchAlerts(monitor, AlertIndices.HISTORY_WRITE_INDEX)
+        val historyAlerts = searchAlerts(monitor, AlertIndices.ALERT_HISTORY_WRITE_INDEX)
         assertEquals("Alert was not moved to history", 1, historyAlerts.size)
         assertEquals(
             "Alert data incorrect",
@@ -865,7 +865,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("One alert should be in active index", 1, alerts.size)
         assertEquals("Wrong alert in active index", alertKeep.toJsonString(), alerts.single().toJsonString())
 
-        val historyAlerts = searchAlerts(monitor, AlertIndices.HISTORY_WRITE_INDEX)
+        val historyAlerts = searchAlerts(monitor, AlertIndices.ALERT_HISTORY_WRITE_INDEX)
         // Only alertDelete should of been moved to history index
         assertEquals("One alert should be in history index", 1, historyAlerts.size)
         assertEquals(
@@ -1116,8 +1116,8 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
-        val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
-        val monitor = createMonitor(randomDocumentReturningMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
 
         val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
 
@@ -1137,9 +1137,9 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
-        val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val monitor = createMonitor(
-            randomDocumentReturningMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger), user = null)
+            randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger), user = null)
         )
 
         val storedMonitor = getMonitor(monitor.id)
@@ -1153,8 +1153,8 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
-        val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
-        val monitor = createMonitor(randomDocumentReturningMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
 
         val updatedTriggers = listOf(
             DocumentLevelTrigger(
@@ -1184,8 +1184,8 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
-        val trigger = randomDocumentReturningTrigger(condition = ALWAYS_RUN)
-        val monitor = createMonitor(randomDocumentReturningMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
 
         val deleteResponse = client().makeRequest("DELETE", monitor.relativeUrl())
         assertEquals("Delete failed", RestStatus.OK, deleteResponse.restStatus())
@@ -1197,7 +1197,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     fun `test creating a document monitor with error trigger`() {
         val trigger = randomQueryLevelTrigger()
         try {
-            val monitor = randomDocumentReturningMonitor(triggers = listOf(trigger))
+            val monitor = randomDocumentLevelMonitor(triggers = listOf(trigger))
             client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             fail("Monitor with illegal trigger should be rejected.")
         } catch (e: IllegalArgumentException) {
