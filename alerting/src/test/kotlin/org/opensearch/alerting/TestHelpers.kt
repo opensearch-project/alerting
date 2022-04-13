@@ -2,6 +2,7 @@
  * Copyright OpenSearch Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
+
 package org.opensearch.alerting
 
 import junit.framework.TestCase.assertNull
@@ -9,11 +10,11 @@ import org.apache.http.Header
 import org.apache.http.HttpEntity
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtFilter
+import org.opensearch.alerting.core.model.ClusterMetricsInput
 import org.opensearch.alerting.core.model.Input
 import org.opensearch.alerting.core.model.IntervalSchedule
 import org.opensearch.alerting.core.model.Schedule
 import org.opensearch.alerting.core.model.SearchInput
-import org.opensearch.alerting.elasticapi.string
 import org.opensearch.alerting.model.ActionExecutionResult
 import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.AggregationResultBucket
@@ -36,6 +37,7 @@ import org.opensearch.alerting.model.action.Throttle
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailEntry
 import org.opensearch.alerting.model.destination.email.EmailGroup
+import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.Request
 import org.opensearch.client.RequestOptions
@@ -109,7 +111,8 @@ fun randomBucketLevelMonitor(
     inputs: List<Input> = listOf(
         SearchInput(
             emptyList(),
-            SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).aggregation(TermsAggregationBuilder("test_agg"))
+            SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                .aggregation(TermsAggregationBuilder("test_agg").field("test_field"))
         )
     ),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
@@ -121,6 +124,24 @@ fun randomBucketLevelMonitor(
 ): Monitor {
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.BUCKET_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
+        schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
+        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+    )
+}
+
+fun randomClusterMetricsMonitor(
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    user: User = randomUser(),
+    inputs: List<Input> = listOf(randomClusterMetricsInput()),
+    schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
+    enabled: Boolean = randomBoolean(),
+    triggers: List<Trigger> = (1..randomInt(10)).map { randomQueryLevelTrigger() },
+    enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
+    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+    withMetadata: Boolean = false
+): Monitor {
+    return Monitor(
+        name = name, monitorType = Monitor.MonitorType.CLUSTER_METRICS_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
         uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
@@ -156,9 +177,12 @@ fun randomBucketLevelTrigger(
         name = name,
         severity = severity,
         bucketSelector = bucketSelector,
-        actions = if (actions.isEmpty()) (0..randomInt(10)).map { randomActionWithPolicy(destinationId = destinationId) } else actions
+        actions = if (actions.isEmpty()) randomActionsForBucketLevelTrigger(destinationId = destinationId) else actions
     )
 }
+
+fun randomActionsForBucketLevelTrigger(min: Int = 0, max: Int = 10, destinationId: String = ""): List<Action> =
+    (min..randomInt(max)).map { randomActionWithPolicy(destinationId = destinationId) }
 
 fun randomBucketSelectorExtAggregationBuilder(
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
@@ -178,9 +202,10 @@ fun randomBucketSelectorScript(
 }
 
 fun randomEmailAccount(
-    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
-    email: String = OpenSearchRestTestCase.randomAlphaOfLength(5) + "@email.com",
-    host: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    salt: String = "",
+    name: String = salt + OpenSearchRestTestCase.randomAlphaOfLength(10),
+    email: String = salt + OpenSearchRestTestCase.randomAlphaOfLength(5) + "@email.com",
+    host: String = salt + OpenSearchRestTestCase.randomAlphaOfLength(10),
     port: Int = randomIntBetween(1, 100),
     method: EmailAccount.MethodType = randomEmailAccountMethod(),
     username: SecureString? = null,
@@ -198,14 +223,18 @@ fun randomEmailAccount(
 }
 
 fun randomEmailGroup(
-    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
-    emails: List<EmailEntry> = (1..randomInt(10)).map { EmailEntry(email = OpenSearchRestTestCase.randomAlphaOfLength(5) + "@email.com") }
+    salt: String = "",
+    name: String = salt + OpenSearchRestTestCase.randomAlphaOfLength(10),
+    emails: List<EmailEntry> = (1..randomInt(10)).map {
+        EmailEntry(email = salt + OpenSearchRestTestCase.randomAlphaOfLength(5) + "@email.com")
+    }
 ): EmailGroup {
     return EmailGroup(name = name, emails = emails)
 }
 
 fun randomScript(source: String = "return " + OpenSearchRestTestCase.randomBoolean().toString()): Script = Script(source)
 
+val ADMIN = "admin"
 val ALERTING_BASE_URI = "/_plugins/_alerting/monitors"
 val DESTINATION_BASE_URI = "/_plugins/_alerting/destinations"
 val LEGACY_OPENDISTRO_ALERTING_BASE_URI = "/_opendistro/_alerting/monitors"
@@ -213,6 +242,14 @@ val LEGACY_OPENDISTRO_DESTINATION_BASE_URI = "/_opendistro/_alerting/destination
 val ALWAYS_RUN = Script("return true")
 val NEVER_RUN = Script("return false")
 val DRYRUN_MONITOR = mapOf("dryrun" to "true")
+val TEST_HR_INDEX = "hr_data"
+val TEST_NON_HR_INDEX = "not_hr_data"
+val TEST_HR_ROLE = "hr_role"
+val TEST_HR_BACKEND_ROLE = "HR"
+// Using a triple-quote string for the query so escaped quotes are kept as-is
+// in the request made using triple-quote strings (i.e. createIndexRoleWithDocLevelSecurity).
+// Removing the escape slash in the request causes the security API role request to fail with parsing exception.
+val TERM_DLS_QUERY = """{\"term\": { \"accessible\": true}}"""
 
 fun randomTemplateScript(
     source: String,
@@ -337,6 +374,14 @@ fun randomQueryLevelTriggerRunResult(): QueryLevelTriggerRunResult {
     return QueryLevelTriggerRunResult("trigger-name", true, null, map)
 }
 
+fun randomClusterMetricsInput(
+    path: String = ClusterMetricsInput.ClusterMetricType.CLUSTER_HEALTH.defaultPath,
+    pathParams: String = "",
+    url: String = ""
+): ClusterMetricsInput {
+    return ClusterMetricsInput(path, pathParams, url)
+}
+
 fun randomBucketLevelTriggerRunResult(): BucketLevelTriggerRunResult {
     val map = mutableMapOf<String, ActionRunResult>()
     map.plus(Pair("key1", randomActionRunResult()))
@@ -399,7 +444,7 @@ fun randomUser(): User {
             OpenSearchRestTestCase.randomAlphaOfLength(10),
             OpenSearchRestTestCase.randomAlphaOfLength(10)
         ),
-        listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), "all_access"),
+        listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), ALL_ACCESS_ROLE),
         listOf("test_attr=test")
     )
 }
@@ -482,7 +527,7 @@ fun xContentRegistry(): NamedXContentRegistry {
     return NamedXContentRegistry(
         listOf(
             SearchInput.XCONTENT_REGISTRY, QueryLevelTrigger.XCONTENT_REGISTRY, BucketLevelTrigger.XCONTENT_REGISTRY
-        ) + SearchModule(Settings.EMPTY, false, emptyList()).namedXContents
+        ) + SearchModule(Settings.EMPTY, emptyList()).namedXContents
     )
 }
 

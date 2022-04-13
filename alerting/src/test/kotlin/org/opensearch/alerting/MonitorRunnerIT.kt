@@ -790,6 +790,8 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         Assert.assertTrue(alerts.single().errorMessage?.contains("Failed running action") as Boolean)
     }
 
+    /*
+    TODO: https://github.com/opensearch-project/alerting/issues/300
     fun `test execute monitor with custom webhook destination`() {
         val customWebhook = CustomWebhook("http://15.16.17.18", null, null, 80, null, "PUT", emptyMap(), emptyMap(), null, null)
         val destination = createDestination(
@@ -814,6 +816,155 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         verifyAlert(alerts.single(), monitor, ERROR)
         Assert.assertTrue(alerts.single().errorMessage?.contains("Connect timed out") as Boolean)
     }
+     */
+
+    fun `test create ClusterMetricsInput monitor with ClusterHealth API`() {
+        // GIVEN
+        val path = "/_cluster/health"
+        val input = randomClusterMetricsInput(path = path)
+        val monitor = createMonitor(randomClusterMetricsMonitor(inputs = listOf(input)))
+
+        // WHEN
+        val response = executeMonitor(monitor.id)
+
+        // THEN
+        val output = entityAsMap(response)
+        val inputResults = output.stringMap("input_results")
+        val resultsContent = (inputResults?.get("results") as ArrayList<*>)[0]
+        val errorMessage = inputResults["error"]
+
+        assertEquals(monitor.name, output["monitor_name"])
+        assertTrue(
+            "Monitor results should contain cluster_name, but found: $resultsContent",
+            resultsContent.toString().contains("cluster_name")
+        )
+        assertNull("There should not be an error message, but found: $errorMessage", errorMessage)
+    }
+
+    fun `test create ClusterMetricsInput monitor with ClusterStats API`() {
+        // GIVEN
+        val path = "/_cluster/stats"
+        val input = randomClusterMetricsInput(path = path)
+        val monitor = createMonitor(randomClusterMetricsMonitor(inputs = listOf(input)))
+
+        // WHEN
+        val response = executeMonitor(monitor.id)
+
+        // THEN
+        val output = entityAsMap(response)
+        val inputResults = output.stringMap("input_results")
+        val resultsContent = (inputResults?.get("results") as ArrayList<*>)[0]
+        val errorMessage = inputResults["error"]
+
+        assertEquals(monitor.name, output["monitor_name"])
+        assertTrue(
+            "Monitor results should contain monitor_name, but found: $resultsContent",
+            resultsContent.toString().contains("memory_size_in_bytes")
+        )
+        assertNull("There should not be an error message, but found: $errorMessage", errorMessage)
+    }
+
+    fun `test create ClusterMetricsInput monitor with alert triggered`() {
+        // GIVEN
+        putAlertMappings()
+        val trigger = randomQueryLevelTrigger(
+            condition = Script(
+                """
+            return ctx.results[0].number_of_pending_tasks < 1
+                """.trimIndent()
+            ),
+            destinationId = createDestination().id
+        )
+        val path = "/_cluster/health"
+        val input = randomClusterMetricsInput(path = path)
+        val monitor = createMonitor(randomClusterMetricsMonitor(inputs = listOf(input), triggers = listOf(trigger)))
+
+        // WHEN
+        val response = executeMonitor(monitor.id)
+
+        // THEN
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        val triggerResults = output.objectMap("trigger_results").values
+        for (triggerResult in triggerResults) {
+            assertTrue(
+                "This triggerResult should be triggered: $triggerResult",
+                triggerResult.objectMap("action_results").isNotEmpty()
+            )
+        }
+
+        val alerts = searchAlerts(monitor)
+        assertEquals("Alert not saved, $output", 1, alerts.size)
+        verifyAlert(alerts.single(), monitor, ACTIVE)
+    }
+
+    fun `test create ClusterMetricsInput monitor with no alert triggered`() {
+        // GIVEN
+        putAlertMappings()
+        val trigger = randomQueryLevelTrigger(
+            condition = Script(
+                """
+            return ctx.results[0].status.equals("red")
+                """.trimIndent()
+            )
+        )
+        val path = "/_cluster/stats"
+        val input = randomClusterMetricsInput(path = path)
+        val monitor = createMonitor(randomClusterMetricsMonitor(inputs = listOf(input), triggers = listOf(trigger)))
+
+        // WHEN
+        val response = executeMonitor(monitor.id)
+
+        // THEN
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        val triggerResults = output.objectMap("trigger_results").values
+        for (triggerResult in triggerResults) {
+            assertTrue(
+                "This triggerResult should not be triggered: $triggerResult",
+                triggerResult.objectMap("action_results").isEmpty()
+            )
+        }
+
+        val alerts = searchAlerts(monitor)
+        assertEquals("Alert saved for test monitor, output: $output", 0, alerts.size)
+    }
+
+    fun `test create ClusterMetricsInput monitor for ClusterHealth API with path parameters`() {
+        // GIVEN
+        val indices = (1..5).map { createTestIndex() }.toTypedArray()
+        val pathParams = indices.joinToString(",")
+        val path = "/_cluster/health/"
+        val input = randomClusterMetricsInput(
+            path = path,
+            pathParams = pathParams
+        )
+        val monitor = createMonitor(randomClusterMetricsMonitor(inputs = listOf(input)))
+
+        // WHEN
+        val response = executeMonitor(monitor.id)
+
+        // THEN
+        val output = entityAsMap(response)
+        val inputResults = output.stringMap("input_results")
+        val resultsContent = (inputResults?.get("results") as ArrayList<*>)[0]
+        val errorMessage = inputResults["error"]
+
+        assertEquals(monitor.name, output["monitor_name"])
+        assertTrue(
+            "Monitor results should contain cluster_name, but found: $resultsContent",
+            resultsContent.toString().contains("cluster_name")
+        )
+        assertNull("There should not be an error message, but found: $errorMessage", errorMessage)
+    }
+
+    // TODO: Once an API is implemented that supports adding/removing entries on the
+    //  SupportedApiSettings::supportedApiList, create an test that simulates executing
+    //  a preexisting ClusterMetricsInput monitor for an API that has been removed from the supportedApiList.
+    //  This will likely involve adding an API to the list before creating the monitor, and then removing
+    //  the API from the list before executing the monitor.
 
     fun `test execute monitor with custom webhook destination and denied host`() {
 
@@ -856,7 +1007,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
             (output["trigger_results"] as HashMap<String, Any>).forEach {
-                _, v ->
+                    _, v ->
                 assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             assertEquals(monitor.name, output["monitor_name"])
@@ -886,7 +1037,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
             (output["trigger_results"] as HashMap<String, Any>).forEach {
-                _, v ->
+                    _, v ->
                 assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             assertEquals(monitor.name, output["monitor_name"])
@@ -913,7 +1064,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
             (output["trigger_results"] as HashMap<String, Any>).forEach {
-                _, v ->
+                    _, v ->
                 assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             @Suppress("UNCHECKED_CAST")
@@ -942,7 +1093,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
             (output["trigger_results"] as HashMap<String, Any>).forEach {
-                _, v ->
+                    _, v ->
                 assertFalse((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             @Suppress("UNCHECKED_CAST")
@@ -990,7 +1141,6 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
         val response = executeMonitor(monitor.id, params = DRYRUN_MONITOR)
         val output = entityAsMap(response)
-        // print("Output is: $output")
 
         assertEquals(monitor.name, output["monitor_name"])
         @Suppress("UNCHECKED_CAST")
@@ -1041,7 +1191,10 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         var alerts = searchAlerts(monitor)
         assertEquals("Alerts not saved", 2, alerts.size)
         alerts.forEach {
-            verifyAlert(it, monitor, ACTIVE)
+            // Given the random configuration of the Bucket-Level Trigger for the test, it's possible to get
+            // an action configuration that leads to no notifications (meaning the field for the Alert is null).
+            // Since testing action execution is not relevant to this test, verifyAlert is asked to ignore it.
+            verifyAlert(it, monitor, ACTIVE, expectNotification = false)
         }
 
         // Delete documents of a particular value
@@ -1087,7 +1240,21 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             params.docCount > 0
         """.trimIndent()
 
-        var trigger = randomBucketLevelTrigger()
+        // For the Actions ensure that there is at least one and any PER_ALERT actions contain ACTIVE, DEDUPED and COMPLETED in its policy
+        // so that the assertions done later in this test don't fail.
+        // The config is being mutated this way to still maintain the randomness in configuration (like including other ActionExecutionScope).
+        val actions = randomActionsForBucketLevelTrigger(min = 1).map {
+            if (it.actionExecutionPolicy?.actionExecutionScope is PerAlertActionScope) {
+                it.copy(
+                    actionExecutionPolicy = ActionExecutionPolicy(
+                        PerAlertActionScope(setOf(AlertCategory.NEW, AlertCategory.DEDUPED, AlertCategory.COMPLETED))
+                    )
+                )
+            } else {
+                it
+            }
+        }
+        var trigger = randomBucketLevelTrigger(actions = actions)
         trigger = trigger.copy(
             bucketSelector = BucketSelectorExtAggregationBuilder(
                 name = trigger.id,
@@ -1143,11 +1310,6 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         assertEquals("Incorrect number of completed alerts", 2, completedAlerts.size)
         val previouslyAcknowledgedAlert = completedAlerts.single { it.aggregationResultBucket?.getBucketKeysHash().equals("test_value_1") }
         val previouslyActiveAlert = completedAlerts.single { it.aggregationResultBucket?.getBucketKeysHash().equals("test_value_2") }
-        // Note: Given the randomization of the Actions and ActionExecutionPolicy for the Bucket-Level Monitor
-        // there is a very small chance we could end up with COMPLETED Alerts that never had lastNotificationTime updated
-        // (This would occur if the Trigger contained Actions with ActionExecutionScope of PER_ALERT that all somehow excluded the
-        // same Alert categories being tested in this test)
-        // In such a rare case, the tests can just be rerun
         assertTrue(
             "Previously acknowledged alert was not updated when it moved to completed",
             previouslyAcknowledgedAlert.lastNotificationTime!! > acknowledgedAlert2.lastNotificationTime
@@ -1573,10 +1735,17 @@ class MonitorRunnerIT : AlertingRestTestCase() {
         }
     }
 
-    private fun verifyAlert(alert: Alert, monitor: Monitor, expectedState: Alert.State = ACTIVE) {
+    private fun verifyAlert(
+        alert: Alert,
+        monitor: Monitor,
+        expectedState: Alert.State = ACTIVE,
+        expectNotification: Boolean = true
+    ) {
         assertNotNull(alert.id)
         assertNotNull(alert.startTime)
-        assertNotNull(alert.lastNotificationTime)
+        if (expectNotification) {
+            assertNotNull(alert.lastNotificationTime)
+        }
         assertEquals("Alert in wrong state", expectedState, alert.state)
         if (expectedState == ERROR) {
             assertNotNull("Missing error message", alert.errorMessage)

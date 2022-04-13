@@ -8,7 +8,7 @@ package org.opensearch.alerting.core
 import org.opensearch.alerting.core.model.Input
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.model.XContentTestBase
-import org.opensearch.alerting.elasticapi.string
+import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder

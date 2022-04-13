@@ -86,6 +86,8 @@ interface SecureTransportAction {
                     )
                 )
                 return false
+            } else if (isAdmin(user)) {
+                return true
             } else if (user.backendRoles.isNullOrEmpty()) {
                 actionListener.onFailure(
                     AlertingException.wrap(
@@ -112,7 +114,7 @@ interface SecureTransportAction {
         resourceId: String
     ): Boolean {
 
-        if (!filterByEnabled) return true
+        if (!doFilterForUser(requesterUser)) return true
 
         val resourceBackendRoles = resourceUser?.backendRoles
         val requesterBackendRoles = requesterUser?.backendRoles

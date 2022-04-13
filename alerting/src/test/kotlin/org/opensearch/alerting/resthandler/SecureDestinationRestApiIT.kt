@@ -5,15 +5,28 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.apache.http.HttpHeaders
+import org.apache.http.message.BasicHeader
+import org.junit.After
+import org.junit.Before
+import org.junit.BeforeClass
+import org.opensearch.alerting.ALERTING_DELETE_DESTINATION_ACCESS
+import org.opensearch.alerting.ALERTING_GET_DESTINATION_ACCESS
+import org.opensearch.alerting.ALERTING_INDEX_DESTINATION_ACCESS
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.DESTINATION_BASE_URI
+import org.opensearch.alerting.TEST_HR_BACKEND_ROLE
+import org.opensearch.alerting.TEST_HR_INDEX
+import org.opensearch.alerting.TEST_HR_ROLE
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.Slack
 import org.opensearch.alerting.randomUser
 import org.opensearch.alerting.util.DestinationType
-import org.opensearch.client.ResponseException
+import org.opensearch.client.RestClient
+import org.opensearch.commons.rest.SecureRestClientBuilder
 import org.opensearch.rest.RestStatus
 import org.opensearch.test.junit.annotations.TestLogging
 import java.time.Instant
@@ -21,6 +34,34 @@ import java.time.Instant
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
 class SecureDestinationRestApiIT : AlertingRestTestCase() {
+
+    companion object {
+
+        @BeforeClass
+        @JvmStatic fun setup() {
+            // things to execute once and keep around for the class
+            org.junit.Assume.assumeTrue(System.getProperty("security", "false")!!.toBoolean())
+        }
+    }
+
+    val user = "userOne"
+    var userClient: RestClient? = null
+
+    @Before
+    fun create() {
+
+        if (userClient == null) {
+            createUser(user, user, arrayOf())
+            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user).setSocketTimeout(60000).build()
+        }
+    }
+
+    @After
+    fun cleanup() {
+
+        userClient?.close()
+        deleteUser(user)
+    }
 
     fun `test create destination with disable filter by`() {
         disableFilterBy()
@@ -55,29 +96,13 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
             email = null
         )
 
-        if (securityEnabled()) {
-            // when security is enabled. No errors, must succeed.
-            val response = client().makeRequest(
-                "POST",
-                "$DESTINATION_BASE_URI?refresh=true",
-                emptyMap(),
-                destination.toHttpEntity()
-            )
-            assertEquals("Create monitor failed", RestStatus.CREATED, response.restStatus())
-        } else {
-            // when security is disable. Must return Forbidden.
-            try {
-                client().makeRequest(
-                    "POST",
-                    "$DESTINATION_BASE_URI?refresh=true",
-                    emptyMap(),
-                    destination.toHttpEntity()
-                )
-                fail("Expected 403 FORBIDDEN response")
-            } catch (e: ResponseException) {
-                assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
-            }
-        }
+        val response = client().makeRequest(
+            "POST",
+            "$DESTINATION_BASE_URI?refresh=true",
+            emptyMap(),
+            destination.toHttpEntity()
+        )
+        assertEquals("Create monitor failed", RestStatus.CREATED, response.restStatus())
     }
 
     fun `test update destination with disable filter by`() {
@@ -109,11 +134,6 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
 
     fun `test update destination with enable filter by`() {
         enableFilterBy()
-        if (!isHttps()) {
-            // if security is disabled and filter by is enabled, we can't create monitor
-            // refer: `test create destination with enable filter by`
-            return
-        }
 
         val chime = Chime("http://abc.com")
         val destination = Destination(
@@ -173,11 +193,6 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
 
     fun `test delete destination with enable filter by`() {
         enableFilterBy()
-        if (!isHttps()) {
-            // if security is disabled and filter by is enabled, we can't create monitor
-            // refer: `test create destination with enable filter by`
-            return
-        }
 
         val chime = Chime("http://abc.com")
         val destination = Destination(
@@ -236,11 +251,7 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
 
     fun `test get destinations with a destination type and filter by`() {
         enableFilterBy()
-        if (!securityEnabled()) {
-            // if security is disabled and filter by is enabled, we can't create monitor
-            // refer: `test create destination with enable filter by`
-            return
-        }
+
         val slack = Slack("url")
         val destination = Destination(
             type = DestinationType.SLACK,
@@ -263,5 +274,79 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
         // 2. get destinations as admin user
         val adminResponse = getDestinations(client(), inputMap)
         assertEquals(1, adminResponse.size)
+    }
+
+    // Destination related tests
+
+    fun `test index destination with an user with index destination role`() {
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            getClusterPermissionsFromCustomRole(ALERTING_INDEX_DESTINATION_ACCESS)
+        )
+
+        val destination = getTestDestination()
+
+        try {
+            val indexDestinationResponse = userClient?.makeRequest(
+                "POST",
+                AlertingPlugin.DESTINATION_BASE_URI,
+                emptyMap(),
+                destination.toHttpEntity()
+            )
+            assertEquals("Index Email Group failed", RestStatus.CREATED, indexDestinationResponse?.restStatus())
+        } finally {
+            deleteRoleAndRoleMapping(TEST_HR_ROLE)
+        }
+    }
+
+    fun `test get destination with an user with get destination role`() {
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            getClusterPermissionsFromCustomRole(ALERTING_GET_DESTINATION_ACCESS)
+        )
+
+        createDestination(getTestDestination())
+
+        try {
+            val getDestinationResponse = userClient?.makeRequest(
+                "GET",
+                AlertingPlugin.DESTINATION_BASE_URI,
+                null,
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+            )
+            assertEquals("Index Email Group failed", RestStatus.OK, getDestinationResponse?.restStatus())
+        } finally {
+            deleteRoleAndRoleMapping(TEST_HR_ROLE)
+        }
+    }
+
+    fun `test delete destination with an user with delete destination role`() {
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            getClusterPermissionsFromCustomRole(ALERTING_DELETE_DESTINATION_ACCESS)
+        )
+
+        val destination = createDestination(getTestDestination())
+
+        try {
+            val getDestinationResponse = userClient?.makeRequest(
+                "DELETE",
+                "${AlertingPlugin.DESTINATION_BASE_URI}/${destination.id}",
+                null,
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+            )
+            assertEquals("Index Email Group failed", RestStatus.OK, getDestinationResponse?.restStatus())
+        } finally {
+            deleteRoleAndRoleMapping(TEST_HR_ROLE)
+        }
     }
 }

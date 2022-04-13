@@ -5,8 +5,8 @@
 
 package org.opensearch.alerting.alerts
 
-import org.opensearch.alerting.elasticapi.instant
-import org.opensearch.alerting.elasticapi.optionalTimeField
+import org.opensearch.alerting.opensearchapi.instant
+import org.opensearch.alerting.opensearchapi.optionalTimeField
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.io.stream.Writeable

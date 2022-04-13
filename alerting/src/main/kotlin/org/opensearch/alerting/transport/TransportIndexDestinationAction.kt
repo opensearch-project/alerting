@@ -117,7 +117,7 @@ class TransportIndexDestinationAction @Inject constructor(
                 })
             } else if (!IndexUtils.scheduledJobIndexUpdated) {
                 IndexUtils.updateIndexMapping(
-                    ScheduledJob.SCHEDULED_JOBS_INDEX, ScheduledJob.SCHEDULED_JOB_TYPE,
+                    ScheduledJob.SCHEDULED_JOBS_INDEX,
                     ScheduledJobIndices.scheduledJobMappings(), clusterService.state(), client.admin().indices(),
                     object : ActionListener<AcknowledgedResponse> {
                         override fun onResponse(response: AcknowledgedResponse) {
@@ -306,7 +306,7 @@ class TransportIndexDestinationAction @Inject constructor(
             var failureReasons = StringBuilder()
             if (response.shardInfo.failed > 0) {
                 response.shardInfo.failures.forEach {
-                    entry ->
+                        entry ->
                     failureReasons.append(entry.reason())
                 }
                 return failureReasons.toString()

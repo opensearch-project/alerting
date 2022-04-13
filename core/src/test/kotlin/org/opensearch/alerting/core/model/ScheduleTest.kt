@@ -5,7 +5,7 @@
 
 package org.opensearch.alerting.core.model
 
-import org.opensearch.alerting.elasticapi.string
+import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.common.xcontent.ToXContent
 import java.time.Instant
 import java.time.ZoneId

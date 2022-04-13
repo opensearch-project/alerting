@@ -23,7 +23,7 @@ import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
 import org.opensearch.alerting.alerts.AlertIndices.Companion.HISTORY_WRITE_INDEX
-import org.opensearch.alerting.elasticapi.suspendUntil
+import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_HISTORY_ENABLED
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_HISTORY_INDEX_MAX_AGE
@@ -78,9 +78,6 @@ class AlertIndices(
 
         /** The in progress alert history index. */
         const val ALERT_INDEX = ".opendistro-alerting-alerts"
-
-        /** The Elastic mapping type */
-        const val MAPPING_TYPE = "_doc"
 
         /** The alias of the index in which to write alert history */
         const val HISTORY_WRITE_INDEX = ".opendistro-alerting-alert-history-write"
@@ -212,7 +209,7 @@ class AlertIndices(
         if (existsResponse.isExists) return true
 
         val request = CreateIndexRequest(index)
-            .mapping(MAPPING_TYPE, alertMapping(), XContentType.JSON)
+            .mapping(alertMapping())
             .settings(Settings.builder().put("index.hidden", true).build())
 
         if (alias != null) request.alias(Alias(alias))
@@ -236,7 +233,7 @@ class AlertIndices(
             return
         }
 
-        var putMappingRequest: PutMappingRequest = PutMappingRequest(targetIndex).type(MAPPING_TYPE)
+        var putMappingRequest: PutMappingRequest = PutMappingRequest(targetIndex)
             .source(mapping, XContentType.JSON)
         val updateResponse: AcknowledgedResponse = client.admin().indices().suspendUntil { putMapping(putMappingRequest, it) }
         if (updateResponse.isAcknowledged) {
@@ -267,7 +264,7 @@ class AlertIndices(
         // We have to pass null for newIndexName in order to get Elastic to increment the index count.
         val request = RolloverRequest(HISTORY_WRITE_INDEX, null)
         request.createIndexRequest.index(HISTORY_INDEX_PATTERN)
-            .mapping(MAPPING_TYPE, alertMapping(), XContentType.JSON)
+            .mapping(alertMapping())
             .settings(Settings.builder().put("index.hidden", true).build())
         request.addMaxIndexDocsCondition(historyMaxDocs)
         request.addMaxIndexAgeCondition(historyMaxAge)

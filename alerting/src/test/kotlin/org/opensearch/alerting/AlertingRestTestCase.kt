@@ -20,14 +20,17 @@ import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
-import org.opensearch.alerting.elasticapi.string
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
+import org.opensearch.alerting.model.destination.Chime
+import org.opensearch.alerting.model.destination.CustomWebhook
 import org.opensearch.alerting.model.destination.Destination
+import org.opensearch.alerting.model.destination.Slack
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
+import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.DestinationType
@@ -35,6 +38,7 @@ import org.opensearch.client.Request
 import org.opensearch.client.Response
 import org.opensearch.client.RestClient
 import org.opensearch.client.WarningFailureException
+import org.opensearch.common.io.PathUtils
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
@@ -51,7 +55,6 @@ import org.opensearch.rest.RestStatus
 import org.opensearch.search.SearchModule
 import java.net.URLEncoder
 import java.nio.file.Files
-import java.nio.file.Path
 import java.time.Instant
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -69,6 +72,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected val numberOfNodes = System.getProperty("cluster.number_of_nodes", "1")!!.toInt()
     protected val isMultiNode = numberOfNodes > 1
 
+    protected val statsResponseOpendistroSweeperEnabledField = "opendistro.scheduled_jobs.enabled"
+    protected val statsResponseOpenSearchSweeperEnabledField = "plugins.scheduled_jobs.enabled"
+
     override fun xContentRegistry(): NamedXContentRegistry {
         return NamedXContentRegistry(
             mutableListOf(
@@ -76,7 +82,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                 SearchInput.XCONTENT_REGISTRY,
                 QueryLevelTrigger.XCONTENT_REGISTRY,
                 BucketLevelTrigger.XCONTENT_REGISTRY
-            ) + SearchModule(Settings.EMPTY, false, emptyList()).namedXContents
+            ) + SearchModule(Settings.EMPTY, emptyList()).namedXContents
         )
     }
 
@@ -84,8 +90,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return entityAsMap(this)
     }
 
-    protected fun createMonitor(monitor: Monitor, refresh: Boolean = true): Monitor {
-        val response = client().makeRequest(
+    protected fun createMonitorWithClient(client: RestClient, monitor: Monitor, refresh: Boolean = true): Monitor {
+        val response = client.makeRequest(
             "POST", "$ALERTING_BASE_URI?refresh=$refresh", emptyMap(),
             monitor.toHttpEntity()
         )
@@ -97,6 +103,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         ).map()
         assertUserNull(monitorJson as HashMap<String, Any>)
         return monitor.copy(id = monitorJson["_id"] as String, version = (monitorJson["_version"] as Int).toLong())
+    }
+
+    protected fun createMonitor(monitor: Monitor, refresh: Boolean = true): Monitor {
+        return createMonitorWithClient(client(), monitor, refresh)
     }
 
     protected fun deleteMonitor(monitor: Monitor, refresh: Boolean = true): Response {
@@ -207,6 +217,12 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return getEmailAccount(emailAccountID = emailAccountID)
     }
 
+    protected fun createRandomEmailAccountWithGivenName(refresh: Boolean = true, randomName: String): EmailAccount {
+        val emailAccount = randomEmailAccount(salt = randomName)
+        val emailAccountID = createEmailAccount(emailAccount, refresh).id
+        return getEmailAccount(emailAccountID = emailAccountID)
+    }
+
     protected fun updateEmailAccount(emailAccount: EmailAccount, refresh: Boolean = true): EmailAccount {
         val response = client().makeRequest(
             "PUT",
@@ -266,6 +282,12 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun createRandomEmailGroup(refresh: Boolean = true): EmailGroup {
         val emailGroup = randomEmailGroup()
+        val emailGroupID = createEmailGroup(emailGroup, refresh).id
+        return getEmailGroup(emailGroupID = emailGroupID)
+    }
+
+    protected fun createRandomEmailGroupWithGivenName(refresh: Boolean = true, randomName: String): EmailGroup {
+        val emailGroup = randomEmailGroup(salt = randomName)
         val emailGroupID = createEmailGroup(emailGroup, refresh).id
         return getEmailGroup(emailGroupID = emailGroupID)
     }
@@ -331,7 +353,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return destinationJson["destinations"] as List<Map<String, Any>>
     }
 
-    private fun getTestDestination(): Destination {
+    protected fun getTestDestination(): Destination {
         return Destination(
             type = DestinationType.TEST_ACTION,
             name = "test",
@@ -340,6 +362,59 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             chime = null,
             slack = null,
             customWebhook = null,
+            email = null
+        )
+    }
+
+    fun getSlackDestination(): Destination {
+        val slack = Slack("https://hooks.slack.com/services/slackId")
+        return Destination(
+            type = DestinationType.SLACK,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = null,
+            slack = slack,
+            customWebhook = null,
+            email = null
+        )
+    }
+
+    fun getChimeDestination(): Destination {
+        val chime = Chime("https://hooks.chime.aws/incomingwebhooks/chimeId")
+        return Destination(
+            type = DestinationType.CHIME,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = chime,
+            slack = null,
+            customWebhook = null,
+            email = null
+        )
+    }
+
+    fun getCustomWebhookDestination(): Destination {
+        val customWebhook = CustomWebhook(
+            "https://hooks.slack.com/services/customWebhookId",
+            null,
+            null,
+            80,
+            null,
+            null,
+            emptyMap(),
+            emptyMap(),
+            null,
+            null
+        )
+        return Destination(
+            type = DestinationType.CUSTOM_WEBHOOK,
+            name = "test",
+            user = randomUser(),
+            lastUpdateTime = Instant.now(),
+            chime = null,
+            slack = null,
+            customWebhook = customWebhook,
             email = null
         )
     }
@@ -638,7 +713,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return StringEntity(toJsonString(), APPLICATION_JSON)
     }
 
-    private fun Destination.toJsonString(): String {
+    protected fun Destination.toJsonString(): String {
         val builder = XContentFactory.jsonBuilder()
         return shuffleXContent(toXContent(builder)).string()
     }
@@ -647,7 +722,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return StringEntity(toJsonString(), APPLICATION_JSON)
     }
 
-    private fun EmailAccount.toJsonString(): String {
+    protected fun EmailAccount.toJsonString(): String {
         val builder = jsonBuilder()
         return shuffleXContent(toXContent(builder)).string()
     }
@@ -656,12 +731,12 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return StringEntity(toJsonString(), APPLICATION_JSON)
     }
 
-    private fun EmailGroup.toJsonString(): String {
+    protected fun EmailGroup.toJsonString(): String {
         val builder = jsonBuilder()
         return shuffleXContent(toXContent(builder)).string()
     }
 
-    private fun Alert.toHttpEntityWithUser(): HttpEntity {
+    protected fun Alert.toHttpEntityWithUser(): HttpEntity {
         return StringEntity(toJsonStringWithUser(), APPLICATION_JSON)
     }
 
@@ -825,6 +900,55 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client().performRequest(request)
     }
 
+    fun createCustomIndexRole(name: String, index: String, clusterPermissions: String?) {
+        val request = Request("PUT", "/_plugins/_security/api/roles/$name")
+        var entity = "{\n" +
+            "\"cluster_permissions\": [\n" +
+            "\"$clusterPermissions\"\n" +
+            "],\n" +
+            "\"index_permissions\": [\n" +
+            "{\n" +
+            "\"index_patterns\": [\n" +
+            "\"$index\"\n" +
+            "],\n" +
+            "\"dls\": \"\",\n" +
+            "\"fls\": [],\n" +
+            "\"masked_fields\": [],\n" +
+            "\"allowed_actions\": [\n" +
+            "\"crud\"\n" +
+            "]\n" +
+            "}\n" +
+            "],\n" +
+            "\"tenant_permissions\": []\n" +
+            "}"
+        request.setJsonEntity(entity)
+        client().performRequest(request)
+    }
+
+    fun createIndexRoleWithDocLevelSecurity(name: String, index: String, dlsQuery: String) {
+        val request = Request("PUT", "/_plugins/_security/api/roles/$name")
+        var entity = "{\n" +
+            "\"cluster_permissions\": [\n" +
+            "],\n" +
+            "\"index_permissions\": [\n" +
+            "{\n" +
+            "\"index_patterns\": [\n" +
+            "\"$index\"\n" +
+            "],\n" +
+            "\"dls\": \"$dlsQuery\",\n" +
+            "\"fls\": [],\n" +
+            "\"masked_fields\": [],\n" +
+            "\"allowed_actions\": [\n" +
+            "\"crud\"\n" +
+            "]\n" +
+            "}\n" +
+            "],\n" +
+            "\"tenant_permissions\": []\n" +
+            "}"
+        request.setJsonEntity(entity)
+        client().performRequest(request)
+    }
+
     fun createUserRolesMapping(role: String, users: Array<String>) {
         val request = Request("PUT", "/_plugins/_security/api/rolesmapping/$role")
         val usersStr = users.joinToString { it -> "\"$it\"" }
@@ -849,11 +973,61 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client().makeRequest("DELETE", "/_plugins/_security/api/rolesmapping/$name")
     }
 
+    fun deleteRoleAndRoleMapping(role: String) {
+        deleteRoleMapping(role)
+        deleteRole(role)
+    }
+
     fun createUserWithTestData(user: String, index: String, role: String, backendRole: String) {
         createUser(user, user, arrayOf(backendRole))
         createTestIndex(index)
         createIndexRole(role, index)
         createUserRolesMapping(role, arrayOf(user))
+    }
+
+    fun createUserWithTestDataAndCustomRole(
+        user: String,
+        index: String,
+        role: String,
+        backendRole: String,
+        clusterPermissions: String?
+    ) {
+        createUser(user, user, arrayOf(backendRole))
+        createTestIndex(index)
+        createCustomIndexRole(role, index, clusterPermissions)
+        createUserRolesMapping(role, arrayOf(user))
+    }
+
+    fun createUserWithDocLevelSecurityTestData(
+        user: String,
+        index: String,
+        role: String,
+        backendRole: String,
+        dlsQuery: String
+    ) {
+        createUser(user, user, arrayOf(backendRole))
+        createTestIndex(index)
+        createIndexRoleWithDocLevelSecurity(role, index, dlsQuery)
+        createUserRolesMapping(role, arrayOf(user))
+    }
+
+    fun createUserWithDocLevelSecurityTestDataAndCustomRole(
+        user: String,
+        index: String,
+        role: String,
+        backendRole: String,
+        dlsQuery: String,
+        clusterPermissions: String?
+    ) {
+        createUser(user, user, arrayOf(backendRole))
+        createTestIndex(index)
+        createIndexRoleWithDocLevelSecurity(role, index, dlsQuery)
+        createCustomIndexRole(role, index, clusterPermissions)
+        createUserRolesMapping(role, arrayOf(user))
+    }
+
+    fun getClusterPermissionsFromCustomRole(clusterPermissions: String): String? {
+        return ROLE_TO_PERMISSION_MAPPING.get(clusterPermissions)
     }
 
     companion object {
@@ -889,7 +1063,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                     false
                 )
                 proxy.getExecutionData(false)?.let {
-                    val path = Path.of("$jacocoBuildPath/integTest.exec")
+                    val path = PathUtils.get("$jacocoBuildPath/integTest.exec")
                     Files.write(path, it)
                 }
             }

@@ -5,16 +5,18 @@
 
 package org.opensearch.alerting.model
 
+import org.opensearch.alerting.core.model.ClusterMetricsInput
 import org.opensearch.alerting.core.model.CronSchedule
 import org.opensearch.alerting.core.model.Input
 import org.opensearch.alerting.core.model.Schedule
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
-import org.opensearch.alerting.elasticapi.instant
-import org.opensearch.alerting.elasticapi.optionalTimeField
-import org.opensearch.alerting.elasticapi.optionalUserField
+import org.opensearch.alerting.opensearchapi.instant
+import org.opensearch.alerting.opensearchapi.optionalTimeField
+import org.opensearch.alerting.opensearchapi.optionalUserField
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MONITOR_MAX_INPUTS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MONITOR_MAX_TRIGGERS
+import org.opensearch.alerting.settings.SupportedClusterMetricsSettings
 import org.opensearch.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
 import org.opensearch.alerting.util._ID
 import org.opensearch.alerting.util._VERSION
@@ -69,6 +71,8 @@ data class Monitor(
                     require(trigger is QueryLevelTrigger) { "Incompatible trigger [$trigger.id] for monitor type [$monitorType]" }
                 MonitorType.BUCKET_LEVEL_MONITOR ->
                     require(trigger is BucketLevelTrigger) { "Incompatible trigger [$trigger.id] for monitor type [$monitorType]" }
+                MonitorType.CLUSTER_METRICS_MONITOR ->
+                    require(trigger is QueryLevelTrigger) { "Incompatible trigger [$trigger.id] for monitor type [$monitorType]" }
             }
         }
         if (enabled) {
@@ -113,7 +117,8 @@ data class Monitor(
     // This is different from 'type' which denotes the Scheduled Job type
     enum class MonitorType(val value: String) {
         QUERY_LEVEL_MONITOR("query_level_monitor"),
-        BUCKET_LEVEL_MONITOR("bucket_level_monitor");
+        BUCKET_LEVEL_MONITOR("bucket_level_monitor"),
+        CLUSTER_METRICS_MONITOR("cluster_metrics_monitor");
 
         override fun toString(): String {
             return value
@@ -216,11 +221,11 @@ data class Monitor(
         @JvmOverloads
         @Throws(IOException::class)
         fun parse(xcp: XContentParser, id: String = NO_ID, version: Long = NO_VERSION): Monitor {
-            lateinit var name: String
+            var name: String? = null
             // Default to QUERY_LEVEL_MONITOR to cover Monitors that existed before the addition of MonitorType
             var monitorType: String = MonitorType.QUERY_LEVEL_MONITOR.toString()
             var user: User? = null
-            lateinit var schedule: Schedule
+            var schedule: Schedule? = null
             var lastUpdateTime: Instant? = null
             var enabledTime: Instant? = null
             var uiMetadata: Map<String, Any> = mapOf()
@@ -250,7 +255,10 @@ data class Monitor(
                     INPUTS_FIELD -> {
                         ensureExpectedToken(Token.START_ARRAY, xcp.currentToken(), xcp)
                         while (xcp.nextToken() != Token.END_ARRAY) {
-                            inputs.add(Input.parse(xcp))
+                            val input = Input.parse(xcp)
+                            if (input is ClusterMetricsInput)
+                                SupportedClusterMetricsSettings.validateApiType(input)
+                            inputs.add(input)
                         }
                     }
                     TRIGGERS_FIELD -> {
@@ -281,7 +289,7 @@ data class Monitor(
                 requireNotNull(schedule) { "Monitor schedule is null" },
                 lastUpdateTime ?: Instant.now(),
                 enabledTime,
-                MonitorType.valueOf(monitorType.toUpperCase(Locale.ROOT)),
+                MonitorType.valueOf(monitorType.uppercase(Locale.ROOT)),
                 user,
                 schemaVersion,
                 inputs.toList(),
