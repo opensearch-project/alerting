@@ -8,6 +8,7 @@ package org.opensearch.alerting
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorIndices.Fields.BUCKET_INDICES
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorIndices.Fields.PARENT_BUCKET_PATH
+import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
@@ -18,20 +19,22 @@ import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
-import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerScript
+import org.opensearch.alerting.triggercondition.parsers.TriggerExpressionParser
 import org.opensearch.alerting.util.getBucketKeysHash
+import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
 import org.opensearch.search.aggregations.Aggregation
 import org.opensearch.search.aggregations.Aggregations
 import org.opensearch.search.aggregations.support.AggregationPath
-import java.time.Instant
 
 /** Service that handles executing Triggers */
 class TriggerService(val scriptService: ScriptService) {
 
     private val logger = LogManager.getLogger(TriggerService::class.java)
+    private val ALWAYS_RUN = Script("return true")
+    private val NEVER_RUN = Script("return false")
 
     fun isQueryLevelTriggerActionable(ctx: QueryLevelTriggerExecutionContext, result: QueryLevelTriggerRunResult): Boolean {
         // Suppress actions if the current alert is acknowledged and there are no errors.
@@ -60,31 +63,18 @@ class TriggerService(val scriptService: ScriptService) {
     fun runDocLevelTrigger(
         monitor: Monitor,
         trigger: DocumentLevelTrigger,
-        ctx: DocumentLevelTriggerExecutionContext,
-        docsToQueries: Map<String, List<String>>,
-        queryIds: List<String>
+        queryToDocIds: Map<DocLevelQuery, Set<String>>
     ): DocumentLevelTriggerRunResult {
         return try {
-            val triggeredDocs = mutableListOf<String>()
+            var triggeredDocs = mutableListOf<String>()
 
-            val dummyTrigger = QueryLevelTrigger(
-                name = trigger.name,
-                severity = trigger.severity,
-                actions = trigger.actions,
-                condition = trigger.condition
-            )
-            val dummyExecutionContext = QueryLevelTriggerExecutionContext(monitor, dummyTrigger, emptyList(), Instant.now(), Instant.now())
-
-            for (doc in docsToQueries.keys) {
-                val params = trigger.condition.params.toMutableMap()
-                for (queryId in queryIds) {
-                    params[queryId] = docsToQueries[doc]!!.contains(queryId)
+            if (trigger.condition.idOrCode.equals(ALWAYS_RUN.idOrCode)) {
+                for (value in queryToDocIds.values) {
+                    triggeredDocs.addAll(value)
                 }
-                val triggered = scriptService.compile(trigger.condition, TriggerScript.CONTEXT)
-                    .newInstance(params)
-                    .execute(dummyExecutionContext)
-                logger.info("trigger val: $triggered")
-                if (triggered) triggeredDocs.add(doc)
+            } else if (!trigger.condition.idOrCode.equals(NEVER_RUN.idOrCode)) {
+                triggeredDocs = TriggerExpressionParser(trigger.condition.idOrCode).parse()
+                    .evaluate(queryToDocIds).toMutableList()
             }
 
             DocumentLevelTriggerRunResult(trigger.name, triggeredDocs, null)

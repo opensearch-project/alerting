@@ -119,7 +119,7 @@ object DocumentReturningMonitorRunner : MonitorRunner {
                 monitor,
                 idQueryMap,
                 docsToQueries,
-                queryIds,
+                queryToDocIds,
                 dryrun
             )
         }
@@ -146,11 +146,11 @@ object DocumentReturningMonitorRunner : MonitorRunner {
         monitor: Monitor,
         idQueryMap: Map<String, DocLevelQuery>,
         docsToQueries: Map<String, List<String>>,
-        queryIds: List<String>,
+        queryToDocIds: Map<DocLevelQuery, Set<String>>,
         dryrun: Boolean
     ): DocumentLevelTriggerRunResult {
         val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger)
-        val triggerResult = monitorCtx.triggerService!!.runDocLevelTrigger(monitor, trigger, triggerCtx, docsToQueries, queryIds)
+        val triggerResult = monitorCtx.triggerService!!.runDocLevelTrigger(monitor, trigger, queryToDocIds)
 
         logger.info("trigger results")
         logger.info(triggerResult.triggeredDocs.toString())
