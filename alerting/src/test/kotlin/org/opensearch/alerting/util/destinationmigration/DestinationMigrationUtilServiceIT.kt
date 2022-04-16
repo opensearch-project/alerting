@@ -46,8 +46,8 @@ class DestinationMigrationUtilServiceIT : AlertingRestTestCase() {
             val emailGroupDoc = "{\"email_group\" : ${emailGroup.toJsonString()}}"
             val emailAccountId = UUID.randomUUID().toString()
             val emailGroupId = UUID.randomUUID().toString()
-            indexDoc(SCHEDULED_JOBS_INDEX, emailAccountId, emailAccountDoc)
-            indexDoc(SCHEDULED_JOBS_INDEX, emailGroupId, emailGroupDoc)
+            indexDocWithAdminClient(SCHEDULED_JOBS_INDEX, emailAccountId, emailAccountDoc)
+            indexDocWithAdminClient(SCHEDULED_JOBS_INDEX, emailGroupId, emailGroupDoc)
 
             val recipient = Recipient(Recipient.RecipientType.EMAIL, null, "test@email.com")
             val email = Email(emailAccountId, listOf(recipient))
@@ -75,7 +75,7 @@ class DestinationMigrationUtilServiceIT : AlertingRestTestCase() {
                       "destination" : ${destination.toJsonString()}
                     }
                 """.trimIndent()
-                indexDoc(SCHEDULED_JOBS_INDEX, destination.id, dest)
+                indexDocWithAdminClient(SCHEDULED_JOBS_INDEX, destination.id, dest)
                 ids.add(destination.id)
             }
 
