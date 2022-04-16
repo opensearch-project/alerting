@@ -59,3 +59,4 @@ This project is licensed under the [Apache v2.0 License](LICENSE.txt).
 ## Copyright
 
 Copyright OpenSearch Contributors. See [NOTICE](NOTICE.txt) for details.
+
