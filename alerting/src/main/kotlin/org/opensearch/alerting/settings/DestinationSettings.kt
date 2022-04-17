@@ -8,6 +8,7 @@ package org.opensearch.alerting.settings
 import org.opensearch.common.settings.SecureSetting
 import org.opensearch.common.settings.SecureString
 import org.opensearch.common.settings.Setting
+import org.opensearch.common.settings.Setting.AffixSetting
 import org.opensearch.common.settings.Settings
 import java.util.function.Function
 
@@ -34,14 +35,24 @@ class DestinationSettings {
             EMAIL_DESTINATION_SETTING_PREFIX,
             "username",
             // Needed to coerce lambda to Function type for some reason to avoid argument mismatch compile error
-            Function { key: String -> SecureSetting.secureString(key, LegacyOpenDistroDestinationSettings.EMAIL_USERNAME) }
+            Function { key: String ->
+                SecureSetting.secureString(
+                    key,
+                    fallback(key, LegacyOpenDistroDestinationSettings.EMAIL_USERNAME, "plugins", "opendistro")
+                )
+            }
         )
 
         val EMAIL_PASSWORD: Setting.AffixSetting<SecureString> = Setting.affixKeySetting(
             EMAIL_DESTINATION_SETTING_PREFIX,
             "password",
             // Needed to coerce lambda to Function type for some reason to avoid argument mismatch compile error
-            Function { key: String -> SecureSetting.secureString(key, LegacyOpenDistroDestinationSettings.EMAIL_PASSWORD) }
+            Function { key: String ->
+                SecureSetting.secureString(
+                    key,
+                    fallback(key, LegacyOpenDistroDestinationSettings.EMAIL_PASSWORD, "plugins", "opendistro")
+                )
+            }
         )
 
         val HOST_DENY_LIST: Setting<List<String>> = Setting.listSetting(
@@ -83,6 +94,14 @@ class DestinationSettings {
         private fun <T> getEmailSettingValue(settings: Settings, emailAccountName: String, emailSetting: Setting.AffixSetting<T>): T? {
             val concreteSetting = emailSetting.getConcreteSettingForNamespace(emailAccountName)
             return concreteSetting.get(settings)
+        }
+
+        private fun <T> fallback(key: String, affixSetting: AffixSetting<T>, regex: String, replacement: String): Setting<T>? {
+            return if ("_na_" == key) {
+                affixSetting.getConcreteSettingForNamespace(key)
+            } else {
+                affixSetting.getConcreteSetting(key.replace(regex.toRegex(), replacement))
+            }
         }
 
         data class SecureDestinationSettings(val emailUsername: SecureString, val emailPassword: SecureString)
