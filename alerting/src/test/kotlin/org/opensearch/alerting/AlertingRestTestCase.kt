@@ -596,9 +596,17 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client.makeRequest("POST", "$ALERTING_BASE_URI/_execute", params, monitor.toHttpEntityWithUser())
 
     protected fun indexDoc(index: String, id: String, doc: String, refresh: Boolean = true): Response {
+        return indexDoc(client(), index, id, doc, refresh)
+    }
+
+    protected fun indexDocWithAdminClient(index: String, id: String, doc: String, refresh: Boolean = true): Response {
+        return indexDoc(adminClient(), index, id, doc, refresh)
+    }
+
+    private fun indexDoc(client: RestClient, index: String, id: String, doc: String, refresh: Boolean = true): Response {
         val requestBody = StringEntity(doc, APPLICATION_JSON)
         val params = if (refresh) mapOf("refresh" to "true") else mapOf()
-        val response = client().makeRequest("PUT", "$index/_doc/$id", params, requestBody)
+        val response = client.makeRequest("PUT", "$index/_doc/$id", params, requestBody)
         assertTrue(
             "Unable to index doc: '${doc.take(15)}...' to index: '$index'",
             listOf(RestStatus.OK, RestStatus.CREATED).contains(response.restStatus())
