@@ -5,16 +5,13 @@
 
 package org.opensearch.alerting.model.destination
 
-import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.common.Strings
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
-import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
-import org.opensearch.common.xcontent.XContentType
 import java.io.IOException
 import java.lang.IllegalStateException
 
@@ -71,12 +68,8 @@ data class Slack(val url: String) : ToXContent {
         }
     }
 
+    // Complete JSON structure is now constructed in the notification plugin
     fun constructMessageContent(subject: String?, message: String): String {
-        val messageContent: String? = if (Strings.isNullOrEmpty(subject)) message else "$subject \n\n $message"
-        val builder = XContentFactory.contentBuilder(XContentType.JSON)
-        builder.startObject()
-            .field("text", messageContent)
-            .endObject()
-        return builder.string()
+        return if (Strings.isNullOrEmpty(subject)) message else "$subject \n\n $message"
     }
 }

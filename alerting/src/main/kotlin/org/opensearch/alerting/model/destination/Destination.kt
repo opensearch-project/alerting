@@ -6,12 +6,6 @@
 package org.opensearch.alerting.model.destination
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.alerting.destination.Notification
-import org.opensearch.alerting.destination.message.BaseMessage
-import org.opensearch.alerting.destination.message.ChimeMessage
-import org.opensearch.alerting.destination.message.CustomWebhookMessage
-import org.opensearch.alerting.destination.message.EmailMessage
-import org.opensearch.alerting.destination.message.SlackMessage
 import org.opensearch.alerting.model.destination.email.Email
 import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.instant
@@ -19,7 +13,7 @@ import org.opensearch.alerting.opensearchapi.optionalTimeField
 import org.opensearch.alerting.opensearchapi.optionalUserField
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
-import org.opensearch.alerting.util.isHostInDenylist
+import org.opensearch.alerting.util.destinationmigration.DestinationConversionUtils.Companion.convertAlertingToNotificationMethodType
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.ToXContent
@@ -27,8 +21,12 @@ import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.destination.message.LegacyBaseMessage
+import org.opensearch.commons.destination.message.LegacyChimeMessage
+import org.opensearch.commons.destination.message.LegacyCustomWebhookMessage
+import org.opensearch.commons.destination.message.LegacyEmailMessage
+import org.opensearch.commons.destination.message.LegacySlackMessage
 import java.io.IOException
-import java.net.InetAddress
 import java.time.Instant
 import java.util.Locale
 
@@ -238,72 +236,52 @@ data class Destination(
         }
     }
 
-    @Throws(IOException::class)
-    fun publish(
+    fun buildLegacyBaseMessage(
         compiledSubject: String?,
         compiledMessage: String,
-        destinationCtx: DestinationContext,
-        denyHostRanges: List<String>
-    ): String {
+        destinationCtx: DestinationContext
+    ): LegacyBaseMessage {
 
-        val destinationMessage: BaseMessage
-        val responseContent: String
-        val responseStatusCode: Int
+        val destinationMessage: LegacyBaseMessage
         when (type) {
             DestinationType.CHIME -> {
                 val messageContent = chime?.constructMessageContent(compiledSubject, compiledMessage)
-                destinationMessage = ChimeMessage.Builder(name)
+                destinationMessage = LegacyChimeMessage.Builder(name)
                     .withUrl(chime?.url)
                     .withMessage(messageContent)
                     .build()
             }
             DestinationType.SLACK -> {
                 val messageContent = slack?.constructMessageContent(compiledSubject, compiledMessage)
-                destinationMessage = SlackMessage.Builder(name)
+                destinationMessage = LegacySlackMessage.Builder(name)
                     .withUrl(slack?.url)
                     .withMessage(messageContent)
                     .build()
             }
             DestinationType.CUSTOM_WEBHOOK -> {
-                destinationMessage = CustomWebhookMessage.Builder(name)
-                    .withUrl(customWebhook?.url)
-                    .withScheme(customWebhook?.scheme)
-                    .withHost(customWebhook?.host)
-                    .withPort(customWebhook?.port)
-                    .withPath(customWebhook?.path)
-                    .withMethod(customWebhook?.method)
-                    .withQueryParams(customWebhook?.queryParams)
+                destinationMessage = LegacyCustomWebhookMessage.Builder(name)
+                    .withUrl(getLegacyCustomWebhookMessageURL(customWebhook))
                     .withHeaderParams(customWebhook?.headerParams)
                     .withMessage(compiledMessage).build()
             }
             DestinationType.EMAIL -> {
                 val emailAccount = destinationCtx.emailAccount
-                destinationMessage = EmailMessage.Builder(name)
+                destinationMessage = LegacyEmailMessage.Builder(name)
+                    .withAccountName(emailAccount?.name)
                     .withHost(emailAccount?.host)
                     .withPort(emailAccount?.port)
-                    .withMethod(emailAccount?.method?.value)
-                    .withUserName(emailAccount?.username)
-                    .withPassword(emailAccount?.password)
+                    .withMethod(emailAccount?.method?.let { convertAlertingToNotificationMethodType(it).toString() })
                     .withFrom(emailAccount?.email)
                     .withRecipients(destinationCtx.recipients)
                     .withSubject(compiledSubject)
                     .withMessage(compiledMessage).build()
             }
-            DestinationType.TEST_ACTION -> {
-                return "test action"
-            }
+            else -> throw IllegalArgumentException("Unsupported Destination type [$type] for building legacy message")
         }
-
-        validateDestinationUri(destinationMessage, denyHostRanges)
-        val response = Notification.publish(destinationMessage) as org.opensearch.alerting.destination.response.DestinationResponse
-        responseContent = response.responseContent
-        responseStatusCode = response.statusCode
-
-        logger.info("Message published for action name: $name, messageid: $responseContent, statuscode: $responseStatusCode")
-        return responseContent
+        return destinationMessage
     }
 
-    fun constructResponseForDestinationType(type: DestinationType): Any {
+    private fun constructResponseForDestinationType(type: DestinationType): Any {
         var content: Any? = null
         when (type) {
             DestinationType.CHIME -> content = chime?.convertToMap()?.get(type.value)
@@ -318,13 +296,14 @@ data class Destination(
         return content
     }
 
-    private fun validateDestinationUri(destinationMessage: BaseMessage, denyHostRanges: List<String>) {
-        if (destinationMessage.isHostInDenylist(denyHostRanges)) {
-            logger.error(
-                "Host: {} resolves to: {} which is in denylist: {}.", destinationMessage.uri.host,
-                InetAddress.getByName(destinationMessage.uri.host), denyHostRanges
-            )
-            throw IOException("The destination address is invalid.")
-        }
+    private fun getLegacyCustomWebhookMessageURL(customWebhook: CustomWebhook?): String {
+        return LegacyCustomWebhookMessage.Builder(name)
+            .withUrl(customWebhook?.url)
+            .withScheme(customWebhook?.scheme)
+            .withHost(customWebhook?.host)
+            .withPort(customWebhook?.port)
+            .withPath(customWebhook?.path)
+            .withQueryParams(customWebhook?.queryParams)
+            .build().uri.toString()
     }
 }

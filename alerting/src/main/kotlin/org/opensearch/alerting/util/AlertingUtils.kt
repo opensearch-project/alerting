@@ -36,6 +36,8 @@ fun isValidEmail(email: String): Boolean {
 /** Allowed Destinations are ones that are specified in the [DestinationSettings.ALLOW_LIST] setting. */
 fun Destination.isAllowed(allowList: List<String>): Boolean = allowList.contains(this.type.value)
 
+fun Destination.isTestAction(): Boolean = this.type == DestinationType.TEST_ACTION
+
 fun BaseMessage.isHostInDenylist(networks: List<String>): Boolean {
     if (this.url != null || this.uri.host != null) {
         val ipStr = IPAddressString(this.uri.host)
