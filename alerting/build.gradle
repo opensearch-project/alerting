@@ -98,6 +98,15 @@ integTest.dependsOn(bundle)
 integTest.getClusters().forEach{c -> c.plugin(project.getObjects().fileProperty().value(bundle.getArchiveFile()))}
 
 def _numNodes = findProperty('numNodes') as Integer ?: 1
+
+String notificationsVersion = "2.0.0"
+String notificationsQualifier = "rc1"
+String notificationsFilePath = "src/test/resources/notifications"
+String notificationsCoreFilePath = "src/test/resources/notifications-core"
+String notificationsOpenDistroPlugin = "opensearch-notifications-" + notificationsVersion + ".0-" + notificationsQualifier + ".zip"
+String notificationsCoreOpenDistroPlugin = "opensearch-notifications-core-" + notificationsVersion + ".0-" + notificationsQualifier + ".zip"
+String notificationsRemoteFile = "https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/" + notificationsVersion + "-" + notificationsQualifier + "/latest/linux/x64/tar/builds/opensearch/plugins/" + notificationsOpenDistroPlugin
+String notificationsCoreRemoteFile = "https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/" + notificationsVersion + "-" + notificationsQualifier + "/latest/linux/x64/tar/builds/opensearch/plugins/" + notificationsCoreOpenDistroPlugin
 testClusters.integTest {
     testDistribution = "ARCHIVE"
     // Cluster shrink exception thrown if we try to set numberOfNodes to 1, so only apply if > 1
@@ -116,14 +125,38 @@ testClusters.integTest {
     plugin(provider({
         new RegularFile() {
             @Override
-            File getAsFile() { fileTree("src/test/resources/notifications-core").getSingleFile() }
+            File getAsFile() {
+                File dir = new File(rootDir.path + "/alerting/" + notificationsCoreFilePath)
+
+                if (!dir.exists()) {
+                    dir.mkdirs()
+                }
+
+                File f = new File(dir, notificationsCoreOpenDistroPlugin)
+                if (!f.exists()) {
+                    new URL(notificationsCoreRemoteFile).withInputStream{ ins -> f.withOutputStream{ it << ins }}
+                }
+                fileTree("src/test/resources/notifications-core").getSingleFile()
+            }
         }
     }))
 
     plugin(provider({
         new RegularFile() {
             @Override
-            File getAsFile() { fileTree("src/test/resources/notifications").getSingleFile() }
+            File getAsFile() {
+                File dir = new File(rootDir.path + "/alerting/" + notificationsFilePath)
+
+                if (!dir.exists()) {
+                    dir.mkdirs()
+                }
+
+                File f = new File(dir, notificationsOpenDistroPlugin)
+                if (!f.exists()) {
+                    new URL(notificationsRemoteFile).withInputStream{ ins -> f.withOutputStream{ it << ins }}
+                }
+                fileTree("src/test/resources/notifications").getSingleFile()
+            }
         }
     }))
 }
@@ -171,6 +204,8 @@ integTest {
 String bwcVersion = "1.13.1.0"
 String baseName = "alertingBwcCluster"
 String bwcFilePath = "src/test/resources/bwc"
+String bwcOpenDistroPlugin = "opendistro-alerting-" + bwcVersion + ".zip"
+String bwcRemoteFile = 'https://d3g5vo6xdbdb9a.cloudfront.net/downloads/elasticsearch-plugins/opendistro-alerting/' + bwcOpenDistroPlugin
 
 2.times {i ->
     testClusters {
@@ -184,6 +219,15 @@ String bwcFilePath = "src/test/resources/bwc"
                     return new RegularFile() {
                         @Override
                         File getAsFile() {
+                            File dir = new File(rootDir.path + "/alerting/" + bwcFilePath + "/alerting/" + bwcVersion)
+
+                            if (!dir.exists()) {
+                                dir.mkdirs()
+                            }
+                            File f = new File(dir, bwcOpenDistroPlugin)
+                            if (!f.exists()) {
+                                new URL(bwcRemoteFile).withInputStream{ ins -> f.withOutputStream{ it << ins }}
+                            }
                             return fileTree(bwcFilePath + "/alerting/" + bwcVersion).getSingleFile()
                         }
                     }
@@ -206,13 +250,37 @@ task prepareBwcTests {
                 provider({
                     new RegularFile() {
                         @Override
-                        File getAsFile() { fileTree("src/test/resources/notifications-core").getSingleFile() }
+                        File getAsFile() {
+                            File dir = new File(rootDir.path + "/alerting/" + notificationsCoreFilePath)
+
+                            if (!dir.exists()) {
+                                dir.mkdirs()
+                            }
+
+                            File f = new File(dir, notificationsCoreOpenDistroPlugin)
+                            if (!f.exists()) {
+                                new URL(notificationsCoreRemoteFile).withInputStream{ ins -> f.withOutputStream{ it << ins }}
+                            }
+                            fileTree("src/test/resources/notifications-core").getSingleFile()
+                        }
                     }
                 }),
                 provider({
                     new RegularFile() {
                         @Override
-                        File getAsFile() { fileTree("src/test/resources/notifications").getSingleFile() }
+                        File getAsFile() {
+                            File dir = new File(rootDir.path + "/alerting/" + notificationsFilePath)
+
+                            if (!dir.exists()) {
+                                dir.mkdirs()
+                            }
+
+                            File f = new File(dir, notificationsOpenDistroPlugin)
+                            if (!f.exists()) {
+                                new URL(notificationsRemoteFile).withInputStream{ ins -> f.withOutputStream{ it << ins }}
+                            }
+                            fileTree("src/test/resources/notifications").getSingleFile()
+                        }
                     }
                 })
         ]
