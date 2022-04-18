@@ -15,8 +15,6 @@ import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.makeRequest
-import org.opensearch.alerting.randomDocLevelMonitorInput
-import org.opensearch.alerting.randomDocLevelTrigger
 import org.opensearch.alerting.randomDocumentLevelMonitor
 import org.opensearch.alerting.randomDocumentLevelTrigger
 import org.opensearch.alerting.randomQueryLevelMonitor
@@ -36,7 +34,13 @@ class AlertIndicesIT : AlertingRestTestCase() {
     }
 
     fun `test create finding index`() {
-        executeMonitor(randomDocumentLevelMonitor(triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN))))
+        val testIndex = createTestIndex()
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+
+        executeMonitor(monitor.id)
 
         assertIndexExists(AlertIndices.FINDING_HISTORY_WRITE_INDEX)
     }
@@ -143,11 +147,12 @@ class AlertIndicesIT : AlertingRestTestCase() {
         client().updateSettings(AlertingSettings.FINDING_HISTORY_ROLLOVER_PERIOD.key, "1s")
         client().updateSettings(AlertingSettings.FINDING_HISTORY_INDEX_MAX_AGE.key, "1s")
 
-        val trueMonitor = randomDocumentLevelMonitor(
-            triggers = listOf(randomDocLevelTrigger(condition = ALWAYS_RUN)),
-            inputs = listOf(randomDocLevelMonitorInput())
-        )
-        executeMonitor(trueMonitor)
+        val testIndex = createTestIndex()
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        executeMonitor(trueMonitor.id)
 
         // Allow for a rollover index.
         Thread.sleep(2000)
