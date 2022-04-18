@@ -29,6 +29,10 @@ import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.authuser.User
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.index.reindex.BulkByScrollResponse
+import org.opensearch.index.reindex.DeleteByQueryAction
+import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -132,6 +136,10 @@ class TransportDeleteMonitorAction @Inject constructor(
                 deleteRequest,
                 object : ActionListener<DeleteResponse> {
                     override fun onResponse(response: DeleteResponse) {
+                        val clusterState = clusterService.state()
+                        if (clusterState.routingTable.hasIndex(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)) {
+                            deleteDocLevelMonitorQueries()
+                        }
                         actionListener.onResponse(response)
                     }
 
@@ -140,6 +148,21 @@ class TransportDeleteMonitorAction @Inject constructor(
                     }
                 }
             )
+        }
+
+        private fun deleteDocLevelMonitorQueries() {
+            DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+                .source(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
+                .filter(QueryBuilders.matchQuery("monitor_id", monitorId))
+                .execute(
+                    object : ActionListener<BulkByScrollResponse> {
+                        override fun onResponse(response: BulkByScrollResponse) {
+                        }
+
+                        override fun onFailure(t: Exception) {
+                        }
+                    }
+                )
         }
     }
 }
