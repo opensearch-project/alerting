@@ -45,9 +45,6 @@ import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.resthandler.RestAcknowledgeAlertAction
-import org.opensearch.alerting.resthandler.RestDeleteDestinationAction
-import org.opensearch.alerting.resthandler.RestDeleteEmailAccountAction
-import org.opensearch.alerting.resthandler.RestDeleteEmailGroupAction
 import org.opensearch.alerting.resthandler.RestDeleteMonitorAction
 import org.opensearch.alerting.resthandler.RestExecuteMonitorAction
 import org.opensearch.alerting.resthandler.RestGetAlertsAction
@@ -56,9 +53,6 @@ import org.opensearch.alerting.resthandler.RestGetEmailAccountAction
 import org.opensearch.alerting.resthandler.RestGetEmailGroupAction
 import org.opensearch.alerting.resthandler.RestGetFindingsAction
 import org.opensearch.alerting.resthandler.RestGetMonitorAction
-import org.opensearch.alerting.resthandler.RestIndexDestinationAction
-import org.opensearch.alerting.resthandler.RestIndexEmailAccountAction
-import org.opensearch.alerting.resthandler.RestIndexEmailGroupAction
 import org.opensearch.alerting.resthandler.RestIndexMonitorAction
 import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
 import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
@@ -177,14 +171,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestExecuteMonitorAction(),
             RestAcknowledgeAlertAction(),
             RestScheduledJobStatsHandler("_alerting"),
-            RestIndexDestinationAction(),
-            RestDeleteDestinationAction(),
-            RestIndexEmailAccountAction(),
-            RestDeleteEmailAccountAction(),
             RestSearchEmailAccountAction(),
             RestGetEmailAccountAction(),
-            RestIndexEmailGroupAction(),
-            RestDeleteEmailGroupAction(),
             RestSearchEmailGroupAction(),
             RestGetEmailGroupAction(),
             RestGetDestinationsAction(),

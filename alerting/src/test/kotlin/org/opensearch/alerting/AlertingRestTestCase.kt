@@ -43,6 +43,7 @@ import org.opensearch.client.Request
 import org.opensearch.client.Response
 import org.opensearch.client.RestClient
 import org.opensearch.client.WarningFailureException
+import org.opensearch.common.UUIDs
 import org.opensearch.common.io.PathUtils
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
@@ -129,19 +130,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return response
     }
 
+    /**
+     * Destinations are now deprecated in favor of the Notification plugin's configs.
+     * This method should only be used for checking legacy behavior/Notification migration scenarios.
+     */
     protected fun createDestination(destination: Destination = getTestDestination(), refresh: Boolean = true): Destination {
-        val response = client().makeRequest(
-            "POST",
-            "$DESTINATION_BASE_URI?refresh=$refresh",
-            emptyMap(),
-            destination.toHttpEntity()
-        )
-        assertEquals("Unable to create a new destination", RestStatus.CREATED, response.restStatus())
+        val response = indexDocWithAdminClient(ScheduledJob.SCHEDULED_JOBS_INDEX, UUIDs.base64UUID(), destination.toJsonStringWithType(), refresh)
         val destinationJson = jsonXContent.createParser(
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
-        assertUserNull(destinationJson as HashMap<String, Any>)
 
         return destination.copy(
             id = destinationJson["_id"] as String,
@@ -206,14 +204,17 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return emailAccount.copy(id = id, version = version)
     }
 
+    /**
+     * Email Accounts are now deprecated in favor of the Notification plugin's configs.
+     * This method should only be used for checking legacy behavior/Notification migration scenarios.
+     */
     protected fun createEmailAccount(emailAccount: EmailAccount = getTestEmailAccount(), refresh: Boolean = true): EmailAccount {
-        val response = client().makeRequest(
-            "POST",
-            "$EMAIL_ACCOUNT_BASE_URI?refresh=$refresh",
-            emptyMap(),
-            emailAccount.toHttpEntity()
+        val response = indexDocWithAdminClient(
+            ScheduledJob.SCHEDULED_JOBS_INDEX,
+            UUIDs.base64UUID(),
+            emailAccount.toJsonStringWithType(),
+            refresh
         )
-        assertEquals("Unable to create a new email account", RestStatus.CREATED, response.restStatus())
         val emailAccountJson = jsonXContent.createParser(
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
@@ -231,21 +232,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val emailAccount = randomEmailAccount(salt = randomName)
         val emailAccountID = createEmailAccount(emailAccount, refresh).id
         return getEmailAccount(emailAccountID = emailAccountID)
-    }
-
-    protected fun updateEmailAccount(emailAccount: EmailAccount, refresh: Boolean = true): EmailAccount {
-        val response = client().makeRequest(
-            "PUT",
-            "$EMAIL_ACCOUNT_BASE_URI/${emailAccount.id}?refresh=$refresh",
-            emptyMap(),
-            emailAccount.toHttpEntity()
-        )
-        assertEquals("Unable to update email account", RestStatus.OK, response.restStatus())
-        val emailAccountJson = jsonXContent.createParser(
-            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-            response.entity.content
-        ).map()
-        return emailAccount.copy(id = emailAccountJson["_id"] as String)
     }
 
     protected fun getEmailGroup(
@@ -275,14 +261,17 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return emailGroup.copy(id = id, version = version)
     }
 
+    /**
+     * Email Groups are now deprecated in favor of the Notification plugin's configs.
+     * This method should only be used for checking legacy behavior/Notification migration scenarios.
+     */
     protected fun createEmailGroup(emailGroup: EmailGroup = getTestEmailGroup(), refresh: Boolean = true): EmailGroup {
-        val response = client().makeRequest(
-            "POST",
-            "$EMAIL_GROUP_BASE_URI?refresh=$refresh",
-            emptyMap(),
-            emailGroup.toHttpEntity()
+        val response = indexDocWithAdminClient(
+            ScheduledJob.SCHEDULED_JOBS_INDEX,
+            UUIDs.base64UUID(),
+            emailGroup.toJsonStringWithType(),
+            refresh
         )
-        assertEquals("Unable to create a new email group", RestStatus.CREATED, response.restStatus())
         val emailGroupJson = jsonXContent.createParser(
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
@@ -300,21 +289,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val emailGroup = randomEmailGroup(salt = randomName)
         val emailGroupID = createEmailGroup(emailGroup, refresh).id
         return getEmailGroup(emailGroupID = emailGroupID)
-    }
-
-    protected fun updateEmailGroup(emailGroup: EmailGroup, refresh: Boolean = true): EmailGroup {
-        val response = client().makeRequest(
-            "PUT",
-            "$EMAIL_GROUP_BASE_URI/${emailGroup.id}?refresh=$refresh",
-            emptyMap(),
-            emailGroup.toHttpEntity()
-        )
-        assertEquals("Unable to update email group", RestStatus.OK, response.restStatus())
-        val emailGroupJson = jsonXContent.createParser(
-            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-            response.entity.content
-        ).map()
-        return emailGroup.copy(id = emailGroupJson["_id"] as String)
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -847,7 +821,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     private fun Monitor.toJsonStringWithUser(): String {
-        val builder = XContentFactory.jsonBuilder()
+        val builder = jsonBuilder()
         return shuffleXContent(toXContentWithUser(builder, ToXContent.EMPTY_PARAMS)).string()
     }
 
@@ -856,8 +830,15 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun Destination.toJsonString(): String {
-        val builder = XContentFactory.jsonBuilder()
+        val builder = jsonBuilder()
         return shuffleXContent(toXContent(builder)).string()
+    }
+
+    protected fun Destination.toJsonStringWithType(): String {
+        val builder = jsonBuilder()
+        return shuffleXContent(
+            toXContent(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
+        ).string()
     }
 
     protected fun EmailAccount.toHttpEntity(): HttpEntity {
@@ -869,6 +850,13 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return shuffleXContent(toXContent(builder)).string()
     }
 
+    protected fun EmailAccount.toJsonStringWithType(): String {
+        val builder = jsonBuilder()
+        return shuffleXContent(
+            toXContent(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
+        ).string()
+    }
+
     protected fun EmailGroup.toHttpEntity(): HttpEntity {
         return StringEntity(toJsonString(), APPLICATION_JSON)
     }
@@ -878,12 +866,19 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return shuffleXContent(toXContent(builder)).string()
     }
 
+    protected fun EmailGroup.toJsonStringWithType(): String {
+        val builder = jsonBuilder()
+        return shuffleXContent(
+            toXContent(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
+        ).string()
+    }
+
     protected fun Alert.toHttpEntityWithUser(): HttpEntity {
         return StringEntity(toJsonStringWithUser(), APPLICATION_JSON)
     }
 
     private fun Alert.toJsonStringWithUser(): String {
-        val builder = XContentFactory.jsonBuilder()
+        val builder = jsonBuilder()
         return shuffleXContent(toXContentWithUser(builder)).string()
     }
 
