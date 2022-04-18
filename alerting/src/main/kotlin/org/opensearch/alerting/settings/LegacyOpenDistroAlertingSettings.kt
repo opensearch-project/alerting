@@ -99,6 +99,12 @@ class LegacyOpenDistroAlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
         )
 
+        val ALERT_FINDING_RETENTION_PERIOD = Setting.positiveTimeSetting(
+            "opendistro.alerting.alert_finding_retention_period",
+            TimeValue(60, TimeUnit.DAYS),
+            Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
+        )
+
         val REQUEST_TIMEOUT = Setting.positiveTimeSetting(
             "opendistro.alerting.request_timeout",
             TimeValue.timeValueSeconds(10),

@@ -18,7 +18,11 @@ class FindingTests : OpenSearchTestCase() {
 
         // THEN
         assertEquals("Template args 'id' field does not match:", templateArgs[Finding.FINDING_ID_FIELD], finding.id)
-        assertEquals("Template args 'logEvent' field does not match:", templateArgs[Finding.RELATED_DOC_ID_FIELD], finding.relatedDocId)
+        assertEquals(
+            "Template args 'relatedDocIds' field does not match:",
+            templateArgs[Finding.RELATED_DOC_IDS_FIELD],
+            finding.relatedDocIds
+        )
         assertEquals("Template args 'monitorId' field does not match:", templateArgs[Finding.MONITOR_ID_FIELD], finding.monitorId)
         assertEquals(
             "Template args 'monitorName' field does not match:",

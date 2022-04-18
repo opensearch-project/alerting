@@ -135,7 +135,7 @@ class TransportGetAlertsAction @Inject constructor(
 
     fun search(searchSourceBuilder: SearchSourceBuilder, actionListener: ActionListener<GetAlertsResponse>) {
         val searchRequest = SearchRequest()
-            .indices(AlertIndices.ALL_INDEX_PATTERN)
+            .indices(AlertIndices.ALL_ALERT_INDEX_PATTERN)
             .source(searchSourceBuilder)
 
         client.search(

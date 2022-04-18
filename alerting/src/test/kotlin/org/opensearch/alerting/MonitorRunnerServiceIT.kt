@@ -255,7 +255,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
         executeMonitor(monitor.id)
         assertTrue("There's still an active alert", searchAlerts(monitor, AlertIndices.ALERT_INDEX).isEmpty())
-        val completedAlert = searchAlerts(monitor, AlertIndices.ALL_INDEX_PATTERN).single()
+        val completedAlert = searchAlerts(monitor, AlertIndices.ALL_ALERT_INDEX_PATTERN).single()
         verifyAlert(completedAlert, monitor, COMPLETED)
     }
 
@@ -490,7 +490,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         val errorAlert = searchAlerts(monitor).single()
         verifyAlert(errorAlert, monitor, ERROR)
         executeMonitor(monitor.id)
-        val completedAlert = searchAlerts(monitor, AlertIndices.ALL_INDEX_PATTERN).single()
+        val completedAlert = searchAlerts(monitor, AlertIndices.ALL_ALERT_INDEX_PATTERN).single()
         verifyAlert(completedAlert, monitor, COMPLETED)
 
         assertNull("Completed alert still has error message.", completedAlert.errorMessage)
@@ -736,7 +736,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         Thread.sleep(200)
         updateMonitor(monitor.copy(triggers = listOf(trigger.copy(condition = NEVER_RUN)), id = monitor.id))
         executeMonitor(monitor.id)
-        val completedAlert = searchAlerts(monitor, AlertIndices.ALL_INDEX_PATTERN).single()
+        val completedAlert = searchAlerts(monitor, AlertIndices.ALL_ALERT_INDEX_PATTERN).single()
         verifyAlert(completedAlert, monitor, COMPLETED)
 
         updateMonitor(monitor.copy(triggers = listOf(trigger.copy(condition = ALWAYS_RUN)), id = monitor.id))
@@ -1210,7 +1210,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         executeMonitor(monitor.id)
 
         // Verify expected alert was completed
-        alerts = searchAlerts(monitor, AlertIndices.ALL_INDEX_PATTERN)
+        alerts = searchAlerts(monitor, AlertIndices.ALL_ALERT_INDEX_PATTERN)
         val activeAlerts = alerts.filter { it.state == ACTIVE }
         val completedAlerts = alerts.filter { it.state == COMPLETED }
         assertEquals("Incorrect number of active alerts", 1, activeAlerts.size)
@@ -1305,7 +1305,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         // Execute Monitor and check that both Alerts were updated
         Thread.sleep(200)
         executeMonitor(monitor.id)
-        currentAlerts = searchAlerts(monitor, AlertIndices.ALL_INDEX_PATTERN)
+        currentAlerts = searchAlerts(monitor, AlertIndices.ALL_ALERT_INDEX_PATTERN)
         val completedAlerts = currentAlerts.filter { it.state == COMPLETED }
         assertEquals("Incorrect number of completed alerts", 2, completedAlerts.size)
         val previouslyAcknowledgedAlert = completedAlerts.single { it.aggregationResultBucket?.getBucketKeysHash().equals("test_value_1") }
@@ -1531,7 +1531,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
         // Execute Monitor and check that both Alerts were moved to COMPLETED
         executeMonitor(monitor.id)
-        currentAlerts = searchAlerts(monitor, AlertIndices.ALL_INDEX_PATTERN)
+        currentAlerts = searchAlerts(monitor, AlertIndices.ALL_ALERT_INDEX_PATTERN)
         val completedAlerts = currentAlerts.filter { it.state == COMPLETED }
         assertEquals("Incorrect number of completed alerts", 2, completedAlerts.size)
     }
