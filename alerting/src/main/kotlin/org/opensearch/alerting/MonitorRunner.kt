@@ -39,7 +39,7 @@ abstract class MonitorRunner {
         dryRun: Boolean
     ): MonitorRunResult<*>
 
-    open suspend fun runAction(
+    suspend fun runAction(
         action: Action,
         ctx: TriggerExecutionContext,
         monitorCtx: MonitorRunnerExecutionContext,

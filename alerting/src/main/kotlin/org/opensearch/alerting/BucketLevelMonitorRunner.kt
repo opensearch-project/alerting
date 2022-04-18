@@ -282,47 +282,6 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         return monitorResult.copy(inputResults = firstPageOfInputResults, triggerResults = triggerResults)
     }
 
-//    override suspend fun runAction(
-//        action: Action,
-//        ctx: TriggerExecutionContext,
-//        monitorCtx: MonitorRunnerExecutionContext,
-//        dryrun: Boolean
-//    ): ActionRunResult {
-//        return try {
-//            val actionOutput = mutableMapOf<String, String>()
-//            actionOutput[Action.SUBJECT] = if (action.subjectTemplate != null)
-//                MonitorRunnerService.compileTemplate(action.subjectTemplate, ctx)
-//            else ""
-//            actionOutput[Action.MESSAGE] = MonitorRunnerService.compileTemplate(action.messageTemplate, ctx)
-//            if (Strings.isNullOrEmpty(actionOutput[Action.MESSAGE])) {
-//                throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
-//            }
-//            if (!dryrun) {
-//                withContext(Dispatchers.IO) {
-//                    val destination = AlertingConfigAccessor.getDestinationInfo(
-//                        monitorCtx.client!!,
-//                        monitorCtx.xContentRegistry!!,
-//                        action.destinationId
-//                    )
-//                    if (!destination.isAllowed(monitorCtx.allowList)) {
-//                        throw IllegalStateException("Monitor contains a Destination type that is not allowed: ${destination.type}")
-//                    }
-//
-//                    val destinationCtx = monitorCtx.destinationContextFactory!!.getDestinationContext(destination)
-//                    actionOutput[Action.MESSAGE_ID] = destination.publish(
-//                        actionOutput[Action.SUBJECT],
-//                        actionOutput[Action.MESSAGE]!!,
-//                        destinationCtx,
-//                        monitorCtx.hostDenyList
-//                    )
-//                }
-//            }
-//            ActionRunResult(action.id, action.name, actionOutput, false, MonitorRunnerService.currentTime(), null)
-//        } catch (e: Exception) {
-//            ActionRunResult(action.id, action.name, mapOf(), false, MonitorRunnerService.currentTime(), e)
-//        }
-//    }
-
     private fun defaultToPerExecutionAction(
         monitorCtx: MonitorRunnerExecutionContext,
         monitorId: String,

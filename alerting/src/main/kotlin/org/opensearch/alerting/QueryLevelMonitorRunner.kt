@@ -85,39 +85,4 @@ object QueryLevelMonitorRunner : MonitorRunner() {
         }
         return monitorResult.copy(triggerResults = triggerResults)
     }
-//
-//    override suspend fun runAction(
-//        action: Action,
-//        ctx: TriggerExecutionContext,
-//        monitorCtx: MonitorRunnerExecutionContext,
-//        dryrun: Boolean
-//    ): ActionRunResult {
-//        return try {
-//            if (!MonitorRunnerService.isActionActionable(action, (ctx as QueryLevelTriggerExecutionContext).alert)) {
-//                return ActionRunResult(action.id, action.name, mapOf(), true, null, null)
-//            }
-//            val actionOutput = mutableMapOf<String, String>()
-//            actionOutput[Action.SUBJECT] = if (action.subjectTemplate != null)
-//                MonitorRunnerService.compileTemplate(action.subjectTemplate, ctx)
-//            else ""
-//            actionOutput[Action.MESSAGE] = MonitorRunnerService.compileTemplate(action.messageTemplate, ctx)
-//            if (Strings.isNullOrEmpty(actionOutput[Action.MESSAGE])) {
-//                throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
-//            }
-//            if (!dryrun) {
-//                // TODO: Inject user here so only Destination/Notifications that the user has permissions to are retrieved
-//                withContext(Dispatchers.IO) {
-//                    actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
-//                        action,
-//                        monitorCtx,
-//                        actionOutput[Action.SUBJECT],
-//                        actionOutput[Action.MESSAGE]!!
-//                    )
-//                }
-//            }
-//            ActionRunResult(action.id, action.name, actionOutput, false, MonitorRunnerService.currentTime(), null)
-//        } catch (e: Exception) {
-//            ActionRunResult(action.id, action.name, mapOf(), false, MonitorRunnerService.currentTime(), e)
-//        }
-//    }
 }

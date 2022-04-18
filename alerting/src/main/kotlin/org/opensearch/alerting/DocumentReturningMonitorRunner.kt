@@ -5,8 +5,6 @@
 
 package org.opensearch.alerting
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchAction
@@ -17,7 +15,6 @@ import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRI
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.DocumentExecutionContext
 import org.opensearch.alerting.model.DocumentLevelTrigger
@@ -26,16 +23,12 @@ import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
-import org.opensearch.alerting.script.TriggerExecutionContext
-import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.updateMonitor
 import org.opensearch.client.Client
 import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
-import org.opensearch.common.Strings
 import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
@@ -50,7 +43,7 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortOrder
 import java.io.IOException
 import java.time.Instant
-import java.util.UUID
+import java.util.*
 import kotlin.collections.HashMap
 import kotlin.math.max
 
@@ -278,42 +271,6 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
 
         monitorCtx.client!!.index(indexRequest).actionGet()
         return finding.id
-    }
-
-    // TODO: Implement action for triggers
-    override suspend fun runAction(
-        action: Action,
-        ctx: TriggerExecutionContext,
-        monitorCtx: MonitorRunnerExecutionContext,
-        dryrun: Boolean
-    ): ActionRunResult {
-        return try {
-            if (!MonitorRunnerService.isActionActionable(action, (ctx as DocumentLevelTriggerExecutionContext).alert)) {
-                return ActionRunResult(action.id, action.name, mapOf(), true, null, null)
-            }
-            val actionOutput = mutableMapOf<String, String>()
-            actionOutput[Action.SUBJECT] = if (action.subjectTemplate != null)
-                MonitorRunnerService.compileTemplate(action.subjectTemplate, ctx)
-            else ""
-            actionOutput[Action.MESSAGE] = MonitorRunnerService.compileTemplate(action.messageTemplate, ctx)
-            if (Strings.isNullOrEmpty(actionOutput[Action.MESSAGE])) {
-                throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
-            }
-            if (!dryrun) {
-                withContext(Dispatchers.IO) {
-                    actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
-                        action,
-                        monitorCtx,
-                        actionOutput[Action.SUBJECT],
-                        actionOutput[Action.MESSAGE]!!
-                    )
-                }
-            }
-            ActionRunResult(action.id, action.name, actionOutput, false, MonitorRunnerService.currentTime(), null)
-        } catch (e: Exception) {
-            logger.debug("Failed to run action", AlertingException.wrap(e))
-            ActionRunResult(action.id, action.name, mapOf(), false, MonitorRunnerService.currentTime(), e)
-        }
     }
 
     private fun validate(monitor: Monitor) {
