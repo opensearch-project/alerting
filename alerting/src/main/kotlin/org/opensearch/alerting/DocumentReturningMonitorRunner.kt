@@ -43,7 +43,7 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortOrder
 import java.io.IOException
 import java.time.Instant
-import java.util.*
+import java.util.UUID
 import kotlin.collections.HashMap
 import kotlin.math.max
 
