@@ -32,6 +32,8 @@ data class Alert(
     val monitorUser: User?,
     val triggerId: String,
     val triggerName: String,
+    val findingIds: List<String>,
+    val relatedDocIds: List<String>,
     val state: State,
     val startTime: Instant,
     val endTime: Instant? = null,
@@ -65,7 +67,7 @@ data class Alert(
         triggerId = trigger.id, triggerName = trigger.name, state = state, startTime = startTime,
         lastNotificationTime = lastNotificationTime, errorMessage = errorMessage, errorHistory = errorHistory,
         severity = trigger.severity, actionExecutionResults = actionExecutionResults, schemaVersion = schemaVersion,
-        aggregationResultBucket = null
+        aggregationResultBucket = null, findingIds = emptyList(), relatedDocIds = emptyList()
     )
 
     constructor(
@@ -83,7 +85,7 @@ data class Alert(
         triggerId = trigger.id, triggerName = trigger.name, state = state, startTime = startTime,
         lastNotificationTime = lastNotificationTime, errorMessage = errorMessage, errorHistory = errorHistory,
         severity = trigger.severity, actionExecutionResults = actionExecutionResults, schemaVersion = schemaVersion,
-        aggregationResultBucket = null
+        aggregationResultBucket = null, findingIds = emptyList(), relatedDocIds = emptyList()
     )
 
     constructor(
@@ -102,7 +104,27 @@ data class Alert(
         triggerId = trigger.id, triggerName = trigger.name, state = state, startTime = startTime,
         lastNotificationTime = lastNotificationTime, errorMessage = errorMessage, errorHistory = errorHistory,
         severity = trigger.severity, actionExecutionResults = actionExecutionResults, schemaVersion = schemaVersion,
-        aggregationResultBucket = aggregationResultBucket
+        aggregationResultBucket = aggregationResultBucket, findingIds = emptyList(), relatedDocIds = emptyList()
+    )
+
+    constructor(
+        monitor: Monitor,
+        trigger: DocumentLevelTrigger,
+        findingIds: List<String>,
+        relatedDocIds: List<String>,
+        startTime: Instant,
+        lastNotificationTime: Instant?,
+        state: State = State.ACTIVE,
+        errorMessage: String? = null,
+        errorHistory: List<AlertError> = mutableListOf(),
+        actionExecutionResults: List<ActionExecutionResult> = mutableListOf(),
+        schemaVersion: Int = NO_SCHEMA_VERSION
+    ) : this(
+        monitorId = monitor.id, monitorName = monitor.name, monitorVersion = monitor.version, monitorUser = monitor.user,
+        triggerId = trigger.id, triggerName = trigger.name, state = state, startTime = startTime,
+        lastNotificationTime = lastNotificationTime, errorMessage = errorMessage, errorHistory = errorHistory,
+        severity = trigger.severity, actionExecutionResults = actionExecutionResults, schemaVersion = schemaVersion,
+        aggregationResultBucket = null, findingIds = findingIds, relatedDocIds = relatedDocIds
     )
 
     enum class State {
@@ -122,6 +144,8 @@ data class Alert(
         } else null,
         triggerId = sin.readString(),
         triggerName = sin.readString(),
+        findingIds = sin.readStringList(),
+        relatedDocIds = sin.readStringList(),
         state = sin.readEnum(State::class.java),
         startTime = sin.readInstant(),
         endTime = sin.readOptionalInstant(),
@@ -148,6 +172,8 @@ data class Alert(
         monitorUser?.writeTo(out)
         out.writeString(triggerId)
         out.writeString(triggerName)
+        out.writeStringCollection(findingIds)
+        out.writeStringCollection(relatedDocIds)
         out.writeEnum(state)
         out.writeInstant(startTime)
         out.writeOptionalInstant(endTime)
@@ -176,6 +202,8 @@ data class Alert(
         const val MONITOR_USER_FIELD = "monitor_user"
         const val TRIGGER_ID_FIELD = "trigger_id"
         const val TRIGGER_NAME_FIELD = "trigger_name"
+        const val FINDING_IDS = "finding_ids"
+        const val RELATED_DOC_IDS = "related_doc_ids"
         const val STATE_FIELD = "state"
         const val START_TIME_FIELD = "start_time"
         const val LAST_NOTIFICATION_TIME_FIELD = "last_notification_time"
@@ -201,6 +229,8 @@ data class Alert(
             var monitorUser: User? = null
             lateinit var triggerId: String
             lateinit var triggerName: String
+            val findingIds = mutableListOf<String>()
+            val relatedDocIds = mutableListOf<String>()
             lateinit var state: State
             lateinit var startTime: Instant
             lateinit var severity: String
@@ -223,6 +253,18 @@ data class Alert(
                     MONITOR_VERSION_FIELD -> monitorVersion = xcp.longValue()
                     MONITOR_USER_FIELD -> monitorUser = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) null else User.parse(xcp)
                     TRIGGER_ID_FIELD -> triggerId = xcp.text()
+                    FINDING_IDS -> {
+                        ensureExpectedToken(XContentParser.Token.START_ARRAY, xcp.currentToken(), xcp)
+                        while (xcp.nextToken() != XContentParser.Token.END_ARRAY) {
+                            findingIds.add(xcp.text())
+                        }
+                    }
+                    RELATED_DOC_IDS -> {
+                        ensureExpectedToken(XContentParser.Token.START_ARRAY, xcp.currentToken(), xcp)
+                        while (xcp.nextToken() != XContentParser.Token.END_ARRAY) {
+                            relatedDocIds.add(xcp.text())
+                        }
+                    }
                     STATE_FIELD -> state = State.valueOf(xcp.text())
                     TRIGGER_NAME_FIELD -> triggerName = xcp.text()
                     START_TIME_FIELD -> startTime = requireNotNull(xcp.instant())
@@ -264,7 +306,8 @@ data class Alert(
                 state = requireNotNull(state), startTime = requireNotNull(startTime), endTime = endTime,
                 lastNotificationTime = lastNotificationTime, acknowledgedTime = acknowledgedTime,
                 errorMessage = errorMessage, errorHistory = errorHistory, severity = severity,
-                actionExecutionResults = actionExecutionResults, aggregationResultBucket = aggAlertBucket
+                actionExecutionResults = actionExecutionResults, aggregationResultBucket = aggAlertBucket, findingIds = findingIds,
+                relatedDocIds = relatedDocIds
             )
         }
 
@@ -297,6 +340,8 @@ data class Alert(
 
         builder.field(TRIGGER_ID_FIELD, triggerId)
             .field(TRIGGER_NAME_FIELD, triggerName)
+            .field(FINDING_IDS, findingIds.toTypedArray())
+            .field(RELATED_DOC_IDS, relatedDocIds.toTypedArray())
             .field(STATE_FIELD, state)
             .field(ERROR_MESSAGE_FIELD, errorMessage)
             .field(ALERT_HISTORY_FIELD, errorHistory.toTypedArray())

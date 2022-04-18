@@ -16,12 +16,17 @@ import org.junit.rules.DisableOnDebug
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
+import org.opensearch.alerting.action.GetFindingsResponse
 import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
+import org.opensearch.alerting.model.DocumentLevelTrigger
+import org.opensearch.alerting.model.Finding
+import org.opensearch.alerting.model.FindingWithDocs
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.destination.Chime
@@ -44,6 +49,7 @@ import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentParser
@@ -60,10 +66,12 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+import java.util.UUID
 import javax.management.MBeanServerInvocationHandler
 import javax.management.ObjectName
 import javax.management.remote.JMXConnectorFactory
 import javax.management.remote.JMXServiceURL
+import kotlin.collections.HashMap
 
 abstract class AlertingRestTestCase : ODFERestTestCase() {
 
@@ -81,7 +89,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                 Monitor.XCONTENT_REGISTRY,
                 SearchInput.XCONTENT_REGISTRY,
                 QueryLevelTrigger.XCONTENT_REGISTRY,
-                BucketLevelTrigger.XCONTENT_REGISTRY
+                BucketLevelTrigger.XCONTENT_REGISTRY,
+                DocumentLevelTrigger.XCONTENT_REGISTRY
             ) + SearchModule(Settings.EMPTY, emptyList()).namedXContents
         )
     }
@@ -102,7 +111,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             response.entity.content
         ).map()
         assertUserNull(monitorJson as HashMap<String, Any>)
-        return monitor.copy(id = monitorJson["_id"] as String, version = (monitorJson["_version"] as Int).toLong())
+
+        return getMonitor(monitorId = monitorJson["_id"] as String)
     }
 
     protected fun createMonitor(monitor: Monitor, refresh: Boolean = true): Monitor {
@@ -475,6 +485,15 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return getMonitor(monitorId = monitorId)
     }
 
+    protected fun createRandomDocumentMonitor(refresh: Boolean = false, withMetadata: Boolean = false): Monitor {
+        val monitor = randomDocumentLevelMonitor(withMetadata = withMetadata)
+        val monitorId = createMonitor(monitor, refresh).id
+        if (withMetadata) {
+            return getMonitor(monitorId = monitorId, header = BasicHeader(HttpHeaders.USER_AGENT, "OpenSearch-Dashboards"))
+        }
+        return getMonitor(monitorId = monitorId)
+    }
+
     @Suppress("UNCHECKED_CAST")
     protected fun updateMonitor(monitor: Monitor, refresh: Boolean = false): Monitor {
         val response = client().makeRequest(
@@ -511,8 +530,81 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return monitor.copy(id = id, version = version)
     }
 
-    protected fun searchAlerts(monitor: Monitor, indices: String = AlertIndices.ALERT_INDEX, refresh: Boolean = true): List<Alert> {
+    // TODO: understand why doc alerts wont work with the normal search Alerts function
+    protected fun searchAlertsWithFilter(
+        monitor: Monitor,
+        indices: String = AlertIndices.ALERT_INDEX,
+        refresh: Boolean = true
+    ): List<Alert> {
         if (refresh) refreshIndex(indices)
+
+        val request = """
+                { "version" : true,
+                  "query": { "match_all": {} }
+                }
+        """.trimIndent()
+        val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", StringEntity(request, APPLICATION_JSON))
+        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
+
+        val searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        return searchResponse.hits.hits.map {
+            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
+            Alert.parse(xcp, it.id, it.version)
+        }.filter { alert -> alert.monitorId == monitor.id }
+    }
+
+    protected fun createFinding(
+        monitorId: String = "NO_ID",
+        monitorName: String = "NO_NAME",
+        index: String = "testIndex",
+        docLevelQueries: List<DocLevelQuery> = listOf(DocLevelQuery(query = "test_field:\"us-west-2\"", name = "testQuery")),
+        matchingDocIds: List<String>
+    ): String {
+        val finding = Finding(
+            id = UUID.randomUUID().toString(),
+            relatedDocIds = matchingDocIds,
+            monitorId = monitorId,
+            monitorName = monitorName,
+            index = index,
+            docLevelQueries = docLevelQueries,
+            timestamp = Instant.now()
+        )
+
+        val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
+
+        indexDoc(".opensearch-alerting-findings", finding.id, findingStr)
+        return finding.id
+    }
+
+    protected fun searchFindings(
+        monitor: Monitor,
+        indices: String = AlertIndices.ALL_FINDING_INDEX_PATTERN,
+        refresh: Boolean = true
+    ): List<Finding> {
+        if (refresh) refreshIndex(indices)
+
+        val request = """
+                { "version" : true,
+                  "query": { "match_all": {} }
+                }
+        """.trimIndent()
+        val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", StringEntity(request, APPLICATION_JSON))
+        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
+
+        val searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        return searchResponse.hits.hits.map {
+            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
+            Finding.parse(xcp)
+        }.filter { finding -> finding.monitorId == monitor.id }
+    }
+
+    protected fun searchAlerts(monitor: Monitor, indices: String = AlertIndices.ALERT_INDEX, refresh: Boolean = true): List<Alert> {
+        try {
+            if (refresh) refreshIndex(indices)
+        } catch (e: Exception) {
+            logger.warn("Could not refresh index $indices because: ${e.message}")
+            return emptyList()
+        }
 
         // If this is a test monitor (it doesn't have an ID) and no alerts will be saved for it.
         val searchParams = if (monitor.id != Monitor.NO_ID) mapOf("routing" to monitor.id) else mapOf()
@@ -594,6 +686,40 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun executeMonitor(client: RestClient, monitor: Monitor, params: Map<String, String> = mapOf()): Response =
         client.makeRequest("POST", "$ALERTING_BASE_URI/_execute", params, monitor.toHttpEntityWithUser())
+
+    protected fun searchFindings(params: Map<String, String> = mutableMapOf()): GetFindingsResponse {
+
+        var baseEndpoint = "${AlertingPlugin.FINDING_BASE_URI}/_search?"
+        for (entry in params.entries) {
+            baseEndpoint += "${entry.key}=${entry.value}&"
+        }
+
+        val response = client().makeRequest("GET", baseEndpoint)
+
+        assertEquals("Unable to retrieve findings", RestStatus.OK, response.restStatus())
+
+        val parser = createParser(XContentType.JSON.xContent(), response.entity.content)
+        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser)
+
+        var totalFindings = 0
+        val findings = mutableListOf<FindingWithDocs>()
+
+        while (parser.nextToken() != XContentParser.Token.END_OBJECT) {
+            parser.nextToken()
+
+            when (parser.currentName()) {
+                "total_findings" -> totalFindings = parser.intValue()
+                "findings" -> {
+                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_ARRAY, parser.currentToken(), parser)
+                    while (parser.nextToken() != XContentParser.Token.END_ARRAY) {
+                        findings.add(FindingWithDocs.parse(parser))
+                    }
+                }
+            }
+        }
+
+        return GetFindingsResponse(response.restStatus(), totalFindings, findings)
+    }
 
     protected fun indexDoc(index: String, id: String, doc: String, refresh: Boolean = true): Response {
         return indexDoc(client(), index, id, doc, refresh)
@@ -679,10 +805,18 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     fun putAlertMappings(mapping: String? = null) {
         val mappingHack = if (mapping != null) mapping else AlertIndices.alertMapping().trimStart('{').trimEnd('}')
-        val encodedHistoryIndex = URLEncoder.encode(AlertIndices.HISTORY_INDEX_PATTERN, Charsets.UTF_8.toString())
+        val encodedHistoryIndex = URLEncoder.encode(AlertIndices.ALERT_HISTORY_INDEX_PATTERN, Charsets.UTF_8.toString())
         val settings = Settings.builder().put("index.hidden", true).build()
         createIndex(AlertIndices.ALERT_INDEX, settings, mappingHack)
-        createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertIndices.HISTORY_WRITE_INDEX}\" : {}")
+        createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertIndices.ALERT_HISTORY_WRITE_INDEX}\" : {}")
+    }
+
+    fun putFindingMappings(mapping: String? = null) {
+        val mappingHack = if (mapping != null) mapping else AlertIndices.findingMapping().trimStart('{').trimEnd('}')
+        val encodedHistoryIndex = URLEncoder.encode(AlertIndices.FINDING_HISTORY_INDEX_PATTERN, Charsets.UTF_8.toString())
+        val settings = Settings.builder().put("index.hidden", true).build()
+//        createIndex(AlertIndices.FINDING_HISTORY_WRITE_INDEX, settings, mappingHack)
+        createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertIndices.FINDING_HISTORY_WRITE_INDEX}\" : {}")
     }
 
     fun scheduledJobMappings(): String {

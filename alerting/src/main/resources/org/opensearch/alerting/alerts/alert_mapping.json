@@ -83,6 +83,22 @@
         }
       }
     },
+    "finding_ids": {
+      "type" : "text",
+      "fields" : {
+        "keyword" : {
+          "type" : "keyword"
+        }
+      }
+    },
+    "related_doc_ids": {
+      "type" : "text",
+      "fields" : {
+        "keyword" : {
+          "type" : "keyword"
+        }
+      }
+    },
     "state": {
       "type": "keyword"
     },
