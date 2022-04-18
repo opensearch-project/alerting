@@ -42,6 +42,8 @@ class GetAlertsResponseTests : OpenSearchTestCase() {
             randomUser(),
             "triggerId",
             "triggerName",
+            Collections.emptyList(),
+            Collections.emptyList(),
             Alert.State.ACKNOWLEDGED,
             Instant.MIN,
             null,
@@ -78,6 +80,8 @@ class GetAlertsResponseTests : OpenSearchTestCase() {
             null,
             "triggerId",
             "triggerName",
+            Collections.emptyList(),
+            Collections.emptyList(),
             Alert.State.ACKNOWLEDGED,
             now,
             null,
@@ -93,8 +97,8 @@ class GetAlertsResponseTests : OpenSearchTestCase() {
         var actualXContentString = req.toXContent(builder(), ToXContent.EMPTY_PARAMS).string()
         val expectedXContentString = "{\"alerts\":[{\"id\":\"id\",\"version\":0,\"monitor_id\":\"monitorId\"," +
             "\"schema_version\":0,\"monitor_version\":0,\"monitor_name\":\"monitorName\"," +
-            "\"trigger_id\":\"triggerId\"," +
-            "\"trigger_name\":\"triggerName\",\"state\":\"ACKNOWLEDGED\",\"error_message\":null,\"alert_history\":[]," +
+            "\"trigger_id\":\"triggerId\",\"trigger_name\":\"triggerName\"," +
+            "\"finding_ids\":[],\"related_doc_ids\":[],\"state\":\"ACKNOWLEDGED\",\"error_message\":null,\"alert_history\":[]," +
             "\"severity\":\"severity\",\"action_execution_results\":[],\"start_time\":" + now.toEpochMilli() +
             ",\"last_notification_time\":null,\"end_time\":null,\"acknowledged_time\":null}],\"totalAlerts\":1}"
         assertEquals(expectedXContentString, actualXContentString)
