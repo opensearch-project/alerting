@@ -55,6 +55,7 @@ data class Monitor(
     val schemaVersion: Int = NO_SCHEMA_VERSION,
     val inputs: List<Input>,
     val triggers: List<Trigger>,
+    val lastRunContext: Map<String, Any>,
     val uiMetadata: Map<String, Any>
 ) : ScheduledJob {
 
@@ -68,11 +69,13 @@ data class Monitor(
             // Verify Trigger type based on Monitor type
             when (monitorType) {
                 MonitorType.QUERY_LEVEL_MONITOR ->
-                    require(trigger is QueryLevelTrigger) { "Incompatible trigger [$trigger.id] for monitor type [$monitorType]" }
+                    require(trigger is QueryLevelTrigger) { "Incompatible trigger [${trigger.id}] for monitor type [$monitorType]" }
                 MonitorType.BUCKET_LEVEL_MONITOR ->
-                    require(trigger is BucketLevelTrigger) { "Incompatible trigger [$trigger.id] for monitor type [$monitorType]" }
+                    require(trigger is BucketLevelTrigger) { "Incompatible trigger [${trigger.id}] for monitor type [$monitorType]" }
                 MonitorType.CLUSTER_METRICS_MONITOR ->
-                    require(trigger is QueryLevelTrigger) { "Incompatible trigger [$trigger.id] for monitor type [$monitorType]" }
+                    require(trigger is QueryLevelTrigger) { "Incompatible trigger [${trigger.id}] for monitor type [$monitorType]" }
+                MonitorType.DOC_LEVEL_MONITOR ->
+                    require(trigger is DocumentLevelTrigger) { "Incompatible trigger [${trigger.id}] for monitor type [$monitorType]" }
             }
         }
         if (enabled) {
@@ -108,8 +111,9 @@ data class Monitor(
             User(sin)
         } else null,
         schemaVersion = sin.readInt(),
-        inputs = sin.readList(::SearchInput),
+        inputs = sin.readList((Input)::readFrom),
         triggers = sin.readList((Trigger)::readFrom),
+        lastRunContext = suppressWarning(sin.readMap()),
         uiMetadata = suppressWarning(sin.readMap())
     )
 
@@ -118,7 +122,8 @@ data class Monitor(
     enum class MonitorType(val value: String) {
         QUERY_LEVEL_MONITOR("query_level_monitor"),
         BUCKET_LEVEL_MONITOR("bucket_level_monitor"),
-        CLUSTER_METRICS_MONITOR("cluster_metrics_monitor");
+        CLUSTER_METRICS_MONITOR("cluster_metrics_monitor"),
+        DOC_LEVEL_MONITOR("doc_level_monitor");
 
         override fun toString(): String {
             return value
@@ -156,6 +161,7 @@ data class Monitor(
             .field(INPUTS_FIELD, inputs.toTypedArray())
             .field(TRIGGERS_FIELD, triggers.toTypedArray())
             .optionalTimeField(LAST_UPDATE_TIME_FIELD, lastUpdateTime)
+        if (lastRunContext.isNotEmpty()) builder.field(LAST_RUN_CONTEXT_FIELD, lastRunContext)
         if (uiMetadata.isNotEmpty()) builder.field(UI_METADATA_FIELD, uiMetadata)
         if (params.paramAsBoolean("with_type", false)) builder.endObject()
         return builder.endObject()
@@ -181,14 +187,22 @@ data class Monitor(
         out.writeBoolean(user != null)
         user?.writeTo(out)
         out.writeInt(schemaVersion)
-        out.writeCollection(inputs)
+        // Outputting type with each Input so that the generic Input.readFrom() can read it
+        out.writeVInt(inputs.size)
+        inputs.forEach {
+            if (it is SearchInput) out.writeEnum(Input.Type.SEARCH_INPUT)
+            else out.writeEnum(Input.Type.DOCUMENT_LEVEL_INPUT)
+            it.writeTo(out)
+        }
         // Outputting type with each Trigger so that the generic Trigger.readFrom() can read it
         out.writeVInt(triggers.size)
         triggers.forEach {
             if (it is QueryLevelTrigger) out.writeEnum(Trigger.Type.QUERY_LEVEL_TRIGGER)
+            else if (it is DocumentLevelTrigger) out.writeEnum(Trigger.Type.DOCUMENT_LEVEL_TRIGGER)
             else out.writeEnum(Trigger.Type.BUCKET_LEVEL_TRIGGER)
             it.writeTo(out)
         }
+        out.writeMap(lastRunContext)
         out.writeMap(uiMetadata)
     }
 
@@ -206,6 +220,7 @@ data class Monitor(
         const val NO_VERSION = 1L
         const val INPUTS_FIELD = "inputs"
         const val LAST_UPDATE_TIME_FIELD = "last_update_time"
+        const val LAST_RUN_CONTEXT_FIELD = "last_run_context"
         const val UI_METADATA_FIELD = "ui_metadata"
         const val ENABLED_TIME_FIELD = "enabled_time"
 
@@ -228,6 +243,7 @@ data class Monitor(
             var schedule: Schedule? = null
             var lastUpdateTime: Instant? = null
             var enabledTime: Instant? = null
+            var lastRunContext: Map<String, Any> = mapOf()
             var uiMetadata: Map<String, Any> = mapOf()
             var enabled = true
             var schemaVersion = NO_SCHEMA_VERSION
@@ -269,6 +285,7 @@ data class Monitor(
                     }
                     ENABLED_TIME_FIELD -> enabledTime = xcp.instant()
                     LAST_UPDATE_TIME_FIELD -> lastUpdateTime = xcp.instant()
+                    LAST_RUN_CONTEXT_FIELD -> lastRunContext = xcp.map()
                     UI_METADATA_FIELD -> uiMetadata = xcp.map()
                     else -> {
                         xcp.skipChildren()
@@ -294,6 +311,7 @@ data class Monitor(
                 schemaVersion,
                 inputs.toList(),
                 triggers.toList(),
+                lastRunContext,
                 uiMetadata
             )
         }

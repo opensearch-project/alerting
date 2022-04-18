@@ -9,6 +9,7 @@ import org.apache.commons.validator.routines.UrlValidator
 import org.apache.http.client.utils.URIBuilder
 import org.opensearch.common.CheckedFunction
 import org.opensearch.common.ParseField
+import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.ToXContent
@@ -63,6 +64,13 @@ data class ClusterMetricsInput(
         this.parseEmptyFields()
     }
 
+    @Throws(IOException::class)
+    constructor(sin: StreamInput) : this(
+        sin.readString(), // path
+        sin.readString(), // path params
+        sin.readString() // url
+    )
+
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         return builder.startObject()
             .startObject(URI_FIELD)
@@ -96,13 +104,13 @@ data class ClusterMetricsInput(
         const val URL_FIELD = "url"
         const val URI_FIELD = "uri"
 
-        val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(Input::class.java, ParseField("uri"), CheckedFunction { parseInner(it) })
+        val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(Input::class.java, ParseField(URI_FIELD), CheckedFunction { parseInner(it) })
 
         /**
          * This parse function uses [XContentParser] to parse JSON input and store corresponding fields to create a [ClusterMetricsInput] object
          */
         @JvmStatic @Throws(IOException::class)
-        private fun parseInner(xcp: XContentParser): ClusterMetricsInput {
+        fun parseInner(xcp: XContentParser): ClusterMetricsInput {
             var path = ""
             var pathParams = ""
             var url = ""
