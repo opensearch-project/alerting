@@ -8,9 +8,6 @@ package org.opensearch.alerting
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionResponse
 import org.opensearch.alerting.action.AcknowledgeAlertAction
-import org.opensearch.alerting.action.DeleteDestinationAction
-import org.opensearch.alerting.action.DeleteEmailAccountAction
-import org.opensearch.alerting.action.DeleteEmailGroupAction
 import org.opensearch.alerting.action.DeleteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.GetAlertsAction
@@ -19,9 +16,6 @@ import org.opensearch.alerting.action.GetEmailAccountAction
 import org.opensearch.alerting.action.GetEmailGroupAction
 import org.opensearch.alerting.action.GetFindingsAction
 import org.opensearch.alerting.action.GetMonitorAction
-import org.opensearch.alerting.action.IndexDestinationAction
-import org.opensearch.alerting.action.IndexEmailAccountAction
-import org.opensearch.alerting.action.IndexEmailGroupAction
 import org.opensearch.alerting.action.IndexMonitorAction
 import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
@@ -63,9 +57,6 @@ import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroAlertingSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings
 import org.opensearch.alerting.transport.TransportAcknowledgeAlertAction
-import org.opensearch.alerting.transport.TransportDeleteDestinationAction
-import org.opensearch.alerting.transport.TransportDeleteEmailAccountAction
-import org.opensearch.alerting.transport.TransportDeleteEmailGroupAction
 import org.opensearch.alerting.transport.TransportDeleteMonitorAction
 import org.opensearch.alerting.transport.TransportExecuteMonitorAction
 import org.opensearch.alerting.transport.TransportGetAlertsAction
@@ -74,9 +65,6 @@ import org.opensearch.alerting.transport.TransportGetEmailAccountAction
 import org.opensearch.alerting.transport.TransportGetEmailGroupAction
 import org.opensearch.alerting.transport.TransportGetFindingsSearchAction
 import org.opensearch.alerting.transport.TransportGetMonitorAction
-import org.opensearch.alerting.transport.TransportIndexDestinationAction
-import org.opensearch.alerting.transport.TransportIndexEmailAccountAction
-import org.opensearch.alerting.transport.TransportIndexEmailGroupAction
 import org.opensearch.alerting.transport.TransportIndexMonitorAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
@@ -184,22 +172,16 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     override fun getActions(): List<ActionPlugin.ActionHandler<out ActionRequest, out ActionResponse>> {
         return listOf(
             ActionPlugin.ActionHandler(ScheduledJobsStatsAction.INSTANCE, ScheduledJobsStatsTransportAction::class.java),
-            ActionPlugin.ActionHandler(IndexDestinationAction.INSTANCE, TransportIndexDestinationAction::class.java),
             ActionPlugin.ActionHandler(IndexMonitorAction.INSTANCE, TransportIndexMonitorAction::class.java),
             ActionPlugin.ActionHandler(GetMonitorAction.INSTANCE, TransportGetMonitorAction::class.java),
             ActionPlugin.ActionHandler(ExecuteMonitorAction.INSTANCE, TransportExecuteMonitorAction::class.java),
             ActionPlugin.ActionHandler(SearchMonitorAction.INSTANCE, TransportSearchMonitorAction::class.java),
             ActionPlugin.ActionHandler(DeleteMonitorAction.INSTANCE, TransportDeleteMonitorAction::class.java),
-            ActionPlugin.ActionHandler(DeleteDestinationAction.INSTANCE, TransportDeleteDestinationAction::class.java),
             ActionPlugin.ActionHandler(AcknowledgeAlertAction.INSTANCE, TransportAcknowledgeAlertAction::class.java),
-            ActionPlugin.ActionHandler(IndexEmailAccountAction.INSTANCE, TransportIndexEmailAccountAction::class.java),
             ActionPlugin.ActionHandler(GetEmailAccountAction.INSTANCE, TransportGetEmailAccountAction::class.java),
             ActionPlugin.ActionHandler(SearchEmailAccountAction.INSTANCE, TransportSearchEmailAccountAction::class.java),
-            ActionPlugin.ActionHandler(DeleteEmailAccountAction.INSTANCE, TransportDeleteEmailAccountAction::class.java),
-            ActionPlugin.ActionHandler(IndexEmailGroupAction.INSTANCE, TransportIndexEmailGroupAction::class.java),
             ActionPlugin.ActionHandler(GetEmailGroupAction.INSTANCE, TransportGetEmailGroupAction::class.java),
             ActionPlugin.ActionHandler(SearchEmailGroupAction.INSTANCE, TransportSearchEmailGroupAction::class.java),
-            ActionPlugin.ActionHandler(DeleteEmailGroupAction.INSTANCE, TransportDeleteEmailGroupAction::class.java),
             ActionPlugin.ActionHandler(GetDestinationsAction.INSTANCE, TransportGetDestinationsAction::class.java),
             ActionPlugin.ActionHandler(GetAlertsAction.INSTANCE, TransportGetAlertsAction::class.java),
             ActionPlugin.ActionHandler(GetFindingsAction.INSTANCE, TransportGetFindingsSearchAction::class.java)

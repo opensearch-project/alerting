@@ -549,6 +549,9 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     }
 
     fun `test execute monitor creates alert for trigger with no actions`() {
+        // Create Alerting config index to avoid mapping issues with legacy destination indexing
+        createAlertingConfigIndex()
+
         putAlertMappings() // Required as we do not have a create alert API.
 
         val trigger = randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = emptyList(), destinationId = createDestination().id)
@@ -562,6 +565,9 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     }
 
     fun `test execute monitor non-dryrun`() {
+        // Create Alerting config index to avoid mapping issues with legacy destination indexing
+        createAlertingConfigIndex()
+
         val monitor = createMonitor(
             randomQueryLevelMonitor(
                 triggers = listOf(
@@ -1322,6 +1328,9 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
     @Suppress("UNCHECKED_CAST")
     fun `test bucket-level monitor with one good action and one bad action`() {
+        // Create Alerting config index to avoid mapping issues with legacy destination indexing
+        createAlertingConfigIndex()
+
         val testIndex = createTestIndex()
         insertSampleTimeSerializedData(
             testIndex,
