@@ -13,6 +13,7 @@ import org.opensearch.action.search.SearchAction
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRITE_INDEX
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.core.model.ScheduledJob
@@ -65,6 +66,18 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
     ): MonitorRunResult<DocumentLevelTriggerRunResult> {
         logger.info("Document-level-monitor is running ...")
         var monitorResult = MonitorRunResult<DocumentLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
+
+        // TODO: is this needed from Charlie?
+        try {
+            monitorCtx.alertIndices!!.createOrUpdateAlertIndex()
+            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex()
+            monitorCtx.alertIndices!!.createOrUpdateInitialFindingHistoryIndex()
+        } catch (e: Exception) {
+            val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
+            logger.error("Error loading alerts for monitor: $id", e)
+            return monitorResult.copy(error = e)
+        }
+
         try {
             validate(monitor)
         } catch (e: Exception) {
@@ -244,7 +257,7 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
     ): String {
         val finding = Finding(
             id = UUID.randomUUID().toString(),
-            relatedDocId = matchingDocIds.joinToString(","),
+            relatedDocIds = matchingDocIds,
             monitorId = monitor.id,
             monitorName = monitor.name,
             index = index,
@@ -257,9 +270,11 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
         logger.info("Findings: $findingStr")
 
         // todo: below is all hardcoded, temp code and added only to test. replace this with proper Findings index lifecycle management.
-        val indexRequest = IndexRequest(".opensearch-alerting-findings")
+        val indexRequest = IndexRequest(FINDING_HISTORY_WRITE_INDEX)
             .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
             .source(findingStr, XContentType.JSON)
+            .id(finding.id)
+            .routing(finding.id)
 
         monitorCtx.client!!.index(indexRequest).actionGet()
         return finding.id

@@ -152,7 +152,7 @@ fun randomClusterMetricsMonitor(
     )
 }
 
-fun randomDocumentReturningMonitor(
+fun randomDocumentLevelMonitor(
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     user: User? = randomUser(),
     inputs: List<Input> = listOf(DocLevelMonitorInput("description", listOf("index"), emptyList())),
@@ -207,7 +207,7 @@ fun randomBucketLevelTrigger(
 fun randomActionsForBucketLevelTrigger(min: Int = 0, max: Int = 10, destinationId: String = ""): List<Action> =
     (min..randomInt(max)).map { randomActionWithPolicy(destinationId = destinationId) }
 
-fun randomDocumentReturningTrigger(
+fun randomDocumentLevelTrigger(
     id: String = UUIDs.base64UUID(),
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     severity: String = "1",
@@ -385,7 +385,7 @@ fun randomDocLevelMonitorInput(
 
 fun randomFinding(
     id: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
-    relatedDocId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    relatedDocIds: List<String> = listOf(OpenSearchRestTestCase.randomAlphaOfLength(10)),
     monitorId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     monitorName: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     index: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
@@ -394,7 +394,7 @@ fun randomFinding(
 ): Finding {
     return Finding(
         id = id,
-        relatedDocId = relatedDocId,
+        relatedDocIds = relatedDocIds,
         monitorId = monitorId,
         monitorName = monitorName,
         index = index,

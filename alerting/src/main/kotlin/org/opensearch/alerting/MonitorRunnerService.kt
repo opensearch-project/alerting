@@ -175,7 +175,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         launch {
             try {
                 monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
-                    if (monitorCtx.alertIndices!!.isInitialized()) {
+                    if (monitorCtx.alertIndices!!.isAlertInitialized()) {
                         moveAlerts(monitorCtx.client!!, job.id, job)
                     }
                 }
@@ -189,7 +189,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         launch {
             try {
                 monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
-                    if (monitorCtx.alertIndices!!.isInitialized()) {
+                    if (monitorCtx.alertIndices!!.isAlertInitialized()) {
                         moveAlerts(monitorCtx.client!!, jobId, null)
                     }
                 }

@@ -320,8 +320,8 @@ class AlertService(
                         DeleteRequest(AlertIndices.ALERT_INDEX, alert.id)
                             .routing(alert.monitorId),
                         // Only add completed alert to history index if history is enabled
-                        if (alertIndices.isHistoryEnabled()) {
-                            IndexRequest(AlertIndices.HISTORY_WRITE_INDEX)
+                        if (alertIndices.isAlertHistoryEnabled()) {
+                            IndexRequest(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
                                 .routing(alert.monitorId)
                                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                                 .id(alert.id)
