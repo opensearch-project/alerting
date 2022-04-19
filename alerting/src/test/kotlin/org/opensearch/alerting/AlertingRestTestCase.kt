@@ -135,6 +135,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
      * This method should only be used for checking legacy behavior/Notification migration scenarios.
      */
     protected fun createDestination(destination: Destination = getTestDestination(), refresh: Boolean = true): Destination {
+        // Create Alerting config index if it doesn't exist to avoid mapping issues with legacy destination indexing
+        createAlertingConfigIndex()
+
         val response = indexDocWithAdminClient(ScheduledJob.SCHEDULED_JOBS_INDEX, UUIDs.base64UUID(), destination.toJsonStringWithType(), refresh)
         val destinationJson = jsonXContent.createParser(
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
@@ -209,6 +212,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
      * This method should only be used for checking legacy behavior/Notification migration scenarios.
      */
     protected fun createEmailAccount(emailAccount: EmailAccount = getTestEmailAccount(), refresh: Boolean = true): EmailAccount {
+        // Create Alerting config index if it doesn't exist to avoid mapping issues with legacy destination indexing
+        createAlertingConfigIndex()
+
         val response = indexDocWithAdminClient(
             ScheduledJob.SCHEDULED_JOBS_INDEX,
             UUIDs.base64UUID(),
@@ -266,6 +272,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
      * This method should only be used for checking legacy behavior/Notification migration scenarios.
      */
     protected fun createEmailGroup(emailGroup: EmailGroup = getTestEmailGroup(), refresh: Boolean = true): EmailGroup {
+        // Create Alerting config index if it doesn't exist to avoid mapping issues with legacy destination indexing
+        createAlertingConfigIndex()
+
         val response = indexDocWithAdminClient(
             ScheduledJob.SCHEDULED_JOBS_INDEX,
             UUIDs.base64UUID(),
@@ -797,10 +806,14 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return javaClass.classLoader.getResource("mappings/scheduled-jobs.json").readText()
     }
 
+    /** Creates the Alerting config index if it does not exist */
     fun createAlertingConfigIndex(mapping: String? = null) {
-        val mappingHack = if (mapping != null) mapping else scheduledJobMappings().trimStart('{').trimEnd('}')
-        val settings = Settings.builder().put("index.hidden", true).build()
-        createIndex(ScheduledJob.SCHEDULED_JOBS_INDEX, settings, mappingHack)
+        val indexExistsResponse = client().makeRequest("HEAD", ScheduledJob.SCHEDULED_JOBS_INDEX)
+        if (indexExistsResponse.restStatus() == RestStatus.NOT_FOUND) {
+            val mappingHack = mapping ?: scheduledJobMappings().trimStart('{').trimEnd('}')
+            val settings = Settings.builder().put("index.hidden", true).build()
+            createIndex(ScheduledJob.SCHEDULED_JOBS_INDEX, settings, mappingHack)
+        }
     }
 
     protected fun Response.restStatus(): RestStatus {
