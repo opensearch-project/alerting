@@ -74,32 +74,6 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
 
     // Email account related tests.
 
-    fun `test index email accounts with an user with index email account role`() {
-        createUserWithTestDataAndCustomRole(
-            user,
-            TEST_HR_INDEX,
-            TEST_HR_ROLE,
-            TEST_HR_BACKEND_ROLE,
-            getClusterPermissionsFromCustomRole(ALERTING_INDEX_EMAIL_ACCOUNT_ACCESS)
-        )
-
-        try {
-            val emailAccount = randomEmailAccount(salt = randomAlphaOfLength(5))
-            val refresh = true
-
-            assertEquals("Email Account Check", false, emailAccount.name.isEmpty())
-            val emailAccountResponse = userClient?.makeRequest(
-                "POST",
-                "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}?refresh=$refresh",
-                emptyMap(),
-                emailAccount.toHttpEntity()
-            )
-            assertEquals("Index Email failed", RestStatus.CREATED, emailAccountResponse?.restStatus())
-        } finally {
-            deleteRoleAndRoleMapping(TEST_HR_ROLE)
-        }
-    }
-
     fun `test get email accounts with an user with get email account role`() {
         createUserWithTestDataAndCustomRole(
             user,
@@ -153,60 +127,8 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test delete email accounts with an user with delete email account role`() {
-        createUserWithTestDataAndCustomRole(
-            user,
-            TEST_HR_INDEX,
-            TEST_HR_ROLE,
-            TEST_HR_BACKEND_ROLE,
-            getClusterPermissionsFromCustomRole(ALERTING_DELETE_EMAIL_ACCOUNT_ACCESS)
-        )
-
-        val emailAccount = createRandomEmailAccountWithGivenName(true, randomAlphaOfLength(5))
-
-        try {
-            val deleteEmailAccountsResponse = userClient?.makeRequest(
-                "DELETE",
-                "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/${emailAccount.id}",
-                null,
-                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-            )
-
-            assertEquals("Delete Email Account failed", RestStatus.OK, deleteEmailAccountsResponse?.restStatus())
-        } finally {
-            deleteRoleAndRoleMapping(TEST_HR_ROLE)
-        }
-    }
-
     /*
     TODO: https://github.com/opensearch-project/alerting/issues/300
-
-    fun `test index email accounts with an user without index email account role`() {
-        createUserWithTestDataAndCustomRole(
-            user,
-            TEST_HR_INDEX,
-            TEST_HR_ROLE,
-            TEST_HR_BACKEND_ROLE,
-            getClusterPermissionsFromCustomRole(ALERTING_NO_ACCESS_ROLE)
-        )
-
-        try {
-            val emailAccount = randomEmailAccount(salt = randomAlphaOfLength(5))
-            val refresh = true
-
-            userClient?.makeRequest(
-                "POST",
-                "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}?refresh=$refresh",
-                emptyMap(),
-                emailAccount.toHttpEntity()
-            )
-            fail("Expected 403 Method FORBIDDEN response")
-        } catch (e: ResponseException) {
-            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
-        } finally {
-            deleteRoleAndRoleMapping(TEST_HR_ROLE)
-        }
-    }
 
     fun `test get email accounts with an user without get email account role`() {
         createUserWithTestDataAndCustomRole(
@@ -264,30 +186,5 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test delete email accounts with an user without delete email account role`() {
-        createUserWithTestDataAndCustomRole(
-            user,
-            TEST_HR_INDEX,
-            TEST_HR_ROLE,
-            TEST_HR_BACKEND_ROLE,
-            getClusterPermissionsFromCustomRole(ALERTING_NO_ACCESS_ROLE)
-        )
-
-        val emailAccount = createRandomEmailAccountWithGivenName(true, randomAlphaOfLength(5))
-
-        try {
-            userClient?.makeRequest(
-                "DELETE",
-                "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/${emailAccount.id}",
-                null,
-                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-            )
-            fail("Expected 403 Method FORBIDDEN response")
-        } catch (e: ResponseException) {
-            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
-        } finally {
-            deleteRoleAndRoleMapping(TEST_HR_ROLE)
-        }
-    }
      */
 }
