@@ -5,12 +5,10 @@
 
 package org.opensearch.alerting.util
 
-import inet.ipaddr.IPAddressString
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.destination.message.BaseMessage
 import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.Monitor
@@ -48,20 +46,6 @@ fun isValidEmail(email: String): Boolean {
 fun Destination.isAllowed(allowList: List<String>): Boolean = allowList.contains(this.type.value)
 
 fun Destination.isTestAction(): Boolean = this.type == DestinationType.TEST_ACTION
-
-fun BaseMessage.isHostInDenylist(networks: List<String>): Boolean {
-    if (this.url != null || this.uri.host != null) {
-        val ipStr = IPAddressString(this.uri.host)
-        for (network in networks) {
-            val netStr = IPAddressString(network)
-            if (netStr.contains(ipStr)) {
-                return true
-            }
-        }
-    }
-
-    return false
-}
 
 fun Monitor.isBucketLevelMonitor(): Boolean = this.monitorType == Monitor.MonitorType.BUCKET_LEVEL_MONITOR
 

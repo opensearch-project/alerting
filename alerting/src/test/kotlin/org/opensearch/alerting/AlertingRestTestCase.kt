@@ -138,7 +138,12 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         // Create Alerting config index if it doesn't exist to avoid mapping issues with legacy destination indexing
         createAlertingConfigIndex()
 
-        val response = indexDocWithAdminClient(ScheduledJob.SCHEDULED_JOBS_INDEX, UUIDs.base64UUID(), destination.toJsonStringWithType(), refresh)
+        val response = indexDocWithAdminClient(
+            ScheduledJob.SCHEDULED_JOBS_INDEX,
+            UUIDs.base64UUID(),
+            destination.toJsonStringWithType(),
+            refresh
+        )
         val destinationJson = jsonXContent.createParser(
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
