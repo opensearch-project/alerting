@@ -73,11 +73,3 @@ distributions="$(dirname "${zipPath}")"
 
 echo "COPY ${distributions}/*.zip"
 cp ${distributions}/*.zip ./$OUTPUT/plugins
-
-./gradlew publishShadowPublicationToMavenLocal -Dopensearch.version=$VERSION -Dbuild.version_qualifier=$QUALIFIER -Dbuild.snapshot=$SNAPSHOT -x ktlint
-./gradlew publishShadowPublicationToStagingRepository -Dopensearch.version=$VERSION -Dbuild.version_qualifier=$QUALIFIER -Dbuild.snapshot=$SNAPSHOT
-
-mkdir -p $OUTPUT/maven/org/opensearch
-cp -r ./build/local-staging-repo/org/opensearch/. $OUTPUT/maven/org/opensearch
-
-
