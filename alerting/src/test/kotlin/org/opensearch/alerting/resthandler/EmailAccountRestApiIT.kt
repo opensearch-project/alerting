@@ -52,70 +52,10 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test creating an email account with an existing name fails`() {
-        val emailAccount = createRandomEmailAccount()
-
-        try {
-            val emailAccountWithExistingName = randomEmailAccount(name = emailAccount.name)
-            client().makeRequest("POST", EMAIL_ACCOUNT_BASE_URI, emptyMap(), emailAccountWithExistingName.toHttpEntity())
-        } catch (e: ResponseException) {
-            assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())
-        }
-    }
-
     fun `test creating an email account when email destination is disallowed fails`() {
         try {
             removeEmailFromAllowList()
             createRandomEmailAccount()
-            fail("Expected 403 Method FORBIDDEN response")
-        } catch (e: ResponseException) {
-            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
-        }
-    }
-
-    fun `test updating an email account`() {
-        val emailAccount = createEmailAccount()
-        val updatedEmailAccount = updateEmailAccount(
-            emailAccount.copy(
-                name = "updatedName",
-                port = 465,
-                method = EmailAccount.MethodType.SSL
-            )
-        )
-        assertEquals("Incorrect email account name after update", updatedEmailAccount.name, "updatedName")
-        assertEquals("Incorrect email account port after update", updatedEmailAccount.port, 465)
-        assertEquals("Incorrect email account method after update", updatedEmailAccount.method, EmailAccount.MethodType.SSL)
-    }
-
-    fun `test updating an email account to an existing name fails`() {
-        val emailAccount1 = createRandomEmailAccount()
-        val emailAccount2 = createRandomEmailAccount()
-
-        try {
-            val updatedEmailAccount = emailAccount1.copy(name = emailAccount2.name)
-            client().makeRequest(
-                "PUT",
-                "$EMAIL_ACCOUNT_BASE_URI/${emailAccount1.id}",
-                emptyMap(),
-                updatedEmailAccount.toHttpEntity()
-            )
-        } catch (e: ResponseException) {
-            assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())
-        }
-    }
-
-    fun `test updating an email account when email destination is disallowed fails`() {
-        val emailAccount = createEmailAccount()
-
-        try {
-            removeEmailFromAllowList()
-            updateEmailAccount(
-                emailAccount.copy(
-                    name = "updatedName",
-                    port = 465,
-                    method = EmailAccount.MethodType.SSL
-                )
-            )
             fail("Expected 403 Method FORBIDDEN response")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
@@ -160,37 +100,6 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
     fun `test checking if a non-existent email account exists`() {
         val headResponse = client().makeRequest("HEAD", "$EMAIL_ACCOUNT_BASE_URI/foobar")
         assertEquals("Unexpected status", RestStatus.NOT_FOUND, headResponse.restStatus())
-    }
-
-    fun `test deleting an email account`() {
-        val emailAccount = createRandomEmailAccount()
-
-        val deleteResponse = client().makeRequest("DELETE", "$EMAIL_ACCOUNT_BASE_URI/${emailAccount.id}")
-        assertEquals("Delete failed", RestStatus.OK, deleteResponse.restStatus())
-
-        val headResponse = client().makeRequest("HEAD", "$EMAIL_ACCOUNT_BASE_URI/${emailAccount.id}")
-        assertEquals("Deleted email account still exists", RestStatus.NOT_FOUND, headResponse.restStatus())
-    }
-
-    fun `test deleting an email account that doesn't exist`() {
-        try {
-            client().makeRequest("DELETE", "$EMAIL_ACCOUNT_BASE_URI/foobar")
-            fail("Expected 404 response exception")
-        } catch (e: ResponseException) {
-            assertEquals(RestStatus.NOT_FOUND, e.response.restStatus())
-        }
-    }
-
-    fun `test deleting an email account when email destination is disallowed fails`() {
-        val emailAccount = createRandomEmailAccount()
-
-        try {
-            removeEmailFromAllowList()
-            client().makeRequest("DELETE", "$EMAIL_ACCOUNT_BASE_URI/${emailAccount.id}")
-            fail("Expected 403 Method FORBIDDEN response")
-        } catch (e: ResponseException) {
-            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
-        }
     }
 
     fun `test querying an email account that exists`() {

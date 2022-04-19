@@ -12,7 +12,6 @@ import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.ANOMALY_DETECTOR_INDEX
 import org.opensearch.alerting.AlertingRestTestCase
-import org.opensearch.alerting.DESTINATION_BASE_URI
 import org.opensearch.alerting.LEGACY_OPENDISTRO_ALERTING_BASE_URI
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.anomalyDetectorIndexMapping
@@ -1036,13 +1035,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             customWebhook = null,
             email = null
         )
-        val response = client().makeRequest(
-            "POST",
-            DESTINATION_BASE_URI,
-            emptyMap(),
-            destination.toHttpEntity()
-        )
-        assertEquals("Unable to create a new destination", RestStatus.CREATED, response.restStatus())
+        createDestination(destination)
 
         // 3. search - must return only monitors.
         val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
