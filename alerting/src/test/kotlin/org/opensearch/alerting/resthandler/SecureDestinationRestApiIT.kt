@@ -10,12 +10,9 @@ import org.apache.http.message.BasicHeader
 import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
-import org.opensearch.alerting.ALERTING_DELETE_DESTINATION_ACCESS
 import org.opensearch.alerting.ALERTING_GET_DESTINATION_ACCESS
-import org.opensearch.alerting.ALERTING_INDEX_DESTINATION_ACCESS
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.AlertingRestTestCase
-import org.opensearch.alerting.DESTINATION_BASE_URI
 import org.opensearch.alerting.TEST_HR_BACKEND_ROLE
 import org.opensearch.alerting.TEST_HR_INDEX
 import org.opensearch.alerting.TEST_HR_ROLE

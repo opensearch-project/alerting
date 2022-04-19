@@ -12,9 +12,7 @@ import org.apache.http.message.BasicHeader
 import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
-import org.opensearch.alerting.ALERTING_DELETE_EMAIL_GROUP_ACCESS
 import org.opensearch.alerting.ALERTING_GET_EMAIL_GROUP_ACCESS
-import org.opensearch.alerting.ALERTING_INDEX_EMAIL_GROUP_ACCESS
 import org.opensearch.alerting.ALERTING_SEARCH_EMAIL_GROUP_ACCESS
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.AlertingRestTestCase
@@ -22,7 +20,6 @@ import org.opensearch.alerting.TEST_HR_BACKEND_ROLE
 import org.opensearch.alerting.TEST_HR_INDEX
 import org.opensearch.alerting.TEST_HR_ROLE
 import org.opensearch.alerting.makeRequest
-import org.opensearch.alerting.randomEmailGroup
 import org.opensearch.client.RestClient
 import org.opensearch.commons.rest.SecureRestClientBuilder
 import org.opensearch.rest.RestStatus
