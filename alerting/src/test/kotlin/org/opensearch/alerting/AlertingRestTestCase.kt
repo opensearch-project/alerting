@@ -18,6 +18,7 @@ import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
 import org.opensearch.alerting.action.GetFindingsResponse
 import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRITE_INDEX
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.core.model.ScheduledJob
@@ -574,7 +575,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
         val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
 
-        indexDoc(".opensearch-alerting-findings", finding.id, findingStr)
+        indexDoc(FINDING_HISTORY_WRITE_INDEX, finding.id, findingStr)
         return finding.id
     }
 
@@ -787,7 +788,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun createTestAlias(
         alias: String = randomAlphaOfLength(10).toLowerCase(Locale.ROOT),
         numOfAliasIndices: Int = randomIntBetween(1, 10),
-        includeWriteIndex: Boolean = randomBoolean()
+        includeWriteIndex: Boolean = true
     ): MutableMap<String, MutableMap<String, Boolean>> {
         return createTestAlias(alias = alias, indices = randomAliasIndices(alias, numOfAliasIndices, includeWriteIndex))
     }
@@ -797,9 +798,11 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         indices: Map<String, Boolean> = randomAliasIndices(
             alias = alias,
             num = randomIntBetween(1, 10),
-            includeWriteIndex = randomBoolean()
+            includeWriteIndex = true
         )
     ): MutableMap<String, MutableMap<String, Boolean>> {
+        logger.info("number of indices behind alias: ${indices.size}")
+        logger.info("the alias indices: $indices")
         val indicesMap = mutableMapOf<String, Boolean>()
         val indicesJson = jsonBuilder().startObject().startArray("actions")
         indices.keys.map {

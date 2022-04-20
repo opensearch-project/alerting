@@ -58,17 +58,16 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
         periodEnd: Instant,
         dryrun: Boolean
     ): MonitorRunResult<DocumentLevelTriggerRunResult> {
-        logger.info("Document-level-monitor is running ...")
+        logger.debug("Document-level-monitor is running ...")
         var monitorResult = MonitorRunResult<DocumentLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
 
-        // TODO: is this needed from Charlie?
         try {
             monitorCtx.alertIndices!!.createOrUpdateAlertIndex()
             monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex()
             monitorCtx.alertIndices!!.createOrUpdateInitialFindingHistoryIndex()
         } catch (e: Exception) {
             val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
-            logger.error("Error loading alerts for monitor: $id", e)
+            logger.error("Error setting up alerts and findings indices for monitor: $id", e)
             return monitorResult.copy(error = e)
         }
 
@@ -86,33 +85,10 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
         val isTempMonitor = dryrun || monitor.id == Monitor.NO_ID
         val lastRunContext = if (monitor.lastRunContext.isNullOrEmpty()) mutableMapOf()
         else monitor.lastRunContext.toMutableMap() as MutableMap<String, MutableMap<String, Any>>
-//        var lastRunContext = monitor.lastRunContext.toMutableMap()
-//        try {
-//            if (lastRunContext.isNullOrEmpty()) {
-//                lastRunContext = createRunContext(monitorCtx.clusterService!!, monitorCtx.client!!, index).toMutableMap()
-//            }
-//        } catch (e: Exception) {
-//            logger.info("Failed to start Document-level-monitor $index. Error: ${e.message}")
-//            return monitorResult.copy(error = e)
-//        }
-
-//        val count: Int = lastRunContext["shards_count"] as Int
         val updatedLastRunContext = lastRunContext.toMutableMap()
-//        for (i: Int in 0 until count) {
-//            val shard = i.toString()
-//            val maxSeqNo: Long = getMaxSeqNo(monitorCtx.client!!, index, shard)
-//            updatedLastRunContext[shard] = maxSeqNo
-//
-//            // update lastRunContext if its a temp monitor as we only want to view the last bit of data then
-//            // TODO: If dryrun, we should make it so we limit the search as this could still potentially give us lots of data
-//            if (isTempMonitor) {
-//                lastRunContext[shard] = max(-1, maxSeqNo - 1)
-//            }
-//        }
 
         val queryToDocIds = mutableMapOf<DocLevelQuery, MutableSet<String>>()
         val docsToQueries = mutableMapOf<String, MutableList<String>>()
-        val docExecutionContext = DocumentExecutionContext(queries, lastRunContext, updatedLastRunContext)
         val idQueryMap = mutableMapOf<String, DocLevelQuery>()
 
         try {
@@ -120,8 +96,8 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
             val getAliasesResponse = monitorCtx.client!!.admin().indices().getAliases(getAliasesRequest).actionGet()
             val aliasIndices = getAliasesResponse.aliases.keys().map { it.value }
 
-            // TODO: Add log message if index is/is not alias?
             val isAlias = aliasIndices.isNotEmpty()
+            logger.debug("index, $index, is an alias index: $isAlias")
 
             // If the input index is an alias, creating a list of all indices associated with that alias;
             // else creating a list containing the single index input
@@ -141,10 +117,21 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
                 ) as MutableMap<String, Any>
                 updatedLastRunContext[indexName] = indexUpdatedRunContext
 
+                val count: Int = indexLastRunContext["shards_count"] as Int
+                for (i: Int in 0 until count) {
+                    val shard = i.toString()
+
+                    // update lastRunContext if its a temp monitor as we only want to view the last bit of data then
+                    // TODO: If dryrun, we should make it so we limit the search as this could still potentially give us lots of data
+                    if (isTempMonitor) {
+                        indexLastRunContext[shard] = max(-1, (indexUpdatedRunContext[shard] as String).toInt() - 1)
+                    }
+                }
+
                 // Prepare DocumentExecutionContext for each index
                 val docExecutionContext = DocumentExecutionContext(queries, indexLastRunContext, indexUpdatedRunContext)
 
-                val matchingDocs = getMatchingDocs(monitor, monitorCtx, docExecutionContext, index, dryrun)
+                val matchingDocs = getMatchingDocs(monitor, monitorCtx, docExecutionContext, index)
 
                 if (matchingDocs.isNotEmpty()) {
                     val matchedQueriesForDocs = getMatchedQueries(monitorCtx, matchingDocs.map { it.second }, monitor)
@@ -173,72 +160,10 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
                         }
                     }
                 }
-
-//                val queryResults = getDocLevelQueryResults(
-//                    monitorCtx,
-//                    docExecutionContext,
-//                    indexName,
-//                    queries
-//                )
-
-//                // Only need to compile the query results together when executing the monitor for more than 1 index
-//                if (indices.size > 1) {
-//                    val newQueryToDocIds = mutableMapOf<DocLevelQuery, MutableSet<String>>()
-//                    queryResults["queryDocIds"]?.forEach {
-//                        val docLevelQuery = it.key
-//                        val matchingDocIds = it.value
-//                        val existingQueryToDocIds = queryToDocIds.getOrDefault(docLevelQuery, setOf()).toMutableSet()
-//                        existingQueryToDocIds.addAll(matchingDocIds)
-//                        newQueryToDocIds[it.key as DocLevelQuery] = existingQueryToDocIds
-//                    }
-//                    queryToDocIds.putAll(newQueryToDocIds)
-//
-//                    val newDocsToQueries = mutableMapOf<String, MutableList<String>>()
-//                    queryResults["docsToQueries"]?.forEach {
-//                        val docId = it.key
-//                        val queryIds = it.value
-//                        val existingQueryIds = docsToQueries.getOrDefault(docId, mutableListOf())
-//                        existingQueryIds.addAll(queryIds)
-//                        newDocsToQueries[docId as String] = existingQueryIds
-//                    }
-//                    docsToQueries.putAll(newDocsToQueries)
-//                } else {
-//                    queryToDocIds.putAll(queryResults["queryDocIds"] as MutableMap<DocLevelQuery, MutableSet<String>>)
-//                    docsToQueries.putAll(queryResults["docsToQueries"] as MutableMap<String, MutableList<String>>)
-//                }
             }
         } catch (e: Exception) {
-            logger.info("Failed to start Document-level-monitor $index. Error: ${e.message}")
+            logger.error("Failed to start Document-level-monitor $index. Error: ${e.message}", e)
         }
-
-//        val matchingDocs = getMatchingDocs(monitor, monitorCtx, docExecutionContext, index, dryrun)
-//
-//        if (matchingDocs.isNotEmpty()) {
-//            val matchedQueriesForDocs = getMatchedQueries(monitorCtx, matchingDocs.map { it.second }, monitor)
-//
-//            matchedQueriesForDocs.forEach { hit ->
-//                val (id, query) = Pair(
-//                    hit.id.replace("_${monitor.id}", ""),
-//                    ((hit.sourceAsMap["query"] as HashMap<*, *>)["query_string"] as HashMap<*, *>)["query"]
-//                )
-//                val docLevelQuery = DocLevelQuery(id, id, query.toString())
-//
-//                val docIndices = hit.field("_percolator_document_slot").values.map { it.toString().toInt() }
-//                docIndices.forEach { idx ->
-//                    if (queryToDocIds.containsKey(docLevelQuery)) {
-//                        queryToDocIds[docLevelQuery]?.add(matchingDocs[idx].first)
-//                    } else {
-//                        queryToDocIds[docLevelQuery] = mutableSetOf(matchingDocs[idx].first)
-//                    }
-//
-//                    if (docsToQueries.containsKey(matchingDocs[idx].first)) {
-//                        docsToQueries[matchingDocs[idx].first]?.add(id)
-//                    } else {
-//                        docsToQueries[matchingDocs[idx].first] = mutableListOf(id)
-//                    }
-//                }
-//            }
-//        }
 
         val queryInputResults = queryToDocIds.mapKeys { it.key.id }
         monitorResult = monitorResult.copy(inputResults = InputRunResults(listOf(queryInputResults)))
@@ -292,7 +217,6 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
         logger.info("trigger results")
         logger.info(triggerResult.triggeredDocs.toString())
 
-        // TODO: modify findings such that there is a finding per document
         val findings = mutableListOf<String>()
         val findingDocPairs = mutableListOf<Pair<String, String>>()
 
@@ -358,10 +282,8 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
         )
 
         val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
-        // change this to debug.
-        logger.info("Findings: $findingStr")
+        logger.debug("Findings: $findingStr")
 
-        // todo: below is all hardcoded, temp code and added only to test. replace this with proper Findings index lifecycle management.
         val indexRequest = IndexRequest(FINDING_HISTORY_WRITE_INDEX)
             .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
             .source(findingStr, XContentType.JSON)
@@ -377,10 +299,6 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
         monitorCtx: MonitorRunnerExecutionContext,
         index: String
     ): Map<String, Any> {
-        // TODO DRAFT: Is it better to get shards_count by calling getShardsCount
-        //  as opposed to retrieving the count from lastRunContext? The number of shards
-        //  could changing between monitor executions.
-//        val count: Int = lastRunContext["shards_count"] as Int
         val count: Int = getShardsCount(monitorCtx.clusterService!!, index)
         val updatedLastRunContext = lastRunContext.toMutableMap()
         for (i: Int in 0 until count) {
@@ -455,28 +373,16 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
         monitor: Monitor,
         monitorCtx: MonitorRunnerExecutionContext,
         docExecutionCtx: DocumentExecutionContext,
-        index: String,
-        dryrun: Boolean
+        index: String
     ): List<Pair<String, BytesReference>> {
-        val count: Int = docExecutionCtx.lastRunContext["shards_count"] as Int
+        val count: Int = docExecutionCtx.updatedLastRunContext["shards_count"] as Int
         val matchingDocs = mutableListOf<Pair<String, BytesReference>>()
         for (i: Int in 0 until count) {
             val shard = i.toString()
             try {
                 logger.info("Monitor execution for shard: $shard")
-
                 val maxSeqNo: Long = docExecutionCtx.updatedLastRunContext[shard].toString().toLong()
-                logger.info("MaxSeqNo of shard_$shard is $maxSeqNo")
-
-                // If dryrun, set the previous sequence number as 1 less than the max sequence number or 0
-                val prevSeqNo = if (dryrun || monitor.id == Monitor.NO_ID)
-                    max(-1, maxSeqNo - 1)
-                else docExecutionCtx.lastRunContext[shard].toString().toLongOrNull()
-
-                if (dryrun) {
-                    logger.info("it is a dryrun")
-                }
-
+                val prevSeqNo = docExecutionCtx.lastRunContext[shard].toString().toLongOrNull()
                 logger.info("prevSeq: $prevSeqNo, maxSeq: $maxSeqNo")
 
                 val hits: SearchHits = searchShard(

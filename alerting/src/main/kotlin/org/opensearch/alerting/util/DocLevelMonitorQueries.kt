@@ -7,6 +7,8 @@ package org.opensearch.alerting.util
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionListener
+import org.opensearch.action.admin.indices.alias.get.GetAliasesRequest
+import org.opensearch.action.admin.indices.alias.get.GetAliasesResponse
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
@@ -69,47 +71,82 @@ class DocLevelMonitorQueries(private val client: AdminClient, private val cluste
         val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
 
         val clusterState = clusterService.state()
-        if (clusterState.routingTable.hasIndex(index)) {
-            val indexMetadata = clusterState.metadata.index(index)
 
-            if (indexMetadata.mapping() != null) {
-                val properties = ((indexMetadata.mapping()?.sourceAsMap?.get("properties")) as Map<String, Map<String, Any>>)
-                val updatedProperties = properties.entries.associate { "${it.key}_$monitorId" to it.value }.toMutableMap()
+        val getAliasesRequest = GetAliasesRequest(index)
+        queryClient.admin().indices().getAliases(
+            getAliasesRequest,
+            object : ActionListener<GetAliasesResponse> {
+                override fun onResponse(getAliasesResponse: GetAliasesResponse?) {
+                    val aliasIndices = getAliasesResponse?.aliases?.keys()?.map { it.value }
+                    val isAlias = aliasIndices != null && aliasIndices.isNotEmpty()
+                    val indices = if (isAlias) getAliasesResponse?.aliases?.keys()?.map { it.value } else listOf(index)
+                    val indexRequests = mutableListOf<IndexRequest>()
+                    log.info("indices: $indices")
+                    indices?.forEach { indexName ->
+                        if (clusterState.routingTable.hasIndex(indexName)) {
+                            val indexMetadata = clusterState.metadata.index(indexName)
 
-                val updateMappingRequest = PutMappingRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
-                updateMappingRequest.source(mapOf<String, Any>("properties" to updatedProperties))
+                            if (indexMetadata.mapping() != null) {
+                                log.info("Index name: $indexName")
+                                val properties = (
+                                    (indexMetadata.mapping()?.sourceAsMap?.get("properties"))
+                                        as Map<String, Map<String, Any>>
+                                    )
+                                val updatedProperties = properties.entries.associate { "${it.key}_$monitorId" to it.value }.toMutableMap()
 
-                queryClient.admin().indices().putMapping(
-                    updateMappingRequest,
-                    object : ActionListener<AcknowledgedResponse> {
-                        override fun onResponse(response: AcknowledgedResponse) {
-                            log.info("Percolation index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX} updated with new mappings")
+                                val updateMappingRequest = PutMappingRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
+                                updateMappingRequest.source(mapOf<String, Any>("properties" to updatedProperties))
 
-                            val request = BulkRequest().setRefreshPolicy(refreshPolicy).timeout(indexTimeout)
+                                queryClient.admin().indices().putMapping(
+                                    updateMappingRequest,
+                                    object : ActionListener<AcknowledgedResponse> {
+                                        override fun onResponse(response: AcknowledgedResponse) {
 
-                            queries.forEach {
-                                var query = it.query
+                                            queries.forEach {
+                                                var query = it.query
 
-                                properties.forEach { prop ->
-                                    query = query.replace("${prop.key}:", "${prop.key}_$monitorId:")
-                                }
-                                val indexRequest = IndexRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
-                                    .id(it.id + "_$monitorId")
-                                    .source(mapOf("query" to mapOf("query_string" to mapOf("query" to query)), "monitor_id" to monitorId))
-                                request.add(indexRequest)
+                                                properties.forEach { prop ->
+                                                    query = query.replace("${prop.key}:", "${prop.key}_$monitorId:")
+                                                }
+                                                val indexRequest = IndexRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
+                                                    .id(it.id + "_$monitorId")
+                                                    .source(
+                                                        mapOf(
+                                                            "query" to mapOf("query_string" to mapOf("query" to query)),
+                                                            "monitor_id" to monitorId
+                                                        )
+                                                    )
+                                                indexRequests.add(indexRequest)
+                                            }
+                                            if (indexRequests.isNotEmpty()) {
+                                                queryClient.bulk(
+                                                    BulkRequest().setRefreshPolicy(refreshPolicy).timeout(indexTimeout).add(indexRequests),
+                                                    docLevelQueryIndexListener
+                                                )
+                                            }
+                                            return
+                                        }
+
+                                        override fun onFailure(e: Exception) {
+                                            log.error("This is a failure", e)
+                                            if (indexMonitorActionListener != null) {
+                                                indexMonitorActionListener.onFailure(AlertingException.wrap(e))
+                                            } else executeMonitorActionListener?.onFailure(AlertingException.wrap(e))
+                                            return
+                                        }
+                                    }
+                                )
                             }
-
-                            queryClient.bulk(request, docLevelQueryIndexListener)
-                        }
-
-                        override fun onFailure(e: Exception) {
-                            if (indexMonitorActionListener != null) {
-                                indexMonitorActionListener.onFailure(AlertingException.wrap(e))
-                            } else executeMonitorActionListener?.onFailure(AlertingException.wrap(e))
                         }
                     }
-                )
+                }
+
+                override fun onFailure(e: Exception) {
+                    if (indexMonitorActionListener != null) {
+                        indexMonitorActionListener.onFailure(AlertingException.wrap(e))
+                    } else executeMonitorActionListener?.onFailure(AlertingException.wrap(e))
+                }
             }
-        }
+        )
     }
 }

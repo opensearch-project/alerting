@@ -39,7 +39,7 @@ class RestGetFindingsAction : BaseRestHandler() {
         log.info("${request.method()} ${request.path()}")
 
         val findingID: String? = request.param("findingId")
-        val sortString = request.param("sortString", "id.keyword")
+        val sortString = request.param("sortString", "id")
         val sortOrder = request.param("sortOrder", "asc")
         val missing: String? = request.param("missing")
         val size = request.paramAsInt("size", 20)
