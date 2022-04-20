@@ -121,7 +121,6 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
         executeMonitor(trueMonitor.id, mapOf(Pair("dryrun", "true")))
 
-//        val docLevelQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "realQuery", tags = listOf("sigma"))
         createFinding(matchingDocIds = listOf("someId"), index = testIndex)
         val findingId = createFinding(
             matchingDocIds = listOf("someId", "someId2"),
