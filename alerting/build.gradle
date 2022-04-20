@@ -99,14 +99,12 @@ integTest.getClusters().forEach{c -> c.plugin(project.getObjects().fileProperty(
 
 def _numNodes = findProperty('numNodes') as Integer ?: 1
 
-String notificationsVersion = "2.0.0"
-String notificationsQualifier = "rc1"
 String notificationsFilePath = "src/test/resources/notifications"
 String notificationsCoreFilePath = "src/test/resources/notifications-core"
-String notificationsOpenDistroPlugin = "opensearch-notifications-" + notificationsVersion + ".0-" + notificationsQualifier + ".zip"
-String notificationsCoreOpenDistroPlugin = "opensearch-notifications-core-" + notificationsVersion + ".0-" + notificationsQualifier + ".zip"
-String notificationsRemoteFile = "https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/" + notificationsVersion + "-" + notificationsQualifier + "/latest/linux/x64/tar/builds/opensearch/plugins/" + notificationsOpenDistroPlugin
-String notificationsCoreRemoteFile = "https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/" + notificationsVersion + "-" + notificationsQualifier + "/latest/linux/x64/tar/builds/opensearch/plugins/" + notificationsCoreOpenDistroPlugin
+String notificationsPlugin = "opensearch-notifications-" + plugin_no_snapshot + ".zip"
+String notificationsCorePlugin = "opensearch-notifications-core-" + plugin_no_snapshot + ".zip"
+String notificationsRemoteFile = "https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/" + opensearch_no_snapshot + "/latest/linux/x64/tar/builds/opensearch/plugins/" + notificationsPlugin
+String notificationsCoreRemoteFile = "https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/" + opensearch_no_snapshot + "/latest/linux/x64/tar/builds/opensearch/plugins/" + notificationsCorePlugin
 testClusters.integTest {
     testDistribution = "ARCHIVE"
     // Cluster shrink exception thrown if we try to set numberOfNodes to 1, so only apply if > 1
@@ -132,11 +130,11 @@ testClusters.integTest {
                     dir.mkdirs()
                 }
 
-                File f = new File(dir, notificationsCoreOpenDistroPlugin)
+                File f = new File(dir, notificationsCorePlugin)
                 if (!f.exists()) {
                     new URL(notificationsCoreRemoteFile).withInputStream{ ins -> f.withOutputStream{ it << ins }}
                 }
-                fileTree("src/test/resources/notifications-core").getSingleFile()
+                fileTree(notificationsCoreFilePath).getSingleFile()
             }
         }
     }))
@@ -151,11 +149,11 @@ testClusters.integTest {
                     dir.mkdirs()
                 }
 
-                File f = new File(dir, notificationsOpenDistroPlugin)
+                File f = new File(dir, notificationsPlugin)
                 if (!f.exists()) {
                     new URL(notificationsRemoteFile).withInputStream{ ins -> f.withOutputStream{ it << ins }}
                 }
-                fileTree("src/test/resources/notifications").getSingleFile()
+                fileTree(notificationsFilePath).getSingleFile()
             }
         }
     }))
@@ -257,11 +255,11 @@ task prepareBwcTests {
                                 dir.mkdirs()
                             }
 
-                            File f = new File(dir, notificationsCoreOpenDistroPlugin)
+                            File f = new File(dir, notificationsCorePlugin)
                             if (!f.exists()) {
                                 new URL(notificationsCoreRemoteFile).withInputStream{ ins -> f.withOutputStream{ it << ins }}
                             }
-                            fileTree("src/test/resources/notifications-core").getSingleFile()
+                            fileTree(notificationsCoreFilePath).getSingleFile()
                         }
                     }
                 }),
@@ -275,11 +273,11 @@ task prepareBwcTests {
                                 dir.mkdirs()
                             }
 
-                            File f = new File(dir, notificationsOpenDistroPlugin)
+                            File f = new File(dir, notificationsPlugin)
                             if (!f.exists()) {
                                 new URL(notificationsRemoteFile).withInputStream{ ins -> f.withOutputStream{ it << ins }}
                             }
-                            fileTree("src/test/resources/notifications").getSingleFile()
+                            fileTree(notificationsFilePath).getSingleFile()
                         }
                     }
                 })
