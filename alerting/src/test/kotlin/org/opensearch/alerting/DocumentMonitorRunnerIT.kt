@@ -172,7 +172,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
     fun `test document-level monitor when docs exist prior to monitor creation`() {
         // FIXME: Consider renaming this test case
         // Only new docs should create findings.
-        val alias = createTestAlias(includeWriteIndex = false)
+        val alias = createTestAlias(includeWriteIndex = true)
         val indices = alias[alias.keys.first()]?.keys?.toList() as List<String>
         val query = randomDocLevelQuery(tags = listOf())
         val input = randomDocLevelMonitorInput(indices = indices, queries = listOf(query))
