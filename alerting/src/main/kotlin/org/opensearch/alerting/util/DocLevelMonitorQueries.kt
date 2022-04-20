@@ -85,14 +85,14 @@ class DocLevelMonitorQueries(private val client: AdminClient, private val cluste
                     indices?.forEach { indexName ->
                         if (clusterState.routingTable.hasIndex(indexName)) {
                             val indexMetadata = clusterState.metadata.index(indexName)
-
-                            if (indexMetadata.mapping() != null) {
-                                log.info("Index name: $indexName")
+                            if (indexMetadata.mapping()?.sourceAsMap?.get("properties") != null) {
                                 val properties = (
                                     (indexMetadata.mapping()?.sourceAsMap?.get("properties"))
                                         as Map<String, Map<String, Any>>
                                     )
-                                val updatedProperties = properties.entries.associate { "${it.key}_${indexName}_$monitorId" to it.value }.toMutableMap()
+                                val updatedProperties = properties.entries.associate {
+                                    "${it.key}_${indexName}_$monitorId" to it.value
+                                }.toMutableMap()
 
                                 val updateMappingRequest = PutMappingRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
                                 updateMappingRequest.source(mapOf<String, Any>("properties" to updatedProperties))
