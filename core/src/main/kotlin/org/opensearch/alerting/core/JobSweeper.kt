@@ -138,7 +138,7 @@ class JobSweeper(
      * the cluster, a replica is added, removed or promoted to primary).
      *
      * This callback won't be invoked concurrently since cluster state changes are applied serially to the node
-     * in the order they occur on the master. However we can't block this callback for the duration of a full sweep so
+     * in the order they occur on the cluster manager. However we can't block this callback for the duration of a full sweep so
      * we perform the sweep in the background in a single threaded executor [fullSweepExecutor].
      */
     override fun clusterChanged(event: ClusterChangedEvent) {

@@ -56,7 +56,7 @@ import java.time.Instant
  * date based index. The frequency of rolling over indices is controlled by the `opendistro.alerting.alert_rollover_period` setting.
  *
  * These indexes are created when first used and are then rolled over every `alert_rollover_period`. The rollover is
- * initiated on the master node to ensure only a single node tries to roll it over.  Once we have a curator functionality
+ * initiated on the cluster manager node to ensure only a single node tries to roll it over.  Once we have a curator functionality
  * in Scheduled Jobs we can migrate to using that to rollover the index.
  */
 // TODO: reafactor to make a generic version of this class for finding and alerts
