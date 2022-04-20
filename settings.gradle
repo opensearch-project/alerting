@@ -6,7 +6,5 @@
 rootProject.name = 'opensearch-alerting'
 include 'alerting'
 include 'core'
-include 'notification'
 
 project(":core").name = 'alerting-core'
-project(":notification").name = 'alerting-notification'
