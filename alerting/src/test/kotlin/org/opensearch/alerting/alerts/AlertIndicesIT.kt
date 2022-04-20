@@ -52,7 +52,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
 
         putAlertMappings(
             AlertIndices.alertMapping().trimStart('{').trimEnd('}')
-                .replace("\"schema_version\": 3", "\"schema_version\": 0")
+                .replace("\"schema_version\": 4", "\"schema_version\": 0")
         )
         assertIndexExists(AlertIndices.ALERT_INDEX)
         assertIndexExists(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
