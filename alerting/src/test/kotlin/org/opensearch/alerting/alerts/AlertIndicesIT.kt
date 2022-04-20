@@ -63,8 +63,8 @@ class AlertIndicesIT : AlertingRestTestCase() {
         assertIndexExists(AlertIndices.ALERT_INDEX)
         assertIndexExists(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
         verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 5)
-        verifyIndexSchemaVersion(AlertIndices.ALERT_INDEX, 3)
-        verifyIndexSchemaVersion(AlertIndices.ALERT_HISTORY_WRITE_INDEX, 3)
+        verifyIndexSchemaVersion(AlertIndices.ALERT_INDEX, 4)
+        verifyIndexSchemaVersion(AlertIndices.ALERT_HISTORY_WRITE_INDEX, 4)
     }
 
     fun `test update finding index mapping with new schema version`() {
