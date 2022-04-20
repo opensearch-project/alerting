@@ -163,6 +163,7 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
             }
         } catch (e: Exception) {
             logger.error("Failed to start Document-level-monitor $index. Error: ${e.message}", e)
+            return monitorResult.copy(error = e)
         }
 
         val queryInputResults = queryToDocIds.mapKeys { it.key.id }
