@@ -79,7 +79,7 @@ class DocLevelMonitorQueries(private val client: AdminClient, private val cluste
                 override fun onResponse(getAliasesResponse: GetAliasesResponse?) {
                     val aliasIndices = getAliasesResponse?.aliases?.keys()?.map { it.value }
                     val isAlias = aliasIndices != null && aliasIndices.isNotEmpty()
-                    val indices = if (isAlias) getAliasesResponse?.aliases?.keys()?.map { it.value } else listOf(index)
+                    val indices = if (isAlias) aliasIndices else listOf(index)
                     val indexRequests = mutableListOf<IndexRequest>()
                     log.info("indices: $indices")
                     indices?.forEach { indexName ->
