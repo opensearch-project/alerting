@@ -230,6 +230,10 @@ class AlertIndices(
         return alertIndexInitialized && alertHistoryIndexInitialized
     }
 
+    fun isAlertIndexInitialized(): Boolean {
+        return alertIndexInitialized
+    }
+
     fun isAlertHistoryEnabled(): Boolean = alertHistoryEnabled
 
     fun isFindingHistoryEnabled(): Boolean = findingHistoryEnabled
