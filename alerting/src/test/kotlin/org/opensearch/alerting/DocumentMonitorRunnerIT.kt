@@ -133,7 +133,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
     fun `test document-level monitor when alias only has write index with 0 docs`() {
         // Monitor should execute, but create 0 findings.
-        val alias = createTestAlias(includeWriteIndex = false)
+        val alias = createTestAlias(includeWriteIndex = true)
         val indices = alias[alias.keys.first()]?.keys?.toList() as List<String>
         val query = randomDocLevelQuery(tags = listOf())
         val input = randomDocLevelMonitorInput(indices = indices, queries = listOf(query))
@@ -158,14 +158,13 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         @Suppress("UNCHECKED_CAST")
         val searchResult = (inputResults?.get("results") as List<Map<String, Any>>).firstOrNull()
         @Suppress("UNCHECKED_CAST")
-        val findings = if (searchResult == null) listOf()
-        else searchResult?.stringMap("hits")?.getOrDefault("hits", listOf<List<Map<String, Any>>>()) as List<Map<String, Any>>
+        val findings = searchFindings()
 
         assertEquals(monitor.name, output["monitor_name"])
         assertNull("Unexpected monitor execution failure: $errorMessage", errorMessage)
-        findings.forEach {
-            val findingQueryId = it["queryId"]
-            assertNotEquals("No findings should exist with queryId ${query.id}, but found: $it", query.id, findingQueryId)
+        findings.findings.forEach {
+            val queryIds = it.finding.docLevelQueries.map { query -> query.id }
+            assertFalse("No findings should exist with queryId ${query.id}, but found: $it", queryIds.contains(query.id))
         }
     }
 
@@ -197,20 +196,22 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         @Suppress("UNCHECKED_CAST")
         val searchResult = (inputResults?.get("results") as List<Map<String, Any>>).firstOrNull()
         @Suppress("UNCHECKED_CAST")
-        val findings = if (searchResult == null) listOf()
-        else searchResult?.stringMap("hits")?.getOrDefault("hits", listOf<List<Map<String, Any>>>()) as List<Map<String, Any>>
+        val findings = searchFindings()
 
         assertEquals(monitor.name, output["monitor_name"])
         assertNull("Unexpected monitor execution failure: $errorMessage", errorMessage)
-        findings.forEach {
-            val findingDocId = it["id"] as String
-            assertFalse("Findings index should not contain a pre-existing doc, but found $it", preExistingDocIds.contains(findingDocId))
+        findings.findings.forEach {
+            val docIds = it.finding.relatedDocIds
+            assertTrue(
+                "Findings index should not contain a pre-existing doc, but found $it",
+                preExistingDocIds.intersect(docIds).isEmpty()
+            )
         }
     }
 
     fun `test document-level monitor when alias indices only contain docs that match query`() {
         // Only new docs should create findings.
-        val alias = createTestAlias(includeWriteIndex = false)
+        val alias = createTestAlias(includeWriteIndex = true)
         val indices = alias[alias.keys.first()]?.keys?.toList() as List<String>
         val query = randomDocLevelQuery(tags = listOf())
         val input = randomDocLevelMonitorInput(indices = indices, queries = listOf(query))
@@ -247,21 +248,23 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         @Suppress("UNCHECKED_CAST")
         val searchResult = (inputResults?.get("results") as List<Map<String, Any>>).firstOrNull()
         @Suppress("UNCHECKED_CAST")
-        val findings = if (searchResult == null) listOf()
-        else searchResult?.stringMap("hits")?.getOrDefault("hits", listOf<List<Map<String, Any>>>()) as List<Map<String, Any>>
+        val findings = searchFindings()
 
         assertEquals(monitor.name, output["monitor_name"])
         assertNull("Unexpected monitor execution failure: $errorMessage", errorMessage)
-        findings.forEach {
-            val findingDocId = it["id"] as String
-            assertFalse("Findings index should not contain a pre-existing doc, but found $it", preExistingDocIds.contains(findingDocId))
-            assertTrue("Found an unexpected finding $it", newDocIds.contains(findingDocId))
+        findings.findings.forEach {
+            val docIds = it.finding.relatedDocIds
+            assertTrue(
+                "Findings index should not contain a pre-existing doc, but found $it",
+                preExistingDocIds.intersect(docIds).isEmpty()
+            )
+            assertTrue("Found an unexpected finding $it", newDocIds.intersect(docIds).isNotEmpty())
         }
     }
 
     fun `test document-level monitor when alias indices contain docs that do and do not match query`() {
         // Only matching docs should create findings.
-        val alias = createTestAlias(includeWriteIndex = false)
+        val alias = createTestAlias(includeWriteIndex = true)
         val indices = alias[alias.keys.first()]?.keys?.toList() as List<String>
         val query = randomDocLevelQuery(tags = listOf())
         val input = randomDocLevelMonitorInput(indices = indices, queries = listOf(query))
@@ -305,16 +308,18 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         @Suppress("UNCHECKED_CAST")
         val searchResult = (inputResults?.get("results") as List<Map<String, Any>>).firstOrNull()
         @Suppress("UNCHECKED_CAST")
-        val findings = if (searchResult == null) listOf()
-        else searchResult?.stringMap("hits")?.getOrDefault("hits", listOf<List<Map<String, Any>>>()) as List<Map<String, Any>>
+        val findings = searchFindings()
 
         assertEquals(monitor.name, output["monitor_name"])
         assertNull("Unexpected monitor execution failure: $errorMessage", errorMessage)
-        findings.forEach {
-            val findingDocId = it["id"] as String
-            assertFalse("Findings index should not contain a pre-existing doc, but found $it", preExistingDocIds.contains(findingDocId))
-            assertFalse("Found doc that doesn't match query: $it", nonMatchingDocIds.contains(findingDocId))
-            assertTrue("Found an unexpected finding $it", matchingDocIds.contains(findingDocId))
+        findings.findings.forEach {
+            val docIds = it.finding.relatedDocIds
+            assertTrue(
+                "Findings index should not contain a pre-existing doc, but found $it",
+                preExistingDocIds.intersect(docIds).isEmpty()
+            )
+            assertTrue("Found doc that doesn't match query: $it", nonMatchingDocIds.intersect(docIds).isEmpty())
+            assertFalse("Found an unexpected finding $it", matchingDocIds.intersect(docIds).isNotEmpty())
         }
     }
 
