@@ -92,7 +92,7 @@ class DocLevelMonitorQueries(private val client: AdminClient, private val cluste
                                     (indexMetadata.mapping()?.sourceAsMap?.get("properties"))
                                         as Map<String, Map<String, Any>>
                                     )
-                                val updatedProperties = properties.entries.associate { "${it.key}_$monitorId" to it.value }.toMutableMap()
+                                val updatedProperties = properties.entries.associate { "${it.key}_${indexName}_$monitorId" to it.value }.toMutableMap()
 
                                 val updateMappingRequest = PutMappingRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
                                 updateMappingRequest.source(mapOf<String, Any>("properties" to updatedProperties))
@@ -106,14 +106,15 @@ class DocLevelMonitorQueries(private val client: AdminClient, private val cluste
                                                 var query = it.query
 
                                                 properties.forEach { prop ->
-                                                    query = query.replace("${prop.key}:", "${prop.key}_$monitorId:")
+                                                    query = query.replace("${prop.key}:", "${prop.key}_${indexName}_$monitorId:")
                                                 }
                                                 val indexRequest = IndexRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
-                                                    .id(it.id + "_$monitorId")
+                                                    .id(it.id + "_${indexName}_$monitorId")
                                                     .source(
                                                         mapOf(
                                                             "query" to mapOf("query_string" to mapOf("query" to query)),
-                                                            "monitor_id" to monitorId
+                                                            "monitor_id" to monitorId,
+                                                            "index" to indexName
                                                         )
                                                     )
                                                 indexRequests.add(indexRequest)

@@ -131,14 +131,14 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
                 // Prepare DocumentExecutionContext for each index
                 val docExecutionContext = DocumentExecutionContext(queries, indexLastRunContext, indexUpdatedRunContext)
 
-                val matchingDocs = getMatchingDocs(monitor, monitorCtx, docExecutionContext, index)
+                val matchingDocs = getMatchingDocs(monitor, monitorCtx, docExecutionContext, indexName)
 
                 if (matchingDocs.isNotEmpty()) {
-                    val matchedQueriesForDocs = getMatchedQueries(monitorCtx, matchingDocs.map { it.second }, monitor)
+                    val matchedQueriesForDocs = getMatchedQueries(monitorCtx, matchingDocs.map { it.second }, monitor, indexName)
 
                     matchedQueriesForDocs.forEach { hit ->
                         val (id, query) = Pair(
-                            hit.id.replace("_${monitor.id}", ""),
+                            hit.id.replace("_${indexName}_${monitor.id}", ""),
                             ((hit.sourceAsMap["query"] as HashMap<*, *>)["query_string"] as HashMap<*, *>)["query"]
                         )
                         val docLevelQuery = DocLevelQuery(id, id, query.toString())
@@ -396,7 +396,7 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
                 logger.info("Search hits for shard_$shard is: ${hits.hits.size}")
 
                 if (hits.hits.isNotEmpty()) {
-                    matchingDocs.addAll(getAllDocs(hits, monitor.id))
+                    matchingDocs.addAll(getAllDocs(hits, index, monitor.id))
                 }
             } catch (e: Exception) {
                 logger.info("Failed to run for shard $shard. Error: ${e.message}")
@@ -443,9 +443,10 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
     private fun getMatchedQueries(
         monitorCtx: MonitorRunnerExecutionContext,
         docs: List<BytesReference>,
-        monitor: Monitor
+        monitor: Monitor,
+        index: String
     ): SearchHits {
-        val boolQueryBuilder = BoolQueryBuilder()
+        val boolQueryBuilder = BoolQueryBuilder().filter(QueryBuilders.matchQuery("index", index))
 
         val percolateQueryBuilder = PercolateQueryBuilderExt("query", docs, XContentType.JSON)
         if (monitor.id.isNotEmpty()) {
@@ -466,13 +467,13 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
         return response.hits
     }
 
-    private fun getAllDocs(hits: SearchHits, monitorId: String): List<Pair<String, BytesReference>> {
+    private fun getAllDocs(hits: SearchHits, index: String, monitorId: String): List<Pair<String, BytesReference>> {
         return hits.map { hit ->
             val sourceMap = hit.sourceAsMap
 
             var xContentBuilder = XContentFactory.jsonBuilder().startObject()
             sourceMap.forEach { (k, v) ->
-                xContentBuilder = xContentBuilder.field("${k}_$monitorId", v)
+                xContentBuilder = xContentBuilder.field("${k}_${index}_$monitorId", v)
             }
             xContentBuilder = xContentBuilder.endObject()
 
