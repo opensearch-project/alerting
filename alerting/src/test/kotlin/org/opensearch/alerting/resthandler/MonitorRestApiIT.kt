@@ -1075,38 +1075,6 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    private fun validateAlertingStatsNodeResponse(nodesResponse: Map<String, Int>) {
-        assertEquals("Incorrect number of nodes", numberOfNodes, nodesResponse["total"])
-        assertEquals("Failed nodes found during monitor stats call", 0, nodesResponse["failed"])
-        assertEquals("More than $numberOfNodes successful node", numberOfNodes, nodesResponse["successful"])
-    }
-
-    private fun isMonitorScheduled(monitorId: String, alertingStatsResponse: Map<String, Any>): Boolean {
-        val nodesInfo = alertingStatsResponse["nodes"] as Map<String, Any>
-        for (nodeId in nodesInfo.keys) {
-            val nodeInfo = nodesInfo[nodeId] as Map<String, Any>
-            val jobsInfo = nodeInfo["jobs_info"] as Map<String, Any>
-            if (jobsInfo.keys.contains(monitorId)) {
-                return true
-            }
-        }
-
-        return false
-    }
-
-    private fun assertAlertingStatsSweeperEnabled(alertingStatsResponse: Map<String, Any>, expected: Boolean) {
-        assertEquals(
-            "Legacy scheduled job enabled field is not set to $expected",
-            expected,
-            alertingStatsResponse[statsResponseOpendistroSweeperEnabledField]
-        )
-        assertEquals(
-            "Scheduled job is not ${if (expected) "enabled" else "disabled"}",
-            expected,
-            alertingStatsResponse[statsResponseOpenSearchSweeperEnabledField]
-        )
-    }
-
     @Throws(Exception::class)
     fun `test creating a document monitor`() {
         val testIndex = createTestIndex()
@@ -1219,5 +1187,37 @@ class MonitorRestApiIT : AlertingRestTestCase() {
                 e.message
             )
         }
+    }
+
+    private fun validateAlertingStatsNodeResponse(nodesResponse: Map<String, Int>) {
+        assertEquals("Incorrect number of nodes", numberOfNodes, nodesResponse["total"])
+        assertEquals("Failed nodes found during monitor stats call", 0, nodesResponse["failed"])
+        assertEquals("More than $numberOfNodes successful node", numberOfNodes, nodesResponse["successful"])
+    }
+
+    private fun isMonitorScheduled(monitorId: String, alertingStatsResponse: Map<String, Any>): Boolean {
+        val nodesInfo = alertingStatsResponse["nodes"] as Map<String, Any>
+        for (nodeId in nodesInfo.keys) {
+            val nodeInfo = nodesInfo[nodeId] as Map<String, Any>
+            val jobsInfo = nodeInfo["jobs_info"] as Map<String, Any>
+            if (jobsInfo.keys.contains(monitorId)) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    private fun assertAlertingStatsSweeperEnabled(alertingStatsResponse: Map<String, Any>, expected: Boolean) {
+        assertEquals(
+            "Legacy scheduled job enabled field is not set to $expected",
+            expected,
+            alertingStatsResponse[statsResponseOpendistroSweeperEnabledField]
+        )
+        assertEquals(
+            "Scheduled job is not ${if (expected) "enabled" else "disabled"}",
+            expected,
+            alertingStatsResponse[statsResponseOpenSearchSweeperEnabledField]
+        )
     }
 }

@@ -42,7 +42,7 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import java.time.Instant
 
-private val log = LogManager.getLogger(TransportGetMonitorAction::class.java)
+private val log = LogManager.getLogger(TransportExecuteMonitorAction::class.java)
 
 class TransportExecuteMonitorAction @Inject constructor(
     transportService: TransportService,
