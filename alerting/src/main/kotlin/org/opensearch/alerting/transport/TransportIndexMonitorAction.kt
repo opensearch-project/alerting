@@ -9,6 +9,7 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchSecurityException
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
+import org.opensearch.action.admin.indices.alias.get.GetAliasesRequest
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
 import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.get.GetRequest
@@ -381,7 +382,8 @@ class TransportIndexMonitorAction @Inject constructor(
         private fun indexMonitor() {
             if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
                 val monitorIndex = (request.monitor.inputs[0] as DocLevelMonitorInput).indices[0]
-                val lastRunContext = DocumentReturningMonitorRunner.createRunContext(clusterService, client, monitorIndex).toMutableMap()
+                val lastRunContext = createFullRunContext(monitorIndex)
+                log.info("index last run context: $lastRunContext")
                 request.monitor = request.monitor.copy(lastRunContext = lastRunContext)
             }
             request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
@@ -511,7 +513,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 request.monitor.lastRunContext.toMutableMap().isNullOrEmpty()
             ) {
                 val monitorIndex = (request.monitor.inputs[0] as DocLevelMonitorInput).indices[0]
-                val lastRunContext = DocumentReturningMonitorRunner.createRunContext(clusterService, client, monitorIndex).toMutableMap()
+                val lastRunContext = createFullRunContext(monitorIndex)
                 request.monitor = request.monitor.copy(lastRunContext = lastRunContext)
             }
 
@@ -568,6 +570,19 @@ class TransportIndexMonitorAction @Inject constructor(
                     }
                 }
             )
+        }
+
+        private fun createFullRunContext(index: String): MutableMap<String, MutableMap<String, Any>> {
+            val getAliasesRequest = GetAliasesRequest(index)
+            val getAliasesResponse = client.admin().indices().getAliases(getAliasesRequest).actionGet()
+            val aliasIndices = getAliasesResponse.aliases.keys().map { it.value }
+            val isAlias = aliasIndices.isNotEmpty()
+            val indices = if (isAlias) getAliasesResponse.aliases.keys().map { it.value } else listOf(index)
+            val lastRunContext = mutableMapOf<String, MutableMap<String, Any>>()
+            indices.forEach { indexName ->
+                lastRunContext[indexName] = DocumentReturningMonitorRunner.createRunContext(clusterService, client, indexName)
+            }
+            return lastRunContext
         }
 
         private fun checkShardsFailure(response: IndexResponse): String? {
