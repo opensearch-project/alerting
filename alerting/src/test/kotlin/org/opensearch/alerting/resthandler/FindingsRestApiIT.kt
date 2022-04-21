@@ -5,8 +5,12 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.AlertingRestTestCase
+import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
+import org.opensearch.alerting.randomDocumentLevelMonitor
+import org.opensearch.alerting.randomDocumentLevelTrigger
 import org.opensearch.test.junit.annotations.TestLogging
 
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
@@ -14,6 +18,12 @@ import org.opensearch.test.junit.annotations.TestLogging
 class FindingsRestApiIT : AlertingRestTestCase() {
 
     fun `test find Finding where doc is not retrieved`() {
+        val testIndex = createTestIndex()
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        executeMonitor(trueMonitor.id, mapOf(Pair("dryrun", "true")))
 
         createFinding(matchingDocIds = listOf("someId"))
         val response = searchFindings()
@@ -34,6 +44,12 @@ class FindingsRestApiIT : AlertingRestTestCase() {
             "test_field" : "us-west-3"
         }"""
         indexDoc(testIndex, "someId2", testDoc2)
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        executeMonitor(trueMonitor.id, mapOf(Pair("dryrun", "true")))
 
         val findingWith1 = createFinding(matchingDocIds = listOf("someId"), index = testIndex)
         val findingWith2 = createFinding(matchingDocIds = listOf("someId", "someId2"), index = testIndex)
@@ -69,6 +85,12 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         }"""
         indexDoc(testIndex, "someId2", testDoc2)
 
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        executeMonitor(trueMonitor.id, mapOf(Pair("dryrun", "true")))
+
         createFinding(matchingDocIds = listOf("someId"), index = testIndex)
         val findingId = createFinding(matchingDocIds = listOf("someId", "someId2"), index = testIndex)
         val response = searchFindings(mapOf(Pair("findingId", findingId)))
@@ -95,6 +117,11 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         indexDoc(testIndex, "someId2", testDoc2)
 
         val docLevelQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "realQuery", tags = listOf("sigma"))
+        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docLevelQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        executeMonitor(trueMonitor.id, mapOf(Pair("dryrun", "true")))
+
         createFinding(matchingDocIds = listOf("someId"), index = testIndex)
         val findingId = createFinding(
             matchingDocIds = listOf("someId", "someId2"),
@@ -125,6 +152,11 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         indexDoc(testIndex, "someId2", testDoc2)
 
         val docLevelQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "realQuery", tags = listOf("sigma"))
+        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docLevelQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        executeMonitor(trueMonitor.id, mapOf(Pair("dryrun", "true")))
+
         createFinding(matchingDocIds = listOf("someId"), index = testIndex)
         val findingId = createFinding(
             matchingDocIds = listOf("someId", "someId2"),
@@ -132,6 +164,42 @@ class FindingsRestApiIT : AlertingRestTestCase() {
             docLevelQueries = listOf(docLevelQuery)
         )
         val response = searchFindings(mapOf(Pair("searchString", "realQuery")))
+        assertEquals(1, response.totalFindings)
+        assertEquals(findingId, response.findings[0].finding.id)
+        assertEquals(2, response.findings[0].documents.size)
+        assertTrue(response.findings[0].documents[0].found)
+        assertTrue(response.findings[0].documents[1].found)
+        assertEquals(testDoc, response.findings[0].documents[0].document)
+        assertEquals(testDoc2, response.findings[0].documents[1].document)
+    }
+
+    fun `test find Finding by monitor id`() {
+        val testIndex = createTestIndex()
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_field" : "us-west-2"
+        }"""
+        indexDoc(testIndex, "someId", testDoc)
+        val testDoc2 = """{
+            "message" : "This is an error2 from IAD region",
+            "test_field" : "us-west-3"
+        }"""
+        indexDoc(testIndex, "someId2", testDoc2)
+
+        val docLevelQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "realQuery", tags = listOf("sigma"))
+        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docLevelQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        executeMonitor(trueMonitor.id, mapOf(Pair("dryrun", "true")))
+
+        createFinding(matchingDocIds = listOf("someId"), index = testIndex)
+        val findingId = createFinding(
+            monitorId = "monitorToFind",
+            matchingDocIds = listOf("someId", "someId2"),
+            index = testIndex,
+            docLevelQueries = listOf(docLevelQuery)
+        )
+        val response = searchFindings(mapOf(Pair("searchString", "monitorToFind")))
         assertEquals(1, response.totalFindings)
         assertEquals(findingId, response.findings[0].finding.id)
         assertEquals(2, response.findings[0].documents.size)

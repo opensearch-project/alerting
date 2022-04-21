@@ -18,6 +18,8 @@ import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
 import org.opensearch.alerting.action.GetFindingsResponse
 import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRITE_INDEX
+import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
@@ -89,6 +91,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             mutableListOf(
                 Monitor.XCONTENT_REGISTRY,
                 SearchInput.XCONTENT_REGISTRY,
+                DocLevelMonitorInput.XCONTENT_REGISTRY,
                 QueryLevelTrigger.XCONTENT_REGISTRY,
                 BucketLevelTrigger.XCONTENT_REGISTRY,
                 DocumentLevelTrigger.XCONTENT_REGISTRY
@@ -559,8 +562,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         )
 
         val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
-
-        indexDoc(".opensearch-alerting-findings", finding.id, findingStr)
+        indexDoc(FINDING_HISTORY_WRITE_INDEX, finding.id, findingStr)
         return finding.id
     }
 
@@ -768,6 +770,60 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             // ignore
         }
         return index
+    }
+
+    protected fun createTestAlias(
+        alias: String = randomAlphaOfLength(10).toLowerCase(Locale.ROOT),
+        numOfAliasIndices: Int = randomIntBetween(1, 10),
+        includeWriteIndex: Boolean = true
+    ): MutableMap<String, MutableMap<String, Boolean>> {
+        return createTestAlias(alias = alias, indices = randomAliasIndices(alias, numOfAliasIndices, includeWriteIndex))
+    }
+
+    protected fun createTestAlias(
+        alias: String = randomAlphaOfLength(10).toLowerCase(Locale.ROOT),
+        indices: Map<String, Boolean> = randomAliasIndices(
+            alias = alias,
+            num = randomIntBetween(1, 10),
+            includeWriteIndex = true
+        )
+    ): MutableMap<String, MutableMap<String, Boolean>> {
+        logger.info("number of indices behind alias: ${indices.size}")
+        logger.info("the alias indices: $indices")
+        val indicesMap = mutableMapOf<String, Boolean>()
+        val indicesJson = jsonBuilder().startObject().startArray("actions")
+        indices.keys.map {
+            val indexName = createTestIndex(index = it.toLowerCase(Locale.ROOT), mapping = "")
+            val isWriteIndex = indices.getOrDefault(indexName, false)
+            indicesMap[indexName] = isWriteIndex
+            val indexMap = mapOf(
+                "add" to mapOf(
+                    "index" to indexName,
+                    "alias" to alias,
+                    "is_write_index" to isWriteIndex
+                )
+            )
+            indicesJson.value(indexMap)
+        }
+        val requestBody = indicesJson.endArray().endObject().string()
+        client().makeRequest("POST", "/_aliases", emptyMap(), StringEntity(requestBody, APPLICATION_JSON))
+        return mutableMapOf(alias to indicesMap)
+    }
+
+    protected fun randomAliasIndices(
+        alias: String,
+        num: Int = randomIntBetween(1, 10),
+        includeWriteIndex: Boolean = true
+    ): Map<String, Boolean> {
+        val indices = mutableMapOf<String, Boolean>()
+        val writeIndex = randomIntBetween(0, num)
+        for (i: Int in 0 until num) {
+            var indexName = randomAlphaOfLength(10)
+            while (indexName.equals(alias) || indices.containsKey(indexName))
+                indexName = randomAlphaOfLength(10)
+            indices[indexName] = includeWriteIndex && i == writeIndex
+        }
+        return indices
     }
 
     protected fun insertSampleTimeSerializedData(index: String, data: List<String>) {

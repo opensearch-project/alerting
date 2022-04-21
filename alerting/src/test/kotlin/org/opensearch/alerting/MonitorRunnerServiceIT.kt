@@ -870,7 +870,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         val trigger = randomQueryLevelTrigger(
             condition = Script(
                 """
-            return ctx.results[0].number_of_pending_tasks < 1
+            return ctx.results[0].number_of_pending_tasks >= 0
                 """.trimIndent()
             ),
             destinationId = createDestination().id

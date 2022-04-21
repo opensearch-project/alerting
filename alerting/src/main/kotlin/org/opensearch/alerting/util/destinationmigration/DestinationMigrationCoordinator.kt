@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
+import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.client.Client
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.ClusterChangedEvent
@@ -24,7 +25,8 @@ import kotlin.coroutines.CoroutineContext
 class DestinationMigrationCoordinator(
     private val client: Client,
     private val clusterService: ClusterService,
-    private val threadPool: ThreadPool
+    private val threadPool: ThreadPool,
+    private val scheduledJobIndices: ScheduledJobIndices
 ) : ClusterStateListener, CoroutineScope, LifecycleListener() {
 
     private val logger = LogManager.getLogger(javaClass)
@@ -66,6 +68,12 @@ class DestinationMigrationCoordinator(
     }
 
     private fun initMigrateDestinations() {
+        if (!scheduledJobIndices.scheduledJobIndexExists()) {
+            logger.debug("Alerting config index is not initialized")
+            scheduledMigration?.cancel()
+            return
+        }
+
         if (!clusterService.state().nodes().isLocalNodeElectedMaster) {
             scheduledMigration?.cancel()
             return
