@@ -1220,4 +1220,118 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             alertingStatsResponse[statsResponseOpenSearchSweeperEnabledField]
         )
     }
+
+    @Throws(Exception::class)
+    fun `test creating a document monitor`() {
+        val testIndex = createTestIndex()
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+
+        val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+
+        assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
+        val responseBody = createResponse.asMap()
+        val createdId = responseBody["_id"] as String
+        val createdVersion = responseBody["_version"] as Int
+        assertNotEquals("response is missing Id", Monitor.NO_ID, createdId)
+        assertTrue("incorrect version", createdVersion > 0)
+        val actualLocation = createResponse.getHeader("Location")
+        assertEquals("Incorrect Location header", "$ALERTING_BASE_URI/$createdId", actualLocation)
+    }
+
+    @Throws(Exception::class)
+    fun `test getting a document level monitor`() {
+        val testIndex = createTestIndex()
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger), user = null)
+        )
+
+        val storedMonitor = getMonitor(monitor.id)
+
+        assertEquals("Indexed and retrieved monitor differ", monitor, storedMonitor)
+    }
+
+    @Throws(Exception::class)
+    fun `test updating conditions for a doc-level monitor`() {
+        val testIndex = createTestIndex()
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+
+        val updatedTriggers = listOf(
+            DocumentLevelTrigger(
+                name = "foo",
+                severity = "1",
+                condition = Script("return true"),
+                actions = emptyList()
+            )
+        )
+        val updateResponse = client().makeRequest(
+            "PUT", monitor.relativeUrl(),
+            emptyMap(), monitor.copy(triggers = updatedTriggers).toHttpEntity()
+        )
+
+        assertEquals("Update monitor failed", RestStatus.OK, updateResponse.restStatus())
+        val responseBody = updateResponse.asMap()
+        assertEquals("Updated monitor id doesn't match", monitor.id, responseBody["_id"] as String)
+        assertEquals("Version not incremented", (monitor.version + 1).toInt(), responseBody["_version"] as Int)
+
+        val updatedMonitor = getMonitor(monitor.id)
+        assertEquals("Monitor trigger not updated", updatedTriggers, updatedMonitor.triggers)
+    }
+
+    @Throws(Exception::class)
+    fun `test deleting a document level monitor`() {
+        val testIndex = createTestIndex()
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+
+        val deleteResponse = client().makeRequest("DELETE", monitor.relativeUrl())
+        assertEquals("Delete failed", RestStatus.OK, deleteResponse.restStatus())
+
+        val getResponse = client().makeRequest("HEAD", monitor.relativeUrl())
+        assertEquals("Deleted monitor still exists", RestStatus.NOT_FOUND, getResponse.restStatus())
+    }
+
+    fun `test creating a document monitor with error trigger`() {
+        val trigger = randomQueryLevelTrigger()
+        try {
+            val monitor = randomDocumentLevelMonitor(triggers = listOf(trigger))
+            client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+            fail("Monitor with illegal trigger should be rejected.")
+        } catch (e: IllegalArgumentException) {
+            assertEquals(
+                "a document monitor with error trigger",
+                "Incompatible trigger [${trigger.id}] for monitor type [${Monitor.MonitorType.DOC_LEVEL_MONITOR}]",
+                e.message
+            )
+        }
+    }
+
+    fun `test creating a query monitor with error trigger`() {
+        val trigger = randomBucketLevelTrigger()
+        try {
+            val monitor = randomQueryLevelMonitor(triggers = listOf(trigger))
+            client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+            fail("Monitor with illegal trigger should be rejected.")
+        } catch (e: IllegalArgumentException) {
+            assertEquals(
+                "a query monitor with error trigger",
+                "Incompatible trigger [${trigger.id}] for monitor type [${Monitor.MonitorType.QUERY_LEVEL_MONITOR}]",
+                e.message
+            )
+        }
+    }
 }

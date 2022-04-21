@@ -144,6 +144,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
                         }
                     }
                     val documents = if (mgetRequest.items.isEmpty()) mutableMapOf() else searchDocument(mgetRequest)
+
                     findings.forEach {
                         val documentIds = it.relatedDocIds
                         val relatedDocs = mutableListOf<FindingDocument>()

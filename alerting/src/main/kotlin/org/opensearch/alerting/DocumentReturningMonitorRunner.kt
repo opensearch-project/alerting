@@ -226,6 +226,7 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
             docsToQueries.forEach {
                 val triggeredQueries = it.value.map { queryId -> idQueryMap[queryId]!! }
                 val findingId = createFindings(monitor, monitorCtx, triggeredQueries, it.key)
+
                 findings.add(findingId)
 
                 if (triggerResult.triggeredDocs.contains(it.key)) {

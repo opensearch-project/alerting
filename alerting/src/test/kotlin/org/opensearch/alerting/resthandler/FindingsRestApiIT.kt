@@ -24,6 +24,7 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
         executeMonitor(trueMonitor.id, mapOf(Pair("dryrun", "true")))
+
         createFinding(matchingDocIds = listOf("someId"))
         val response = searchFindings()
         assertEquals(1, response.totalFindings)
