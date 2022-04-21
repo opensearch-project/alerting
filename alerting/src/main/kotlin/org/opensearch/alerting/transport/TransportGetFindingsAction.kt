@@ -6,6 +6,7 @@
 package org.opensearch.alerting.transport
 
 import org.apache.logging.log4j.LogManager
+import org.apache.lucene.search.join.ScoreMode
 import org.opensearch.action.ActionListener
 import org.opensearch.action.get.MultiGetRequest
 import org.opensearch.action.search.SearchRequest
@@ -90,12 +91,23 @@ class TransportGetFindingsSearchAction @Inject constructor(
 
         if (!tableProp.searchString.isNullOrBlank()) {
             queryBuilder
-                .must(
+                .should(
                     QueryBuilders
                         .queryStringQuery(tableProp.searchString)
-                        .defaultOperator(Operator.AND)
-                        .field("queries.tags")
-                        .field("queries.name")
+                )
+                .should(
+                    QueryBuilders.nestedQuery(
+                        "queries",
+                        QueryBuilders.boolQuery()
+                            .must(
+                                QueryBuilders
+                                    .queryStringQuery(tableProp.searchString)
+                                    .defaultOperator(Operator.AND)
+                                    .field("queries.tags")
+                                    .field("queries.name")
+                            ),
+                        ScoreMode.Avg
+                    )
                 )
         }
 
@@ -131,7 +143,8 @@ class TransportGetFindingsSearchAction @Inject constructor(
                             mgetRequest.add(MultiGetRequest.Item(finding.index, docId))
                         }
                     }
-                    val documents = searchDocument(mgetRequest)
+                    val documents = if (mgetRequest.items.isEmpty()) mutableMapOf() else searchDocument(mgetRequest)
+
                     findings.forEach {
                         val documentIds = it.relatedDocIds
                         val relatedDocs = mutableListOf<FindingDocument>()

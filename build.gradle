@@ -13,12 +13,15 @@ buildscript {
         // 2.0.0-rc1-SNAPSHOT -> 2.0.0.0-rc1-SNAPSHOT
         version_tokens = opensearch_version.tokenize('-')
         opensearch_build = version_tokens[0] + '.0'
+        plugin_no_snapshot = opensearch_build
         if (buildVersionQualifier) {
             opensearch_build += "-${buildVersionQualifier}"
+            plugin_no_snapshot += "-${buildVersionQualifier}"
         }
         if (isSnapshot) {
             opensearch_build += "-SNAPSHOT"
         }
+        opensearch_no_snapshot = opensearch_version.replace("-SNAPSHOT","")
         common_utils_version = System.getProperty("common_utils.version", opensearch_build)
         kotlin_version = '1.6.10'
     }
