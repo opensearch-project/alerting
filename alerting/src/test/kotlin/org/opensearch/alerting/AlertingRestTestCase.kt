@@ -16,12 +16,19 @@ import org.junit.rules.DisableOnDebug
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
+import org.opensearch.alerting.action.GetFindingsResponse
 import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRITE_INDEX
+import org.opensearch.alerting.core.model.DocLevelMonitorInput
+import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
+import org.opensearch.alerting.model.DocumentLevelTrigger
+import org.opensearch.alerting.model.Finding
+import org.opensearch.alerting.model.FindingWithDocs
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.destination.Chime
@@ -38,12 +45,14 @@ import org.opensearch.client.Request
 import org.opensearch.client.Response
 import org.opensearch.client.RestClient
 import org.opensearch.client.WarningFailureException
+import org.opensearch.common.UUIDs
 import org.opensearch.common.io.PathUtils
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentParser
@@ -60,10 +69,12 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+import java.util.UUID
 import javax.management.MBeanServerInvocationHandler
 import javax.management.ObjectName
 import javax.management.remote.JMXConnectorFactory
 import javax.management.remote.JMXServiceURL
+import kotlin.collections.HashMap
 
 abstract class AlertingRestTestCase : ODFERestTestCase() {
 
@@ -80,8 +91,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             mutableListOf(
                 Monitor.XCONTENT_REGISTRY,
                 SearchInput.XCONTENT_REGISTRY,
+                DocLevelMonitorInput.XCONTENT_REGISTRY,
                 QueryLevelTrigger.XCONTENT_REGISTRY,
-                BucketLevelTrigger.XCONTENT_REGISTRY
+                BucketLevelTrigger.XCONTENT_REGISTRY,
+                DocumentLevelTrigger.XCONTENT_REGISTRY
             ) + SearchModule(Settings.EMPTY, emptyList()).namedXContents
         )
     }
@@ -102,7 +115,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             response.entity.content
         ).map()
         assertUserNull(monitorJson as HashMap<String, Any>)
-        return monitor.copy(id = monitorJson["_id"] as String, version = (monitorJson["_version"] as Int).toLong())
+
+        return getMonitor(monitorId = monitorJson["_id"] as String)
     }
 
     protected fun createMonitor(monitor: Monitor, refresh: Boolean = true): Monitor {
@@ -119,19 +133,24 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return response
     }
 
+    /**
+     * Destinations are now deprecated in favor of the Notification plugin's configs.
+     * This method should only be used for checking legacy behavior/Notification migration scenarios.
+     */
     protected fun createDestination(destination: Destination = getTestDestination(), refresh: Boolean = true): Destination {
-        val response = client().makeRequest(
-            "POST",
-            "$DESTINATION_BASE_URI?refresh=$refresh",
-            emptyMap(),
-            destination.toHttpEntity()
+        // Create Alerting config index if it doesn't exist to avoid mapping issues with legacy destination indexing
+        createAlertingConfigIndex()
+
+        val response = indexDocWithAdminClient(
+            ScheduledJob.SCHEDULED_JOBS_INDEX,
+            UUIDs.base64UUID(),
+            destination.toJsonStringWithType(),
+            refresh
         )
-        assertEquals("Unable to create a new destination", RestStatus.CREATED, response.restStatus())
         val destinationJson = jsonXContent.createParser(
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
-        assertUserNull(destinationJson as HashMap<String, Any>)
 
         return destination.copy(
             id = destinationJson["_id"] as String,
@@ -196,14 +215,20 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return emailAccount.copy(id = id, version = version)
     }
 
+    /**
+     * Email Accounts are now deprecated in favor of the Notification plugin's configs.
+     * This method should only be used for checking legacy behavior/Notification migration scenarios.
+     */
     protected fun createEmailAccount(emailAccount: EmailAccount = getTestEmailAccount(), refresh: Boolean = true): EmailAccount {
-        val response = client().makeRequest(
-            "POST",
-            "$EMAIL_ACCOUNT_BASE_URI?refresh=$refresh",
-            emptyMap(),
-            emailAccount.toHttpEntity()
+        // Create Alerting config index if it doesn't exist to avoid mapping issues with legacy destination indexing
+        createAlertingConfigIndex()
+
+        val response = indexDocWithAdminClient(
+            ScheduledJob.SCHEDULED_JOBS_INDEX,
+            UUIDs.base64UUID(),
+            emailAccount.toJsonStringWithType(),
+            refresh
         )
-        assertEquals("Unable to create a new email account", RestStatus.CREATED, response.restStatus())
         val emailAccountJson = jsonXContent.createParser(
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
@@ -221,21 +246,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val emailAccount = randomEmailAccount(salt = randomName)
         val emailAccountID = createEmailAccount(emailAccount, refresh).id
         return getEmailAccount(emailAccountID = emailAccountID)
-    }
-
-    protected fun updateEmailAccount(emailAccount: EmailAccount, refresh: Boolean = true): EmailAccount {
-        val response = client().makeRequest(
-            "PUT",
-            "$EMAIL_ACCOUNT_BASE_URI/${emailAccount.id}?refresh=$refresh",
-            emptyMap(),
-            emailAccount.toHttpEntity()
-        )
-        assertEquals("Unable to update email account", RestStatus.OK, response.restStatus())
-        val emailAccountJson = jsonXContent.createParser(
-            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-            response.entity.content
-        ).map()
-        return emailAccount.copy(id = emailAccountJson["_id"] as String)
     }
 
     protected fun getEmailGroup(
@@ -265,14 +275,20 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return emailGroup.copy(id = id, version = version)
     }
 
+    /**
+     * Email Groups are now deprecated in favor of the Notification plugin's configs.
+     * This method should only be used for checking legacy behavior/Notification migration scenarios.
+     */
     protected fun createEmailGroup(emailGroup: EmailGroup = getTestEmailGroup(), refresh: Boolean = true): EmailGroup {
-        val response = client().makeRequest(
-            "POST",
-            "$EMAIL_GROUP_BASE_URI?refresh=$refresh",
-            emptyMap(),
-            emailGroup.toHttpEntity()
+        // Create Alerting config index if it doesn't exist to avoid mapping issues with legacy destination indexing
+        createAlertingConfigIndex()
+
+        val response = indexDocWithAdminClient(
+            ScheduledJob.SCHEDULED_JOBS_INDEX,
+            UUIDs.base64UUID(),
+            emailGroup.toJsonStringWithType(),
+            refresh
         )
-        assertEquals("Unable to create a new email group", RestStatus.CREATED, response.restStatus())
         val emailGroupJson = jsonXContent.createParser(
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
@@ -290,21 +306,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val emailGroup = randomEmailGroup(salt = randomName)
         val emailGroupID = createEmailGroup(emailGroup, refresh).id
         return getEmailGroup(emailGroupID = emailGroupID)
-    }
-
-    protected fun updateEmailGroup(emailGroup: EmailGroup, refresh: Boolean = true): EmailGroup {
-        val response = client().makeRequest(
-            "PUT",
-            "$EMAIL_GROUP_BASE_URI/${emailGroup.id}?refresh=$refresh",
-            emptyMap(),
-            emailGroup.toHttpEntity()
-        )
-        assertEquals("Unable to update email group", RestStatus.OK, response.restStatus())
-        val emailGroupJson = jsonXContent.createParser(
-            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-            response.entity.content
-        ).map()
-        return emailGroup.copy(id = emailGroupJson["_id"] as String)
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -475,6 +476,15 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return getMonitor(monitorId = monitorId)
     }
 
+    protected fun createRandomDocumentMonitor(refresh: Boolean = false, withMetadata: Boolean = false): Monitor {
+        val monitor = randomDocumentLevelMonitor(withMetadata = withMetadata)
+        val monitorId = createMonitor(monitor, refresh).id
+        if (withMetadata) {
+            return getMonitor(monitorId = monitorId, header = BasicHeader(HttpHeaders.USER_AGENT, "OpenSearch-Dashboards"))
+        }
+        return getMonitor(monitorId = monitorId)
+    }
+
     @Suppress("UNCHECKED_CAST")
     protected fun updateMonitor(monitor: Monitor, refresh: Boolean = false): Monitor {
         val response = client().makeRequest(
@@ -511,8 +521,81 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return monitor.copy(id = id, version = version)
     }
 
-    protected fun searchAlerts(monitor: Monitor, indices: String = AlertIndices.ALERT_INDEX, refresh: Boolean = true): List<Alert> {
+    // TODO: understand why doc alerts wont work with the normal search Alerts function
+    protected fun searchAlertsWithFilter(
+        monitor: Monitor,
+        indices: String = AlertIndices.ALERT_INDEX,
+        refresh: Boolean = true
+    ): List<Alert> {
         if (refresh) refreshIndex(indices)
+
+        val request = """
+                { "version" : true,
+                  "query": { "match_all": {} }
+                }
+        """.trimIndent()
+        val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", StringEntity(request, APPLICATION_JSON))
+        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
+
+        val searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        return searchResponse.hits.hits.map {
+            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
+            Alert.parse(xcp, it.id, it.version)
+        }.filter { alert -> alert.monitorId == monitor.id }
+    }
+
+    protected fun createFinding(
+        monitorId: String = "NO_ID",
+        monitorName: String = "NO_NAME",
+        index: String = "testIndex",
+        docLevelQueries: List<DocLevelQuery> = listOf(DocLevelQuery(query = "test_field:\"us-west-2\"", name = "testQuery")),
+        matchingDocIds: List<String>
+    ): String {
+        val finding = Finding(
+            id = UUID.randomUUID().toString(),
+            relatedDocIds = matchingDocIds,
+            monitorId = monitorId,
+            monitorName = monitorName,
+            index = index,
+            docLevelQueries = docLevelQueries,
+            timestamp = Instant.now()
+        )
+
+        val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
+
+        indexDoc(FINDING_HISTORY_WRITE_INDEX, finding.id, findingStr)
+        return finding.id
+    }
+
+    protected fun searchFindings(
+        monitor: Monitor,
+        indices: String = AlertIndices.ALL_FINDING_INDEX_PATTERN,
+        refresh: Boolean = true
+    ): List<Finding> {
+        if (refresh) refreshIndex(indices)
+
+        val request = """
+                { "version" : true,
+                  "query": { "match_all": {} }
+                }
+        """.trimIndent()
+        val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", StringEntity(request, APPLICATION_JSON))
+        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
+
+        val searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        return searchResponse.hits.hits.map {
+            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
+            Finding.parse(xcp)
+        }.filter { finding -> finding.monitorId == monitor.id }
+    }
+
+    protected fun searchAlerts(monitor: Monitor, indices: String = AlertIndices.ALERT_INDEX, refresh: Boolean = true): List<Alert> {
+        try {
+            if (refresh) refreshIndex(indices)
+        } catch (e: Exception) {
+            logger.warn("Could not refresh index $indices because: ${e.message}")
+            return emptyList()
+        }
 
         // If this is a test monitor (it doesn't have an ID) and no alerts will be saved for it.
         val searchParams = if (monitor.id != Monitor.NO_ID) mapOf("routing" to monitor.id) else mapOf()
@@ -595,6 +678,40 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun executeMonitor(client: RestClient, monitor: Monitor, params: Map<String, String> = mapOf()): Response =
         client.makeRequest("POST", "$ALERTING_BASE_URI/_execute", params, monitor.toHttpEntityWithUser())
 
+    protected fun searchFindings(params: Map<String, String> = mutableMapOf()): GetFindingsResponse {
+
+        var baseEndpoint = "${AlertingPlugin.FINDING_BASE_URI}/_search?"
+        for (entry in params.entries) {
+            baseEndpoint += "${entry.key}=${entry.value}&"
+        }
+
+        val response = client().makeRequest("GET", baseEndpoint)
+
+        assertEquals("Unable to retrieve findings", RestStatus.OK, response.restStatus())
+
+        val parser = createParser(XContentType.JSON.xContent(), response.entity.content)
+        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser)
+
+        var totalFindings = 0
+        val findings = mutableListOf<FindingWithDocs>()
+
+        while (parser.nextToken() != XContentParser.Token.END_OBJECT) {
+            parser.nextToken()
+
+            when (parser.currentName()) {
+                "total_findings" -> totalFindings = parser.intValue()
+                "findings" -> {
+                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_ARRAY, parser.currentToken(), parser)
+                    while (parser.nextToken() != XContentParser.Token.END_ARRAY) {
+                        findings.add(FindingWithDocs.parse(parser))
+                    }
+                }
+            }
+        }
+
+        return GetFindingsResponse(response.restStatus(), totalFindings, findings)
+    }
+
     protected fun indexDoc(index: String, id: String, doc: String, refresh: Boolean = true): Response {
         return indexDoc(client(), index, id, doc, refresh)
     }
@@ -656,6 +773,60 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return index
     }
 
+    protected fun createTestAlias(
+        alias: String = randomAlphaOfLength(10).toLowerCase(Locale.ROOT),
+        numOfAliasIndices: Int = randomIntBetween(1, 10),
+        includeWriteIndex: Boolean = true
+    ): MutableMap<String, MutableMap<String, Boolean>> {
+        return createTestAlias(alias = alias, indices = randomAliasIndices(alias, numOfAliasIndices, includeWriteIndex))
+    }
+
+    protected fun createTestAlias(
+        alias: String = randomAlphaOfLength(10).toLowerCase(Locale.ROOT),
+        indices: Map<String, Boolean> = randomAliasIndices(
+            alias = alias,
+            num = randomIntBetween(1, 10),
+            includeWriteIndex = true
+        )
+    ): MutableMap<String, MutableMap<String, Boolean>> {
+        logger.info("number of indices behind alias: ${indices.size}")
+        logger.info("the alias indices: $indices")
+        val indicesMap = mutableMapOf<String, Boolean>()
+        val indicesJson = jsonBuilder().startObject().startArray("actions")
+        indices.keys.map {
+            val indexName = createTestIndex(index = it.toLowerCase(Locale.ROOT), mapping = "")
+            val isWriteIndex = indices.getOrDefault(indexName, false)
+            indicesMap[indexName] = isWriteIndex
+            val indexMap = mapOf(
+                "add" to mapOf(
+                    "index" to indexName,
+                    "alias" to alias,
+                    "is_write_index" to isWriteIndex
+                )
+            )
+            indicesJson.value(indexMap)
+        }
+        val requestBody = indicesJson.endArray().endObject().string()
+        client().makeRequest("POST", "/_aliases", emptyMap(), StringEntity(requestBody, APPLICATION_JSON))
+        return mutableMapOf(alias to indicesMap)
+    }
+
+    protected fun randomAliasIndices(
+        alias: String,
+        num: Int = randomIntBetween(1, 10),
+        includeWriteIndex: Boolean = true
+    ): Map<String, Boolean> {
+        val indices = mutableMapOf<String, Boolean>()
+        val writeIndex = randomIntBetween(0, num)
+        for (i: Int in 0 until num) {
+            var indexName = randomAlphaOfLength(10)
+            while (indexName.equals(alias) || indices.containsKey(indexName))
+                indexName = randomAlphaOfLength(10)
+            indices[indexName] = includeWriteIndex && i == writeIndex
+        }
+        return indices
+    }
+
     protected fun insertSampleTimeSerializedData(index: String, data: List<String>) {
         data.forEachIndexed { i, value ->
             val twoMinsAgo = ZonedDateTime.now().minus(2, ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MILLIS)
@@ -679,20 +850,32 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     fun putAlertMappings(mapping: String? = null) {
         val mappingHack = if (mapping != null) mapping else AlertIndices.alertMapping().trimStart('{').trimEnd('}')
-        val encodedHistoryIndex = URLEncoder.encode(AlertIndices.HISTORY_INDEX_PATTERN, Charsets.UTF_8.toString())
+        val encodedHistoryIndex = URLEncoder.encode(AlertIndices.ALERT_HISTORY_INDEX_PATTERN, Charsets.UTF_8.toString())
         val settings = Settings.builder().put("index.hidden", true).build()
         createIndex(AlertIndices.ALERT_INDEX, settings, mappingHack)
-        createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertIndices.HISTORY_WRITE_INDEX}\" : {}")
+        createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertIndices.ALERT_HISTORY_WRITE_INDEX}\" : {}")
+    }
+
+    fun putFindingMappings(mapping: String? = null) {
+        val mappingHack = if (mapping != null) mapping else AlertIndices.findingMapping().trimStart('{').trimEnd('}')
+        val encodedHistoryIndex = URLEncoder.encode(AlertIndices.FINDING_HISTORY_INDEX_PATTERN, Charsets.UTF_8.toString())
+        val settings = Settings.builder().put("index.hidden", true).build()
+//        createIndex(AlertIndices.FINDING_HISTORY_WRITE_INDEX, settings, mappingHack)
+        createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertIndices.FINDING_HISTORY_WRITE_INDEX}\" : {}")
     }
 
     fun scheduledJobMappings(): String {
         return javaClass.classLoader.getResource("mappings/scheduled-jobs.json").readText()
     }
 
+    /** Creates the Alerting config index if it does not exist */
     fun createAlertingConfigIndex(mapping: String? = null) {
-        val mappingHack = if (mapping != null) mapping else scheduledJobMappings().trimStart('{').trimEnd('}')
-        val settings = Settings.builder().put("index.hidden", true).build()
-        createIndex(ScheduledJob.SCHEDULED_JOBS_INDEX, settings, mappingHack)
+        val indexExistsResponse = client().makeRequest("HEAD", ScheduledJob.SCHEDULED_JOBS_INDEX)
+        if (indexExistsResponse.restStatus() == RestStatus.NOT_FOUND) {
+            val mappingHack = mapping ?: scheduledJobMappings().trimStart('{').trimEnd('}')
+            val settings = Settings.builder().put("index.hidden", true).build()
+            createIndex(ScheduledJob.SCHEDULED_JOBS_INDEX, settings, mappingHack)
+        }
     }
 
     protected fun Response.restStatus(): RestStatus {
@@ -713,7 +896,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     private fun Monitor.toJsonStringWithUser(): String {
-        val builder = XContentFactory.jsonBuilder()
+        val builder = jsonBuilder()
         return shuffleXContent(toXContentWithUser(builder, ToXContent.EMPTY_PARAMS)).string()
     }
 
@@ -722,8 +905,15 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun Destination.toJsonString(): String {
-        val builder = XContentFactory.jsonBuilder()
+        val builder = jsonBuilder()
         return shuffleXContent(toXContent(builder)).string()
+    }
+
+    protected fun Destination.toJsonStringWithType(): String {
+        val builder = jsonBuilder()
+        return shuffleXContent(
+            toXContent(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
+        ).string()
     }
 
     protected fun EmailAccount.toHttpEntity(): HttpEntity {
@@ -735,6 +925,13 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return shuffleXContent(toXContent(builder)).string()
     }
 
+    protected fun EmailAccount.toJsonStringWithType(): String {
+        val builder = jsonBuilder()
+        return shuffleXContent(
+            toXContent(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
+        ).string()
+    }
+
     protected fun EmailGroup.toHttpEntity(): HttpEntity {
         return StringEntity(toJsonString(), APPLICATION_JSON)
     }
@@ -744,12 +941,19 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return shuffleXContent(toXContent(builder)).string()
     }
 
+    protected fun EmailGroup.toJsonStringWithType(): String {
+        val builder = jsonBuilder()
+        return shuffleXContent(
+            toXContent(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
+        ).string()
+    }
+
     protected fun Alert.toHttpEntityWithUser(): HttpEntity {
         return StringEntity(toJsonStringWithUser(), APPLICATION_JSON)
     }
 
     private fun Alert.toJsonStringWithUser(): String {
-        val builder = XContentFactory.jsonBuilder()
+        val builder = jsonBuilder()
         return shuffleXContent(toXContentWithUser(builder)).string()
     }
 

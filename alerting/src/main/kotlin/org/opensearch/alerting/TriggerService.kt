@@ -8,27 +8,33 @@ package org.opensearch.alerting
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorIndices.Fields.BUCKET_INDICES
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorIndices.Fields.PARENT_BUCKET_PATH
+import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
+import org.opensearch.alerting.model.DocumentLevelTrigger
+import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerScript
+import org.opensearch.alerting.triggercondition.parsers.TriggerExpressionParser
 import org.opensearch.alerting.util.getBucketKeysHash
+import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
 import org.opensearch.search.aggregations.Aggregation
 import org.opensearch.search.aggregations.Aggregations
 import org.opensearch.search.aggregations.support.AggregationPath
-import java.lang.IllegalArgumentException
 
 /** Service that handles executing Triggers */
 class TriggerService(val scriptService: ScriptService) {
 
     private val logger = LogManager.getLogger(TriggerService::class.java)
+    private val ALWAYS_RUN = Script("return true")
+    private val NEVER_RUN = Script("return false")
 
     fun isQueryLevelTriggerActionable(ctx: QueryLevelTriggerExecutionContext, result: QueryLevelTriggerRunResult): Boolean {
         // Suppress actions if the current alert is acknowledged and there are no errors.
@@ -50,6 +56,32 @@ class TriggerService(val scriptService: ScriptService) {
             logger.info("Error running script for monitor ${monitor.id}, trigger: ${trigger.id}", e)
             // if the script fails we need to send an alert so set triggered = true
             QueryLevelTriggerRunResult(trigger.name, true, e)
+        }
+    }
+
+    // TODO: improve performance and support match all and match any
+    fun runDocLevelTrigger(
+        monitor: Monitor,
+        trigger: DocumentLevelTrigger,
+        queryToDocIds: Map<DocLevelQuery, Set<String>>
+    ): DocumentLevelTriggerRunResult {
+        return try {
+            var triggeredDocs = mutableListOf<String>()
+
+            if (trigger.condition.idOrCode.equals(ALWAYS_RUN.idOrCode)) {
+                for (value in queryToDocIds.values) {
+                    triggeredDocs.addAll(value)
+                }
+            } else if (!trigger.condition.idOrCode.equals(NEVER_RUN.idOrCode)) {
+                triggeredDocs = TriggerExpressionParser(trigger.condition.idOrCode).parse()
+                    .evaluate(queryToDocIds).toMutableList()
+            }
+
+            DocumentLevelTriggerRunResult(trigger.name, triggeredDocs, null)
+        } catch (e: Exception) {
+            logger.info("Error running script for monitor ${monitor.id}, trigger: ${trigger.id}", e)
+            // if the script fails we need to send an alert so set triggered = true
+            DocumentLevelTriggerRunResult(trigger.name, emptyList(), e)
         }
     }
 

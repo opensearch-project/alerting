@@ -26,6 +26,18 @@ import org.opensearch.common.xcontent.XContentType
  */
 class AlertingConfigAccessor {
     companion object {
+        suspend fun getMonitorInfo(client: Client, xContentRegistry: NamedXContentRegistry, monitorId: String): Monitor {
+            val jobSource = getAlertingConfigDocumentSource(client, "Monitor", monitorId)
+            return withContext(Dispatchers.IO) {
+                val xcp = XContentHelper.createParser(
+                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                    jobSource, XContentType.JSON
+                )
+                val monitor = Monitor.parse(xcp)
+                monitor
+            }
+        }
+
         suspend fun getDestinationInfo(client: Client, xContentRegistry: NamedXContentRegistry, destinationId: String): Destination {
             val jobSource = getAlertingConfigDocumentSource(client, "Destination", destinationId)
             return withContext(Dispatchers.IO) {

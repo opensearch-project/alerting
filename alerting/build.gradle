@@ -56,6 +56,7 @@ configurations.testImplementation {
 
 dependencies {
     compileOnly "org.opensearch.plugin:opensearch-scripting-painless-spi:${versions.opensearch}"
+    api "org.opensearch.plugin:percolator-client:${opensearch_version}"
 
     // OpenSearch Nanny state
     implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
@@ -63,7 +64,6 @@ dependencies {
     implementation "org.jetbrains:annotations:13.0"
 
     api project(":alerting-core")
-    api project(":alerting-notification")
     implementation "com.github.seancfoley:ipaddress:5.3.3"
 
     testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlin_version}"
@@ -97,6 +97,13 @@ integTest.dependsOn(bundle)
 integTest.getClusters().forEach{c -> c.plugin(project.getObjects().fileProperty().value(bundle.getArchiveFile()))}
 
 def _numNodes = findProperty('numNodes') as Integer ?: 1
+
+String notificationsFilePath = "src/test/resources/notifications"
+String notificationsCoreFilePath = "src/test/resources/notifications-core"
+String notificationsPlugin = "opensearch-notifications-" + plugin_no_snapshot + ".zip"
+String notificationsCorePlugin = "opensearch-notifications-core-" + plugin_no_snapshot + ".zip"
+String notificationsRemoteFile = "https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/" + opensearch_no_snapshot + "/latest/linux/x64/tar/builds/opensearch/plugins/" + notificationsPlugin
+String notificationsCoreRemoteFile = "https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/" + opensearch_no_snapshot + "/latest/linux/x64/tar/builds/opensearch/plugins/" + notificationsCorePlugin
 testClusters.integTest {
     testDistribution = "ARCHIVE"
     // Cluster shrink exception thrown if we try to set numberOfNodes to 1, so only apply if > 1
@@ -115,14 +122,38 @@ testClusters.integTest {
     plugin(provider({
         new RegularFile() {
             @Override
-            File getAsFile() { fileTree("src/test/resources/notifications-core").getSingleFile() }
+            File getAsFile() {
+                File dir = new File(rootDir.path + "/alerting/" + notificationsCoreFilePath)
+
+                if (!dir.exists()) {
+                    dir.mkdirs()
+                }
+
+                File f = new File(dir, notificationsCorePlugin)
+                if (!f.exists()) {
+                    new URL(notificationsCoreRemoteFile).withInputStream{ ins -> f.withOutputStream{ it << ins }}
+                }
+                fileTree(notificationsCoreFilePath).getSingleFile()
+            }
         }
     }))
 
     plugin(provider({
         new RegularFile() {
             @Override
-            File getAsFile() { fileTree("src/test/resources/notifications").getSingleFile() }
+            File getAsFile() {
+                File dir = new File(rootDir.path + "/alerting/" + notificationsFilePath)
+
+                if (!dir.exists()) {
+                    dir.mkdirs()
+                }
+
+                File f = new File(dir, notificationsPlugin)
+                if (!f.exists()) {
+                    new URL(notificationsRemoteFile).withInputStream{ ins -> f.withOutputStream{ it << ins }}
+                }
+                fileTree(notificationsFilePath).getSingleFile()
+            }
         }
     }))
 }
@@ -167,9 +198,36 @@ integTest {
     }
 }
 
+task integTestRemote(type: RestIntegTestTask) {
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    systemProperty 'tests.security.manager', 'false'
+    systemProperty 'java.io.tmpdir', opensearch_tmp_dir.absolutePath
+
+    systemProperty "https", System.getProperty("https")
+    systemProperty "security", System.getProperty("security")
+    systemProperty "user", System.getProperty("user")
+    systemProperty "password", System.getProperty("password")
+
+    if (System.getProperty("tests.rest.cluster") != null) {
+        filter {
+            includeTestsMatching "org.opensearch.alerting.resthandler.*IT"
+        }
+    }
+
+    if (System.getProperty("https") == null || System.getProperty("https") == "false") {
+        filter {
+            excludeTestsMatching "org.opensearch.alerting.resthandler.Secure*IT"
+        }
+    }
+}
+integTestRemote.enabled = System.getProperty("tests.rest.cluster") != null
+
 String bwcVersion = "1.13.1.0"
 String baseName = "alertingBwcCluster"
 String bwcFilePath = "src/test/resources/bwc"
+String bwcOpenDistroPlugin = "opendistro-alerting-" + bwcVersion + ".zip"
+String bwcRemoteFile = 'https://d3g5vo6xdbdb9a.cloudfront.net/downloads/elasticsearch-plugins/opendistro-alerting/' + bwcOpenDistroPlugin
 
 2.times {i ->
     testClusters {
@@ -183,6 +241,15 @@ String bwcFilePath = "src/test/resources/bwc"
                     return new RegularFile() {
                         @Override
                         File getAsFile() {
+                            File dir = new File(rootDir.path + "/alerting/" + bwcFilePath + "/alerting/" + bwcVersion)
+
+                            if (!dir.exists()) {
+                                dir.mkdirs()
+                            }
+                            File f = new File(dir, bwcOpenDistroPlugin)
+                            if (!f.exists()) {
+                                new URL(bwcRemoteFile).withInputStream{ ins -> f.withOutputStream{ it << ins }}
+                            }
                             return fileTree(bwcFilePath + "/alerting/" + bwcVersion).getSingleFile()
                         }
                     }
@@ -205,13 +272,37 @@ task prepareBwcTests {
                 provider({
                     new RegularFile() {
                         @Override
-                        File getAsFile() { fileTree("src/test/resources/notifications-core").getSingleFile() }
+                        File getAsFile() {
+                            File dir = new File(rootDir.path + "/alerting/" + notificationsCoreFilePath)
+
+                            if (!dir.exists()) {
+                                dir.mkdirs()
+                            }
+
+                            File f = new File(dir, notificationsCorePlugin)
+                            if (!f.exists()) {
+                                new URL(notificationsCoreRemoteFile).withInputStream{ ins -> f.withOutputStream{ it << ins }}
+                            }
+                            fileTree(notificationsCoreFilePath).getSingleFile()
+                        }
                     }
                 }),
                 provider({
                     new RegularFile() {
                         @Override
-                        File getAsFile() { fileTree("src/test/resources/notifications").getSingleFile() }
+                        File getAsFile() {
+                            File dir = new File(rootDir.path + "/alerting/" + notificationsFilePath)
+
+                            if (!dir.exists()) {
+                                dir.mkdirs()
+                            }
+
+                            File f = new File(dir, notificationsPlugin)
+                            if (!f.exists()) {
+                                new URL(notificationsRemoteFile).withInputStream{ ins -> f.withOutputStream{ it << ins }}
+                            }
+                            fileTree(notificationsFilePath).getSingleFile()
+                        }
                     }
                 })
         ]

@@ -53,7 +53,7 @@ data class SearchInput(val indices: List<String>, val query: SearchSourceBuilder
         val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(Input::class.java, ParseField("search"), CheckedFunction { parseInner(it) })
 
         @JvmStatic @Throws(IOException::class)
-        private fun parseInner(xcp: XContentParser): SearchInput {
+        fun parseInner(xcp: XContentParser): SearchInput {
             val indices = mutableListOf<String>()
             lateinit var searchSourceBuilder: SearchSourceBuilder
 

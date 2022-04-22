@@ -8,19 +8,14 @@ package org.opensearch.alerting
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionResponse
 import org.opensearch.alerting.action.AcknowledgeAlertAction
-import org.opensearch.alerting.action.DeleteDestinationAction
-import org.opensearch.alerting.action.DeleteEmailAccountAction
-import org.opensearch.alerting.action.DeleteEmailGroupAction
 import org.opensearch.alerting.action.DeleteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.GetAlertsAction
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetEmailAccountAction
 import org.opensearch.alerting.action.GetEmailGroupAction
+import org.opensearch.alerting.action.GetFindingsAction
 import org.opensearch.alerting.action.GetMonitorAction
-import org.opensearch.alerting.action.IndexDestinationAction
-import org.opensearch.alerting.action.IndexEmailAccountAction
-import org.opensearch.alerting.action.IndexEmailGroupAction
 import org.opensearch.alerting.action.IndexMonitorAction
 import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
@@ -32,6 +27,7 @@ import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsAction
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsTransportAction
 import org.opensearch.alerting.core.model.ClusterMetricsInput
+import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler
@@ -39,22 +35,18 @@ import org.opensearch.alerting.core.schedule.JobScheduler
 import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSettings
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.model.BucketLevelTrigger
+import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.resthandler.RestAcknowledgeAlertAction
-import org.opensearch.alerting.resthandler.RestDeleteDestinationAction
-import org.opensearch.alerting.resthandler.RestDeleteEmailAccountAction
-import org.opensearch.alerting.resthandler.RestDeleteEmailGroupAction
 import org.opensearch.alerting.resthandler.RestDeleteMonitorAction
 import org.opensearch.alerting.resthandler.RestExecuteMonitorAction
 import org.opensearch.alerting.resthandler.RestGetAlertsAction
 import org.opensearch.alerting.resthandler.RestGetDestinationsAction
 import org.opensearch.alerting.resthandler.RestGetEmailAccountAction
 import org.opensearch.alerting.resthandler.RestGetEmailGroupAction
+import org.opensearch.alerting.resthandler.RestGetFindingsAction
 import org.opensearch.alerting.resthandler.RestGetMonitorAction
-import org.opensearch.alerting.resthandler.RestIndexDestinationAction
-import org.opensearch.alerting.resthandler.RestIndexEmailAccountAction
-import org.opensearch.alerting.resthandler.RestIndexEmailGroupAction
 import org.opensearch.alerting.resthandler.RestIndexMonitorAction
 import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
 import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
@@ -65,23 +57,19 @@ import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroAlertingSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings
 import org.opensearch.alerting.transport.TransportAcknowledgeAlertAction
-import org.opensearch.alerting.transport.TransportDeleteDestinationAction
-import org.opensearch.alerting.transport.TransportDeleteEmailAccountAction
-import org.opensearch.alerting.transport.TransportDeleteEmailGroupAction
 import org.opensearch.alerting.transport.TransportDeleteMonitorAction
 import org.opensearch.alerting.transport.TransportExecuteMonitorAction
 import org.opensearch.alerting.transport.TransportGetAlertsAction
 import org.opensearch.alerting.transport.TransportGetDestinationsAction
 import org.opensearch.alerting.transport.TransportGetEmailAccountAction
 import org.opensearch.alerting.transport.TransportGetEmailGroupAction
+import org.opensearch.alerting.transport.TransportGetFindingsSearchAction
 import org.opensearch.alerting.transport.TransportGetMonitorAction
-import org.opensearch.alerting.transport.TransportIndexDestinationAction
-import org.opensearch.alerting.transport.TransportIndexEmailAccountAction
-import org.opensearch.alerting.transport.TransportIndexEmailGroupAction
 import org.opensearch.alerting.transport.TransportIndexMonitorAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
+import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
 import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
@@ -102,8 +90,8 @@ import org.opensearch.index.IndexModule
 import org.opensearch.painless.spi.PainlessExtension
 import org.opensearch.painless.spi.Whitelist
 import org.opensearch.painless.spi.WhitelistLoader
+import org.opensearch.percolator.PercolatorPluginExt
 import org.opensearch.plugins.ActionPlugin
-import org.opensearch.plugins.Plugin
 import org.opensearch.plugins.ReloadablePlugin
 import org.opensearch.plugins.ScriptPlugin
 import org.opensearch.plugins.SearchPlugin
@@ -122,7 +110,7 @@ import java.util.function.Supplier
  * It also adds [Monitor.XCONTENT_REGISTRY], [SearchInput.XCONTENT_REGISTRY], [QueryLevelTrigger.XCONTENT_REGISTRY],
  * [BucketLevelTrigger.XCONTENT_REGISTRY], [ClusterMetricsInput.XCONTENT_REGISTRY] to the [NamedXContentRegistry] so that we are able to deserialize the custom named objects.
  */
-internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, ReloadablePlugin, SearchPlugin, Plugin() {
+internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, ReloadablePlugin, SearchPlugin, PercolatorPluginExt() {
 
     override fun getContextWhitelists(): Map<ScriptContext<*>, List<Whitelist>> {
         val whitelist = WhitelistLoader.loadFromResourceFiles(javaClass, "org.opensearch.alerting.txt")
@@ -140,13 +128,15 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         @JvmField val EMAIL_GROUP_BASE_URI = "$DESTINATION_BASE_URI/email_groups"
         @JvmField val LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI = "$LEGACY_OPENDISTRO_DESTINATION_BASE_URI/email_accounts"
         @JvmField val LEGACY_OPENDISTRO_EMAIL_GROUP_BASE_URI = "$LEGACY_OPENDISTRO_DESTINATION_BASE_URI/email_groups"
+        @JvmField val FINDING_BASE_URI = "/_plugins/_alerting/findings"
         @JvmField val ALERTING_JOB_TYPES = listOf("monitor")
     }
 
-    lateinit var runner: MonitorRunner
+    lateinit var runner: MonitorRunnerService
     lateinit var scheduler: JobScheduler
     lateinit var sweeper: JobSweeper
     lateinit var scheduledJobIndices: ScheduledJobIndices
+    lateinit var docLevelMonitorQueries: DocLevelMonitorQueries
     lateinit var threadPool: ThreadPool
     lateinit var alertIndices: AlertIndices
     lateinit var clusterService: ClusterService
@@ -169,42 +159,33 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestExecuteMonitorAction(),
             RestAcknowledgeAlertAction(),
             RestScheduledJobStatsHandler("_alerting"),
-            RestIndexDestinationAction(),
-            RestDeleteDestinationAction(),
-            RestIndexEmailAccountAction(),
-            RestDeleteEmailAccountAction(),
             RestSearchEmailAccountAction(),
             RestGetEmailAccountAction(),
-            RestIndexEmailGroupAction(),
-            RestDeleteEmailGroupAction(),
             RestSearchEmailGroupAction(),
             RestGetEmailGroupAction(),
             RestGetDestinationsAction(),
-            RestGetAlertsAction()
+            RestGetAlertsAction(),
+            RestGetFindingsAction()
         )
     }
 
     override fun getActions(): List<ActionPlugin.ActionHandler<out ActionRequest, out ActionResponse>> {
         return listOf(
             ActionPlugin.ActionHandler(ScheduledJobsStatsAction.INSTANCE, ScheduledJobsStatsTransportAction::class.java),
-            ActionPlugin.ActionHandler(IndexDestinationAction.INSTANCE, TransportIndexDestinationAction::class.java),
             ActionPlugin.ActionHandler(IndexMonitorAction.INSTANCE, TransportIndexMonitorAction::class.java),
             ActionPlugin.ActionHandler(GetMonitorAction.INSTANCE, TransportGetMonitorAction::class.java),
             ActionPlugin.ActionHandler(ExecuteMonitorAction.INSTANCE, TransportExecuteMonitorAction::class.java),
             ActionPlugin.ActionHandler(SearchMonitorAction.INSTANCE, TransportSearchMonitorAction::class.java),
             ActionPlugin.ActionHandler(DeleteMonitorAction.INSTANCE, TransportDeleteMonitorAction::class.java),
-            ActionPlugin.ActionHandler(DeleteDestinationAction.INSTANCE, TransportDeleteDestinationAction::class.java),
             ActionPlugin.ActionHandler(AcknowledgeAlertAction.INSTANCE, TransportAcknowledgeAlertAction::class.java),
-            ActionPlugin.ActionHandler(IndexEmailAccountAction.INSTANCE, TransportIndexEmailAccountAction::class.java),
             ActionPlugin.ActionHandler(GetEmailAccountAction.INSTANCE, TransportGetEmailAccountAction::class.java),
             ActionPlugin.ActionHandler(SearchEmailAccountAction.INSTANCE, TransportSearchEmailAccountAction::class.java),
-            ActionPlugin.ActionHandler(DeleteEmailAccountAction.INSTANCE, TransportDeleteEmailAccountAction::class.java),
-            ActionPlugin.ActionHandler(IndexEmailGroupAction.INSTANCE, TransportIndexEmailGroupAction::class.java),
             ActionPlugin.ActionHandler(GetEmailGroupAction.INSTANCE, TransportGetEmailGroupAction::class.java),
             ActionPlugin.ActionHandler(SearchEmailGroupAction.INSTANCE, TransportSearchEmailGroupAction::class.java),
-            ActionPlugin.ActionHandler(DeleteEmailGroupAction.INSTANCE, TransportDeleteEmailGroupAction::class.java),
             ActionPlugin.ActionHandler(GetDestinationsAction.INSTANCE, TransportGetDestinationsAction::class.java),
-            ActionPlugin.ActionHandler(GetAlertsAction.INSTANCE, TransportGetAlertsAction::class.java)
+            ActionPlugin.ActionHandler(GetAlertsAction.INSTANCE, TransportGetAlertsAction::class.java),
+            ActionPlugin.ActionHandler(GetFindingsAction.INSTANCE, TransportGetFindingsSearchAction::class.java)
+
         )
     }
 
@@ -212,9 +193,11 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         return listOf(
             Monitor.XCONTENT_REGISTRY,
             SearchInput.XCONTENT_REGISTRY,
+            DocLevelMonitorInput.XCONTENT_REGISTRY,
             QueryLevelTrigger.XCONTENT_REGISTRY,
             BucketLevelTrigger.XCONTENT_REGISTRY,
-            ClusterMetricsInput.XCONTENT_REGISTRY
+            ClusterMetricsInput.XCONTENT_REGISTRY,
+            DocumentLevelTrigger.XCONTENT_REGISTRY
         )
     }
 
@@ -234,7 +217,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         // Need to figure out how to use the OpenSearch DI classes rather than handwiring things here.
         val settings = environment.settings()
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
-        runner = MonitorRunner
+        runner = MonitorRunnerService
             .registerClusterService(clusterService)
             .registerClient(client)
             .registerNamedXContentRegistry(xContentRegistry)
@@ -248,12 +231,13 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerConsumers()
             .registerDestinationSettings()
         scheduledJobIndices = ScheduledJobIndices(client.admin(), clusterService)
+        docLevelMonitorQueries = DocLevelMonitorQueries(client.admin(), clusterService)
         scheduler = JobScheduler(threadPool, runner)
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
-        destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool)
+        destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool, scheduledJobIndices)
         this.threadPool = threadPool
         this.clusterService = clusterService
-        return listOf(sweeper, scheduler, runner, scheduledJobIndices, destinationMigrationCoordinator)
+        return listOf(sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator)
     }
 
     override fun getSettings(): List<Setting<*>> {
@@ -310,7 +294,12 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             LegacyOpenDistroDestinationSettings.EMAIL_USERNAME,
             LegacyOpenDistroDestinationSettings.EMAIL_PASSWORD,
             LegacyOpenDistroDestinationSettings.ALLOW_LIST,
-            LegacyOpenDistroDestinationSettings.HOST_DENY_LIST
+            LegacyOpenDistroDestinationSettings.HOST_DENY_LIST,
+            AlertingSettings.FINDING_HISTORY_ENABLED,
+            AlertingSettings.FINDING_HISTORY_MAX_DOCS,
+            AlertingSettings.FINDING_HISTORY_INDEX_MAX_AGE,
+            AlertingSettings.FINDING_HISTORY_ROLLOVER_PERIOD,
+            AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD
         )
     }
 

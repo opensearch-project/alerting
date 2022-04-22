@@ -11,6 +11,8 @@ import org.apache.http.HttpEntity
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtFilter
 import org.opensearch.alerting.core.model.ClusterMetricsInput
+import org.opensearch.alerting.core.model.DocLevelMonitorInput
+import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.core.model.Input
 import org.opensearch.alerting.core.model.IntervalSchedule
 import org.opensearch.alerting.core.model.Schedule
@@ -21,6 +23,9 @@ import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
+import org.opensearch.alerting.model.DocumentLevelTrigger
+import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
+import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorRunResult
@@ -83,7 +88,7 @@ fun randomQueryLevelMonitor(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
-        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        lastRunContext = mapOf(), uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 
@@ -101,7 +106,7 @@ fun randomQueryLevelMonitorWithoutUser(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = null,
-        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        lastRunContext = mapOf(), uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 
@@ -125,7 +130,7 @@ fun randomBucketLevelMonitor(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.BUCKET_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
-        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        lastRunContext = mapOf(), uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 
@@ -143,7 +148,25 @@ fun randomClusterMetricsMonitor(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.CLUSTER_METRICS_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
-        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        lastRunContext = mapOf(), uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+    )
+}
+
+fun randomDocumentLevelMonitor(
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    user: User? = randomUser(),
+    inputs: List<Input> = listOf(DocLevelMonitorInput("description", listOf("index"), emptyList())),
+    schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
+    enabled: Boolean = randomBoolean(),
+    triggers: List<Trigger> = (1..randomInt(10)).map { randomQueryLevelTrigger() },
+    enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
+    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+    withMetadata: Boolean = false
+): Monitor {
+    return Monitor(
+        name = name, monitorType = Monitor.MonitorType.DOC_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
+        schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
+        lastRunContext = mapOf(), uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 
@@ -184,6 +207,25 @@ fun randomBucketLevelTrigger(
 fun randomActionsForBucketLevelTrigger(min: Int = 0, max: Int = 10, destinationId: String = ""): List<Action> =
     (min..randomInt(max)).map { randomActionWithPolicy(destinationId = destinationId) }
 
+fun randomDocumentLevelTrigger(
+    id: String = UUIDs.base64UUID(),
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    severity: String = "1",
+    condition: Script = randomScript(),
+    actions: List<Action> = mutableListOf(),
+    destinationId: String = ""
+): DocumentLevelTrigger {
+    return DocumentLevelTrigger(
+        id = id,
+        name = name,
+        severity = severity,
+        condition = condition,
+        actions = if (actions.isEmpty() && destinationId.isNotBlank())
+            (0..randomInt(10)).map { randomAction(destinationId = destinationId) }
+        else actions
+    )
+}
+
 fun randomBucketSelectorExtAggregationBuilder(
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     bucketsPathsMap: MutableMap<String, String> = mutableMapOf("avg" to "10"),
@@ -199,6 +241,23 @@ fun randomBucketSelectorScript(
     params: Map<String, String> = mutableMapOf("avg" to "10")
 ): Script {
     return Script(Script.DEFAULT_SCRIPT_TYPE, Script.DEFAULT_SCRIPT_LANG, idOrCode, emptyMap<String, String>(), params)
+}
+
+fun randomDocLevelTrigger(
+    id: String = UUIDs.base64UUID(),
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    severity: String = "1",
+    condition: Script = randomScript(),
+    actions: List<Action> = mutableListOf(),
+    destinationId: String = ""
+): DocumentLevelTrigger {
+    return DocumentLevelTrigger(
+        id = id,
+        name = name,
+        severity = severity,
+        condition = condition,
+        actions = if (actions.isEmpty()) (0..randomInt(10)).map { randomAction(destinationId = destinationId) } else actions
+    )
 }
 
 fun randomEmailAccount(
@@ -307,6 +366,43 @@ fun randomAlert(monitor: Monitor = randomQueryLevelMonitor()): Alert {
     )
 }
 
+fun randomDocLevelQuery(
+    id: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    query: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    name: String = "${randomInt(5)}",
+    tags: List<String> = mutableListOf(0..randomInt(10)).map { OpenSearchRestTestCase.randomAlphaOfLength(10) }
+): DocLevelQuery {
+    return DocLevelQuery(id = id, query = query, name = name, tags = tags)
+}
+
+fun randomDocLevelMonitorInput(
+    description: String = OpenSearchRestTestCase.randomAlphaOfLength(randomInt(10)),
+    indices: List<String> = listOf(1..randomInt(10)).map { OpenSearchRestTestCase.randomAlphaOfLength(10) },
+    queries: List<DocLevelQuery> = listOf(1..randomInt(10)).map { randomDocLevelQuery() }
+): DocLevelMonitorInput {
+    return DocLevelMonitorInput(description = description, indices = indices, queries = queries)
+}
+
+fun randomFinding(
+    id: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    relatedDocIds: List<String> = listOf(OpenSearchRestTestCase.randomAlphaOfLength(10)),
+    monitorId: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    monitorName: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    index: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    docLevelQueries: List<DocLevelQuery> = listOf(randomDocLevelQuery()),
+    timestamp: Instant = Instant.now()
+): Finding {
+    return Finding(
+        id = id,
+        relatedDocIds = relatedDocIds,
+        monitorId = monitorId,
+        monitorName = monitorName,
+        index = index,
+        docLevelQueries = docLevelQueries,
+        timestamp = timestamp
+    )
+}
+
 fun randomAlertWithAggregationResultBucket(monitor: Monitor = randomBucketLevelMonitor()): Alert {
     val trigger = randomBucketLevelTrigger()
     val actionExecutionResults = mutableListOf(randomActionExecutionResult(), randomActionExecutionResult())
@@ -351,6 +447,21 @@ fun randomQueryLevelMonitorRunResult(): MonitorRunResult<QueryLevelTriggerRunRes
 fun randomBucketLevelMonitorRunResult(): MonitorRunResult<BucketLevelTriggerRunResult> {
     val triggerResults = mutableMapOf<String, BucketLevelTriggerRunResult>()
     val triggerRunResult = randomBucketLevelTriggerRunResult()
+    triggerResults.plus(Pair("test", triggerRunResult))
+
+    return MonitorRunResult(
+        "test-monitor",
+        Instant.now(),
+        Instant.now(),
+        null,
+        randomInputRunResults(),
+        triggerResults
+    )
+}
+
+fun randomDocumentLevelMonitorRunResult(): MonitorRunResult<DocumentLevelTriggerRunResult> {
+    val triggerResults = mutableMapOf<String, DocumentLevelTriggerRunResult>()
+    val triggerRunResult = randomDocumentLevelTriggerRunResult()
     triggerResults.plus(Pair("test", triggerRunResult))
 
     return MonitorRunResult(
@@ -410,6 +521,13 @@ fun randomBucketLevelTriggerRunResult(): BucketLevelTriggerRunResult {
         ),
         actionResultsMap
     )
+}
+
+fun randomDocumentLevelTriggerRunResult(): DocumentLevelTriggerRunResult {
+    val map = mutableMapOf<String, ActionRunResult>()
+    map.plus(Pair("key1", randomActionRunResult()))
+    map.plus(Pair("key2", randomActionRunResult()))
+    return DocumentLevelTriggerRunResult("trigger-name", mutableListOf(UUIDs.randomBase64UUID().toString()), null, map)
 }
 
 fun randomActionRunResult(): ActionRunResult {
@@ -526,7 +644,11 @@ fun parser(xc: String): XContentParser {
 fun xContentRegistry(): NamedXContentRegistry {
     return NamedXContentRegistry(
         listOf(
-            SearchInput.XCONTENT_REGISTRY, QueryLevelTrigger.XCONTENT_REGISTRY, BucketLevelTrigger.XCONTENT_REGISTRY
+            SearchInput.XCONTENT_REGISTRY,
+            DocLevelMonitorInput.XCONTENT_REGISTRY,
+            QueryLevelTrigger.XCONTENT_REGISTRY,
+            BucketLevelTrigger.XCONTENT_REGISTRY,
+            DocumentLevelTrigger.XCONTENT_REGISTRY
         ) + SearchModule(Settings.EMPTY, emptyList()).namedXContents
     )
 }

@@ -49,6 +49,7 @@ class GetMonitorResponseTests : OpenSearchTestCase() {
             schemaVersion = 0,
             inputs = mutableListOf(),
             triggers = mutableListOf(),
+            lastRunContext = mutableMapOf(),
             uiMetadata = mutableMapOf()
         )
         val req = GetMonitorResponse("1234", 1L, 2L, 0L, RestStatus.OK, monitor)

@@ -11,20 +11,26 @@ import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
+import org.opensearch.action.admin.indices.create.CreateIndexResponse
+import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.alerting.MonitorRunner
+import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorResponse
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
-import org.opensearch.alerting.util.isBucketLevelMonitor
+import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.client.Client
+import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
+import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentHelper
@@ -36,17 +42,21 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import java.time.Instant
 
-private val log = LogManager.getLogger(TransportGetMonitorAction::class.java)
+private val log = LogManager.getLogger(TransportExecuteMonitorAction::class.java)
 
 class TransportExecuteMonitorAction @Inject constructor(
     transportService: TransportService,
     private val client: Client,
-    private val runner: MonitorRunner,
+    private val clusterService: ClusterService,
+    private val runner: MonitorRunnerService,
     actionFilters: ActionFilters,
-    val xContentRegistry: NamedXContentRegistry
+    val xContentRegistry: NamedXContentRegistry,
+    private val docLevelMonitorQueries: DocLevelMonitorQueries,
+    private val settings: Settings
 ) : HandledTransportAction<ExecuteMonitorRequest, ExecuteMonitorResponse> (
     ExecuteMonitorAction.NAME, transportService, actionFilters, ::ExecuteMonitorRequest
 ) {
+    @Volatile private var indexTimeout = AlertingSettings.INDEX_TIMEOUT.get(settings)
 
     override fun doExecute(task: Task, execMonitorRequest: ExecuteMonitorRequest, actionListener: ActionListener<ExecuteMonitorResponse>) {
 
@@ -63,11 +73,7 @@ class TransportExecuteMonitorAction @Inject constructor(
                     val (periodStart, periodEnd) =
                         monitor.schedule.getPeriodEndingAt(Instant.ofEpochMilli(execMonitorRequest.requestEnd.millis))
                     try {
-                        val monitorRunResult = if (monitor.isBucketLevelMonitor()) {
-                            runner.runBucketLevelMonitor(monitor, periodStart, periodEnd, execMonitorRequest.dryrun)
-                        } else {
-                            runner.runQueryLevelMonitor(monitor, periodStart, periodEnd, execMonitorRequest.dryrun)
-                        }
+                        val monitorRunResult = runner.runJob(monitor, periodStart, periodEnd, execMonitorRequest.dryrun)
                         withContext(Dispatchers.IO) {
                             actionListener.onResponse(ExecuteMonitorResponse(monitorRunResult))
                         }
@@ -115,7 +121,61 @@ class TransportExecuteMonitorAction @Inject constructor(
                     true -> execMonitorRequest.monitor as Monitor
                     false -> (execMonitorRequest.monitor as Monitor).copy(user = user)
                 }
-                executeMonitor(monitor)
+
+                if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                    if (!docLevelMonitorQueries.docLevelQueryIndexExists()) {
+                        docLevelMonitorQueries.initDocLevelQueryIndex(object : ActionListener<CreateIndexResponse> {
+                            override fun onResponse(response: CreateIndexResponse) {
+                                log.info("Central Percolation index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX} created")
+                                docLevelMonitorQueries.indexDocLevelQueries(
+                                    client,
+                                    monitor,
+                                    monitor.id,
+                                    WriteRequest.RefreshPolicy.IMMEDIATE,
+                                    indexTimeout,
+                                    null,
+                                    actionListener,
+                                    object : ActionListener<BulkResponse> {
+                                        override fun onResponse(response: BulkResponse) {
+                                            log.info("Queries inserted into Percolate index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}")
+                                            executeMonitor(monitor)
+                                        }
+
+                                        override fun onFailure(t: Exception) {
+                                            actionListener.onFailure(AlertingException.wrap(t))
+                                        }
+                                    }
+                                )
+                            }
+
+                            override fun onFailure(t: Exception) {
+                                actionListener.onFailure(AlertingException.wrap(t))
+                            }
+                        })
+                    } else {
+                        docLevelMonitorQueries.indexDocLevelQueries(
+                            client,
+                            monitor,
+                            monitor.id,
+                            WriteRequest.RefreshPolicy.IMMEDIATE,
+                            indexTimeout,
+                            null,
+                            actionListener,
+                            object : ActionListener<BulkResponse> {
+                                override fun onResponse(response: BulkResponse) {
+                                    log.info("Queries inserted into Percolate index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}")
+                                    executeMonitor(monitor)
+                                }
+
+                                override fun onFailure(t: Exception) {
+                                    actionListener.onFailure(AlertingException.wrap(t))
+                                }
+                            }
+                        )
+                    }
+                } else {
+                    executeMonitor(monitor)
+                }
             }
         }
     }
