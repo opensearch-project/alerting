@@ -251,7 +251,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
         assertUserNull(createResponse.asMap()["monitor"] as HashMap<String, Any>)
     }
-
     fun `test get monitor with an user with get monitor role`() {
         createUserWithTestDataAndCustomRole(
             user,
@@ -275,7 +274,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
         }
     }
-
     /*
     TODO: https://github.com/opensearch-project/alerting/issues/300
     fun `test get monitor with an user without get monitor role`() {
