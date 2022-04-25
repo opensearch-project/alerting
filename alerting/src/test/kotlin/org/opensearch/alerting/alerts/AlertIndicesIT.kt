@@ -36,9 +36,9 @@ class AlertIndicesIT : AlertingRestTestCase() {
     fun `test create finding index`() {
         val testIndex = createTestIndex()
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
-        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
 
         executeMonitor(monitor.id)
 
@@ -81,9 +81,9 @@ class AlertIndicesIT : AlertingRestTestCase() {
 
         val testIndex = createTestIndex()
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
-        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
         executeMonitor(trueMonitor.id)
         assertIndexExists(AlertIndices.FINDING_HISTORY_WRITE_INDEX)
         verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 5)
@@ -113,9 +113,9 @@ class AlertIndicesIT : AlertingRestTestCase() {
         assertIndexDoesNotExist(AlertIndices.FINDING_HISTORY_WRITE_INDEX)
         val testIndex = createTestIndex()
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
-        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
 
         executeMonitor(trueMonitor.id)
         assertIndexExists(AlertIndices.FINDING_HISTORY_WRITE_INDEX)
@@ -149,9 +149,9 @@ class AlertIndicesIT : AlertingRestTestCase() {
 
         val testIndex = createTestIndex()
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
-        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
         executeMonitor(trueMonitor.id)
 
         // Allow for a rollover index.
@@ -249,9 +249,9 @@ class AlertIndicesIT : AlertingRestTestCase() {
         // Create monitor and execute
         val testIndex = createTestIndex()
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
-        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
 
         val testDoc = """{
             "message" : "This is an error from IAD region",
