@@ -123,17 +123,12 @@ class TransportExecuteMonitorAction @Inject constructor(
                 }
 
                 if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
-                    scope.launch {
-                        if (!docLevelMonitorQueries.docLevelQueryIndexExists()) {
-                            try {
+                    try {
+                        scope.launch {
+                            if (!docLevelMonitorQueries.docLevelQueryIndexExists()) {
                                 docLevelMonitorQueries.initDocLevelQueryIndex()
                                 log.info("Central Percolation index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX} created")
-                            } catch (t: Exception) {
-                                actionListener.onFailure(AlertingException.wrap(t))
-                                return@launch
                             }
-                        }
-                        try {
                             docLevelMonitorQueries.indexDocLevelQueries(
                                 client,
                                 monitor,
@@ -143,10 +138,9 @@ class TransportExecuteMonitorAction @Inject constructor(
                             )
                             log.info("Queries inserted into Percolate index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}")
                             executeMonitor(monitor)
-                        } catch (t: Exception) {
-                            log.error("Failed to add queries into Percolate index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}")
-                            actionListener.onFailure(AlertingException.wrap(t))
                         }
+                    } catch (t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
                     }
                 } else {
                     executeMonitor(monitor)
