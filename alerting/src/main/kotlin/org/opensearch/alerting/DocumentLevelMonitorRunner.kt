@@ -7,7 +7,9 @@ package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.admin.indices.alias.get.GetAliasesRequest
+import org.opensearch.action.admin.indices.alias.get.GetAliasesResponse
 import org.opensearch.action.index.IndexRequest
+import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.search.SearchAction
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
@@ -25,7 +27,9 @@ import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.opensearchapi.string
+import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
+import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.updateMonitor
 import org.opensearch.client.Client
 import org.opensearch.cluster.routing.ShardRouting
@@ -48,7 +52,7 @@ import java.util.UUID
 import kotlin.collections.HashMap
 import kotlin.math.max
 
-object DocumentReturningMonitorRunner : MonitorRunner() {
+object DocumentLevelMonitorRunner : MonitorRunner() {
     private val logger = LogManager.getLogger(javaClass)
 
     override suspend fun runMonitor(
@@ -68,14 +72,14 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
         } catch (e: Exception) {
             val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
             logger.error("Error setting up alerts and findings indices for monitor: $id", e)
-            return monitorResult.copy(error = e)
+            return monitorResult.copy(error = AlertingException.wrap(e))
         }
 
         try {
             validate(monitor)
         } catch (e: Exception) {
             logger.info("Failed to start Document-level-monitor. Error: ${e.message}")
-            return monitorResult.copy(error = e)
+            return monitorResult.copy(error = AlertingException.wrap(e))
         }
 
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
@@ -93,7 +97,9 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
 
         try {
             val getAliasesRequest = GetAliasesRequest(index)
-            val getAliasesResponse = monitorCtx.client!!.admin().indices().getAliases(getAliasesRequest).actionGet()
+            val getAliasesResponse: GetAliasesResponse = monitorCtx.client!!.suspendUntil {
+                monitorCtx.client!!.admin().indices().getAliases(getAliasesRequest, it)
+            }
             val aliasIndices = getAliasesResponse.aliases.keys().map { it.value }
 
             val isAlias = aliasIndices.isNotEmpty()
@@ -163,7 +169,8 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
             }
         } catch (e: Exception) {
             logger.error("Failed to start Document-level-monitor $index. Error: ${e.message}", e)
-            return monitorResult.copy(error = e)
+            val alertingException = AlertingException.wrap(e)
+            return monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
         }
 
         val queryInputResults = queryToDocIds.mapKeys { it.key.id }
@@ -263,7 +270,7 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
         return triggerResult
     }
 
-    private fun createFindings(
+    private suspend fun createFindings(
         monitor: Monitor,
         monitorCtx: MonitorRunnerExecutionContext,
         docLevelQueries: List<DocLevelQuery>,
@@ -291,11 +298,13 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
             .id(finding.id)
             .routing(finding.id)
 
-        monitorCtx.client!!.index(indexRequest).actionGet()
+        val indexResponse: IndexResponse = monitorCtx.client!!.suspendUntil {
+            monitorCtx.client!!.index(indexRequest, it)
+        }
         return finding.id
     }
 
-    private fun updateLastRunContext(
+    private suspend fun updateLastRunContext(
         lastRunContext: Map<String, Any>,
         monitorCtx: MonitorRunnerExecutionContext,
         index: String
@@ -325,7 +334,7 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
         }
     }
 
-    fun createRunContext(clusterService: ClusterService, client: Client, index: String): HashMap<String, Any> {
+    suspend fun createRunContext(clusterService: ClusterService, client: Client, index: String): HashMap<String, Any> {
         val lastRunContext = HashMap<String, Any>()
         lastRunContext["index"] = index
         val count = getShardsCount(clusterService, index)
@@ -343,7 +352,7 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
      * Get the current max seq number of the shard. We find it by searching the last document
      *  in the primary shard.
      */
-    private fun getMaxSeqNo(client: Client, index: String, shard: String): Long {
+    private suspend fun getMaxSeqNo(client: Client, index: String, shard: String): Long {
         val request: SearchRequest = SearchRequest()
             .indices(index)
             .preference("_shards:$shard")
@@ -355,7 +364,7 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
                     .query(QueryBuilders.matchAllQuery())
                     .size(1)
             )
-        val response: SearchResponse = client.search(request).actionGet()
+        val response: SearchResponse = client.suspendUntil { client.search(request, it) }
         if (response.status() !== RestStatus.OK) {
             throw IOException("Failed to get max seq no for shard: $shard")
         }
@@ -370,7 +379,7 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
         return allShards.filter { it.primary() }.size
     }
 
-    private fun getMatchingDocs(
+    private suspend fun getMatchingDocs(
         monitor: Monitor,
         monitorCtx: MonitorRunnerExecutionContext,
         docExecutionCtx: DocumentExecutionContext,
@@ -406,7 +415,7 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
         return matchingDocs
     }
 
-    private fun searchShard(
+    private suspend fun searchShard(
         monitorCtx: MonitorRunnerExecutionContext,
         index: String,
         shard: String,
@@ -434,14 +443,14 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
                     .size(10000) // fixme: make this configurable.
             )
         logger.info("Request: $request")
-        val response: SearchResponse = monitorCtx.client!!.search(request).actionGet()
+        val response: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(request, it) }
         if (response.status() !== RestStatus.OK) {
             throw IOException("Failed to search shard: $shard")
         }
         return response.hits
     }
 
-    private fun getMatchedQueries(
+    private suspend fun getMatchedQueries(
         monitorCtx: MonitorRunnerExecutionContext,
         docs: List<BytesReference>,
         monitor: Monitor,
@@ -460,7 +469,9 @@ object DocumentReturningMonitorRunner : MonitorRunner() {
         searchSourceBuilder.query(boolQueryBuilder)
         searchRequest.source(searchSourceBuilder)
 
-        val response: SearchResponse = monitorCtx.client!!.execute(SearchAction.INSTANCE, searchRequest).actionGet()
+        val response: SearchResponse = monitorCtx.client!!.suspendUntil {
+            monitorCtx.client!!.execute(SearchAction.INSTANCE, searchRequest, it)
+        }
 
         if (response.status() !== RestStatus.OK) {
             throw IOException("Failed to search percolate index: ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}")

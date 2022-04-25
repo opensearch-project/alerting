@@ -28,11 +28,11 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val index = createTestIndex()
 
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
-        val docReturningInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
 
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
         val monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docReturningInput),
+            inputs = listOf(docLevelInput),
             triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
         )
 
@@ -68,10 +68,10 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         }"""
 
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
-        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        val monitor = randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger))
+        val monitor = randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger))
 
         indexDoc(testIndex, "1", testDoc)
         indexDoc(testIndex, "5", testDoc)
@@ -90,7 +90,6 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
     }
 
     fun `test execute monitor generates alerts and findings`() {
-        putFindingMappings()
         val testIndex = createTestIndex()
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -100,10 +99,10 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         }"""
 
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
-        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
         assertNotNull(monitor.id)
 
         indexDoc(testIndex, "1", testDoc)
@@ -134,9 +133,9 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
     fun `test document-level monitor when alias only has write index with 0 docs`() {
         // Monitor should execute, but create 0 findings.
         val alias = createTestAlias(includeWriteIndex = true)
-        val indices = alias[alias.keys.first()]?.keys?.toList() as List<String>
+        val aliasIndex = alias.keys.first()
         val query = randomDocLevelQuery(tags = listOf())
-        val input = randomDocLevelMonitorInput(indices = indices, queries = listOf(query))
+        val input = randomDocLevelMonitorInput(indices = listOf(aliasIndex), queries = listOf(query))
         val trigger = randomDocLevelTrigger(condition = Script("params${query.id}"))
         val monitor = createMonitor(randomDocumentLevelMonitor(enabled = false, inputs = listOf(input), triggers = listOf(trigger)))
 
@@ -172,9 +171,10 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         // FIXME: Consider renaming this test case
         // Only new docs should create findings.
         val alias = createTestAlias(includeWriteIndex = true)
-        val indices = alias[alias.keys.first()]?.keys?.toList() as List<String>
+        val aliasIndex = alias.keys.first()
+        val indices = alias[aliasIndex]?.keys?.toList() as List<String>
         val query = randomDocLevelQuery(tags = listOf())
-        val input = randomDocLevelMonitorInput(indices = indices, queries = listOf(query))
+        val input = randomDocLevelMonitorInput(indices = listOf(aliasIndex), queries = listOf(query))
         val trigger = randomDocLevelTrigger(condition = Script("params${query.id}"))
 
         val preExistingDocIds = mutableSetOf<String>()
@@ -212,9 +212,10 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
     fun `test document-level monitor when alias indices only contain docs that match query`() {
         // Only new docs should create findings.
         val alias = createTestAlias(includeWriteIndex = true)
-        val indices = alias[alias.keys.first()]?.keys?.toList() as List<String>
+        val aliasIndex = alias.keys.first()
+        val indices = alias[aliasIndex]?.keys?.toList() as List<String>
         val query = randomDocLevelQuery(tags = listOf())
-        val input = randomDocLevelMonitorInput(indices = indices, queries = listOf(query))
+        val input = randomDocLevelMonitorInput(indices = listOf(aliasIndex), queries = listOf(query))
         val trigger = randomDocLevelTrigger(condition = Script("params${query.id}"))
 
         val preExistingDocIds = mutableSetOf<String>()
@@ -265,9 +266,10 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
     fun `test document-level monitor when alias indices contain docs that do and do not match query`() {
         // Only matching docs should create findings.
         val alias = createTestAlias(includeWriteIndex = true)
-        val indices = alias[alias.keys.first()]?.keys?.toList() as List<String>
+        val aliasIndex = alias.keys.first()
+        val indices = alias[aliasIndex]?.keys?.toList() as List<String>
         val query = randomDocLevelQuery(tags = listOf())
-        val input = randomDocLevelMonitorInput(indices = indices, queries = listOf(query))
+        val input = randomDocLevelMonitorInput(indices = listOf(aliasIndex), queries = listOf(query))
         val trigger = randomDocLevelTrigger(condition = Script("params${query.id}"))
 
         val preExistingDocIds = mutableSetOf<String>()

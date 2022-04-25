@@ -8,6 +8,9 @@
     },
     "monitor_id": {
       "type": "text"
+    },
+    "index": {
+      "type": "text"
     }
   }
 }
