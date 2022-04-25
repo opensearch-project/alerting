@@ -217,7 +217,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         } else {
             QueryLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         }
-        logger.info("runResult has error: ${runResult.error}")
         return runResult
     }
 
