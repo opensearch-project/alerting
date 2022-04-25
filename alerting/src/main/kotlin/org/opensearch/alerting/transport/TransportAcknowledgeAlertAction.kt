@@ -67,7 +67,9 @@ class TransportAcknowledgeAlertAction @Inject constructor(
 
     override fun doExecute(task: Task, request: AcknowledgeAlertRequest, actionListener: ActionListener<AcknowledgeAlertResponse>) {
         client.threadPool().threadContext.stashContext().use {
-            AcknowledgeHandler(client, actionListener, request).start()
+            scope.launch {
+                AcknowledgeHandler(client, actionListener, request).start()
+            }
         }
     }
 
@@ -78,9 +80,9 @@ class TransportAcknowledgeAlertAction @Inject constructor(
     ) {
         val alerts = mutableMapOf<String, Alert>()
 
-        fun start() = findActiveAlerts()
+        suspend fun start() = findActiveAlerts()
 
-        private fun findActiveAlerts() {
+        private suspend fun findActiveAlerts() {
             val queryBuilder = QueryBuilders.boolQuery()
                 .filter(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, request.monitorId))
                 .filter(QueryBuilders.termsQuery("_id", request.alertIds))
@@ -94,21 +96,12 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                         .seqNoAndPrimaryTerm(true)
                         .size(request.alertIds.size)
                 )
-
-            client.search(
-                searchRequest,
-                object : ActionListener<SearchResponse> {
-                    override fun onResponse(response: SearchResponse) {
-                        scope.launch {
-                            onSearchResponse(response)
-                        }
-                    }
-
-                    override fun onFailure(t: Exception) {
-                        actionListener.onFailure(AlertingException.wrap(t))
-                    }
-                }
-            )
+            try {
+                val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
+                onSearchResponse(searchResponse)
+            } catch (t: Exception) {
+                actionListener.onFailure(AlertingException.wrap(t))
+            }
         }
 
         private suspend fun onSearchResponse(response: SearchResponse) {

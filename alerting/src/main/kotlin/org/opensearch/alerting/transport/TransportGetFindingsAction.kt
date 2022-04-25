@@ -121,48 +121,49 @@ class TransportGetFindingsSearchAction @Inject constructor(
 
         client.threadPool().threadContext.stashContext().use {
             scope.launch {
-                search(searchSourceBuilder, actionListener)
+                try {
+                    val getFindingsResponse = search(searchSourceBuilder)
+                    actionListener.onResponse(getFindingsResponse)
+                } catch (t: Exception) {
+                    actionListener.onFailure(AlertingException.wrap(t))
+                }
             }
         }
     }
 
-    suspend fun search(searchSourceBuilder: SearchSourceBuilder, actionListener: ActionListener<GetFindingsResponse>) {
-        try {
-            val searchRequest = SearchRequest()
-                .source(searchSourceBuilder)
-                .indices(ALL_FINDING_INDEX_PATTERN)
-            val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
-            val totalFindingCount = searchResponse.hits.totalHits?.value?.toInt()
-            val mgetRequest = MultiGetRequest()
-            val findingsWithDocs = mutableListOf<FindingWithDocs>()
-            val findings = mutableListOf<Finding>()
-            for (hit in searchResponse.hits) {
-                val xcp = XContentFactory.xContent(XContentType.JSON)
-                    .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
-                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                val finding = Finding.parse(xcp)
-                findings.add(finding)
-                val documentIds = finding.relatedDocIds
-                // Add getRequests to mget request
-                documentIds.forEach { docId ->
-                    mgetRequest.add(MultiGetRequest.Item(finding.index, docId))
-                }
+    suspend fun search(searchSourceBuilder: SearchSourceBuilder): GetFindingsResponse {
+        val searchRequest = SearchRequest()
+            .source(searchSourceBuilder)
+            .indices(ALL_FINDING_INDEX_PATTERN)
+        val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
+        val totalFindingCount = searchResponse.hits.totalHits?.value?.toInt()
+        val mgetRequest = MultiGetRequest()
+        val findingsWithDocs = mutableListOf<FindingWithDocs>()
+        val findings = mutableListOf<Finding>()
+        for (hit in searchResponse.hits) {
+            val xcp = XContentFactory.xContent(XContentType.JSON)
+                .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
+            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+            val finding = Finding.parse(xcp)
+            findings.add(finding)
+            val documentIds = finding.relatedDocIds
+            // Add getRequests to mget request
+            documentIds.forEach { docId ->
+                mgetRequest.add(MultiGetRequest.Item(finding.index, docId))
             }
-            val documents = if (mgetRequest.items.isEmpty()) mutableMapOf() else searchDocument(mgetRequest)
-            findings.forEach {
-                val documentIds = it.relatedDocIds
-                val relatedDocs = mutableListOf<FindingDocument>()
-                for (docId in documentIds) {
-                    val key = "${it.index}|$docId"
-                    documents[key]?.let { document -> relatedDocs.add(document) }
-                }
-                findingsWithDocs.add(FindingWithDocs(it, relatedDocs))
-            }
-
-            actionListener.onResponse(GetFindingsResponse(searchResponse.status(), totalFindingCount, findingsWithDocs))
-        } catch (t: Exception) {
-            actionListener.onFailure(AlertingException.wrap(t))
         }
+        val documents = if (mgetRequest.items.isEmpty()) mutableMapOf() else searchDocument(mgetRequest)
+        findings.forEach {
+            val documentIds = it.relatedDocIds
+            val relatedDocs = mutableListOf<FindingDocument>()
+            for (docId in documentIds) {
+                val key = "${it.index}|$docId"
+                documents[key]?.let { document -> relatedDocs.add(document) }
+            }
+            findingsWithDocs.add(FindingWithDocs(it, relatedDocs))
+        }
+
+        return GetFindingsResponse(searchResponse.status(), totalFindingCount, findingsWithDocs)
     }
 
     // TODO: Verify what happens if indices are closed/deleted
