@@ -38,4 +38,4 @@ Compatible with OpenSearch 2.0.0-rc1
 ### Documentation
 * Add Document Level Alerting RFC ([#388](https://github.com/opensearch-project/alerting/pull/388]))
 * Deprecate the Master nomenclature in 2.0 ([#415](https://github.com/opensearch-project/alerting/pull/415]))
-* Add release notes for version 2.0.0-rc1 ([#425](https://github.com/opensearch-project/alerting/pull/425))
+* Add release notes for version 2.0.0-rc1 ([#426](https://github.com/opensearch-project/alerting/pull/426))
