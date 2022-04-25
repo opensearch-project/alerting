@@ -5,6 +5,9 @@
 
 package org.opensearch.alerting.transport
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionListener
 import org.opensearch.action.bulk.BulkRequest
@@ -22,6 +25,7 @@ import org.opensearch.alerting.action.AcknowledgeAlertResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.opensearchapi.optionalTimeField
+import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
@@ -42,6 +46,7 @@ import org.opensearch.transport.TransportService
 import java.time.Instant
 
 private val log = LogManager.getLogger(TransportAcknowledgeAlertAction::class.java)
+private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
 class TransportAcknowledgeAlertAction @Inject constructor(
     transportService: TransportService,
@@ -94,7 +99,9 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                 searchRequest,
                 object : ActionListener<SearchResponse> {
                     override fun onResponse(response: SearchResponse) {
-                        onSearchResponse(response)
+                        scope.launch {
+                            onSearchResponse(response)
+                        }
                     }
 
                     override fun onFailure(t: Exception) {
@@ -104,7 +111,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
             )
         }
 
-        private fun onSearchResponse(response: SearchResponse) {
+        private suspend fun onSearchResponse(response: SearchResponse) {
             val updateRequests = mutableListOf<UpdateRequest>()
             val copyRequests = mutableListOf<IndexRequest>()
             response.hits.forEach { hit ->
@@ -143,11 +150,15 @@ class TransportAcknowledgeAlertAction @Inject constructor(
             }
 
             try {
-                val updateResponse = if (updateRequests.isNotEmpty())
-                    client.bulk(BulkRequest().add(updateRequests).setRefreshPolicy(request.refreshPolicy)).actionGet()
+                val updateResponse: BulkResponse? = if (updateRequests.isNotEmpty())
+                    client.suspendUntil {
+                        client.bulk(BulkRequest().add(updateRequests).setRefreshPolicy(request.refreshPolicy), it)
+                    }
                 else null
-                val copyResponse = if (copyRequests.isNotEmpty())
-                    client.bulk(BulkRequest().add(copyRequests).setRefreshPolicy(request.refreshPolicy)).actionGet()
+                val copyResponse: BulkResponse? = if (copyRequests.isNotEmpty())
+                    client.suspendUntil {
+                        client.bulk(BulkRequest().add(copyRequests).setRefreshPolicy(request.refreshPolicy), it)
+                    }
                 else null
                 onBulkResponse(updateResponse, copyResponse)
             } catch (t: Exception) {
@@ -156,7 +167,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
             }
         }
 
-        private fun onBulkResponse(updateResponse: BulkResponse?, copyResponse: BulkResponse?) {
+        private suspend fun onBulkResponse(updateResponse: BulkResponse?, copyResponse: BulkResponse?) {
             val deleteRequests = mutableListOf<DeleteRequest>()
             val missing = request.alertIds.toMutableSet()
             val acknowledged = mutableListOf<Alert>()
@@ -193,7 +204,9 @@ class TransportAcknowledgeAlertAction @Inject constructor(
 
             if (deleteRequests.isNotEmpty()) {
                 try {
-                    val deleteResponse = client.bulk(BulkRequest().add(deleteRequests).setRefreshPolicy(request.refreshPolicy)).actionGet()
+                    val deleteResponse: BulkResponse = client.suspendUntil {
+                        client.bulk(BulkRequest().add(deleteRequests).setRefreshPolicy(request.refreshPolicy), it)
+                    }
                     deleteResponse.items.forEach { item ->
                         missing.remove(item.id)
                         if (item.isFailed) {

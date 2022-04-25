@@ -210,13 +210,15 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
     suspend fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant, dryrun: Boolean): MonitorRunResult<*> {
         val monitor = job as Monitor
-        return if (monitor.isBucketLevelMonitor()) {
+        val runResult = if (monitor.isBucketLevelMonitor()) {
             BucketLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         } else if (monitor.isDocLevelMonitor()) {
-            DocumentReturningMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
+            DocumentLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         } else {
             QueryLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         }
+        logger.info("runResult has error: ${runResult.error}")
+        return runResult
     }
 
     // TODO: See if we can move below methods (or few of these) to a common utils

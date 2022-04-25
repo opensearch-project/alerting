@@ -5,14 +5,13 @@
 
 package org.opensearch.alerting.transport
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
-import org.opensearch.action.admin.indices.create.CreateIndexResponse
-import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
@@ -43,6 +42,7 @@ import org.opensearch.transport.TransportService
 import java.time.Instant
 
 private val log = LogManager.getLogger(TransportExecuteMonitorAction::class.java)
+private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
 class TransportExecuteMonitorAction @Inject constructor(
     transportService: TransportService,
@@ -123,55 +123,30 @@ class TransportExecuteMonitorAction @Inject constructor(
                 }
 
                 if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
-                    if (!docLevelMonitorQueries.docLevelQueryIndexExists()) {
-                        docLevelMonitorQueries.initDocLevelQueryIndex(object : ActionListener<CreateIndexResponse> {
-                            override fun onResponse(response: CreateIndexResponse) {
+                    scope.launch {
+                        if (!docLevelMonitorQueries.docLevelQueryIndexExists()) {
+                            try {
+                                docLevelMonitorQueries.initDocLevelQueryIndex()
                                 log.info("Central Percolation index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX} created")
-                                docLevelMonitorQueries.indexDocLevelQueries(
-                                    client,
-                                    monitor,
-                                    monitor.id,
-                                    WriteRequest.RefreshPolicy.IMMEDIATE,
-                                    indexTimeout,
-                                    null,
-                                    actionListener,
-                                    object : ActionListener<BulkResponse> {
-                                        override fun onResponse(response: BulkResponse) {
-                                            log.info("Queries inserted into Percolate index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}")
-                                            executeMonitor(monitor)
-                                        }
-
-                                        override fun onFailure(t: Exception) {
-                                            actionListener.onFailure(AlertingException.wrap(t))
-                                        }
-                                    }
-                                )
-                            }
-
-                            override fun onFailure(t: Exception) {
+                            } catch (t: Exception) {
                                 actionListener.onFailure(AlertingException.wrap(t))
+                                return@launch
                             }
-                        })
-                    } else {
-                        docLevelMonitorQueries.indexDocLevelQueries(
-                            client,
-                            monitor,
-                            monitor.id,
-                            WriteRequest.RefreshPolicy.IMMEDIATE,
-                            indexTimeout,
-                            null,
-                            actionListener,
-                            object : ActionListener<BulkResponse> {
-                                override fun onResponse(response: BulkResponse) {
-                                    log.info("Queries inserted into Percolate index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}")
-                                    executeMonitor(monitor)
-                                }
-
-                                override fun onFailure(t: Exception) {
-                                    actionListener.onFailure(AlertingException.wrap(t))
-                                }
-                            }
-                        )
+                        }
+                        try {
+                            docLevelMonitorQueries.indexDocLevelQueries(
+                                client,
+                                monitor,
+                                monitor.id,
+                                WriteRequest.RefreshPolicy.IMMEDIATE,
+                                indexTimeout
+                            )
+                            log.info("Queries inserted into Percolate index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}")
+                            executeMonitor(monitor)
+                        } catch (t: Exception) {
+                            log.error("Failed to add queries into Percolate index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}")
+                            actionListener.onFailure(AlertingException.wrap(t))
+                        }
                     }
                 } else {
                     executeMonitor(monitor)

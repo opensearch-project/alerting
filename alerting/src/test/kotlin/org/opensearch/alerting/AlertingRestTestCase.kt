@@ -739,7 +739,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     /** A test index that can be used across tests. Feel free to add new fields but don't remove any. */
-    protected fun createTestIndex(index: String = randomAlphaOfLength(10).toLowerCase(Locale.ROOT)): String {
+    protected fun createTestIndex(index: String = randomAlphaOfLength(10).lowercase(Locale.ROOT)): String {
         createIndex(
             index, Settings.EMPTY,
             """
@@ -757,7 +757,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return index
     }
 
-    protected fun createTestConfigIndex(index: String = "." + randomAlphaOfLength(10).toLowerCase(Locale.ROOT)): String {
+    protected fun createTestConfigIndex(index: String = "." + randomAlphaOfLength(10).lowercase(Locale.ROOT)): String {
         try {
             createIndex(
                 index, Settings.builder().build(),
@@ -774,7 +774,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun createTestAlias(
-        alias: String = randomAlphaOfLength(10).toLowerCase(Locale.ROOT),
+        alias: String = randomAlphaOfLength(10).lowercase(Locale.ROOT),
         numOfAliasIndices: Int = randomIntBetween(1, 10),
         includeWriteIndex: Boolean = true
     ): MutableMap<String, MutableMap<String, Boolean>> {
@@ -782,19 +782,17 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun createTestAlias(
-        alias: String = randomAlphaOfLength(10).toLowerCase(Locale.ROOT),
+        alias: String = randomAlphaOfLength(10).lowercase(Locale.ROOT),
         indices: Map<String, Boolean> = randomAliasIndices(
             alias = alias,
             num = randomIntBetween(1, 10),
             includeWriteIndex = true
         )
     ): MutableMap<String, MutableMap<String, Boolean>> {
-        logger.info("number of indices behind alias: ${indices.size}")
-        logger.info("the alias indices: $indices")
         val indicesMap = mutableMapOf<String, Boolean>()
         val indicesJson = jsonBuilder().startObject().startArray("actions")
         indices.keys.map {
-            val indexName = createTestIndex(index = it.toLowerCase(Locale.ROOT), mapping = "")
+            val indexName = createTestIndex(index = it.lowercase(Locale.ROOT), mapping = "")
             val isWriteIndex = indices.getOrDefault(indexName, false)
             indicesMap[indexName] = isWriteIndex
             val indexMap = mapOf(
