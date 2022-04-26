@@ -53,7 +53,7 @@ data class ClusterMetricsInput(
                 "The provided URL and URI fields form different URLs."
             }
 
-        require(constructedUri.host.toLowerCase() == SUPPORTED_HOST) {
+        require(constructedUri.host.lowercase() == SUPPORTED_HOST) {
             "Only host '$SUPPORTED_HOST' is supported."
         }
         require(constructedUri.port == SUPPORTED_PORT) {
