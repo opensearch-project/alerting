@@ -24,7 +24,7 @@ Compatible with OpenSearch 2.0.0-rc1
 * Remove write Destination APIs ([#412](https://github.com/opensearch-project/alerting/pull/412]))
 * Remove Alerting's notification subproject ([#413](https://github.com/opensearch-project/alerting/pull/413]))
 * Skipping destination migration if alerting index is not initialized ([#417](https://github.com/opensearch-project/alerting/pull/417]))
-* Fix Finding action naming and update release notes ([#430](https://github.com/opensearch-project/alerting/pull/430]))
+* Fix Finding action naming and update release notes ([#432](https://github.com/opensearch-project/alerting/pull/432]))
 
 ### Infrastructure
 * Removed the Beta label from the bug report template. ([#353](https://github.com/opensearch-project/alerting/pull/353))
