@@ -10,6 +10,6 @@ import org.opensearch.action.ActionType
 class GetFindingsAction private constructor() : ActionType<GetFindingsResponse>(NAME, ::GetFindingsResponse) {
     companion object {
         val INSTANCE = GetFindingsAction()
-        const val NAME = "cluster:admin/opendistro/alerting/findings/get"
+        const val NAME = "cluster:admin/opensearch/alerting/findings/get"
     }
 }
