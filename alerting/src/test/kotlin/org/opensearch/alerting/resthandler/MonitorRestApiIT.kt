@@ -1079,10 +1079,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     fun `test creating a document monitor`() {
         val testIndex = createTestIndex()
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
-        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
 
         val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
 
@@ -1100,11 +1100,11 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     fun `test getting a document level monitor`() {
         val testIndex = createTestIndex()
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
-        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val monitor = createMonitor(
-            randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger), user = null)
+            randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger), user = null)
         )
 
         val storedMonitor = getMonitor(monitor.id)
@@ -1116,10 +1116,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     fun `test updating conditions for a doc-level monitor`() {
         val testIndex = createTestIndex()
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
-        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
 
         val updatedTriggers = listOf(
             DocumentLevelTrigger(
@@ -1147,10 +1147,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     fun `test deleting a document level monitor`() {
         val testIndex = createTestIndex()
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
-        val docReturningInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docReturningInput), triggers = listOf(trigger)))
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
 
         val deleteResponse = client().makeRequest("DELETE", monitor.relativeUrl())
         assertEquals("Delete failed", RestStatus.OK, deleteResponse.restStatus())
