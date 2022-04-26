@@ -18,11 +18,13 @@ Compatible with OpenSearch 2.0.0-rc1
 * fix security test workflow ([#407](https://github.com/opensearch-project/alerting/pull/407))
 * Fixed a flaky test condition. ([#375](https://github.com/opensearch-project/alerting/pull/375]))
 * Remove actionGet and fix minor bugs ([#424](https://github.com/opensearch-project/alerting/pull/424]))
+* Fix UnsupportedOperation error while alert categorization in BucketLevel monitor ([#428](https://github.com/opensearch-project/alerting/pull/428]))
 
 ### Refactoring
 * Remove write Destination APIs ([#412](https://github.com/opensearch-project/alerting/pull/412]))
 * Remove Alerting's notification subproject ([#413](https://github.com/opensearch-project/alerting/pull/413]))
 * Skipping destination migration if alerting index is not initialized ([#417](https://github.com/opensearch-project/alerting/pull/417]))
+* Fix Finding action naming and update release notes ([#430](https://github.com/opensearch-project/alerting/pull/430]))
 
 ### Infrastructure
 * Removed the Beta label from the bug report template. ([#353](https://github.com/opensearch-project/alerting/pull/353))
