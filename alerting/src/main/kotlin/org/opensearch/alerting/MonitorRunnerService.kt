@@ -23,6 +23,8 @@ import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.script.TriggerExecutionContext
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_TRIGGER_MAX_ACTIONS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_TRIGGER_TOTAL_MAX_ACTIONS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_MILLIS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTIONABLE_ALERT_COUNT
@@ -120,8 +122,10 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 MOVE_ALERTS_BACKOFF_MILLIS.get(monitorCtx.settings),
                 MOVE_ALERTS_BACKOFF_COUNT.get(monitorCtx.settings)
             )
-        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(MOVE_ALERTS_BACKOFF_MILLIS, MOVE_ALERTS_BACKOFF_COUNT) {
-                millis, count ->
+        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(
+            MOVE_ALERTS_BACKOFF_MILLIS,
+            MOVE_ALERTS_BACKOFF_COUNT
+        ) { millis, count ->
             monitorCtx.moveAlertsRetryPolicy = BackoffPolicy.exponentialBackoff(millis, count)
         }
 
@@ -138,6 +142,21 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             monitorCtx.maxActionableAlertCount = it
         }
 
+        monitorCtx.triggerMaxActions = ALERTING_TRIGGER_MAX_ACTIONS.get(monitorCtx.settings)
+        monitorCtx.triggerTotalMaxActions = ALERTING_TRIGGER_TOTAL_MAX_ACTIONS.get(monitorCtx.settings)
+        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(
+            ALERTING_TRIGGER_MAX_ACTIONS,
+            ALERTING_TRIGGER_TOTAL_MAX_ACTIONS
+        ) { maxActions: Int, totalMaxActions: Int ->
+            if (maxActions > totalMaxActions) {
+                throw IllegalArgumentException(
+                    "The limit number of a single trigger should not be greater " +
+                        "than that of the overall trigger $maxActions $totalMaxActions"
+                )
+            }
+            monitorCtx.triggerMaxActions = maxActions
+            monitorCtx.triggerTotalMaxActions = totalMaxActions
+        }
         return this
     }
 

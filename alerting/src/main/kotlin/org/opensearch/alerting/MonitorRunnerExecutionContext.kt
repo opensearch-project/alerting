@@ -40,5 +40,8 @@ data class MonitorRunnerExecutionContext(
     @Volatile var destinationSettings: Map<String, DestinationSettings.Companion.SecureDestinationSettings>? = null,
     @Volatile var destinationContextFactory: DestinationContextFactory? = null,
 
-    @Volatile var maxActionableAlertCount: Long = AlertingSettings.DEFAULT_MAX_ACTIONABLE_ALERT_COUNT
+    @Volatile var maxActionableAlertCount: Long = AlertingSettings.DEFAULT_MAX_ACTIONABLE_ALERT_COUNT,
+
+    @Volatile var triggerMaxActions: Int = AlertingSettings.DEFAULT_ALERTING_TRIGGER_MAX_ACTIONS,
+    @Volatile var triggerTotalMaxActions: Int = AlertingSettings.DEFAULT_ALERTING_TRIGGER_TOTAL_MAX_ACTIONS,
 )

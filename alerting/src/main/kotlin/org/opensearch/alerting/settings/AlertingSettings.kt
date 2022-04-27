@@ -20,6 +20,8 @@ class AlertingSettings {
         const val MONITOR_MAX_INPUTS = 1
         const val MONITOR_MAX_TRIGGERS = 10
         const val DEFAULT_MAX_ACTIONABLE_ALERT_COUNT = 50L
+        const val DEFAULT_ALERTING_TRIGGER_MAX_ACTIONS = 5
+        const val DEFAULT_ALERTING_TRIGGER_TOTAL_MAX_ACTIONS = 150
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(
             "plugins.alerting.monitor.max_monitors",
@@ -154,6 +156,19 @@ class AlertingSettings {
             "plugins.alerting.max_actionable_alert_count",
             DEFAULT_MAX_ACTIONABLE_ALERT_COUNT,
             -1L,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val ALERTING_TRIGGER_MAX_ACTIONS = Setting.intSetting(
+            "plugins.alerting.trigger.max_actions",
+            DEFAULT_ALERTING_TRIGGER_MAX_ACTIONS,
+            -1,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+        val ALERTING_TRIGGER_TOTAL_MAX_ACTIONS = Setting.intSetting(
+            "plugins.alerting.trigger.total_max_actions",
+            DEFAULT_ALERTING_TRIGGER_TOTAL_MAX_ACTIONS,
+            -1,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
     }

@@ -14,6 +14,7 @@ import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
+import org.opensearch.alerting.util.TriggersActionThresholdUtils
 import org.opensearch.alerting.util.isADMonitor
 import java.time.Instant
 
@@ -59,6 +60,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
 
         val updatedAlerts = mutableListOf<Alert>()
         val triggerResults = mutableMapOf<String, QueryLevelTriggerRunResult>()
+        val triggersThresholdParams = TriggersActionThresholdUtils.TriggersActionThresholdParams(monitorCtx.triggerTotalMaxActions)
         for (trigger in monitor.triggers) {
             val currentAlert = currentAlerts[trigger]
             val triggerCtx = QueryLevelTriggerExecutionContext(monitor, trigger as QueryLevelTrigger, monitorResult, currentAlert)
@@ -67,7 +69,13 @@ object QueryLevelMonitorRunner : MonitorRunner() {
 
             if (monitorCtx.triggerService!!.isQueryLevelTriggerActionable(triggerCtx, triggerResult)) {
                 val actionCtx = triggerCtx.copy(error = monitorResult.error ?: triggerResult.error)
-                for (action in trigger.actions) {
+                val numberEnd = TriggersActionThresholdUtils.getThreshold(
+                    triggersThresholdParams,
+                    trigger.actions.size,
+                    monitorCtx.triggerMaxActions,
+                    monitorCtx.triggerTotalMaxActions
+                )
+                for (action in trigger.actions.slice(0 until numberEnd)) {
                     triggerResult.actionResults[action.id] = this.runAction(action, actionCtx, monitorCtx, dryrun)
                 }
             }

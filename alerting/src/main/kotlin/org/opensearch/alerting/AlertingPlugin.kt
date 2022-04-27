@@ -299,7 +299,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.FINDING_HISTORY_MAX_DOCS,
             AlertingSettings.FINDING_HISTORY_INDEX_MAX_AGE,
             AlertingSettings.FINDING_HISTORY_ROLLOVER_PERIOD,
-            AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD
+            AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD,
+            AlertingSettings.ALERTING_TRIGGER_MAX_ACTIONS,
+            AlertingSettings.ALERTING_TRIGGER_TOTAL_MAX_ACTIONS
         )
     }
 
