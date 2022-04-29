@@ -93,8 +93,8 @@ class AlertService(
             (
                 foundAlerts[trigger.id]?.mapNotNull { alert ->
                     alert.aggregationResultBucket?.let { it.getBucketKeysHash() to alert }
-                }?.toMap() ?: mutableMapOf()
-                ) as MutableMap<String, Alert>
+                }?.toMap()?.toMutableMap() ?: mutableMapOf()
+                )
         }
     }
 
