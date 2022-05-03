@@ -42,6 +42,6 @@ data class MonitorRunnerExecutionContext(
 
     @Volatile var maxActionableAlertCount: Long = AlertingSettings.DEFAULT_MAX_ACTIONABLE_ALERT_COUNT,
 
-    @Volatile var triggerMaxActions: Int = AlertingSettings.DEFAULT_ALERTING_TRIGGER_MAX_ACTIONS,
-    @Volatile var triggerTotalMaxActions: Int = AlertingSettings.DEFAULT_ALERTING_TRIGGER_TOTAL_MAX_ACTIONS,
+    @Volatile var maxActionsAcrossTriggers: Int = AlertingSettings.DEFAULT_MAX_ACTIONS_ACROSS_TRIGGERS,
+    @Volatile var totalMaxActionsAcrossTriggers: Int = AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS,
 )

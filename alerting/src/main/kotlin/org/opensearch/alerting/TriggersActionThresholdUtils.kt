@@ -5,6 +5,8 @@
 
 package org.opensearch.alerting.util
 
+import kotlin.math.min
+
 object TriggersActionThresholdUtils {
 
     /**
@@ -14,21 +16,18 @@ object TriggersActionThresholdUtils {
         p: TriggersActionThresholdParams,
         currentTriggerActionSize: Int,
         triggerMaxActions: Int,
-        triggerTotalMaxActions: Int
     ): Int {
-        var threshold = currentTriggerActionSize
-        if (triggerTotalMaxActions == 0) {
-            threshold = 0
-        } else if (triggerTotalMaxActions > 0) {
-            threshold = if (triggerMaxActions >= 0) {
-                val temporaryThreshold = if (triggerMaxActions < p.surplusActionCount) triggerMaxActions else p.surplusActionCount
-                if (temporaryThreshold < currentTriggerActionSize) temporaryThreshold else currentTriggerActionSize
+        return if (p.surplusActionCount <= 0) {
+            0
+        } else {
+            val tmpThreshold = if (triggerMaxActions >= 0) {
+                min(min(triggerMaxActions, p.surplusActionCount), currentTriggerActionSize)
             } else {
-                currentTriggerActionSize
+                min(currentTriggerActionSize, p.surplusActionCount)
             }
+            p.surplusActionCount -= tmpThreshold
+            tmpThreshold
         }
-        p.surplusActionCount -= threshold
-        return threshold
     }
 
     /**
@@ -40,4 +39,13 @@ object TriggersActionThresholdUtils {
     data class TriggersActionThresholdParams(
         var surplusActionCount: Int
     )
+
+    fun checkTriggerActionConfig(maxTriggerActions: Int, totalMaxTriggerActions: Int) {
+        if (maxTriggerActions > totalMaxTriggerActions) {
+            throw IllegalArgumentException(
+                "The limit number of a single trigger should not be greater than that of the overall trigger " +
+                    "$maxTriggerActions $totalMaxTriggerActions"
+            )
+        }
+    }
 }

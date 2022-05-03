@@ -60,7 +60,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
 
         val updatedAlerts = mutableListOf<Alert>()
         val triggerResults = mutableMapOf<String, QueryLevelTriggerRunResult>()
-        val triggersThresholdParams = TriggersActionThresholdUtils.TriggersActionThresholdParams(monitorCtx.triggerTotalMaxActions)
+        val triggersThresholdParams = TriggersActionThresholdUtils.TriggersActionThresholdParams(monitorCtx.totalMaxActionsAcrossTriggers)
         for (trigger in monitor.triggers) {
             val currentAlert = currentAlerts[trigger]
             val triggerCtx = QueryLevelTriggerExecutionContext(monitor, trigger as QueryLevelTrigger, monitorResult, currentAlert)
@@ -72,8 +72,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                 val numberEnd = TriggersActionThresholdUtils.getThreshold(
                     triggersThresholdParams,
                     trigger.actions.size,
-                    monitorCtx.triggerMaxActions,
-                    monitorCtx.triggerTotalMaxActions
+                    monitorCtx.maxActionsAcrossTriggers,
                 )
                 for (action in trigger.actions.slice(0 until numberEnd)) {
                     triggerResult.actionResults[action.id] = this.runAction(action, actionCtx, monitorCtx, dryrun)

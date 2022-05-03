@@ -23,8 +23,8 @@ import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.script.TriggerExecutionContext
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_TRIGGER_MAX_ACTIONS
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_TRIGGER_TOTAL_MAX_ACTIONS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTIONS_ACROSS_TRIGGERS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_MILLIS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTIONABLE_ALERT_COUNT
@@ -33,6 +33,7 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.MOVE_ALERTS_B
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.HOST_DENY_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.loadDestinationSettings
+import org.opensearch.alerting.util.TriggersActionThresholdUtils
 import org.opensearch.alerting.util.isBucketLevelMonitor
 import org.opensearch.alerting.util.isDocLevelMonitor
 import org.opensearch.client.Client
@@ -142,20 +143,16 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             monitorCtx.maxActionableAlertCount = it
         }
 
-        monitorCtx.triggerMaxActions = ALERTING_TRIGGER_MAX_ACTIONS.get(monitorCtx.settings)
-        monitorCtx.triggerTotalMaxActions = ALERTING_TRIGGER_TOTAL_MAX_ACTIONS.get(monitorCtx.settings)
+        monitorCtx.maxActionsAcrossTriggers = MAX_ACTIONS_ACROSS_TRIGGERS.get(monitorCtx.settings)
+        monitorCtx.totalMaxActionsAcrossTriggers = TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.get(monitorCtx.settings)
+        TriggersActionThresholdUtils.checkTriggerActionConfig(monitorCtx.maxActionsAcrossTriggers, monitorCtx.totalMaxActionsAcrossTriggers)
         monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(
-            ALERTING_TRIGGER_MAX_ACTIONS,
-            ALERTING_TRIGGER_TOTAL_MAX_ACTIONS
+            MAX_ACTIONS_ACROSS_TRIGGERS,
+            TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
         ) { maxActions: Int, totalMaxActions: Int ->
-            if (maxActions > totalMaxActions) {
-                throw IllegalArgumentException(
-                    "The limit number of a single trigger should not be greater " +
-                        "than that of the overall trigger $maxActions $totalMaxActions"
-                )
-            }
-            monitorCtx.triggerMaxActions = maxActions
-            monitorCtx.triggerTotalMaxActions = totalMaxActions
+            TriggersActionThresholdUtils.checkTriggerActionConfig(maxActions, totalMaxActions)
+            monitorCtx.maxActionsAcrossTriggers = maxActions
+            monitorCtx.totalMaxActionsAcrossTriggers = totalMaxActions
         }
         return this
     }

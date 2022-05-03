@@ -161,7 +161,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 nextAlerts[trigger.id]?.get(AlertCategory.COMPLETED)
                     ?.addAll(monitorCtx.alertService!!.convertToCompletedAlerts(keysToAlertsMap))
         }
-        val triggersThresholdParams = TriggersActionThresholdUtils.TriggersActionThresholdParams(monitorCtx.triggerTotalMaxActions)
+        val triggersThresholdParams = TriggersActionThresholdUtils.TriggersActionThresholdParams(monitorCtx.totalMaxActionsAcrossTriggers)
         for (trigger in monitor.triggers) {
             val alertsToUpdate = mutableSetOf<Alert>()
             val completedAlertsToUpdate = mutableSetOf<Alert>()
@@ -193,8 +193,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             val numberEnd = TriggersActionThresholdUtils.getThreshold(
                 triggersThresholdParams,
                 trigger.actions.size,
-                monitorCtx.triggerMaxActions,
-                monitorCtx.triggerTotalMaxActions
+                monitorCtx.maxActionsAcrossTriggers,
             )
             for (action in trigger.actions.slice(0 until numberEnd)) {
                 // ActionExecutionPolicy should not be null for Bucket-Level Monitors since it has a default config when not set explicitly
