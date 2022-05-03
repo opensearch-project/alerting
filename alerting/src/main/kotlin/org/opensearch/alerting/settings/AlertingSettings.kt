@@ -166,7 +166,7 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
         val TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS = Setting.intSetting(
-            "plugins.alerting.trigger.total_max_actions",
+            "plugins.alerting.total_max_actions_across_triggers",
             DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS,
             -1,
             Setting.Property.NodeScope, Setting.Property.Dynamic
