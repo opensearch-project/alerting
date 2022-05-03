@@ -23,13 +23,13 @@ import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.script.TriggerExecutionContext
-import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTIONS_ACROSS_TRIGGERS
-import org.opensearch.alerting.settings.AlertingSettings.Companion.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_MILLIS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTIONABLE_ALERT_COUNT
+import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTIONS_ACROSS_TRIGGERS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MOVE_ALERTS_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MOVE_ALERTS_BACKOFF_MILLIS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.HOST_DENY_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.loadDestinationSettings
