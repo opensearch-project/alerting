@@ -5,13 +5,16 @@
 
 package org.opensearch.alerting.transport
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchSecurityException
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
 import org.opensearch.action.admin.indices.alias.get.GetAliasesRequest
+import org.opensearch.action.admin.indices.alias.get.GetAliasesResponse
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
-import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.index.IndexRequest
@@ -22,7 +25,7 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.master.AcknowledgedResponse
-import org.opensearch.alerting.DocumentReturningMonitorRunner
+import org.opensearch.alerting.DocumentLevelMonitorRunner
 import org.opensearch.alerting.action.IndexMonitorAction
 import org.opensearch.alerting.action.IndexMonitorRequest
 import org.opensearch.alerting.action.IndexMonitorResponse
@@ -32,6 +35,7 @@ import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
@@ -68,6 +72,7 @@ import java.io.IOException
 import java.time.Duration
 
 private val log = LogManager.getLogger(TransportIndexMonitorAction::class.java)
+private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
 class TransportIndexMonitorAction @Inject constructor(
     transportService: TransportService,
@@ -286,23 +291,27 @@ class TransportIndexMonitorAction @Inject constructor(
                 return
             }
 
-            if (request.method == RestRequest.Method.PUT) return updateMonitor()
-
-            val query = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery("${Monitor.MONITOR_TYPE}.type", Monitor.MONITOR_TYPE))
-            val searchSource = SearchSourceBuilder().query(query).timeout(requestTimeout)
-            val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
-            client.search(
-                searchRequest,
-                object : ActionListener<SearchResponse> {
-                    override fun onResponse(searchResponse: SearchResponse) {
-                        onSearchResponse(searchResponse)
-                    }
-
-                    override fun onFailure(t: Exception) {
-                        actionListener.onFailure(AlertingException.wrap(t))
-                    }
+            if (request.method == RestRequest.Method.PUT) {
+                scope.launch {
+                    updateMonitor()
                 }
-            )
+            } else {
+                val query = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery("${Monitor.MONITOR_TYPE}.type", Monitor.MONITOR_TYPE))
+                val searchSource = SearchSourceBuilder().query(query).timeout(requestTimeout)
+                val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
+                client.search(
+                    searchRequest,
+                    object : ActionListener<SearchResponse> {
+                        override fun onResponse(searchResponse: SearchResponse) {
+                            onSearchResponse(searchResponse)
+                        }
+
+                        override fun onFailure(t: Exception) {
+                            actionListener.onFailure(AlertingException.wrap(t))
+                        }
+                    }
+                )
+            }
         }
 
         private fun validateActionThrottle(monitor: Monitor, maxValue: TimeValue, minValue: TimeValue) {
@@ -339,8 +348,9 @@ class TransportIndexMonitorAction @Inject constructor(
                     )
                 )
             } else {
-
-                indexMonitor()
+                scope.launch {
+                    indexMonitor()
+                }
             }
         }
 
@@ -379,11 +389,10 @@ class TransportIndexMonitorAction @Inject constructor(
             }
         }
 
-        private fun indexMonitor() {
+        private suspend fun indexMonitor() {
             if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
                 val monitorIndex = (request.monitor.inputs[0] as DocLevelMonitorInput).indices[0]
                 val lastRunContext = createFullRunContext(monitorIndex)
-                log.info("index last run context: $lastRunContext")
                 request.monitor = request.monitor.copy(lastRunContext = lastRunContext)
             }
             request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
@@ -393,117 +402,70 @@ class TransportIndexMonitorAction @Inject constructor(
                 .setIfSeqNo(request.seqNo)
                 .setIfPrimaryTerm(request.primaryTerm)
                 .timeout(indexTimeout)
-            client.index(
-                indexRequest,
-                object : ActionListener<IndexResponse> {
-                    override fun onResponse(response: IndexResponse) {
-                        val failureReasons = checkShardsFailure(response)
-                        if (failureReasons != null) {
-                            actionListener.onFailure(
-                                AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), response.status()))
-                            )
-                            return
-                        }
 
-                        if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
-                            indexDocLevelMonitorQueries(request.monitor, response.id, request.refreshPolicy)
-                        }
-
-                        actionListener.onResponse(
-                            IndexMonitorResponse(
-                                response.id, response.version, response.seqNo,
-                                response.primaryTerm, RestStatus.CREATED, request.monitor
-                            )
-                        )
-                    }
-                    override fun onFailure(t: Exception) {
-                        actionListener.onFailure(AlertingException.wrap(t))
-                    }
+            try {
+                val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
+                val failureReasons = checkShardsFailure(indexResponse)
+                if (failureReasons != null) {
+                    actionListener.onFailure(
+                        AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), indexResponse.status()))
+                    )
+                    return
                 }
-            )
-        }
-
-        @Suppress("UNCHECKED_CAST")
-        private fun indexDocLevelMonitorQueries(monitor: Monitor, monitorId: String, refreshPolicy: RefreshPolicy) {
-            if (!docLevelMonitorQueries.docLevelQueryIndexExists()) {
-                docLevelMonitorQueries.initDocLevelQueryIndex(object : ActionListener<CreateIndexResponse> {
-                    override fun onResponse(response: CreateIndexResponse) {
-                        log.info("Central Percolation index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX} created")
-                        docLevelMonitorQueries.indexDocLevelQueries(
-                            client,
-                            monitor,
-                            monitorId,
-                            refreshPolicy,
-                            indexTimeout,
-                            actionListener,
-                            null,
-                            object : ActionListener<BulkResponse> {
-                                override fun onResponse(response: BulkResponse) {
-                                    log.info("Queries inserted into Percolate index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}")
-                                }
-
-                                override fun onFailure(t: Exception) {
-                                    actionListener.onFailure(AlertingException.wrap(t))
-                                }
-                            }
-                        )
-                    }
-
-                    override fun onFailure(t: Exception) {
-                        actionListener.onFailure(AlertingException.wrap(t))
-                    }
-                })
-            } else {
-                docLevelMonitorQueries.indexDocLevelQueries(
-                    client,
-                    monitor,
-                    monitorId,
-                    refreshPolicy,
-                    indexTimeout,
-                    actionListener,
-                    null,
-                    object : ActionListener<BulkResponse> {
-                        override fun onResponse(response: BulkResponse) {
-                            log.info("Queries inserted into Percolate index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}")
-                        }
-
-                        override fun onFailure(t: Exception) {
-                            actionListener.onFailure(AlertingException.wrap(t))
-                        }
-                    }
+                if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                    indexDocLevelMonitorQueries(request.monitor, indexResponse.id, request.refreshPolicy)
+                }
+                actionListener.onResponse(
+                    IndexMonitorResponse(
+                        indexResponse.id, indexResponse.version, indexResponse.seqNo,
+                        indexResponse.primaryTerm, RestStatus.CREATED, request.monitor
+                    )
                 )
+            } catch (t: Exception) {
+                actionListener.onFailure(AlertingException.wrap(t))
             }
         }
 
-        private fun updateMonitor() {
-            val getRequest = GetRequest(SCHEDULED_JOBS_INDEX, request.monitorId)
-            client.get(
-                getRequest,
-                object : ActionListener<GetResponse> {
-                    override fun onResponse(response: GetResponse) {
-                        if (!response.isExists) {
-                            actionListener.onFailure(
-                                AlertingException.wrap(
-                                    OpenSearchStatusException("Monitor with ${request.monitorId} is not found", RestStatus.NOT_FOUND)
-                                )
-                            )
-                            return
-                        }
-                        val xcp = XContentHelper.createParser(
-                            xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                            response.sourceAsBytesRef, XContentType.JSON
-                        )
-                        val monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
-                        onGetResponse(monitor)
-                    }
-                    override fun onFailure(t: Exception) {
-                        actionListener.onFailure(AlertingException.wrap(t))
-                    }
-                }
+        @Suppress("UNCHECKED_CAST")
+        private suspend fun indexDocLevelMonitorQueries(monitor: Monitor, monitorId: String, refreshPolicy: RefreshPolicy) {
+            if (!docLevelMonitorQueries.docLevelQueryIndexExists()) {
+                docLevelMonitorQueries.initDocLevelQueryIndex()
+                log.info("Central Percolation index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX} created")
+            }
+            docLevelMonitorQueries.indexDocLevelQueries(
+                client,
+                monitor,
+                monitorId,
+                refreshPolicy,
+                indexTimeout
             )
+            log.info("Queries inserted into Percolate index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}")
         }
 
-        private fun onGetResponse(currentMonitor: Monitor) {
+        private suspend fun updateMonitor() {
+            val getRequest = GetRequest(SCHEDULED_JOBS_INDEX, request.monitorId)
+            try {
+                val getResponse: GetResponse = client.suspendUntil { client.get(getRequest, it) }
+                if (!getResponse.isExists) {
+                    actionListener.onFailure(
+                        AlertingException.wrap(
+                            OpenSearchStatusException("Monitor with ${request.monitorId} is not found", RestStatus.NOT_FOUND)
+                        )
+                    )
+                    return
+                }
+                val xcp = XContentHelper.createParser(
+                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                    getResponse.sourceAsBytesRef, XContentType.JSON
+                )
+                val monitor = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
+                onGetResponse(monitor)
+            } catch (t: Exception) {
+                actionListener.onFailure(AlertingException.wrap(t))
+            }
+        }
+
+        private suspend fun onGetResponse(currentMonitor: Monitor) {
             if (!checkUserPermissionsWithResource(user, currentMonitor.user, actionListener, "monitor", request.monitorId)) {
                 return
             }
@@ -531,56 +493,44 @@ class TransportIndexMonitorAction @Inject constructor(
                 .setIfPrimaryTerm(request.primaryTerm)
                 .timeout(indexTimeout)
 
-            client.index(
-                indexRequest,
-                object : ActionListener<IndexResponse> {
-                    override fun onResponse(response: IndexResponse) {
-                        val failureReasons = checkShardsFailure(response)
-                        if (failureReasons != null) {
-                            actionListener.onFailure(
-                                AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), response.status()))
-                            )
-                            return
-                        }
-
-                        if (currentMonitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
-                            DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-                                .source(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
-                                .filter(QueryBuilders.matchQuery("monitor_id", currentMonitor.id))
-                                .execute(
-                                    object : ActionListener<BulkByScrollResponse> {
-                                        override fun onResponse(response: BulkByScrollResponse) {
-                                            indexDocLevelMonitorQueries(request.monitor, currentMonitor.id, request.refreshPolicy)
-                                        }
-
-                                        override fun onFailure(t: Exception) {
-                                        }
-                                    }
-                                )
-                        }
-                        actionListener.onResponse(
-                            IndexMonitorResponse(
-                                response.id, response.version, response.seqNo,
-                                response.primaryTerm, RestStatus.CREATED, request.monitor
-                            )
-                        )
-                    }
-                    override fun onFailure(t: Exception) {
-                        actionListener.onFailure(AlertingException.wrap(t))
-                    }
+            try {
+                val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
+                val failureReasons = checkShardsFailure(indexResponse)
+                if (failureReasons != null) {
+                    actionListener.onFailure(
+                        AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), indexResponse.status()))
+                    )
+                    return
                 }
-            )
+                if (currentMonitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                    val bulkByScrollResponse: BulkByScrollResponse = client.suspendUntil {
+                        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+                            .source(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
+                            .filter(QueryBuilders.matchQuery("monitor_id", currentMonitor.id))
+                            .execute(it)
+                    }
+                    indexDocLevelMonitorQueries(request.monitor, currentMonitor.id, request.refreshPolicy)
+                }
+                actionListener.onResponse(
+                    IndexMonitorResponse(
+                        indexResponse.id, indexResponse.version, indexResponse.seqNo,
+                        indexResponse.primaryTerm, RestStatus.CREATED, request.monitor
+                    )
+                )
+            } catch (t: Exception) {
+                actionListener.onFailure(AlertingException.wrap(t))
+            }
         }
 
-        private fun createFullRunContext(index: String): MutableMap<String, MutableMap<String, Any>> {
+        private suspend fun createFullRunContext(index: String): MutableMap<String, MutableMap<String, Any>> {
             val getAliasesRequest = GetAliasesRequest(index)
-            val getAliasesResponse = client.admin().indices().getAliases(getAliasesRequest).actionGet()
+            val getAliasesResponse: GetAliasesResponse = client.suspendUntil { client.admin().indices().getAliases(getAliasesRequest, it) }
             val aliasIndices = getAliasesResponse.aliases.keys().map { it.value }
             val isAlias = aliasIndices.isNotEmpty()
             val indices = if (isAlias) getAliasesResponse.aliases.keys().map { it.value } else listOf(index)
             val lastRunContext = mutableMapOf<String, MutableMap<String, Any>>()
             indices.forEach { indexName ->
-                lastRunContext[indexName] = DocumentReturningMonitorRunner.createRunContext(clusterService, client, indexName)
+                lastRunContext[indexName] = DocumentLevelMonitorRunner.createRunContext(clusterService, client, indexName)
             }
             return lastRunContext
         }

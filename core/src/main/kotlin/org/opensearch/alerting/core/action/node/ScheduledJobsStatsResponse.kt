@@ -60,7 +60,7 @@ class ScheduledJobsStatsResponse : BaseNodesResponse<ScheduledJobStats>, ToXCont
         builder.field(LegacyOpenDistroScheduledJobSettings.SWEEPER_ENABLED.key, scheduledJobEnabled)
         builder.field(ScheduledJobSettings.SWEEPER_ENABLED.key, scheduledJobEnabled)
         builder.field("scheduled_job_index_exists", indexExists)
-        builder.field("scheduled_job_index_status", indexHealth?.status?.name?.toLowerCase())
+        builder.field("scheduled_job_index_status", indexHealth?.status?.name?.lowercase())
         val nodesOnSchedule = nodes.count { it.status == ScheduledJobStats.ScheduleStatus.GREEN }
         val nodesNotOnSchedule = nodes.count { it.status == ScheduledJobStats.ScheduleStatus.RED }
         builder.field("nodes_on_schedule", nodesOnSchedule)

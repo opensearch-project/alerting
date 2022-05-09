@@ -5,10 +5,14 @@
 
 package org.opensearch.alerting.transport
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.apache.lucene.search.join.ScoreMode
 import org.opensearch.action.ActionListener
 import org.opensearch.action.get.MultiGetRequest
+import org.opensearch.action.get.MultiGetResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
@@ -20,6 +24,7 @@ import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_FINDING_INDEX_P
 import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.FindingDocument
 import org.opensearch.alerting.model.FindingWithDocs
+import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
@@ -43,6 +48,7 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 
 private val log = LogManager.getLogger(TransportGetFindingsSearchAction::class.java)
+private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
 class TransportGetFindingsSearchAction @Inject constructor(
     transportService: TransportService,
@@ -114,60 +120,57 @@ class TransportGetFindingsSearchAction @Inject constructor(
         searchSourceBuilder.query(queryBuilder)
 
         client.threadPool().threadContext.stashContext().use {
-            search(searchSourceBuilder, actionListener)
-        }
-    }
-
-    fun search(searchSourceBuilder: SearchSourceBuilder, actionListener: ActionListener<GetFindingsResponse>) {
-        val searchRequest = SearchRequest()
-            .source(searchSourceBuilder)
-            .indices(ALL_FINDING_INDEX_PATTERN)
-        client.search(
-            searchRequest,
-            object : ActionListener<SearchResponse> {
-                override fun onResponse(response: SearchResponse) {
-                    val totalFindingCount = response.hits.totalHits?.value?.toInt()
-                    val mgetRequest = MultiGetRequest()
-                    val findingsWithDocs = mutableListOf<FindingWithDocs>()
-                    val findings = mutableListOf<Finding>()
-                    for (hit in response.hits) {
-                        val xcp = XContentFactory.xContent(XContentType.JSON)
-                            .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
-                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                        val finding = Finding.parse(xcp)
-                        findings.add(finding)
-                        val documentIds = finding.relatedDocIds
-                        // Add getRequests to mget request
-                        documentIds.forEach {
-                                docId ->
-                            mgetRequest.add(MultiGetRequest.Item(finding.index, docId))
-                        }
-                    }
-                    val documents = if (mgetRequest.items.isEmpty()) mutableMapOf() else searchDocument(mgetRequest)
-                    findings.forEach {
-                        val documentIds = it.relatedDocIds
-                        val relatedDocs = mutableListOf<FindingDocument>()
-                        for (docId in documentIds) {
-                            val key = "${it.index}|$docId"
-                            documents[key]?.let { document -> relatedDocs.add(document) }
-                        }
-                        findingsWithDocs.add(FindingWithDocs(it, relatedDocs))
-                    }
-                    actionListener.onResponse(GetFindingsResponse(response.status(), totalFindingCount, findingsWithDocs))
-                }
-
-                override fun onFailure(t: Exception) {
+            scope.launch {
+                try {
+                    val getFindingsResponse = search(searchSourceBuilder)
+                    actionListener.onResponse(getFindingsResponse)
+                } catch (t: Exception) {
                     actionListener.onFailure(AlertingException.wrap(t))
                 }
             }
-        )
+        }
+    }
+
+    suspend fun search(searchSourceBuilder: SearchSourceBuilder): GetFindingsResponse {
+        val searchRequest = SearchRequest()
+            .source(searchSourceBuilder)
+            .indices(ALL_FINDING_INDEX_PATTERN)
+        val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
+        val totalFindingCount = searchResponse.hits.totalHits?.value?.toInt()
+        val mgetRequest = MultiGetRequest()
+        val findingsWithDocs = mutableListOf<FindingWithDocs>()
+        val findings = mutableListOf<Finding>()
+        for (hit in searchResponse.hits) {
+            val xcp = XContentFactory.xContent(XContentType.JSON)
+                .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
+            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+            val finding = Finding.parse(xcp)
+            findings.add(finding)
+            val documentIds = finding.relatedDocIds
+            // Add getRequests to mget request
+            documentIds.forEach { docId ->
+                mgetRequest.add(MultiGetRequest.Item(finding.index, docId))
+            }
+        }
+        val documents = if (mgetRequest.items.isEmpty()) mutableMapOf() else searchDocument(mgetRequest)
+        findings.forEach {
+            val documentIds = it.relatedDocIds
+            val relatedDocs = mutableListOf<FindingDocument>()
+            for (docId in documentIds) {
+                val key = "${it.index}|$docId"
+                documents[key]?.let { document -> relatedDocs.add(document) }
+            }
+            findingsWithDocs.add(FindingWithDocs(it, relatedDocs))
+        }
+
+        return GetFindingsResponse(searchResponse.status(), totalFindingCount, findingsWithDocs)
     }
 
     // TODO: Verify what happens if indices are closed/deleted
-    fun searchDocument(
+    suspend fun searchDocument(
         mgetRequest: MultiGetRequest
     ): Map<String, FindingDocument> {
-        val response = client.multiGet(mgetRequest).actionGet()
+        val response: MultiGetResponse = client.suspendUntil { client.multiGet(mgetRequest, it) }
         val documents: MutableMap<String, FindingDocument> = mutableMapOf()
         response.responses.forEach {
             val key = "${it.index}|${it.id}"
