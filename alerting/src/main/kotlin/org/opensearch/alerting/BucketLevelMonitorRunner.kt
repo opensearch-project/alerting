@@ -20,7 +20,6 @@ import org.opensearch.alerting.model.action.PerAlertActionScope
 import org.opensearch.alerting.model.action.PerExecutionActionScope
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
-import org.opensearch.alerting.util.TriggersActionThresholdUtils
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.alerting.util.getCombinedTriggerRunResult
@@ -161,7 +160,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 nextAlerts[trigger.id]?.get(AlertCategory.COMPLETED)
                     ?.addAll(monitorCtx.alertService!!.convertToCompletedAlerts(keysToAlertsMap))
         }
-        val triggersThresholdParams = TriggersActionThresholdUtils.TriggersActionThresholdParams(monitorCtx.totalMaxActionsAcrossTriggers)
+
         for (trigger in monitor.triggers) {
             val alertsToUpdate = mutableSetOf<Alert>()
             val completedAlertsToUpdate = mutableSetOf<Alert>()
@@ -190,12 +189,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 totalActionableAlertCount = dedupedAlerts.size + newAlerts.size + completedAlerts.size,
                 monitorOrTriggerError = monitorOrTriggerError
             )
-            val numberEnd = TriggersActionThresholdUtils.getThreshold(
-                triggersThresholdParams,
-                trigger.actions.size,
-                monitorCtx.maxActionsAcrossTriggers,
-            )
-            for (action in trigger.actions.slice(0 until numberEnd)) {
+            for (action in trigger.actions) {
                 // ActionExecutionPolicy should not be null for Bucket-Level Monitors since it has a default config when not set explicitly
                 val actionExecutionScope = action.getActionExecutionPolicy(monitor)!!.actionExecutionScope
                 if (actionExecutionScope is PerAlertActionScope && !shouldDefaultToPerExecution) {

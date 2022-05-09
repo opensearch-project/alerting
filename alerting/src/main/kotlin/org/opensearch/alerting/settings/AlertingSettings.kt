@@ -20,8 +20,9 @@ class AlertingSettings {
         const val MONITOR_MAX_INPUTS = 1
         const val MONITOR_MAX_TRIGGERS = 10
         const val DEFAULT_MAX_ACTIONABLE_ALERT_COUNT = 50L
-        const val DEFAULT_MAX_ACTIONS_ACROSS_TRIGGERS = 5
-        const val DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS = 250
+        const val UNBOUNDED_ACTIONS_ACROSS_TRIGGERS = -1
+        const val DEFAULT_MAX_ACTIONS_ACROSS_TRIGGERS = UNBOUNDED_ACTIONS_ACROSS_TRIGGERS
+        const val DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS = UNBOUNDED_ACTIONS_ACROSS_TRIGGERS
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(
             "plugins.alerting.monitor.max_monitors",
@@ -160,11 +161,12 @@ class AlertingSettings {
         )
 
         val MAX_ACTIONS_ACROSS_TRIGGERS = Setting.intSetting(
-            "plugins.alerting.trigger.max_actions",
+            "plugins.alerting.max_actions_across_triggers",
             DEFAULT_MAX_ACTIONS_ACROSS_TRIGGERS,
             -1,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+
         val TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS = Setting.intSetting(
             "plugins.alerting.total_max_actions_across_triggers",
             DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS,

@@ -33,7 +33,6 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.TOTAL_MAX_ACT
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.HOST_DENY_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.loadDestinationSettings
-import org.opensearch.alerting.util.TriggersActionThresholdUtils
 import org.opensearch.alerting.util.isBucketLevelMonitor
 import org.opensearch.alerting.util.isDocLevelMonitor
 import org.opensearch.client.Client
@@ -47,12 +46,16 @@ import org.opensearch.script.TemplateScript
 import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
 import kotlin.coroutines.CoroutineContext
+import kotlin.math.min
 
 object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
 
     private val logger = LogManager.getLogger(javaClass)
 
     var monitorCtx: MonitorRunnerExecutionContext = MonitorRunnerExecutionContext()
+
+    // Record the total number of actions when the monitor is executed
+    private val monitorTotalActions = mutableMapOf<String, Int>()
 
     private lateinit var runnerSupervisor: Job
     override val coroutineContext: CoroutineContext
@@ -143,17 +146,33 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             monitorCtx.maxActionableAlertCount = it
         }
 
-        monitorCtx.maxActionsAcrossTriggers = MAX_ACTIONS_ACROSS_TRIGGERS.get(monitorCtx.settings)
+        monitorCtx.maxActionsAcrossTriggers =
+            min(MAX_ACTIONS_ACROSS_TRIGGERS.get(monitorCtx.settings), TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.get(monitorCtx.settings))
         monitorCtx.totalMaxActionsAcrossTriggers = TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.get(monitorCtx.settings)
-        TriggersActionThresholdUtils.checkTriggerActionConfig(monitorCtx.maxActionsAcrossTriggers, monitorCtx.totalMaxActionsAcrossTriggers)
+
         monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(
             MAX_ACTIONS_ACROSS_TRIGGERS,
             TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
         ) { maxActions: Int, totalMaxActions: Int ->
-            TriggersActionThresholdUtils.checkTriggerActionConfig(maxActions, totalMaxActions)
+            if (maxActions > totalMaxActions) {
+                throw IllegalArgumentException(
+                    "The limit number of actions for a single trigger, $maxActions, " +
+                        "should not be greater than that of the overall max actions across all triggers of the monitor, $totalMaxActions"
+                )
+            }
+            monitorTotalActions.forEach { (monitorType, monitorTotalActions) ->
+                if (monitorTotalActions > totalMaxActions) {
+                    throw IllegalArgumentException(
+                        "The currently set total execution count $totalMaxActions is already less than the " +
+                            "total execution count $totalMaxActions of type $monitorType"
+                    )
+                }
+            }
+
             monitorCtx.maxActionsAcrossTriggers = maxActions
             monitorCtx.totalMaxActionsAcrossTriggers = totalMaxActions
         }
+
         return this
     }
 
@@ -227,10 +246,12 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     suspend fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant, dryrun: Boolean): MonitorRunResult<*> {
         val monitor = job as Monitor
         val runResult = if (monitor.isBucketLevelMonitor()) {
+            monitorTotalActions[Monitor.MonitorType.BUCKET_LEVEL_MONITOR.value] = monitor.triggers.sumOf { it.actions.size }
             BucketLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         } else if (monitor.isDocLevelMonitor()) {
             DocumentLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         } else {
+            monitorTotalActions[Monitor.MonitorType.QUERY_LEVEL_MONITOR.value] = monitor.triggers.sumOf { it.actions.size }
             QueryLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         }
         return runResult
