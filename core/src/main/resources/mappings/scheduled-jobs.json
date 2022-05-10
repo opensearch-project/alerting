@@ -244,9 +244,8 @@
             }
           }
         },
-        "last_run_context": {
-          "type": "object",
-          "enabled": false
+        "metadata_id": {
+          "type": "keyword"
         },
         "ui_metadata": {
           "type": "object",
@@ -444,6 +443,46 @@
               "type": "text"
             }
           }
+        }
+      }
+    },
+    "metadata" : {
+      "properties": {
+        "monitor_id": {
+          "type": "keyword"
+        },
+        "monitor_error": {
+          "type": "text"
+        },
+        "trigger_errors": {
+          "type": "nested",
+          "properties": {
+            "trigger_id": {
+              "type": "keyword"
+            },
+            "message": {
+              "type": "text"
+            },
+            "cause": {
+              "type": "text"
+            }
+          }
+        },
+        "last_action_execution_times": {
+          "type": "nested",
+          "properties": {
+            "action_id": {
+              "type": "keyword"
+            },
+            "execution_time": {
+              "type": "date",
+              "format": "strict_date_time||epoch_millis"
+            }
+          }
+        },
+        "last_run_context": {
+          "type": "object",
+          "enabled": false
         }
       }
     }

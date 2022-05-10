@@ -7,6 +7,7 @@ package org.opensearch.alerting.model
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.apache.logging.log4j.LogManager
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.alerting.core.model.ScheduledJob
@@ -26,6 +27,8 @@ import org.opensearch.common.xcontent.XContentType
  */
 class AlertingConfigAccessor {
     companion object {
+        private val logger = LogManager.getLogger(javaClass)
+
         suspend fun getMonitorInfo(client: Client, xContentRegistry: NamedXContentRegistry, monitorId: String): Monitor {
             val jobSource = getAlertingConfigDocumentSource(client, "Monitor", monitorId)
             return withContext(Dispatchers.IO) {
@@ -35,6 +38,17 @@ class AlertingConfigAccessor {
                 )
                 val monitor = Monitor.parse(xcp)
                 monitor
+            }
+        }
+
+        suspend fun getMonitorMetadata(client: Client, xContentRegistry: NamedXContentRegistry, metadataId: String): MonitorMetadata {
+            val jobSource = getAlertingConfigDocumentSource(client, "Monitor Metadata", metadataId)
+            return withContext(Dispatchers.IO) {
+                val xcp = XContentHelper.createParser(
+                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                    jobSource, XContentType.JSON
+                )
+                MonitorMetadata.parse(xcp, metadataId)
             }
         }
 
@@ -79,7 +93,9 @@ class AlertingConfigAccessor {
                 throw IllegalStateException("$type document with id $docId not found or source is empty")
             }
 
-            return getResponse.sourceAsBytesRef
+            val finalResponse: GetResponse = client.suspendUntil { client.get(getRequest, it) }
+
+            return finalResponse.sourceAsBytesRef
         }
     }
 }

@@ -7,10 +7,10 @@ package org.opensearch.alerting.util
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ResourceAlreadyExistsException
-import org.opensearch.action.admin.indices.alias.get.GetAliasesRequest
-import org.opensearch.action.admin.indices.alias.get.GetAliasesResponse
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
+import org.opensearch.action.admin.indices.get.GetIndexRequest
+import org.opensearch.action.admin.indices.get.GetIndexResponse
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
@@ -77,13 +77,11 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
 
         val clusterState = clusterService.state()
 
-        val getAliasesRequest = GetAliasesRequest(index)
-        val getAliasesResponse: GetAliasesResponse = queryClient.suspendUntil {
-            queryClient.admin().indices().getAliases(getAliasesRequest, it)
+        val getIndexRequest = GetIndexRequest().indices(index)
+        val getIndexResponse: GetIndexResponse = queryClient.suspendUntil {
+            queryClient.admin().indices().getIndex(getIndexRequest, it)
         }
-        val aliasIndices = getAliasesResponse.aliases?.keys()?.map { it.value }
-        val isAlias = aliasIndices != null && aliasIndices.isNotEmpty()
-        val indices = if (isAlias) aliasIndices else listOf(index)
+        val indices = getIndexResponse.indices()
 
         indices?.forEach { indexName ->
             if (clusterState.routingTable.hasIndex(indexName)) {

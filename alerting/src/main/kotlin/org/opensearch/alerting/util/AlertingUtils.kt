@@ -12,6 +12,7 @@ import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.alerting.model.destination.Destination
@@ -64,6 +65,8 @@ fun Action.getActionExecutionPolicy(monitor: Monitor): ActionExecutionPolicy? {
     // the parse.
     return this.actionExecutionPolicy ?: if (monitor.isBucketLevelMonitor()) {
         ActionExecutionPolicy.getDefaultConfigurationForBucketLevelMonitor()
+    } else if (monitor.isDocLevelMonitor()) {
+        ActionExecutionPolicy.getDefaultConfigurationForDocumentLevelMonitor()
     } else {
         null
     }
@@ -100,6 +103,24 @@ suspend fun updateMonitor(client: Client, xContentRegistry: NamedXContentRegistr
         .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
         .source(monitor.toXContentWithUser(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
         .id(monitor.id)
+        .timeout(AlertingSettings.INDEX_TIMEOUT.get(settings))
+
+    return client.suspendUntil { client.index(indexRequest, it) }
+}
+
+suspend fun updateMonitorMetadata(client: Client, settings: Settings, monitorMetadata: MonitorMetadata): IndexResponse {
+    /*val currentMonitor = AlertingConfigAccessor.getMonitorInfo(client, xContentRegistry, monitor.id)
+
+    var updateMonitor = monitor
+    // If both are enabled, use the current existing monitor enabled time, otherwise the next execution will be
+    // incorrect.
+    if (monitor.enabled && currentMonitor.enabled)
+        updateMonitor = monitor.copy(enabledTime = currentMonitor.enabledTime)*/
+
+    val indexRequest = IndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
+        .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+        .source(monitorMetadata.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+        .id(monitorMetadata.id)
         .timeout(AlertingSettings.INDEX_TIMEOUT.get(settings))
 
     return client.suspendUntil { client.index(indexRequest, it) }

@@ -34,7 +34,7 @@ import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
 import org.opensearch.commons.authuser.User
 import java.io.IOException
 import java.time.Instant
-import java.util.Locale
+import java.util.*
 
 /**
  * A value object that represents a Monitor. Monitors are used to periodically execute a source query and check the
@@ -55,7 +55,7 @@ data class Monitor(
     val schemaVersion: Int = NO_SCHEMA_VERSION,
     val inputs: List<Input>,
     val triggers: List<Trigger>,
-    val lastRunContext: Map<String, Any>,
+    val metadataId: String?,
     val uiMetadata: Map<String, Any>
 ) : ScheduledJob {
 
@@ -113,7 +113,7 @@ data class Monitor(
         schemaVersion = sin.readInt(),
         inputs = sin.readList((Input)::readFrom),
         triggers = sin.readList((Trigger)::readFrom),
-        lastRunContext = suppressWarning(sin.readMap()),
+        metadataId = sin.readOptionalString(),
         uiMetadata = suppressWarning(sin.readMap())
     )
 
@@ -161,7 +161,7 @@ data class Monitor(
             .field(INPUTS_FIELD, inputs.toTypedArray())
             .field(TRIGGERS_FIELD, triggers.toTypedArray())
             .optionalTimeField(LAST_UPDATE_TIME_FIELD, lastUpdateTime)
-        if (lastRunContext.isNotEmpty()) builder.field(LAST_RUN_CONTEXT_FIELD, lastRunContext)
+            .field(METADATA_ID_FIELD, metadataId)
         if (uiMetadata.isNotEmpty()) builder.field(UI_METADATA_FIELD, uiMetadata)
         if (params.paramAsBoolean("with_type", false)) builder.endObject()
         return builder.endObject()
@@ -204,7 +204,8 @@ data class Monitor(
             }
             it.writeTo(out)
         }
-        out.writeMap(lastRunContext)
+//        out.writeMap(lastRunContext)
+        out.writeOptionalString(metadataId)
         out.writeMap(uiMetadata)
     }
 
@@ -222,7 +223,8 @@ data class Monitor(
         const val NO_VERSION = 1L
         const val INPUTS_FIELD = "inputs"
         const val LAST_UPDATE_TIME_FIELD = "last_update_time"
-        const val LAST_RUN_CONTEXT_FIELD = "last_run_context"
+        const val METADATA_ID_FIELD = "metadata_id"
+//        const val LAST_RUN_CONTEXT_FIELD = "last_run_context"
         const val UI_METADATA_FIELD = "ui_metadata"
         const val ENABLED_TIME_FIELD = "enabled_time"
 
@@ -245,7 +247,7 @@ data class Monitor(
             var schedule: Schedule? = null
             var lastUpdateTime: Instant? = null
             var enabledTime: Instant? = null
-            var lastRunContext: Map<String, Any> = mapOf()
+            var metadataId: String? = null
             var uiMetadata: Map<String, Any> = mapOf()
             var enabled = true
             var schemaVersion = NO_SCHEMA_VERSION
@@ -287,7 +289,7 @@ data class Monitor(
                     }
                     ENABLED_TIME_FIELD -> enabledTime = xcp.instant()
                     LAST_UPDATE_TIME_FIELD -> lastUpdateTime = xcp.instant()
-                    LAST_RUN_CONTEXT_FIELD -> lastRunContext = xcp.map()
+                    METADATA_ID_FIELD -> metadataId = if (xcp.currentToken() == Token.VALUE_NULL) null else xcp.text()
                     UI_METADATA_FIELD -> uiMetadata = xcp.map()
                     else -> {
                         xcp.skipChildren()
@@ -313,7 +315,7 @@ data class Monitor(
                 schemaVersion,
                 inputs.toList(),
                 triggers.toList(),
-                lastRunContext,
+                metadataId,
                 uiMetadata
             )
         }

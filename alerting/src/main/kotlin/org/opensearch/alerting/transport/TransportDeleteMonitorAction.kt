@@ -140,11 +140,45 @@ class TransportDeleteMonitorAction @Inject constructor(
                         if (clusterState.routingTable.hasIndex(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)) {
                             deleteDocLevelMonitorQueries()
                         }
+                        deleteMetadata()
+
                         actionListener.onResponse(response)
                     }
 
                     override fun onFailure(t: Exception) {
                         actionListener.onFailure(AlertingException.wrap(t))
+                    }
+                }
+            )
+        }
+
+        private fun deleteMetadata() {
+            val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, monitorId)
+            client.get(
+                getRequest,
+                object : ActionListener<GetResponse> {
+                    override fun onResponse(response: GetResponse) {
+                        if (response.isExists) {
+                            val xcp = XContentHelper.createParser(
+                                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                                response.sourceAsBytesRef, XContentType.JSON
+                            )
+                            val monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
+                            val deleteMetadataRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, monitor.metadataId)
+                                .setRefreshPolicy(deleteRequest.refreshPolicy)
+                            client.delete(
+                                deleteMetadataRequest,
+                                object : ActionListener<DeleteResponse> {
+                                    override fun onResponse(response: DeleteResponse) {
+                                    }
+
+                                    override fun onFailure(t: Exception) {
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    override fun onFailure(t: Exception) {
                     }
                 }
             )

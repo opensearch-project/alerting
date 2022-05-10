@@ -14,9 +14,10 @@ import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.test.OpenSearchTestCase
+import java.lang.IllegalArgumentException
 
 class DocLevelMonitorInputTests : OpenSearchTestCase() {
-    fun `testing DocLevelQuery asTemplateArgs`() {
+    fun `test DocLevelQuery asTemplateArgs`() {
         // GIVEN
         val query = randomDocLevelQuery()
 
@@ -30,7 +31,34 @@ class DocLevelMonitorInputTests : OpenSearchTestCase() {
         assertEquals("Template args 'tags' field does not match:", templateArgs[DocLevelQuery.TAGS_FIELD], query.tags)
     }
 
-    fun `testing DocLevelMonitorInput asTemplateArgs`() {
+    fun `test create Doc Level Query with invalid characters for name`() {
+        val badString = "query with space"
+        try {
+            randomDocLevelQuery(name = badString)
+            fail("Expecting an illegal argument exception")
+        } catch (e: IllegalArgumentException) {
+            assertEquals(
+                "They query name or tag, $badString, contains an invalid character: [' ','[',']','{','}','(',')']",
+                e.message
+            )
+        }
+    }
+
+    @Throws(IllegalArgumentException::class)
+    fun `test create Doc Level Query with invalid characters for tags`() {
+        val badString = "[(){}]"
+        try {
+            randomDocLevelQuery(tags = listOf(badString))
+            fail("Expecting an illegal argument exception")
+        } catch (e: IllegalArgumentException) {
+            assertEquals(
+                "They query name or tag, $badString, contains an invalid character: [' ','[',']','{','}','(',')']",
+                e.message
+            )
+        }
+    }
+
+    fun `test DocLevelMonitorInput asTemplateArgs`() {
         // GIVEN
         val input = randomDocLevelMonitorInput()
 
