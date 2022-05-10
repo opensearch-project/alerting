@@ -34,7 +34,7 @@ import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
 import org.opensearch.commons.authuser.User
 import java.io.IOException
 import java.time.Instant
-import java.util.*
+import java.util.Locale
 
 /**
  * A value object that represents a Monitor. Monitors are used to periodically execute a source query and check the
@@ -204,7 +204,6 @@ data class Monitor(
             }
             it.writeTo(out)
         }
-//        out.writeMap(lastRunContext)
         out.writeOptionalString(metadataId)
         out.writeMap(uiMetadata)
     }
@@ -224,7 +223,6 @@ data class Monitor(
         const val INPUTS_FIELD = "inputs"
         const val LAST_UPDATE_TIME_FIELD = "last_update_time"
         const val METADATA_ID_FIELD = "metadata_id"
-//        const val LAST_RUN_CONTEXT_FIELD = "last_run_context"
         const val UI_METADATA_FIELD = "ui_metadata"
         const val ENABLED_TIME_FIELD = "enabled_time"
 

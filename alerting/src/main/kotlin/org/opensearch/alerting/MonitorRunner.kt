@@ -31,7 +31,7 @@ import org.opensearch.client.node.NodeClient
 import org.opensearch.common.Strings
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import java.time.Instant
-import java.util.*
+import java.util.UUID
 
 abstract class MonitorRunner {
     private val logger = LogManager.getLogger(javaClass)

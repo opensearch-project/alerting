@@ -109,14 +109,6 @@ suspend fun updateMonitor(client: Client, xContentRegistry: NamedXContentRegistr
 }
 
 suspend fun updateMonitorMetadata(client: Client, settings: Settings, monitorMetadata: MonitorMetadata): IndexResponse {
-    /*val currentMonitor = AlertingConfigAccessor.getMonitorInfo(client, xContentRegistry, monitor.id)
-
-    var updateMonitor = monitor
-    // If both are enabled, use the current existing monitor enabled time, otherwise the next execution will be
-    // incorrect.
-    if (monitor.enabled && currentMonitor.enabled)
-        updateMonitor = monitor.copy(enabledTime = currentMonitor.enabledTime)*/
-
     val indexRequest = IndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
         .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
         .source(monitorMetadata.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
