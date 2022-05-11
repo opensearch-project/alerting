@@ -7,10 +7,10 @@ buildscript {
     apply from: 'build-tools/repositories.gradle'
 
     ext {
-        opensearch_version = System.getProperty("opensearch.version", "2.0.0-rc1-SNAPSHOT")
-        buildVersionQualifier = System.getProperty("build.version_qualifier", "rc1")
+        opensearch_version = System.getProperty("opensearch.version", "2.0.0-SNAPSHOT")
+        buildVersionQualifier = System.getProperty("build.version_qualifier", "")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
-        // 2.0.0-rc1-SNAPSHOT -> 2.0.0.0-rc1-SNAPSHOT
+        // 2.0.0-SNAPSHOT -> 2.0.0.0-SNAPSHOT
         version_tokens = opensearch_version.tokenize('-')
         opensearch_build = version_tokens[0] + '.0'
         plugin_no_snapshot = opensearch_build
