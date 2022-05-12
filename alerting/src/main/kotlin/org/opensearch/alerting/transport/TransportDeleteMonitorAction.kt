@@ -159,12 +159,7 @@ class TransportDeleteMonitorAction @Inject constructor(
                 object : ActionListener<GetResponse> {
                     override fun onResponse(response: GetResponse) {
                         if (response.isExists) {
-                            val xcp = XContentHelper.createParser(
-                                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                                response.sourceAsBytesRef, XContentType.JSON
-                            )
-                            val monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
-                            val deleteMetadataRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, monitor.metadataId)
+                            val deleteMetadataRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, "$monitorId")
                                 .setRefreshPolicy(deleteRequest.refreshPolicy)
                             client.delete(
                                 deleteMetadataRequest,

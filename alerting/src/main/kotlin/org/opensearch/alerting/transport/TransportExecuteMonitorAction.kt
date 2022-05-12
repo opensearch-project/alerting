@@ -130,7 +130,6 @@ class TransportExecuteMonitorAction @Inject constructor(
                                 log.info("Central Percolation index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX} created")
                             }
                             docLevelMonitorQueries.indexDocLevelQueries(
-                                client,
                                 monitor,
                                 monitor.id,
                                 WriteRequest.RefreshPolicy.IMMEDIATE,

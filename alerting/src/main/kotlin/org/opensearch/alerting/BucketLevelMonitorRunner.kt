@@ -19,6 +19,7 @@ import org.opensearch.alerting.model.action.PerAlertActionScope
 import org.opensearch.alerting.model.action.PerExecutionActionScope
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
+import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.alerting.util.getCombinedTriggerRunResult
@@ -182,7 +183,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             val triggerResult = triggerResults[trigger.id]!!
             val monitorOrTriggerError = monitorResult.error ?: triggerResult.error
             val shouldDefaultToPerExecution = defaultToPerExecutionAction(
-                monitorCtx,
+                monitorCtx.maxActionableAlertCount,
                 monitorId = monitor.id,
                 triggerId = trigger.id,
                 totalActionableAlertCount = dedupedAlerts.size + newAlerts.size + completedAlerts.size,

@@ -88,7 +88,7 @@ fun randomQueryLevelMonitor(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
-        metadataId = null, uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 
@@ -106,7 +106,7 @@ fun randomQueryLevelMonitorWithoutUser(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = null,
-        metadataId = null, uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 
@@ -130,7 +130,7 @@ fun randomBucketLevelMonitor(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.BUCKET_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
-        metadataId = null, uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 
@@ -148,7 +148,7 @@ fun randomClusterMetricsMonitor(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.CLUSTER_METRICS_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
-        metadataId = null, uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 
@@ -166,7 +166,7 @@ fun randomDocumentLevelMonitor(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.DOC_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
-        metadataId = null, uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 

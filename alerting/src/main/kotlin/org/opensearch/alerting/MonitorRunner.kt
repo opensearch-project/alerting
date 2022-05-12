@@ -7,14 +7,12 @@ package org.opensearch.alerting
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.AlertingConfigAccessor
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.action.Action
-import org.opensearch.alerting.model.action.ActionExecutionScope
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
@@ -31,10 +29,8 @@ import org.opensearch.client.node.NodeClient
 import org.opensearch.common.Strings
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import java.time.Instant
-import java.util.UUID
 
 abstract class MonitorRunner {
-    private val logger = LogManager.getLogger(javaClass)
 
     abstract suspend fun runMonitor(
         monitor: Monitor,
@@ -147,40 +143,7 @@ abstract class MonitorRunner {
         return NotificationActionConfigs(destination, channel)
     }
 
-    protected fun defaultToPerExecutionAction(
-        monitorCtx: MonitorRunnerExecutionContext,
-        monitorId: String,
-        triggerId: String,
-        totalActionableAlertCount: Int,
-        monitorOrTriggerError: Exception?
-    ): Boolean {
-        // If the monitorId or triggerResult has an error, then also default to PER_EXECUTION to communicate the error
-        if (monitorOrTriggerError != null) {
-            logger.debug(
-                "Trigger [$triggerId] in monitor [$monitorId] encountered an error. Defaulting to " +
-                    "[${ActionExecutionScope.Type.PER_EXECUTION}] for action execution to communicate error."
-            )
-            return true
-        }
-
-        // If the MAX_ACTIONABLE_ALERT_COUNT is set to -1, consider it unbounded and proceed regardless of actionable Alert count
-        if (monitorCtx.maxActionableAlertCount < 0) return false
-
-        // If the total number of Alerts to execute Actions on exceeds the MAX_ACTIONABLE_ALERT_COUNT setting then default to
-        // PER_EXECUTION for less intrusive Actions
-        if (totalActionableAlertCount > monitorCtx.maxActionableAlertCount) {
-            logger.debug(
-                "The total actionable alerts for trigger [$triggerId] in monitor [$monitorId] is [$totalActionableAlertCount] " +
-                    "which exceeds the maximum of [${monitorCtx.maxActionableAlertCount}]. " +
-                    "Defaulting to [${ActionExecutionScope.Type.PER_EXECUTION}] for action execution."
-            )
-            return true
-        }
-
-        return false
-    }
-
     protected fun createMonitorMetadata(monitorId: String): MonitorMetadata {
-        return MonitorMetadata(UUID.randomUUID().toString(), monitorId, null, emptyList(), emptyList(), emptyMap())
+        return MonitorMetadata("$monitorId-metadata", monitorId, emptyList(), emptyMap())
     }
 }

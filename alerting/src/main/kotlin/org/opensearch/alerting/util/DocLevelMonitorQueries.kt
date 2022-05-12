@@ -65,10 +65,9 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
     }
 
     suspend fun indexDocLevelQueries(
-        queryClient: Client,
         monitor: Monitor,
         monitorId: String,
-        refreshPolicy: RefreshPolicy,
+        refreshPolicy: RefreshPolicy = RefreshPolicy.IMMEDIATE,
         indexTimeout: TimeValue
     ) {
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
@@ -78,8 +77,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         val clusterState = clusterService.state()
 
         val getIndexRequest = GetIndexRequest().indices(index)
-        val getIndexResponse: GetIndexResponse = queryClient.suspendUntil {
-            queryClient.admin().indices().getIndex(getIndexRequest, it)
+        val getIndexResponse: GetIndexResponse = client.suspendUntil {
+            client.admin().indices().getIndex(getIndexRequest, it)
         }
         val indices = getIndexResponse.indices()
 
@@ -104,8 +103,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
 
                     val updateMappingRequest = PutMappingRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
                     updateMappingRequest.source(mapOf<String, Any>("properties" to updatedProperties))
-                    val updateMappingResponse: AcknowledgedResponse = queryClient.suspendUntil {
-                        queryClient.admin().indices().putMapping(updateMappingRequest, it)
+                    val updateMappingResponse: AcknowledgedResponse = client.suspendUntil {
+                        client.admin().indices().putMapping(updateMappingRequest, it)
                     }
 
                     if (updateMappingResponse.isAcknowledged) {
@@ -127,8 +126,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                             indexRequests.add(indexRequest)
                         }
                         if (indexRequests.isNotEmpty()) {
-                            val bulkResponse: BulkResponse = queryClient.suspendUntil {
-                                queryClient.bulk(
+                            val bulkResponse: BulkResponse = client.suspendUntil {
+                                client.bulk(
                                     BulkRequest().setRefreshPolicy(refreshPolicy).timeout(indexTimeout).add(indexRequests), it
                                 )
                             }

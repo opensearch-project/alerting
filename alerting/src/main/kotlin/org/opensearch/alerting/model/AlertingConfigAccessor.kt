@@ -7,7 +7,6 @@ package org.opensearch.alerting.model
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.apache.logging.log4j.LogManager
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.alerting.core.model.ScheduledJob
@@ -20,14 +19,16 @@ import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentHelper
+import org.opensearch.common.xcontent.XContentParser
+import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.index.IndexNotFoundException
 
 /**
  * This is an accessor class to retrieve documents/information from the Alerting config index.
  */
 class AlertingConfigAccessor {
     companion object {
-        private val logger = LogManager.getLogger(javaClass)
 
         suspend fun getMonitorInfo(client: Client, xContentRegistry: NamedXContentRegistry, monitorId: String): Monitor {
             val jobSource = getAlertingConfigDocumentSource(client, "Monitor", monitorId)
@@ -41,14 +42,25 @@ class AlertingConfigAccessor {
             }
         }
 
-        suspend fun getMonitorMetadata(client: Client, xContentRegistry: NamedXContentRegistry, metadataId: String): MonitorMetadata {
-            val jobSource = getAlertingConfigDocumentSource(client, "Monitor Metadata", metadataId)
-            return withContext(Dispatchers.IO) {
-                val xcp = XContentHelper.createParser(
-                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                    jobSource, XContentType.JSON
-                )
-                MonitorMetadata.parse(xcp, metadataId)
+        suspend fun getMonitorMetadata(client: Client, xContentRegistry: NamedXContentRegistry, metadataId: String): MonitorMetadata? {
+            return try {
+                val jobSource = getAlertingConfigDocumentSource(client, "Monitor Metadata", metadataId)
+                withContext(Dispatchers.IO) {
+                    val xcp = XContentHelper.createParser(
+                        xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                        jobSource, XContentType.JSON
+                    )
+                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                    MonitorMetadata.parse(xcp)
+                }
+            } catch (e: IllegalStateException) {
+                if (e.message?.equals("Monitor Metadata document with id $metadataId not found or source is empty") == true) {
+                    return null
+                } else throw e
+            } catch (e: IndexNotFoundException) {
+                if (e.message?.equals("no such index [.opendistro-alerting-config]") == true) {
+                    return null
+                } else throw e
             }
         }
 

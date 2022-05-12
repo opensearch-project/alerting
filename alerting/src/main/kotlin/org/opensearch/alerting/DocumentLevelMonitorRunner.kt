@@ -33,8 +33,8 @@ import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
-import org.opensearch.alerting.util.updateMonitor
 import org.opensearch.alerting.util.updateMonitorMetadata
 import org.opensearch.client.Client
 import org.opensearch.cluster.routing.ShardRouting
@@ -83,22 +83,24 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         try {
             validate(monitor)
         } catch (e: Exception) {
-            logger.info("Failed to start Document-level-monitor. Error: ${e.message}")
+            logger.error("Failed to start Document-level-monitor. Error: ${e.message}")
             return monitorResult.copy(error = AlertingException.wrap(e))
         }
+
+        monitorCtx.docLevelMonitorQueries!!.initDocLevelQueryIndex()
+        monitorCtx.docLevelMonitorQueries!!.indexDocLevelQueries(
+            monitor = monitor,
+            monitorId = monitor.id,
+            indexTimeout = monitorCtx.indexTimeout!!
+        )
 
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
         val index = docLevelMonitorInput.indices[0]
         val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
 
-        val monitorMetadata = if (monitor.metadataId.isNullOrEmpty()) createMonitorMetadata(monitor.id)
-        else {
-            try {
-                getMonitorMetadata(monitorCtx.client!!, monitorCtx.xContentRegistry!!, monitor.metadataId)
-            } catch (e: Exception) {
-                logger.warn("Monitor metadata with id, ${monitor.metadataId}, is missing for monitor: ${monitor.id}")
-                createMonitorMetadata(monitor.id)
-            }
+        var monitorMetadata = getMonitorMetadata(monitorCtx.client!!, monitorCtx.xContentRegistry!!, "${monitor.id}-metadata")
+        if (monitorMetadata == null) {
+            monitorMetadata = createMonitorMetadata(monitor.id)
         }
 
         val isTempMonitor = dryrun || monitor.id == Monitor.NO_ID
@@ -128,7 +130,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             indices.forEach { indexName ->
                 // Prepare lastRunContext for each index
                 val indexLastRunContext = lastRunContext.getOrPut(indexName) {
-                    createRunContext(monitorCtx.clusterService!!, monitorCtx.client!!, indexName)
+                    val indexCreatedRecently = createdRecently(monitor, indexName, periodStart, periodEnd, getIndexResponse)
+                    createRunContext(monitorCtx.clusterService!!, monitorCtx.client!!, indexName, indexCreatedRecently)
                 }
 
                 // Prepare updatedLastRunContext for each index
@@ -202,14 +205,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         // Don't update monitor if this is a test monitor
         if (!isTempMonitor) {
             updateMonitorMetadata(monitorCtx.client!!, monitorCtx.settings!!, monitorMetadata.copy(lastRunContext = updatedLastRunContext))
-            if (monitor.metadataId.isNullOrEmpty() || monitor.metadataId != monitorMetadata.id) {
-                updateMonitor(
-                    monitorCtx.client!!,
-                    monitorCtx.xContentRegistry!!,
-                    monitorCtx.settings!!,
-                    monitor.copy(metadataId = monitorMetadata.id)
-                )
-            }
         }
 
         // TODO: Update the Document as part of the Trigger and return back the trigger action result
@@ -261,7 +256,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         }
 
         val shouldDefaultToPerExecution = defaultToPerExecutionAction(
-            monitorCtx,
+            monitorCtx.maxActionableAlertCount,
             monitorId = monitor.id,
             triggerId = trigger.id,
             totalActionableAlertCount = alerts.size,
@@ -330,7 +325,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 .id(finding.id)
                 .routing(finding.id)
 
-            val indexResponse: IndexResponse = monitorCtx.client!!.suspendUntil {
+            monitorCtx.client!!.suspendUntil<Client, IndexResponse> {
                 monitorCtx.client!!.index(indexRequest, it)
             }
         }
@@ -367,7 +362,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         }
     }
 
-    suspend fun createRunContext(clusterService: ClusterService, client: Client, index: String): HashMap<String, Any> {
+    suspend fun createRunContext(
+        clusterService: ClusterService,
+        client: Client,
+        index: String,
+        createdRecently: Boolean = false
+    ): HashMap<String, Any> {
         val lastRunContext = HashMap<String, Any>()
         lastRunContext["index"] = index
         val count = getShardsCount(clusterService, index)
@@ -375,10 +375,23 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         for (i: Int in 0 until count) {
             val shard = i.toString()
-            val maxSeqNo: Long = getMaxSeqNo(client, index, shard)
+            val maxSeqNo: Long = if (createdRecently) -1L else getMaxSeqNo(client, index, shard)
             lastRunContext[shard] = maxSeqNo
         }
         return lastRunContext
+    }
+
+    // Checks if the index was created from the last execution run or when the monitor was last updated to ensure that
+    // new index is monitored from the beginning of that index
+    private fun createdRecently(
+        monitor: Monitor,
+        index: String,
+        periodStart: Instant,
+        periodEnd: Instant,
+        getIndexResponse: GetIndexResponse
+    ): Boolean {
+        val lastExecutionTime = if (periodStart == periodEnd) monitor.lastUpdateTime else periodStart
+        return getIndexResponse.settings.get(index).getAsLong("index.creation_date", 0L) > lastExecutionTime.toEpochMilli()
     }
 
     /**
