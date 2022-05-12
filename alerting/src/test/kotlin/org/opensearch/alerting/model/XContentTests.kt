@@ -39,7 +39,6 @@ import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase
 import java.time.temporal.ChronoUnit
-import java.util.*
 import kotlin.test.assertFailsWith
 
 class XContentTests : OpenSearchTestCase() {
