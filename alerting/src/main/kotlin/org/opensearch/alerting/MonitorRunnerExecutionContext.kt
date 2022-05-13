@@ -11,9 +11,11 @@ import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings
+import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.script.ScriptService
 import org.opensearch.threadpool.ThreadPool
@@ -30,6 +32,7 @@ data class MonitorRunnerExecutionContext(
     var inputService: InputService? = null,
     var triggerService: TriggerService? = null,
     var alertService: AlertService? = null,
+    var docLevelMonitorQueries: DocLevelMonitorQueries? = null,
 
     @Volatile var retryPolicy: BackoffPolicy? = null,
     @Volatile var moveAlertsRetryPolicy: BackoffPolicy? = null,
@@ -40,5 +43,6 @@ data class MonitorRunnerExecutionContext(
     @Volatile var destinationSettings: Map<String, DestinationSettings.Companion.SecureDestinationSettings>? = null,
     @Volatile var destinationContextFactory: DestinationContextFactory? = null,
 
-    @Volatile var maxActionableAlertCount: Long = AlertingSettings.DEFAULT_MAX_ACTIONABLE_ALERT_COUNT
+    @Volatile var maxActionableAlertCount: Long = AlertingSettings.DEFAULT_MAX_ACTIONABLE_ALERT_COUNT,
+    @Volatile var indexTimeout: TimeValue? = null
 )

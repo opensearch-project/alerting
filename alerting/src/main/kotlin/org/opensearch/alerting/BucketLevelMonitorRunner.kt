@@ -14,12 +14,12 @@ import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.model.action.ActionExecutionScope
 import org.opensearch.alerting.model.action.AlertCategory
 import org.opensearch.alerting.model.action.PerAlertActionScope
 import org.opensearch.alerting.model.action.PerExecutionActionScope
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
+import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.alerting.util.getCombinedTriggerRunResult
@@ -183,7 +183,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             val triggerResult = triggerResults[trigger.id]!!
             val monitorOrTriggerError = monitorResult.error ?: triggerResult.error
             val shouldDefaultToPerExecution = defaultToPerExecutionAction(
-                monitorCtx,
+                monitorCtx.maxActionableAlertCount,
                 monitorId = monitor.id,
                 triggerId = trigger.id,
                 totalActionableAlertCount = dedupedAlerts.size + newAlerts.size + completedAlerts.size,
@@ -280,39 +280,6 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         }
 
         return monitorResult.copy(inputResults = firstPageOfInputResults, triggerResults = triggerResults)
-    }
-
-    private fun defaultToPerExecutionAction(
-        monitorCtx: MonitorRunnerExecutionContext,
-        monitorId: String,
-        triggerId: String,
-        totalActionableAlertCount: Int,
-        monitorOrTriggerError: Exception?
-    ): Boolean {
-        // If the monitorId or triggerResult has an error, then also default to PER_EXECUTION to communicate the error
-        if (monitorOrTriggerError != null) {
-            logger.debug(
-                "Trigger [$triggerId] in monitor [$monitorId] encountered an error. Defaulting to " +
-                    "[${ActionExecutionScope.Type.PER_EXECUTION}] for action execution to communicate error."
-            )
-            return true
-        }
-
-        // If the MAX_ACTIONABLE_ALERT_COUNT is set to -1, consider it unbounded and proceed regardless of actionable Alert count
-        if (monitorCtx.maxActionableAlertCount < 0) return false
-
-        // If the total number of Alerts to execute Actions on exceeds the MAX_ACTIONABLE_ALERT_COUNT setting then default to
-        // PER_EXECUTION for less intrusive Actions
-        if (totalActionableAlertCount > monitorCtx.maxActionableAlertCount) {
-            logger.debug(
-                "The total actionable alerts for trigger [$triggerId] in monitor [$monitorId] is [$totalActionableAlertCount] " +
-                    "which exceeds the maximum of [${monitorCtx.maxActionableAlertCount}]. " +
-                    "Defaulting to [${ActionExecutionScope.Type.PER_EXECUTION}] for action execution."
-            )
-            return true
-        }
-
-        return false
     }
 
     private fun getActionContextForAlertCategory(

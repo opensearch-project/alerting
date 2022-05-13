@@ -228,6 +228,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerInputService(InputService(client, scriptService, namedWriteableRegistry, xContentRegistry))
             .registerTriggerService(TriggerService(scriptService))
             .registerAlertService(AlertService(client, xContentRegistry, alertIndices))
+            .registerDocLevelMonitorQueries(DocLevelMonitorQueries(client, clusterService))
             .registerConsumers()
             .registerDestinationSettings()
         scheduledJobIndices = ScheduledJobIndices(client.admin(), clusterService)
