@@ -412,6 +412,10 @@ class TransportIndexMonitorAction @Inject constructor(
                 }
                 metadata = metadata.copy(monitorId = indexResponse.id, id = "${indexResponse.id}-metadata")
 
+                // In case the metadata fails to be created, the monitor runner should have logic to recreate and index the metadata.
+                // This is currently being handled in DocumentLevelMonitor as its the only current monitor to use metadata currently.
+                // This should be enhanced by having a utility class to handle the logic of management and creation of the metadata.
+                // Issue to track this: https://github.com/opensearch-project/alerting/issues/445
                 val metadataIndexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
                     .setRefreshPolicy(request.refreshPolicy)
                     .source(metadata.toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
