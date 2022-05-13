@@ -6,8 +6,8 @@
 package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.action.admin.indices.alias.get.GetAliasesRequest
-import org.opensearch.action.admin.indices.alias.get.GetAliasesResponse
+import org.opensearch.action.admin.indices.get.GetIndexRequest
+import org.opensearch.action.admin.indices.get.GetIndexResponse
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.search.SearchAction
@@ -18,7 +18,9 @@ import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRI
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.core.model.ScheduledJob
+import org.opensearch.alerting.model.ActionExecutionResult
 import org.opensearch.alerting.model.Alert
+import org.opensearch.alerting.model.AlertingConfigAccessor.Companion.getMonitorMetadata
 import org.opensearch.alerting.model.DocumentExecutionContext
 import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
@@ -26,11 +28,14 @@ import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorRunResult
+import org.opensearch.alerting.model.action.PerAlertActionScope
 import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.util.AlertingException
-import org.opensearch.alerting.util.updateMonitor
+import org.opensearch.alerting.util.defaultToPerExecutionAction
+import org.opensearch.alerting.util.getActionExecutionPolicy
+import org.opensearch.alerting.util.updateMonitorMetadata
 import org.opensearch.client.Client
 import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
@@ -78,41 +83,55 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         try {
             validate(monitor)
         } catch (e: Exception) {
-            logger.info("Failed to start Document-level-monitor. Error: ${e.message}")
+            logger.error("Failed to start Document-level-monitor. Error: ${e.message}")
             return monitorResult.copy(error = AlertingException.wrap(e))
         }
+
+        monitorCtx.docLevelMonitorQueries!!.initDocLevelQueryIndex()
+        monitorCtx.docLevelMonitorQueries!!.indexDocLevelQueries(
+            monitor = monitor,
+            monitorId = monitor.id,
+            indexTimeout = monitorCtx.indexTimeout!!
+        )
 
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
         val index = docLevelMonitorInput.indices[0]
         val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
 
+        var monitorMetadata = getMonitorMetadata(monitorCtx.client!!, monitorCtx.xContentRegistry!!, "${monitor.id}-metadata")
+        if (monitorMetadata == null) {
+            monitorMetadata = createMonitorMetadata(monitor.id)
+        }
+
         val isTempMonitor = dryrun || monitor.id == Monitor.NO_ID
-        val lastRunContext = if (monitor.lastRunContext.isNullOrEmpty()) mutableMapOf()
-        else monitor.lastRunContext.toMutableMap() as MutableMap<String, MutableMap<String, Any>>
+        val lastRunContext = if (monitorMetadata.lastRunContext.isNullOrEmpty()) mutableMapOf()
+        else monitorMetadata.lastRunContext.toMutableMap() as MutableMap<String, MutableMap<String, Any>>
+
         val updatedLastRunContext = lastRunContext.toMutableMap()
 
         val queryToDocIds = mutableMapOf<DocLevelQuery, MutableSet<String>>()
+        val inputRunResults = mutableMapOf<String, MutableSet<String>>()
         val docsToQueries = mutableMapOf<String, MutableList<String>>()
-        val idQueryMap = mutableMapOf<String, DocLevelQuery>()
 
         try {
-            val getAliasesRequest = GetAliasesRequest(index)
-            val getAliasesResponse: GetAliasesResponse = monitorCtx.client!!.suspendUntil {
-                monitorCtx.client!!.admin().indices().getAliases(getAliasesRequest, it)
+            val getIndexRequest = GetIndexRequest().indices(index)
+            val getIndexResponse: GetIndexResponse = monitorCtx.client!!.suspendUntil {
+                monitorCtx.client!!.admin().indices().getIndex(getIndexRequest, it)
             }
-            val aliasIndices = getAliasesResponse.aliases.keys().map { it.value }
+            val indices = getIndexResponse.indices()
 
-            val isAlias = aliasIndices.isNotEmpty()
-            logger.debug("index, $index, is an alias index: $isAlias")
-
-            // If the input index is an alias, creating a list of all indices associated with that alias;
-            // else creating a list containing the single index input
-            val indices = if (isAlias) getAliasesResponse.aliases.keys().map { it.value } else listOf(index)
+            // cleanup old indices that are not monitored anymore from the same monitor
+            for (ind in updatedLastRunContext.keys) {
+                if (!indices.contains(ind)) {
+                    updatedLastRunContext.remove(ind)
+                }
+            }
 
             indices.forEach { indexName ->
                 // Prepare lastRunContext for each index
                 val indexLastRunContext = lastRunContext.getOrPut(indexName) {
-                    createRunContext(monitorCtx.clusterService!!, monitorCtx.client!!, indexName)
+                    val indexCreatedRecently = createdRecently(monitor, indexName, periodStart, periodEnd, getIndexResponse)
+                    createRunContext(monitorCtx.clusterService!!, monitorCtx.client!!, indexName, indexCreatedRecently)
                 }
 
                 // Prepare updatedLastRunContext for each index
@@ -152,17 +171,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                         val docIndices = hit.field("_percolator_document_slot").values.map { it.toString().toInt() }
                         docIndices.forEach { idx ->
                             val docIndex = "${matchingDocs[idx].first}|$indexName"
-                            if (queryToDocIds.containsKey(docLevelQuery)) {
-                                queryToDocIds[docLevelQuery]?.add(docIndex)
-                            } else {
-                                queryToDocIds[docLevelQuery] = mutableSetOf(docIndex)
-                            }
-
-                            if (docsToQueries.containsKey(docIndex)) {
-                                docsToQueries[docIndex]?.add(id)
-                            } else {
-                                docsToQueries[docIndex] = mutableListOf(id)
-                            }
+                            queryToDocIds.getOrPut(docLevelQuery) { mutableSetOf() }.add(docIndex)
+                            inputRunResults.getOrPut(docLevelQuery.id) { mutableSetOf() }.add(docIndex)
+                            docsToQueries.getOrPut(docIndex) { mutableListOf() }.add(id)
                         }
                     }
                 }
@@ -173,12 +184,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             return monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
         }
 
-        val queryInputResults = queryToDocIds.mapKeys { it.key.id }
-        monitorResult = monitorResult.copy(inputResults = InputRunResults(listOf(queryInputResults)))
-        val queryIds = queries.map {
-            idQueryMap[it.id] = it
-            it.id
-        }
+        monitorResult = monitorResult.copy(inputResults = InputRunResults(listOf(inputRunResults)))
+
+        val idQueryMap: Map<String, DocLevelQuery> = queries.associateBy { it.id }
 
         val triggerResults = mutableMapOf<String, DocumentLevelTriggerRunResult>()
         monitor.triggers.forEach {
@@ -196,13 +204,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         // Don't update monitor if this is a test monitor
         if (!isTempMonitor) {
-
-            // TODO: Check for race condition against the update monitor api
-            // This does the update at the end in case of errors and makes sure all the queries are executed
-            val updatedMonitor = monitor.copy(lastRunContext = updatedLastRunContext)
-            // note: update has to called in serial for shards of a given index.
-            // make sure this is just updated for the specific query or at the end of all the queries
-            updateMonitor(monitorCtx.client!!, monitorCtx.xContentRegistry!!, monitorCtx.settings!!, updatedMonitor)
+            updateMonitorMetadata(monitorCtx.client!!, monitorCtx.settings!!, monitorMetadata.copy(lastRunContext = updatedLastRunContext))
         }
 
         // TODO: Update the Document as part of the Trigger and return back the trigger action result
@@ -222,22 +224,17 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger)
         val triggerResult = monitorCtx.triggerService!!.runDocLevelTrigger(monitor, trigger, queryToDocIds)
 
-        logger.info("trigger results")
-        logger.info(triggerResult.triggeredDocs.toString())
-
         val findings = mutableListOf<String>()
         val findingDocPairs = mutableListOf<Pair<String, String>>()
 
         // TODO: Implement throttling for findings
-        if (!dryrun && monitor.id != Monitor.NO_ID) {
-            docsToQueries.forEach {
-                val triggeredQueries = it.value.map { queryId -> idQueryMap[queryId]!! }
-                val findingId = createFindings(monitor, monitorCtx, triggeredQueries, it.key)
-                findings.add(findingId)
+        docsToQueries.forEach {
+            val triggeredQueries = it.value.map { queryId -> idQueryMap[queryId]!! }
+            val findingId = createFindings(monitor, monitorCtx, triggeredQueries, it.key, !dryrun && monitor.id != Monitor.NO_ID)
+            findings.add(findingId)
 
-                if (triggerResult.triggeredDocs.contains(it.key)) {
-                    findingDocPairs.add(Pair(findingId, it.key))
-                }
+            if (triggerResult.triggeredDocs.contains(it.key)) {
+                findingDocPairs.add(Pair(findingId, it.key))
             }
         }
 
@@ -247,25 +244,53 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             error = monitorResult.error ?: triggerResult.error
         )
 
-        for (action in trigger.actions) {
-            triggerResult.actionResults[action.id] = this.runAction(action, actionCtx, monitorCtx, dryrun)
+        val alerts = mutableListOf<Alert>()
+        findingDocPairs.forEach {
+            val alert = monitorCtx.alertService!!.composeDocLevelAlert(
+                listOf(it.first),
+                listOf(it.second),
+                triggerCtx,
+                monitorResult.alertError() ?: triggerResult.alertError()
+            )
+            alerts.add(alert)
         }
 
-        // TODO: Implement throttling for alerts
+        val shouldDefaultToPerExecution = defaultToPerExecutionAction(
+            monitorCtx.maxActionableAlertCount,
+            monitorId = monitor.id,
+            triggerId = trigger.id,
+            totalActionableAlertCount = alerts.size,
+            monitorOrTriggerError = actionCtx.error
+        )
+
+        for (action in trigger.actions) {
+            val actionExecutionScope = action.getActionExecutionPolicy(monitor)!!.actionExecutionScope
+            if (actionExecutionScope is PerAlertActionScope && !shouldDefaultToPerExecution) {
+                for (alert in alerts) {
+                    val actionResults = this.runAction(action, actionCtx.copy(alert = alert), monitorCtx, dryrun)
+                    triggerResult.actionResultsMap.getOrPut(alert.id) { mutableMapOf() }
+                    triggerResult.actionResultsMap[alert.id]?.set(action.id, actionResults)
+                }
+            } else {
+                val actionResults = this.runAction(action, actionCtx, monitorCtx, dryrun)
+                for (alert in alerts) {
+                    triggerResult.actionResultsMap.getOrPut(alert.id) { mutableMapOf() }
+                    triggerResult.actionResultsMap[alert.id]?.set(action.id, actionResults)
+                }
+            }
+        }
+
         // Alerts are saved after the actions since if there are failures in the actions, they can be stated in the alert
         if (!dryrun && monitor.id != Monitor.NO_ID) {
-            val alerts = mutableListOf<Alert>()
-            findingDocPairs.forEach {
-                val alert = monitorCtx.alertService!!.composeDocLevelAlert(
-                    listOf(it.first),
-                    listOf(it.second),
-                    triggerCtx,
-                    triggerResult,
-                    monitorResult.alertError() ?: triggerResult.alertError()
-                )
-                alerts.add(alert)
+            val updatedAlerts = alerts.map { alert ->
+                val actionResults = triggerResult.actionResultsMap.getOrDefault(alert.id, emptyMap())
+                val actionExecutionResults = actionResults.values.map { actionRunResult ->
+                    ActionExecutionResult(actionRunResult.actionId, actionRunResult.executionTime, if (actionRunResult.throttled) 1 else 0)
+                }
+                alert.copy(actionExecutionResults = actionExecutionResults)
             }
-            monitorCtx.retryPolicy?.let { monitorCtx.alertService!!.saveAlerts(alerts, it) }
+
+            monitorCtx.retryPolicy?.let { monitorCtx.alertService!!.saveAlerts(updatedAlerts, it) }
         }
         return triggerResult
     }
@@ -274,7 +299,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         monitor: Monitor,
         monitorCtx: MonitorRunnerExecutionContext,
         docLevelQueries: List<DocLevelQuery>,
-        matchingDocId: String
+        matchingDocId: String,
+        shouldCreateFinding: Boolean
     ): String {
         // Before the "|" is the doc id and after the "|" is the index
         val docIndex = matchingDocId.split("|")
@@ -292,14 +318,16 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
         logger.debug("Findings: $findingStr")
 
-        val indexRequest = IndexRequest(FINDING_HISTORY_WRITE_INDEX)
-            .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-            .source(findingStr, XContentType.JSON)
-            .id(finding.id)
-            .routing(finding.id)
+        if (shouldCreateFinding) {
+            val indexRequest = IndexRequest(FINDING_HISTORY_WRITE_INDEX)
+                .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+                .source(findingStr, XContentType.JSON)
+                .id(finding.id)
+                .routing(finding.id)
 
-        val indexResponse: IndexResponse = monitorCtx.client!!.suspendUntil {
-            monitorCtx.client!!.index(indexRequest, it)
+            monitorCtx.client!!.suspendUntil<Client, IndexResponse> {
+                monitorCtx.client!!.index(indexRequest, it)
+            }
         }
         return finding.id
     }
@@ -334,7 +362,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         }
     }
 
-    suspend fun createRunContext(clusterService: ClusterService, client: Client, index: String): HashMap<String, Any> {
+    suspend fun createRunContext(
+        clusterService: ClusterService,
+        client: Client,
+        index: String,
+        createdRecently: Boolean = false
+    ): HashMap<String, Any> {
         val lastRunContext = HashMap<String, Any>()
         lastRunContext["index"] = index
         val count = getShardsCount(clusterService, index)
@@ -342,10 +375,23 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         for (i: Int in 0 until count) {
             val shard = i.toString()
-            val maxSeqNo: Long = getMaxSeqNo(client, index, shard)
+            val maxSeqNo: Long = if (createdRecently) -1L else getMaxSeqNo(client, index, shard)
             lastRunContext[shard] = maxSeqNo
         }
         return lastRunContext
+    }
+
+    // Checks if the index was created from the last execution run or when the monitor was last updated to ensure that
+    // new index is monitored from the beginning of that index
+    private fun createdRecently(
+        monitor: Monitor,
+        index: String,
+        periodStart: Instant,
+        periodEnd: Instant,
+        getIndexResponse: GetIndexResponse
+    ): Boolean {
+        val lastExecutionTime = if (periodStart == periodEnd) monitor.lastUpdateTime else periodStart
+        return getIndexResponse.settings.get(index).getAsLong("index.creation_date", 0L) > lastExecutionTime.toEpochMilli()
     }
 
     /**
@@ -390,10 +436,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         for (i: Int in 0 until count) {
             val shard = i.toString()
             try {
-                logger.info("Monitor execution for shard: $shard")
                 val maxSeqNo: Long = docExecutionCtx.updatedLastRunContext[shard].toString().toLong()
                 val prevSeqNo = docExecutionCtx.lastRunContext[shard].toString().toLongOrNull()
-                logger.info("prevSeq: $prevSeqNo, maxSeq: $maxSeqNo")
 
                 val hits: SearchHits = searchShard(
                     monitorCtx,
@@ -403,13 +447,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     maxSeqNo,
                     null
                 )
-                logger.info("Search hits for shard_$shard is: ${hits.hits.size}")
 
                 if (hits.hits.isNotEmpty()) {
                     matchingDocs.addAll(getAllDocs(hits, index, monitor.id))
                 }
             } catch (e: Exception) {
-                logger.info("Failed to run for shard $shard. Error: ${e.message}")
+                logger.warn("Failed to run for shard $shard. Error: ${e.message}")
             }
         }
         return matchingDocs
@@ -442,7 +485,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     .query(boolQueryBuilder)
                     .size(10000) // fixme: make this configurable.
             )
-        logger.info("Request: $request")
         val response: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(request, it) }
         if (response.status() !== RestStatus.OK) {
             throw IOException("Failed to search shard: $shard")
