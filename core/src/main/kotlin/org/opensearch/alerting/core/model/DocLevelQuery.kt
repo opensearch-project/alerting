@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.core.model
 
+import com.google.common.collect.ImmutableList
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.io.stream.Writeable
@@ -14,6 +15,7 @@ import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
 import java.io.IOException
+import java.lang.IllegalArgumentException
 
 data class DocLevelQuery(
     val id: String = NO_ID,
@@ -21,6 +23,14 @@ data class DocLevelQuery(
     val query: String,
     val tags: List<String> = mutableListOf()
 ) : Writeable, ToXContentObject {
+
+    init {
+        // Ensure the name and tags have valid characters
+        validateQuery(name)
+        for (tag in tags) {
+            validateQuery(tag)
+        }
+    }
 
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
@@ -62,8 +72,8 @@ data class DocLevelQuery(
         const val NAME_FIELD = "name"
         const val QUERY_FIELD = "query"
         const val TAGS_FIELD = "tags"
-
         const val NO_ID = ""
+        val INVALID_CHARACTERS: ImmutableList<String> = ImmutableList.of(" ", "[", "]", "{", "}", "(", ")")
 
         @JvmStatic @Throws(IOException::class)
         fun parse(xcp: XContentParser): DocLevelQuery {
@@ -79,12 +89,17 @@ data class DocLevelQuery(
 
                 when (fieldName) {
                     QUERY_ID_FIELD -> id = xcp.text()
-                    NAME_FIELD -> name = xcp.text()
+                    NAME_FIELD -> {
+                        name = xcp.text()
+                        validateQuery(name)
+                    }
                     QUERY_FIELD -> query = xcp.text()
                     TAGS_FIELD -> {
                         ensureExpectedToken(XContentParser.Token.START_ARRAY, xcp.currentToken(), xcp)
                         while (xcp.nextToken() != XContentParser.Token.END_ARRAY) {
-                            tags.add(xcp.text())
+                            val tag = xcp.text()
+                            validateQuery(tag)
+                            tags.add(tag)
                         }
                     }
                 }
@@ -101,6 +116,17 @@ data class DocLevelQuery(
         @JvmStatic @Throws(IOException::class)
         fun readFrom(sin: StreamInput): DocLevelQuery {
             return DocLevelQuery(sin)
+        }
+
+        // TODO: add test for this
+        private fun validateQuery(stringVal: String) {
+            for (inValidChar in INVALID_CHARACTERS) {
+                if (stringVal.contains(inValidChar)) {
+                    throw IllegalArgumentException(
+                        "They query name or tag, $stringVal, contains an invalid character: [' ','[',']','{','}','(',')']"
+                    )
+                }
+            }
         }
     }
 }

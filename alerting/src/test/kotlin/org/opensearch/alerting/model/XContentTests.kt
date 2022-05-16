@@ -33,6 +33,7 @@ import org.opensearch.alerting.randomUserEmpty
 import org.opensearch.alerting.toJsonString
 import org.opensearch.alerting.toJsonStringWithUser
 import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
@@ -379,5 +380,12 @@ class XContentTests : OpenSearchTestCase() {
         val actionExecutionPolicyString = actionExecutionPolicy.toXContent(builder(), ToXContent.EMPTY_PARAMS).string()
         val parsedActionExecutionPolicy = ActionExecutionPolicy.parse(parser(actionExecutionPolicyString))
         assertEquals("Round tripping ActionExecutionPolicy doesn't work", actionExecutionPolicy, parsedActionExecutionPolicy)
+    }
+
+    fun `test MonitorMetadata`() {
+        val monitorMetadata = MonitorMetadata("monitorId-metadata", "monitorId", emptyList(), emptyMap())
+        val monitorMetadataString = monitorMetadata.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS).string()
+        val parsedMonitorMetadata = MonitorMetadata.parse(parser(monitorMetadataString))
+        assertEquals("Round tripping MonitorMetadata doesn't work", monitorMetadata, parsedMonitorMetadata)
     }
 }

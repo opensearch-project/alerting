@@ -88,7 +88,7 @@ fun randomQueryLevelMonitor(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
-        lastRunContext = mapOf(), uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 
@@ -106,7 +106,7 @@ fun randomQueryLevelMonitorWithoutUser(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = null,
-        lastRunContext = mapOf(), uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 
@@ -130,7 +130,7 @@ fun randomBucketLevelMonitor(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.BUCKET_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
-        lastRunContext = mapOf(), uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 
@@ -148,7 +148,7 @@ fun randomClusterMetricsMonitor(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.CLUSTER_METRICS_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
-        lastRunContext = mapOf(), uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 
@@ -166,7 +166,7 @@ fun randomDocumentLevelMonitor(
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.DOC_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
-        lastRunContext = mapOf(), uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )
 }
 
@@ -241,23 +241,6 @@ fun randomBucketSelectorScript(
     params: Map<String, String> = mutableMapOf("avg" to "10")
 ): Script {
     return Script(Script.DEFAULT_SCRIPT_TYPE, Script.DEFAULT_SCRIPT_LANG, idOrCode, emptyMap<String, String>(), params)
-}
-
-fun randomDocLevelTrigger(
-    id: String = UUIDs.base64UUID(),
-    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
-    severity: String = "1",
-    condition: Script = randomScript(),
-    actions: List<Action> = mutableListOf(),
-    destinationId: String = ""
-): DocumentLevelTrigger {
-    return DocumentLevelTrigger(
-        id = id,
-        name = name,
-        severity = severity,
-        condition = condition,
-        actions = if (actions.isEmpty()) (0..randomInt(10)).map { randomAction(destinationId = destinationId) } else actions
-    )
 }
 
 fun randomEmailAccount(
@@ -527,7 +510,12 @@ fun randomDocumentLevelTriggerRunResult(): DocumentLevelTriggerRunResult {
     val map = mutableMapOf<String, ActionRunResult>()
     map.plus(Pair("key1", randomActionRunResult()))
     map.plus(Pair("key2", randomActionRunResult()))
-    return DocumentLevelTriggerRunResult("trigger-name", mutableListOf(UUIDs.randomBase64UUID().toString()), null, map)
+    return DocumentLevelTriggerRunResult(
+        "trigger-name",
+        mutableListOf(UUIDs.randomBase64UUID().toString()),
+        null,
+        mutableMapOf(Pair("alertId", map))
+    )
 }
 
 fun randomActionRunResult(): ActionRunResult {
