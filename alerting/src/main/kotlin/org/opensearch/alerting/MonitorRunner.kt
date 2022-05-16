@@ -68,6 +68,7 @@ abstract class MonitorRunner {
                         ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT,
                         userStr
                     )
+                    // TODO: investigate if "withContext" can be replaced with "withClosableContext" and not have side effects
                     withContext(Dispatchers.IO) {
                         actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
                             action,
