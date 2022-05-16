@@ -108,6 +108,7 @@ data class Alert(
     )
 
     constructor(
+        id: String = NO_ID,
         monitor: Monitor,
         trigger: DocumentLevelTrigger,
         findingIds: List<String>,
@@ -120,7 +121,7 @@ data class Alert(
         actionExecutionResults: List<ActionExecutionResult> = mutableListOf(),
         schemaVersion: Int = NO_SCHEMA_VERSION
     ) : this(
-        monitorId = monitor.id, monitorName = monitor.name, monitorVersion = monitor.version, monitorUser = monitor.user,
+        id = id, monitorId = monitor.id, monitorName = monitor.name, monitorVersion = monitor.version, monitorUser = monitor.user,
         triggerId = trigger.id, triggerName = trigger.name, state = state, startTime = startTime,
         lastNotificationTime = lastNotificationTime, errorMessage = errorMessage, errorHistory = errorHistory,
         severity = trigger.severity, actionExecutionResults = actionExecutionResults, schemaVersion = schemaVersion,

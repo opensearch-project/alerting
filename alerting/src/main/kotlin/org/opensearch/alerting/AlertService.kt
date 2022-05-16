@@ -22,7 +22,6 @@ import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
-import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.model.Trigger
@@ -47,6 +46,7 @@ import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.time.Instant
+import java.util.UUID
 
 /** Service that handles CRUD operations for alerts */
 class AlertService(
@@ -173,21 +173,15 @@ class AlertService(
         findings: List<String>,
         relatedDocIds: List<String>,
         ctx: DocumentLevelTriggerExecutionContext,
-        result: DocumentLevelTriggerRunResult,
         alertError: AlertError?
     ): Alert {
         val currentTime = Instant.now()
 
-        val actionExecutionResults = result.actionResults.map {
-            ActionExecutionResult(it.key, it.value.executionTime, if (it.value.throttled) 1 else 0)
-        }
-
         val alertState = if (alertError == null) Alert.State.ACTIVE else Alert.State.ERROR
         return Alert(
-            monitor = ctx.monitor, trigger = ctx.trigger, startTime = currentTime,
+            id = UUID.randomUUID().toString(), monitor = ctx.monitor, trigger = ctx.trigger, startTime = currentTime,
             lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
-            actionExecutionResults = actionExecutionResults, schemaVersion = IndexUtils.alertIndexSchemaVersion,
-            findingIds = findings, relatedDocIds = relatedDocIds
+            schemaVersion = IndexUtils.alertIndexSchemaVersion, findingIds = findings, relatedDocIds = relatedDocIds
         )
     }
 
