@@ -27,6 +27,7 @@ import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isTestAction
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.Strings
+import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import java.time.Instant
 
@@ -62,14 +63,21 @@ abstract class MonitorRunner {
                 throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
             }
             if (!dryrun) {
-                // TODO: Inject user here so only Destination/Notifications that the user has permissions to are retrieved
-                withContext(Dispatchers.IO) {
-                    actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
-                        action,
-                        monitorCtx,
-                        actionOutput[Action.SUBJECT],
-                        actionOutput[Action.MESSAGE]!!
+                val userStr = monitorCtx.client!!.threadPool().threadContext
+                    .getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
+                monitorCtx.client!!.threadPool().threadContext.stashContext().use {
+                    monitorCtx.client!!.threadPool().threadContext.putTransient(
+                        ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT,
+                        userStr
                     )
+                    withContext(Dispatchers.IO) {
+                        actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
+                            action,
+                            monitorCtx,
+                            actionOutput[Action.SUBJECT],
+                            actionOutput[Action.MESSAGE]!!
+                        )
+                    }
                 }
             }
             ActionRunResult(action.id, action.name, actionOutput, false, MonitorRunnerService.currentTime(), null)
