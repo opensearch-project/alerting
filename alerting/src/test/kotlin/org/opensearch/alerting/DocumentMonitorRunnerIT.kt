@@ -132,7 +132,6 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val alerts = searchAlertsWithFilter(monitor)
         assertEquals("Alert saved for test monitor", 2, alerts.size)
 
-        // TODO: modify findings such that there is a finding per document, so this test will need to be modified
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 2, findings.size)
         assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
@@ -199,7 +198,6 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val alerts = searchAlertsWithFilter(monitor)
         assertEquals("Alert saved for test monitor", 2, alerts.size)
 
-        // TODO: modify findings such that there is a finding per document, so this test will need to be modified
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 2, findings.size)
         assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
@@ -263,7 +261,6 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val alerts = searchAlertsWithFilter(monitor)
         assertEquals("Alert saved for test monitor", 2, alerts.size)
 
-        // TODO: modify findings such that there is a finding per document, so this test will need to be modified
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 2, findings.size)
         assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
@@ -305,7 +302,6 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val alerts = searchAlertsWithFilter(monitor)
         assertEquals("Alert saved for test monitor", 2, alerts.size)
 
-        // TODO: modify findings such that there is a finding per document, so this test will need to be modified
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 2, findings.size)
         assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
@@ -333,6 +329,20 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         indexDoc(testIndex2, "5", testDoc)
         executeMonitor(monitor.id)
 
+        var alerts = searchAlertsWithFilter(monitor)
+        assertEquals("Alert saved for test monitor", 2, alerts.size)
+
+        var findings = searchFindings(monitor)
+        assertEquals("Findings saved for test monitor", 2, findings.size)
+        assertTrue(
+            "Findings saved for test monitor expected 1 instead of ${findings[0].relatedDocIds}",
+            findings[0].relatedDocIds.contains("1")
+        )
+        assertTrue(
+            "Findings saved for test monitor expected 51 instead of ${findings[1].relatedDocIds}",
+            findings[1].relatedDocIds.contains("5")
+        )
+
         // clear previous findings and alerts
         deleteIndex(ALL_FINDING_INDEX_PATTERN)
         deleteIndex(ALL_ALERT_INDEX_PATTERN)
@@ -354,11 +364,10 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertEquals("Incorrect search result", 3, matchingDocsToQuery.size)
         assertTrue("Incorrect search result", matchingDocsToQuery.containsAll(listOf("14|$testIndex", "51|$testIndex2", "10|$testIndex3")))
 
-        val alerts = searchAlertsWithFilter(monitor)
+        alerts = searchAlertsWithFilter(monitor)
         assertEquals("Alert saved for test monitor", 3, alerts.size)
 
-        // TODO: modify findings such that there is a finding per document, so this test will need to be modified
-        val findings = searchFindings(monitor)
+        findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 3, findings.size)
         assertTrue(
             "Findings saved for test monitor expected 14 instead of ${findings[0].relatedDocIds}",
@@ -372,7 +381,6 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             "Findings saved for test monitor expected 10 instead of ${findings[2].relatedDocIds}",
             findings[2].relatedDocIds.contains("10")
         )
-        assertEquals("Findings saved for test monitor", 3, findings.size)
     }
 
     fun `test document-level monitor when alias only has write index with 0 docs`() {

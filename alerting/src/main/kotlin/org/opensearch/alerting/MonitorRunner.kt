@@ -14,7 +14,6 @@ import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.destination.Destination
-import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
 import org.opensearch.alerting.util.destinationmigration.NotificationActionConfigs
@@ -48,10 +47,7 @@ abstract class MonitorRunner {
         dryrun: Boolean
     ): ActionRunResult {
         return try {
-            if (
-                (ctx is QueryLevelTriggerExecutionContext && !MonitorRunnerService.isActionActionable(action, ctx.alert)) ||
-                (ctx is DocumentLevelTriggerExecutionContext && !MonitorRunnerService.isActionActionable(action, ctx.alert))
-            ) {
+            if (ctx is QueryLevelTriggerExecutionContext && !MonitorRunnerService.isActionActionable(action, ctx.alert)) {
                 return ActionRunResult(action.id, action.name, mapOf(), true, null, null)
             }
             val actionOutput = mutableMapOf<String, String>()
@@ -63,6 +59,8 @@ abstract class MonitorRunner {
                 throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
             }
             if (!dryrun) {
+                // TODO: Add integration test to ensure user context information is passed correctly when calling Notification plugin and
+                // only accessing notification channels that the user can only access
                 val userStr = monitorCtx.client!!.threadPool().threadContext
                     .getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
                 monitorCtx.client!!.threadPool().threadContext.stashContext().use {
