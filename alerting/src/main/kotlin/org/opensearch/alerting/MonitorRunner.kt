@@ -10,6 +10,7 @@ import kotlinx.coroutines.withContext
 import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.AlertingConfigAccessor
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.destination.Destination
@@ -140,5 +141,9 @@ abstract class MonitorRunner {
         }
 
         return NotificationActionConfigs(destination, channel)
+    }
+
+    protected fun createMonitorMetadata(monitorId: String): MonitorMetadata {
+        return MonitorMetadata("$monitorId-metadata", monitorId, emptyList(), emptyMap())
     }
 }
