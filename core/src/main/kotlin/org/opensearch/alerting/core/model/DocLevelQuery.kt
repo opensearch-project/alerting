@@ -16,9 +16,10 @@ import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
 import java.io.IOException
 import java.lang.IllegalArgumentException
+import java.util.UUID
 
 data class DocLevelQuery(
-    val id: String = NO_ID,
+    val id: String = UUID.randomUUID().toString(),
     val name: String,
     val query: String,
     val tags: List<String> = mutableListOf()
@@ -77,7 +78,7 @@ data class DocLevelQuery(
 
         @JvmStatic @Throws(IOException::class)
         fun parse(xcp: XContentParser): DocLevelQuery {
-            var id: String = NO_ID
+            var id: String = UUID.randomUUID().toString()
             lateinit var query: String
             lateinit var name: String
             val tags: MutableList<String> = mutableListOf()
