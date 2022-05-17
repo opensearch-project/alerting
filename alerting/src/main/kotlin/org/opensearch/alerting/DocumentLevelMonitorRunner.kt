@@ -164,9 +164,10 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     matchedQueriesForDocs.forEach { hit ->
                         val (id, query) = Pair(
                             hit.id.replace("_${indexName}_${monitor.id}", ""),
-                            ((hit.sourceAsMap["query"] as HashMap<*, *>)["query_string"] as HashMap<*, *>)["query"]
+                            ((hit.sourceAsMap["query"] as HashMap<*, *>)["query_string"] as HashMap<*, *>)["query"].toString()
+                                .replace("_${indexName}_${monitor.id}", "")
                         )
-                        val docLevelQuery = DocLevelQuery(id, id, query.toString())
+                        val docLevelQuery = DocLevelQuery(id, id, query)
 
                         val docIndices = hit.field("_percolator_document_slot").values.map { it.toString().toInt() }
                         docIndices.forEach { idx ->
@@ -267,12 +268,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             val actionExecutionScope = action.getActionExecutionPolicy(monitor)!!.actionExecutionScope
             if (actionExecutionScope is PerAlertActionScope && !shouldDefaultToPerExecution) {
                 for (alert in alerts) {
-                    val actionResults = this.runAction(action, actionCtx.copy(alert = alert), monitorCtx, dryrun)
+                    val actionResults = this.runAction(action, actionCtx.copy(alerts = listOf(alert)), monitorCtx, dryrun)
                     triggerResult.actionResultsMap.getOrPut(alert.id) { mutableMapOf() }
                     triggerResult.actionResultsMap[alert.id]?.set(action.id, actionResults)
                 }
-            } else {
-                val actionResults = this.runAction(action, actionCtx, monitorCtx, dryrun)
+            } else if (alerts.isNotEmpty()) {
+                val actionResults = this.runAction(action, actionCtx.copy(alerts = alerts), monitorCtx, dryrun)
                 for (alert in alerts) {
                     triggerResult.actionResultsMap.getOrPut(alert.id) { mutableMapOf() }
                     triggerResult.actionResultsMap[alert.id]?.set(action.id, actionResults)
