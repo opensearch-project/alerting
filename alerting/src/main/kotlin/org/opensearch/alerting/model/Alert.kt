@@ -370,7 +370,9 @@ data class Alert(
             STATE_FIELD to state.toString(),
             // Converting bucket keys to comma separated String to avoid manipulation in Action mustache templates
             BUCKET_KEYS to aggregationResultBucket?.bucketKeys?.joinToString(","),
-            PARENTS_BUCKET_PATH to aggregationResultBucket?.parentBucketPath
+            PARENTS_BUCKET_PATH to aggregationResultBucket?.parentBucketPath,
+            FINDING_IDS to findingIds.joinToString(","),
+            RELATED_DOC_IDS to relatedDocIds.joinToString(",")
         )
     }
 }
