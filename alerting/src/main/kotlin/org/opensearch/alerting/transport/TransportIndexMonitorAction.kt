@@ -31,6 +31,7 @@ import org.opensearch.alerting.action.IndexMonitorRequest
 import org.opensearch.alerting.action.IndexMonitorResponse
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
+import org.opensearch.alerting.core.model.DocLevelMonitorInput.Companion.DOC_LEVEL_INPUT_FIELD
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.alerting.core.model.SearchInput
@@ -133,10 +134,11 @@ class TransportIndexMonitorAction @Inject constructor(
     ) {
         val indices = mutableListOf<String>()
         // todo: for doc level alerting: check if index is present before monitor is created.
-        val searchInputs = request.monitor.inputs.filter { it.name() == SearchInput.SEARCH_FIELD }
+        val searchInputs = request.monitor.inputs.filter { it.name() == SearchInput.SEARCH_FIELD || it.name() == DOC_LEVEL_INPUT_FIELD }
         searchInputs.forEach {
-            val searchInput = it as SearchInput
-            indices.addAll(searchInput.indices)
+            val inputIndices = if (it.name() == SearchInput.SEARCH_FIELD) (it as SearchInput).indices
+            else (it as DocLevelMonitorInput).indices
+            indices.addAll(inputIndices)
         }
         val searchRequest = SearchRequest().indices(*indices.toTypedArray())
             .source(SearchSourceBuilder.searchSource().size(1).query(QueryBuilders.matchAllQuery()))
@@ -402,6 +404,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 .timeout(indexTimeout)
 
             try {
+                log.info("About to index monitor")
                 val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
                 val failureReasons = checkShardsFailure(indexResponse)
                 if (failureReasons != null) {
@@ -410,6 +413,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     )
                     return
                 }
+                log.info("Indexed monitor")
                 metadata = metadata.copy(monitorId = indexResponse.id, id = "${indexResponse.id}-metadata")
 
                 // In case the metadata fails to be created, the monitor runner should have logic to recreate and index the metadata.
@@ -422,9 +426,11 @@ class TransportIndexMonitorAction @Inject constructor(
                     .id(metadata.id)
                     .timeout(indexTimeout)
                 client.suspendUntil<Client, IndexResponse> { client.index(metadataIndexRequest, it) }
+                log.info("Indexed metadata")
 
                 if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
                     indexDocLevelMonitorQueries(request.monitor, indexResponse.id, request.refreshPolicy)
+                    log.info("Indexed doc level monitor queries")
                 }
 
                 actionListener.onResponse(

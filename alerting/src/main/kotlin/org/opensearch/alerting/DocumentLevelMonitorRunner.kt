@@ -149,7 +149,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     // update lastRunContext if its a temp monitor as we only want to view the last bit of data then
                     // TODO: If dryrun, we should make it so we limit the search as this could still potentially give us lots of data
                     if (isTempMonitor) {
-                        indexLastRunContext[shard] = max(-1, (indexUpdatedRunContext[shard] as String).toInt() - 1)
+                        indexLastRunContext[shard] = max(-1, (indexUpdatedRunContext[shard] as String).toInt() - 10)
                     }
                 }
 
@@ -268,12 +268,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             val actionExecutionScope = action.getActionExecutionPolicy(monitor)!!.actionExecutionScope
             if (actionExecutionScope is PerAlertActionScope && !shouldDefaultToPerExecution) {
                 for (alert in alerts) {
-                    val actionResults = this.runAction(action, actionCtx.copy(alerts = listOf(alert)), monitorCtx, dryrun)
+                    val actionResults = this.runAction(action, actionCtx.copy(alerts = listOf(alert)), monitorCtx, monitor, dryrun)
                     triggerResult.actionResultsMap.getOrPut(alert.id) { mutableMapOf() }
                     triggerResult.actionResultsMap[alert.id]?.set(action.id, actionResults)
                 }
             } else if (alerts.isNotEmpty()) {
-                val actionResults = this.runAction(action, actionCtx.copy(alerts = alerts), monitorCtx, dryrun)
+                val actionResults = this.runAction(action, actionCtx.copy(alerts = alerts), monitorCtx, monitor, dryrun)
                 for (alert in alerts) {
                     triggerResult.actionResultsMap.getOrPut(alert.id) { mutableMapOf() }
                     triggerResult.actionResultsMap[alert.id]?.set(action.id, actionResults)
