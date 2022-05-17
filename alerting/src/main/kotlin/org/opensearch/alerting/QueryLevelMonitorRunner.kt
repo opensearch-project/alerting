@@ -5,7 +5,6 @@
 
 package org.opensearch.alerting
 
-import kotlinx.coroutines.runBlocking
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.Monitor
@@ -13,6 +12,7 @@ import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
+import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.util.isADMonitor
 import java.time.Instant
@@ -46,7 +46,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
             return monitorResult.copy(error = e)
         }
         if (!isADMonitor(monitor)) {
-            runBlocking(InjectorContextElement(monitor.id, monitorCtx.settings!!, monitorCtx.threadPool!!.threadContext, roles)) {
+            withClosableContext(InjectorContextElement(monitor.id, monitorCtx.settings!!, monitorCtx.threadPool!!.threadContext, roles)) {
                 monitorResult = monitorResult.copy(
                     inputResults = monitorCtx.inputService!!.collectInputResults(monitor, periodStart, periodEnd)
                 )
