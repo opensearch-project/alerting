@@ -404,7 +404,6 @@ class TransportIndexMonitorAction @Inject constructor(
                 .timeout(indexTimeout)
 
             try {
-                log.info("About to index monitor")
                 val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
                 val failureReasons = checkShardsFailure(indexResponse)
                 if (failureReasons != null) {
@@ -413,7 +412,6 @@ class TransportIndexMonitorAction @Inject constructor(
                     )
                     return
                 }
-                log.info("Indexed monitor")
                 metadata = metadata.copy(monitorId = indexResponse.id, id = "${indexResponse.id}-metadata")
 
                 // In case the metadata fails to be created, the monitor runner should have logic to recreate and index the metadata.
@@ -426,11 +424,9 @@ class TransportIndexMonitorAction @Inject constructor(
                     .id(metadata.id)
                     .timeout(indexTimeout)
                 client.suspendUntil<Client, IndexResponse> { client.index(metadataIndexRequest, it) }
-                log.info("Indexed metadata")
 
                 if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
                     indexDocLevelMonitorQueries(request.monitor, indexResponse.id, request.refreshPolicy)
-                    log.info("Indexed doc level monitor queries")
                 }
 
                 actionListener.onResponse(
