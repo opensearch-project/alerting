@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.util
 
+import org.apache.logging.log4j.LogManager
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.support.WriteRequest
@@ -12,8 +13,10 @@ import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.action.ActionExecutionPolicy
+import org.opensearch.alerting.model.action.ActionExecutionScope
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
@@ -23,6 +26,8 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory
+
+private val logger = LogManager.getLogger("AlertingUtils")
 
 /**
  * RFC 5322 compliant pattern matching: https://www.ietf.org/rfc/rfc5322.txt
@@ -64,6 +69,8 @@ fun Action.getActionExecutionPolicy(monitor: Monitor): ActionExecutionPolicy? {
     // the parse.
     return this.actionExecutionPolicy ?: if (monitor.isBucketLevelMonitor()) {
         ActionExecutionPolicy.getDefaultConfigurationForBucketLevelMonitor()
+    } else if (monitor.isDocLevelMonitor()) {
+        ActionExecutionPolicy.getDefaultConfigurationForDocumentLevelMonitor()
     } else {
         null
     }
@@ -85,6 +92,39 @@ fun BucketLevelTriggerRunResult.getCombinedTriggerRunResult(
     return this.copy(aggregationResultBuckets = mergedAggregationResultBuckets, actionResultsMap = mergedActionResultsMap, error = error)
 }
 
+fun defaultToPerExecutionAction(
+    maxActionableAlertCount: Long,
+    monitorId: String,
+    triggerId: String,
+    totalActionableAlertCount: Int,
+    monitorOrTriggerError: Exception?
+): Boolean {
+    // If the monitorId or triggerResult has an error, then also default to PER_EXECUTION to communicate the error
+    if (monitorOrTriggerError != null) {
+        logger.debug(
+            "Trigger [$triggerId] in monitor [$monitorId] encountered an error. Defaulting to " +
+                "[${ActionExecutionScope.Type.PER_EXECUTION}] for action execution to communicate error."
+        )
+        return true
+    }
+
+    // If the MAX_ACTIONABLE_ALERT_COUNT is set to -1, consider it unbounded and proceed regardless of actionable Alert count
+    if (maxActionableAlertCount < 0) return false
+
+    // If the total number of Alerts to execute Actions on exceeds the MAX_ACTIONABLE_ALERT_COUNT setting then default to
+    // PER_EXECUTION for less intrusive Actions
+    if (totalActionableAlertCount > maxActionableAlertCount) {
+        logger.debug(
+            "The total actionable alerts for trigger [$triggerId] in monitor [$monitorId] is [$totalActionableAlertCount] " +
+                "which exceeds the maximum of [$maxActionableAlertCount]. " +
+                "Defaulting to [${ActionExecutionScope.Type.PER_EXECUTION}] for action execution."
+        )
+        return true
+    }
+
+    return false
+}
+
 // TODO: Check if this can be more generic such that TransportIndexMonitorAction class can use this. Also see if this should be refactored
 // to another class. Include tests for this as well.
 suspend fun updateMonitor(client: Client, xContentRegistry: NamedXContentRegistry, settings: Settings, monitor: Monitor): IndexResponse {
@@ -100,6 +140,16 @@ suspend fun updateMonitor(client: Client, xContentRegistry: NamedXContentRegistr
         .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
         .source(monitor.toXContentWithUser(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
         .id(monitor.id)
+        .timeout(AlertingSettings.INDEX_TIMEOUT.get(settings))
+
+    return client.suspendUntil { client.index(indexRequest, it) }
+}
+
+suspend fun updateMonitorMetadata(client: Client, settings: Settings, monitorMetadata: MonitorMetadata): IndexResponse {
+    val indexRequest = IndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
+        .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+        .source(monitorMetadata.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+        .id(monitorMetadata.id)
         .timeout(AlertingSettings.INDEX_TIMEOUT.get(settings))
 
     return client.suspendUntil { client.index(indexRequest, it) }

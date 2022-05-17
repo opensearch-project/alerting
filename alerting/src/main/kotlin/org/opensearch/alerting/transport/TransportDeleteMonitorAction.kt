@@ -140,11 +140,40 @@ class TransportDeleteMonitorAction @Inject constructor(
                         if (clusterState.routingTable.hasIndex(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)) {
                             deleteDocLevelMonitorQueries()
                         }
+                        deleteMetadata()
+
                         actionListener.onResponse(response)
                     }
 
                     override fun onFailure(t: Exception) {
                         actionListener.onFailure(AlertingException.wrap(t))
+                    }
+                }
+            )
+        }
+
+        private fun deleteMetadata() {
+            val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, monitorId)
+            client.get(
+                getRequest,
+                object : ActionListener<GetResponse> {
+                    override fun onResponse(response: GetResponse) {
+                        if (response.isExists) {
+                            val deleteMetadataRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, "$monitorId")
+                                .setRefreshPolicy(deleteRequest.refreshPolicy)
+                            client.delete(
+                                deleteMetadataRequest,
+                                object : ActionListener<DeleteResponse> {
+                                    override fun onResponse(response: DeleteResponse) {
+                                    }
+
+                                    override fun onFailure(t: Exception) {
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    override fun onFailure(t: Exception) {
                     }
                 }
             )

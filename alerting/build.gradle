@@ -233,7 +233,7 @@ String bwcRemoteFile = 'https://d3g5vo6xdbdb9a.cloudfront.net/downloads/elastics
     testClusters {
         "${baseName}$i" {
             testDistribution = "ARCHIVE"
-            versions = ["7.10.2","2.0.0-rc1-SNAPSHOT"]
+            versions = ["7.10.2","2.0.0-SNAPSHOT"]
             numberOfNodes = 3
             plugin(provider(new Callable<RegularFile>(){
                 @Override

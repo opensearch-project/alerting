@@ -108,6 +108,7 @@ data class Alert(
     )
 
     constructor(
+        id: String = NO_ID,
         monitor: Monitor,
         trigger: DocumentLevelTrigger,
         findingIds: List<String>,
@@ -120,7 +121,7 @@ data class Alert(
         actionExecutionResults: List<ActionExecutionResult> = mutableListOf(),
         schemaVersion: Int = NO_SCHEMA_VERSION
     ) : this(
-        monitorId = monitor.id, monitorName = monitor.name, monitorVersion = monitor.version, monitorUser = monitor.user,
+        id = id, monitorId = monitor.id, monitorName = monitor.name, monitorVersion = monitor.version, monitorUser = monitor.user,
         triggerId = trigger.id, triggerName = trigger.name, state = state, startTime = startTime,
         lastNotificationTime = lastNotificationTime, errorMessage = errorMessage, errorHistory = errorHistory,
         severity = trigger.severity, actionExecutionResults = actionExecutionResults, schemaVersion = schemaVersion,
@@ -369,7 +370,9 @@ data class Alert(
             STATE_FIELD to state.toString(),
             // Converting bucket keys to comma separated String to avoid manipulation in Action mustache templates
             BUCKET_KEYS to aggregationResultBucket?.bucketKeys?.joinToString(","),
-            PARENTS_BUCKET_PATH to aggregationResultBucket?.parentBucketPath
+            PARENTS_BUCKET_PATH to aggregationResultBucket?.parentBucketPath,
+            FINDING_IDS to findingIds.joinToString(","),
+            RELATED_DOC_IDS to relatedDocIds.joinToString(",")
         )
     }
 }

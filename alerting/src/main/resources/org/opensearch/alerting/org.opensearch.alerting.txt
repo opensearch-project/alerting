@@ -31,16 +31,6 @@ class org.opensearch.alerting.script.QueryLevelTriggerExecutionContext {
     Exception getError()
 }
 
-class org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext {
-    Monitor getMonitor()
-    DocumentLevelTrigger getTrigger()
-    List getResults()
-    java.time.Instant getPeriodStart()
-    java.time.Instant getPeriodEnd()
-    Alert getAlert()
-    Exception getError()
-}
-
 class org.opensearch.alerting.model.Monitor {
     String getId()
     long getVersion()
@@ -49,13 +39,6 @@ class org.opensearch.alerting.model.Monitor {
 }
 
 class org.opensearch.alerting.model.QueryLevelTrigger {
-    String getId()
-    String getName()
-    String getSeverity()
-    List getActions()
-}
-
-class org.opensearch.alerting.model.DocumentLevelTrigger {
     String getId()
     String getName()
     String getSeverity()

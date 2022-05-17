@@ -16,7 +16,7 @@ data class DocumentLevelTriggerExecutionContext(
     override val results: List<Map<String, Any>>,
     override val periodStart: Instant,
     override val periodEnd: Instant,
-    val alert: Alert? = null,
+    val alerts: List<Alert> = listOf(),
     val triggeredDocs: List<String>,
     val relatedFindings: List<String>,
     override val error: Exception? = null
@@ -25,10 +25,10 @@ data class DocumentLevelTriggerExecutionContext(
     constructor(
         monitor: Monitor,
         trigger: DocumentLevelTrigger,
-        alert: Alert? = null
+        alerts: List<Alert> = listOf()
     ) : this(
         monitor, trigger, emptyList(), Instant.now(), Instant.now(),
-        alert, emptyList(), emptyList(), null
+        alerts, emptyList(), emptyList(), null
     )
 
     /**
@@ -38,7 +38,7 @@ data class DocumentLevelTriggerExecutionContext(
     override fun asTemplateArg(): Map<String, Any?> {
         val tempArg = super.asTemplateArg().toMutableMap()
         tempArg["trigger"] = trigger.asTemplateArg()
-        tempArg["alert"] = alert?.asTemplateArg()
+        tempArg["alerts"] = alerts.map { it.asTemplateArg() }
         return tempArg
     }
 }

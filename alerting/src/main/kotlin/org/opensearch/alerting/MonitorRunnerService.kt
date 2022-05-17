@@ -25,6 +25,7 @@ import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.script.TriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_MILLIS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTIONABLE_ALERT_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTIONS_ACROSS_TRIGGERS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MOVE_ALERTS_BACKOFF_COUNT
@@ -33,6 +34,7 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.TOTAL_MAX_ACT
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.HOST_DENY_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.loadDestinationSettings
+import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.isBucketLevelMonitor
 import org.opensearch.alerting.util.isDocLevelMonitor
 import org.opensearch.client.Client
@@ -111,6 +113,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         return this
     }
 
+    fun registerDocLevelMonitorQueries(docLevelMonitorQueries: DocLevelMonitorQueries): MonitorRunnerService {
+        this.monitorCtx.docLevelMonitorQueries = docLevelMonitorQueries
+        return this
+    }
+
     // Must be called after registerClusterService and registerSettings in AlertingPlugin
     fun registerConsumers(): MonitorRunnerService {
         monitorCtx.retryPolicy = BackoffPolicy.constantBackoff(
@@ -145,6 +152,8 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(MAX_ACTIONABLE_ALERT_COUNT) {
             monitorCtx.maxActionableAlertCount = it
         }
+
+        monitorCtx.indexTimeout = INDEX_TIMEOUT.get(monitorCtx.settings)
 
         monitorCtx.maxActionsAcrossTriggers =
             min(MAX_ACTIONS_ACROSS_TRIGGERS.get(monitorCtx.settings), TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.get(monitorCtx.settings))

@@ -10,10 +10,10 @@ import kotlinx.coroutines.withContext
 import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.AlertingConfigAccessor
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.destination.Destination
-import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
 import org.opensearch.alerting.util.destinationmigration.NotificationActionConfigs
@@ -26,6 +26,7 @@ import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isTestAction
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.Strings
+import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import java.time.Instant
 
@@ -46,10 +47,7 @@ abstract class MonitorRunner {
         dryrun: Boolean
     ): ActionRunResult {
         return try {
-            if (
-                (ctx is QueryLevelTriggerExecutionContext && !MonitorRunnerService.isActionActionable(action, ctx.alert)) ||
-                (ctx is DocumentLevelTriggerExecutionContext && !MonitorRunnerService.isActionActionable(action, ctx.alert))
-            ) {
+            if (ctx is QueryLevelTriggerExecutionContext && !MonitorRunnerService.isActionActionable(action, ctx.alert)) {
                 return ActionRunResult(action.id, action.name, mapOf(), true, null, null)
             }
             val actionOutput = mutableMapOf<String, String>()
@@ -61,14 +59,24 @@ abstract class MonitorRunner {
                 throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
             }
             if (!dryrun) {
-                // TODO: Inject user here so only Destination/Notifications that the user has permissions to are retrieved
-                withContext(Dispatchers.IO) {
-                    actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
-                        action,
-                        monitorCtx,
-                        actionOutput[Action.SUBJECT],
-                        actionOutput[Action.MESSAGE]!!
+                // TODO: Add integration test to ensure user context information is passed correctly when calling Notification plugin and
+                // only accessing notification channels that the user can only access
+                val userStr = monitorCtx.client!!.threadPool().threadContext
+                    .getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
+                monitorCtx.client!!.threadPool().threadContext.stashContext().use {
+                    monitorCtx.client!!.threadPool().threadContext.putTransient(
+                        ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT,
+                        userStr
                     )
+                    // TODO: investigate if "withContext" can be replaced with "withClosableContext" and not have side effects
+                    withContext(Dispatchers.IO) {
+                        actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
+                            action,
+                            monitorCtx,
+                            actionOutput[Action.SUBJECT],
+                            actionOutput[Action.MESSAGE]!!
+                        )
+                    }
                 }
             }
             ActionRunResult(action.id, action.name, actionOutput, false, MonitorRunnerService.currentTime(), null)
@@ -140,5 +148,9 @@ abstract class MonitorRunner {
         }
 
         return NotificationActionConfigs(destination, channel)
+    }
+
+    protected fun createMonitorMetadata(monitorId: String): MonitorMetadata {
+        return MonitorMetadata("$monitorId-metadata", monitorId, emptyList(), emptyMap())
     }
 }

@@ -17,8 +17,8 @@ import org.opensearch.alerting.randomActionRunResult
 import org.opensearch.alerting.randomBucketLevelMonitorRunResult
 import org.opensearch.alerting.randomBucketLevelTrigger
 import org.opensearch.alerting.randomBucketLevelTriggerRunResult
-import org.opensearch.alerting.randomDocLevelTrigger
 import org.opensearch.alerting.randomDocumentLevelMonitorRunResult
+import org.opensearch.alerting.randomDocumentLevelTrigger
 import org.opensearch.alerting.randomDocumentLevelTriggerRunResult
 import org.opensearch.alerting.randomEmailAccount
 import org.opensearch.alerting.randomEmailGroup
@@ -111,7 +111,7 @@ class WriteableTests : OpenSearchTestCase() {
     }
 
     fun `test doc-level trigger as stream`() {
-        val trigger = randomDocLevelTrigger()
+        val trigger = randomDocumentLevelTrigger()
         val out = BytesStreamOutput()
         trigger.writeTo(out)
         val sin = StreamInput.wrap(out.bytes().toBytesRef().bytes)
