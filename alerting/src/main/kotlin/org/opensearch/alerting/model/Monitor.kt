@@ -79,18 +79,19 @@ data class Monitor(
                     require(trigger is DocumentLevelTrigger) { "Incompatible trigger [${trigger.id}] for monitor type [$monitorType]" }
             }
         }
-        // validate the number of actions across triggers
+
+        // validate the number of Actions Across Triggers
         if (MonitorRunnerService.monitorCtx.totalMaxActionsAcrossTriggers > AlertingSettings.UNBOUNDED_ACTIONS_ACROSS_TRIGGERS) {
             val totalActions = triggers.sumOf { trigger ->
                 require(trigger.actions.size <= MonitorRunnerService.monitorCtx.maxActionsAcrossTriggers) {
-                    "In a single trigger, the number of actions executed should be lees than or equal to" +
-                        " ${MonitorRunnerService.monitorCtx.maxActionsAcrossTriggers}"
+                    "For a single trigger, the number of actions to be executed must be less than or equal to " +
+                        "${MonitorRunnerService.monitorCtx.maxActionsAcrossTriggers}"
                 }
                 trigger.actions.size
             }
             require(totalActions <= MonitorRunnerService.monitorCtx.totalMaxActionsAcrossTriggers) {
-                "The total number of action executions of all triggers must be less than or equal to" +
-                    " ${MonitorRunnerService.monitorCtx.totalMaxActionsAcrossTriggers}"
+                "The sum of the number of actions executed by all triggers must be less than or equal to " +
+                    "${MonitorRunnerService.monitorCtx.totalMaxActionsAcrossTriggers}"
             }
         }
 

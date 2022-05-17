@@ -154,7 +154,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         }
 
         monitorCtx.indexTimeout = INDEX_TIMEOUT.get(monitorCtx.settings)
-
         monitorCtx.maxActionsAcrossTriggers =
             min(MAX_ACTIONS_ACROSS_TRIGGERS.get(monitorCtx.settings), TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.get(monitorCtx.settings))
         monitorCtx.totalMaxActionsAcrossTriggers = TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.get(monitorCtx.settings)
@@ -181,7 +180,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             monitorCtx.maxActionsAcrossTriggers = maxActions
             monitorCtx.totalMaxActionsAcrossTriggers = totalMaxActions
         }
-
         return this
     }
 
