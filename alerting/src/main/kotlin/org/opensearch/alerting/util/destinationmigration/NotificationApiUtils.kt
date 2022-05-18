@@ -60,18 +60,12 @@ class NotificationApiUtils {
             client: NodeClient,
             getNotificationConfigRequest: GetNotificationConfigRequest
         ): GetNotificationConfigResponse {
-            lateinit var getNotificationConfigResponse: GetNotificationConfigResponse
-            val userStr = client.threadPool().threadContext
-                .getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
-            client.threadPool().threadContext.stashContext().use {
-                client.threadPool().threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
-                getNotificationConfigResponse = NotificationsPluginInterface.suspendUntil {
-                    this.getNotificationConfig(
-                        client,
-                        getNotificationConfigRequest,
-                        it
-                    )
-                }
+            val getNotificationConfigResponse: GetNotificationConfigResponse = NotificationsPluginInterface.suspendUntil {
+                this.getNotificationConfig(
+                    client,
+                    getNotificationConfigRequest,
+                    it
+                )
             }
             return getNotificationConfigResponse
         }

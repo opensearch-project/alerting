@@ -208,7 +208,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             // Keeping the throttled response separate from runAction for now since
                             // throttling is not supported for PER_EXECUTION
                             val actionResult = if (MonitorRunnerService.isActionActionable(action, alert)) {
-                                this.runAction(action, actionCtx, monitorCtx, dryrun)
+                                this.runAction(action, actionCtx, monitorCtx, monitor, dryrun)
                             } else {
                                 ActionRunResult(action.id, action.name, mapOf(), true, null, null)
                             }
@@ -232,7 +232,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                         completedAlerts = completedAlerts,
                         error = monitorResult.error ?: triggerResult.error
                     )
-                    val actionResult = this.runAction(action, actionCtx, monitorCtx, dryrun)
+                    val actionResult = this.runAction(action, actionCtx, monitorCtx, monitor, dryrun)
                     // If there was an error during trigger execution then the Alerts to be updated are the current Alerts since the state
                     // was not changed. Otherwise, the Alerts to be updated are the sum of the deduped, new and completed Alerts.
                     val alertsToIterate = if (monitorOrTriggerError == null) {
