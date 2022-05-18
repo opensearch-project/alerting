@@ -45,7 +45,7 @@ publishing {
                 developers {
                     developer {
                         name = "OpenSearch"
-                        url = "https://github.com/opensearch-project/ml-commons"
+                        url = "https://github.com/opensearch-project/alerting"
                     }
                 }
             }
