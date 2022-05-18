@@ -9,9 +9,8 @@ import kotlin.math.min
 
 object TriggersActionThresholdUtils {
 
-
     /**
-    Get threshold value
+     Get threshold value
      */
     fun getThreshold(
         p: TriggersActionThresholdParams,
@@ -29,18 +28,15 @@ object TriggersActionThresholdUtils {
             p.surplusActionCount -= tmpThreshold
             tmpThreshold
         }
-
     }
-
 
     /**
      *The construction use of the class here is available for a runBucketLevelMonitor or runQueryLevelMonitor with individual restrictions
-    for each method
+     for each method
      *If we want a limit on the two sets, we can input in the same object when the two are executing
      *The current default is to limit the two methods individually
      */
     data class TriggersActionThresholdParams(
-            var surplusActionCount: Int
+        var surplusActionCount: Int
     )
-
 }
