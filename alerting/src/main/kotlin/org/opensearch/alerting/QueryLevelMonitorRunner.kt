@@ -75,7 +75,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                     monitorCtx.maxActionsAcrossTriggers,
                 )
                 for (action in trigger.actions.slice(0 until numberEnd)) {
-                    triggerResult.actionResults[action.id] = this.runAction(action, actionCtx, monitorCtx, dryrun)
+                    triggerResult.actionResults[action.id] = this.runAction(action, actionCtx, monitorCtx, monitor, dryrun)
                 }
             }
 

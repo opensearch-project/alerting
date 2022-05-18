@@ -6,6 +6,7 @@
 package org.opensearch.alerting.util.destinationmigration
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.OpenSearchSecurityException
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.alerting.model.destination.Destination
@@ -48,6 +49,8 @@ class NotificationApiUtils {
             return try {
                 val res: GetNotificationConfigResponse = getNotificationConfig(client, GetNotificationConfigRequest(setOf(id)))
                 res.searchResult.objectList.firstOrNull()
+            } catch (e: OpenSearchSecurityException) {
+                throw e
             } catch (e: OpenSearchStatusException) {
                 if (e.status() == RestStatus.NOT_FOUND) {
                     logger.debug("Notification config [$id] was not found")
@@ -60,18 +63,12 @@ class NotificationApiUtils {
             client: NodeClient,
             getNotificationConfigRequest: GetNotificationConfigRequest
         ): GetNotificationConfigResponse {
-            lateinit var getNotificationConfigResponse: GetNotificationConfigResponse
-            val userStr = client.threadPool().threadContext
-                .getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
-            client.threadPool().threadContext.stashContext().use {
-                client.threadPool().threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
-                getNotificationConfigResponse = NotificationsPluginInterface.suspendUntil {
-                    this.getNotificationConfig(
-                        client,
-                        getNotificationConfigRequest,
-                        it
-                    )
-                }
+            val getNotificationConfigResponse: GetNotificationConfigResponse = NotificationsPluginInterface.suspendUntil {
+                this.getNotificationConfig(
+                    client,
+                    getNotificationConfigRequest,
+                    it
+                )
             }
             return getNotificationConfigResponse
         }

@@ -5,15 +5,20 @@
 
 package org.opensearch.alerting
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import org.opensearch.OpenSearchSecurityException
+import org.opensearch.alerting.action.GetDestinationsAction
+import org.opensearch.alerting.action.GetDestinationsRequest
+import org.opensearch.alerting.action.GetDestinationsResponse
 import org.opensearch.alerting.model.ActionRunResult
-import org.opensearch.alerting.model.AlertingConfigAccessor
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.MonitorRunResult
+import org.opensearch.alerting.model.Table
 import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.destination.Destination
+import org.opensearch.alerting.opensearchapi.InjectorContextElement
+import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
 import org.opensearch.alerting.util.destinationmigration.NotificationActionConfigs
@@ -26,7 +31,6 @@ import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isTestAction
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.Strings
-import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import java.time.Instant
 
@@ -44,6 +48,7 @@ abstract class MonitorRunner {
         action: Action,
         ctx: TriggerExecutionContext,
         monitorCtx: MonitorRunnerExecutionContext,
+        monitor: Monitor,
         dryrun: Boolean
     ): ActionRunResult {
         return try {
@@ -59,24 +64,16 @@ abstract class MonitorRunner {
                 throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
             }
             if (!dryrun) {
-                // TODO: Add integration test to ensure user context information is passed correctly when calling Notification plugin and
-                // only accessing notification channels that the user can only access
-                val userStr = monitorCtx.client!!.threadPool().threadContext
-                    .getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
-                monitorCtx.client!!.threadPool().threadContext.stashContext().use {
-                    monitorCtx.client!!.threadPool().threadContext.putTransient(
-                        ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT,
-                        userStr
+                val roles = MonitorRunnerService.getRolesForMonitor(monitor)
+                withClosableContext(
+                    InjectorContextElement(monitor.id, monitorCtx.settings!!, monitorCtx.threadPool!!.threadContext, roles)
+                ) {
+                    actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
+                        action,
+                        monitorCtx,
+                        actionOutput[Action.SUBJECT],
+                        actionOutput[Action.MESSAGE]!!
                     )
-                    // TODO: investigate if "withContext" can be replaced with "withClosableContext" and not have side effects
-                    withContext(Dispatchers.IO) {
-                        actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
-                            action,
-                            monitorCtx,
-                            actionOutput[Action.SUBJECT],
-                            actionOutput[Action.MESSAGE]!!
-                        )
-                    }
                 }
             }
             ActionRunResult(action.id, action.name, actionOutput, false, MonitorRunnerService.currentTime(), null)
@@ -135,16 +132,50 @@ abstract class MonitorRunner {
         monitorCtx: MonitorRunnerExecutionContext
     ): NotificationActionConfigs {
         var destination: Destination? = null
-        val channel: NotificationConfigInfo? = getNotificationConfigInfo(monitorCtx.client as NodeClient, action.destinationId)
+        var notificationPermissionException: Exception? = null
+
+        var channel: NotificationConfigInfo? = null
+        try {
+            channel = getNotificationConfigInfo(monitorCtx.client as NodeClient, action.destinationId)
+        } catch (e: OpenSearchSecurityException) {
+            notificationPermissionException = e
+        }
 
         // If the channel was not found, try to retrieve the Destination
         if (channel == null) {
             destination = try {
-                AlertingConfigAccessor.getDestinationInfo(monitorCtx.client!!, monitorCtx.xContentRegistry!!, action.destinationId)
+                val table = Table(
+                    "asc",
+                    "destination.name.keyword",
+                    null,
+                    1,
+                    0,
+                    null
+                )
+                val getDestinationsRequest = GetDestinationsRequest(
+                    action.destinationId,
+                    0L,
+                    null,
+                    table,
+                    "ALL"
+                )
+
+                val getDestinationsResponse: GetDestinationsResponse = monitorCtx.client!!.suspendUntil {
+                    monitorCtx.client!!.execute(GetDestinationsAction.INSTANCE, getDestinationsRequest, it)
+                }
+                getDestinationsResponse.destinations.firstOrNull()
             } catch (e: IllegalStateException) {
                 // Catching the exception thrown when the Destination was not found so the NotificationActionConfigs object can be returned
                 null
+            } catch (e: OpenSearchSecurityException) {
+                if (notificationPermissionException != null)
+                    throw notificationPermissionException
+                else
+                    throw e
             }
+
+            if (destination == null && notificationPermissionException != null)
+                throw notificationPermissionException
         }
 
         return NotificationActionConfigs(destination, channel)
