@@ -5,14 +5,19 @@
 
 package org.opensearch.alerting
 
+import org.opensearch.OpenSearchSecurityException
+import org.opensearch.alerting.action.GetDestinationsAction
+import org.opensearch.alerting.action.GetDestinationsRequest
+import org.opensearch.alerting.action.GetDestinationsResponse
 import org.opensearch.alerting.model.ActionRunResult
-import org.opensearch.alerting.model.AlertingConfigAccessor
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.MonitorRunResult
+import org.opensearch.alerting.model.Table
 import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
+import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
@@ -127,16 +132,50 @@ abstract class MonitorRunner {
         monitorCtx: MonitorRunnerExecutionContext
     ): NotificationActionConfigs {
         var destination: Destination? = null
-        val channel: NotificationConfigInfo? = getNotificationConfigInfo(monitorCtx.client as NodeClient, action.destinationId)
+        var notificationPermissionException: Exception? = null
+
+        var channel: NotificationConfigInfo? = null
+        try {
+            channel = getNotificationConfigInfo(monitorCtx.client as NodeClient, action.destinationId)
+        } catch (e: OpenSearchSecurityException) {
+            notificationPermissionException = e
+        }
 
         // If the channel was not found, try to retrieve the Destination
         if (channel == null) {
             destination = try {
-                AlertingConfigAccessor.getDestinationInfo(monitorCtx.client!!, monitorCtx.xContentRegistry!!, action.destinationId)
+                val table = Table(
+                    "asc",
+                    "destination.name.keyword",
+                    null,
+                    1,
+                    0,
+                    null
+                )
+                val getDestinationsRequest = GetDestinationsRequest(
+                    action.destinationId,
+                    0L,
+                    null,
+                    table,
+                    "ALL"
+                )
+
+                val getDestinationsResponse: GetDestinationsResponse = monitorCtx.client!!.suspendUntil {
+                    monitorCtx.client!!.execute(GetDestinationsAction.INSTANCE, getDestinationsRequest, it)
+                }
+                getDestinationsResponse.destinations.firstOrNull()
             } catch (e: IllegalStateException) {
                 // Catching the exception thrown when the Destination was not found so the NotificationActionConfigs object can be returned
                 null
+            } catch (e: OpenSearchSecurityException) {
+                if (notificationPermissionException != null)
+                    throw notificationPermissionException
+                else
+                    throw e
             }
+
+            if (destination == null && notificationPermissionException != null)
+                throw notificationPermissionException
         }
 
         return NotificationActionConfigs(destination, channel)
