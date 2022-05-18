@@ -8,3 +8,4 @@ include 'alerting'
 include 'core'
 
 project(":core").name = 'alerting-core'
+startParameter.excludedTaskNames=["validatePluginZipPom"]
