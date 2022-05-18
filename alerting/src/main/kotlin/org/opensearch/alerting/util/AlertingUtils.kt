@@ -23,7 +23,6 @@ import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.client.Client
 import org.opensearch.common.settings.Settings
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory
 
@@ -123,26 +122,6 @@ fun defaultToPerExecutionAction(
     }
 
     return false
-}
-
-// TODO: Check if this can be more generic such that TransportIndexMonitorAction class can use this. Also see if this should be refactored
-// to another class. Include tests for this as well.
-suspend fun updateMonitor(client: Client, xContentRegistry: NamedXContentRegistry, settings: Settings, monitor: Monitor): IndexResponse {
-    /*val currentMonitor = AlertingConfigAccessor.getMonitorInfo(client, xContentRegistry, monitor.id)
-
-    var updateMonitor = monitor
-    // If both are enabled, use the current existing monitor enabled time, otherwise the next execution will be
-    // incorrect.
-    if (monitor.enabled && currentMonitor.enabled)
-        updateMonitor = monitor.copy(enabledTime = currentMonitor.enabledTime)*/
-
-    val indexRequest = IndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
-        .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-        .source(monitor.toXContentWithUser(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-        .id(monitor.id)
-        .timeout(AlertingSettings.INDEX_TIMEOUT.get(settings))
-
-    return client.suspendUntil { client.index(indexRequest, it) }
 }
 
 suspend fun updateMonitorMetadata(client: Client, settings: Settings, monitorMetadata: MonitorMetadata): IndexResponse {
