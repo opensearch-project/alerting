@@ -94,7 +94,8 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
         @Suppress("UNCHECKED_CAST")
         val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
-        assertEquals("Incorrect search result", 1, matchingDocsToQuery.size)
+        assertEquals("Incorrect search result", 2, matchingDocsToQuery.size)
+        assertTrue("Incorrect search result", matchingDocsToQuery.contains("1|$testIndex"))
         assertTrue("Incorrect search result", matchingDocsToQuery.contains("5|$testIndex"))
     }
 
