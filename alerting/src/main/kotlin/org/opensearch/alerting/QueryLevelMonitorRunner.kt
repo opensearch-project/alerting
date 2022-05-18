@@ -68,7 +68,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
             if (monitorCtx.triggerService!!.isQueryLevelTriggerActionable(triggerCtx, triggerResult)) {
                 val actionCtx = triggerCtx.copy(error = monitorResult.error ?: triggerResult.error)
                 for (action in trigger.actions) {
-                    triggerResult.actionResults[action.id] = this.runAction(action, actionCtx, monitorCtx, dryrun)
+                    triggerResult.actionResults[action.id] = this.runAction(action, actionCtx, monitorCtx, monitor, dryrun)
                 }
             }
 
