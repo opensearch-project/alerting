@@ -10,7 +10,6 @@ import kotlinx.coroutines.withContext
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -29,18 +28,6 @@ import org.opensearch.index.IndexNotFoundException
  */
 class AlertingConfigAccessor {
     companion object {
-
-        suspend fun getMonitorInfo(client: Client, xContentRegistry: NamedXContentRegistry, monitorId: String): Monitor {
-            val jobSource = getAlertingConfigDocumentSource(client, "Monitor", monitorId)
-            return withContext(Dispatchers.IO) {
-                val xcp = XContentHelper.createParser(
-                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                    jobSource, XContentType.JSON
-                )
-                val monitor = Monitor.parse(xcp)
-                monitor
-            }
-        }
 
         suspend fun getMonitorMetadata(client: Client, xContentRegistry: NamedXContentRegistry, metadataId: String): MonitorMetadata? {
             return try {
@@ -61,18 +48,6 @@ class AlertingConfigAccessor {
                 if (e.message?.equals("no such index [.opendistro-alerting-config]") == true) {
                     return null
                 } else throw e
-            }
-        }
-
-        suspend fun getDestinationInfo(client: Client, xContentRegistry: NamedXContentRegistry, destinationId: String): Destination {
-            val jobSource = getAlertingConfigDocumentSource(client, "Destination", destinationId)
-            return withContext(Dispatchers.IO) {
-                val xcp = XContentHelper.createParser(
-                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                    jobSource, XContentType.JSON
-                )
-                val destination = Destination.parseWithType(xcp)
-                destination
             }
         }
 
