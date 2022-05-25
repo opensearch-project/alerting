@@ -7,6 +7,7 @@ package org.opensearch.alerting.core.model
 
 import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.common.xcontent.ToXContent
+import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -303,11 +304,12 @@ class ScheduleTest : XContentTestBase {
 
     @Test
     fun `execution time matches across different time zones`() {
-        val pdtClockCronSchedule = CronSchedule("* * * * *", ZoneId.systemDefault())
-        val utcClockCronSchedule = CronSchedule("* * * * *", ZoneId.systemDefault())
-        val instant = Instant.ofEpochSecond(1539615226L)
-        val pdtNextExecution = pdtClockCronSchedule.getExpectedNextExecutionTime(instant.atZone(ZoneId.of("America/Los_Angeles")).toInstant(), null)
-        val utcNextExecution = utcClockCronSchedule.getExpectedNextExecutionTime(instant.atZone(ZoneId.of("UTC")).toInstant(), null)
+        val pdtClock = Clock.system(ZoneId.of("America/Los_Angeles"))
+        val utcClock = Clock.system(ZoneId.of("UTC"))
+        val pdtClockCronSchedule = CronSchedule("* * * * *", ZoneId.of("America/Los_Angeles"))
+        val utcClockCronSchedule = CronSchedule("* * * * *", ZoneId.of("UTC"))
+        val pdtNextExecution = pdtClockCronSchedule.getExpectedNextExecutionTime(pdtClock.instant(), null)
+        val utcNextExecution = utcClockCronSchedule.getExpectedNextExecutionTime(utcClock.instant(), null)
         assertEquals(pdtNextExecution, utcNextExecution)
     }
 
