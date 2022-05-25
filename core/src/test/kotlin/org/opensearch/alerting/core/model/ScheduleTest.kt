@@ -304,8 +304,9 @@ class ScheduleTest : XContentTestBase {
 
     @Test
     fun `execution time matches across different time zones`() {
-        val pdtClock = Clock.system(ZoneId.of("America/Los_Angeles"))
-        val utcClock = Clock.system(ZoneId.of("UTC"))
+        val now = Instant.now()
+        val pdtClock = Clock.fixed(now, ZoneId.of("America/Los_Angeles"))
+        val utcClock = Clock.fixed(now, ZoneId.of("UTC"))
         val pdtClockCronSchedule = CronSchedule("* * * * *", ZoneId.of("America/Los_Angeles"))
         val utcClockCronSchedule = CronSchedule("* * * * *", ZoneId.of("UTC"))
         val pdtNextExecution = pdtClockCronSchedule.getExpectedNextExecutionTime(pdtClock.instant(), null)
