@@ -11,6 +11,7 @@ apply plugin: 'java'
 apply plugin: 'idea'
 apply plugin: 'org.jetbrains.kotlin.jvm'
 apply plugin: 'opensearch.opensearchplugin'
+apply plugin: 'opensearch.pluginzip'
 apply plugin: 'jacoco'
 
 def usingRemoteCluster = System.properties.containsKey('tests.rest.cluster') || System.properties.containsKey('tests.cluster')
@@ -27,6 +28,29 @@ opensearchplugin {
     description 'Amazon OpenSearch alerting plugin'
     classname 'org.opensearch.alerting.AlertingPlugin'
     extendedPlugins = ['lang-painless']
+}
+
+publishing {
+    publications {
+        pluginZip(MavenPublication) { publication ->
+            pom {
+                name = "opensearch-alerting"
+                description = "OpenSearch Alerting plugin"
+                licenses {
+                    license {
+                        name = "The Apache License, Version 2.0"
+                        url = "http://www.apache.org/licenses/LICENSE-2.0.txt"
+                    }
+                }
+                developers {
+                    developer {
+                        name = "OpenSearch"
+                        url = "https://github.com/opensearch-project/alerting"
+                    }
+                }
+            }
+        }
+    }
 }
 
 // Prefer elastic bundled versions for conflicts (primarily with AWS SDK).  We need to specify these manually because
