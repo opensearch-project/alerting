@@ -163,15 +163,58 @@ class AlertingSettings {
         val MAX_ACTIONS_ACROSS_TRIGGERS = Setting.intSetting(
             "plugins.alerting.max_actions_across_triggers",
             DEFAULT_MAX_ACTIONS_ACROSS_TRIGGERS,
-            -1,
+            -1, MaxActionsTriggersValidator(),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
-
         val TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS = Setting.intSetting(
             "plugins.alerting.total_max_actions_across_triggers",
             DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS,
-            -1,
+            -1, TotalMaxActionsTriggersValidator(),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+
+        internal class TotalMaxActionsTriggersValidator : Setting.Validator<Int> {
+            override fun validate(value: Int) {}
+
+            override fun validate(value: Int, settings: Map<Setting<*>, Any>) {
+                val maxActions = settings[MAX_ACTIONS_ACROSS_TRIGGERS] as Int
+                validateActionsTrigger(maxActions, value)
+            }
+
+            override fun settings(): MutableIterator<Setting<*>> {
+                val settings = mutableListOf<Setting<*>>(
+                    MAX_ACTIONS_ACROSS_TRIGGERS
+                )
+                return settings.iterator()
+            }
+        }
+
+        internal class MaxActionsTriggersValidator : Setting.Validator<Int> {
+            override fun validate(value: Int) {}
+            
+            override fun validate(value: Int, settings: Map<Setting<*>, Any>) {
+                val totalMaxActions = settings[TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS] as Int
+                validateActionsTrigger(value, totalMaxActions)
+            }
+
+            override fun settings(): MutableIterator<Setting<*>> {
+                val settings = mutableListOf<Setting<*>>(
+                    TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
+                )
+                return settings.iterator()
+            }
+        }
+
+        private fun validateActionsTrigger(maxActions: Int, totalMaxActions: Int) {
+            if (maxActions > totalMaxActions) {
+                throw IllegalArgumentException(
+                    "The limit number of actions for a single trigger, $maxActions, " +
+                        "should not be greater than that of the overall max actions across all triggers of the monitor, $totalMaxActions"
+                )
+            }
+//              Get all the trigger content of user here
+//              then traverse all the actions under the trigger and compare them with maxActions
+//              and then add up the actions under the trigger and compare them with totalMaxActions
+        }
     }
 }
