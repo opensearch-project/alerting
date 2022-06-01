@@ -162,21 +162,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             MAX_ACTIONS_ACROSS_TRIGGERS,
             TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
         ) { maxActions: Int, totalMaxActions: Int ->
-            if (maxActions > totalMaxActions) {
-                throw IllegalArgumentException(
-                    "The limit number of actions for a single trigger, $maxActions, " +
-                        "should not be greater than that of the overall max actions across all triggers of the monitor, $totalMaxActions"
-                )
-            }
-            monitorTotalActions.forEach { (monitorType, monitorTotalActions) ->
-                if (monitorTotalActions > totalMaxActions) {
-                    throw IllegalArgumentException(
-                        "The currently set total execution count $totalMaxActions is already less than the " +
-                            "total execution count $totalMaxActions of type $monitorType"
-                    )
-                }
-            }
-
             monitorCtx.maxActionsAcrossTriggers = maxActions
             monitorCtx.totalMaxActionsAcrossTriggers = totalMaxActions
         }

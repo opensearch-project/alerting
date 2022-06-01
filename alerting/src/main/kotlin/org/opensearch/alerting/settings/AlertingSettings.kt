@@ -191,7 +191,7 @@ class AlertingSettings {
 
         internal class MaxActionsTriggersValidator : Setting.Validator<Int> {
             override fun validate(value: Int) {}
-            
+
             override fun validate(value: Int, settings: Map<Setting<*>, Any>) {
                 val totalMaxActions = settings[TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS] as Int
                 validateActionsTrigger(value, totalMaxActions)
