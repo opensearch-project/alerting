@@ -56,9 +56,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
     var monitorCtx: MonitorRunnerExecutionContext = MonitorRunnerExecutionContext()
 
-    // Record the total number of actions when the monitor is executed
-    private val monitorTotalActions = mutableMapOf<String, Int>()
-
     private lateinit var runnerSupervisor: Job
     override val coroutineContext: CoroutineContext
         get() = Dispatchers.Default + runnerSupervisor
@@ -238,12 +235,10 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     suspend fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant, dryrun: Boolean): MonitorRunResult<*> {
         val monitor = job as Monitor
         val runResult = if (monitor.isBucketLevelMonitor()) {
-            monitorTotalActions[Monitor.MonitorType.BUCKET_LEVEL_MONITOR.value] = monitor.triggers.sumOf { it.actions.size }
             BucketLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         } else if (monitor.isDocLevelMonitor()) {
             DocumentLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         } else {
-            monitorTotalActions[Monitor.MonitorType.QUERY_LEVEL_MONITOR.value] = monitor.triggers.sumOf { it.actions.size }
             QueryLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         }
         return runResult
