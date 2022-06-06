@@ -7,6 +7,7 @@ package org.opensearch.alerting.core.model
 
 import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.common.xcontent.ToXContent
+import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -299,6 +300,18 @@ class ScheduleTest : XContentTestBase {
         val intervalSchedule = createTestIntervalSchedule()
 
         assertTrue(intervalSchedule.runningOnTime(null))
+    }
+
+    @Test
+    fun `execution time matches across different time zones`() {
+        val now = Instant.now()
+        val pdtClock = Clock.fixed(now, ZoneId.of("America/Los_Angeles"))
+        val utcClock = Clock.fixed(now, ZoneId.of("UTC"))
+        val pdtClockCronSchedule = CronSchedule("* * * * *", ZoneId.of("America/Los_Angeles"))
+        val utcClockCronSchedule = CronSchedule("* * * * *", ZoneId.of("UTC"))
+        val pdtNextExecution = pdtClockCronSchedule.getExpectedNextExecutionTime(pdtClock.instant(), null)
+        val utcNextExecution = utcClockCronSchedule.getExpectedNextExecutionTime(utcClock.instant(), null)
+        assertEquals(pdtNextExecution, utcNextExecution)
     }
 
     private fun createTestIntervalSchedule(): IntervalSchedule {
