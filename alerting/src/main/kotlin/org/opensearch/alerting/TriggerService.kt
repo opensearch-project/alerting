@@ -126,7 +126,7 @@ class TriggerService(val scriptService: ScriptService) {
         when {
             bucket[keyField] is String -> keyValuesList.add(bucket[keyField] as String)
             // In the case where the key field is an Int
-            bucket[keyField] is Int -> keyValuesList.add(bucket[keyField].toString()) 
+            bucket[keyField] is Int -> keyValuesList.add(bucket[keyField].toString())
             // In the case where the key field is an object with multiple values (such as a composite aggregation with more than one source)
             // the values will be iterated through and converted into a string
             bucket[keyField] is Map<*, *> -> (bucket[keyField] as Map<String, Any>).values.map { keyValuesList.add(it.toString()) }
