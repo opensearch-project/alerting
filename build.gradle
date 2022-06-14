@@ -88,6 +88,10 @@ allprojects {
         compileKotlin.kotlinOptions.jvmTarget = compileTestKotlin.kotlinOptions.jvmTarget = JavaVersion.VERSION_11
         compileKotlin.dependsOn ktlint
     }
+    tasks.withType(AbstractArchiveTask).configureEach {
+        preserveFileTimestamps = false
+        reproducibleFileOrder = true
+    }
 }
 
 evaluationDependsOnChildren()
