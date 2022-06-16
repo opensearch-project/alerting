@@ -241,7 +241,7 @@ class AlertingSettings(client: Client) {
                         throw IllegalArgumentException(
                             "The amount of actions that the client wants to update plus the amount of actions that " +
                                 "already exist, $currentAmountOfActions should not be greater than  that of the " +
-                                    "overall max actions across all triggers of the monitor, $totalMaxActions"
+                                "overall max actions across all triggers of the monitor, $totalMaxActions"
                         )
                 }
             }
