@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit
 /**
  * settings specific to [AlertingPlugin]. These settings include things like history index max age, request timeout, etc...
  */
-class AlertingSettings(client: Client) {
+class AlertingSettings(val client: Client) {
 
     init {
         internalClient = client
@@ -249,7 +249,7 @@ class AlertingSettings(client: Client) {
 //              then traverse all the actions under the trigger and compare them with maxActions
 //              and then add up the actions under the trigger and compare them with totalMaxActions
         }
-        private suspend fun getTriggers(client: Client): List<Trigger> {
+        suspend fun getTriggers(client: Client): List<Trigger> {
             val getMonitorRequest = GetMonitorRequest("", 1L, RestRequest.Method.GET, null)
 
             val getMonitorResponse: GetMonitorResponse = client.suspendUntil {

@@ -6,21 +6,26 @@
 package org.opensearch.alerting.settings
 
 import org.junit.Before
+import org.mockito.Mockito
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSettings
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
+import org.opensearch.client.Client
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
+import org.opensearch.test.OpenSearchIntegTestCase.client
 import org.opensearch.test.OpenSearchTestCase
 import java.util.concurrent.TimeUnit
 
 class AlertingSettingsTests : OpenSearchTestCase() {
 
     private lateinit var plugin: AlertingPlugin
+    private lateinit var alertingSettings: AlertingSettings
 
     @Before
     fun setup() {
         plugin = AlertingPlugin()
+        alertingSettings = AlertingSettings(client())
     }
 
     fun `test all opendistro settings returned`() {
@@ -185,5 +190,20 @@ class AlertingSettingsTests : OpenSearchTestCase() {
                 LegacyOpenDistroScheduledJobSettings.SWEEP_PERIOD
             )
         )
+    }
+
+    suspend fun `test acquisition of triggers client not initialized`() {
+        val alertingSettingsCompanionMock = Mockito.mock(AlertingSettings.Companion::class.java)
+        AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
+        Mockito.verify(alertingSettingsCompanionMock, Mockito.times(0)).getTriggers(Any() as Client)
+    }
+
+    suspend fun `test acquisition of triggers client is initialized`() {
+        val alertingSettingsMock = Mockito.mock(AlertingSettings::class.java)
+        val alertingSettingsCompanionMock = Mockito.mock(AlertingSettings.Companion::class.java)
+
+        Mockito.`when`(alertingSettingsMock.client).thenReturn(client())
+        AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
+        Mockito.verify(alertingSettingsCompanionMock, Mockito.times(1)).getTriggers(client())
     }
 }
