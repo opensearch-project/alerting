@@ -245,10 +245,8 @@ class AlertingSettings(val client: Client) {
                         )
                 }
             }
-//              Get all the trigger content of user here
-//              then traverse all the actions under the trigger and compare them with maxActions
-//              and then add up the actions under the trigger and compare them with totalMaxActions
         }
+
         suspend fun getTriggers(client: Client): List<Trigger> {
             val getMonitorRequest = GetMonitorRequest("", 1L, RestRequest.Method.GET, null)
 

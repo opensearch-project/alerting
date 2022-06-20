@@ -13,19 +13,19 @@ object TriggersActionThresholdUtils {
      Get threshold value
      */
     fun getThreshold(
-        p: TriggersActionThresholdParams,
+        thresholdParams: TriggersActionThresholdParams,
         currentTriggerActionSize: Int,
         triggerMaxActions: Int,
     ): Int {
-        return if (p.surplusActionCount <= 0) {
+        return if (thresholdParams.surplusActionCount <= 0) {
             0
         } else {
             val tmpThreshold = if (triggerMaxActions >= 0) {
-                min(min(triggerMaxActions, p.surplusActionCount), currentTriggerActionSize)
+                min(min(triggerMaxActions, thresholdParams.surplusActionCount), currentTriggerActionSize)
             } else {
-                min(currentTriggerActionSize, p.surplusActionCount)
+                min(currentTriggerActionSize, thresholdParams.surplusActionCount)
             }
-            p.surplusActionCount -= tmpThreshold
+            thresholdParams.surplusActionCount -= tmpThreshold
             tmpThreshold
         }
     }
