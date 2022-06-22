@@ -255,5 +255,13 @@ class AlertingSettings(val client: Client) {
             }
             return getMonitorResponse.monitor?.triggers ?: emptyList()
         }
+        fun getCurrentAmountOfActions(triggers: List<Trigger>): Int {
+            var currentAmountOfActions = 0
+
+            currentAmountOfActions += triggers.sumOf { trigger ->
+                trigger.actions.size
+            }
+            return currentAmountOfActions
+        }
     }
 }

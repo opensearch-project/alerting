@@ -5,33 +5,80 @@
 
 package org.opensearch.alerting.settings
 
-import org.junit.Before
-import org.mockito.Mockito
+import org.mockito.ArgumentMatchers.anyList
+import org.mockito.Mockito.spy
+import org.mockito.Mockito.times
+import org.mockito.Mockito.verify
+import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.AlertingRestTestCase
-import org.opensearch.client.Client
+import org.opensearch.alerting.model.Trigger
+import org.opensearch.alerting.model.action.Action
+import org.opensearch.alerting.randomAction
+import org.opensearch.alerting.randomQueryLevelMonitor
+import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.test.OpenSearchIntegTestCase
 
 class AlertingSettingsIT : AlertingRestTestCase() {
-    private lateinit var alertingSettings: AlertingSettings
 
-    @Before
-    fun setup() {
-        alertingSettings = AlertingSettings(OpenSearchIntegTestCase.client())
+    fun `test client not initialized`() {
+        AlertingSettings.MAX_ACTIONS_ACROSS_TRIGGERS
+
+        assertEquals("Client has not been initialized", AlertingSettings.Companion.internalClient, null)
     }
 
-    suspend fun `test acquisition of triggers client not initialized`() {
-        val alertingSettingsCompanionMock = Mockito.mock(AlertingSettings.Companion::class.java)
+    fun `test client initialized successfully`() {
+        val client = OpenSearchIntegTestCase.client()
+        AlertingSettings(client)
 
-        AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
-        Mockito.verify(alertingSettingsCompanionMock, Mockito.times(0)).getTriggers(Any() as Client)
+        assertEquals("Client has been initialized successfully", AlertingSettings.Companion.internalClient, client)
     }
 
-    suspend fun `test acquisition of triggers client is initialized`() {
-        val alertingSettingsMock = Mockito.mock(AlertingSettings::class.java)
-        val alertingSettingsCompanionMock = Mockito.mock(AlertingSettings.Companion::class.java)
+    fun `test acquisition of triggers client is initialized`() {
+        val client = OpenSearchIntegTestCase.client()
+        AlertingSettings(client)
+        val alertingSettingsCompanion = spy(AlertingSettings.Companion)
 
-        Mockito.`when`(alertingSettingsMock.client).thenReturn(OpenSearchIntegTestCase.client())
-        AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
-        Mockito.verify(alertingSettingsCompanionMock, Mockito.times(1)).getTriggers(OpenSearchIntegTestCase.client())
+        verify(alertingSettingsCompanion, times(1)).getCurrentAmountOfActions(anyList())
+    }
+
+    fun `test acquisition of triggers`() {
+        val client = OpenSearchIntegTestCase.client()
+        AlertingSettings(client)
+        val alertingSettingsCompanion = spy(AlertingSettings.Companion)
+
+        val actions = createActions(2)
+        val triggers = createTriggers(1, actions)
+        val monitor = createMonitor(
+            randomQueryLevelMonitor(
+                triggers = triggers
+            )
+        )
+
+        executeMonitor(monitor.id)
+
+        var amountOfActions = 0
+        for (trigger in monitor.triggers)
+            amountOfActions += trigger.actions.size
+
+        assertEquals(
+            "Monitor contains correct amount of actions",
+            amountOfActions, alertingSettingsCompanion.getCurrentAmountOfActions(triggers)
+        )
+    }
+
+    private fun createTriggers(amount: Int, actions: List<Action>): List<Trigger> {
+        val triggers = mutableListOf<Trigger>()
+        for (i in 0..amount)
+            triggers.add(randomQueryLevelTrigger(actions = actions, condition = ALWAYS_RUN, destinationId = createDestination().id))
+
+        return triggers
+    }
+
+    private fun createActions(amount: Int): List<Action> {
+        val actions = mutableListOf<Action>()
+        for (i in 0..amount)
+            actions.add(randomAction())
+
+        return actions
     }
 }
