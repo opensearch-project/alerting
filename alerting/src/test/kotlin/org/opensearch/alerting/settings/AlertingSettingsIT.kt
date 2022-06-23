@@ -5,10 +5,6 @@
 
 package org.opensearch.alerting.settings
 
-import org.mockito.ArgumentMatchers.anyList
-import org.mockito.Mockito.spy
-import org.mockito.Mockito.times
-import org.mockito.Mockito.verify
 import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.model.Trigger
@@ -33,19 +29,11 @@ class AlertingSettingsIT : AlertingRestTestCase() {
         assertEquals("Client has been initialized successfully", AlertingSettings.Companion.internalClient, client)
     }
 
-    fun `test acquisition of triggers client is initialized`() {
-        val client = VerifyingClient(randomAlphaOfLength(10))
-        AlertingSettings(client)
-        val alertingSettingsCompanion = spy(AlertingSettings.Companion)
-
-        verify(alertingSettingsCompanion, times(1)).getCurrentAmountOfActions(anyList())
-    }
-
-    fun `test acquisition of triggers`() {
-        val alertingSettingsCompanion = spy(AlertingSettings.Companion)
+    fun `test acquisition of multiple triggers`() {
+        val alertingSettingsCompanion = AlertingSettings.Companion
 
         val actions = createActions(2)
-        val triggers = createTriggers(1, actions)
+        val triggers = createTriggers(2, actions)
         val monitor = createMonitor(
             randomQueryLevelMonitor(
                 triggers = triggers
@@ -61,6 +49,28 @@ class AlertingSettingsIT : AlertingRestTestCase() {
         assertEquals(
             "Monitor contains correct amount of actions",
             amountOfActions, alertingSettingsCompanion.getCurrentAmountOfActions(triggers)
+        )
+    }
+
+    fun `test acquisition of single trigger`() {
+        val alertingSettingsCompanion = AlertingSettings.Companion
+
+        val actions = createActions(3)
+        val triggers = createTriggers(1, actions)
+        val monitor = createMonitor(
+            randomQueryLevelMonitor(
+                triggers = triggers
+            )
+        )
+
+        executeMonitor(monitor.id)
+
+        var amountOfActions = 0
+        for (trigger in monitor.triggers)
+            amountOfActions += trigger.actions.size
+
+        assertEquals(
+            "Monitor contains correct amount of actions", amountOfActions, alertingSettingsCompanion.getCurrentAmountOfActions(triggers)
         )
     }
 
