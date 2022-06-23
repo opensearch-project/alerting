@@ -16,7 +16,7 @@ import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelTrigger
-import org.opensearch.test.OpenSearchIntegTestCase
+import org.opensearch.test.rest.RestActionTestCase.VerifyingClient
 
 class AlertingSettingsIT : AlertingRestTestCase() {
 
@@ -27,14 +27,14 @@ class AlertingSettingsIT : AlertingRestTestCase() {
     }
 
     fun `test client initialized successfully`() {
-        val client = OpenSearchIntegTestCase.client()
+        val client = VerifyingClient(randomAlphaOfLength(10))
         AlertingSettings(client)
 
         assertEquals("Client has been initialized successfully", AlertingSettings.Companion.internalClient, client)
     }
 
     fun `test acquisition of triggers client is initialized`() {
-        val client = OpenSearchIntegTestCase.client()
+        val client = VerifyingClient(randomAlphaOfLength(10))
         AlertingSettings(client)
         val alertingSettingsCompanion = spy(AlertingSettings.Companion)
 
@@ -42,8 +42,6 @@ class AlertingSettingsIT : AlertingRestTestCase() {
     }
 
     fun `test acquisition of triggers`() {
-        val client = OpenSearchIntegTestCase.client()
-        AlertingSettings(client)
         val alertingSettingsCompanion = spy(AlertingSettings.Companion)
 
         val actions = createActions(2)

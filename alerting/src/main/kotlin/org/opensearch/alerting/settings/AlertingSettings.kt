@@ -230,12 +230,8 @@ class AlertingSettings(val client: Client) {
                 GlobalScope.launch {
                     val triggers = getTriggers(it)
 
-                    var currentAmountOfActions = 0
-
+                    var currentAmountOfActions = getCurrentAmountOfActions(triggers)
                     currentAmountOfActions += maxActions
-                    currentAmountOfActions += triggers.sumOf { trigger ->
-                        trigger.actions.size
-                    }
 
                     if (currentAmountOfActions > totalMaxActions)
                         throw IllegalArgumentException(
@@ -253,14 +249,17 @@ class AlertingSettings(val client: Client) {
             val getMonitorResponse: GetMonitorResponse = client.suspendUntil {
                 client.execute(GetMonitorAction.INSTANCE, getMonitorRequest, it)
             }
+
             return getMonitorResponse.monitor?.triggers ?: emptyList()
         }
+
         fun getCurrentAmountOfActions(triggers: List<Trigger>): Int {
             var currentAmountOfActions = 0
 
             currentAmountOfActions += triggers.sumOf { trigger ->
                 trigger.actions.size
             }
+
             return currentAmountOfActions
         }
     }
