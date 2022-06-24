@@ -95,7 +95,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         )
 
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
-        val index = docLevelMonitorInput.indices[0]
+        val inputIndices = docLevelMonitorInput.indices
         val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
 
         var monitorMetadata = getMonitorMetadata(monitorCtx.client!!, monitorCtx.xContentRegistry!!, "${monitor.id}-metadata")
@@ -114,11 +114,15 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         val docsToQueries = mutableMapOf<String, MutableList<String>>()
 
         try {
-            val getIndexRequest = GetIndexRequest().indices(index)
-            val getIndexResponse: GetIndexResponse = monitorCtx.client!!.suspendUntil {
-                monitorCtx.client!!.admin().indices().getIndex(getIndexRequest, it)
+
+            val indices = mutableListOf<String>()
+            for (index in inputIndices) {
+                val getIndexRequest = GetIndexRequest().indices(index)
+                val getIndexResponse: GetIndexResponse = monitorCtx.client!!.suspendUntil {
+                    monitorCtx.client!!.admin().indices().getIndex(getIndexRequest, it)
+                }
+                indices.addAll(getIndexResponse.indices())
             }
-            val indices = getIndexResponse.indices()
 
             // cleanup old indices that are not monitored anymore from the same monitor
             for (ind in updatedLastRunContext.keys) {
@@ -129,6 +133,10 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
             indices.forEach { indexName ->
                 // Prepare lastRunContext for each index
+                val getIndexRequest = GetIndexRequest().indices(indexName)
+                val getIndexResponse: GetIndexResponse = monitorCtx.client!!.suspendUntil {
+                    monitorCtx.client!!.admin().indices().getIndex(getIndexRequest, it)
+                }
                 val indexLastRunContext = lastRunContext.getOrPut(indexName) {
                     val indexCreatedRecently = createdRecently(monitor, indexName, periodStart, periodEnd, getIndexResponse)
                     createRunContext(monitorCtx.clusterService!!, monitorCtx.client!!, indexName, indexCreatedRecently)
