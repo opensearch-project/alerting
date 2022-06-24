@@ -12,15 +12,11 @@ import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelTrigger
-import org.opensearch.test.rest.RestActionTestCase.VerifyingClient
 
 class AlertingSettingsIT : AlertingRestTestCase() {
 
     fun `test client initialized successfully`() {
-        val client = VerifyingClient(randomAlphaOfLength(10))
-        AlertingSettings(client)
-
-        assertEquals("Client has been initialized successfully", AlertingSettings.Companion.internalClient, client)
+        assertNotNull("Client has been initialized successfully", AlertingSettings.Companion.internalClient)
     }
 
     fun `test acquisition of multiple triggers`() {
