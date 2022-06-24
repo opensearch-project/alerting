@@ -27,10 +27,10 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_MILLIS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTIONABLE_ALERT_COUNT
-import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTIONS_ACROSS_TRIGGERS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MOVE_ALERTS_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MOVE_ALERTS_BACKOFF_MILLIS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.TOTAL_MAX_ACTIONS_PER_TRIGGERS
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.HOST_DENY_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.loadDestinationSettings
@@ -152,11 +152,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
         monitorCtx.indexTimeout = INDEX_TIMEOUT.get(monitorCtx.settings)
         monitorCtx.maxActionsAcrossTriggers =
-            min(MAX_ACTIONS_ACROSS_TRIGGERS.get(monitorCtx.settings), TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.get(monitorCtx.settings))
+            min(TOTAL_MAX_ACTIONS_PER_TRIGGERS.get(monitorCtx.settings), TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.get(monitorCtx.settings))
         monitorCtx.totalMaxActionsAcrossTriggers = TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.get(monitorCtx.settings)
 
         monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(
-            MAX_ACTIONS_ACROSS_TRIGGERS,
+            TOTAL_MAX_ACTIONS_PER_TRIGGERS,
             TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
         ) { maxActions: Int, totalMaxActions: Int ->
             monitorCtx.maxActionsAcrossTriggers = maxActions

@@ -35,7 +35,7 @@ class AlertingSettings(val client: Client) {
         const val MONITOR_MAX_TRIGGERS = 10
         const val DEFAULT_MAX_ACTIONABLE_ALERT_COUNT = 50L
         const val UNBOUNDED_ACTIONS_ACROSS_TRIGGERS = -1
-        const val DEFAULT_MAX_ACTIONS_ACROSS_TRIGGERS = UNBOUNDED_ACTIONS_ACROSS_TRIGGERS
+        const val DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGERS = UNBOUNDED_ACTIONS_ACROSS_TRIGGERS
         const val DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS = UNBOUNDED_ACTIONS_ACROSS_TRIGGERS
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(
@@ -174,9 +174,9 @@ class AlertingSettings(val client: Client) {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val MAX_ACTIONS_ACROSS_TRIGGERS = Setting.intSetting(
+        val TOTAL_MAX_ACTIONS_PER_TRIGGERS = Setting.intSetting(
             "plugins.alerting.max_actions_across_triggers",
-            DEFAULT_MAX_ACTIONS_ACROSS_TRIGGERS,
+            DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGERS,
             -1, MaxActionsTriggersValidator(internalClient),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
@@ -191,13 +191,13 @@ class AlertingSettings(val client: Client) {
             override fun validate(value: Int) {}
 
             override fun validate(value: Int, settings: Map<Setting<*>, Any>) {
-                val maxActions = settings[MAX_ACTIONS_ACROSS_TRIGGERS] as Int
+                val maxActions = settings[TOTAL_MAX_ACTIONS_PER_TRIGGERS] as Int
                 validateActionsTrigger(maxActions, value, client)
             }
 
             override fun settings(): MutableIterator<Setting<*>> {
                 val settings = mutableListOf<Setting<*>>(
-                    MAX_ACTIONS_ACROSS_TRIGGERS
+                    TOTAL_MAX_ACTIONS_PER_TRIGGERS
                 )
                 return settings.iterator()
             }
