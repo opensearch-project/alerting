@@ -15,8 +15,32 @@ import org.opensearch.alerting.randomQueryLevelTrigger
 
 class AlertingSettingsIT : AlertingRestTestCase() {
 
-    fun `test client initialized successfully`() {
-        assertNotNull("Client has been initialized successfully", AlertingSettings.Companion.internalClient)
+    fun `test updating setting of max actions per trigger with less actions than allowed actions`() {
+        val actions = createActions(4)
+        val triggers = createTriggers(1, actions)
+        createMonitor(
+            randomQueryLevelMonitor(
+                triggers = triggers
+            )
+        )
+
+        try {
+            client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.key, 1)
+        } catch (e: Exception) {
+            assertTrue(e is IllegalArgumentException)
+        }
+    }
+
+    fun `test updating setting of max actions per trigger with more actions than allowed actions`() {
+        val actions = createActions(4)
+        val triggers = createTriggers(1, actions)
+        createMonitor(
+            randomQueryLevelMonitor(
+                triggers = triggers
+            )
+        )
+
+        client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.key, 10)
     }
 
     fun `test acquisition of multiple triggers`() {
