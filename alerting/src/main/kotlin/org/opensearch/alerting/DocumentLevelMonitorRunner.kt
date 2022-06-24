@@ -18,16 +18,8 @@ import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRI
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.model.ActionExecutionResult
-import org.opensearch.alerting.model.Alert
+import org.opensearch.alerting.model.*
 import org.opensearch.alerting.model.AlertingConfigAccessor.Companion.getMonitorMetadata
-import org.opensearch.alerting.model.DocumentExecutionContext
-import org.opensearch.alerting.model.DocumentLevelTrigger
-import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
-import org.opensearch.alerting.model.Finding
-import org.opensearch.alerting.model.InputRunResults
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.action.PerAlertActionScope
 import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -53,8 +45,7 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortOrder
 import java.io.IOException
 import java.time.Instant
-import java.util.UUID
-import kotlin.collections.HashMap
+import java.util.*
 import kotlin.math.max
 
 object DocumentLevelMonitorRunner : MonitorRunner() {
@@ -115,30 +106,30 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         try {
 
-            val indices = mutableListOf<String>()
+            val indexCreationTimeMap = mutableMapOf<String, Long>()
             for (index in inputIndices) {
                 val getIndexRequest = GetIndexRequest().indices(index)
                 val getIndexResponse: GetIndexResponse = monitorCtx.client!!.suspendUntil {
                     monitorCtx.client!!.admin().indices().getIndex(getIndexRequest, it)
                 }
-                indices.addAll(getIndexResponse.indices())
+                var indices = getIndexResponse.indices()
+                indices.forEach{ index ->
+                    indexCreationTimeMap[index] = getIndexResponse.settings.get(index).getAsLong("index.creation_date", 0L)
+                }
             }
 
             // cleanup old indices that are not monitored anymore from the same monitor
             for (ind in updatedLastRunContext.keys) {
-                if (!indices.contains(ind)) {
+                if (!indexCreationTimeMap.keys.contains(ind)) {
                     updatedLastRunContext.remove(ind)
                 }
             }
 
-            indices.forEach { indexName ->
+            indexCreationTimeMap.keys.forEach { indexName ->
                 // Prepare lastRunContext for each index
-                val getIndexRequest = GetIndexRequest().indices(indexName)
-                val getIndexResponse: GetIndexResponse = monitorCtx.client!!.suspendUntil {
-                    monitorCtx.client!!.admin().indices().getIndex(getIndexRequest, it)
-                }
+                val indexCreationTime = indexCreationTimeMap[indexName]!!
                 val indexLastRunContext = lastRunContext.getOrPut(indexName) {
-                    val indexCreatedRecently = createdRecently(monitor, indexName, periodStart, periodEnd, getIndexResponse)
+                    val indexCreatedRecently = createdRecently(monitor, periodStart, periodEnd, indexCreationTime)
                     createRunContext(monitorCtx.clusterService!!, monitorCtx.client!!, indexName, indexCreatedRecently)
                 }
 
@@ -394,13 +385,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
     // new index is monitored from the beginning of that index
     private fun createdRecently(
         monitor: Monitor,
-        index: String,
         periodStart: Instant,
         periodEnd: Instant,
-        getIndexResponse: GetIndexResponse
+        indexCreationTime: Long
     ): Boolean {
         val lastExecutionTime = if (periodStart == periodEnd) monitor.lastUpdateTime else periodStart
-        return getIndexResponse.settings.get(index).getAsLong("index.creation_date", 0L) > lastExecutionTime.toEpochMilli()
+        return indexCreationTime > lastExecutionTime.toEpochMilli()
     }
 
     /**
