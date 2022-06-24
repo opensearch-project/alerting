@@ -16,12 +16,6 @@ import org.opensearch.test.rest.RestActionTestCase.VerifyingClient
 
 class AlertingSettingsIT : AlertingRestTestCase() {
 
-    fun `test client not initialized`() {
-        AlertingSettings.MAX_ACTIONS_ACROSS_TRIGGERS
-
-        assertEquals("Client has not been initialized", AlertingSettings.Companion.internalClient, null)
-    }
-
     fun `test client initialized successfully`() {
         val client = VerifyingClient(randomAlphaOfLength(10))
         AlertingSettings(client)
@@ -35,9 +29,9 @@ class AlertingSettingsIT : AlertingRestTestCase() {
         val actions = createActions(2)
         val triggers = createTriggers(2, actions)
         val monitor = createMonitor(
-            randomQueryLevelMonitor(
-                triggers = triggers
-            )
+                randomQueryLevelMonitor(
+                        triggers = triggers
+                )
         )
 
         executeMonitor(monitor.id)
@@ -46,10 +40,7 @@ class AlertingSettingsIT : AlertingRestTestCase() {
         for (trigger in monitor.triggers)
             amountOfActions += trigger.actions.size
 
-        assertEquals(
-            "Monitor contains correct amount of actions",
-            amountOfActions, alertingSettingsCompanion.getCurrentAmountOfActions(triggers)
-        )
+        assertEquals("Monitor contains correct amount of actions", amountOfActions, alertingSettingsCompanion.getCurrentAmountOfActions(triggers))
     }
 
     fun `test acquisition of single trigger`() {
@@ -58,9 +49,9 @@ class AlertingSettingsIT : AlertingRestTestCase() {
         val actions = createActions(3)
         val triggers = createTriggers(1, actions)
         val monitor = createMonitor(
-            randomQueryLevelMonitor(
-                triggers = triggers
-            )
+                randomQueryLevelMonitor(
+                        triggers = triggers
+                )
         )
 
         executeMonitor(monitor.id)
@@ -69,10 +60,9 @@ class AlertingSettingsIT : AlertingRestTestCase() {
         for (trigger in monitor.triggers)
             amountOfActions += trigger.actions.size
 
-        assertEquals(
-            "Monitor contains correct amount of actions", amountOfActions, alertingSettingsCompanion.getCurrentAmountOfActions(triggers)
-        )
+        assertEquals("Monitor contains correct amount of actions", amountOfActions, alertingSettingsCompanion.getCurrentAmountOfActions(triggers))
     }
+
 
     private fun createTriggers(amount: Int, actions: List<Action>): List<Trigger> {
         val triggers = mutableListOf<Trigger>()
