@@ -29,9 +29,9 @@ class AlertingSettingsIT : AlertingRestTestCase() {
         val actions = createActions(2)
         val triggers = createTriggers(2, actions)
         val monitor = createMonitor(
-                randomQueryLevelMonitor(
-                        triggers = triggers
-                )
+            randomQueryLevelMonitor(
+                triggers = triggers
+            )
         )
 
         executeMonitor(monitor.id)
@@ -40,7 +40,10 @@ class AlertingSettingsIT : AlertingRestTestCase() {
         for (trigger in monitor.triggers)
             amountOfActions += trigger.actions.size
 
-        assertEquals("Monitor contains correct amount of actions", amountOfActions, alertingSettingsCompanion.getCurrentAmountOfActions(triggers))
+        assertEquals(
+            "Monitor contains correct amount of actions",
+            amountOfActions, alertingSettingsCompanion.getCurrentAmountOfActions(triggers)
+        )
     }
 
     fun `test acquisition of single trigger`() {
@@ -49,9 +52,9 @@ class AlertingSettingsIT : AlertingRestTestCase() {
         val actions = createActions(3)
         val triggers = createTriggers(1, actions)
         val monitor = createMonitor(
-                randomQueryLevelMonitor(
-                        triggers = triggers
-                )
+            randomQueryLevelMonitor(
+                triggers = triggers
+            )
         )
 
         executeMonitor(monitor.id)
@@ -60,9 +63,11 @@ class AlertingSettingsIT : AlertingRestTestCase() {
         for (trigger in monitor.triggers)
             amountOfActions += trigger.actions.size
 
-        assertEquals("Monitor contains correct amount of actions", amountOfActions, alertingSettingsCompanion.getCurrentAmountOfActions(triggers))
+        assertEquals(
+            "Monitor contains correct amount of actions",
+            amountOfActions, alertingSettingsCompanion.getCurrentAmountOfActions(triggers)
+        )
     }
-
 
     private fun createTriggers(amount: Int, actions: List<Action>): List<Trigger> {
         val triggers = mutableListOf<Trigger>()
