@@ -113,7 +113,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     monitorCtx.client!!.admin().indices().getIndex(getIndexRequest, it)
                 }
                 var indices = getIndexResponse.indices()
-                indices.forEach{ index ->
+                indices.forEach { index ->
                     indexCreationTimeMap[index] = getIndexResponse.settings.get(index).getAsLong("index.creation_date", 0L)
                 }
             }
@@ -179,7 +179,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 }
             }
         } catch (e: Exception) {
-            logger.error("Failed to start Document-level-monitor $index. Error: ${e.message}", e)
+            logger.error("Failed to start Document-level-monitor $inputIndices. Error: ${e.message}", e)
             val alertingException = AlertingException.wrap(e)
             return monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
         }
