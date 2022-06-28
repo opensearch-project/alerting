@@ -570,7 +570,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             for (alertActionResult in triggerResult.objectMap("action_results").values) {
                 for (actionResult in alertActionResult.values) {
                     @Suppress("UNCHECKED_CAST") val actionOutput = (actionResult as Map<String, Map<String, String>>)["output"]
-                            as Map<String, String>
+                        as Map<String, String>
                     assertEquals("Hello ${monitor.name}", actionOutput["subject"])
                     assertEquals("Hello ${monitor.name}", actionOutput["message"])
                 }
