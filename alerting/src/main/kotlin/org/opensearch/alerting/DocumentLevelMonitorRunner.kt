@@ -18,8 +18,16 @@ import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRI
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.core.model.ScheduledJob
+import org.opensearch.alerting.model.ActionExecutionResult
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.AlertingConfigAccessor.Companion.getMonitorMetadata
+import org.opensearch.alerting.model.DocumentExecutionContext
+import org.opensearch.alerting.model.DocumentLevelTrigger
+import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
+import org.opensearch.alerting.model.Finding
+import org.opensearch.alerting.model.InputRunResults
+import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.action.PerAlertActionScope
 import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -45,7 +53,8 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortOrder
 import java.io.IOException
 import java.time.Instant
-import java.util.*
+import java.util.UUID
+import kotlin.collections.HashMap
 import kotlin.math.max
 
 object DocumentLevelMonitorRunner : MonitorRunner() {
