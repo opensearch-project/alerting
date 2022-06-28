@@ -18,7 +18,7 @@ import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRI
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.model.*
+import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.AlertingConfigAccessor.Companion.getMonitorMetadata
 import org.opensearch.alerting.model.action.PerAlertActionScope
 import org.opensearch.alerting.opensearchapi.string
