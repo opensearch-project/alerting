@@ -22,8 +22,7 @@ import java.time.temporal.ChronoUnit.MILLIS
 
 class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
-
-    fun `test execute monitor returns search result with dryrun`() {
+    fun `test execute monitor returns search result with dryrun and single inputed index`() {
         val testIndex = createTestIndex()
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -548,7 +547,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val testIndex2 = createTestIndex("test2")
 
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
-        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex1, testIndex2), listOf(docQuery))
 
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
         val monitor = randomDocumentLevelMonitor(
@@ -581,8 +580,6 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val alerts = searchAlerts(monitor)
         assertEquals("Alert saved for test monitor", 0, alerts.size)
     }
-
-
     @Suppress("UNCHECKED_CAST")
     /** helper that returns a field in a json map whose values are all json objects */
     private fun Map<String, Any>.objectMap(key: String): Map<String, Map<String, Any>> {
