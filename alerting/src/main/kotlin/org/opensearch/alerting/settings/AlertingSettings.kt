@@ -257,8 +257,8 @@ class AlertingSettings(val client: Client) {
         private fun validateActionsPerTrigger(maxActions: Int, totalMaxActions: Int, client: Client?) {
             if (maxActions > totalMaxActions) {
                 throw IllegalArgumentException(
-                        "The limit number of actions for a single trigger, $maxActions, " +
-                                "should not be greater than that of the overall max actions across all triggers of the monitor, $totalMaxActions"
+                    "The limit number of actions for a single trigger, $maxActions, " +
+                        "should not be greater than that of the overall max actions across all triggers of the monitor, $totalMaxActions"
                 )
             }
 
@@ -270,12 +270,11 @@ class AlertingSettings(val client: Client) {
                         for (trigger in monitor.triggers) {
                             if (trigger.actions.size > maxActions)
                                 throw IllegalArgumentException(
-                                        "The amount of actions in the trigger, $maxActions, should not be greater than $totalMaxActions"
+                                    "The amount of actions in the trigger, $maxActions, should not be greater than $totalMaxActions"
                                 )
                         }
                     }
                 }
-
             }
         }
 
@@ -285,18 +284,18 @@ class AlertingSettings(val client: Client) {
             val configName = "monitor"
 
             val searchSourceBuilder = SearchSourceBuilder()
-                    .from(start)
-                    .fetchSource(FetchSourceContext(true, Strings.EMPTY_ARRAY, Strings.EMPTY_ARRAY))
-                    .seqNoAndPrimaryTerm(true)
-                    .version(true)
+                .from(start)
+                .fetchSource(FetchSourceContext(true, Strings.EMPTY_ARRAY, Strings.EMPTY_ARRAY))
+                .seqNoAndPrimaryTerm(true)
+                .version(true)
             val queryBuilder = QueryBuilders.boolQuery()
-                    .should(QueryBuilders.existsQuery(configName))
+                .should(QueryBuilders.existsQuery(configName))
             queryBuilder.filter(QueryBuilders.existsQuery(Monitor.MONITOR_TYPE))
             searchSourceBuilder.query(queryBuilder)
 
             val searchRequest = SearchRequest()
-                    .source(searchSourceBuilder)
-                    .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
+                .source(searchSourceBuilder)
+                .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
             val response: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
 
             if (response.status() != RestStatus.OK)
@@ -304,12 +303,12 @@ class AlertingSettings(val client: Client) {
 
             for (hit in response.hits) {
                 val xcp = XContentFactory.xContent(XContentType.JSON)
-                        .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
+                    .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
 
                 val monitor = Monitor.parse(
-                        xcp = xcp,
-                        id = hit.id,
-                        version = hit.version
+                    xcp = xcp,
+                    id = hit.id,
+                    version = hit.version
                 )
 
                 monitors.add(monitor)
