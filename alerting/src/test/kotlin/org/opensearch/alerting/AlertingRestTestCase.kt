@@ -562,6 +562,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         )
 
         val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
+
         indexDoc(FINDING_HISTORY_WRITE_INDEX, finding.id, findingStr)
         return finding.id
     }
