@@ -363,11 +363,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         if (monitor.inputs[0].name() != DocLevelMonitorInput.DOC_LEVEL_INPUT_FIELD) {
             throw IOException("Invalid input with document-level-monitor.")
         }
-
-        val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
-        if (docLevelMonitorInput.indices.size > 1) {
-            throw IOException("Only one index is supported with document-level-monitor.")
-        }
     }
 
     suspend fun createRunContext(

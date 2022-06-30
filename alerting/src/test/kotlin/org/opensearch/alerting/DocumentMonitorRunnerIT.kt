@@ -579,7 +579,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test document-level monitor with multiple input indices `() {
+    fun `test document-level monitor with multiple input indices`() {
 
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -600,8 +600,8 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
         )
 
-        indexDoc(testIndex1, "11", testDoc)
-        indexDoc(testIndex2, "17", testDoc)
+        indexDoc(testIndex1, "1", testDoc)
+        indexDoc(testIndex2, "5", testDoc)
 
         val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
 
