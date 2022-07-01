@@ -31,8 +31,8 @@ class AlertingSettingsIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test updating setting of max actions per trigger with an existing monitor successfully`() {
-        val actions = createActions(4)
+    fun `test updating setting of max actions per trigger with more actions than allowed actions`() {
+        val actions = createActions(10)
         val triggers = createTriggers(1, actions)
         createMonitor(
             randomQueryLevelMonitor(
@@ -40,7 +40,35 @@ class AlertingSettingsIT : AlertingRestTestCase() {
             )
         )
 
-        client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, 10)
+        client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, 1)
+    }
+
+    fun `test updating setting of overall max actions with more actions than allowed actions`() {
+        val actions = createActions(4)
+        val triggers = createTriggers(4, actions)
+        createMonitor(
+            randomQueryLevelMonitor(
+                triggers = triggers
+            )
+        )
+
+        try {
+            client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.key, 1)
+        } catch (e: Exception) {
+            assertTrue(e is IllegalArgumentException)
+        }
+    }
+
+    fun `test updating setting of overall max actions with less actions than allowed actions`() {
+        val actions = createActions(1)
+        val triggers = createTriggers(1, actions)
+        createMonitor(
+            randomQueryLevelMonitor(
+                triggers = triggers
+            )
+        )
+
+        client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.key, 10)
     }
 
     private fun createTriggers(amount: Int, actions: List<Action>): List<Trigger> {
