@@ -15,7 +15,7 @@ import org.opensearch.alerting.randomQueryLevelTrigger
 
 class AlertingSettingsIT : AlertingRestTestCase() {
 
-    fun `test updating setting of max actions per trigger with less actions than allowed actions`() {
+    fun `test updating setting of max actions per trigger with more actions than allowed actions`() {
         val actions = createActions(4)
         val triggers = createTriggers(1, actions)
         createMonitor(
@@ -31,7 +31,7 @@ class AlertingSettingsIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test updating setting of max actions per trigger with more actions than allowed actions`() {
+    fun `test updating setting of max actions per trigger with less actions than allowed actions`() {
         val actions = createActions(10)
         val triggers = createTriggers(1, actions)
         createMonitor(
@@ -40,7 +40,7 @@ class AlertingSettingsIT : AlertingRestTestCase() {
             )
         )
 
-        client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, 1)
+        client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, 10)
     }
 
     fun `test updating setting of overall max actions with more actions than allowed actions`() {

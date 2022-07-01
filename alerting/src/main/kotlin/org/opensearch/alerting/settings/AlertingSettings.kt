@@ -230,6 +230,8 @@ class AlertingSettings(val client: Client) {
         }
 
         private fun validateActionsAcrossTriggers(maxActions: Int, totalMaxActions: Int, client: Client?) {
+            if (totalMaxActions == DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS) return
+
             if (maxActions > totalMaxActions) {
                 throw IllegalArgumentException(
                     "The limit number of actions for a single trigger, $maxActions, " +
@@ -255,6 +257,8 @@ class AlertingSettings(val client: Client) {
         }
 
         private fun validateActionsPerTrigger(maxActions: Int, totalMaxActions: Int, client: Client?) {
+            if (totalMaxActions == DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER) return
+
             client?.let {
                 runBlocking {
                     val monitors = getMonitors(client)
