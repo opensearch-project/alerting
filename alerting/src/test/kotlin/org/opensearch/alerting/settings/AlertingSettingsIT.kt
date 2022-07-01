@@ -28,6 +28,10 @@ class AlertingSettingsIT : AlertingRestTestCase() {
             client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, 1)
         } catch (e: Exception) {
             assertTrue(e is IllegalArgumentException)
+        } finally {
+            client().updateSettings(
+                AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER
+            )
         }
     }
 
@@ -41,6 +45,7 @@ class AlertingSettingsIT : AlertingRestTestCase() {
         )
 
         client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, 10)
+        client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER)
     }
 
     fun `test updating setting of overall max actions with more actions than allowed actions`() {
@@ -56,6 +61,10 @@ class AlertingSettingsIT : AlertingRestTestCase() {
             client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.key, 1)
         } catch (e: Exception) {
             assertTrue(e is IllegalArgumentException)
+        } finally {
+            client().updateSettings(
+                AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
+            )
         }
     }
 
@@ -69,6 +78,9 @@ class AlertingSettingsIT : AlertingRestTestCase() {
         )
 
         client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.key, 10)
+        client().updateSettings(
+            AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
+        )
     }
 
     private fun createTriggers(amount: Int, actions: List<Action>): List<Trigger> {
