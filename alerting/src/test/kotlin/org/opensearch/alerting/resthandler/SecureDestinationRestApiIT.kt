@@ -41,7 +41,7 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    val user = "userOne"
+    val user = "userA"
     var userClient: RestClient? = null
 
     @Before
