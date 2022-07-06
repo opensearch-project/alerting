@@ -52,7 +52,7 @@ class SecureEmailGroupsRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    val user = "userOne"
+    val user = "userC"
     var userClient: RestClient? = null
 
     @Before
