@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting
 
+import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionResponse
 import org.opensearch.action.support.WriteRequest
@@ -120,6 +121,7 @@ import java.util.function.Supplier
  * It also adds [Monitor.XCONTENT_REGISTRY], [SearchInput.XCONTENT_REGISTRY], [QueryLevelTrigger.XCONTENT_REGISTRY],
  * [BucketLevelTrigger.XCONTENT_REGISTRY], [ClusterMetricsInput.XCONTENT_REGISTRY] to the [NamedXContentRegistry] so that we are able to deserialize the custom named objects.
  */
+private val log = LogManager.getLogger(AlertingPlugin::class.java)
 internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, ReloadablePlugin, SearchPlugin, PercolatorPluginExt() {
 
     override fun getContextWhitelists(): Map<ScriptContext<*>, List<Whitelist>> {
@@ -250,8 +252,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             refreshPolicy = WriteRequest.RefreshPolicy.IMMEDIATE,
             RestRequest.Method.POST, monitor
         )
-        val response = client.execute(IndexMonitorAction.INSTANCE, monitorRequest).get()
-        response.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS)
+
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
         runner = MonitorRunnerService
             .registerClusterService(clusterService)
@@ -272,11 +273,13 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         scheduler = JobScheduler(threadPool, runner)
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
         destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool, scheduledJobIndices)
-        // create a cluster metrics visualization index upon initialization of alerting plugin
-        ClusterMetricsVisualizationIndex(client, clusterService)
         // Create Monitor using Monitor.kt, and then feed the request to client in some way
         this.threadPool = threadPool
         this.clusterService = clusterService
+        // create a cluster metrics visualization index upon initialization of alerting plugin
+        ClusterMetricsVisualizationIndex(client, clusterService)
+        val response = client.execute(IndexMonitorAction.INSTANCE, monitorRequest).get()
+        response.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS)
         return listOf(sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator)
     }
 
