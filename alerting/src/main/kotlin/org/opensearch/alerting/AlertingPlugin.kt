@@ -73,7 +73,6 @@ import org.opensearch.alerting.transport.TransportIndexMonitorAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
-import org.opensearch.alerting.util.ClusterMetricsVisualizationIndex
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
 import org.opensearch.client.Client
@@ -277,9 +276,12 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         this.threadPool = threadPool
         this.clusterService = clusterService
         // create a cluster metrics visualization index upon initialization of alerting plugin
-        ClusterMetricsVisualizationIndex(client, clusterService)
-        val response = client.execute(IndexMonitorAction.INSTANCE, monitorRequest).get()
-        response.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS)
+        // ClusterMetricsVisualizationIndex(client, clusterService)
+        log.info("YEP MESSAGE   $client")
+        if (client != null) {
+            val response = client.execute(IndexMonitorAction.INSTANCE, monitorRequest).get()
+            response.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS)
+        }
         return listOf(sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator)
     }
 
