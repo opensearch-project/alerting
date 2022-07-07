@@ -1,0 +1,19 @@
+{
+  "_meta": {
+    "schema_version": 1
+  },
+  "properties": {
+    "metric":{
+      "type": "nested",
+      "properties": {
+        "date": {
+          "type": "text",
+          "format": "basic_date_time"
+        },
+        "metric_value": {
+          "type": "text"
+        }
+      }
+    }
+  }
+}

@@ -7,6 +7,7 @@ package org.opensearch.alerting
 
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionResponse
+import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.action.AcknowledgeAlertAction
 import org.opensearch.alerting.action.DeleteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorAction
@@ -17,6 +18,7 @@ import org.opensearch.alerting.action.GetEmailGroupAction
 import org.opensearch.alerting.action.GetFindingsAction
 import org.opensearch.alerting.action.GetMonitorAction
 import org.opensearch.alerting.action.IndexMonitorAction
+import org.opensearch.alerting.action.IndexMonitorRequest
 import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
 import org.opensearch.alerting.action.SearchMonitorAction
@@ -27,6 +29,7 @@ import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsAction
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsTransportAction
 import org.opensearch.alerting.core.model.ClusterMetricsInput
+import org.opensearch.alerting.core.model.CronSchedule
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.model.SearchInput
@@ -69,6 +72,7 @@ import org.opensearch.alerting.transport.TransportIndexMonitorAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
+import org.opensearch.alerting.util.ClusterMetricsVisualizationIndex
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
 import org.opensearch.client.Client
@@ -83,7 +87,10 @@ import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.settings.SettingsFilter
 import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentParser
+import org.opensearch.common.xcontent.XContentType
 import org.opensearch.env.Environment
 import org.opensearch.env.NodeEnvironment
 import org.opensearch.index.IndexModule
@@ -98,10 +105,13 @@ import org.opensearch.plugins.SearchPlugin
 import org.opensearch.repositories.RepositoriesService
 import org.opensearch.rest.RestController
 import org.opensearch.rest.RestHandler
+import org.opensearch.rest.RestRequest
 import org.opensearch.script.ScriptContext
 import org.opensearch.script.ScriptService
 import org.opensearch.threadpool.ThreadPool
 import org.opensearch.watcher.ResourceWatcherService
+import java.time.Instant
+import java.time.ZoneId
 import java.util.function.Supplier
 
 /**
@@ -212,10 +222,36 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         nodeEnvironment: NodeEnvironment,
         namedWriteableRegistry: NamedWriteableRegistry,
         indexNameExpressionResolver: IndexNameExpressionResolver,
-        repositoriesServiceSupplier: Supplier<RepositoriesService>
+        repositoriesServiceSupplier: Supplier<RepositoriesService>,
+
     ): Collection<Any> {
         // Need to figure out how to use the OpenSearch DI classes rather than handwiring things here.
         val settings = environment.settings()
+        val cronSchedule = CronSchedule("*/15 * * * *", ZoneId.of("US/Pacific"))
+        val monitor = Monitor(
+            id = "",
+            version = 0L,
+            name = "yepclock",
+            enabled = true,
+            user = null,
+            schedule = cronSchedule,
+            lastUpdateTime = Instant.now(),
+            enabledTime = Instant.now(),
+            monitorType = Monitor.MonitorType.CLUSTER_METRICS_MONITOR,
+            schemaVersion = 0,
+            inputs = mutableListOf(),
+            triggers = mutableListOf(),
+            uiMetadata = mutableMapOf()
+        )
+        val monitorRequest = IndexMonitorRequest(
+            monitorId = "",
+            seqNo = 0L,
+            primaryTerm = 0L,
+            refreshPolicy = WriteRequest.RefreshPolicy.IMMEDIATE,
+            RestRequest.Method.POST, monitor
+        )
+        val response = client.execute(IndexMonitorAction.INSTANCE, monitorRequest).get()
+        response.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS)
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
         runner = MonitorRunnerService
             .registerClusterService(clusterService)
@@ -236,6 +272,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         scheduler = JobScheduler(threadPool, runner)
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
         destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool, scheduledJobIndices)
+        // create a cluster metrics visualization index upon initialization of alerting plugin
+        ClusterMetricsVisualizationIndex(client, clusterService)
+        // Create Monitor using Monitor.kt, and then feed the request to client in some way
         this.threadPool = threadPool
         this.clusterService = clusterService
         return listOf(sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator)
