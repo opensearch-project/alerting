@@ -54,9 +54,9 @@ class ClusterMetricsVisualizationIndex(
     fun helper() {
         val cronSchedule = CronSchedule("*/15 * * * *", ZoneId.of("US/Pacific"))
         val monitor = Monitor(
-            id = "123",
+            id = "12345",
             version = 1L,
-            name = "yepclock",
+            name = "test_pls_work",
             enabled = true,
             user = null,
             schedule = cronSchedule,
@@ -69,7 +69,7 @@ class ClusterMetricsVisualizationIndex(
             uiMetadata = mutableMapOf()
         )
         val monitorRequest = IndexMonitorRequest(
-            monitorId = "69420",
+            monitorId = "11111",
             seqNo = 1L,
             primaryTerm = 1L,
             refreshPolicy = WriteRequest.RefreshPolicy.IMMEDIATE,
