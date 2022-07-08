@@ -1,8 +1,6 @@
 package org.opensearch.alerting.util
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.action.admin.indices.create.CreateIndexRequest
-import org.opensearch.action.admin.indices.create.CreateIndexResponse
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.action.IndexMonitorAction
 import org.opensearch.alerting.action.IndexMonitorRequest
@@ -14,7 +12,6 @@ import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.component.LifecycleListener
 import org.opensearch.common.settings.Setting
-import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentType
@@ -69,17 +66,17 @@ class ClusterMetricsVisualizationIndex(
         response.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS)
     }
 
-    init {
-        if (!clusterMetricsVisualizationIndexExists()) {
-            val indexRequest = CreateIndexRequest(CLUSTER_METRIC_VISUALIZATION_INDEX)
-                .mapping(clusterMetricsVisualizationsMappings())
-                .settings(
-                    Settings.builder().put("index.hidden", true)
-                        .build()
-                )
-            val createIndexResponse: CreateIndexResponse = client.admin().indices().create(indexRequest).get()
-            createIndexResponse.isAcknowledged
-        }
+//    init {
+//        if (!clusterMetricsVisualizationIndexExists()) {
+//            val indexRequest = CreateIndexRequest(CLUSTER_METRIC_VISUALIZATION_INDEX)
+//                .mapping(clusterMetricsVisualizationsMappings())
+//                .settings(
+//                    Settings.builder().put("index.hidden", true)
+//                        .build()
+//                )
+//            val createIndexResponse: CreateIndexResponse = client.admin().indices().create(indexRequest).get()
+//            createIndexResponse.isAcknowledged
+//        }
 //        clusterService.addListener(this)
 //        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERT_HISTORY_ENABLED) { alertHistoryEnabled = it }
 //        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERT_HISTORY_MAX_DOCS) { alertHistoryMaxDocs = it }
@@ -88,7 +85,7 @@ class ClusterMetricsVisualizationIndex(
 //            alertHistoryRolloverPeriod = it
 //            rescheduleAlertRollover()
 //        }
-    }
+//    }
 //    suspend fun initFunc() {
 //        if (!clusterMetricsVisualizationIndexExists()) {
 //            val indexRequest = CreateIndexRequest(CLUSTER_METRIC_VISUALIZATION_INDEX)
@@ -101,8 +98,8 @@ class ClusterMetricsVisualizationIndex(
 //            createIndexResponse.isAcknowledged
 //        }
 //    }
-    fun clusterMetricsVisualizationIndexExists(): Boolean {
-        val clusterState = clusterService.state()
-        return clusterState.routingTable.hasIndex(CLUSTER_METRIC_VISUALIZATION_INDEX)
-    }
+//    fun clusterMetricsVisualizationIndexExists(): Boolean {
+//        val clusterState = clusterService.state()
+//        return clusterState.routingTable.hasIndex(CLUSTER_METRIC_VISUALIZATION_INDEX)
+//    }
 }
