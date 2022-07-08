@@ -69,7 +69,7 @@ class ClusterMetricsVisualizationIndex(
             uiMetadata = mutableMapOf()
         )
         val monitorRequest = IndexMonitorRequest(
-            monitorId = "1234",
+            monitorId = "69420",
             seqNo = 1L,
             primaryTerm = 1L,
             refreshPolicy = WriteRequest.RefreshPolicy.IMMEDIATE,
