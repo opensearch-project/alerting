@@ -40,10 +40,7 @@ class ClusterMetricsVisualizationIndex(
     }
     override fun clusterChanged(p0: ClusterChangedEvent) {
         log.info("THIS CLASS IS BEING CALLED")
-        val scheduledJob = Runnable {
-            helper()
-        }
-        threadPool.schedule(scheduledJob, TimeValue.timeValueMinutes(1), ThreadPool.Names.MANAGEMENT)
+        threadPool.schedule({ helper() }, TimeValue.timeValueMinutes(1), ThreadPool.Names.MANAGEMENT)
     }
 
     fun helper() {
