@@ -2,7 +2,6 @@ package org.opensearch.alerting.util
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.support.WriteRequest
-import org.opensearch.alerting.action.IndexMonitorAction
 import org.opensearch.alerting.action.IndexMonitorRequest
 import org.opensearch.alerting.core.model.CronSchedule
 import org.opensearch.alerting.model.Monitor
@@ -13,9 +12,6 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.component.LifecycleListener
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.unit.TimeValue
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentBuilder
-import org.opensearch.common.xcontent.XContentType
 import org.opensearch.rest.RestRequest
 import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
@@ -76,7 +72,6 @@ class ClusterMetricsVisualizationIndex(
             RestRequest.Method.POST,
             monitor
         )
-
     }
 
 //    init {
