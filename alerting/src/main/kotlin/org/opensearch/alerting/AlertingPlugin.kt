@@ -144,6 +144,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     lateinit var alertIndices: AlertIndices
     lateinit var clusterService: ClusterService
     lateinit var destinationMigrationCoordinator: DestinationMigrationCoordinator
+    lateinit var clusterMetricsVisualization: ClusterMetricsVisualizationIndex
 
     override fun getRestHandlers(
         settings: Settings,
@@ -247,8 +248,16 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         // create a cluster metrics visualization index upon initialization of alerting plugin
         // ClusterMetricsVisualizationIndex(client, clusterService)
         log.info("YEP MESSAGE   $client")
-        ClusterMetricsVisualizationIndex(client, clusterService)
-        return listOf(sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator)
+        clusterMetricsVisualization = ClusterMetricsVisualizationIndex(client, clusterService)
+        return listOf(
+            sweeper,
+            scheduler,
+            runner,
+            scheduledJobIndices,
+            docLevelMonitorQueries,
+            destinationMigrationCoordinator,
+            clusterMetricsVisualization
+        )
     }
 
     override fun getSettings(): List<Setting<*>> {
