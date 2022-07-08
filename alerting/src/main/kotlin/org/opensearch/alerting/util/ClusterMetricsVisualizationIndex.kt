@@ -68,16 +68,15 @@ class ClusterMetricsVisualizationIndex(
             triggers = mutableListOf(),
             uiMetadata = mutableMapOf()
         )
-        val monitorRequest = IndexMonitorRequest(
+        IndexMonitorRequest(
             monitorId = "11111",
             seqNo = 1L,
-            primaryTerm = 1L,
+            primaryTerm = 2L,
             refreshPolicy = WriteRequest.RefreshPolicy.IMMEDIATE,
             RestRequest.Method.POST,
             monitor
         )
-        val response = client.execute(IndexMonitorAction.INSTANCE, monitorRequest).get()
-        response.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS)
+
     }
 
 //    init {
