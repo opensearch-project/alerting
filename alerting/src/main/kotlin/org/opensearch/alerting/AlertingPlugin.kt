@@ -248,7 +248,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         // create a cluster metrics visualization index upon initialization of alerting plugin
         // ClusterMetricsVisualizationIndex(client, clusterService)
         log.info("YEP MESSAGE   $client")
-        clusterMetricsVisualization = ClusterMetricsVisualizationIndex(client, clusterService)
+        clusterMetricsVisualization = ClusterMetricsVisualizationIndex(client, clusterService, threadPool)
         return listOf(
             sweeper,
             scheduler,
