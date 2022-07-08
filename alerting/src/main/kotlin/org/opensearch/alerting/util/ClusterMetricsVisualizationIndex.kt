@@ -39,6 +39,10 @@ class ClusterMetricsVisualizationIndex(
         }
     }
 
+    init {
+        clusterService.addListener(this)
+        clusterService.addLifecycleListener(this)
+    }
     override fun clusterChanged(p0: ClusterChangedEvent) {
         log.info("THIS CLASS IS BEING CALLED")
         val scheduledJob = Runnable {
