@@ -12,10 +12,12 @@ import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.component.LifecycleListener
 import org.opensearch.common.settings.Setting
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.rest.RestRequest
+import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
 import java.time.ZoneId
 
@@ -23,7 +25,8 @@ private val log = LogManager.getLogger(ClusterMetricsVisualizationIndex::class.j
 
 class ClusterMetricsVisualizationIndex(
     private val client: Client,
-    private val clusterService: ClusterService
+    private val clusterService: ClusterService,
+    private val threadPool: ThreadPool
 ) : ClusterStateListener, LifecycleListener() {
     /** The index name pattern for all cluster metric visualizations indices */
     val CLUSTER_METRIC_VISUALIZATION_INDEX = ".opendistro-alerting-cluster-metrics"
@@ -38,6 +41,13 @@ class ClusterMetricsVisualizationIndex(
 
     override fun clusterChanged(p0: ClusterChangedEvent) {
         log.info("THIS CLASS IS BEING CALLED")
+        val scheduledJob = Runnable {
+            helper()
+        }
+        threadPool.schedule(scheduledJob, TimeValue.timeValueMinutes(1), ThreadPool.Names.MANAGEMENT)
+    }
+
+    fun helper() {
         val cronSchedule = CronSchedule("*/15 * * * *", ZoneId.of("US/Pacific"))
         val monitor = Monitor(
             id = "123",
