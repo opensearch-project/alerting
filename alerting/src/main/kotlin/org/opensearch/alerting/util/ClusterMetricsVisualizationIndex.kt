@@ -12,7 +12,6 @@ import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.component.LifecycleListener
 import org.opensearch.common.settings.Setting
-import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentType
@@ -45,10 +44,7 @@ class ClusterMetricsVisualizationIndex(
     }
     override fun clusterChanged(p0: ClusterChangedEvent) {
         log.info("THIS CLASS IS BEING CALLED")
-        val scheduledJob = Runnable {
-            helper()
-        }
-        threadPool.schedule(scheduledJob, TimeValue.timeValueMinutes(1), ThreadPool.Names.MANAGEMENT)
+        helper()
     }
 
     fun helper() {
