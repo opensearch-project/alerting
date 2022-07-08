@@ -3,14 +3,31 @@ package org.opensearch.alerting.util
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
+import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.action.IndexMonitorAction
+import org.opensearch.alerting.action.IndexMonitorRequest
+import org.opensearch.alerting.core.model.CronSchedule
+import org.opensearch.alerting.model.Monitor
 import org.opensearch.client.Client
+import org.opensearch.cluster.ClusterChangedEvent
+import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.service.ClusterService
+import org.opensearch.common.component.LifecycleListener
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.rest.RestRequest
+import java.time.Instant
+import java.time.ZoneId
 
 private val log = LogManager.getLogger(ClusterMetricsVisualizationIndex::class.java)
 
-class ClusterMetricsVisualizationIndex(private val client: Client, private val clusterService: ClusterService) {
+class ClusterMetricsVisualizationIndex(
+    private val client: Client,
+    private val clusterService: ClusterService
+) : ClusterStateListener, LifecycleListener() {
     /** The index name pattern for all cluster metric visualizations indices */
     val CLUSTER_METRIC_VISUALIZATION_INDEX = ".opendistro-alerting-cluster-metrics"
     val METRICS_HISTORY_ENABLED = Setting.boolSetting("opendistro.alerting.metrics_history_enabled", true)
@@ -20,6 +37,36 @@ class ClusterMetricsVisualizationIndex(private val client: Client, private val c
         fun clusterMetricsVisualizationsMappings(): String {
             return ClusterMetricsVisualizationIndex::class.java.classLoader.getResource("mappings/metrics-visualizations.json").readText()
         }
+    }
+
+    override fun clusterChanged(p0: ClusterChangedEvent) {
+        log.info("THIS CLASS IS BEING CALLED")
+        val cronSchedule = CronSchedule("*/15 * * * *", ZoneId.of("US/Pacific"))
+        val monitor = Monitor(
+            id = "123",
+            version = 0L,
+            name = "yepclock",
+            enabled = true,
+            user = null,
+            schedule = cronSchedule,
+            lastUpdateTime = Instant.now(),
+            enabledTime = Instant.now(),
+            monitorType = Monitor.MonitorType.CLUSTER_METRICS_MONITOR,
+            schemaVersion = 0,
+            inputs = mutableListOf(),
+            triggers = mutableListOf(),
+            uiMetadata = mutableMapOf()
+        )
+        val monitorRequest = IndexMonitorRequest(
+            monitorId = "",
+            seqNo = 0L,
+            primaryTerm = 0L,
+            refreshPolicy = WriteRequest.RefreshPolicy.IMMEDIATE,
+            RestRequest.Method.POST,
+            monitor
+        )
+        val response = client.execute(IndexMonitorAction.INSTANCE, monitorRequest).get()
+        response.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS)
     }
 
     init {
