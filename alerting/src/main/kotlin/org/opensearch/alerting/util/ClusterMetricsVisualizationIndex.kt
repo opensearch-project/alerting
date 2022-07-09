@@ -50,6 +50,7 @@ class ClusterMetricsVisualizationIndex(
 
     fun helper() {
         val cronSchedule = CronSchedule("*/15 * * * *", ZoneId.of("US/Pacific"))
+        // index is already being created error, maybe check index is created and THEN run?
         val monitor = Monitor(
             id = "12345",
             version = 1L,
@@ -66,7 +67,7 @@ class ClusterMetricsVisualizationIndex(
             uiMetadata = mutableMapOf()
         )
         val monitorRequest = IndexMonitorRequest(
-            monitorId = "",
+            monitorId = "69420",
             seqNo = 0L,
             primaryTerm = 0L,
             refreshPolicy = WriteRequest.RefreshPolicy.IMMEDIATE,
