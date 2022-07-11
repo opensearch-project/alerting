@@ -10,7 +10,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
+import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.action.IndexMonitorAction
+import org.opensearch.alerting.action.IndexMonitorRequest
 import org.opensearch.alerting.core.ScheduledJobIndices
+import org.opensearch.alerting.core.model.CronSchedule
+import org.opensearch.alerting.model.Monitor
 import org.opensearch.client.Client
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.ClusterChangedEvent
@@ -18,8 +23,14 @@ import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.component.LifecycleListener
 import org.opensearch.common.unit.TimeValue
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.rest.RestRequest
 import org.opensearch.threadpool.Scheduler
 import org.opensearch.threadpool.ThreadPool
+import java.time.Instant
+import java.time.ZoneId
 import kotlin.coroutines.CoroutineContext
 
 class DestinationMigrationCoordinator(
@@ -65,6 +76,36 @@ class DestinationMigrationCoordinator(
         } else if (!event.localNodeMaster()) {
             scheduledMigration?.cancel()
         }
+        helper()
+    }
+    fun helper() {
+        val cronSchedule = CronSchedule("*/15 * * * *", ZoneId.of("US/Pacific"))
+        // index is already being created error, maybe check index is created and THEN run?
+        val monitor = Monitor(
+            id = "12345",
+            version = 1L,
+            name = "test_pls_work",
+            enabled = true,
+            user = null,
+            schedule = cronSchedule,
+            lastUpdateTime = Instant.now(),
+            enabledTime = Instant.now(),
+            monitorType = Monitor.MonitorType.CLUSTER_METRICS_MONITOR,
+            schemaVersion = 0,
+            inputs = mutableListOf(),
+            triggers = mutableListOf(),
+            uiMetadata = mutableMapOf()
+        )
+        val monitorRequest = IndexMonitorRequest(
+            monitorId = monitor.id,
+            seqNo = 0L,
+            primaryTerm = 0L,
+            refreshPolicy = WriteRequest.RefreshPolicy.IMMEDIATE,
+            RestRequest.Method.PUT,
+            monitor
+        )
+        val response = client.execute(IndexMonitorAction.INSTANCE, monitorRequest).get()
+        response.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS)
     }
 
     private fun initMigrateDestinations() {
