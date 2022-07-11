@@ -241,12 +241,12 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         docLevelMonitorQueries = DocLevelMonitorQueries(client, clusterService)
         scheduler = JobScheduler(threadPool, runner)
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
-        clusterMetricsVisualization = ClusterMetricsVisualizationIndex(client, clusterService, threadPool)
         destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool, scheduledJobIndices)
         // Create Monitor using Monitor.kt, and then feed the request to client in some way
         this.threadPool = threadPool
         this.clusterService = clusterService
         // create a cluster metrics visualization index upon initialization of alerting plugin
+        clusterMetricsVisualization = ClusterMetricsVisualizationIndex(client, clusterService, threadPool)
         // ClusterMetricsVisualizationIndex(client, clusterService)
         log.info("YEP MESSAGE   $client")
         return listOf(
