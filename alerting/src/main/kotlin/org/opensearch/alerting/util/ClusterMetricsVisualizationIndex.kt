@@ -13,10 +13,6 @@ import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.component.LifecycleListener
 import org.opensearch.common.settings.Setting
-import org.opensearch.common.unit.TimeValue
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentBuilder
-import org.opensearch.common.xcontent.XContentType
 import org.opensearch.rest.RestRequest
 import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
@@ -47,10 +43,10 @@ class ClusterMetricsVisualizationIndex(
     }
     override fun clusterChanged(p0: ClusterChangedEvent) {
         log.info("THIS CLASS IS BEING CALLED")
-        threadPool.schedule({ helper() }, TimeValue.timeValueMinutes(1), ThreadPool.Names.MANAGEMENT)
+        // threadPool.schedule({ helper() }, TimeValue.timeValueMinutes(1), ThreadPool.Names.MANAGEMENT)
     }
 
-    fun helper() {
+    suspend fun helper() {
         val cronSchedule = CronSchedule("*/15 * * * *", ZoneId.of("US/Pacific"))
         // index is already being created error, maybe check index is created and THEN run?
         val monitor = Monitor(
@@ -76,7 +72,8 @@ class ClusterMetricsVisualizationIndex(
             monitor
         )
         val response = client.execute(IndexMonitorAction.INSTANCE, monitorRequest).get()
-        response.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS)
+        log.info("YEP $response")
+        // response.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS)
     }
 
 //    init {

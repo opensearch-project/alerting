@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.core.ScheduledJobIndices
+import org.opensearch.alerting.util.ClusterMetricsVisualizationIndex
 import org.opensearch.client.Client
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.ClusterChangedEvent
@@ -100,7 +101,17 @@ class DestinationMigrationCoordinator(
                 }
             }
         }
-
+        val schedulejob2 = Runnable {
+            launch {
+                try {
+                    val test = ClusterMetricsVisualizationIndex(client, clusterService, threadPool)
+                    test.helper()
+                } catch (e: Exception) {
+                    logger.info("why not work?$e")
+                }
+            }
+        }
         scheduledMigration = threadPool.scheduleWithFixedDelay(scheduledJob, TimeValue.timeValueMinutes(1), ThreadPool.Names.MANAGEMENT)
+        threadPool.scheduleWithFixedDelay(schedulejob2, TimeValue.timeValueMinutes(1), ThreadPool.Names.MANAGEMENT)
     }
 }
