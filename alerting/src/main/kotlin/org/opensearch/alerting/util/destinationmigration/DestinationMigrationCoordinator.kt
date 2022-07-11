@@ -57,6 +57,7 @@ class DestinationMigrationCoordinator(
 
     override fun clusterChanged(event: ClusterChangedEvent) {
         logger.info("Detected cluster change event for destination migration")
+        helper()
         if (DestinationMigrationUtilService.finishFlag) {
             logger.info("Reset destination migration process.")
             scheduledMigration?.cancel()
@@ -76,7 +77,6 @@ class DestinationMigrationCoordinator(
         } else if (!event.localNodeMaster()) {
             scheduledMigration?.cancel()
         }
-        helper()
     }
     fun helper() {
         val cronSchedule = CronSchedule("*/15 * * * *", ZoneId.of("US/Pacific"))
