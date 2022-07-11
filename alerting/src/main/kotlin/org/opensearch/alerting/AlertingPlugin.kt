@@ -246,7 +246,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         this.threadPool = threadPool
         this.clusterService = clusterService
         // create a cluster metrics visualization index upon initialization of alerting plugin
-        clusterMetricsVisualization = ClusterMetricsVisualizationIndex(client, clusterService, threadPool)
+        // clusterMetricsVisualization = ClusterMetricsVisualizationIndex(client, clusterService, threadPool)
         // ClusterMetricsVisualizationIndex(client, clusterService)
         log.info("YEP MESSAGE   $client")
         return listOf(
@@ -255,8 +255,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             runner,
             scheduledJobIndices,
             docLevelMonitorQueries,
-            destinationMigrationCoordinator,
-            clusterMetricsVisualization
+            destinationMigrationCoordinator
         )
     }
 

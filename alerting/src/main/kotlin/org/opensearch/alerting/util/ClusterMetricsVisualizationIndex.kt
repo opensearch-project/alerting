@@ -8,6 +8,7 @@ import org.opensearch.alerting.core.model.CronSchedule
 import org.opensearch.alerting.core.model.IntervalSchedule
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.client.Client
+import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.service.ClusterService
@@ -34,6 +35,36 @@ class ClusterMetricsVisualizationIndex(
         @JvmStatic
         fun clusterMetricsVisualizationsMappings(): String {
             return ClusterMetricsVisualizationIndex::class.java.classLoader.getResource("mappings/metrics-visualizations.json").readText()
+        }
+        suspend fun helperStatic(client: NodeClient) {
+            val cronSchedule = CronSchedule("*/15 * * * *", ZoneId.of("US/Pacific"))
+            // index is already being created error, maybe check index is created and THEN run?
+            log.info("richfu helperStatic is being called")
+            val monitor = Monitor(
+                id = "12345",
+                version = 1L,
+                name = "test_pls_work",
+                enabled = true,
+                user = null,
+                schedule = IntervalSchedule(interval = 15, unit = ChronoUnit.MINUTES),
+                lastUpdateTime = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+                enabledTime = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+                monitorType = Monitor.MonitorType.CLUSTER_METRICS_MONITOR,
+                inputs = mutableListOf(),
+                triggers = mutableListOf(),
+                uiMetadata = mapOf()
+            )
+            val monitorRequest = IndexMonitorRequest(
+                monitorId = "111111",
+                seqNo = 1L,
+                primaryTerm = 2L,
+                refreshPolicy = WriteRequest.RefreshPolicy.IMMEDIATE,
+                RestRequest.Method.POST,
+                monitor
+            )
+            val response = client.execute(IndexMonitorAction.INSTANCE, monitorRequest).get()
+            log.info("richfu step create monitor $response")
+            // response.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS)
         }
     }
 
@@ -72,7 +103,7 @@ class ClusterMetricsVisualizationIndex(
             monitor
         )
         val response = client.execute(IndexMonitorAction.INSTANCE, monitorRequest).get()
-        log.info("YEP $response")
+        log.info(" $response")
         // response.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS)
     }
 
