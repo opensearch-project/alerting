@@ -5,6 +5,7 @@ import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.action.IndexMonitorAction
 import org.opensearch.alerting.action.IndexMonitorRequest
 import org.opensearch.alerting.core.model.CronSchedule
+import org.opensearch.alerting.core.model.IntervalSchedule
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.client.Client
 import org.opensearch.cluster.ClusterChangedEvent
@@ -20,6 +21,7 @@ import org.opensearch.rest.RestRequest
 import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 
 private val log = LogManager.getLogger(ClusterMetricsVisualizationIndex::class.java)
 
@@ -57,19 +59,18 @@ class ClusterMetricsVisualizationIndex(
             name = "test_pls_work",
             enabled = true,
             user = null,
-            schedule = cronSchedule,
-            lastUpdateTime = Instant.now(),
-            enabledTime = Instant.now(),
+            schedule = IntervalSchedule(interval = 15, unit = ChronoUnit.MINUTES),
+            lastUpdateTime = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+            enabledTime = Instant.now().truncatedTo(ChronoUnit.MILLIS),
             monitorType = Monitor.MonitorType.CLUSTER_METRICS_MONITOR,
-            schemaVersion = 0,
             inputs = mutableListOf(),
             triggers = mutableListOf(),
-            uiMetadata = mutableMapOf()
+            uiMetadata = mapOf()
         )
         val monitorRequest = IndexMonitorRequest(
             monitorId = "111111",
-            seqNo = 0L,
-            primaryTerm = 0L,
+            seqNo = 1L,
+            primaryTerm = 2L,
             refreshPolicy = WriteRequest.RefreshPolicy.IMMEDIATE,
             RestRequest.Method.POST,
             monitor
