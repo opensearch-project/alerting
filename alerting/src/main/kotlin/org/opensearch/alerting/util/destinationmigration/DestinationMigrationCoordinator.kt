@@ -57,6 +57,7 @@ class DestinationMigrationCoordinator(
             !runningLock &&
             (scheduledMigration == null || scheduledMigration!!.isCancelled)
         ) {
+            logger.info("richfu destination migration")
             try {
                 runningLock = true
                 initMigrateDestinations()
@@ -64,6 +65,7 @@ class DestinationMigrationCoordinator(
                 runningLock = false
             }
         } else if (!event.localNodeMaster()) {
+            logger.info("richfu no destination migration")
             scheduledMigration?.cancel()
         }
     }
