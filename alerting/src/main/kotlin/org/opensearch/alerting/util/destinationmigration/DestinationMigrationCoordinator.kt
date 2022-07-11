@@ -75,6 +75,8 @@ class DestinationMigrationCoordinator(
     }
 
     private fun initMigrateDestinations() {
+        logger.info("start of initMigrateDestination")
+        logger.info("includes $clusterService")
         if (!scheduledJobIndices.scheduledJobIndexExists()) {
             logger.debug("Alerting config index is not initialized")
             scheduledMigration?.cancel()
