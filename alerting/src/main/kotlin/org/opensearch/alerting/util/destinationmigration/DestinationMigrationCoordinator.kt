@@ -59,10 +59,14 @@ class DestinationMigrationCoordinator(
         ) {
             logger.info("richfu destination migration")
             try {
+                logger.info("richfu try before")
                 runningLock = true
                 initMigrateDestinations()
+                logger.info("richfu try after")
             } finally {
+                logger.info("richfu finally before")
                 runningLock = false
+                logger.info("richfu finally after")
             }
         } else if (!event.localNodeMaster()) {
             logger.info("richfu no destination migration")
