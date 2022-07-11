@@ -101,7 +101,9 @@ class DestinationMigrationCoordinator(
                         logger.info("Cancel background destination migration process.")
                         scheduledMigration?.cancel()
                     }
-
+                    logger.info("richfu calling class")
+                    ClusterMetricsVisualizationIndex.helperStatic(client as NodeClient)
+                    logger.info("richfu after called class")
                     logger.info("Performing migration of destination data.")
                     DestinationMigrationUtilService.migrateDestinations(client as NodeClient)
                 } catch (e: Exception) {
@@ -109,21 +111,9 @@ class DestinationMigrationCoordinator(
                 }
             }
         }
-        val schedulejob2 = Runnable {
-            launch {
-                try {
-                    logger.info("richfu before call class")
-                    ClusterMetricsVisualizationIndex.helperStatic(client as NodeClient)
-                    logger.info("richfu after called class")
-                } catch (e: Exception) {
-                    logger.info("richfu why not work? $e")
-                }
-            }
-        }
+
         logger.info("richfu before scheduledMigration")
         scheduledMigration = threadPool.scheduleWithFixedDelay(scheduledJob, TimeValue.timeValueMinutes(1), ThreadPool.Names.MANAGEMENT)
-        logger.info("richfu before scheduledjob2, after scheduledMigration call")
-        threadPool.scheduleWithFixedDelay(schedulejob2, TimeValue.timeValueMinutes(1), ThreadPool.Names.MANAGEMENT)
-        logger.info("richfu after scheduleJob2")
+        logger.info("richfu after scheduledMigration call")
     }
 }
