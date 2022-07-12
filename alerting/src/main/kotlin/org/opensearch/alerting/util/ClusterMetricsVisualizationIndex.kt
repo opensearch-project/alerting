@@ -1,6 +1,7 @@
 package org.opensearch.alerting.util
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.ResourceAlreadyExistsException
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -42,8 +43,13 @@ class ClusterMetricsVisualizationIndex(
                         Settings.builder().put("index.hidden", true)
                             .build()
                     )
-                val createIndexResponse: CreateIndexResponse = client.suspendUntil { client.admin().indices().create(indexRequest, it) }
-                createIndexResponse.isAcknowledged
+                try {
+                    val createIndexResponse: CreateIndexResponse = client.suspendUntil { client.admin().indices().create(indexRequest, it) }
+                    createIndexResponse.isAcknowledged
+                } catch (e: ResourceAlreadyExistsException) {
+                    log.info("Index already exists.")
+                    true
+                }
             }
         }
         fun clusterMetricsVisualizationIndexExists(clusterService: ClusterService): Boolean {
