@@ -6,7 +6,7 @@
     "metric":{
       "type": "nested",
       "properties": {
-        "date": {
+        "timestamp": {
           "type": "text",
           "format": "basic_date_time"
         },
