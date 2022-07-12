@@ -70,7 +70,7 @@ import org.opensearch.alerting.transport.TransportIndexMonitorAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
-import org.opensearch.alerting.util.ClusterMetricsVisualizationIndex
+import org.opensearch.alerting.util.ClusterMetricsCoordinator
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
 import org.opensearch.client.Client
@@ -144,7 +144,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     lateinit var alertIndices: AlertIndices
     lateinit var clusterService: ClusterService
     lateinit var destinationMigrationCoordinator: DestinationMigrationCoordinator
-    lateinit var clusterMetricsVisualization: ClusterMetricsVisualizationIndex
+    lateinit var clusterMetricsCoordinator: ClusterMetricsCoordinator
 
     override fun getRestHandlers(
         settings: Settings,
@@ -242,6 +242,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         scheduler = JobScheduler(threadPool, runner)
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
         destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool, scheduledJobIndices)
+        clusterMetricsCoordinator = ClusterMetricsCoordinator(client, clusterService, threadPool)
         // Create Monitor using Monitor.kt, and then feed the request to client in some way
         this.threadPool = threadPool
         this.clusterService = clusterService
@@ -255,7 +256,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             runner,
             scheduledJobIndices,
             docLevelMonitorQueries,
-            destinationMigrationCoordinator
+            destinationMigrationCoordinator,
+            clusterMetricsCoordinator
         )
     }
 
