@@ -142,6 +142,7 @@ class DestinationMigrationCoordinator(
             call index API to index the document
          */
         val current_time = Instant.now().toString()
+        logger.info("richfu THIS IS THE TIME $current_time")
         // cluster health for unassigned shards
         val cluster_health = client.admin().cluster().health(ClusterHealthRequest()).get().toMap()
         // cluster stats for cluster status (health), CPU usage, JVM pressure
