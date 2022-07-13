@@ -73,10 +73,16 @@ class ClusterMetricsCoordinator(
         val nodes_map = cluster_stats["nodes"] as Map<String, Any>
         log.info("this is nodes map $nodes_map")
         val process_map = nodes_map["process"] as Map<String, Any>
-        log.info("this is process map $process_map")
         val cpu_map = process_map["cpu"] as Map<String, Any>
         val percent = cpu_map["percent"].toString()
         log.info("THIS IS CPU USAGE $percent")
+
+        val jvm_map = nodes_map["jvm"] as Map<String, Any>
+        var mem_used = jvm_map["heap_used_in_bytes"]
+        var mem_avail = jvm_map["heap_max_in_bytes"]
+        log.info("mem_used type is ${mem_used!!::class.qualifiedName}")
+        log.info("mem_avail type is ${mem_avail!!::class.qualifiedName}")
+
 
         var cluster_status_data = ClusterMetricsDataPoint(ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS, current_time, cluster_status)
         var unassigned_shards_data = ClusterMetricsDataPoint(
