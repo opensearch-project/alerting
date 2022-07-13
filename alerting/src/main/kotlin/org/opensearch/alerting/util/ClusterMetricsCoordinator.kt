@@ -86,7 +86,6 @@ class ClusterMetricsCoordinator(
             log.info("jvm pressure is $jvm_pressure")
         }
 
-
         var cluster_status_data = ClusterMetricsDataPoint(ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS, current_time, cluster_status)
         var unassigned_shards_data = ClusterMetricsDataPoint(
             ClusterMetricsDataPoint.MetricType.UNASSIGNED_SHARDS,
