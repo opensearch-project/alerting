@@ -77,8 +77,9 @@ class ClusterMetricsCoordinator(
         val percent = cpu_map["percent"].toString()
         log.info("THIS IS CPU USAGE $percent")
         val jvm_map = nodes_map["jvm"] as Map<String, Any>
-        var mem_used = jvm_map["heap_used_in_bytes"]
-        var mem_avail = jvm_map["heap_max_in_bytes"]
+        val mem_map = jvm_map["mem"] as Map<String, Any>
+        var mem_used = mem_map["heap_used_in_bytes"]
+        var mem_avail = mem_map["heap_max_in_bytes"]
         log.info("mem_used type is ${mem_used!!::class.qualifiedName}")
         log.info("mem_avail type is ${mem_avail!!::class.qualifiedName}")
 
