@@ -115,15 +115,13 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         try {
             val indexCreationTimeMap = mutableMapOf<String, Long>()
-            for (index in inputIndices) {
-                val getIndexRequest = GetIndexRequest().indices(index)
-                val getIndexResponse: GetIndexResponse = monitorCtx.client!!.suspendUntil {
-                    monitorCtx.client!!.admin().indices().getIndex(getIndexRequest, it)
-                }
-                val indices = getIndexResponse.indices()
-                indices.forEach { index ->
-                    indexCreationTimeMap[index] = getIndexResponse.settings.get(index).getAsLong("index.creation_date", 0L)
-                }
+            val getIndexRequest = GetIndexRequest().indices(*inputIndices.toTypedArray())
+            val getIndexResponse: GetIndexResponse = monitorCtx.client!!.suspendUntil {
+                monitorCtx.client!!.admin().indices().getIndex(getIndexRequest, it)
+            }
+            val indices = getIndexResponse.indices()
+            indices.forEach { index ->
+                indexCreationTimeMap[index] = getIndexResponse.settings.get(index).getAsLong("index.creation_date", 0L)
             }
 
             // cleanup old indices that are not monitored anymore from the same monitor
