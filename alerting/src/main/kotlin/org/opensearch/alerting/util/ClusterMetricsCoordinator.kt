@@ -70,7 +70,7 @@ class ClusterMetricsCoordinator(
         log.info("this is unassigned shards $unassignedShards")
         var cluster_status = cluster_health["status"].toString()
         log.info("this is cluster status $cluster_status")
-        val process_map = cluster_stats.toMap()["process"]
+        val process_map = cluster_stats["process"]
         log.info("this is process map $process_map")
 
         var cluster_status_data = ClusterMetricsDataPoint(ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS, current_time, cluster_status)
