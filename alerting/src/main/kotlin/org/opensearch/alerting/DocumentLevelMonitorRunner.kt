@@ -95,7 +95,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         )
 
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
-        val index = docLevelMonitorInput.indices[0]
+        val inputIndices = docLevelMonitorInput.indices
         val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
 
         var monitorMetadata = getMonitorMetadata(monitorCtx.client!!, monitorCtx.xContentRegistry!!, "${monitor.id}-metadata")
@@ -114,23 +114,28 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         val docsToQueries = mutableMapOf<String, MutableList<String>>()
 
         try {
-            val getIndexRequest = GetIndexRequest().indices(index)
+            val indexCreationTimeMap = mutableMapOf<String, Long>()
+            val getIndexRequest = GetIndexRequest().indices(*inputIndices.toTypedArray())
             val getIndexResponse: GetIndexResponse = monitorCtx.client!!.suspendUntil {
                 monitorCtx.client!!.admin().indices().getIndex(getIndexRequest, it)
             }
             val indices = getIndexResponse.indices()
+            indices.forEach { index ->
+                indexCreationTimeMap[index] = getIndexResponse.settings.get(index).getAsLong("index.creation_date", 0L)
+            }
 
             // cleanup old indices that are not monitored anymore from the same monitor
             for (ind in updatedLastRunContext.keys) {
-                if (!indices.contains(ind)) {
+                if (!indexCreationTimeMap.keys.contains(ind)) {
                     updatedLastRunContext.remove(ind)
                 }
             }
 
-            indices.forEach { indexName ->
+            indexCreationTimeMap.keys.forEach { indexName ->
                 // Prepare lastRunContext for each index
+                val indexCreationTime = indexCreationTimeMap[indexName]!!
                 val indexLastRunContext = lastRunContext.getOrPut(indexName) {
-                    val indexCreatedRecently = createdRecently(monitor, indexName, periodStart, periodEnd, getIndexResponse)
+                    val indexCreatedRecently = createdRecently(monitor, periodStart, periodEnd, indexCreationTime)
                     createRunContext(monitorCtx.clusterService!!, monitorCtx.client!!, indexName, indexCreatedRecently)
                 }
 
@@ -180,7 +185,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 }
             }
         } catch (e: Exception) {
-            logger.error("Failed to start Document-level-monitor $index. Error: ${e.message}", e)
+            logger.error("Failed to start Document-level-monitor $inputIndices. Error: ${e.message}", e)
             val alertingException = AlertingException.wrap(e)
             return monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
         }
@@ -356,11 +361,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         if (monitor.inputs[0].name() != DocLevelMonitorInput.DOC_LEVEL_INPUT_FIELD) {
             throw IOException("Invalid input with document-level-monitor.")
         }
-
-        val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
-        if (docLevelMonitorInput.indices.size > 1) {
-            throw IOException("Only one index is supported with document-level-monitor.")
-        }
     }
 
     suspend fun createRunContext(
@@ -386,13 +386,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
     // new index is monitored from the beginning of that index
     private fun createdRecently(
         monitor: Monitor,
-        index: String,
         periodStart: Instant,
         periodEnd: Instant,
-        getIndexResponse: GetIndexResponse
+        indexCreationTime: Long
     ): Boolean {
         val lastExecutionTime = if (periodStart == periodEnd) monitor.lastUpdateTime else periodStart
-        return getIndexResponse.settings.get(index).getAsLong("index.creation_date", 0L) > lastExecutionTime.toEpochMilli()
+        return indexCreationTime > lastExecutionTime.toEpochMilli()
     }
 
     /**
