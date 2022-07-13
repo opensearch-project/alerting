@@ -82,12 +82,15 @@ class ClusterMetricsCoordinator(
         var mem_avail = mem_map["heap_max_in_bytes"]
 
         if (mem_used is Int && mem_avail is Int) {
-            val jvm_pressure = mem_used.toDouble() / mem_avail.toDouble()
+            val jvm_pressure = ((mem_used.toDouble() / mem_avail.toDouble()) * 100).toString()
             log.info("jvm pressure is $jvm_pressure")
+            val jvm_pressure_data = ClusterMetricsDataPoint(ClusterMetricsDataPoint.MetricType.JVM_PRESSURE, current_time, jvm_pressure)
+            val indexRequest_pressure = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+                .source(jvm_pressure_data.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
         }
 
-        var cluster_status_data = ClusterMetricsDataPoint(ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS, current_time, cluster_status)
-        var unassigned_shards_data = ClusterMetricsDataPoint(
+        val cluster_status_data = ClusterMetricsDataPoint(ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS, current_time, cluster_status)
+        val unassigned_shards_data = ClusterMetricsDataPoint(
             ClusterMetricsDataPoint.MetricType.UNASSIGNED_SHARDS,
             current_time,
             unassignedShards
