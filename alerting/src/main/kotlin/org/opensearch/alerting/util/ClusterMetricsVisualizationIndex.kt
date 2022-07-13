@@ -38,7 +38,6 @@ class ClusterMetricsVisualizationIndex(
         suspend fun initFunc(client: Client, clusterService: ClusterService) {
             if (!clusterMetricsVisualizationIndexExists(clusterService)) {
                 val indexRequest = CreateIndexRequest(CLUSTER_METRIC_VISUALIZATION_INDEX)
-                    .mapping(clusterMetricsVisualizationsMappings())
                     .settings(
                         Settings.builder().put("index.hidden", true)
                             .build()
