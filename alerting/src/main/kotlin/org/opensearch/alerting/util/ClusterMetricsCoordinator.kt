@@ -81,8 +81,8 @@ class ClusterMetricsCoordinator(
         var mem_used = mem_map["heap_used_in_bytes"]
         var mem_avail = mem_map["heap_max_in_bytes"]
         val jvm_pressure = 0
-        if (mem_used is Int && mem_avail is Int){
-            val jvm_pressure = mem_used/mem_avail
+        if (mem_used is Int && mem_avail is Int) {
+            val jvm_pressure = mem_used / mem_avail
         }
 
         log.info("jvm_pressure is $jvm_pressure")
