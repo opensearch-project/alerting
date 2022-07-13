@@ -70,9 +70,8 @@ class ClusterMetricsCoordinator(
         log.info("this is unassigned shards $unassignedShards")
         var cluster_status = cluster_health["status"].toString()
         log.info("this is cluster status $cluster_status")
-//        var CPU_usage = cluster_stats.
-//        logger.info("this is CPU usage $CPU_usage")
-//        var JVM_pressure = cluster_stats
+        var CPU_usage = cluster_stats.get("nodes")
+        log.info("this is CPU usage $CPU_usage")
 
         var cluster_status_data = ClusterMetricsDataPoint(ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS, current_time, cluster_status)
         var unassigned_shards_data = ClusterMetricsDataPoint(
