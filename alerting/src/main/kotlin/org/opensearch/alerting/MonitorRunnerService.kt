@@ -29,8 +29,6 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTIONABLE_ALERT_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MOVE_ALERTS_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MOVE_ALERTS_BACKOFF_MILLIS
-import org.opensearch.alerting.settings.AlertingSettings.Companion.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
-import org.opensearch.alerting.settings.AlertingSettings.Companion.TOTAL_MAX_ACTIONS_PER_TRIGGER
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.HOST_DENY_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.loadDestinationSettings
@@ -48,7 +46,6 @@ import org.opensearch.script.TemplateScript
 import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
 import kotlin.coroutines.CoroutineContext
-import kotlin.math.min
 
 object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
 
@@ -151,17 +148,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         }
 
         monitorCtx.indexTimeout = INDEX_TIMEOUT.get(monitorCtx.settings)
-        monitorCtx.maxActionsAcrossTriggers =
-            min(TOTAL_MAX_ACTIONS_PER_TRIGGER.get(monitorCtx.settings), TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.get(monitorCtx.settings))
-        monitorCtx.totalMaxActionsAcrossTriggers = TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.get(monitorCtx.settings)
-
-        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(
-            TOTAL_MAX_ACTIONS_PER_TRIGGER,
-            TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
-        ) { maxActions: Int, totalMaxActions: Int ->
-            monitorCtx.maxActionsAcrossTriggers = maxActions
-            monitorCtx.totalMaxActionsAcrossTriggers = totalMaxActions
-        }
         return this
     }
 
