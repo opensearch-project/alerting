@@ -80,8 +80,12 @@ class ClusterMetricsCoordinator(
         val mem_map = jvm_map["mem"] as Map<String, Any>
         var mem_used = mem_map["heap_used_in_bytes"]
         var mem_avail = mem_map["heap_max_in_bytes"]
-        log.info("mem_used type is ${mem_used!!::class.qualifiedName}")
-        log.info("mem_avail type is ${mem_avail!!::class.qualifiedName}")
+        val jvm_pressure = 0
+        if (mem_used is Int && mem_avail is Int){
+            val jvm_pressure = mem_used/mem_avail
+        }
+
+        log.info("jvm_pressure is $jvm_pressure")
 
         var cluster_status_data = ClusterMetricsDataPoint(ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS, current_time, cluster_status)
         var unassigned_shards_data = ClusterMetricsDataPoint(
