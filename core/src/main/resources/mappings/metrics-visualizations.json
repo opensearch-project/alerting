@@ -3,13 +3,12 @@
     "schema_version": 1
   },
   "properties": {
-    "metric":{
-      "type": "nested",
+    "metricName":{
       "properties": {
         "timestamp": {
-          "type": "text"
+          "type": "date"
         },
-        "metric_value": {
+        "value": {
           "type": "text"
         }
       }
