@@ -71,8 +71,11 @@ class ClusterMetricsCoordinator(
         var cluster_status = cluster_health["status"].toString()
         log.info("this is cluster status $cluster_status")
         val os_map = cluster_stats.get("os") as Map<String, Any>
+        log.info("this is os map $os_map")
         val process_map = os_map?.get("process") as Map<String, Any>
+        log.info("this is process map $process_map")
         val cpu_map = process_map?.get("cpu") as Map<String, Any>
+        log.info("this is cpu map $cpu_map")
         val CPU_usage = cpu_map?.get("percent").toString()
         log.info("this is CPU usage $CPU_usage")
 
