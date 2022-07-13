@@ -3,7 +3,7 @@
     "schema_version": 1
   },
   "properties": {
-    "metric.metricName":{
+    "metric": {
       "properties": {
         "timestamp": {
           "type": "date"
