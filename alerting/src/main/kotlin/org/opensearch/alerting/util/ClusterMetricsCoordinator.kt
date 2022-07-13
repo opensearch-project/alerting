@@ -70,7 +70,10 @@ class ClusterMetricsCoordinator(
         log.info("this is unassigned shards $unassignedShards")
         var cluster_status = cluster_health["status"].toString()
         log.info("this is cluster status $cluster_status")
-        var CPU_usage = cluster_stats.get("nodes")
+        val os_map = cluster_stats.get("os") as Map<Any, Any>
+        val process_map = os_map?.get("process") as Map<Any, Any>
+        val cpu_map = process_map?.get("cpu") as Map<Any, Any>
+        val CPU_usage = cpu_map?.get("percent").toString()
         log.info("this is CPU usage $CPU_usage")
 
         var cluster_status_data = ClusterMetricsDataPoint(ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS, current_time, cluster_status)
