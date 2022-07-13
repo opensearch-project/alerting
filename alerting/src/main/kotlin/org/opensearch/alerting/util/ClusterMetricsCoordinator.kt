@@ -61,6 +61,7 @@ class ClusterMetricsCoordinator(
         log.info("richfu THIS IS THE TIME $current_time")
         // cluster health for unassigned shards
         val cluster_health = client.admin().cluster().health(ClusterHealthRequest()).get().toMap()
+        log.info("cluster health work $cluster_health")
         // cluster stats for cluster status (health), CPU usage, JVM pressure
         var cluster_stats = client.admin().cluster().clusterStats(ClusterStatsRequest()).get().toMap()
         log.info("cluster stats why not work? $cluster_stats")
