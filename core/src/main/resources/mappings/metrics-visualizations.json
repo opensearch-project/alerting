@@ -3,14 +3,19 @@
     "schema_version": 1
   },
   "properties": {
-    "metricName":{
+    "metric":{
       "properties": {
         "timestamp": {
           "type": "date"
         },
-        "value": {
-          "type": "text"
-        }
+        "value" : {
+          "type" : "text",
+          "fields" : {
+            "keyword" : {
+              "type" : "keyword",
+              "ignore_above" : 256
+            }
+          }
       }
     }
   }
