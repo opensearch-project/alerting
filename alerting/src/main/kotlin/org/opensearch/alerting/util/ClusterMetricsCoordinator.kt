@@ -74,6 +74,9 @@ class ClusterMetricsCoordinator(
         log.info("this is nodes map $nodes_map")
         val process_map = nodes_map["process"] as Map<String, Any>
         log.info("this is process map $process_map")
+        val cpu_map = process_map["cpu"] as Map<String, Any>
+        val percent = cpu_map["percent"].toString()
+        log.info("THIS IS CPU USAGE $percent")
 
         var cluster_status_data = ClusterMetricsDataPoint(ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS, current_time, cluster_status)
         var unassigned_shards_data = ClusterMetricsDataPoint(
