@@ -81,34 +81,36 @@ class ClusterMetricsCoordinator(
         var mem_used = mem_map["heap_used_in_bytes"]
         var mem_avail = mem_map["heap_max_in_bytes"]
 
-        if (mem_used is Int && mem_avail is Int) {
-            val jvm_pressure = ((mem_used.toDouble() / mem_avail.toDouble()) * 100).toString()
-            log.info("jvm pressure is $jvm_pressure")
-            val jvm_pressure_data = ClusterMetricsDataPoint(ClusterMetricsDataPoint.MetricType.JVM_PRESSURE, current_time, jvm_pressure)
-            val indexRequest_pressure = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-                .source(jvm_pressure_data.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-        }
-
         val cluster_status_data = ClusterMetricsDataPoint(ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS, current_time, cluster_status)
         val unassigned_shards_data = ClusterMetricsDataPoint(
             ClusterMetricsDataPoint.MetricType.UNASSIGNED_SHARDS,
             current_time,
             unassignedShards
         )
+        val cpu_usage_data = ClusterMetricsDataPoint(
+            ClusterMetricsDataPoint.MetricType.CPU_USAGE,
+            current_time,
+            percent
+        )
 
         val indexRequest_status = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
             .source(cluster_status_data.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
         val indexRequest_shards = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
             .source(unassigned_shards_data.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+        val indexRequest_cpu = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .source(cpu_usage_data.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
 
         try {
             val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest_status, it) }
             val indexResponse2: IndexResponse = client.suspendUntil { client.index(indexRequest_shards, it) }
+            val indexResponse3: IndexResponse = client.suspendUntil { client.index(indexRequest_cpu, it) }
             val failureReasons = checkShardsFailure(indexResponse)
             val failureReasons2 = checkShardsFailure(indexResponse2)
-            if (failureReasons != null || failureReasons2 != null) {
+            val failureReasons3 = checkShardsFailure(indexResponse3)
+            if (failureReasons != null || failureReasons2 != null || failureReasons3 != null) {
                 log.info("richfu failed because $failureReasons")
                 log.info("richfu failed because $failureReasons2")
+                log.info("richfu failed because $failureReasons3")
                 return
             }
         } catch (t: Exception) {
