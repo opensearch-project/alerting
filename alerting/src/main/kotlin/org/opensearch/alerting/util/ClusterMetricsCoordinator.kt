@@ -82,7 +82,8 @@ class ClusterMetricsCoordinator(
         var jvm_pressure = "0.0"
 
         if (mem_used is Int && mem_avail is Int) {
-            jvm_pressure = ((mem_used.toDouble() / mem_avail.toDouble()) * 100).toString()
+            val jvm_pressure_num = ((mem_used.toDouble() / mem_avail.toDouble()) * 100)
+            jvm_pressure = String.format("%.2f", jvm_pressure_num)
         }
         log.info("THIS IS JVM PRESSURE $jvm_pressure")
 
