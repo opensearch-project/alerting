@@ -63,11 +63,10 @@ class ClusterMetricsCoordinator(
         val cluster_health = client.admin().cluster().health(ClusterHealthRequest()).get().toMap()
         // cluster stats for cluster status (health), CPU usage, JVM pressure
         var cluster_stats = client.admin().cluster().clusterStats(ClusterStatsRequest()).get().toMap()
-        log.info("cluster stats why not work? $cluster_stats")
+
         ClusterMetricsVisualizationIndex.initFunc(client, clusterService)
 
         var unassignedShards = cluster_health["unassigned_shards"].toString()
-        log.info("this is unassigned shards $unassignedShards")
         var cluster_status = cluster_health["status"].toString()
         log.info("this is cluster status $cluster_status")
         val nodes_map = cluster_stats["nodes"] as Map<String, Any>
