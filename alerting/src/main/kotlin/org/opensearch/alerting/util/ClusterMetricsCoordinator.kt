@@ -84,6 +84,7 @@ class ClusterMetricsCoordinator(
         if (mem_used is Int && mem_avail is Int) {
             jvm_pressure = ((mem_used.toDouble() / mem_avail.toDouble()) * 100).toString()
         }
+        log.info("THIS IS JVM PRESSURE $jvm_pressure")
 
         val cluster_status_data = ClusterMetricsDataPoint(ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS, current_time, cluster_status)
         val unassigned_shards_data = ClusterMetricsDataPoint(
