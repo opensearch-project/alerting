@@ -67,10 +67,10 @@ class ClusterMetricsCoordinator(
         ClusterMetricsVisualizationIndex.initFunc(client, clusterService)
 
         var unassignedShards = cluster_health["unassigned_shards"].toString()
+        log.info("this is unassigned shards $unassignedShards")
         var cluster_status = cluster_health["status"].toString()
         log.info("this is cluster status $cluster_status")
         val nodes_map = cluster_stats["nodes"] as Map<String, Any>
-        log.info("this is nodes map $nodes_map")
         val process_map = nodes_map["process"] as Map<String, Any>
         val cpu_map = process_map["cpu"] as Map<String, Any>
         val percent = cpu_map["percent"].toString()
