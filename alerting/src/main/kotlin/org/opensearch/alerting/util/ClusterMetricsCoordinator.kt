@@ -45,7 +45,7 @@ class ClusterMetricsCoordinator(
                 destinationHelper(client as NodeClient, clusterService)
             }
         }
-        threadPool.scheduleWithFixedDelay(scheduledJob, TimeValue.timeValueMinutes(1), ThreadPool.Names.SYSTEM_WRITE)
+        threadPool.scheduleWithFixedDelay(scheduledJob, TimeValue.timeValueMinutes(5), ThreadPool.Names.SYSTEM_WRITE)
     }
     suspend fun destinationHelper(client: NodeClient, clusterService: ClusterService) {
         /*
