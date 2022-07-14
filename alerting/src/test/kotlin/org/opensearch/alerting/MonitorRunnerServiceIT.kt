@@ -27,6 +27,7 @@ import org.opensearch.alerting.model.destination.CustomWebhook
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.email.Email
 import org.opensearch.alerting.model.destination.email.Recipient
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.ResponseException
@@ -408,6 +409,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     }
 
     fun `test monitor with one bad action and one good action`() {
+        updateTriggersLimits()
+
         val goodAction = randomAction(
             template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
             destinationId = createDestination().id
@@ -444,6 +447,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     }
 
     fun `test execute monitor adds to alert error history`() {
+        updateTriggersLimits()
+
         putAlertMappings() // Required as we do not have a create alert API.
         // This template script has a parsing error to purposefully create an errorMessage during runMonitor
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name"))
@@ -651,6 +656,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     }
 
     fun `test monitor with throttled action for same alert`() {
+        updateTriggersLimits()
+
         val actionThrottleEnabled = randomAction(
             template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
             destinationId = createDestination().id,
@@ -712,6 +719,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     }
 
     fun `test monitor with throttled action for different alerts`() {
+        updateTriggersLimits()
+
         val actionThrottleEnabled = randomAction(
             template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
             destinationId = createDestination().id,
@@ -754,6 +763,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     }
 
     fun `test execute monitor with email destination creates alert in error state`() {
+        updateTriggersLimits()
+
         putAlertMappings() // Required as we do not have a create alert API.
 
         val emailAccount = createRandomEmailAccount()
@@ -865,6 +876,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     }
 
     fun `test create ClusterMetricsInput monitor with alert triggered`() {
+        updateTriggersLimits()
         // GIVEN
         putAlertMappings()
         val trigger = randomQueryLevelTrigger(
@@ -967,6 +979,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     //  the API from the list before executing the monitor.
 
     fun `test execute monitor with custom webhook destination and denied host`() {
+        updateTriggersLimits()
 
         listOf("http://10.1.1.1", "127.0.0.1").forEach {
             val customWebhook = CustomWebhook(it, null, null, 80, null, "PUT", emptyMap(), emptyMap(), null, null)
@@ -1218,6 +1231,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     }
 
     fun `test bucket-level monitor with acknowledged alert`() {
+        updateTriggersLimits()
+
         val testIndex = createTestIndex()
         insertSampleTimeSerializedData(
             testIndex,
@@ -1322,6 +1337,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
     @Suppress("UNCHECKED_CAST")
     fun `test bucket-level monitor with one good action and one bad action`() {
+        updateTriggersLimits()
+
         val testIndex = createTestIndex()
         insertSampleTimeSerializedData(
             testIndex,
@@ -1400,6 +1417,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
     @Suppress("UNCHECKED_CAST")
     fun `test bucket-level monitor with per execution action scope`() {
+        updateTriggersLimits()
+
         val testIndex = createTestIndex()
         insertSampleTimeSerializedData(
             testIndex,
@@ -1538,6 +1557,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
     @Suppress("UNCHECKED_CAST")
     fun `test bucket-level monitor throttling with per alert action scope`() {
+        updateTriggersLimits()
+
         val testIndex = createTestIndex()
         insertSampleTimeSerializedData(
             testIndex,
@@ -1770,5 +1791,13 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     /** helper that returns a field in a json map whose values are all json objects */
     private fun Map<String, Any>.objectMap(key: String): Map<String, Map<String, Any>> {
         return this[key] as Map<String, Map<String, Any>>
+    }
+    private fun updateTriggersLimits() {
+        client().updateSettings(
+            AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, 20
+        )
+        client().updateSettings(
+            AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, 20
+        )
     }
 }
