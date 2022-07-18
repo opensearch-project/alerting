@@ -195,7 +195,7 @@ class AlertServiceTests : OpenSearchTestCase() {
         )
         val aggResultBuckets = createAggregationResultBucketsFromBucketKeys(
             listOf(
-                listOf("a"),
+                listOf("a")
             )
         )
 
