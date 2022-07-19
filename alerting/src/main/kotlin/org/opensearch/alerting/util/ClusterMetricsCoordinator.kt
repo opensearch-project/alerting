@@ -31,6 +31,11 @@ class ClusterMetricsCoordinator(
     private val threadPool: ThreadPool
 ) : ClusterStateListener, CoroutineScope, LifecycleListener() {
 
+    companion object {
+        var isRunningFlag = false
+            internal set
+    }
+
     override val coroutineContext: CoroutineContext
         get() = Dispatchers.Default + CoroutineName("ClusterMetricsCoordinator")
 
@@ -45,7 +50,10 @@ class ClusterMetricsCoordinator(
                 destinationHelper(client as NodeClient, clusterService)
             }
         }
-        threadPool.scheduleWithFixedDelay(scheduledJob, TimeValue.timeValueMinutes(5), ThreadPool.Names.SYSTEM_WRITE)
+        if (event!!.localNodeMaster() && !isRunningFlag) {
+            isRunningFlag = true
+            threadPool.scheduleWithFixedDelay(scheduledJob, TimeValue.timeValueMinutes(5), ThreadPool.Names.SYSTEM_WRITE)
+        }
     }
     suspend fun destinationHelper(client: NodeClient, clusterService: ClusterService) {
         /*
