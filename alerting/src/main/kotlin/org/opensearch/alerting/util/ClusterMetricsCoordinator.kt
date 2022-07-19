@@ -51,8 +51,8 @@ class ClusterMetricsCoordinator(
             }
         }
         if (event!!.localNodeMaster() && !isRunningFlag) {
+            threadPool.scheduleWithFixedDelay(scheduledJob, TimeValue.timeValueMinutes(1), ThreadPool.Names.SYSTEM_WRITE)
             isRunningFlag = true
-            threadPool.scheduleWithFixedDelay(scheduledJob, TimeValue.timeValueMinutes(5), ThreadPool.Names.SYSTEM_WRITE)
         }
     }
     suspend fun destinationHelper(client: NodeClient, clusterService: ClusterService) {
