@@ -32,6 +32,7 @@ class ClusterMetricsCoordinator(
 ) : ClusterStateListener, CoroutineScope, LifecycleListener() {
 
     companion object {
+        @Volatile
         var isRunningFlag = false
             internal set
     }
@@ -87,7 +88,7 @@ class ClusterMetricsCoordinator(
         val mem_map = jvm_map["mem"] as Map<String, Any>
         val mem_used = mem_map["heap_used_in_bytes"]
         val mem_avail = mem_map["heap_max_in_bytes"]
-        var jvm_pressure = "0.0"
+        var jvm_pressure = "0.00"
 
         if (mem_used is Int && mem_avail is Int) {
             val jvm_pressure_num = ((mem_used.toDouble() / mem_avail.toDouble()) * 100)
@@ -95,7 +96,11 @@ class ClusterMetricsCoordinator(
         }
         log.info("THIS IS JVM PRESSURE $jvm_pressure")
 
-        val cluster_status_data = ClusterMetricsDataPoint(ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS, current_time, cluster_status)
+        val cluster_status_data = ClusterMetricsDataPoint(
+            ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS,
+            current_time,
+            cluster_status
+        )
         val unassigned_shards_data = ClusterMetricsDataPoint(
             ClusterMetricsDataPoint.MetricType.UNASSIGNED_SHARDS,
             current_time,
