@@ -67,6 +67,7 @@ class ClusterMetricsCoordinator(
             call index API to index the document
          */
         val current_time = Instant.now().toString()
+//        val curTime = current_time.
         log.info("richfu THIS IS THE TIME $current_time")
         // cluster health for unassigned shards
         val cluster_health = client.admin().cluster().health(ClusterHealthRequest()).get().toMap()

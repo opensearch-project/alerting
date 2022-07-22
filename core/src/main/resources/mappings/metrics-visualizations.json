@@ -3,7 +3,55 @@
     "schema_version": 1
   },
   "properties": {
-    "metric": {
+    "cluster_status": {
+      "properties": {
+        "timestamp": {
+          "type": "date"
+        },
+        "value" : {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        }
+      }
+    },
+    "cpu_usage": {
+      "properties": {
+        "timestamp": {
+          "type": "date"
+        },
+        "value" : {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        }
+      }
+    },
+    "jvm_pressure": {
+      "properties": {
+        "timestamp": {
+          "type": "date"
+        },
+        "value" : {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        }
+      }
+    },
+    "unassigned_shards": {
       "properties": {
         "timestamp": {
           "type": "date"

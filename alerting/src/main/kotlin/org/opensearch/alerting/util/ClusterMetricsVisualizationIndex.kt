@@ -24,7 +24,7 @@ class ClusterMetricsVisualizationIndex(
     companion object {
         /** The index name pattern for all cluster metric visualizations indices */
         val CLUSTER_METRIC_VISUALIZATION_INDEX = ".opendistro-alerting-cluster-metrics"
-        val METRICS_HISTORY_ENABLED = Setting.boolSetting("opendistro.alerting.metrics_history_enabled", true)
+//        val METRICS_HISTORY_ENABLED = Setting.boolSetting("opendistro.alerting.metrics_history_enabled", true)
         val METRICS_STORE_TIME = Setting.positiveTimeSetting(
             "opendistro.alerting.metrics_history_max_age",
             TimeValue(7, TimeUnit.DAYS),
@@ -38,7 +38,6 @@ class ClusterMetricsVisualizationIndex(
         suspend fun initFunc(client: Client, clusterService: ClusterService) {
             if (!clusterMetricsVisualizationIndexExists(clusterService)) {
                 val indexRequest = CreateIndexRequest(CLUSTER_METRIC_VISUALIZATION_INDEX)
-                    .mapping(clusterMetricsVisualizationsMappings())
                     .settings(
                         Settings.builder().put("index.hidden", true)
                             .build()
