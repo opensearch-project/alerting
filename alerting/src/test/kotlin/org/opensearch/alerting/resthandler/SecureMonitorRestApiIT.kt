@@ -251,7 +251,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
         assertUserNull(createResponse.asMap()["monitor"] as HashMap<String, Any>)
     }
-
     fun `test get monitor with an user with get monitor role`() {
         createUserWithTestDataAndCustomRole(
             user,
@@ -275,7 +274,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
         }
     }
-
     /*
     TODO: https://github.com/opensearch-project/alerting/issues/300
     fun `test get monitor with an user without get monitor role`() {
@@ -412,8 +410,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Monitor found during search", 0, adminDocsFound)
     }
 
-    /*
-    TODO: https://github.com/opensearch-project/alerting/issues/300
+    // TODO: https://github.com/opensearch-project/alerting/issues/300
     fun `test query monitors with disable filter by`() {
 
         disableFilterBy()
@@ -505,8 +502,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
         }
     }
-
-     */
 
     fun `test execute monitor with an user with execute monitor access`() {
         createUserWithTestDataAndCustomRole(
@@ -613,6 +608,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
         }
     }
+    */
 
     fun `test query all alerts in all states with disabled filter by`() {
 
@@ -649,7 +645,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
         }
     }
-
+    /*
     fun `test query all alerts in all states with filter by`() {
 
         enableFilterBy()
