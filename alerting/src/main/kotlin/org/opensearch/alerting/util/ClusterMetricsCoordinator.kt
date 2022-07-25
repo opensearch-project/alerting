@@ -9,10 +9,8 @@ import org.opensearch.action.admin.cluster.health.ClusterHealthRequest
 import org.opensearch.action.admin.cluster.stats.ClusterStatsRequest
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
-import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.model.ClusterMetricsDataPoint
 import org.opensearch.alerting.opensearchapi.suspendUntil
-import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.METRICS_EXECUTION_FREQUENCY
 import org.opensearch.alerting.settings.AlertingSettings.Companion.METRICS_STORE_TIME
 import org.opensearch.client.Client
