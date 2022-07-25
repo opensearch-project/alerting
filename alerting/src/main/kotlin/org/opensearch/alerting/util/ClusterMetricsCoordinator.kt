@@ -179,7 +179,7 @@ class ClusterMetricsCoordinator(
                     }
                 }
             )
-        log.info("deleted cluster_status data")
+        log.info("deleted cluster_status data from 10 minutes ago")
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
@@ -193,7 +193,7 @@ class ClusterMetricsCoordinator(
                     }
                 }
             )
-        log.info("deleted cpu_usage data")
+        log.info("deleted cpu_usage data from 10 minutes ago")
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
@@ -207,7 +207,7 @@ class ClusterMetricsCoordinator(
                     }
                 }
             )
-        log.info("deleted jvm_pressure data")
+        log.info("deleted jvm_pressure data from 10 minutes ago")
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
@@ -221,6 +221,6 @@ class ClusterMetricsCoordinator(
                     }
                 }
             )
-        log.info("deleted unassigned_shards data")
+        log.info("deleted unassigned_shards data from 10 minutes ago")
     }
 }
