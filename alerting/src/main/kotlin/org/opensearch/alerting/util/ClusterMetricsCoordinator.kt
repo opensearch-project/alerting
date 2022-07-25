@@ -169,7 +169,7 @@ class ClusterMetricsCoordinator(
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("cluster_status.timestamp").lte("now-10m/m"))
+            .filter(QueryBuilders.rangeQuery("cluster_status.timestamp").lte("now-15m/m"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {
@@ -183,7 +183,7 @@ class ClusterMetricsCoordinator(
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("cpu_usage.timestamp").lte("now-10m/m"))
+            .filter(QueryBuilders.rangeQuery("cpu_usage.timestamp").lte("now-15m/m"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {
@@ -211,7 +211,7 @@ class ClusterMetricsCoordinator(
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("unassigned_shards.timestamp").lte("now-10m/m"))
+            .filter(QueryBuilders.rangeQuery("unassigned_shards.timestamp").lte("now-15m/m"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {

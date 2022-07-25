@@ -7,7 +7,9 @@ import org.opensearch.action.admin.indices.create.CreateIndexResponse
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
+import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.threadpool.ThreadPool
 
 private val log = LogManager.getLogger(ClusterMetricsVisualizationIndex::class.java)
