@@ -9,8 +9,10 @@ import org.opensearch.action.admin.cluster.health.ClusterHealthRequest
 import org.opensearch.action.admin.cluster.stats.ClusterStatsRequest
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
+import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.model.ClusterMetricsDataPoint
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.METRICS_EXECUTION_FREQUENCY
 import org.opensearch.alerting.settings.AlertingSettings.Companion.METRICS_STORE_TIME
 import org.opensearch.client.Client
@@ -39,6 +41,8 @@ class ClusterMetricsCoordinator(
     private val threadPool: ThreadPool
 ) : ClusterStateListener, CoroutineScope, LifecycleListener() {
 
+    @Volatile private var metricsExecutionFrequency = METRICS_EXECUTION_FREQUENCY.get(settings)
+    @Volatile private var metricsStoreTime = METRICS_STORE_TIME.get(settings)
     companion object {
         @Volatile
         var isRunningFlag = false
@@ -51,6 +55,8 @@ class ClusterMetricsCoordinator(
     init {
         clusterService.addListener(this)
         clusterService.addLifecycleListener(this)
+        clusterService.clusterSettings.addSettingsUpdateConsumer(METRICS_EXECUTION_FREQUENCY) { metricsExecutionFrequency = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(METRICS_STORE_TIME) { metricsStoreTime = it }
     }
 
     override fun clusterChanged(event: ClusterChangedEvent?) {
@@ -170,8 +176,9 @@ class ClusterMetricsCoordinator(
 
     fun deleteDocs(client: NodeClient) {
         val documentAge = METRICS_STORE_TIME.get(settings)
-        log.info("documentAge returns $documentAge")
         val unitTime = documentAge.toString().last()
+        log.info("documentAge returns $documentAge, unitTime returns $unitTime")
+
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
             .filter(QueryBuilders.rangeQuery("cluster_status.timestamp").lte("now - $documentAge/$unitTime"))
