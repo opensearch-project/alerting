@@ -11,12 +11,15 @@ import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
 import org.opensearch.alerting.model.ClusterMetricsDataPoint
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.settings.AlertingSettings.Companion.METRICS_EXECUTION_FREQUENCY
+import org.opensearch.alerting.settings.AlertingSettings.Companion.METRICS_STORE_TIME
 import org.opensearch.client.Client
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.component.LifecycleListener
+import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory
@@ -27,10 +30,12 @@ import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
 import kotlin.coroutines.CoroutineContext
+import kotlin.reflect.typeOf
 
 private val log = org.apache.logging.log4j.LogManager.getLogger(ClusterMetricsCoordinator::class.java)
 
 class ClusterMetricsCoordinator(
+    private val settings: Settings,
     private val client: Client,
     private val clusterService: ClusterService,
     private val threadPool: ThreadPool
@@ -58,7 +63,7 @@ class ClusterMetricsCoordinator(
             }
         }
         if (event!!.localNodeMaster() && !isRunningFlag) {
-            threadPool.scheduleWithFixedDelay(scheduledJob, TimeValue.timeValueMinutes(1), ThreadPool.Names.SYSTEM_WRITE)
+            threadPool.scheduleWithFixedDelay(scheduledJob, METRICS_EXECUTION_FREQUENCY.get(settings), ThreadPool.Names.SYSTEM_WRITE)
             isRunningFlag = true
         }
     }
@@ -166,10 +171,12 @@ class ClusterMetricsCoordinator(
     }
 
     fun deleteDocs(client: NodeClient) {
+        val documentAge = METRICS_STORE_TIME.get(settings)
+        log.info("documentAge returns $documentAge")
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("cluster_status.timestamp").lte("now-15m/m"))
+            .filter(QueryBuilders.rangeQuery("cluster_status.timestamp").lte("now - $documentAge"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {
@@ -183,7 +190,7 @@ class ClusterMetricsCoordinator(
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("cpu_usage.timestamp").lte("now-15m/m"))
+            .filter(QueryBuilders.rangeQuery("cpu_usage.timestamp").lte("now - $documentAge"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {
@@ -197,7 +204,7 @@ class ClusterMetricsCoordinator(
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("jvm_pressure.timestamp").lte("now-15m/m"))
+            .filter(QueryBuilders.rangeQuery("jvm_pressure.timestamp").lte("now - $documentAge"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {
@@ -211,7 +218,7 @@ class ClusterMetricsCoordinator(
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("unassigned_shards.timestamp").lte("now-15m/m"))
+            .filter(QueryBuilders.rangeQuery("unassigned_shards.timestamp").lte("now - $documentAge"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {
