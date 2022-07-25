@@ -171,10 +171,10 @@ class ClusterMetricsCoordinator(
     fun deleteDocs(client: NodeClient) {
         val documentAge = METRICS_STORE_TIME.get(settings)
         log.info("documentAge returns $documentAge")
-
+        val unitTime = documentAge.toString().last()
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("cluster_status.timestamp").lte("now - $documentAge"))
+            .filter(QueryBuilders.rangeQuery("cluster_status.timestamp").lte("now - $documentAge/$unitTime"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {
@@ -184,11 +184,11 @@ class ClusterMetricsCoordinator(
                     }
                 }
             )
-        log.info("deleted cluster_status data from 10 minutes ago")
+        log.info("deleted cluster_status data from $documentAge ago")
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("cpu_usage.timestamp").lte("now - $documentAge"))
+            .filter(QueryBuilders.rangeQuery("cpu_usage.timestamp").lte("now - $documentAge/$unitTime"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {
@@ -198,11 +198,11 @@ class ClusterMetricsCoordinator(
                     }
                 }
             )
-        log.info("deleted cpu_usage data from 10 minutes ago")
+        log.info("deleted cpu_usage data from $documentAge ago")
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("jvm_pressure.timestamp").lte("now - $documentAge"))
+            .filter(QueryBuilders.rangeQuery("jvm_pressure.timestamp").lte("now - $documentAge/$unitTime"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {
@@ -212,11 +212,11 @@ class ClusterMetricsCoordinator(
                     }
                 }
             )
-        log.info("deleted jvm_pressure data from 10 minutes ago")
+        log.info("deleted jvm_pressure data from $documentAge ago")
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("unassigned_shards.timestamp").lte("now - $documentAge"))
+            .filter(QueryBuilders.rangeQuery("unassigned_shards.timestamp").lte("now - $documentAge/$unitTime"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {
@@ -226,6 +226,6 @@ class ClusterMetricsCoordinator(
                     }
                 }
             )
-        log.info("deleted unassigned_shards data from 10 minutes ago")
+        log.info("deleted unassigned_shards data from $documentAge ago")
     }
 }
