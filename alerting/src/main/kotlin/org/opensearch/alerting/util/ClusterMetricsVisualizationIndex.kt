@@ -7,11 +7,8 @@ import org.opensearch.action.admin.indices.create.CreateIndexResponse
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
-import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
-import org.opensearch.common.unit.TimeValue
 import org.opensearch.threadpool.ThreadPool
-import java.util.concurrent.TimeUnit
 
 private val log = LogManager.getLogger(ClusterMetricsVisualizationIndex::class.java)
 
@@ -24,12 +21,6 @@ class ClusterMetricsVisualizationIndex(
     companion object {
         /** The index name pattern for all cluster metric visualizations indices */
         val CLUSTER_METRIC_VISUALIZATION_INDEX = ".opendistro-alerting-cluster-metrics"
-//        val METRICS_HISTORY_ENABLED = Setting.boolSetting("opendistro.alerting.metrics_history_enabled", true)
-        val METRICS_STORE_TIME = Setting.positiveTimeSetting(
-            "opendistro.alerting.metrics_history_max_age",
-            TimeValue(7, TimeUnit.DAYS),
-            Setting.Property.NodeScope, Setting.Property.Dynamic
-        )
 
         @JvmStatic
         fun clusterMetricsVisualizationsMappings(): String {

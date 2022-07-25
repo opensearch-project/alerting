@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.opensearch.action.ActionListener
 import org.opensearch.action.admin.cluster.health.ClusterHealthRequest
 import org.opensearch.action.admin.cluster.stats.ClusterStatsRequest
 import org.opensearch.action.index.IndexRequest
@@ -19,6 +20,10 @@ import org.opensearch.common.component.LifecycleListener
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.index.reindex.BulkByScrollResponse
+import org.opensearch.index.reindex.DeleteByQueryAction
+import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
 import kotlin.coroutines.CoroutineContext
@@ -49,6 +54,7 @@ class ClusterMetricsCoordinator(
         val scheduledJob = Runnable {
             launch {
                 destinationHelper(client as NodeClient, clusterService)
+                deleteDocs(client)
             }
         }
         if (event!!.localNodeMaster() && !isRunningFlag) {
@@ -157,5 +163,64 @@ class ClusterMetricsCoordinator(
             return failureReasons.toString()
         }
         return null
+    }
+
+    fun deleteDocs(client: NodeClient) {
+
+        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .filter(QueryBuilders.rangeQuery("cluster_status.timestamp").lte("now-10m/m"))
+            .execute(
+                object : ActionListener<BulkByScrollResponse> {
+                    override fun onResponse(response: BulkByScrollResponse) {
+                    }
+
+                    override fun onFailure(t: Exception) {
+                    }
+                }
+            )
+        log.info("deleted cluster_status data")
+
+        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .filter(QueryBuilders.rangeQuery("cpu_usage.timestamp").lte("now-10m/m"))
+            .execute(
+                object : ActionListener<BulkByScrollResponse> {
+                    override fun onResponse(response: BulkByScrollResponse) {
+                    }
+
+                    override fun onFailure(t: Exception) {
+                    }
+                }
+            )
+        log.info("deleted cpu_usage data")
+
+        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .filter(QueryBuilders.rangeQuery("jvm_pressure.timestamp").lte("now-10m/m"))
+            .execute(
+                object : ActionListener<BulkByScrollResponse> {
+                    override fun onResponse(response: BulkByScrollResponse) {
+                    }
+
+                    override fun onFailure(t: Exception) {
+                    }
+                }
+            )
+        log.info("deleted jvm_pressure data")
+
+        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .filter(QueryBuilders.rangeQuery("unassigned_shards.timestamp").lte("now-10m/m"))
+            .execute(
+                object : ActionListener<BulkByScrollResponse> {
+                    override fun onResponse(response: BulkByScrollResponse) {
+                    }
+
+                    override fun onFailure(t: Exception) {
+                    }
+                }
+            )
+        log.info("deleted unassigned_shards data")
     }
 }
