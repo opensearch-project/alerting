@@ -26,6 +26,7 @@ import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
 import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
+import org.opensearch.threadpool.Scheduler
 import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
 import kotlin.coroutines.CoroutineContext
@@ -41,6 +42,8 @@ class ClusterMetricsCoordinator(
 
     @Volatile private var metricsExecutionFrequency = METRICS_EXECUTION_FREQUENCY.get(settings)
     @Volatile private var metricsStoreTime = METRICS_STORE_TIME.get(settings)
+    private var dataPointCollectionJob: Scheduler.Cancellable? = null
+    private var dataPointDeletionJob: Scheduler.Cancellable? = null
     companion object {
         @Volatile
         var isRunningFlag = false
