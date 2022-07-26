@@ -276,5 +276,47 @@ class ClusterMetricsCoordinator(
                 }
             )
         log.info("deleted unassigned_shards data from $documentAge ago")
+
+        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .filter(QueryBuilders.rangeQuery("number_of_pending_tasks.timestamp").lte("now - $documentAge/$unitTime"))
+            .execute(
+                object : ActionListener<BulkByScrollResponse> {
+                    override fun onResponse(response: BulkByScrollResponse) {
+                    }
+
+                    override fun onFailure(t: Exception) {
+                    }
+                }
+            )
+        log.info("deleted number of pending tasks from $documentAge ago")
+
+        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .filter(QueryBuilders.rangeQuery("active_shards.timestamp").lte("now - $documentAge/$unitTime"))
+            .execute(
+                object : ActionListener<BulkByScrollResponse> {
+                    override fun onResponse(response: BulkByScrollResponse) {
+                    }
+
+                    override fun onFailure(t: Exception) {
+                    }
+                }
+            )
+        log.info("deleted active shards from $documentAge ago")
+
+        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .filter(QueryBuilders.rangeQuery("relocating_shards.timestamp").lte("now - $documentAge/$unitTime"))
+            .execute(
+                object : ActionListener<BulkByScrollResponse> {
+                    override fun onResponse(response: BulkByScrollResponse) {
+                    }
+
+                    override fun onFailure(t: Exception) {
+                    }
+                }
+            )
+        log.info("deleted number of relocating shards from $documentAge ago")
     }
 }
