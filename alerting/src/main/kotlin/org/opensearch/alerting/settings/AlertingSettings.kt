@@ -159,13 +159,13 @@ class AlertingSettings {
 
         val METRICS_STORE_TIME = Setting.positiveTimeSetting(
             "plugins.alerting.cluster_metrics.metrics_history_max_age",
-            TimeValue(10, TimeUnit.MINUTES),
+            TimeValue(7, TimeUnit.DAYS),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         val METRICS_EXECUTION_FREQUENCY = Setting.positiveTimeSetting(
             "plugins.alerting.cluster_metrics.execution_frequency",
-            TimeValue(1, TimeUnit.MINUTES),
+            TimeValue(15, TimeUnit.MINUTES),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
     }
