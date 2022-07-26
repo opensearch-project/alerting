@@ -65,7 +65,7 @@ class ClusterMetricsCoordinator(
             }
         }
         if (event!!.localNodeMaster() && !isRunningFlag) {
-            threadPool.scheduleWithFixedDelay(scheduledJob, METRICS_EXECUTION_FREQUENCY.get(settings), ThreadPool.Names.SYSTEM_WRITE)
+            threadPool.scheduleWithFixedDelay(scheduledJob, metricsExecutionFrequency, ThreadPool.Names.SYSTEM_WRITE)
             isRunningFlag = true
         }
     }
@@ -217,13 +217,13 @@ class ClusterMetricsCoordinator(
     }
 
     fun deleteDocs(client: NodeClient) {
-        val documentAge = METRICS_STORE_TIME.get(settings).toString()
+        val documentAge = metricsStoreTime.toString()
         val unitTime = documentAge.last()
         log.info("documentAge returns $documentAge, unitTime returns $unitTime")
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("cluster_status.timestamp").lte("now - $documentAge/$unitTime"))
+            .filter(QueryBuilders.rangeQuery("cluster_status.timestamp").lte("now - $documentAge"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {
@@ -233,11 +233,11 @@ class ClusterMetricsCoordinator(
                     }
                 }
             )
-        log.info("deleted clusterStatus data from $documentAge/$unitTime ago, now - $documentAge/$unitTime")
+        log.info("deleted clusterStatus data from $documentAge/$unitTime ago, now - $documentAge")
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("cpu_usage.timestamp").lte("now - $documentAge/$unitTime"))
+            .filter(QueryBuilders.rangeQuery("cpu_usage.timestamp").lte("now - $documentAge"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {
@@ -251,7 +251,7 @@ class ClusterMetricsCoordinator(
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("jvm_pressure.timestamp").lte("now - $documentAge/$unitTime"))
+            .filter(QueryBuilders.rangeQuery("jvm_pressure.timestamp").lte("now - $documentAge"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {
@@ -265,7 +265,7 @@ class ClusterMetricsCoordinator(
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("unassigned_shards.timestamp").lte("now - $documentAge/$unitTime"))
+            .filter(QueryBuilders.rangeQuery("unassigned_shards.timestamp").lte("now - $documentAge"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {
@@ -279,7 +279,7 @@ class ClusterMetricsCoordinator(
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("number_of_pending_tasks.timestamp").lte("now - $documentAge/$unitTime"))
+            .filter(QueryBuilders.rangeQuery("number_of_pending_tasks.timestamp").lte("now - $documentAge"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {
@@ -293,7 +293,7 @@ class ClusterMetricsCoordinator(
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("active_shards.timestamp").lte("now - $documentAge/$unitTime"))
+            .filter(QueryBuilders.rangeQuery("active_shards.timestamp").lte("now - $documentAge"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {
@@ -307,7 +307,7 @@ class ClusterMetricsCoordinator(
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("relocating_shards.timestamp").lte("now - $documentAge/$unitTime"))
+            .filter(QueryBuilders.rangeQuery("relocating_shards.timestamp").lte("now - $documentAge"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {
