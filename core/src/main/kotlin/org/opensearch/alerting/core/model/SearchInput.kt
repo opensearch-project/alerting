@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.core.model
 
+import org.opensearch.alerting.opensearchapi.asTemplateArg
 import org.opensearch.common.CheckedFunction
 import org.opensearch.common.ParseField
 import org.opensearch.common.io.stream.StreamInput
@@ -43,6 +44,10 @@ data class SearchInput(val indices: List<String>, val query: SearchSourceBuilder
     override fun writeTo(out: StreamOutput) {
         out.writeStringCollection(indices)
         query.writeTo(out)
+    }
+
+    override fun asTemplateArg(): Map<String, Any> {
+        return mapOf(SEARCH_FIELD to mapOf(INDICES_FIELD to indices, QUERY_FIELD to query.asTemplateArg()))
     }
 
     companion object {

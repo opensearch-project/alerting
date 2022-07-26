@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.model
 
+import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.alerting.model.Trigger.Companion.ACTIONS_FIELD
 import org.opensearch.alerting.model.Trigger.Companion.ID_FIELD
@@ -35,6 +36,8 @@ data class BucketLevelTrigger(
     val bucketSelector: BucketSelectorExtAggregationBuilder,
     override val actions: List<Action>
 ) : Trigger {
+
+    private val log = LogManager.getLogger(javaClass)
 
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
@@ -73,11 +76,12 @@ data class BucketLevelTrigger(
         out.writeCollection(actions)
     }
 
-    fun asTemplateArg(): Map<String, Any> {
+    override fun asTemplateArg(): Map<String, Any?> {
         return mapOf(
             ID_FIELD to id,
             NAME_FIELD to name,
             SEVERITY_FIELD to severity,
+            CONDITION_FIELD to bucketSelector.asTemplateArg(),
             ACTIONS_FIELD to actions.map { it.asTemplateArg() },
             PARENT_BUCKET_PATH to getParentBucketPath()
         )

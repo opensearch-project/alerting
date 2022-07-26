@@ -74,6 +74,42 @@ import org.opensearch.test.rest.OpenSearchRestTestCase
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
+// Monitor of random type (QueryLevel, BucketLevel, etc)
+fun randomMonitor(
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    user: User = randomUser(),
+    inputs: List<Input> = listOf(
+        SearchInput(
+            emptyList(),
+            SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                .aggregation(TermsAggregationBuilder("test_agg").field("test_field"))
+        )
+    ),
+    schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
+    enabled: Boolean = randomBoolean(),
+    enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
+    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+    withMetadata: Boolean = false
+): Monitor {
+    // get random monitor type
+    val monitorTypes: Array<Monitor.MonitorType> = Monitor.MonitorType.values()
+    val monitorType = monitorTypes[randomInt(monitorTypes.size - 1)]
+
+    // get corresponding list of triggers
+    val triggers: List<Trigger> = when (monitorType) {
+        Monitor.MonitorType.QUERY_LEVEL_MONITOR -> (1..randomInt(10)).map { randomQueryLevelTrigger() }
+        Monitor.MonitorType.BUCKET_LEVEL_MONITOR -> (1..randomInt(10)).map { randomBucketLevelTrigger() }
+        Monitor.MonitorType.CLUSTER_METRICS_MONITOR -> (1..randomInt(10)).map { randomQueryLevelTrigger() }
+        Monitor.MonitorType.DOC_LEVEL_MONITOR -> (1..randomInt(10)).map { randomDocumentLevelTrigger() }
+    }
+
+    return Monitor(
+        name = name, monitorType = monitorType, enabled = enabled, inputs = inputs,
+        schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
+        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+    )
+}
+
 fun randomQueryLevelMonitor(
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     user: User = randomUser(),
@@ -158,7 +194,7 @@ fun randomDocumentLevelMonitor(
     inputs: List<Input> = listOf(DocLevelMonitorInput("description", listOf("index"), emptyList())),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
     enabled: Boolean = randomBoolean(),
-    triggers: List<Trigger> = (1..randomInt(10)).map { randomQueryLevelTrigger() },
+    triggers: List<Trigger> = (1..randomInt(10)).map { randomDocumentLevelTrigger() },
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     withMetadata: Boolean = false

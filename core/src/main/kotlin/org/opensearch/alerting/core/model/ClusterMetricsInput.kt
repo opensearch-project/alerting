@@ -93,6 +93,10 @@ data class ClusterMetricsInput(
         out.writeString(url)
     }
 
+    override fun asTemplateArg(): Map<String, Any?> {
+        return mapOf(URI_FIELD to mapOf(API_TYPE_FIELD to clusterMetricType, PATH_FIELD to path, PATH_PARAMS_FIELD to pathParams, URL_FIELD to url))
+    }
+
     companion object {
         const val SUPPORTED_SCHEME = "http"
         const val SUPPORTED_HOST = "localhost"

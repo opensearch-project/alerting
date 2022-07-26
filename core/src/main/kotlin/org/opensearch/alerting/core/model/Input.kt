@@ -61,4 +61,6 @@ interface Input : Writeable, ToXContentObject {
     }
 
     fun name(): String
+
+    fun asTemplateArg(): Map<String, Any?>
 }

@@ -6,12 +6,14 @@
 package org.opensearch.alerting.aggregation.bucketselectorext
 
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.opensearchapi.asTemplateArg
 import org.opensearch.plugins.SearchPlugin
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptType
 import org.opensearch.search.aggregations.BasePipelineAggregationTestCase
 import org.opensearch.search.aggregations.bucket.terms.IncludeExclude
 import org.opensearch.search.aggregations.pipeline.BucketHelpers.GapPolicy
+import org.opensearch.search.aggregations.pipeline.PipelineAggregator
 
 class BucketSelectorExtAggregationBuilderTests : BasePipelineAggregationTestCase<BucketSelectorExtAggregationBuilder>() {
     override fun plugins(): List<SearchPlugin?> {
@@ -50,5 +52,13 @@ class BucketSelectorExtAggregationBuilderTests : BasePipelineAggregationTestCase
             factory.gapPolicy(randomFrom(*GapPolicy.values()))
         }
         return factory
+    }
+
+    fun `test bucketselectorextaggregationbuilder astemplateargs`() {
+        val builder = createTestAggregatorFactory()
+        val templateArgs = builder.asTemplateArg()
+
+        assertEquals("Template args bucket paths does not match", templateArgs[PipelineAggregator.Parser.BUCKETS_PATH.preferredName] as Map<*, *>, builder.getBucketsPathsMap())
+        assertEquals("Template args script does not match", templateArgs[Script.SCRIPT_PARSE_FIELD.preferredName] as Map<*, *>, builder.script.asTemplateArg())
     }
 }

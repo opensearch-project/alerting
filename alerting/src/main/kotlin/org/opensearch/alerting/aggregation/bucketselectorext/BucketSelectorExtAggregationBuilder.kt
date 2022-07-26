@@ -7,6 +7,7 @@ package org.opensearch.alerting.aggregation.bucketselectorext
 
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtFilter.Companion.BUCKET_SELECTOR_COMPOSITE_AGG_FILTER
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtFilter.Companion.BUCKET_SELECTOR_FILTER
+import org.opensearch.alerting.opensearchapi.asTemplateArg
 import org.opensearch.common.ParseField
 import org.opensearch.common.ParsingException
 import org.opensearch.common.io.stream.StreamInput
@@ -19,7 +20,7 @@ import org.opensearch.search.aggregations.pipeline.AbstractPipelineAggregationBu
 import org.opensearch.search.aggregations.pipeline.BucketHelpers.GapPolicy
 import org.opensearch.search.aggregations.pipeline.PipelineAggregator
 import java.io.IOException
-import java.util.Objects
+import java.util.*
 
 class BucketSelectorExtAggregationBuilder :
     AbstractPipelineAggregationBuilder<BucketSelectorExtAggregationBuilder> {
@@ -103,6 +104,13 @@ class BucketSelectorExtAggregationBuilder :
         return builder
     }
 
+    fun asTemplateArg(): Map<String, Any?> {
+        return mapOf(
+            PipelineAggregator.Parser.BUCKETS_PATH.preferredName to bucketsPathsMap as Map<String, Any?>,
+            Script.SCRIPT_PARSE_FIELD.preferredName to script.asTemplateArg()
+        )
+    }
+
     override fun overrideBucketsPath(): Boolean {
         return true
     }
@@ -129,6 +137,10 @@ class BucketSelectorExtAggregationBuilder :
 
     override fun getWriteableName(): String {
         return NAME.preferredName
+    }
+
+    fun getBucketsPathsMap(): Map<String, String> {
+        return this.bucketsPathsMap
     }
 
     companion object {

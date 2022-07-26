@@ -25,7 +25,7 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import java.time.zone.ZoneRulesException
-import java.util.Locale
+import java.util.*
 
 sealed class Schedule : Writeable, ToXContentObject {
     enum class TYPE { CRON, INTERVAL }
@@ -149,6 +149,8 @@ sealed class Schedule : Writeable, ToXContentObject {
     abstract fun getPeriodEndingAt(endTime: Instant?): Pair<Instant, Instant>
 
     abstract fun runningOnTime(lastExecutionTime: Instant?): Boolean
+
+    abstract fun asTemplateArg(): Map<String, Any>
 }
 
 /**
@@ -243,6 +245,13 @@ data class CronSchedule(
         val actualExecutionTime = ZonedDateTime.ofInstant(lastExecutionTime, timezone)
 
         return ChronoUnit.SECONDS.between(expectedExecutionTime.get(), actualExecutionTime) == 0L
+    }
+
+    override fun asTemplateArg(): Map<String, Any> {
+        return mapOf(
+            EXPRESSION_FIELD to expression,
+            TIMEZONE_FIELD to timezone
+        )
     }
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
@@ -340,6 +349,13 @@ data class IntervalSchedule(
         // Make sure the lastExecutionTime is less than interval time.
         val delta = ChronoUnit.MILLIS.between(lastExecutionTime, testInstant ?: Instant.now())
         return 0 < delta && delta < intervalInMills
+    }
+
+    override fun asTemplateArg(): Map<String, Any> {
+        return mapOf(
+            INTERVAL_FIELD to interval,
+            UNIT_FIELD to unit
+        )
     }
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
