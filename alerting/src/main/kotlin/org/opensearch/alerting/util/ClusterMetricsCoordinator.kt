@@ -233,7 +233,7 @@ class ClusterMetricsCoordinator(
                     }
                 }
             )
-        log.info("deleted clusterStatus data from $documentAge/$unitTime ago")
+        log.info("deleted clusterStatus data from $documentAge/$unitTime ago, now - $documentAge/$unitTime")
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
