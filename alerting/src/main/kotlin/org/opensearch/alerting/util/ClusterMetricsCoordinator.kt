@@ -223,7 +223,7 @@ class ClusterMetricsCoordinator(
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("clusterStatus.timestamp").lte("now - $documentAge/$unitTime"))
+            .filter(QueryBuilders.rangeQuery("cluster_status.timestamp").lte("now - $documentAge/$unitTime"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {
