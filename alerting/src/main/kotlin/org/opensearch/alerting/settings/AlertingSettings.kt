@@ -159,7 +159,7 @@ class AlertingSettings {
 
         val METRICS_STORE_TIME = Setting.positiveTimeSetting(
             "plugins.alerting.cluster_metrics.metrics_history_max_age",
-            TimeValue(7, TimeUnit.DAYS),
+            TimeValue(10, TimeUnit.MINUTES),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 

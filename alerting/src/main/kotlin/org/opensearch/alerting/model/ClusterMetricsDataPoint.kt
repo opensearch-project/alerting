@@ -37,6 +37,15 @@ data class ClusterMetricsDataPoint(
         ),
         UNASSIGNED_SHARDS(
             "unassigned_shards"
+        ),
+        NUM_PENDING_TASKS(
+            "number_of_pending_tasks"
+        ),
+        ACTIVE_SHARDS(
+            "active_shards"
+        ),
+        RELOCATING_SHARDS(
+            "relocating_shards"
         )
     }
 }

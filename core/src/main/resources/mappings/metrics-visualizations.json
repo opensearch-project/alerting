@@ -66,6 +66,54 @@
           }
         }
       }
+    },
+    "number_of_pending_tasks": {
+      "properties": {
+        "timestamp": {
+          "type": "date"
+        },
+        "value" : {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        }
+      }
+    },
+    "active_shards": {
+      "properties": {
+        "timestamp": {
+          "type": "date"
+        },
+        "value" : {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        }
+      }
+    },
+    "relocating_shards": {
+      "properties": {
+        "timestamp": {
+          "type": "date"
+        },
+        "value" : {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        }
+      }
     }
   }
 }

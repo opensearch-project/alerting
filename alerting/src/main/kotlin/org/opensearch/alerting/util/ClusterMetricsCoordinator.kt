@@ -89,10 +89,16 @@ class ClusterMetricsCoordinator(
 
         ClusterMetricsVisualizationIndex.initFunc(client, clusterService)
 
-        var unassignedShards = cluster_health["unassigned_shards"].toString()
+        val unassignedShards = cluster_health["unassigned_shards"].toString()
         log.info("this is unassigned shards $unassignedShards")
-        var cluster_status = cluster_health["status"].toString()
-        log.info("this is cluster status $cluster_status")
+        val clusterStatus = cluster_health["status"].toString()
+        log.info("this is cluster status $clusterStatus")
+        val numPending = cluster_health["number_of_pending_tasks"].toString()
+        log.info("this is number of pending tasks $numPending")
+        val activeShards = cluster_health["active_shards"].toString()
+        log.info("this is number of active shards $activeShards")
+        val relocatingShards = cluster_health["relocating_shards"].toString()
+        log.info("This is number of relocatingShards $relocatingShards")
         val nodes_map = cluster_stats["nodes"] as Map<String, Any>
         val process_map = nodes_map["process"] as Map<String, Any>
         val cpu_map = process_map["cpu"] as Map<String, Any>
@@ -110,10 +116,10 @@ class ClusterMetricsCoordinator(
         }
         log.info("THIS IS JVM PRESSURE $jvm_pressure")
 
-        val cluster_status_data = ClusterMetricsDataPoint(
+        val clusterStatus_data = ClusterMetricsDataPoint(
             ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS,
             current_time,
-            cluster_status
+            clusterStatus
         )
         val unassigned_shards_data = ClusterMetricsDataPoint(
             ClusterMetricsDataPoint.MetricType.UNASSIGNED_SHARDS,
@@ -130,30 +136,68 @@ class ClusterMetricsCoordinator(
             current_time,
             jvm_pressure
         )
+        val pendingTasksData = ClusterMetricsDataPoint(
+            ClusterMetricsDataPoint.MetricType.NUM_PENDING_TASKS,
+            current_time,
+            numPending
+        )
+        val activeShardsData = ClusterMetricsDataPoint(
+            ClusterMetricsDataPoint.MetricType.ACTIVE_SHARDS,
+            current_time,
+            activeShards
+        )
+        val relocatingShardsData = ClusterMetricsDataPoint(
+            ClusterMetricsDataPoint.MetricType.RELOCATING_SHARDS,
+            current_time,
+            relocatingShards
+        )
 
         val indexRequest_status = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .source(cluster_status_data.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+            .source(clusterStatus_data.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
         val indexRequest_shards = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
             .source(unassigned_shards_data.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
         val indexRequest_cpu = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
             .source(cpu_usage_data.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
         val indexRequest_jvm = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
             .source(jvm_data.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+        val indexRequest_pending = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .source(pendingTasksData.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+        val indexRequest_active = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .source(activeShardsData.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+        val indexRequest_relocating = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .source(relocatingShardsData.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
 
         try {
             val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest_status, it) }
             val indexResponse2: IndexResponse = client.suspendUntil { client.index(indexRequest_shards, it) }
             val indexResponse3: IndexResponse = client.suspendUntil { client.index(indexRequest_cpu, it) }
             val indexResponse4: IndexResponse = client.suspendUntil { client.index(indexRequest_jvm, it) }
+            val indexResponse5: IndexResponse = client.suspendUntil { client.index(indexRequest_pending, it) }
+            val indexResponse6: IndexResponse = client.suspendUntil { client.index(indexRequest_active, it) }
+            val indexResponse7: IndexResponse = client.suspendUntil { client.index(indexRequest_relocating, it) }
             val failureReasons = checkShardsFailure(indexResponse)
             val failureReasons2 = checkShardsFailure(indexResponse2)
             val failureReasons3 = checkShardsFailure(indexResponse3)
             val failureReasons4 = checkShardsFailure(indexResponse4)
-            if (failureReasons != null || failureReasons2 != null || failureReasons3 != null || failureReasons4 != null) {
+            val failureReasons5 = checkShardsFailure(indexResponse5)
+            val failureReasons6 = checkShardsFailure(indexResponse6)
+            val failureReasons7 = checkShardsFailure(indexResponse7)
+            if (
+                failureReasons != null ||
+                failureReasons2 != null ||
+                failureReasons3 != null ||
+                failureReasons4 != null ||
+                failureReasons5 != null ||
+                failureReasons6 != null ||
+                failureReasons7 != null
+            ) {
                 log.info("richfu failed because $failureReasons")
                 log.info("richfu failed because $failureReasons2")
                 log.info("richfu failed because $failureReasons3")
                 log.info("richfu failed because $failureReasons4")
+                log.info("richfu failed because $failureReasons5")
+                log.info("richfu failed because $failureReasons6")
+                log.info("richfu failed because $failureReasons7")
                 return
             }
         } catch (t: Exception) {
@@ -179,7 +223,7 @@ class ClusterMetricsCoordinator(
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("cluster_status.timestamp").lte("now - $documentAge/$unitTime"))
+            .filter(QueryBuilders.rangeQuery("clusterStatus.timestamp").lte("now - $documentAge/$unitTime"))
             .execute(
                 object : ActionListener<BulkByScrollResponse> {
                     override fun onResponse(response: BulkByScrollResponse) {
@@ -189,7 +233,7 @@ class ClusterMetricsCoordinator(
                     }
                 }
             )
-        log.info("deleted cluster_status data from $documentAge ago")
+        log.info("deleted clusterStatus data from $documentAge ago")
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
