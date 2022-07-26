@@ -7,7 +7,9 @@ package org.opensearch.alerting.script
 
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.DocumentLevelTrigger
+import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.MonitorRunResult
 import java.time.Instant
 
 data class DocumentLevelTriggerExecutionContext(
@@ -25,10 +27,11 @@ data class DocumentLevelTriggerExecutionContext(
     constructor(
         monitor: Monitor,
         trigger: DocumentLevelTrigger,
+        monitorRunResult: MonitorRunResult<DocumentLevelTriggerRunResult>,
         alerts: List<Alert> = listOf()
     ) : this(
-        monitor, trigger, emptyList(), Instant.now(), Instant.now(),
-        alerts, emptyList(), emptyList(), null
+        monitor, trigger, monitorRunResult.inputResults.results, monitorRunResult.periodStart, monitorRunResult.periodEnd,
+        alerts, emptyList(), emptyList(), monitorRunResult.scriptContextError(trigger)
     )
 
     /**
