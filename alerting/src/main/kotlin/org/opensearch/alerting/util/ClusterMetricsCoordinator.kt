@@ -233,7 +233,7 @@ class ClusterMetricsCoordinator(
                     }
                 }
             )
-        log.info("deleted clusterStatus data from $documentAge ago")
+        log.info("deleted clusterStatus data from $documentAge/$unitTime ago")
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
@@ -247,7 +247,7 @@ class ClusterMetricsCoordinator(
                     }
                 }
             )
-        log.info("deleted cpu_usage data from $documentAge ago")
+        log.info("deleted cpu_usage data from $documentAge/$unitTime ago")
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
@@ -261,7 +261,7 @@ class ClusterMetricsCoordinator(
                     }
                 }
             )
-        log.info("deleted jvm_pressure data from $documentAge ago")
+        log.info("deleted jvm_pressure data from $documentAge/$unitTime ago")
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
@@ -275,7 +275,7 @@ class ClusterMetricsCoordinator(
                     }
                 }
             )
-        log.info("deleted unassigned_shards data from $documentAge ago")
+        log.info("deleted unassigned_shards data from $documentAge/$unitTime ago")
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
@@ -289,7 +289,7 @@ class ClusterMetricsCoordinator(
                     }
                 }
             )
-        log.info("deleted number of pending tasks from $documentAge ago")
+        log.info("deleted number of pending tasks from $documentAge/$unitTime ago")
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
@@ -303,7 +303,7 @@ class ClusterMetricsCoordinator(
                     }
                 }
             )
-        log.info("deleted active shards from $documentAge ago")
+        log.info("deleted active shards from $documentAge/$unitTime ago")
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
             .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
@@ -317,6 +317,6 @@ class ClusterMetricsCoordinator(
                     }
                 }
             )
-        log.info("deleted number of relocating shards from $documentAge ago")
+        log.info("deleted number of relocating shards from $documentAge/$unitTime ago")
     }
 }
