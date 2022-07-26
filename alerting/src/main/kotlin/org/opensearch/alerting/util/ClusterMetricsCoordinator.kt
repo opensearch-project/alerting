@@ -65,6 +65,7 @@ class ClusterMetricsCoordinator(
             }
         }
         if (event!!.localNodeMaster() && !isRunningFlag) {
+            log.info("cluster changed metricsExecutionFrequency = $metricsExecutionFrequency")
             threadPool.scheduleWithFixedDelay(scheduledJob, metricsExecutionFrequency, ThreadPool.Names.SYSTEM_WRITE)
             isRunningFlag = true
         }
