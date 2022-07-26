@@ -222,7 +222,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         queryToDocIds: Map<DocLevelQuery, Set<String>>,
         dryrun: Boolean
     ): DocumentLevelTriggerRunResult {
-        val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger)
+        val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger, monitorResult)
         val triggerResult = monitorCtx.triggerService!!.runDocLevelTrigger(monitor, trigger, queryToDocIds)
 
         val findings = mutableListOf<String>()
