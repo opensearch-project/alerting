@@ -217,8 +217,8 @@ class ClusterMetricsCoordinator(
     }
 
     fun deleteDocs(client: NodeClient) {
-        val documentAge = METRICS_STORE_TIME.get(settings)
-        val unitTime = documentAge.toString().last()
+        val documentAge = METRICS_STORE_TIME.get(settings).toString()
+        val unitTime = documentAge.last()
         log.info("documentAge returns $documentAge, unitTime returns $unitTime")
 
         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
