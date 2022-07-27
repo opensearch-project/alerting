@@ -15,6 +15,7 @@ class ScriptTests : OpenSearchTestCase() {
 
         val templateArgs = script.asTemplateArg()
 
+        // check strictly for the required fields, source and lang
         assertEquals("Template args source does not match", templateArgs["source"], script.idOrCode)
         assertEquals("Template args lang does not match", templateArgs["lang"], script.lang)
     }
