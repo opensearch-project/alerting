@@ -8,7 +8,9 @@ package org.opensearch.alerting.util.clustermetricscoordinatortest
 import org.junit.Before
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest
+import org.opensearch.alerting.model.ClusterMetricsDataPoint
 import org.opensearch.alerting.util.ClusterMetricsVisualizationIndex
+import org.opensearch.common.xcontent.XContentType
 import org.opensearch.rest.RestStatus
 
 class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
@@ -41,12 +43,18 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         val response = client().makeRequest("HEAD", index)
         assertEquals("Index $index does not exist.", RestStatus.OK, response.restStatus())
     }
-//    fun `test numberDocs`() {
-//        client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "1m")
-//        Thread.sleep(300000)
-//
-//
-//    }
+    fun `test numberDocs`() {
+        val response = client().makeRequest(
+            "GET",
+            ".opendistro-alerting-cluster-metrics/_search"
+        )
+        val xcp = createParser(XContentType.JSON.xContent(), response.entity.content)
+        val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+        val numberOfDocsFound = (hits["total"]?.get("value") as Int)
+        val size = ClusterMetricsDataPoint.MetricType.values().size
+        assertEquals((numberOfDocsFound.mod(size)), 0)
+    }
+
     private fun generateData() {
         client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "1s")
         client().updateSettings("plugins.alerting.cluster_metrics.metrics_history_max_age", "10m")
