@@ -24,8 +24,6 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         Thread.sleep(90000)
         val index = ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX
         val response = client().makeRequest("HEAD", index)
-        assertNull("CHECK NAME METHOD PLEASE WORK", response)
-        assertNotNull("CHECK NAME METHOD PLEASE WORK", response)
         assertEquals("Index $index does not exist.", RestStatus.OK, response.restStatus())
     }
 }
