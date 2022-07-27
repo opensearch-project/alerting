@@ -15,7 +15,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
     4. Adjust the execution frequency setting to 1 minute, and make sure that the timestamps between the datapoints are 1 minute apart.
      */
     fun `check name`() {
-        val settingsRequestFrequency = client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "1m")
+        client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "1m")
         Thread.sleep(90000)
         val index = ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX
         val response = client().makeRequest("HEAD", index)
