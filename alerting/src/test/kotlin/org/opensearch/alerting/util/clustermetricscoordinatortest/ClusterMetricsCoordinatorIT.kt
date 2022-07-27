@@ -22,6 +22,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
     fun `check name`() {
         client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "1m")
         Thread.sleep(90000)
+        logger.info("CHECK NAME METHOD PLEASE WORK")
         val index = ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX
         val response = client().makeRequest("HEAD", index)
         assertEquals("Index $index does not exist.", RestStatus.OK, response.restStatus())
