@@ -124,10 +124,18 @@ class ClusterMetricsCoordinator(
 
         ClusterMetricsVisualizationIndex.initFunc(client, clusterService)
 
-        val unassignedShards = cluster_health["unassigned_shards"].toString()
-        log.info("this is unassigned shards $unassignedShards")
-        val clusterStatus = cluster_health["status"].toString()
-        log.info("this is cluster status $clusterStatus")
+//        val unassignedShards = cluster_health["unassigned_shards"].toString()
+//        log.info("this is unassigned shards $unassignedShards")
+//        val clusterStatus = cluster_health["status"].toString()
+//        log.info("this is cluster status $clusterStatus")
+        val randomUnassignedShards = (0..4).random().toString()
+        var clusterStatusRandom = "green"
+        val colors = arrayOf("yellow", "red")
+        clusterStatusRandom = if (randomUnassignedShards == "0") {
+            "green"
+        } else {
+            colors.random()
+        }
         val numPending = cluster_health["number_of_pending_tasks"].toString()
         log.info("this is number of pending tasks $numPending")
         val activeShards = cluster_health["active_shards"].toString()
@@ -137,7 +145,8 @@ class ClusterMetricsCoordinator(
         val nodes_map = cluster_stats["nodes"] as Map<String, Any>
         val process_map = nodes_map["process"] as Map<String, Any>
         val cpu_map = process_map["cpu"] as Map<String, Any>
-        val percent = cpu_map["percent"].toString()
+//        val percent = cpu_map["percent"].toString()
+        val percent = (30..80).random().toString()
         log.info("THIS IS CPU USAGE $percent")
         val jvm_map = nodes_map["jvm"] as Map<String, Any>
         val mem_map = jvm_map["mem"] as Map<String, Any>
@@ -154,12 +163,12 @@ class ClusterMetricsCoordinator(
         val clusterStatus_data = ClusterMetricsDataPoint(
             ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS,
             current_time,
-            clusterStatus
+            clusterStatusRandom
         )
         val unassigned_shards_data = ClusterMetricsDataPoint(
             ClusterMetricsDataPoint.MetricType.UNASSIGNED_SHARDS,
             current_time,
-            unassignedShards
+            randomUnassignedShards
         )
         val cpu_usage_data = ClusterMetricsDataPoint(
             ClusterMetricsDataPoint.MetricType.CPU_USAGE,
