@@ -27,6 +27,5 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         assertNull("CHECK NAME METHOD PLEASE WORK", response)
         assertNotNull("CHECK NAME METHOD PLEASE WORK", response)
         assertEquals("Index $index does not exist.", RestStatus.OK, response.restStatus())
-
     }
 }
