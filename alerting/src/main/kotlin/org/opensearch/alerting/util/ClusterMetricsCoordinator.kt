@@ -42,8 +42,7 @@ class ClusterMetricsCoordinator(
 
     @Volatile private var metricsExecutionFrequency = METRICS_EXECUTION_FREQUENCY.get(settings)
     @Volatile private var metricsStoreTime = METRICS_STORE_TIME.get(settings)
-    private var dataPointCollectionJob: Scheduler.Cancellable? = null
-    private var dataPointDeletionJob: Scheduler.Cancellable? = null
+    private var dataPointCollectionDeletionJob: Scheduler.Cancellable? = null
     companion object {
         @Volatile
         var isRunningFlag = false
@@ -60,38 +59,46 @@ class ClusterMetricsCoordinator(
     init {
         clusterService.addListener(this)
         clusterService.addLifecycleListener(this)
-        clusterService.clusterSettings.addSettingsUpdateConsumer(METRICS_EXECUTION_FREQUENCY) { metricsExecutionFrequency = it; isCollectionUpdated = true }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(METRICS_STORE_TIME) { metricsStoreTime = it; isDeletionUpdated = true }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(METRICS_EXECUTION_FREQUENCY) {
+            metricsExecutionFrequency = it
+            isCollectionUpdated = true
+        }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(METRICS_STORE_TIME) {
+            metricsStoreTime = it
+            isDeletionUpdated = true
+        }
     }
 
     override fun clusterChanged(event: ClusterChangedEvent?) {
-        val scheduledJobCollection = Runnable {
-            launch {
-                createDocs(client as NodeClient, clusterService)
+        if (metricsStoreTime > metricsExecutionFrequency) {
+            val scheduledJobCollection = Runnable {
+                launch {
+                    createDocs(client as NodeClient, clusterService)
+                    deleteDocs(client)
+                }
             }
-        }
-        val scheduledJobDeletion = Runnable {
-            launch {
-                deleteDocs(client as NodeClient)
+            if (isCollectionUpdated || isDeletionUpdated) {
+                dataPointCollectionDeletionJob?.cancel()
+                log.info("cancelled data collection and deletion jobs ")
+                isRunningFlag = false
+                log.info("detected changes to settings, resetting running, deletion and collection flags to false")
+                isDeletionUpdated = false
+                isCollectionUpdated = false
             }
-        }
-        if (isCollectionUpdated || isDeletionUpdated) {
-            dataPointCollectionJob?.cancel()
-            dataPointDeletionJob?.cancel()
-            log.info("cancelled data collection and deletion jobs ")
-            isRunningFlag = false
-            log.info("detected changes to settings, resetting running, deletion and collection flags to false")
-            isDeletionUpdated = false
-            isCollectionUpdated = false
-        }
-        // if cluster changed event occurs (if settings are changed)
-        // cancel current scheduled job and change runningFlag to false.
-        // maybe have individual runningFlags for collection and deletion?
-        if (event!!.localNodeMaster() && !isRunningFlag) {
-            log.info("cluster changed metricsExecutionFrequency = $metricsExecutionFrequency")
-            dataPointCollectionJob = threadPool.scheduleWithFixedDelay(scheduledJobCollection, metricsExecutionFrequency, ThreadPool.Names.SYSTEM_WRITE)
-            dataPointDeletionJob = threadPool.scheduleWithFixedDelay(scheduledJobDeletion, metricsExecutionFrequency, ThreadPool.Names.SYSTEM_WRITE)
-            isRunningFlag = true
+            // if cluster changed event occurs (if settings are changed)
+            // cancel current scheduled job and change runningFlag to false.
+            // maybe have individual runningFlags for collection and deletion?
+            if (event!!.localNodeMaster() && !isRunningFlag) {
+                log.info("cluster changed metricsExecutionFrequency = $metricsExecutionFrequency")
+                dataPointCollectionDeletionJob = threadPool.scheduleWithFixedDelay(
+                    scheduledJobCollection,
+                    metricsExecutionFrequency,
+                    ThreadPool.Names.SYSTEM_WRITE
+                )
+                isRunningFlag = true
+            }
+        } else {
+            log.info("Execution frequency can not be greater than the storage time. ")
         }
     }
 
