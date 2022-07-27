@@ -19,7 +19,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
     3, Ingest a really old document, older than the stated deletion date, and make sure that it is properly deleted.
     4. Adjust the execution frequency setting to 1 minute, and make sure that the timestamps between the datapoints are 1 minute apart.
      */
-    fun `check name`() {
+    fun `test checkName`() {
         client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "1m")
         Thread.sleep(90000)
         val index = ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX
