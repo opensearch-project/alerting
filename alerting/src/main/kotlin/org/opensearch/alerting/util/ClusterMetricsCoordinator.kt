@@ -1,3 +1,8 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package org.opensearch.alerting.util
 
 import kotlinx.coroutines.CoroutineName
@@ -29,6 +34,7 @@ import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.threadpool.Scheduler
 import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
+import java.util.*
 import kotlin.coroutines.CoroutineContext
 
 private val log = org.apache.logging.log4j.LogManager.getLogger(ClusterMetricsCoordinator::class.java)
@@ -156,7 +162,7 @@ class ClusterMetricsCoordinator(
 
         if (mem_used is Int && mem_avail is Int) {
             val jvm_pressure_num = ((mem_used.toDouble() / mem_avail.toDouble()) * 100)
-            jvm_pressure = String.format("%.2f", jvm_pressure_num)
+            jvm_pressure = String.format(Locale.ROOT, "%.2f", jvm_pressure_num)
         }
         log.info("THIS IS JVM PRESSURE $jvm_pressure")
 
