@@ -98,7 +98,9 @@ class ClusterMetricsCoordinator(
                 isRunningFlag = true
             }
         } else {
-            log.info("Execution frequency can not be greater than the storage time. ")
+            throw java.lang.IllegalArgumentException(
+                "Execution frequency ($metricsExecutionFrequency) can not be greater than the storage time ($metricsStoreTime). "
+            )
         }
     }
 
