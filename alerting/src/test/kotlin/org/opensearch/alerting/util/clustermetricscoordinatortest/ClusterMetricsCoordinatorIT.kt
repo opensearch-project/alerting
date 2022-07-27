@@ -2,6 +2,8 @@ package org.opensearch.alerting.util.clustermetricscoordinatortest
 
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest
+import org.opensearch.alerting.util.ClusterMetricsVisualizationIndex
+import org.opensearch.rest.RestStatus
 
 class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
     /*
@@ -13,11 +15,10 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
     4. Adjust the execution frequency setting to 1 minute, and make sure that the timestamps between the datapoints are 1 minute apart.
      */
     fun `check name`() {
-        val indexRequest = client().makeRequest(
-            "GET",
-            "_cat/indices/.opendistro-alerting-cluster-metrics?format=json"
-        )
-        val indexName = indexRequest.asMap()
-        assertNotNull("check name test case, indexRequest = $indexRequest", indexRequest)
+        val settingsRequestFrequency = client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "1m")
+        Thread.sleep(90000)
+        val index = ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX
+        val response = client().makeRequest("HEAD", index)
+        assertEquals("Index $index does not exist.", RestStatus.OK, response.restStatus())
     }
 }
