@@ -5,11 +5,15 @@
 
 package org.opensearch.alerting.util.clustermetricscoordinatortest
 
+import org.apache.http.entity.ContentType
+import org.apache.http.entity.StringEntity
 import org.junit.Before
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.ClusterMetricsDataPoint
+import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.util.ClusterMetricsVisualizationIndex
+import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.rest.RestStatus
 
@@ -45,9 +49,15 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
     }
     fun `test numberDocs`() {
         // Check that the total number of documents found is divisible by the total number of metric types.
+        val settings = jsonBuilder()
+            .startObject()
+            .field("size", 10000)
+            .endObject()
+            .string()
         val response = client().makeRequest(
             "GET",
-            ".opendistro-alerting-cluster-metrics/_search"
+            ".opendistro-alerting-cluster-metrics/_search",
+            StringEntity(settings, ContentType.APPLICATION_JSON)
         )
         val xcp = createParser(XContentType.JSON.xContent(), response.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
