@@ -13,12 +13,12 @@ import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.ClusterMetricsDataPoint
 import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.util.ClusterMetricsVisualizationIndex
+import org.opensearch.client.Response
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.rest.RestStatus
 import java.util.*
 import kotlin.collections.ArrayList
-
 class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
     /*
     2. Check that the total number of documents in the index is divisible by 7.
@@ -52,16 +52,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
 
     fun `test numberDocs`() {
         // Check that the total number of documents found is divisible by the total number of metric types.
-        val settings = jsonBuilder()
-            .startObject()
-            .field("size", 10000)
-            .endObject()
-            .string()
-        val response = client().makeRequest(
-            "GET",
-            ".opendistro-alerting-cluster-metrics/_search",
-            StringEntity(settings, ContentType.APPLICATION_JSON)
-        )
+        val response = getResponse()
         val xcp = createParser(XContentType.JSON.xContent(), response.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
         val numberOfDocsFound = (hits["total"]?.get("value") as Int)
@@ -70,11 +61,11 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         val docs = hits["hits"] as ArrayList<Map<String, Any>>
 
         // check that each of the metric types has a unique timestamp, and number of timestamps must be equal to total docs divided by 7
-        // expect that there only document created for each metric type.
-        var mapCheck = hashMapOf<String, Set<String>>()
+        // expect that there should only be one document created for each metric type at a time.
+        val mapCheck = hashMapOf<String, Set<String>>()
         ClusterMetricsDataPoint.MetricType.values().forEach { mapCheck[it.metricName] = mutableSetOf() }
         for (doc in docs) {
-            var source = doc["_source"] as Map<String, Map<String, Any>>
+            val source = doc["_source"] as Map<String, Map<String, Any>>
             logger.info("this is source data $source")
             val metricType = source.keys.first()
             try {
@@ -84,9 +75,12 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
                 logger.info("Key does not exist in the enum class.")
             }
         }
-        logger.info("mapcheck is this $mapCheck, and mapcheck set size ${mapCheck.values.toSet().size}")
         assertEquals(mapCheck.values.toSet().size, 1)
-        assertNull("fail the test", 1)
+    }
+
+    fun `test deleteDocs`() {
+        createDoc()
+        Thread.sleep(60000)
     }
 
     private fun generateData() {
@@ -94,5 +88,35 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         client().updateSettings("plugins.alerting.cluster_metrics.metrics_history_max_age", "10m")
         Thread.sleep(60000)
         client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "1m")
+    }
+
+    private fun getResponse(): Response {
+        val settings = jsonBuilder()
+            .startObject()
+            .field("size", 10000)
+            .endObject()
+            .string()
+        return client().makeRequest(
+            "GET",
+            ".opendistro-alerting-cluster-metrics/_search",
+            StringEntity(settings, ContentType.APPLICATION_JSON)
+        )
+    }
+
+    private fun createDoc() {
+        var year = (0..2000).random().toString()
+        val doc = jsonBuilder()
+            .startObject()
+            .startObject("cluster_status")
+            .field("timestamp", "$year-01-01T12:00:00")
+            .field("value", "yellow")
+            .endObject()
+            .endObject()
+            .string()
+        client().makeRequest(
+            "POST",
+            ".opendistro-alerting-cluster-metrics/_doc",
+            StringEntity(doc, ContentType.APPLICATION_JSON)
+        )
     }
 }
