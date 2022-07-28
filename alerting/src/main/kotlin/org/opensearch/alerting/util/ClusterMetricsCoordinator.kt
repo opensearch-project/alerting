@@ -187,7 +187,7 @@ class ClusterMetricsCoordinator(
             jvm_pressure
         )
         val pendingTasksData = ClusterMetricsDataPoint(
-            ClusterMetricsDataPoint.MetricType.NUM_PENDING_TASKS,
+            ClusterMetricsDataPoint.MetricType.NUMBER_OF_PENDING_TASKS,
             current_time,
             numPending
         )

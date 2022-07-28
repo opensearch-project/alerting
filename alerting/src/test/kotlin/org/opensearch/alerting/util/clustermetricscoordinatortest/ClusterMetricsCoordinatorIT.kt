@@ -16,6 +16,8 @@ import org.opensearch.alerting.util.ClusterMetricsVisualizationIndex
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.rest.RestStatus
+import java.util.*
+import kotlin.collections.ArrayList
 
 class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
     /*
@@ -70,12 +72,23 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         // check that each of the metric types has a unique timestamp, and number of timestamps must be equal to total docs divided by 7
         // expect that there only document created for each metric type.
         var mapCheck = hashMapOf<String, Set<String>>()
-        ClusterMetricsDataPoint.MetricType.values().forEach { mapCheck[it.metricName] = setOf() }
-        logger.info("this is mapCheck $mapCheck")
+        ClusterMetricsDataPoint.MetricType.values().forEach { mapCheck[it.metricName] = mutableSetOf() }
         for (doc in docs) {
-            var source = doc["_source"] as Map<String, Any>
+            var source = doc["_source"] as Map<String, Map<String, Any>>
             logger.info("this is source data $source")
+
+            ClusterMetricsDataPoint.MetricType.values().forEach {
+                val metricType = source.keys.first()
+                try {
+                    ClusterMetricsDataPoint.MetricType.valueOf(metricType.uppercase(Locale.getDefault()))
+                    mapCheck[metricType]?.plus(source[metricType]?.get("timestamp"))
+                } catch (e: java.lang.IllegalArgumentException) {
+                    logger.info("Key does not exist in the enum class.")
+                }
+            }
         }
+        logger.info("mapcheck is this $mapCheck")
+        assertEquals(mapCheck.values.toSet().size, 1)
         assertNull("fail the test", 1)
     }
 
