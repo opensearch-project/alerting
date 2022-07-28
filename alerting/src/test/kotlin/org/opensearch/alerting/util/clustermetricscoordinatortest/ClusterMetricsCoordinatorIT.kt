@@ -44,6 +44,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         assertEquals("Index $index does not exist.", RestStatus.OK, response.restStatus())
     }
     fun `test numberDocs`() {
+        // Check that the total number of documents found is divisible by the total number of metric types.
         val response = client().makeRequest(
             "GET",
             ".opendistro-alerting-cluster-metrics/_search"
@@ -53,6 +54,17 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         val numberOfDocsFound = (hits["total"]?.get("value") as Int)
         val size = ClusterMetricsDataPoint.MetricType.values().size
         assertEquals((numberOfDocsFound.mod(size)), 0)
+        logger.info("this is the hits")
+
+        // check that each of the metric types has a unique timestamp, and number of timestamps must be equal to total docs divided by 7
+        // expect that there only document created for each metric type.
+        var mapCheck = hashMapOf<String, Set<String>>()
+        ClusterMetricsDataPoint.MetricType.values().forEach { mapCheck[it.metricName] = setOf() }
+
+        val docs = hits["hits"]!!
+//        for (doc in docs) {
+//
+//        }
     }
 
     private fun generateData() {
