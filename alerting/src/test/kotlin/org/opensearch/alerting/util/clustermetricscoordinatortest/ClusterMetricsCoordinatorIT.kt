@@ -64,7 +64,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         val numberOfDocsFound = (hits["total"]?.get("value") as Int)
         val size = ClusterMetricsDataPoint.MetricType.values().size
         assertEquals((numberOfDocsFound.mod(size)), 0)
-        val hitsData = hits["hits"]!!
+        val hitsData = hits["hits"]
         logger.info("this is the hits $hitsData")
 
         // check that each of the metric types has a unique timestamp, and number of timestamps must be equal to total docs divided by 7
