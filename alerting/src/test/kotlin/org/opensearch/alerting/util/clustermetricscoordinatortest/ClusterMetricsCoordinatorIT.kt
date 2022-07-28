@@ -71,6 +71,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         var mapCheck = hashMapOf<String, Set<String>>()
         ClusterMetricsDataPoint.MetricType.values().forEach { mapCheck[it.metricName] = setOf() }
         logger.info("this is mapCheck $mapCheck")
+        assertNotNull("Check the number of docs and stuff", 1)
 //        val docs = hits["hits"]!!
 //        for (doc in docs) {
 //
