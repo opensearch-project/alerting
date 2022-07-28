@@ -65,21 +65,19 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         val numberOfDocsFound = (hits["total"]?.get("value") as Int)
         val size = ClusterMetricsDataPoint.MetricType.values().size
         assertEquals((numberOfDocsFound.mod(size)), 0)
-        logger.info("this is the hits $hits")
-        val dataHits = hits["hits"] as ArrayList<Any>
-        logger.info("this is dataHits size $dataHits")
+        val docs = hits["hits"] as ArrayList<Map<String, Any>>
+
 
         // check that each of the metric types has a unique timestamp, and number of timestamps must be equal to total docs divided by 7
         // expect that there only document created for each metric type.
         var mapCheck = hashMapOf<String, Set<String>>()
         ClusterMetricsDataPoint.MetricType.values().forEach { mapCheck[it.metricName] = setOf() }
         logger.info("this is mapCheck $mapCheck")
-        assertNotNull("Check the number of docs and stuff", 1)
-        assertNull("Check the number of docs and stuff", 1)
-//        val docs = hits["hits"]!!
-//        for (doc in docs) {
-//
-//        }
+        for (doc in docs) {
+            var source = doc["_source"] as Map<String, Any>
+            logger.info("this is source data $source")
+        }
+        assertNull("fail the test", 1)
     }
 
     private fun generateData() {
