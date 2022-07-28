@@ -76,15 +76,12 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         for (doc in docs) {
             var source = doc["_source"] as Map<String, Map<String, Any>>
             logger.info("this is source data $source")
-
-            ClusterMetricsDataPoint.MetricType.values().forEach {
-                val metricType = source.keys.first()
-                try {
-                    ClusterMetricsDataPoint.MetricType.valueOf(metricType.uppercase(Locale.getDefault()))
-                    mapCheck[metricType]?.plus(source[metricType]?.get("timestamp"))
-                } catch (e: java.lang.IllegalArgumentException) {
-                    logger.info("Key does not exist in the enum class.")
-                }
+            val metricType = source.keys.first()
+            try {
+                ClusterMetricsDataPoint.MetricType.valueOf(metricType.uppercase(Locale.getDefault()))
+                mapCheck[metricType] = mapCheck[metricType]?.plus(source[metricType]?.get("timestamp")) as Set<String>
+            } catch (e: java.lang.IllegalArgumentException) {
+                logger.info("Key does not exist in the enum class.")
             }
         }
         logger.info("mapcheck is this $mapCheck")
