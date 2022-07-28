@@ -84,7 +84,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
                 logger.info("Key does not exist in the enum class.")
             }
         }
-        logger.info("mapcheck is this $mapCheck")
+        logger.info("mapcheck is this $mapCheck, and mapcheck set size ${mapCheck.values.toSet().size}")
         assertEquals(mapCheck.values.toSet().size, 1)
         assertNull("fail the test", 1)
     }
