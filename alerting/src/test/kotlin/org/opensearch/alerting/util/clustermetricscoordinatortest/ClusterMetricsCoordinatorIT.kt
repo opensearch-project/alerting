@@ -47,6 +47,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         val response = client().makeRequest("HEAD", index)
         assertEquals("Index $index does not exist.", RestStatus.OK, response.restStatus())
     }
+
     fun `test numberDocs`() {
         // Check that the total number of documents found is divisible by the total number of metric types.
         val settings = jsonBuilder()
@@ -65,6 +66,8 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         val size = ClusterMetricsDataPoint.MetricType.values().size
         assertEquals((numberOfDocsFound.mod(size)), 0)
         logger.info("this is the hits $hits")
+        val dataHits = hits.size
+        logger.info("this is dataHits size $dataHits")
 
         // check that each of the metric types has a unique timestamp, and number of timestamps must be equal to total docs divided by 7
         // expect that there only document created for each metric type.
