@@ -67,7 +67,6 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         assertEquals((numberOfDocsFound.mod(size)), 0)
         val docs = hits["hits"] as ArrayList<Map<String, Any>>
 
-
         // check that each of the metric types has a unique timestamp, and number of timestamps must be equal to total docs divided by 7
         // expect that there only document created for each metric type.
         var mapCheck = hashMapOf<String, Set<String>>()
