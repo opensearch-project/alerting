@@ -83,7 +83,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         Thread.sleep(60000)
         val response = getResponse()
         val xcp = createParser(XContentType.JSON.xContent(), response.entity.content)
-        val hits =  xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+        val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
         var flag = false
         val docs = hits["hits"] as ArrayList<Map<String, Any>>
 
