@@ -23,9 +23,6 @@ import java.util.*
 import kotlin.collections.ArrayList
 class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
     /*
-    2. Check that the total number of documents in the index is divisible by 7.
-    Additionally want to check that the number of individual metrics documents == total number of docs in index/7
-    3, Ingest a really old document, older than the stated deletion date, and make sure that it is properly deleted.
     4. Adjust the execution frequency setting to 1 minute, and make sure that the timestamps between the datapoints are 1 minute apart.
     Check 2 minute apart after
      */
@@ -52,8 +49,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
     fun `test numberDocs`() {
         // Check that the total number of documents found is divisible by the total number of metric types.
         val response = getResponse()
-        val xcp = createParser(XContentType.JSON.xContent(), response.entity.content)
-        val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+        val hits = getHits(response)
         val numberOfDocsFound = (hits["total"]?.get("value") as Int)
         val size = ClusterMetricsDataPoint.MetricType.values().size
         assertEquals((numberOfDocsFound.mod(size)), 0)
@@ -82,8 +78,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         createDoc(time)
         Thread.sleep(60000)
         val response = getResponse()
-        val xcp = createParser(XContentType.JSON.xContent(), response.entity.content)
-        val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+        val hits = getHits(response)
         var flag = false
         val docs = hits["hits"] as ArrayList<Map<String, Any>>
 
@@ -99,6 +94,24 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         }
         flag = true
         assertTrue(flag)
+    }
+
+    fun `test frequency`() {
+        client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "2m")
+        Thread.sleep(300000)
+
+        val response = getResponse()
+        val hits = getHits(response)
+        val docs = hits["hits"] as ArrayList<Map<String, Any>>
+        val times = mutableSetOf<String>()
+
+        for (doc in docs) {
+            val source = doc["_source"] as Map<String, Map<String, Any>>
+            val metricType = source.keys.first()
+            times.plus(source[metricType]?.get("timestamp"))
+        }
+        logger.info("this is the times Set $times")
+        assertFalse(true)
     }
 
     private fun generateData() {
@@ -138,6 +151,11 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
     }
     private fun getTime(): Instant? {
         return Instant.now().minus(10, ChronoUnit.MINUTES).minus(1, ChronoUnit.MINUTES)
+    }
+
+    private fun getHits(response: Response): Map<String, Map<String, Any>> {
+        val xcp = createParser(XContentType.JSON.xContent(), response.entity.content)
+        return xcp.map()["hits"]!! as Map<String, Map<String, Any>>
     }
 
     private fun getSettings(): Map<String, Any> {
