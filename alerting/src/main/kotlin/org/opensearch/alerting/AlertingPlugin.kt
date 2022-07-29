@@ -141,6 +141,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     lateinit var alertIndices: AlertIndices
     lateinit var clusterService: ClusterService
     lateinit var destinationMigrationCoordinator: DestinationMigrationCoordinator
+    lateinit var alertingSettings: AlertingSettings
 
     override fun getRestHandlers(
         settings: Settings,
@@ -238,6 +239,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool, scheduledJobIndices)
         this.threadPool = threadPool
         this.clusterService = clusterService
+        alertingSettings = AlertingSettings(client)
         return listOf(sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator)
     }
 
@@ -300,7 +302,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.FINDING_HISTORY_MAX_DOCS,
             AlertingSettings.FINDING_HISTORY_INDEX_MAX_AGE,
             AlertingSettings.FINDING_HISTORY_ROLLOVER_PERIOD,
-            AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD
+            AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD,
+            AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER,
+            AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
         )
     }
 
