@@ -12,10 +12,7 @@ import kotlinx.coroutines.launch
 import org.opensearch.action.ActionListener
 import org.opensearch.action.admin.cluster.health.ClusterHealthRequest
 import org.opensearch.action.admin.cluster.node.stats.NodesStatsRequest
-import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
-import org.opensearch.alerting.model.ClusterMetricsDataPoint
-import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings.Companion.METRICS_EXECUTION_FREQUENCY
 import org.opensearch.alerting.settings.AlertingSettings.Companion.METRICS_STORE_TIME
 import org.opensearch.client.Client
@@ -25,8 +22,6 @@ import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.component.LifecycleListener
 import org.opensearch.common.settings.Settings
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
@@ -34,7 +29,6 @@ import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.threadpool.Scheduler
 import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
-import java.util.*
 import kotlin.coroutines.CoroutineContext
 
 private val log = org.apache.logging.log4j.LogManager.getLogger(ClusterMetricsCoordinator::class.java)
