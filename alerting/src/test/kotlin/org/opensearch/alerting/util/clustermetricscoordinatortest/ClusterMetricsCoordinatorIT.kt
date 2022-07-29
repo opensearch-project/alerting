@@ -143,7 +143,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
     private fun getSettings(): Map<String, Any> {
         return client().makeRequest(
             "GET",
-            ".opendistro-alerting-cluster-metrics/_settings"
+            "_cluster/settings?flat_settings=true"
         ).asMap()
     }
 }
