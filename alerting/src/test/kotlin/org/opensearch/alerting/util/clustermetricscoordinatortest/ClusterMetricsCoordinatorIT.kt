@@ -108,8 +108,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         for (doc in docs) {
             val source = doc["_source"] as Map<String, Map<String, Any>>
             val metricType = source.keys.first()
-            logger.info("this is data ${source[metricType]?.get("timestamp")}")
-            times.plus(source[metricType]?.get("timestamp"))
+            times.plus(source[metricType]?.get("timestamp").toString())
         }
         logger.info("this is the times Set $times")
         assertFalse(true)
