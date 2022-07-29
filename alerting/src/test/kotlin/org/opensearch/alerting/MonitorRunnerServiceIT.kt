@@ -1663,6 +1663,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     fun setup() {
         client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.key, 1000)
         client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, 1000)
+        Thread.sleep(40000)
     }
 
     /**
