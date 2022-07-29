@@ -12,21 +12,16 @@ import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.ClusterMetricsDataPoint
 import org.opensearch.alerting.opensearchapi.string
-import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.ClusterMetricsVisualizationIndex
 import org.opensearch.client.Response
-import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.rest.RestStatus
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.time.temporal.TemporalAmount
 import java.util.*
 import kotlin.collections.ArrayList
-class ClusterMetricsCoordinatorIT(
-    private val settings: Settings
-) : AlertingRestTestCase() {
+class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
     /*
     2. Check that the total number of documents in the index is divisible by 7.
     Additionally want to check that the number of individual metrics documents == total number of docs in index/7
@@ -56,9 +51,7 @@ class ClusterMetricsCoordinatorIT(
 
     fun `test numberDocs`() {
         // Check that the total number of documents found is divisible by the total number of metric types.
-        val response = getResponse()
-        val xcp = createParser(XContentType.JSON.xContent(), response.entity.content)
-        val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+        val hits = parseResponse()
         val numberOfDocsFound = (hits["total"]?.get("value") as Int)
         val size = ClusterMetricsDataPoint.MetricType.values().size
         assertEquals((numberOfDocsFound.mod(size)), 0)
@@ -83,13 +76,25 @@ class ClusterMetricsCoordinatorIT(
     }
 
     fun `test deleteDocs`() {
-        createDoc()
+        val time = getTime()
+        createDoc(time)
         Thread.sleep(60000)
-        val response = getResponse()
-        val storageTime = AlertingSettings.METRICS_STORE_TIME.get(settings)
-        val time = Instant.now().minus(storageTime as TemporalAmount).minus(1, ChronoUnit.MINUTES).toString()
-        logger.info("this is time now - 10 minutes - 1 minute $time")
-        assertNull("YEP ERROR", 1)
+        val hits = parseResponse()
+        var flag = false
+        val docs = hits["hits"] as ArrayList<Map<String, Any>>
+
+        for (doc in docs) {
+            val source = doc["_source"] as Map<String, Map<String, Any>>
+            val metricType = source.keys.first()
+            if (metricType == "cluster_status") {
+                if (source[metricType]?.get("timestamp") == time) {
+                    assertTrue(flag)
+                    return
+                }
+            }
+        }
+        flag = true
+        assertTrue(flag)
     }
 
     private fun generateData() {
@@ -111,13 +116,17 @@ class ClusterMetricsCoordinatorIT(
             StringEntity(settings, ContentType.APPLICATION_JSON)
         )
     }
+    private fun parseResponse(): Map<String, Map<String, Any>> {
+        val response = getResponse()
+        val xcp = createParser(XContentType.JSON.xContent(), response.entity.content)
+        return xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+    }
 
-    private fun createDoc() {
-        val storageTime = AlertingSettings.METRICS_STORE_TIME.get(settings)
+    private fun createDoc(time: Instant?) {
         val doc = jsonBuilder()
             .startObject()
             .startObject("cluster_status")
-            .field("timestamp", storageTime.toString())
+            .field("timestamp", time.toString())
             .field("value", "yellow")
             .endObject()
             .endObject()
@@ -127,6 +136,9 @@ class ClusterMetricsCoordinatorIT(
             ".opendistro-alerting-cluster-metrics/_doc",
             StringEntity(doc, ContentType.APPLICATION_JSON)
         )
+    }
+    private fun getTime(): Instant? {
+        return Instant.now().minus(10, ChronoUnit.MINUTES).minus(1, ChronoUnit.MINUTES)
     }
 
     private fun getSettings(): Map<String, Any> {
