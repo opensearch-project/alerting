@@ -52,7 +52,8 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
     fun `test numberDocs`() {
         // Check that the total number of documents found is divisible by the total number of metric types.
         val response = getResponse()
-        val hits = parseResponse(response)
+        val xcp = createParser(XContentType.JSON.xContent(), response.entity.content)
+        val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
         val numberOfDocsFound = (hits["total"]?.get("value") as Int)
         val size = ClusterMetricsDataPoint.MetricType.values().size
         assertEquals((numberOfDocsFound.mod(size)), 0)
@@ -81,7 +82,8 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         createDoc(time)
         Thread.sleep(60000)
         val response = getResponse()
-        val hits = parseResponse(response)
+        val xcp = createParser(XContentType.JSON.xContent(), response.entity.content)
+        val hits =  xcp.map()["hits"]!! as Map<String, Map<String, Any>>
         var flag = false
         val docs = hits["hits"] as ArrayList<Map<String, Any>>
 
@@ -117,10 +119,6 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
             ".opendistro-alerting-cluster-metrics/_search",
             StringEntity(settings, ContentType.APPLICATION_JSON)
         )
-    }
-    private fun parseResponse(response: Response): Map<String, Map<String, Any>> {
-        val xcp = createParser(XContentType.JSON.xContent(), response.entity.content)
-        return xcp.map()["hits"]!! as Map<String, Map<String, Any>>
     }
 
     private fun createDoc(time: Instant?) {
