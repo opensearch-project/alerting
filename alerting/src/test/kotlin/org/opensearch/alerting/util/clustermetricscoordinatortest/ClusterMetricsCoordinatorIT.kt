@@ -7,19 +7,27 @@ package org.opensearch.alerting.util.clustermetricscoordinatortest
 
 import org.apache.http.entity.ContentType
 import org.apache.http.entity.StringEntity
+import org.joda.time.Minutes
 import org.junit.Before
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.ClusterMetricsDataPoint
 import org.opensearch.alerting.opensearchapi.string
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.ClusterMetricsVisualizationIndex
 import org.opensearch.client.Response
+import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.rest.RestStatus
+import java.time.Instant
+import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalAmount
 import java.util.*
 import kotlin.collections.ArrayList
-class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
+class ClusterMetricsCoordinatorIT(
+    private val settings: Settings
+) : AlertingRestTestCase() {
     /*
     2. Check that the total number of documents in the index is divisible by 7.
     Additionally want to check that the number of individual metrics documents == total number of docs in index/7
@@ -32,10 +40,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         // When setting up the tests, change the execution frequency and history max age settings to 1 minute and 10 minutes from
         // 15 minutes and 7 days.
         generateData()
-        val response = client().makeRequest(
-            "GET",
-            "_cluster/settings?flat_settings=true"
-        ).asMap()
+        val response = getSettings()
         val persistentMap = response["persistent"] as Map<String, Any>
         val executionFrequency = persistentMap["plugins.alerting.cluster_metrics.execution_frequency"].toString()
         val storageTime = persistentMap["plugins.alerting.cluster_metrics.metrics_history_max_age"].toString()
@@ -81,6 +86,12 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
     fun `test deleteDocs`() {
         createDoc()
         Thread.sleep(60000)
+        val response = getResponse()
+        val storageTime = AlertingSettings.METRICS_STORE_TIME.get(settings)
+        val time = Instant.now().minus(storageTime as TemporalAmount).minus(1, ChronoUnit.MINUTES).toString()
+        logger.info("this is time now - 10 minutes - 1 minute $time")
+        assertNull("YEP ERROR", 1)
+
     }
 
     private fun generateData() {
@@ -104,11 +115,11 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
     }
 
     private fun createDoc() {
-        var year = (0..2000).random().toString()
+        val storageTime = AlertingSettings.METRICS_STORE_TIME.get(settings)
         val doc = jsonBuilder()
             .startObject()
             .startObject("cluster_status")
-            .field("timestamp", "$year-01-01T12:00:00")
+            .field("timestamp", storageTime.toString())
             .field("value", "yellow")
             .endObject()
             .endObject()
@@ -118,5 +129,12 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
             ".opendistro-alerting-cluster-metrics/_doc",
             StringEntity(doc, ContentType.APPLICATION_JSON)
         )
+    }
+
+    private fun getSettings(): Map<String, Any> {
+        return client().makeRequest(
+            "GET",
+            ".opendistro-alerting-cluster-metrics/_settings"
+        ).asMap()
     }
 }
