@@ -2,7 +2,7 @@
  * Copyright OpenSearch Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
-/*
+
 package org.opensearch.alerting.settings
 
 import org.junit.After
@@ -112,4 +112,3 @@ class AlertingSettingsIT : AlertingRestTestCase() {
         return actions
     }
 }
-*/
