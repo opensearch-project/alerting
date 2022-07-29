@@ -20,21 +20,27 @@ import org.opensearch.alerting.ALERTING_FULL_ACCESS_ROLE
 import org.opensearch.alerting.ALERTING_GET_ALERTS_ACCESS
 import org.opensearch.alerting.ALERTING_GET_MONITOR_ACCESS
 import org.opensearch.alerting.ALERTING_INDEX_MONITOR_ACCESS
+import org.opensearch.alerting.ALERTING_NO_ACCESS_ROLE
+import org.opensearch.alerting.ALERTING_READ_ONLY_ACCESS
 import org.opensearch.alerting.ALERTING_SEARCH_MONITOR_ONLY_ACCESS
 import org.opensearch.alerting.ALL_ACCESS_ROLE
 import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.DRYRUN_MONITOR
+import org.opensearch.alerting.TERM_DLS_QUERY
 import org.opensearch.alerting.TEST_HR_BACKEND_ROLE
 import org.opensearch.alerting.TEST_HR_INDEX
 import org.opensearch.alerting.TEST_HR_ROLE
 import org.opensearch.alerting.TEST_NON_HR_INDEX
+import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.alerting.assertUserNull
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomAlert
+import org.opensearch.alerting.randomBucketLevelMonitor
+import org.opensearch.alerting.randomBucketLevelTrigger
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.randomTemplateScript
@@ -49,6 +55,9 @@ import org.opensearch.commons.authuser.User
 import org.opensearch.commons.rest.SecureRestClientBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
+import org.opensearch.script.Script
+import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
+import org.opensearch.search.aggregations.bucket.composite.TermsValuesSourceBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.junit.annotations.TestLogging
 
@@ -65,7 +74,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    val user = "userOne"
+    val user = "userD"
     var userClient: RestClient? = null
 
     @Before
@@ -85,7 +94,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     // Create Monitor related security tests
-
     fun `test create monitor with an user with alerting role`() {
 
         createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
@@ -105,11 +113,13 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             assertUserNull(createResponse?.asMap()!!["monitor"] as HashMap<String, Any>)
         } finally {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
+            deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
         }
     }
 
     /*
     TODO: https://github.com/opensearch-project/alerting/issues/300
+    */
     fun `test create monitor with an user without alerting role`() {
 
         createUserWithTestDataAndCustomRole(
@@ -138,13 +148,9 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test create monitor with an user with read-only role`() {
 
-        createUserWithTestDataAndCustomRole(
-            user,
-            TEST_HR_INDEX,
-            TEST_HR_ROLE,
-            TEST_HR_BACKEND_ROLE,
-            getClusterPermissionsFromCustomRole(ALERTING_READ_ONLY_ACCESS)
-        )
+        createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
+        createUserRolesMapping(ALERTING_READ_ONLY_ACCESS, arrayOf(user))
+
         try {
             val monitor = randomQueryLevelMonitor().copy(
                 inputs = listOf(
@@ -159,9 +165,9 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         } finally {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
+            deleteRoleMapping(ALERTING_READ_ONLY_ACCESS)
         }
     }
-     */
 
     fun `test query monitors with an user with only search monitor cluster permission`() {
 
@@ -186,10 +192,12 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
         val numberDocsFound = hits["total"]?.get("value")
         assertEquals("Monitor not found during search", 1, numberDocsFound)
+        deleteRoleAndRoleMapping(TEST_HR_ROLE)
     }
 
     /*
     TODO: https://github.com/opensearch-project/alerting/issues/300
+    */
     fun `test query monitors with an user without search monitor cluster permission`() {
 
         createUserWithTestDataAndCustomRole(
@@ -215,7 +223,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
         }
     }
-    */
 
     fun `test create monitor with an user without index read role`() {
 
@@ -278,6 +285,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     /*
     TODO: https://github.com/opensearch-project/alerting/issues/300
+     */
     fun `test get monitor with an user without get monitor role`() {
         createUserWithTestDataAndCustomRole(
             user,
@@ -303,7 +311,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
         }
     }
-     */
 
     fun getDocs(response: Response?): Any? {
         val hits = createParser(
@@ -414,8 +421,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     /*
     TODO: https://github.com/opensearch-project/alerting/issues/300
+     */
     fun `test query monitors with disable filter by`() {
-
         disableFilterBy()
 
         // creates monitor as "admin" user.
@@ -440,10 +447,9 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 NStringEntity(search, ContentType.APPLICATION_JSON)
             )
             fail("Expected 403 FORBIDDEN response")
-        } catch (e: AssertionError) {
-            assertEquals("Unexpected status", "Expected 403 FORBIDDEN response", e.message)
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         }
-
         // add alerting roles and search as userOne - must return 1 docs
         createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
         try {
@@ -486,8 +492,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 NStringEntity(search, ContentType.APPLICATION_JSON)
             )
             fail("Expected 403 FORBIDDEN response")
-        } catch (e: AssertionError) {
-            assertEquals("Unexpected status", "Expected 403 FORBIDDEN response", e.message)
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         }
 
         // add alerting roles and search as userOne - must return 0 docs
@@ -505,8 +511,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
         }
     }
-
-     */
 
     fun `test execute monitor with an user with execute monitor access`() {
         createUserWithTestDataAndCustomRole(
@@ -533,6 +537,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     /*
     TODO: https://github.com/opensearch-project/alerting/issues/300
+    */
     fun `test execute monitor with an user without execute monitor access`() {
         createUserWithTestDataAndCustomRole(
             user,
@@ -558,7 +563,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
         }
     }
-    */
 
     fun `test delete monitor with an user with delete monitor access`() {
         createUserWithTestDataAndCustomRole(
@@ -587,6 +591,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     /*
     TODO: https://github.com/opensearch-project/alerting/issues/300
+     */
     fun `test delete monitor with an user without delete monitor access`() {
         createUserWithTestDataAndCustomRole(
             user,
@@ -636,8 +641,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         try {
             getAlerts(userClient as RestClient, inputMap).asMap()
             fail("Expected 403 FORBIDDEN response")
-        } catch (e: AssertionError) {
-            assertEquals("Unexpected status", "Expected 403 FORBIDDEN response", e.message)
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         }
 
         // add alerting roles and search as userOne - must return 0 docs
@@ -673,10 +678,9 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         try {
             getAlerts(userClient as RestClient, inputMap).asMap()
             fail("Expected 403 FORBIDDEN response")
-        } catch (e: AssertionError) {
-            assertEquals("Unexpected status", "Expected 403 FORBIDDEN response", e.message)
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         }
-
         // add alerting roles and search as userOne - must return 0 docs
         createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
         try {
@@ -686,8 +690,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
         }
     }
-
-     */
 
     fun `test get alerts with an user with get alerts role`() {
 
@@ -809,21 +811,19 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             assertEquals("Delete monitor failed", RestStatus.OK, adminDeleteResponse.restStatus())
         } finally {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
+            deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
         }
     }
 
     /*
     TODO: https://github.com/opensearch-project/alerting/issues/300
+     */
     fun `test execute query-level monitor with user having partial index permissions`() {
 
-        createUserWithDocLevelSecurityTestDataAndCustomRole(
-            user,
-            TEST_HR_INDEX,
-            TEST_HR_ROLE,
-            TEST_HR_BACKEND_ROLE,
-            TERM_DLS_QUERY,
-            getClusterPermissionsFromCustomRole(ALERTING_FULL_ACCESS_ROLE)
-        )
+        createUser(user, user, arrayOf(TEST_HR_BACKEND_ROLE))
+        createTestIndex(TEST_HR_INDEX)
+        createCustomIndexRoleWithDocLevelSecurity(TEST_HR_ROLE, TEST_HR_INDEX, TERM_DLS_QUERY, getClusterPermissionsFromCustomRole(ALERTING_INDEX_MONITOR_ACCESS))
+        createUserRolesMapping(TEST_HR_ROLE, arrayOf(user))
 
         // Add a doc that is accessible to the user
         indexDoc(
@@ -831,7 +831,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             """
             {
               "test_field": "a",
-              "accessible": true
+              "accessible": true 
             }
             """.trimIndent()
         )
@@ -850,7 +850,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         val input = SearchInput(indices = listOf(TEST_HR_INDEX), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
         val triggerScript = """
             // make sure there is exactly one hit
-            return ctx.results[0].hits.hits.size() == 1
+            return ctx.results[0].hits.hits.size() == 1 
         """.trimIndent()
 
         val trigger = randomQueryLevelTrigger(condition = Script(triggerScript)).copy(actions = listOf())
@@ -870,14 +870,10 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test execute bucket-level monitor with user having partial index permissions`() {
 
-        createUserWithDocLevelSecurityTestDataAndCustomRole(
-            user,
-            TEST_HR_INDEX,
-            TEST_HR_ROLE,
-            TEST_HR_BACKEND_ROLE,
-            TERM_DLS_QUERY,
-            getClusterPermissionsFromCustomRole(ALERTING_FULL_ACCESS_ROLE)
-        )
+        createUser(user, user, arrayOf(TEST_HR_BACKEND_ROLE))
+        createTestIndex(TEST_HR_INDEX)
+        createCustomIndexRoleWithDocLevelSecurity(TEST_HR_ROLE, TEST_HR_INDEX, TERM_DLS_QUERY, getClusterPermissionsFromCustomRole(ALERTING_INDEX_MONITOR_ACCESS))
+        createUserRolesMapping(TEST_HR_ROLE, arrayOf(user))
 
         // Add a doc that is accessible to the user
         indexDoc(
@@ -937,5 +933,4 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
         }
     }
-     */
 }

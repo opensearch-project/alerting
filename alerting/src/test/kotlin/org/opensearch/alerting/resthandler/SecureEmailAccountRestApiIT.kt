@@ -13,6 +13,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
 import org.opensearch.alerting.ALERTING_GET_EMAIL_ACCOUNT_ACCESS
+import org.opensearch.alerting.ALERTING_NO_ACCESS_ROLE
 import org.opensearch.alerting.ALERTING_SEARCH_EMAIL_ACCOUNT_ACCESS
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.AlertingRestTestCase
@@ -20,6 +21,7 @@ import org.opensearch.alerting.TEST_HR_BACKEND_ROLE
 import org.opensearch.alerting.TEST_HR_INDEX
 import org.opensearch.alerting.TEST_HR_ROLE
 import org.opensearch.alerting.makeRequest
+import org.opensearch.client.ResponseException
 import org.opensearch.client.RestClient
 import org.opensearch.commons.rest.SecureRestClientBuilder
 import org.opensearch.rest.RestStatus
@@ -50,7 +52,7 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    val user = "userOne"
+    val user = "userB"
     var userClient: RestClient? = null
 
     @Before
@@ -126,7 +128,7 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
 
     /*
     TODO: https://github.com/opensearch-project/alerting/issues/300
-
+     */
     fun `test get email accounts with an user without get email account role`() {
         createUserWithTestDataAndCustomRole(
             user,
@@ -135,9 +137,7 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
             TEST_HR_BACKEND_ROLE,
             getClusterPermissionsFromCustomRole(ALERTING_NO_ACCESS_ROLE)
         )
-
         val emailAccount = createRandomEmailAccountWithGivenName(true, randomAlphaOfLength(5))
-
         try {
             userClient?.makeRequest(
                 "GET",
@@ -155,9 +155,7 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
         }
     }
-
     fun `test search email accounts with an user without search email account role`() {
-
         createUserWithTestDataAndCustomRole(
             user,
             TEST_HR_INDEX,
@@ -165,9 +163,7 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
             TEST_HR_BACKEND_ROLE,
             getClusterPermissionsFromCustomRole(ALERTING_NO_ACCESS_ROLE)
         )
-
         createRandomEmailAccountWithGivenName(true, randomAlphaOfLength(5))
-
         try {
             userClient?.makeRequest(
                 "POST",
@@ -182,6 +178,4 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
         }
     }
-
-     */
 }
