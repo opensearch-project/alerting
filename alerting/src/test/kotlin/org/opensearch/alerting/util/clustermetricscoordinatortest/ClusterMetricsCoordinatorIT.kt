@@ -7,7 +7,6 @@ package org.opensearch.alerting.util.clustermetricscoordinatortest
 
 import org.apache.http.entity.ContentType
 import org.apache.http.entity.StringEntity
-import org.joda.time.Minutes
 import org.junit.Before
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest
@@ -91,7 +90,6 @@ class ClusterMetricsCoordinatorIT(
         val time = Instant.now().minus(storageTime as TemporalAmount).minus(1, ChronoUnit.MINUTES).toString()
         logger.info("this is time now - 10 minutes - 1 minute $time")
         assertNull("YEP ERROR", 1)
-
     }
 
     private fun generateData() {
