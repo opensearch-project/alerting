@@ -143,15 +143,18 @@ class ClusterMetricsCoordinator(
 
         for (key in keys) {
             val keyData = nodesMap[key] as Map<String, Any>
+            log.info("this is keyData $keyData")
             val osMap = keyData["os"] as Map<String, Any>
+            log.info("This is osMap $osMap")
             val cpuMap = osMap["cpu"] as Map<String, Any>
+            log.info("This is cpuMap $cpuMap")
             val percent = cpuMap["percent"].toString()
-            CPU_data.add(percent)
 
             val jvmMap = keyData["jvm"] as Map<String, Any>
+            log.info("this is jvmMap $jvmMap")
             val memMap = jvmMap["mem"] as Map<String, Any>
+            log.info("this is memMap $memMap")
             val pressure = memMap["heap_used_percent"].toString()
-            JVM_data.add(pressure)
         }
         log.info("this is CPU data $CPU_data")
         log.info("this is JVM data $JVM_data")
