@@ -144,9 +144,9 @@ class ClusterMetricsCoordinator(
         for (key in keys) {
             val keyData = nodesMap[key] as Map<String, Any>
             log.info("this is keyData $keyData")
-            val osMap = keyData["os"] as Map<String, Any>
-            log.info("This is osMap $osMap")
-            val cpuMap = osMap["cpu"] as Map<String, Any>
+            val processMap = keyData["process"] as Map<String, Any>
+            log.info("This is osMap $processMap")
+            val cpuMap = processMap["cpu"] as Map<String, Any>
             log.info("This is cpuMap $cpuMap")
             val percent = cpuMap["percent"].toString()
 
