@@ -172,8 +172,8 @@ class ClusterMetricsCoordinator(
         log.info("this is max JVM $maximumJVM")
         log.info("this is min JVM $minimumJVM")
 
-        var avgCPU = 0
-        var avgJVM = 0
+        var avgCPU = 0.0
+        var avgJVM = 0.0
 
         for (i in cpuData.indices) {
             avgCPU += cpuData[i]
