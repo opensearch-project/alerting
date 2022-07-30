@@ -5,7 +5,9 @@
 
 package org.opensearch.alerting
 
+import org.junit.After
 import org.junit.Assert
+import org.junit.Before
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.alerting.alerts.AlertError
 import org.opensearch.alerting.alerts.AlertIndices
@@ -27,6 +29,7 @@ import org.opensearch.alerting.model.destination.CustomWebhook
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.email.Email
 import org.opensearch.alerting.model.destination.email.Recipient
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.ResponseException
@@ -967,7 +970,6 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     //  the API from the list before executing the monitor.
 
     fun `test execute monitor with custom webhook destination and denied host`() {
-
         listOf("http://10.1.1.1", "127.0.0.1").forEach {
             val customWebhook = CustomWebhook(it, null, null, 80, null, "PUT", emptyMap(), emptyMap(), null, null)
             val destination = createDestination(
@@ -1655,6 +1657,25 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 throttledActionResults[actionThrottleNotEnabled.id]!!.lastExecutionTime!! > prevNotThrottledActionLastExecutionTime
             )
         }
+    }
+
+    @Before
+    fun setup() {
+        client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.key, 1000)
+        client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, 1000)
+        Thread.sleep(4000)
+    }
+
+    /**
+     [AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS] and [AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER]
+     must be reset to their default values once the tests have completed.
+     */
+    @After
+    fun cleanup() {
+        client().updateSettings(
+            AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
+        )
+        client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER)
     }
 
     private fun prepareTestAnomalyResult(detectorId: String, user: User) {

@@ -127,8 +127,10 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 MOVE_ALERTS_BACKOFF_MILLIS.get(monitorCtx.settings),
                 MOVE_ALERTS_BACKOFF_COUNT.get(monitorCtx.settings)
             )
-        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(MOVE_ALERTS_BACKOFF_MILLIS, MOVE_ALERTS_BACKOFF_COUNT) {
-                millis, count ->
+        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(
+            MOVE_ALERTS_BACKOFF_MILLIS,
+            MOVE_ALERTS_BACKOFF_COUNT
+        ) { millis, count ->
             monitorCtx.moveAlertsRetryPolicy = BackoffPolicy.exponentialBackoff(millis, count)
         }
 
@@ -146,7 +148,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         }
 
         monitorCtx.indexTimeout = INDEX_TIMEOUT.get(monitorCtx.settings)
-
         return this
     }
 
