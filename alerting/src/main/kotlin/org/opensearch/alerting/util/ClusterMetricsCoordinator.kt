@@ -31,7 +31,6 @@ import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
 import java.util.*
 import kotlin.coroutines.CoroutineContext
-import kotlin.math.min
 
 private val log = org.apache.logging.log4j.LogManager.getLogger(ClusterMetricsCoordinator::class.java)
 
@@ -172,6 +171,19 @@ class ClusterMetricsCoordinator(
         val maximumJVM = Collections.max(jvmData)
         log.info("this is max JVM $maximumJVM")
         log.info("this is min JVM $minimumJVM")
+
+        var avgCPU = 0
+        var avgJVM = 0
+
+        for (i in cpuData.indices) {
+            avgCPU += cpuData[i]
+            avgJVM += jvmData[i]
+        }
+
+        avgCPU /= cpuData.size
+        avgJVM /= jvmData.size
+        log.info("this is avgCPU $avgCPU")
+        log.info("this is avgJVM $avgJVM")
 //
 //        val clusterStatus_data = ClusterMetricsDataPoint(
 //            ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS,
