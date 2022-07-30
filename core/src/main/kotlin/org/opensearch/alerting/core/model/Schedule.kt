@@ -248,10 +248,7 @@ data class CronSchedule(
     }
 
     override fun asTemplateArg(): Map<String, Any> {
-        return mapOf(
-            EXPRESSION_FIELD to expression,
-            TIMEZONE_FIELD to timezone
-        )
+        return mapOf("cron" to mapOf(EXPRESSION_FIELD to expression, TIMEZONE_FIELD to timezone))
     }
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
@@ -352,10 +349,7 @@ data class IntervalSchedule(
     }
 
     override fun asTemplateArg(): Map<String, Any> {
-        return mapOf(
-            INTERVAL_FIELD to interval,
-            UNIT_FIELD to unit
-        )
+        return mapOf("period" to mapOf(INTERVAL_FIELD to interval, UNIT_FIELD to unit))
     }
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {

@@ -32,8 +32,10 @@ data class DocLevelMonitorInput(
     override fun asTemplateArg(): Map<String, Any?> {
         return mapOf(
             DESCRIPTION_FIELD to description,
-            INDICES_FIELD to indices,
-            QUERIES_FIELD to queries.map { it.asTemplateArg() }
+            SEARCH_FIELD to mapOf(
+                INDICES_FIELD to indices,
+                QUERIES_FIELD to queries.map { it.asTemplateArg() }
+            )
         )
     }
 
@@ -64,6 +66,7 @@ data class DocLevelMonitorInput(
         const val INDICES_FIELD = "indices"
         const val DOC_LEVEL_INPUT_FIELD = "doc_level_input"
         const val QUERIES_FIELD = "queries"
+        const val SEARCH_FIELD = "search"
 
         const val NO_DESCRIPTION = ""
 

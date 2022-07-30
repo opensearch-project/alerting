@@ -20,7 +20,7 @@ import org.opensearch.search.aggregations.pipeline.AbstractPipelineAggregationBu
 import org.opensearch.search.aggregations.pipeline.BucketHelpers.GapPolicy
 import org.opensearch.search.aggregations.pipeline.PipelineAggregator
 import java.io.IOException
-import java.util.*
+import java.util.Objects
 
 class BucketSelectorExtAggregationBuilder :
     AbstractPipelineAggregationBuilder<BucketSelectorExtAggregationBuilder> {
@@ -107,6 +107,7 @@ class BucketSelectorExtAggregationBuilder :
     fun asTemplateArg(): Map<String, Any?> {
         return mapOf(
             PipelineAggregator.Parser.BUCKETS_PATH.preferredName to bucketsPathsMap as Map<String, Any?>,
+            PARENT_BUCKET_PATH.preferredName to parentBucketPath,
             Script.SCRIPT_PARSE_FIELD.preferredName to script.asTemplateArg()
         )
     }

@@ -9,6 +9,7 @@ import org.opensearch.alerting.randomBucketLevelTrigger
 import org.opensearch.test.OpenSearchTestCase
 
 class BucketLevelTriggerTests : OpenSearchTestCase() {
+
     fun `test bucket level trigger as template args`() {
         val trigger = randomBucketLevelTrigger()
 
@@ -29,6 +30,5 @@ class BucketLevelTriggerTests : OpenSearchTestCase() {
                 (templateArgs[Trigger.ACTIONS_FIELD] as List<*>).contains(it.asTemplateArg())
             )
         }
-        assertEquals("Template args parent bucket path does not match", templateArgs[BucketLevelTrigger.PARENT_BUCKET_PATH], trigger.getParentBucketPath())
     }
 }

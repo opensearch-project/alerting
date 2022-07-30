@@ -335,7 +335,7 @@ fun randomTemplateScript(
 ): Script = Script(ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG, source, params)
 
 fun randomAction(
-    name: String = OpenSearchRestTestCase.randomUnicodeOfLength(10),
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     template: Script = randomTemplateScript("Hello World"),
     destinationId: String = "",
     throttleEnabled: Boolean = false,
@@ -343,7 +343,7 @@ fun randomAction(
 ) = Action(name, destinationId, template, template, throttleEnabled, throttle, actionExecutionPolicy = null)
 
 fun randomActionWithPolicy(
-    name: String = OpenSearchRestTestCase.randomUnicodeOfLength(10),
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     template: Script = randomTemplateScript("Hello World"),
     destinationId: String = "",
     throttleEnabled: Boolean = false,

@@ -59,6 +59,7 @@ class BucketSelectorExtAggregationBuilderTests : BasePipelineAggregationTestCase
         val templateArgs = builder.asTemplateArg()
 
         assertEquals("Template args bucket paths does not match", templateArgs[PipelineAggregator.Parser.BUCKETS_PATH.preferredName] as Map<*, *>, builder.getBucketsPathsMap())
+        assertEquals("Template args parent bucket path does not match", templateArgs[BucketSelectorExtAggregationBuilder.PARENT_BUCKET_PATH.preferredName], builder.parentBucketPath)
         assertEquals("Template args script does not match", templateArgs[Script.SCRIPT_PARSE_FIELD.preferredName] as Map<*, *>, builder.script.asTemplateArg())
     }
 }

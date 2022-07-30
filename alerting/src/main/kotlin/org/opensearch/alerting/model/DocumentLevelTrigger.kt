@@ -5,7 +5,6 @@
 
 package org.opensearch.alerting.model
 
-import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.model.Trigger.Companion.ACTIONS_FIELD
 import org.opensearch.alerting.model.Trigger.Companion.ID_FIELD
 import org.opensearch.alerting.model.Trigger.Companion.NAME_FIELD
@@ -39,8 +38,6 @@ data class DocumentLevelTrigger(
     val condition: Script
 ) : Trigger {
 
-    private val log = LogManager.getLogger(javaClass)
-
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
         sin.readString(), // id
@@ -71,7 +68,6 @@ data class DocumentLevelTrigger(
 
     /** Returns a representation of the trigger suitable for passing into painless and mustache scripts. */
     override fun asTemplateArg(): Map<String, Any?> {
-        log.info("inside docleveltrigger astemplatearg")
         return mapOf(
             ID_FIELD to id,
             NAME_FIELD to name,

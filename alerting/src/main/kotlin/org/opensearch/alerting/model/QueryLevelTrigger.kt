@@ -71,7 +71,6 @@ data class QueryLevelTrigger(
 
     /** Returns a representation of the trigger suitable for passing into painless and mustache scripts. */
     override fun asTemplateArg(): Map<String, Any?> {
-        log.info("in query level as template arg")
         return mapOf(
             ID_FIELD to id,
             NAME_FIELD to name,

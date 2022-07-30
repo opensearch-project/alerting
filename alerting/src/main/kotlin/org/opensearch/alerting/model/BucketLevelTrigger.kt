@@ -80,7 +80,6 @@ data class BucketLevelTrigger(
             SEVERITY_FIELD to severity,
             CONDITION_FIELD to bucketSelector.asTemplateArg(),
             ACTIONS_FIELD to actions.map { it.asTemplateArg() },
-            PARENT_BUCKET_PATH to getParentBucketPath()
         )
     }
 
