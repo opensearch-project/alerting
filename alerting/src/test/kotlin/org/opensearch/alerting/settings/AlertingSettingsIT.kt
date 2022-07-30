@@ -50,37 +50,34 @@ class AlertingSettingsIT : AlertingRestTestCase() {
     }
 
     fun `test updating setting of overall max actions with more actions than allowed actions`() {
-        val actions = createActions(4)
-        val triggers = createTriggers(4, actions)
-        createMonitor(
-            randomQueryLevelMonitor(
-                triggers = triggers
-            )
-        )
-
         try {
             client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.key, 1)
+            // Wait for settings to update
+            Thread.sleep(4000)
+
+            val actions = createActions(4)
+            val triggers = createTriggers(4, actions)
+            createMonitor(
+                randomQueryLevelMonitor(
+                    triggers = triggers
+                )
+            )
         } catch (e: Exception) {
             assertTrue(e is IllegalArgumentException)
-        } finally {
-            client().updateSettings(
-                AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
-            )
         }
     }
 
     fun `test updating setting of overall max actions with less actions than allowed actions`() {
+        client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.key, 10)
+        // Wait for setting to be updated
+        Thread.sleep(4000)
+
         val actions = createActions(1)
         val triggers = createTriggers(1, actions)
         createMonitor(
             randomQueryLevelMonitor(
                 triggers = triggers
             )
-        )
-
-        client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.key, 10)
-        client().updateSettings(
-            AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
         )
     }
 
