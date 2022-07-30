@@ -14,7 +14,6 @@ import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.test.OpenSearchTestCase
-import java.lang.IllegalArgumentException
 
 class DocLevelMonitorInputTests : OpenSearchTestCase() {
     fun `test DocLevelQuery asTemplateArgs`() {
@@ -77,18 +76,18 @@ class DocLevelMonitorInputTests : OpenSearchTestCase() {
         )
         assertEquals(
             "Template args 'indices' field does not match:",
-            templateArgs[DocLevelMonitorInput.INDICES_FIELD],
+            (templateArgs[DocLevelMonitorInput.SEARCH_FIELD] as Map<*, *>)[DocLevelMonitorInput.INDICES_FIELD],
             input.indices
         )
         assertEquals(
             "Template args 'queries' field does not contain the expected number of queries:",
             input.queries.size,
-            (templateArgs[DocLevelMonitorInput.QUERIES_FIELD] as List<*>).size
+            ((templateArgs[DocLevelMonitorInput.SEARCH_FIELD] as Map<*, *>)[DocLevelMonitorInput.QUERIES_FIELD] as List<*>).size
         )
         input.queries.forEach {
             assertTrue(
                 "Template args 'queries' field does not match:",
-                (templateArgs[DocLevelMonitorInput.QUERIES_FIELD] as List<*>).contains(it.asTemplateArg())
+                ((templateArgs[DocLevelMonitorInput.SEARCH_FIELD] as Map<*, *>)[DocLevelMonitorInput.QUERIES_FIELD] as List<*>).contains(it.asTemplateArg())
             )
         }
     }

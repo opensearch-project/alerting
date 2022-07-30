@@ -74,7 +74,12 @@ data class Action(
     }
 
     fun asTemplateArg(): Map<String, Any> {
-        return mapOf(NAME_FIELD to name)
+        return mapOf(
+            ID_FIELD to id,
+            NAME_FIELD to name,
+            DESTINATION_ID_FIELD to destinationId,
+            THROTTLE_ENABLED_FIELD to throttleEnabled
+        )
     }
 
     @Throws(IOException::class)

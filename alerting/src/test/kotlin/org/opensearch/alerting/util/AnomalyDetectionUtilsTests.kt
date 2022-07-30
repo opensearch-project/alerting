@@ -53,6 +53,10 @@ class AnomalyDetectionUtilsTests : OpenSearchTestCase() {
                 override fun toXContent(builder: XContentBuilder?, params: ToXContent.Params?): XContentBuilder {
                     TODO("Not yet implemented")
                 }
+
+                override fun asTemplateArg(): Map<String, Any?> {
+                    TODO("Not yet implemented")
+                }
             })
         )
         assertFalse(isADMonitor(monitor))

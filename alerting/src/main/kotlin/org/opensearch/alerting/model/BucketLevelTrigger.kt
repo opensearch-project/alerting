@@ -73,13 +73,13 @@ data class BucketLevelTrigger(
         out.writeCollection(actions)
     }
 
-    fun asTemplateArg(): Map<String, Any> {
+    override fun asTemplateArg(): Map<String, Any?> {
         return mapOf(
             ID_FIELD to id,
             NAME_FIELD to name,
             SEVERITY_FIELD to severity,
+            CONDITION_FIELD to bucketSelector.asTemplateArg(),
             ACTIONS_FIELD to actions.map { it.asTemplateArg() },
-            PARENT_BUCKET_PATH to getParentBucketPath()
         )
     }
 

@@ -5,10 +5,14 @@
 
 package org.opensearch.alerting
 
+import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_FINDING_INDEX_PATTERN
+import org.opensearch.alerting.core.model.CronSchedule
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
+import org.opensearch.alerting.core.model.IntervalSchedule
+import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.alerting.model.action.AlertCategory
 import org.opensearch.alerting.model.action.PerAlertActionScope
@@ -21,6 +25,8 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit.MILLIS
 
 class DocumentMonitorRunnerIT : AlertingRestTestCase() {
+
+    private val log = LogManager.getLogger(javaClass)
 
     fun `test execute monitor with dryrun`() {
 
@@ -576,6 +582,200 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             )
             assertTrue("Found doc that doesn't match query: $it", nonMatchingDocIds.intersect(docIds).isEmpty())
             assertFalse("Found an unexpected finding $it", matchingDocIds.intersect(docIds).isNotEmpty())
+        }
+    }
+
+    fun `test DocLevelMonitor with IntervalSchedule returns expected template args`() {
+        // create a template that invokes all template arg fields we support
+        val template = randomTemplateScript(
+            "{{ctx.monitor._id}};" + // 0
+                "{{ctx.monitor._version}};" + // 1
+                "{{ctx.monitor.name}};" + // 2
+                "{{ctx.monitor.monitor_type}};" + // 3
+                "{{ctx.monitor.enabled}};" + // 4
+                "{{ctx.monitor.enabled_time}};" + // 5
+                "{{ctx.monitor.last_update_time}};" + // 6
+                "{{ctx.monitor.schedule.period.interval}};" + // 7
+                "{{ctx.monitor.schedule.period.unit}};" + // 8
+                "{{ctx.monitor.inputs.size}};" + // 9
+                "{{ctx.monitor.inputs.0.search.indices.size}};" + // 10
+                "{{ctx.monitor.inputs.0.search.indices.0}};" + // 11
+                "{{ctx.monitor.inputs.0.search.queries.size}};" + // 12
+                "{{ctx.monitor.inputs.0.search.queries.0.query}};" + // 13
+                "{{ctx.trigger.id}};" + // 14
+                "{{ctx.trigger.name}};" + // 15
+                "{{ctx.trigger.severity}};" + // 16
+                "{{ctx.trigger.condition.script.source}};" + // 17
+                "{{ctx.trigger.condition.script.lang}};" + // 18
+                "{{ctx.trigger.actions.size}};" + // 19
+                "{{ctx.trigger.actions.0.id}};" + // 20
+                "{{ctx.trigger.actions.0.name}};" + // 21
+                "{{ctx.trigger.actions.0.destination_id}};" + // 22
+                "{{ctx.trigger.actions.0.throttle_enabled}}" // 23
+        )
+
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val index = createTestIndex()
+
+        val docQuery = DocLevelQuery(query = "test_field:us-west-2", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+
+        val action = randomAction(template = template, destinationId = createDestination().id)
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))
+
+        val monitor = randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger))
+
+        indexDoc(index, "1", testDoc)
+
+        val output = entityAsMap(executeMonitor(monitor))
+
+        log.info("output: $output")
+
+        assertEquals(1, output.objectMap("trigger_results").values.size) // ensure that we got actual trigger results
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertEquals(1, triggerResult.objectMap("action_results").values.size)
+            for (alertActionResult in triggerResult.objectMap("action_results").values) {
+                for (actionResult in alertActionResult.values) {
+                    @Suppress("UNCHECKED_CAST") val actionOutput = (actionResult as Map<String, Map<String, String>>)["output"]
+                        as Map<String, String>
+
+                    val rawOutput: String = actionOutput["message"] as String // the raw mustache template that just lists all the fields
+                    val results: List<String> = rawOutput.split(";")
+
+                    assertEquals(24, results.size) // we asked for 23 fields, make sure we got them
+
+                    // start checking asTemplateArg values
+                    assertEquals(results[0], monitor.id) // ctx.monitor.id
+                    assertEquals(results[1], monitor.version.toString()) // ctx.monitor.version
+                    assertEquals(results[2], monitor.name) // ctx.monitor.name
+                    assertEquals(results[3], monitor.monitorType.toString()) // ctx.monitor.monitor_type
+                    assertEquals(results[4], monitor.enabled.toString()) // ctx.monitor.enabled
+                    assertEquals(results[5], monitor.enabledTime.toString()) // ctx.monitor.enabled_time
+                    assertEquals(results[6], monitor.lastUpdateTime.toString()) // ctx.monitor.last_update_time
+                    assertEquals(results[7], (monitor.schedule as IntervalSchedule).interval.toString()) // ctx.monitor.schedule.period.interval
+                    assertEquals(results[8], (monitor.schedule as IntervalSchedule).unit.toString()) // ctx.monitor.schedule.period.unit
+                    assertEquals(results[9], monitor.inputs.size.toString()) // ctx.monitor.inputs.size
+                    assertEquals(results[10], (monitor.inputs[0] as DocLevelMonitorInput).indices.size.toString()) // ctx.monitor.inputs.search.indices.size
+                    assertEquals(results[11], (monitor.inputs[0] as DocLevelMonitorInput).indices[0]) // ctx.monitor.inputs.search.indices
+                    assertEquals(results[12], (monitor.inputs[0] as DocLevelMonitorInput).queries.size.toString()) // ctx.monitor.inputs.search.queries.size
+                    assertEquals(results[13], (monitor.inputs[0] as DocLevelMonitorInput).queries[0].query) // ctx.monitor.inputs.search.queries.query
+                    assertEquals(results[14], monitor.triggers[0].id) // ctx.trigger.id
+                    assertEquals(results[15], monitor.triggers[0].name) // ctx.trigger.name
+                    assertEquals(results[16], monitor.triggers[0].severity) // ctx.trigger.severity
+                    assertEquals(results[17], (monitor.triggers[0] as DocumentLevelTrigger).condition.idOrCode) // ctx.trigger.condition.script.source
+                    assertEquals(results[18], (monitor.triggers[0] as DocumentLevelTrigger).condition.lang) // ctx.trigger.condition.script.lang
+                    assertEquals(results[19], (monitor.triggers[0] as DocumentLevelTrigger).actions.size.toString()) // ctx.trigger.actions.size
+                    assertEquals(results[20], (monitor.triggers[0] as DocumentLevelTrigger).actions[0].id) // ctx.trigger.actions.id
+                    assertEquals(results[21], (monitor.triggers[0] as DocumentLevelTrigger).actions[0].name) // ctx.trigger.actions.name
+                    assertEquals(results[22], (monitor.triggers[0] as DocumentLevelTrigger).actions[0].destinationId) // ctx.trigger.actions.destination_id
+                    assertEquals(results[23], (monitor.triggers[0] as DocumentLevelTrigger).actions[0].throttleEnabled.toString()) // ctx.trigger.actions.throttle_enabled
+                }
+            }
+        }
+    }
+
+    fun `test DocLevelMonitor with CronSchedule returns expected template args`() {
+        // create a template that invokes all template arg fields we support
+        val template = randomTemplateScript(
+            "{{ctx.monitor._id}};" + // 0
+                "{{ctx.monitor._version}};" + // 1
+                "{{ctx.monitor.name}};" + // 2
+                "{{ctx.monitor.monitor_type}};" + // 3
+                "{{ctx.monitor.enabled}};" + // 4
+                "{{ctx.monitor.enabled_time}};" + // 5
+                "{{ctx.monitor.last_update_time}};" + // 6
+                "{{ctx.monitor.schedule.cron.expression}};" + // 7
+                "{{ctx.monitor.schedule.cron.timezone}};" + // 8
+                "{{ctx.monitor.inputs.size}};" + // 9
+                "{{ctx.monitor.inputs.0.search.indices.size}};" + // 10
+                "{{ctx.monitor.inputs.0.search.indices.0}};" + // 11
+                "{{ctx.monitor.inputs.0.search.queries.size}};" + // 12
+                "{{ctx.monitor.inputs.0.search.queries.0.query}};" + // 13
+                "{{ctx.trigger.id}};" + // 14
+                "{{ctx.trigger.name}};" + // 15
+                "{{ctx.trigger.severity}};" + // 16
+                "{{ctx.trigger.condition.script.source}};" + // 17
+                "{{ctx.trigger.condition.script.lang}};" + // 18
+                "{{ctx.trigger.actions.size}};" + // 19
+                "{{ctx.trigger.actions.0.id}};" + // 20
+                "{{ctx.trigger.actions.0.name}};" + // 21
+                "{{ctx.trigger.actions.0.destination_id}};" + // 22
+                "{{ctx.trigger.actions.0.throttle_enabled}}" // 23
+        )
+
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val index = createTestIndex()
+
+        val docQuery = DocLevelQuery(query = "test_field:us-west-2", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+
+        val action = randomAction(template = template, destinationId = createDestination().id)
+
+        val schedule = CronSchedule(expression = "* * * * *", timezone = randomZone())
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))
+
+        val monitor = randomDocumentLevelMonitor(inputs = listOf(docLevelInput), schedule = schedule, triggers = listOf(trigger))
+
+        indexDoc(index, "1", testDoc)
+
+        val output = entityAsMap(executeMonitor(monitor))
+
+        log.info("output: $output")
+
+        assertEquals(1, output.objectMap("trigger_results").values.size) // ensure that we got actual trigger results
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertEquals(1, triggerResult.objectMap("action_results").values.size)
+            for (alertActionResult in triggerResult.objectMap("action_results").values) {
+                for (actionResult in alertActionResult.values) {
+                    @Suppress("UNCHECKED_CAST") val actionOutput = (actionResult as Map<String, Map<String, String>>)["output"]
+                        as Map<String, String>
+
+                    val rawOutput: String = actionOutput["message"] as String // the raw mustache template that just lists all the fields
+                    val results: List<String> = rawOutput.split(";")
+
+                    assertEquals(24, results.size) // we asked for 23 fields, make sure we got them
+
+                    // start checking asTemplateArg values
+                    assertEquals(results[0], monitor.id) // ctx.monitor.id
+                    assertEquals(results[1], monitor.version.toString()) // ctx.monitor.version
+                    assertEquals(results[2], monitor.name) // ctx.monitor.name
+                    assertEquals(results[3], monitor.monitorType.toString()) // ctx.monitor.monitor_type
+                    assertEquals(results[4], monitor.enabled.toString()) // ctx.monitor.enabled
+                    assertEquals(results[5], monitor.enabledTime.toString()) // ctx.monitor.enabled_time
+                    assertEquals(results[6], monitor.lastUpdateTime.toString()) // ctx.monitor.last_update_time
+                    assertEquals(results[7], (monitor.schedule as CronSchedule).expression) // ctx.monitor.schedule.period.interval
+                    assertEquals(results[8], (monitor.schedule as CronSchedule).timezone.toString()) // ctx.monitor.schedule.period.unit
+                    assertEquals(results[9], monitor.inputs.size.toString()) // ctx.monitor.inputs.size
+                    assertEquals(results[10], (monitor.inputs[0] as DocLevelMonitorInput).indices.size.toString()) // ctx.monitor.inputs.search.indices.size
+                    assertEquals(results[11], (monitor.inputs[0] as DocLevelMonitorInput).indices[0]) // ctx.monitor.inputs.search.indices
+                    assertEquals(results[12], (monitor.inputs[0] as DocLevelMonitorInput).queries.size.toString()) // ctx.monitor.inputs.search.queries.size
+                    assertEquals(results[13], (monitor.inputs[0] as DocLevelMonitorInput).queries[0].query) // ctx.monitor.inputs.search.queries.query
+                    assertEquals(results[14], monitor.triggers[0].id) // ctx.trigger.id
+                    assertEquals(results[15], monitor.triggers[0].name) // ctx.trigger.name
+                    assertEquals(results[16], monitor.triggers[0].severity) // ctx.trigger.severity
+                    assertEquals(results[17], (monitor.triggers[0] as DocumentLevelTrigger).condition.idOrCode) // ctx.trigger.condition.script.source
+                    assertEquals(results[18], (monitor.triggers[0] as DocumentLevelTrigger).condition.lang) // ctx.trigger.condition.script.lang
+                    assertEquals(results[19], (monitor.triggers[0] as DocumentLevelTrigger).actions.size.toString()) // ctx.trigger.actions.size
+                    assertEquals(results[20], (monitor.triggers[0] as DocumentLevelTrigger).actions[0].id) // ctx.trigger.actions.id
+                    assertEquals(results[21], (monitor.triggers[0] as DocumentLevelTrigger).actions[0].name) // ctx.trigger.actions.name
+                    assertEquals(results[22], (monitor.triggers[0] as DocumentLevelTrigger).actions[0].destinationId) // ctx.trigger.actions.destination_id
+                    assertEquals(results[23], (monitor.triggers[0] as DocumentLevelTrigger).actions[0].throttleEnabled.toString()) // ctx.trigger.actions.throttle_enabled
+                }
+            }
         }
     }
 

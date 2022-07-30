@@ -10,6 +10,7 @@ import org.opensearch.alerting.model.Trigger.Companion.ID_FIELD
 import org.opensearch.alerting.model.Trigger.Companion.NAME_FIELD
 import org.opensearch.alerting.model.Trigger.Companion.SEVERITY_FIELD
 import org.opensearch.alerting.model.action.Action
+import org.opensearch.alerting.opensearchapi.asTemplateArg
 import org.opensearch.common.CheckedFunction
 import org.opensearch.common.ParseField
 import org.opensearch.common.UUIDs
@@ -66,11 +67,12 @@ data class DocumentLevelTrigger(
     }
 
     /** Returns a representation of the trigger suitable for passing into painless and mustache scripts. */
-    fun asTemplateArg(): Map<String, Any> {
+    override fun asTemplateArg(): Map<String, Any?> {
         return mapOf(
             ID_FIELD to id,
             NAME_FIELD to name,
             SEVERITY_FIELD to severity,
+            CONDITION_FIELD to mapOf(SCRIPT_FIELD to condition.asTemplateArg()),
             ACTIONS_FIELD to actions.map { it.asTemplateArg() }
         )
     }

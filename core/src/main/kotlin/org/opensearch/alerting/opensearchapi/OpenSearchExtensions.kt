@@ -35,6 +35,7 @@ import org.opensearch.rest.RestStatus
 import org.opensearch.rest.RestStatus.BAD_GATEWAY
 import org.opensearch.rest.RestStatus.GATEWAY_TIMEOUT
 import org.opensearch.rest.RestStatus.SERVICE_UNAVAILABLE
+import org.opensearch.script.Script
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.time.Instant
 import kotlin.coroutines.CoroutineContext
@@ -254,4 +255,12 @@ suspend fun <T> withClosableContext(
     } finally {
         context.rolesInjectorHelper.close()
     }
+}
+
+fun Script.asTemplateArg(): Map<String, Any> {
+    return mapOf("source" to this.idOrCode, "lang" to this.lang)
+}
+
+fun SearchSourceBuilder.asTemplateArg(): Map<String, Any> {
+    return this.convertToMap()
 }

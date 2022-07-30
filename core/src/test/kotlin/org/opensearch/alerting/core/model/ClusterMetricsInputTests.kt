@@ -445,4 +445,25 @@ class ClusterMetricsInputTests {
         assertEquals(pathParams, clusterMetricsInput.pathParams)
         assertEquals(testUrl, clusterMetricsInput.url)
     }
+
+    @Test
+    fun `test ClusterMetricsInput asTemplateArgs`() {
+        ClusterMetricsInput.ClusterMetricType.values()
+            .filter { enum -> enum != ClusterMetricsInput.ClusterMetricType.BLANK }
+            .forEach { testApiType ->
+                // GIVEN
+                path = testApiType.defaultPath
+                pathParams = if (testApiType.supportsPathParams) "/index1,index2,index3,index4,index5" else ""
+                url = "http://localhost:9200$path$pathParams"
+
+                // WHEN
+                val templateArgs = ClusterMetricsInput(path, pathParams, url).asTemplateArg()
+
+                // THEN
+                assertEquals((templateArgs[ClusterMetricsInput.URI_FIELD] as Map<*, *>)[ClusterMetricsInput.API_TYPE_FIELD], testApiType)
+                assertEquals((templateArgs[ClusterMetricsInput.URI_FIELD] as Map<*, *>)[ClusterMetricsInput.PATH_FIELD], path)
+                assertEquals((templateArgs[ClusterMetricsInput.URI_FIELD] as Map<*, *>)[ClusterMetricsInput.PATH_PARAMS_FIELD], pathParams)
+                assertEquals((templateArgs[ClusterMetricsInput.URI_FIELD] as Map<*, *>)[ClusterMetricsInput.URL_FIELD], url)
+            }
+    }
 }

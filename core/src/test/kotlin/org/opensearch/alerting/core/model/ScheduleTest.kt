@@ -314,6 +314,22 @@ class ScheduleTest : XContentTestBase {
         assertEquals(pdtNextExecution, utcNextExecution)
     }
 
+    @Test
+    fun `cron schedule as template args is valid`() {
+        val cronSchedule = createTestCronSchedule()
+        val templateArgs = cronSchedule.asTemplateArg()
+        assertEquals((templateArgs["cron"] as Map<*, *>)[Schedule.EXPRESSION_FIELD], cronSchedule.expression)
+        assertEquals((templateArgs["cron"] as Map<*, *>)[Schedule.TIMEZONE_FIELD], cronSchedule.timezone)
+    }
+
+    @Test
+    fun `interval schedule as template args is valid`() {
+        val intervalSchedule = createTestIntervalSchedule()
+        val templateArgs = intervalSchedule.asTemplateArg()
+        assertEquals((templateArgs["period"] as Map<*, *>)[Schedule.INTERVAL_FIELD], intervalSchedule.interval)
+        assertEquals((templateArgs["period"] as Map<*, *>)[Schedule.UNIT_FIELD], intervalSchedule.unit)
+    }
+
     private fun createTestIntervalSchedule(): IntervalSchedule {
         val testInstance = Instant.ofEpochSecond(1539715678L)
         val enabledTime = Instant.ofEpochSecond(1539615146L)

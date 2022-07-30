@@ -80,4 +80,6 @@ interface Trigger : Writeable, ToXContentObject {
     val actions: List<Action>
 
     fun name(): String
+
+    fun asTemplateArg(): Map<String, Any?>
 }
