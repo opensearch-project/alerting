@@ -25,7 +25,7 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import java.time.zone.ZoneRulesException
-import java.util.*
+import java.util.Locale
 
 sealed class Schedule : Writeable, ToXContentObject {
     enum class TYPE { CRON, INTERVAL }
