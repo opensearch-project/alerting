@@ -12,7 +12,10 @@ import kotlinx.coroutines.launch
 import org.opensearch.action.ActionListener
 import org.opensearch.action.admin.cluster.health.ClusterHealthRequest
 import org.opensearch.action.admin.cluster.node.stats.NodesStatsRequest
+import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
+import org.opensearch.alerting.model.ClusterMetricsDataPoint
+import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings.Companion.METRICS_EXECUTION_FREQUENCY
 import org.opensearch.alerting.settings.AlertingSettings.Companion.METRICS_STORE_TIME
 import org.opensearch.client.Client
@@ -22,6 +25,8 @@ import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.component.LifecycleListener
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
@@ -162,116 +167,121 @@ class ClusterMetricsCoordinator(
         log.info("this is CPU data $cpuData")
         log.info("this is JVM data $jvmData")
 
-        val minimumCPU = Collections.min(cpuData)
-        val maximumCPU = Collections.max(cpuData)
+        val minimumCPU = Collections.min(cpuData).toString()
+        val maximumCPU = Collections.max(cpuData).toString()
         log.info("this is min CPU $minimumCPU")
         log.info("this is max CPU $maximumCPU")
 
-        val minimumJVM = Collections.min(jvmData)
-        val maximumJVM = Collections.max(jvmData)
+        val minimumJVM = Collections.min(jvmData).toString()
+        val maximumJVM = Collections.max(jvmData).toString()
         log.info("this is max JVM $maximumJVM")
         log.info("this is min JVM $minimumJVM")
 
-        var avgCPU = 0.0
-        var avgJVM = 0.0
+        var avgCPUcalc = 0.0
+        var avgJVMcalc = 0.0
 
         for (i in cpuData.indices) {
-            avgCPU += cpuData[i]
-            avgJVM += jvmData[i]
+            avgCPUcalc += cpuData[i]
+            avgJVMcalc += jvmData[i]
         }
 
-        avgCPU /= cpuData.size
-        avgJVM /= jvmData.size
-        log.info("this is avgCPU $avgCPU")
-        log.info("this is avgJVM $avgJVM")
-//
-//        val clusterStatus_data = ClusterMetricsDataPoint(
-//            ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS,
-//            current_time,
-//            clusterStatusRandom
-//        )
-//        val unassigned_shards_data = ClusterMetricsDataPoint(
-//            ClusterMetricsDataPoint.MetricType.UNASSIGNED_SHARDS,
-//            current_time,
-//            randomUnassignedShards
-//        )
-//        val cpu_usage_data = ClusterMetricsDataPoint(
-//            ClusterMetricsDataPoint.MetricType.CPU_USAGE,
-//            current_time,
-//            percent
-//        )
-//        val jvm_data = ClusterMetricsDataPoint(
-//            ClusterMetricsDataPoint.MetricType.JVM_PRESSURE,
-//            current_time,
-//            jvm_pressure
-//        )
-//        val pendingTasksData = ClusterMetricsDataPoint(
-//            ClusterMetricsDataPoint.MetricType.NUMBER_OF_PENDING_TASKS,
-//            current_time,
-//            numPending
-//        )
-//        val activeShardsData = ClusterMetricsDataPoint(
-//            ClusterMetricsDataPoint.MetricType.ACTIVE_SHARDS,
-//            current_time,
-//            activeShards
-//        )
-//        val relocatingShardsData = ClusterMetricsDataPoint(
-//            ClusterMetricsDataPoint.MetricType.RELOCATING_SHARDS,
-//            current_time,
-//            relocatingShards
-//        )
-//
-//        val indexRequest_status = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-//            .source(clusterStatus_data.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-//        val indexRequest_shards = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-//            .source(unassigned_shards_data.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-//        val indexRequest_cpu = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-//            .source(cpu_usage_data.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-//        val indexRequest_jvm = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-//            .source(jvm_data.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-//        val indexRequest_pending = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-//            .source(pendingTasksData.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-//        val indexRequest_active = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-//            .source(activeShardsData.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-//        val indexRequest_relocating = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-//            .source(relocatingShardsData.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-//
-//        try {
-//            val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest_status, it) }
-//            val indexResponse2: IndexResponse = client.suspendUntil { client.index(indexRequest_shards, it) }
-//            val indexResponse3: IndexResponse = client.suspendUntil { client.index(indexRequest_cpu, it) }
-//            val indexResponse4: IndexResponse = client.suspendUntil { client.index(indexRequest_jvm, it) }
-//            val indexResponse5: IndexResponse = client.suspendUntil { client.index(indexRequest_pending, it) }
-//            val indexResponse6: IndexResponse = client.suspendUntil { client.index(indexRequest_active, it) }
-//            val indexResponse7: IndexResponse = client.suspendUntil { client.index(indexRequest_relocating, it) }
-//            val failureReasons = checkShardsFailure(indexResponse)
-//            val failureReasons2 = checkShardsFailure(indexResponse2)
-//            val failureReasons3 = checkShardsFailure(indexResponse3)
-//            val failureReasons4 = checkShardsFailure(indexResponse4)
-//            val failureReasons5 = checkShardsFailure(indexResponse5)
-//            val failureReasons6 = checkShardsFailure(indexResponse6)
-//            val failureReasons7 = checkShardsFailure(indexResponse7)
-//            if (
-//                failureReasons != null ||
-//                failureReasons2 != null ||
-//                failureReasons3 != null ||
-//                failureReasons4 != null ||
-//                failureReasons5 != null ||
-//                failureReasons6 != null ||
-//                failureReasons7 != null
-//            ) {
-//                log.info("richfu failed because $failureReasons")
-//                log.info("richfu failed because $failureReasons2")
-//                log.info("richfu failed because $failureReasons3")
-//                log.info("richfu failed because $failureReasons4")
-//                log.info("richfu failed because $failureReasons5")
-//                log.info("richfu failed because $failureReasons6")
-//                log.info("richfu failed because $failureReasons7")
-//                return
-//            }
-//        } catch (t: Exception) {
-//            log.info("richfu CLUSTER METRICS NOT WORK $t")
-//        }
+        avgCPUcalc /= cpuData.size
+        avgJVMcalc /= jvmData.size
+
+        val avgCPU = String.format("%.2f", avgCPUcalc)
+        val avgJVM = String.format("%.2f", avgJVMcalc)
+
+        val clusterStatus_data = ClusterMetricsDataPoint(
+            ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS,
+            current_time,
+            clusterStatus
+        )
+        val unassigned_shards_data = ClusterMetricsDataPoint(
+            ClusterMetricsDataPoint.MetricType.UNASSIGNED_SHARDS,
+            current_time,
+            unassignedShards
+        )
+        val cpu_usage_data = ClusterMetricsDataPoint(
+            ClusterMetricsDataPoint.MetricType.CPU_USAGE,
+            current_time,
+            avgCPU,
+            minimumCPU,
+            maximumCPU
+        )
+        val jvm_data = ClusterMetricsDataPoint(
+            ClusterMetricsDataPoint.MetricType.JVM_PRESSURE,
+            current_time,
+            avgJVM,
+            minimumJVM,
+            maximumJVM
+        )
+        val pendingTasksData = ClusterMetricsDataPoint(
+            ClusterMetricsDataPoint.MetricType.NUMBER_OF_PENDING_TASKS,
+            current_time,
+            numPending
+        )
+        val activeShardsData = ClusterMetricsDataPoint(
+            ClusterMetricsDataPoint.MetricType.ACTIVE_SHARDS,
+            current_time,
+            activeShards
+        )
+        val relocatingShardsData = ClusterMetricsDataPoint(
+            ClusterMetricsDataPoint.MetricType.RELOCATING_SHARDS,
+            current_time,
+            relocatingShards
+        )
+
+        val indexRequest_status = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .source(clusterStatus_data.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+        val indexRequest_shards = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .source(unassigned_shards_data.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+        val indexRequest_cpu = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .source(cpu_usage_data.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+        val indexRequest_jvm = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .source(jvm_data.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+        val indexRequest_pending = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .source(pendingTasksData.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+        val indexRequest_active = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .source(activeShardsData.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+        val indexRequest_relocating = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .source(relocatingShardsData.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+
+        try {
+            val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest_status, it) }
+            val indexResponse2: IndexResponse = client.suspendUntil { client.index(indexRequest_shards, it) }
+            val indexResponse3: IndexResponse = client.suspendUntil { client.index(indexRequest_cpu, it) }
+            val indexResponse4: IndexResponse = client.suspendUntil { client.index(indexRequest_jvm, it) }
+            val indexResponse5: IndexResponse = client.suspendUntil { client.index(indexRequest_pending, it) }
+            val indexResponse6: IndexResponse = client.suspendUntil { client.index(indexRequest_active, it) }
+            val indexResponse7: IndexResponse = client.suspendUntil { client.index(indexRequest_relocating, it) }
+            val failureReasons = checkShardsFailure(indexResponse)
+            val failureReasons2 = checkShardsFailure(indexResponse2)
+            val failureReasons3 = checkShardsFailure(indexResponse3)
+            val failureReasons4 = checkShardsFailure(indexResponse4)
+            val failureReasons5 = checkShardsFailure(indexResponse5)
+            val failureReasons6 = checkShardsFailure(indexResponse6)
+            val failureReasons7 = checkShardsFailure(indexResponse7)
+            if (
+                failureReasons != null ||
+                failureReasons2 != null ||
+                failureReasons3 != null ||
+                failureReasons4 != null ||
+                failureReasons5 != null ||
+                failureReasons6 != null ||
+                failureReasons7 != null
+            ) {
+                log.info("richfu failed because $failureReasons")
+                log.info("richfu failed because $failureReasons2")
+                log.info("richfu failed because $failureReasons3")
+                log.info("richfu failed because $failureReasons4")
+                log.info("richfu failed because $failureReasons5")
+                log.info("richfu failed because $failureReasons6")
+                log.info("richfu failed because $failureReasons7")
+                return
+            }
+        } catch (t: Exception) {
+            log.info("richfu CLUSTER METRICS NOT WORK $t")
+        }
     }
     fun checkShardsFailure(response: IndexResponse): String? {
         val failureReasons = StringBuilder()
