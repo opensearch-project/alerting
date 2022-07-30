@@ -5,7 +5,6 @@
 
 package org.opensearch.alerting.model
 
-import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.model.Trigger.Companion.ACTIONS_FIELD
 import org.opensearch.alerting.model.Trigger.Companion.ID_FIELD
 import org.opensearch.alerting.model.Trigger.Companion.NAME_FIELD
@@ -38,8 +37,6 @@ data class QueryLevelTrigger(
     override val actions: List<Action>,
     val condition: Script
 ) : Trigger {
-
-    private val log = LogManager.getLogger(javaClass)
 
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
