@@ -120,7 +120,7 @@ class ClusterMetricsCoordinator(
         // cluster health for unassigned shards
         val cluster_health = client.admin().cluster().health(ClusterHealthRequest()).get().toMap()
         // cluster stats for cluster status (health), CPU usage, JVM pressure
-        var nodeStats = client.admin().cluster().nodesStats(NodesStatsRequest()).get().toMap()
+        var nodeStats = client.admin().cluster().nodesStats(NodesStatsRequest().addMetrics("process", "jvm")).get().toMap()
 
         ClusterMetricsVisualizationIndex.initFunc(client, clusterService)
 
