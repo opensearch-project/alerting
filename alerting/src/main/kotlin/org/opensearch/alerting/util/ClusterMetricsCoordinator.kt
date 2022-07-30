@@ -29,7 +29,9 @@ import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.threadpool.Scheduler
 import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
+import java.util.*
 import kotlin.coroutines.CoroutineContext
+import kotlin.math.min
 
 private val log = org.apache.logging.log4j.LogManager.getLogger(ClusterMetricsCoordinator::class.java)
 
@@ -138,8 +140,8 @@ class ClusterMetricsCoordinator(
         val nodesMap = nodeStats["nodes"] as Map<String, Any>
         val keys = nodesMap.keys
         log.info("this is nodesMap keys $keys")
-        val jvmData = arrayListOf<String>()
-        val cpuData = arrayListOf<String>()
+        val jvmData = arrayListOf<Int>()
+        val cpuData = arrayListOf<Int>()
 
         for (key in keys) {
             val keyData = nodesMap[key] as Map<String, Any>
@@ -148,20 +150,28 @@ class ClusterMetricsCoordinator(
             log.info("This is osMap $processMap")
             val cpuMap = processMap["cpu"] as Map<String, Any>
             log.info("This is cpuMap $cpuMap")
-            val percent = cpuMap["percent"].toString()
-            cpuData.add(percent)
+            val percent = cpuMap["percent"]
+            cpuData.add(percent as Int)
 
             val jvmMap = keyData["jvm"] as Map<String, Any>
             log.info("this is jvmMap $jvmMap")
             val memMap = jvmMap["mem"] as Map<String, Any>
             log.info("this is memMap $memMap")
-            val pressure = memMap["heap_used_percent"].toString()
-            jvmData.add(pressure)
+            val pressure = memMap["heap_used_percent"]
+            jvmData.add(pressure as Int)
         }
         log.info("this is CPU data $cpuData")
         log.info("this is JVM data $jvmData")
 
-//        log.info("THIS IS JVM PRESSURE $jvm_pressure")
+        val minimumCPU = Collections.min(cpuData)
+        val maximumCPU = Collections.max(cpuData)
+        log.info("this is min CPU $minimumCPU")
+        log.info("this is max CPU $maximumCPU")
+
+        val minimumJVM = Collections.min(jvmData)
+        val maximumJVM = Collections.max(jvmData)
+        log.info("this is max JVM $maximumJVM")
+        log.info("this is min JVM $minimumJVM")
 //
 //        val clusterStatus_data = ClusterMetricsDataPoint(
 //            ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS,
