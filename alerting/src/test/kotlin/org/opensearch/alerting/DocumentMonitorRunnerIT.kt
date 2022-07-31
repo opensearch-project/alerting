@@ -636,8 +636,6 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val output = entityAsMap(executeMonitor(monitor))
 
-        log.info("output: $output")
-
         assertEquals(1, output.objectMap("trigger_results").values.size) // ensure that we got actual trigger results
         for (triggerResult in output.objectMap("trigger_results").values) {
             assertEquals(1, triggerResult.objectMap("action_results").values.size)
@@ -733,8 +731,6 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         indexDoc(index, "1", testDoc)
 
         val output = entityAsMap(executeMonitor(monitor))
-
-        log.info("output: $output")
 
         assertEquals(1, output.objectMap("trigger_results").values.size) // ensure that we got actual trigger results
         for (triggerResult in output.objectMap("trigger_results").values) {

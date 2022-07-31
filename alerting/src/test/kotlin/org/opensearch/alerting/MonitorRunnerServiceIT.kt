@@ -1707,8 +1707,6 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         // execute it and format its output
         val output = entityAsMap(executeMonitor(monitor))
 
-        log.info("output: $output")
-
         assertEquals(1, output.objectMap("trigger_results").values.size) // ensure that we got actual trigger results
         for (triggerResult in output.objectMap("trigger_results").values) {
             assertEquals(1, triggerResult.objectMap("action_results").values.size) // ensure that we got actual action results
@@ -1787,8 +1785,6 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
         // execute it and format its output
         val output = entityAsMap(executeMonitor(monitor))
-
-        log.info("output: $output")
 
         assertEquals(1, output.objectMap("trigger_results").values.size) // ensure that we got actual trigger results
         for (triggerResult in output.objectMap("trigger_results").values) {
@@ -1903,8 +1899,6 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
 
         val output = entityAsMap(executeMonitor(monitor.id))
-
-        log.info("output: $output")
 
         assert(!output.objectMap("trigger_results").values.isEmpty()) // ensure that we got actual trigger results
         for (triggerResult in output.objectMap("trigger_results").values) {
@@ -2025,8 +2019,6 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
         val output = entityAsMap(executeMonitor(monitor.id))
 
-        log.info("output: $output")
-
         assert(!output.objectMap("trigger_results").values.isEmpty()) // ensure that we got actual trigger results
         for (triggerResult in output.objectMap("trigger_results").values) {
             assert(!triggerResult.objectMap("action_results").values.isEmpty()) // ensure that we got actual action results
@@ -2113,8 +2105,6 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
         val output = entityAsMap(executeMonitor(monitor.id))
 
-        log.info("output: $output")
-
         assertEquals(1, output.objectMap("trigger_results").values.size) // ensure that we got actual trigger results
         for (triggerResult in output.objectMap("trigger_results").values) {
             assertEquals(1, triggerResult.objectMap("action_results").values.size) // ensure that we got actual action results
@@ -2199,8 +2189,6 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         )
 
         val output = entityAsMap(executeMonitor(monitor.id))
-
-        log.info("output: $output")
 
         assertEquals(1, output.objectMap("trigger_results").values.size) // ensure that we got actual trigger results
         for (triggerResult in output.objectMap("trigger_results").values) {
