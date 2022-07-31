@@ -78,13 +78,6 @@ import java.time.temporal.ChronoUnit
 fun randomMonitor(
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     user: User = randomUser(),
-    inputs: List<Input> = listOf(
-        SearchInput(
-            emptyList(),
-            SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
-                .aggregation(TermsAggregationBuilder("test_agg").field("test_field"))
-        )
-    ),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
     enabled: Boolean = randomBoolean(),
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
@@ -101,6 +94,20 @@ fun randomMonitor(
         Monitor.MonitorType.BUCKET_LEVEL_MONITOR -> (1..randomInt(10)).map { randomBucketLevelTrigger() }
         Monitor.MonitorType.CLUSTER_METRICS_MONITOR -> (1..randomInt(10)).map { randomQueryLevelTrigger() }
         Monitor.MonitorType.DOC_LEVEL_MONITOR -> (1..randomInt(10)).map { randomDocumentLevelTrigger() }
+    }
+
+    // get corresponding list of inputs
+    val inputs: List<Input> = when (monitorType) {
+        Monitor.MonitorType.QUERY_LEVEL_MONITOR -> listOf(SearchInput(emptyList(), SearchSourceBuilder().query(QueryBuilders.matchAllQuery())))
+        Monitor.MonitorType.BUCKET_LEVEL_MONITOR -> listOf(
+            SearchInput(
+                emptyList(),
+                SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                    .aggregation(TermsAggregationBuilder("test_agg").field("test_field"))
+            )
+        )
+        Monitor.MonitorType.CLUSTER_METRICS_MONITOR -> listOf(randomClusterMetricsInput())
+        Monitor.MonitorType.DOC_LEVEL_MONITOR -> listOf(DocLevelMonitorInput("description", listOf("index"), emptyList()))
     }
 
     return Monitor(
