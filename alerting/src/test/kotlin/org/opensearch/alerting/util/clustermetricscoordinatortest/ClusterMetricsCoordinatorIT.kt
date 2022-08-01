@@ -96,23 +96,23 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         assertTrue(flag)
     }
 
-//    fun `test frequency`() {
-//        client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "2m")
-//        Thread.sleep(300000)
-//
-//        val response = getResponse()
-//        val hits = getHits(response)
-//        val docs = hits["hits"] as ArrayList<Map<String, Any>>
-//        val times = mutableSetOf<String>()
-//
-//        for (doc in docs) {
-//            val source = doc["_source"] as Map<String, Map<String, Any>>
-//            val metricType = source.keys.first()
-//            times.add(source[metricType]?.get("timestamp").toString())
-//        }
-//        logger.info("this is the times Set length ${times.size}")
-//        assertFalse(true)
-//    }
+    fun `test frequency`() {
+        client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "2m")
+        Thread.sleep(300000)
+
+        val response = getResponse()
+        val hits = getHits(response)
+        val docs = hits["hits"] as ArrayList<Map<String, Any>>
+        val times = mutableSetOf<String>()
+
+        for (doc in docs) {
+            val source = doc["_source"] as Map<String, Map<String, Any>>
+            val metricType = source.keys.first()
+            times.add(source[metricType]?.get("timestamp").toString())
+        }
+        logger.info("this is the times Set length ${times.size}")
+        assertFalse(true)
+    }
 
     private fun generateData() {
         client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "1s")
