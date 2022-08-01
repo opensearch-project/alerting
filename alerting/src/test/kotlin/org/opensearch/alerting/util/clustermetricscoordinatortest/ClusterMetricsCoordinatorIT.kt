@@ -111,8 +111,8 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
             times.add(source[metricType]?.get("timestamp").toString())
         }
         logger.info("this is the times Set length ${times.size}, this is times set data $times")
-        val time1 = times.elementAt(times.size-1)
-        val time2 = times.elementAt(times.size-2)
+        val time1 = times.elementAt(times.size - 1)
+        val time2 = times.elementAt(times.size - 2)
         logger.info("this is time1 $time1, and this is time2 $time2")
         assertFalse(true)
     }
