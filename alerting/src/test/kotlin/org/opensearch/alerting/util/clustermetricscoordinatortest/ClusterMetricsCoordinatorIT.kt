@@ -116,7 +116,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         logger.info("this is time1 $time1, and this is time2 $time2")
         val diff = time2.until(time1, ChronoUnit.MINUTES)
         logger.info("this is diff between time1 and time2 $diff")
-        assertFalse(true)
+        assertEquals(diff, 2)
     }
 
     private fun generateData() {
