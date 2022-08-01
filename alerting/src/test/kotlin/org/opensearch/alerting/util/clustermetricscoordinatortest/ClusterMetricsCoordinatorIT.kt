@@ -110,7 +110,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
             val metricType = source.keys.first()
             times.add(source[metricType]?.get("timestamp").toString())
         }
-        logger.info("this is the times Set length ${times.size}")
+        logger.info("this is the times Set length ${times.size}, this is times set data $times")
         assertFalse(true)
     }
 
