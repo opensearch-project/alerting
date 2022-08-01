@@ -140,6 +140,10 @@ class ClusterMetricsCoordinator(
         log.info("this is number of active shards $activeShards")
         val relocatingShards = cluster_health["relocating_shards"].toString()
         log.info("This is number of relocatingShards $relocatingShards")
+        val numNodes = cluster_health["number_of_nodes"].toString()
+        log.info("This is number of nodes (total) $numNodes")
+        val numDataNodes = cluster_health["number_of_data_nodes"].toString()
+        log.info("This is number of data nodes $numDataNodes")
 
         val nodesMap = nodeStats["nodes"] as Map<String, Any>
         val keys = nodesMap.keys
@@ -230,6 +234,16 @@ class ClusterMetricsCoordinator(
             current_time,
             relocatingShards
         )
+        val nodesData = ClusterMetricsDataPoint(
+            ClusterMetricsDataPoint.MetricType.NUMBER_OF_NODES,
+            current_time,
+            numNodes
+        )
+        val dataNodesData = ClusterMetricsDataPoint(
+            ClusterMetricsDataPoint.MetricType.NUMBER_OF_DATA_NODES,
+            current_time,
+            numDataNodes
+        )
 
         val indexRequest_status = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
             .source(clusterStatus_data.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
@@ -245,6 +259,10 @@ class ClusterMetricsCoordinator(
             .source(activeShardsData.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
         val indexRequest_relocating = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
             .source(relocatingShardsData.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+        val indexRequest_nodes = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .source(nodesData.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+        val indexRequest_dataNodes = IndexRequest(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .source(dataNodesData.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
 
         try {
             val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest_status, it) }
@@ -254,6 +272,8 @@ class ClusterMetricsCoordinator(
             val indexResponse5: IndexResponse = client.suspendUntil { client.index(indexRequest_pending, it) }
             val indexResponse6: IndexResponse = client.suspendUntil { client.index(indexRequest_active, it) }
             val indexResponse7: IndexResponse = client.suspendUntil { client.index(indexRequest_relocating, it) }
+            val indexResponse8: IndexResponse = client.suspendUntil { client.index(indexRequest_nodes, it) }
+            val indexResponse9: IndexResponse = client.suspendUntil { client.index(indexRequest_dataNodes, it) }
             val failureReasons = checkShardsFailure(indexResponse)
             val failureReasons2 = checkShardsFailure(indexResponse2)
             val failureReasons3 = checkShardsFailure(indexResponse3)
@@ -261,6 +281,8 @@ class ClusterMetricsCoordinator(
             val failureReasons5 = checkShardsFailure(indexResponse5)
             val failureReasons6 = checkShardsFailure(indexResponse6)
             val failureReasons7 = checkShardsFailure(indexResponse7)
+            val failureReasons8 = checkShardsFailure(indexResponse8)
+            val failureReasons9 = checkShardsFailure(indexResponse9)
             if (
                 failureReasons != null ||
                 failureReasons2 != null ||
@@ -268,7 +290,9 @@ class ClusterMetricsCoordinator(
                 failureReasons4 != null ||
                 failureReasons5 != null ||
                 failureReasons6 != null ||
-                failureReasons7 != null
+                failureReasons7 != null ||
+                failureReasons8 != null ||
+                failureReasons9 != null
             ) {
                 log.info("richfu failed because $failureReasons")
                 log.info("richfu failed because $failureReasons2")
@@ -277,6 +301,8 @@ class ClusterMetricsCoordinator(
                 log.info("richfu failed because $failureReasons5")
                 log.info("richfu failed because $failureReasons6")
                 log.info("richfu failed because $failureReasons7")
+                log.info("failed because $failureReasons8")
+                log.info("failed because $failureReasons9")
                 return
             }
         } catch (t: Exception) {

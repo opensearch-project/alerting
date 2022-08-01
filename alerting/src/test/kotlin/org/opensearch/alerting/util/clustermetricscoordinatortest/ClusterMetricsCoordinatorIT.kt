@@ -110,12 +110,9 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
             val metricType = source.keys.first()
             times.add(source[metricType]?.get("timestamp").toString())
         }
-        logger.info("this is the times Set length ${times.size}, this is times set data $times")
-        var time1 = Instant.parse(times.elementAt(times.size - 1))
-        var time2 = Instant.parse(times.elementAt(times.size - 2))
-        logger.info("this is time1 $time1, and this is time2 $time2")
+        val time1 = Instant.parse(times.elementAt(times.size - 1))
+        val time2 = Instant.parse(times.elementAt(times.size - 2))
         val diff = time2.until(time1, ChronoUnit.MINUTES)
-        logger.info("this is diff between time1 and time2 $diff")
         assertEquals(diff, 2)
     }
 

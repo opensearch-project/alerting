@@ -61,6 +61,12 @@ data class ClusterMetricsDataPoint(
         ),
         RELOCATING_SHARDS(
             "relocating_shards"
+        ),
+        NUMBER_OF_NODES(
+            "number_of_nodes"
+        ),
+        NUMBER_OF_DATA_NODES(
+            "number_of_data_nodes"
         )
     }
 }
