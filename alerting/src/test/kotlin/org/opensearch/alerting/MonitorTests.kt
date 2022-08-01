@@ -58,7 +58,7 @@ class MonitorTests : OpenSearchTestCase() {
         assertEquals("Template args id does not match", templateArgs[_ID], monitor.id)
         assertEquals("Template args version does not match", templateArgs[_VERSION], monitor.version)
         assertEquals("Template args name does not match", templateArgs[Monitor.NAME_FIELD], monitor.name)
-        assertEquals("Template args monitor type does not match\nhere's templateArgs: ", templateArgs[Monitor.MONITOR_TYPE_FIELD], monitor.monitorType.toString())
+        assertEquals("Template args monitor type does not match", templateArgs[Monitor.MONITOR_TYPE_FIELD], monitor.monitorType.toString())
         assertEquals("Template args enabled field does not match", templateArgs[Monitor.ENABLED_FIELD], monitor.enabled)
         assertEquals("Template args enabled time does not match", templateArgs[Monitor.ENABLED_TIME_FIELD], monitor.enabledTime.toString())
         assertEquals("Template args last update time does not match", templateArgs[Monitor.LAST_UPDATE_TIME_FIELD], monitor.lastUpdateTime.toString())
