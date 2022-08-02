@@ -187,8 +187,10 @@ class AlertingSettings {
             override fun validate(value: TimeValue) {}
 
             override fun validate(value: TimeValue, settings: Map<Setting<*>, Any>) {
-                val storageTime = settings[METRICS_STORE_TIME] as TimeValue
-                validateExecutionFrequency(value, storageTime)
+                log.info("THIS IS SETTING $settings")
+                log.info("THIS IS VALUE $value")
+                val storageTime = settings[METRICS_STORE_TIME]
+                validateExecutionFrequency(value, storageTime as TimeValue)
             }
 
             override fun settings(): MutableIterator<Setting<*>> {
