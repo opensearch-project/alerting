@@ -5,9 +5,7 @@
 
 package org.opensearch.alerting
 
-import org.junit.After
 import org.junit.Assert
-import org.junit.Before
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.alerting.alerts.AlertError
 import org.opensearch.alerting.alerts.AlertIndices
@@ -29,7 +27,6 @@ import org.opensearch.alerting.model.destination.CustomWebhook
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.email.Email
 import org.opensearch.alerting.model.destination.email.Recipient
-import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.ResponseException

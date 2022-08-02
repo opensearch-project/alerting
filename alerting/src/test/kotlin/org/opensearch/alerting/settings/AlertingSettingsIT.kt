@@ -17,13 +17,13 @@ import org.opensearch.alerting.randomQueryLevelTrigger
 class AlertingSettingsIT : AlertingRestTestCase() {
 
     /**
-    [AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS] and [AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER]
-    must be reset to their default values once the tests have completed.
+     [AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS] and [AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER]
+     must be reset to their default values once the tests have completed.
      */
     @After
     fun cleanup() {
         client().updateSettings(
-                AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
+            AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
         )
         client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER)
     }
