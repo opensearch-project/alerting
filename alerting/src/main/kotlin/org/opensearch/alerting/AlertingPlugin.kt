@@ -145,6 +145,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     lateinit var clusterService: ClusterService
     lateinit var destinationMigrationCoordinator: DestinationMigrationCoordinator
     lateinit var clusterMetricsCoordinator: ClusterMetricsCoordinator
+    lateinit var alertingSettings: AlertingSettings
 
     override fun getRestHandlers(
         settings: Settings,
@@ -241,9 +242,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         docLevelMonitorQueries = DocLevelMonitorQueries(client, clusterService)
         scheduler = JobScheduler(threadPool, runner)
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
+        alertingSettings = AlertingSettings(client, settings)
         destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool, scheduledJobIndices)
         clusterMetricsCoordinator = ClusterMetricsCoordinator(settings, client, clusterService, threadPool)
-        // Create Monitor using Monitor.kt, and then feed the request to client in some way
         this.threadPool = threadPool
         this.clusterService = clusterService
         // create a cluster metrics visualization index upon initialization of alerting plugin

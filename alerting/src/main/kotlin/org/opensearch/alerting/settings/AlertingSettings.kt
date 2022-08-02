@@ -6,7 +6,9 @@
 package org.opensearch.alerting.settings
 
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.client.Client
 import org.opensearch.common.settings.Setting
+import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import java.util.concurrent.TimeUnit
 
@@ -15,9 +17,15 @@ import java.util.concurrent.TimeUnit
  */
 private val log = org.apache.logging.log4j.LogManager.getLogger(AlertingSettings::class.java)
 
-class AlertingSettings {
+class AlertingSettings(val client: Client, val settings: Settings) {
 
+    init {
+        internalClient = client
+        internalSettings = settings
+    }
     companion object {
+        internal var internalClient: Client? = null
+        internal var internalSettings: Settings? = null
 
         const val MONITOR_MAX_INPUTS = 1
         const val MONITOR_MAX_TRIGGERS = 10
@@ -173,24 +181,23 @@ class AlertingSettings {
         val METRICS_STORE_TIME = Setting.timeSetting(
             METRICS_STORE_TIME_DEFAULT.key,
             METRICS_STORE_TIME_DEFAULT,
-            StorageTimeValidator(),
+            TimeValueValidator(internalClient, internalSettings),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         val METRICS_EXECUTION_FREQUENCY = Setting.timeSetting(
             METRICS_EXECUTION_FREQUENCY_DEFAULT.key,
             METRICS_EXECUTION_FREQUENCY_DEFAULT,
-            ExecutionFrequencyValidator(),
+            TimeValueValidator(internalClient, internalSettings),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
-        internal class ExecutionFrequencyValidator : Setting.Validator<TimeValue> {
+        internal class TimeValueValidator(val client: Client?, val clusterSettings: Settings?) : Setting.Validator<TimeValue> {
             override fun validate(value: TimeValue) {}
 
             override fun validate(value: TimeValue, settings: Map<Setting<*>, Any>) {
                 log.info("THIS IS SETTING $settings")
                 log.info("THIS IS VALUE $value")
-                val storageTime = settings[METRICS_STORE_TIME]
-                validateExecutionFrequency(value, storageTime as TimeValue)
+                log.info("THIS IS CLUSTERSETTINGS $clusterSettings")
             }
 
             override fun settings(): MutableIterator<Setting<*>> {
@@ -199,37 +206,21 @@ class AlertingSettings {
                 )
                 return settings.iterator()
             }
-        }
+            private fun validateExecutionFrequency(executionFrequency: TimeValue, storageTime: TimeValue) {
+                log.info("THIS IS VALIDATEEXECUTIONFREQUENCY PARAMS $executionFrequency, $storageTime")
+                log.info("THIS IS MINIMUM_TIME_VALUE $MINIMUM_TIME_VALUE")
 
-        internal class StorageTimeValidator : Setting.Validator<TimeValue> {
-            override fun validate(value: TimeValue) {}
-
-            override fun validate(value: TimeValue, settings: Map<Setting<*>, Any>) {
-                val executionFrequency = settings[METRICS_EXECUTION_FREQUENCY] as TimeValue
-                validateExecutionFrequency(executionFrequency, value)
-            }
-
-            override fun settings(): MutableIterator<Setting<*>> {
-                val settings = mutableListOf<Setting<*>>(
-                    METRICS_STORE_TIME
-                )
-                return settings.iterator()
-            }
-        }
-        fun validateExecutionFrequency(executionFrequency: TimeValue, storageTime: TimeValue) {
-            log.info("THIS IS VALIDATEEXECUTIONFREQUENCY PARAMS $executionFrequency, $storageTime")
-            log.info("THIS IS MINIMUM_TIME_VALUE $MINIMUM_TIME_VALUE")
-
-            if (executionFrequency < MINIMUM_TIME_VALUE || storageTime < MINIMUM_TIME_VALUE) {
-                throw IllegalArgumentException(
-                    "Execution frequency or storage time cannot be less than $MINIMUM_TIME_VALUE."
-                )
-            }
-            if (executionFrequency < storageTime) return
-            if (executionFrequency > storageTime) {
-                throw IllegalArgumentException(
-                    "Execution frequency cannot be greater than the storage time."
-                )
+                if (executionFrequency < MINIMUM_TIME_VALUE || storageTime < MINIMUM_TIME_VALUE) {
+                    throw IllegalArgumentException(
+                        "Execution frequency or storage time cannot be less than $MINIMUM_TIME_VALUE."
+                    )
+                }
+                if (executionFrequency < storageTime) return
+                if (executionFrequency > storageTime) {
+                    throw IllegalArgumentException(
+                        "Execution frequency cannot be greater than the storage time."
+                    )
+                }
             }
         }
     }
