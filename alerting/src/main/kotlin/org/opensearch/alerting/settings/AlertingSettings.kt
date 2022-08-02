@@ -13,6 +13,8 @@ import java.util.concurrent.TimeUnit
 /**
  * settings specific to [AlertingPlugin]. These settings include things like history index max age, request timeout, etc...
  */
+private val log = org.apache.logging.log4j.LogManager.getLogger(AlertingSettings::class.java)
+
 class AlertingSettings {
 
     companion object {
@@ -213,6 +215,9 @@ class AlertingSettings {
             }
         }
         fun validateExecutionFrequency(executionFrequency: TimeValue, storageTime: TimeValue) {
+            log.info("THIS IS VALIDATEEXECUTIONFREQUENCY PARAMS $executionFrequency, $storageTime")
+            log.info("THIS IS MINIMUM_TIME_VALUE $MINIMUM_TIME_VALUE")
+
             if (executionFrequency < MINIMUM_TIME_VALUE || storageTime < MINIMUM_TIME_VALUE) {
                 throw java.lang.IllegalArgumentException(
                     "Execution frequency or storage time cannot be less than $MINIMUM_TIME_VALUE."
