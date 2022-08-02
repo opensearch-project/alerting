@@ -15,10 +15,6 @@ import java.util.concurrent.TimeUnit
  */
 class AlertingSettings {
 
-    init {
-
-    }
-
     companion object {
 
         const val MONITOR_MAX_INPUTS = 1
