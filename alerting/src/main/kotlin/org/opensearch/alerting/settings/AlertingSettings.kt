@@ -187,8 +187,8 @@ class AlertingSettings {
             override fun validate(value: TimeValue) {}
 
             override fun validate(value: TimeValue, settings: Map<Setting<*>, Any>) {
-                val executionFrequency = settings[METRICS_EXECUTION_FREQUENCY] as TimeValue
-                validateExecutionFrequency(executionFrequency, value)
+                val storageTime = settings[METRICS_STORE_TIME] as TimeValue
+                validateExecutionFrequency(value, storageTime)
             }
 
             override fun settings(): MutableIterator<Setting<*>> {
@@ -203,8 +203,8 @@ class AlertingSettings {
             override fun validate(value: TimeValue) {}
 
             override fun validate(value: TimeValue, settings: Map<Setting<*>, Any>) {
-                val storageTime = settings[METRICS_STORE_TIME] as TimeValue
-                validateExecutionFrequency(value, storageTime)
+                val executionFrequency = settings[METRICS_EXECUTION_FREQUENCY] as TimeValue
+                validateExecutionFrequency(executionFrequency, value)
             }
 
             override fun settings(): MutableIterator<Setting<*>> {
@@ -219,13 +219,13 @@ class AlertingSettings {
             log.info("THIS IS MINIMUM_TIME_VALUE $MINIMUM_TIME_VALUE")
 
             if (executionFrequency < MINIMUM_TIME_VALUE || storageTime < MINIMUM_TIME_VALUE) {
-                throw java.lang.IllegalArgumentException(
+                throw IllegalArgumentException(
                     "Execution frequency or storage time cannot be less than $MINIMUM_TIME_VALUE."
                 )
             }
             if (executionFrequency < storageTime) return
             if (executionFrequency > storageTime) {
-                throw java.lang.IllegalArgumentException(
+                throw IllegalArgumentException(
                     "Execution frequency cannot be greater than the storage time."
                 )
             }
