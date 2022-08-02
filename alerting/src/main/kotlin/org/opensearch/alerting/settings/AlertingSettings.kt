@@ -15,11 +15,26 @@ import java.util.concurrent.TimeUnit
  */
 class AlertingSettings {
 
+    init {
+
+    }
+
     companion object {
 
         const val MONITOR_MAX_INPUTS = 1
         const val MONITOR_MAX_TRIGGERS = 10
         const val DEFAULT_MAX_ACTIONABLE_ALERT_COUNT = 50L
+        val METRICS_EXECUTION_FREQUENCY_DEFAULT = Setting.positiveTimeSetting(
+            "plugins.alerting.cluster_metrics.execution_frequency",
+            TimeValue(15, TimeUnit.MINUTES),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+        val METRICS_STORE_TIME_DEFAULT = Setting.positiveTimeSetting(
+            "plugins.alerting.cluster_metrics.metrics_history_max_age",
+            TimeValue(7, TimeUnit.DAYS),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+        val MINIMUM_TIME_VALUE = TimeValue(1, TimeUnit.SECONDS)
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(
             "plugins.alerting.monitor.max_monitors",
@@ -157,16 +172,62 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val METRICS_STORE_TIME = Setting.positiveTimeSetting(
-            "plugins.alerting.cluster_metrics.metrics_history_max_age",
-            TimeValue(7, TimeUnit.DAYS),
+        val METRICS_STORE_TIME = Setting.timeSetting(
+            METRICS_STORE_TIME_DEFAULT.key,
+            METRICS_STORE_TIME_DEFAULT,
+            StorageTimeValidator(),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val METRICS_EXECUTION_FREQUENCY = Setting.positiveTimeSetting(
-            "plugins.alerting.cluster_metrics.execution_frequency",
-            TimeValue(15, TimeUnit.MINUTES),
+        val METRICS_EXECUTION_FREQUENCY = Setting.timeSetting(
+            METRICS_EXECUTION_FREQUENCY_DEFAULT.key,
+            METRICS_EXECUTION_FREQUENCY_DEFAULT,
+            ExecutionFrequencyValidator(),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+        internal class ExecutionFrequencyValidator : Setting.Validator<TimeValue> {
+            override fun validate(value: TimeValue) {}
+
+            override fun validate(value: TimeValue, settings: Map<Setting<*>, Any>) {
+                val executionFrequency = settings[METRICS_EXECUTION_FREQUENCY] as TimeValue
+                validateExecutionFrequency(executionFrequency, value)
+            }
+
+            override fun settings(): MutableIterator<Setting<*>> {
+                val settings = mutableListOf<Setting<*>>(
+                    METRICS_EXECUTION_FREQUENCY
+                )
+                return settings.iterator()
+            }
+        }
+
+        internal class StorageTimeValidator : Setting.Validator<TimeValue> {
+            override fun validate(value: TimeValue) {}
+
+            override fun validate(value: TimeValue, settings: Map<Setting<*>, Any>) {
+                val storageTime = settings[METRICS_STORE_TIME] as TimeValue
+                validateExecutionFrequency(value, storageTime)
+            }
+
+            override fun settings(): MutableIterator<Setting<*>> {
+                val settings = mutableListOf<Setting<*>>(
+                    METRICS_STORE_TIME
+                )
+                return settings.iterator()
+            }
+        }
+        fun validateExecutionFrequency(executionFrequency: TimeValue, storageTime: TimeValue) {
+            if (executionFrequency < MINIMUM_TIME_VALUE || storageTime < MINIMUM_TIME_VALUE) {
+                throw java.lang.IllegalArgumentException(
+                    "Execution frequency or storage time cannot be less than $MINIMUM_TIME_VALUE."
+                )
+            }
+            if (executionFrequency < storageTime) return
+            if (executionFrequency > storageTime) {
+                throw java.lang.IllegalArgumentException(
+                    "Execution frequency cannot be greater than the storage time."
+                )
+            }
+        }
     }
 }
