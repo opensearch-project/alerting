@@ -423,5 +423,33 @@ class ClusterMetricsCoordinator(
                 }
             )
         log.info("deleted number of relocating shards from $documentAge/$unitTime ago")
+
+        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .filter(QueryBuilders.rangeQuery("number_of_nodes.timestamp").lte("now-$documentAge/$unitTime"))
+            .execute(
+                object : ActionListener<BulkByScrollResponse> {
+                    override fun onResponse(response: BulkByScrollResponse) {
+                    }
+
+                    override fun onFailure(t: Exception) {
+                    }
+                }
+            )
+        log.info("deleted number of nodes from $documentAge/$unitTime ago")
+
+        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+            .filter(QueryBuilders.rangeQuery("number_of_data_nodes.timestamp").lte("now-$documentAge/$unitTime"))
+            .execute(
+                object : ActionListener<BulkByScrollResponse> {
+                    override fun onResponse(response: BulkByScrollResponse) {
+                    }
+
+                    override fun onFailure(t: Exception) {
+                    }
+                }
+            )
+        log.info("deleted number of data nodes from $documentAge/$unitTime ago")
     }
 }
