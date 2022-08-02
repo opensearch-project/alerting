@@ -1659,25 +1659,6 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         }
     }
 
-    @Before
-    fun setup() {
-        client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.key, 1000)
-        client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, 1000)
-        Thread.sleep(4000)
-    }
-
-    /**
-     [AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS] and [AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER]
-     must be reset to their default values once the tests have completed.
-     */
-    @After
-    fun cleanup() {
-        client().updateSettings(
-            AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
-        )
-        client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER)
-    }
-
     private fun prepareTestAnomalyResult(detectorId: String, user: User) {
         val adResultIndex = ".opendistro-anomaly-results-history-2020.10.17"
         try {

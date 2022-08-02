@@ -16,6 +16,18 @@ import org.opensearch.alerting.randomQueryLevelTrigger
 
 class AlertingSettingsIT : AlertingRestTestCase() {
 
+    /**
+    [AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS] and [AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER]
+    must be reset to their default values once the tests have completed.
+     */
+    @After
+    fun cleanup() {
+        client().updateSettings(
+                AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
+        )
+        client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER)
+    }
+
     fun `test updating setting of max actions per trigger with more actions than allowed actions`() {
         val actions = createActions(4)
         val triggers = createTriggers(1, actions)
@@ -29,10 +41,10 @@ class AlertingSettingsIT : AlertingRestTestCase() {
             client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, 1)
         } catch (e: Exception) {
             assertTrue(e is IllegalArgumentException)
-        } finally {
-            client().updateSettings(
-                AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER
-            )
+//        } finally {
+//            client().updateSettings(
+//                AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER
+//            )
         }
     }
 
@@ -70,7 +82,6 @@ class AlertingSettingsIT : AlertingRestTestCase() {
     fun `test updating setting of overall max actions with less actions than allowed actions`() {
         client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.key, 10)
         // Wait for setting to be updated
-        Thread.sleep(4000)
 
         val actions = createActions(1)
         val triggers = createTriggers(1, actions)
@@ -79,18 +90,6 @@ class AlertingSettingsIT : AlertingRestTestCase() {
                 triggers = triggers
             )
         )
-    }
-
-    /**
-     [AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS] and [AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER]
-     must be reset to their default values once the tests have completed.
-     */
-    @After
-    fun cleanup() {
-        client().updateSettings(
-            AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS
-        )
-        client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER)
     }
 
     private fun createTriggers(amount: Int, actions: List<Action>): List<Trigger> {
