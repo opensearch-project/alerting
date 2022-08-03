@@ -56,26 +56,18 @@ class DestinationMigrationCoordinator(
             !runningLock &&
             (scheduledMigration == null || scheduledMigration!!.isCancelled)
         ) {
-            logger.info("richfu destination migration")
             try {
-                logger.info("richfu try before")
                 runningLock = true
                 initMigrateDestinations()
-                logger.info("richfu try after")
             } finally {
-                logger.info("richfu finally before")
                 runningLock = false
-                logger.info("richfu finally after")
             }
         } else if (!event.localNodeMaster()) {
-            logger.info("richfu no destination migration")
             scheduledMigration?.cancel()
         }
     }
 
     private fun initMigrateDestinations() {
-        logger.info("start of initMigrateDestination")
-        logger.info("includes $clusterService")
         if (!scheduledJobIndices.scheduledJobIndexExists()) {
             logger.debug("Alerting config index is not initialized")
             scheduledMigration?.cancel()
@@ -100,8 +92,6 @@ class DestinationMigrationCoordinator(
                         logger.info("Cancel background destination migration process.")
                         scheduledMigration?.cancel()
                     }
-                    logger.info("richfu calling class")
-                    logger.info("richfu after called class")
                     logger.info("Performing migration of destination data.")
                     DestinationMigrationUtilService.migrateDestinations(client as NodeClient)
                 } catch (e: Exception) {
@@ -109,9 +99,6 @@ class DestinationMigrationCoordinator(
                 }
             }
         }
-
-        logger.info("richfu before scheduledMigration")
         scheduledMigration = threadPool.scheduleWithFixedDelay(scheduledJob, TimeValue.timeValueMinutes(1), ThreadPool.Names.MANAGEMENT)
-        logger.info("richfu after scheduledMigration call")
     }
 }
