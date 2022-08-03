@@ -967,7 +967,6 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     //  the API from the list before executing the monitor.
 
     fun `test execute monitor with custom webhook destination and denied host`() {
-
         listOf("http://10.1.1.1", "127.0.0.1").forEach {
             val customWebhook = CustomWebhook(it, null, null, 80, null, "PUT", emptyMap(), emptyMap(), null, null)
             val destination = createDestination(

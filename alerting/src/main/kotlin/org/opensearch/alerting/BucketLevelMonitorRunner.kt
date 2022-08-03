@@ -160,7 +160,6 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 nextAlerts[trigger.id]?.get(AlertCategory.COMPLETED)
                     ?.addAll(monitorCtx.alertService!!.convertToCompletedAlerts(keysToAlertsMap))
         }
-
         for (trigger in monitor.triggers) {
             val alertsToUpdate = mutableSetOf<Alert>()
             val completedAlertsToUpdate = mutableSetOf<Alert>()

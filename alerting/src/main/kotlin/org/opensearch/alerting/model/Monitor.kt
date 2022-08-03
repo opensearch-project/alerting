@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.model
 
+import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.core.model.ClusterMetricsInput
 import org.opensearch.alerting.core.model.CronSchedule
 import org.opensearch.alerting.core.model.Input
@@ -14,6 +15,7 @@ import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.opensearchapi.instant
 import org.opensearch.alerting.opensearchapi.optionalTimeField
 import org.opensearch.alerting.opensearchapi.optionalUserField
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MONITOR_MAX_INPUTS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MONITOR_MAX_TRIGGERS
 import org.opensearch.alerting.settings.SupportedClusterMetricsSettings
@@ -75,6 +77,21 @@ data class Monitor(
                     require(trigger is QueryLevelTrigger) { "Incompatible trigger [${trigger.id}] for monitor type [$monitorType]" }
                 MonitorType.DOC_LEVEL_MONITOR ->
                     require(trigger is DocumentLevelTrigger) { "Incompatible trigger [${trigger.id}] for monitor type [$monitorType]" }
+            }
+        }
+
+        // validate the number of Actions Across Triggers
+        if (MonitorRunnerService.monitorCtx.totalMaxActionsAcrossTriggers > AlertingSettings.UNBOUNDED_ACTIONS_ACROSS_TRIGGERS) {
+            val totalActions = triggers.sumOf { trigger ->
+                require(trigger.actions.size <= MonitorRunnerService.monitorCtx.maxActionsAcrossTriggers) {
+                    "For a single trigger, the number of actions to be executed must be less than or equal to " +
+                        "${MonitorRunnerService.monitorCtx.maxActionsAcrossTriggers}"
+                }
+                trigger.actions.size
+            }
+            require(totalActions <= MonitorRunnerService.monitorCtx.totalMaxActionsAcrossTriggers) {
+                "The sum of the number of actions executed by all triggers must be less than or equal to " +
+                    "${MonitorRunnerService.monitorCtx.totalMaxActionsAcrossTriggers}"
             }
         }
         if (enabled) {
