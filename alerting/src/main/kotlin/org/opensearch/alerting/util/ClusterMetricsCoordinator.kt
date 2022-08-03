@@ -85,7 +85,7 @@ class ClusterMetricsCoordinator(
             }
             if (isCollectionUpdated || isDeletionUpdated) {
                 dataPointCollectionDeletionJob?.cancel()
-                log.info("cancelled data collection and deletion jobs ")
+                log.info("Cancelled data collection and deletion jobs")
                 isRunningFlag = false
                 log.info("detected changes to settings, resetting running, deletion and collection flags to false")
                 isDeletionUpdated = false
