@@ -22,10 +22,6 @@ import java.time.temporal.ChronoUnit
 import java.util.*
 import kotlin.collections.ArrayList
 class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
-    /*
-    4. Adjust the execution frequency setting to 1 minute, and make sure that the timestamps between the datapoints are 1 minute apart.
-    Check 2 minute apart after
-     */
     @Before
     fun setup() {
         // When setting up the tests, change the execution frequency and history max age settings to 1 minute and 10 minutes from
