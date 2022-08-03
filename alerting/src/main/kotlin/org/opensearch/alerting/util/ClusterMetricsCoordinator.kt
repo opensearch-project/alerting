@@ -109,18 +109,26 @@ class ClusterMetricsCoordinator(
 
     suspend fun createDocs(client: NodeClient, clusterService: ClusterService) {
         val currentTime = Instant.now().toString()
+        log.info("This is the current time: $currentTime")
         val clusterHealth = client.admin().cluster().health(ClusterHealthRequest()).get().toMap()
         val nodeStats = client.admin().cluster().nodesStats(NodesStatsRequest().addMetrics("process", "jvm")).get().toMap()
 
         ClusterMetricsVisualizationIndex.initFunc(client, clusterService)
 
         val unassignedShards = clusterHealth["unassigned_shards"].toString()
+        log.info("This is unassigned shards value: $unassignedShards")
         val clusterStatus = clusterHealth["status"].toString()
+        log.info("This is cluster status value: $clusterStatus")
         val numPending = clusterHealth["number_of_pending_tasks"].toString()
+        log.info("This is the number of pending tasks: $numPending")
         val activeShards = clusterHealth["active_shards"].toString()
+        log.info("This is active shards $activeShards")
         val relocatingShards = clusterHealth["relocating_shards"].toString()
+        log.info("This is relocating shards $relocatingShards")
         val numNodes = clusterHealth["number_of_nodes"].toString()
+        log.info("This is number of nodes $numNodes")
         val numDataNodes = clusterHealth["number_of_data_nodes"].toString()
+        log.info("this is number of data nodes $numDataNodes")
 
         val nodesMap = nodeStats["nodes"] as Map<String, Any>
         val keys = nodesMap.keys
@@ -142,9 +150,13 @@ class ClusterMetricsCoordinator(
 
         val minimumCPU = Collections.min(cpuData).toString()
         val maximumCPU = Collections.max(cpuData).toString()
+        log.info("This is minimum CPU Usage, $minimumCPU")
+        log.info("This is maximum CPU usage, $maximumCPU")
 
         val minimumJVM = Collections.min(jvmData).toString()
         val maximumJVM = Collections.max(jvmData).toString()
+        log.info("This is minimum JVM, $minimumJVM")
+        log.info("This is maximum JVM, $maximumJVM")
 
         var avgCPUcalc = 0.0
         var avgJVMcalc = 0.0
@@ -159,6 +171,8 @@ class ClusterMetricsCoordinator(
 
         val avgCPU = String.format("%.2f", avgCPUcalc)
         val avgJVM = String.format("%.2f", avgJVMcalc)
+        log.info("This is average CPU, $avgCPU")
+        log.info("This is average JVM, $avgJVM")
 
         val clusterstatusData = ClusterMetricsDataPoint(
             ClusterMetricsDataPoint.MetricType.CLUSTER_STATUS,
