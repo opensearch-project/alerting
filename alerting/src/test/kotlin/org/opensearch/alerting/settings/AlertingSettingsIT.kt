@@ -41,10 +41,6 @@ class AlertingSettingsIT : AlertingRestTestCase() {
             client().updateSettings(AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, 1)
         } catch (e: Exception) {
             assertTrue(e is IllegalArgumentException)
-//        } finally {
-//            client().updateSettings(
-//                AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.key, AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER
-//            )
         }
     }
 
