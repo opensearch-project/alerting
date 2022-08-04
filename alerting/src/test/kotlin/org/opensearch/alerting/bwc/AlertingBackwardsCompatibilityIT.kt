@@ -9,7 +9,6 @@ import org.apache.http.entity.ContentType.APPLICATION_JSON
 import org.apache.http.entity.StringEntity
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.AlertingRestTestCase
-import org.opensearch.alerting.LEGACY_OPENDISTRO_ALERTING_BASE_URI
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.common.settings.Settings
@@ -53,15 +52,15 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
             val pluginNames = plugins.map { plugin -> plugin["name"] }.toSet()
             when (CLUSTER_TYPE) {
                 ClusterType.OLD -> {
-                    assertTrue(pluginNames.contains("opendistro-alerting"))
+                    assertTrue(pluginNames.contains("opensearch-alerting"))
                     createBasicMonitor()
                 }
                 ClusterType.MIXED -> {
                     assertTrue(pluginNames.contains("opensearch-alerting"))
-                    verifyMonitorExists(LEGACY_OPENDISTRO_ALERTING_BASE_URI)
+                    verifyMonitorExists(ALERTING_BASE_URI)
                     // TODO: Need to move the base URI being used here into a constant and rename ALERTING_BASE_URI to
                     //  MONITOR_BASE_URI
-                    verifyMonitorStats("/_opendistro/_alerting")
+                    verifyMonitorStats("/_plugins/_alerting")
                 }
                 ClusterType.UPGRADED -> {
                     assertTrue(pluginNames.contains("opensearch-alerting"))
@@ -112,7 +111,7 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
     @Throws(Exception::class)
     private fun createBasicMonitor() {
         val indexName = "test_bwc_index"
-        val legacyMonitorString = """
+        val bwcMonitorString = """
             {
               "type": "monitor",
               "name": "test_bwc_monitor",
@@ -123,43 +122,38 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
                   "unit": "MINUTES"
                 }
               },
-              "inputs": [
-                {
-                  "search": {
-                    "indices": [
-                      "$indexName"
-                    ],
+              "inputs": [{
+                "search": {
+                  "indices": ["$indexName"],
+                  "query": {
+                    "size": 0,
+                    "aggregations": {},
                     "query": {
-                      "size": 0,
-                      "query": {
-                        "match_all": {}
-                      }
+                      "match_all": {}
                     }
                   }
                 }
-              ],
-              "triggers": [
-                {
-                  "name": "abc",
-                  "severity": "1",
-                  "condition": {
-                    "script": {
-                      "source": "ctx.results[0].hits.total.value > 100000",
-                      "lang": "painless"
-                    }
-                  },
-                  "actions": []
-                }
-              ]
+              }],
+              "triggers": [{
+                "name": "abc",
+                "severity": "1",
+                "condition": {
+                  "script": {
+                    "source": "ctx.results[0].hits.total.value > 100000",
+                    "lang": "painless"
+                  }
+                },
+                "actions": []
+              }]
             }
         """.trimIndent()
         createIndex(indexName, Settings.EMPTY)
 
         val createResponse = client().makeRequest(
             method = "POST",
-            endpoint = "$LEGACY_OPENDISTRO_ALERTING_BASE_URI?refresh=true",
+            endpoint = "$ALERTING_BASE_URI?refresh=true",
             params = emptyMap(),
-            entity = StringEntity(legacyMonitorString, APPLICATION_JSON)
+            entity = StringEntity(bwcMonitorString, APPLICATION_JSON)
         )
 
         assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
@@ -167,7 +161,7 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
         val createdId = responseBody["_id"] as String
         val createdVersion = responseBody["_version"] as Int
         assertNotEquals("Create monitor response is missing id", Monitor.NO_ID, createdId)
-        assertTrue("Create monitor reponse has incorrect version", createdVersion > 0)
+        assertTrue("Create monitor response has incorrect version", createdVersion > 0)
     }
 
     @Throws(Exception::class)
