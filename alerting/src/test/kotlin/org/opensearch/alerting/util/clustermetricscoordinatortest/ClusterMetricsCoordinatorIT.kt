@@ -7,6 +7,7 @@ package org.opensearch.alerting.util.clustermetricscoordinatortest
 
 import org.apache.http.entity.ContentType
 import org.apache.http.entity.StringEntity
+import org.junit.After
 import org.junit.Before
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest
@@ -112,6 +113,16 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         assertEquals(diff, 2)
     }
 
+    @After
+    // Reset the settings back to default, delete the created index.
+    fun cleanup() {
+        // delete the documents from index first, and then reset execution frequency
+        client().updateSettings("plugins.alerting.cluster_metrics.metrics_history_max_age", "now")
+        client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "15m")
+        // reset storage time and delete the index
+        client().updateSettings("plugins.alerting.cluster_metrics.metrics_history_max_age", "7d")
+        client().makeRequest("DELETE", ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+    }
     private fun generateData() {
         client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "1s")
         client().updateSettings("plugins.alerting.cluster_metrics.metrics_history_max_age", "10m")
