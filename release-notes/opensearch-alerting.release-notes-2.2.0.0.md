@@ -11,4 +11,4 @@ Compatible with OpenSearch 2.2.0
 * Refactored backwards compatibility tests to point to the OpenSearch 1.1.0.0 zip following deprecation of ODFE. ([#510](https://github.com/opensearch-project/alerting/pull/510))
 
 ### Documentation
-* Added 2.2 release notes. ([#]())
+* Added 2.2 release notes. ([#514](https://github.com/opensearch-project/alerting/pull/514))
