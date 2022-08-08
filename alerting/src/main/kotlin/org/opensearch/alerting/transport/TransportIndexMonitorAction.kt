@@ -119,7 +119,7 @@ class TransportIndexMonitorAction @Inject constructor(
             return
         }
 
-        //TODO: create helper validate monitor actions
+        // TODO: create helper validate monitor actions
         validateActionsAcrossTriggers(AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.get(settings))
 
         if (!isADMonitor(request.monitor)) {
@@ -209,12 +209,11 @@ class TransportIndexMonitorAction @Inject constructor(
 
             if (currentAmountOfActions > totalMaxActions)
                 throw IllegalArgumentException(
-                        "The amount of actions that the client wants to update plus the amount of actions that " +
-                                "already exist, $currentAmountOfActions should not be greater than  that of the " +
-                                "overall max actions across all triggers of the monitor, $totalMaxActions"
+                    "The amount of actions that the client wants to update plus the amount of actions that " +
+                        "already exist, $currentAmountOfActions should not be greater than  that of the " +
+                        "overall max actions across all triggers of the monitor, $totalMaxActions"
                 )
         }
-
     }
 
     private suspend fun getMonitors(client: Client): List<Monitor> {
@@ -223,18 +222,18 @@ class TransportIndexMonitorAction @Inject constructor(
         val configName = "monitor"
 
         val searchSourceBuilder = SearchSourceBuilder()
-                .from(start)
-                .fetchSource(FetchSourceContext(true, Strings.EMPTY_ARRAY, Strings.EMPTY_ARRAY))
-                .seqNoAndPrimaryTerm(true)
-                .version(true)
+            .from(start)
+            .fetchSource(FetchSourceContext(true, Strings.EMPTY_ARRAY, Strings.EMPTY_ARRAY))
+            .seqNoAndPrimaryTerm(true)
+            .version(true)
         val queryBuilder = QueryBuilders.boolQuery()
-                .should(QueryBuilders.existsQuery(configName))
+            .should(QueryBuilders.existsQuery(configName))
         queryBuilder.filter(QueryBuilders.existsQuery(Monitor.MONITOR_TYPE))
         searchSourceBuilder.query(queryBuilder)
 
         val searchRequest = SearchRequest()
-                .source(searchSourceBuilder)
-                .indices(SCHEDULED_JOBS_INDEX)
+            .source(searchSourceBuilder)
+            .indices(SCHEDULED_JOBS_INDEX)
         val response: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
 
         if (response.status() != RestStatus.OK)
@@ -242,12 +241,12 @@ class TransportIndexMonitorAction @Inject constructor(
 
         for (hit in response.hits) {
             val xcp = XContentFactory.xContent(XContentType.JSON)
-                    .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
+                .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
 
             val monitor = Monitor.parse(
-                    xcp = xcp,
-                    id = hit.id,
-                    version = hit.version
+                xcp = xcp,
+                id = hit.id,
+                version = hit.version
             )
 
             monitors.add(monitor)
