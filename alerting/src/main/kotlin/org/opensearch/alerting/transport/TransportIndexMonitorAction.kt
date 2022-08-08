@@ -7,6 +7,7 @@ package org.opensearch.alerting.transport
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchSecurityException
@@ -38,6 +39,7 @@ import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.model.AlertingConfigAccessor.Companion.getMonitorMetadata
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorMetadata
+import org.opensearch.alerting.model.Trigger
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
@@ -52,12 +54,14 @@ import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
+import org.opensearch.common.Strings
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
@@ -69,6 +73,7 @@ import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import java.io.IOException
@@ -113,6 +118,9 @@ class TransportIndexMonitorAction @Inject constructor(
         if (!validateUserBackendRoles(user, actionListener)) {
             return
         }
+
+        //TODO: create helper validate monitor actions
+        validateActionsAcrossTriggers(AlertingSettings.TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS.get(settings))
 
         if (!isADMonitor(request.monitor)) {
             checkIndicesAndExecute(client, actionListener, request, user)
@@ -188,6 +196,84 @@ class TransportIndexMonitorAction @Inject constructor(
         client.threadPool().threadContext.stashContext().use {
             IndexMonitorHandler(client, actionListener, request, user).resolveUserAndStartForAD()
         }
+    }
+
+    private fun validateActionsAcrossTriggers(totalMaxActions: Int) {
+        if (totalMaxActions == AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS) return
+
+        GlobalScope.launch {
+            val monitors = getMonitors(client)
+            val triggers = getTriggers(monitors)
+
+            val currentAmountOfActions = getCurrentAmountOfActions(triggers)
+
+            if (currentAmountOfActions > totalMaxActions)
+                throw IllegalArgumentException(
+                        "The amount of actions that the client wants to update plus the amount of actions that " +
+                                "already exist, $currentAmountOfActions should not be greater than  that of the " +
+                                "overall max actions across all triggers of the monitor, $totalMaxActions"
+                )
+        }
+
+    }
+
+    private suspend fun getMonitors(client: Client): List<Monitor> {
+        val monitors = mutableListOf<Monitor>()
+        val start = 0
+        val configName = "monitor"
+
+        val searchSourceBuilder = SearchSourceBuilder()
+                .from(start)
+                .fetchSource(FetchSourceContext(true, Strings.EMPTY_ARRAY, Strings.EMPTY_ARRAY))
+                .seqNoAndPrimaryTerm(true)
+                .version(true)
+        val queryBuilder = QueryBuilders.boolQuery()
+                .should(QueryBuilders.existsQuery(configName))
+        queryBuilder.filter(QueryBuilders.existsQuery(Monitor.MONITOR_TYPE))
+        searchSourceBuilder.query(queryBuilder)
+
+        val searchRequest = SearchRequest()
+                .source(searchSourceBuilder)
+                .indices(SCHEDULED_JOBS_INDEX)
+        val response: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
+
+        if (response.status() != RestStatus.OK)
+            return emptyList()
+
+        for (hit in response.hits) {
+            val xcp = XContentFactory.xContent(XContentType.JSON)
+                    .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
+
+            val monitor = Monitor.parse(
+                    xcp = xcp,
+                    id = hit.id,
+                    version = hit.version
+            )
+
+            monitors.add(monitor)
+        }
+
+        return monitors
+    }
+
+    private fun getTriggers(monitors: List<Monitor>): List<Trigger> {
+        val triggers = mutableListOf<Trigger>()
+
+        monitors.map {
+            triggers.addAll(triggers)
+        }
+
+        return triggers
+    }
+
+    private fun getCurrentAmountOfActions(triggers: List<Trigger>): Int {
+        var currentAmountOfActions = 0
+
+        currentAmountOfActions += triggers.sumOf { trigger ->
+            trigger.actions.size
+        }
+
+        return currentAmountOfActions
     }
 
     inner class IndexMonitorHandler(
