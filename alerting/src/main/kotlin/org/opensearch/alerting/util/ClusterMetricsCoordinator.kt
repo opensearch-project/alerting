@@ -169,8 +169,8 @@ class ClusterMetricsCoordinator(
         avgCPUcalc /= cpuData.size
         avgJVMcalc /= jvmData.size
 
-        val avgCPU = String.format("%.2f", avgCPUcalc)
-        val avgJVM = String.format("%.2f", avgJVMcalc)
+        val avgCPU = avgCPUcalc.toString()
+        val avgJVM = avgJVMcalc.toString()
         log.info("This is average CPU, $avgCPU")
         log.info("This is average JVM, $avgJVM")
 
