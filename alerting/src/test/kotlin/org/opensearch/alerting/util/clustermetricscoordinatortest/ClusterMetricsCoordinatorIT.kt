@@ -58,7 +58,6 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         ClusterMetricsDataPoint.MetricType.values().forEach { mapCheck[it.metricName] = mutableSetOf() }
         for (doc in docs) {
             val source = doc["_source"] as Map<String, Map<String, Any>>
-            logger.info("this is source data $source")
             val metricType = source.keys.first()
             try {
                 ClusterMetricsDataPoint.MetricType.valueOf(metricType.uppercase(Locale.getDefault()))
@@ -107,6 +106,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
             val metricType = source.keys.first()
             times.add(source[metricType]?.get("timestamp").toString())
         }
+        logger.info("this is times $times")
         val time1 = Instant.parse(times.elementAt(times.size - 1))
         val time2 = Instant.parse(times.elementAt(times.size - 2))
         val diff = time2.until(time1, ChronoUnit.MINUTES)
