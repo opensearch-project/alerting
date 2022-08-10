@@ -235,6 +235,8 @@ class AlertingSettings(val client: Client) {
         }
 
         private fun validateActionsAcrossTriggers(maxActions: Int, totalMaxActions: Int, client: Client?) {
+            if (totalMaxActions < 0) throw IllegalArgumentException("cannot update")
+
             if (totalMaxActions == DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS) return
 
             if (maxActions > totalMaxActions) {
@@ -262,6 +264,8 @@ class AlertingSettings(val client: Client) {
         }
 
         private fun validateActionsPerTrigger(maxActions: Int, totalMaxActions: Int, client: Client?) {
+            if (totalMaxActions < 0) throw IllegalArgumentException("cannot update")
+
             if (totalMaxActions == DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER) return
 
             client?.let {
