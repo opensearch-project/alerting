@@ -13,6 +13,8 @@ import java.util.concurrent.TimeUnit
 /**
  * settings specific to [AlertingPlugin]. These settings include things like history index max age, request timeout, etc...
  */
+private val log = org.apache.logging.log4j.LogManager.getLogger(AlertingSettings::class.java)
+
 class AlertingSettings {
 
     companion object {
@@ -20,6 +22,17 @@ class AlertingSettings {
         const val MONITOR_MAX_INPUTS = 1
         const val MONITOR_MAX_TRIGGERS = 10
         const val DEFAULT_MAX_ACTIONABLE_ALERT_COUNT = 50L
+        val METRICS_EXECUTION_FREQUENCY_DEFAULT = Setting.positiveTimeSetting(
+            "plugins.alerting.cluster_metrics.execution_frequency",
+            TimeValue(15, TimeUnit.MINUTES),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+        val METRICS_STORE_TIME_DEFAULT = Setting.positiveTimeSetting(
+            "plugins.alerting.cluster_metrics.metrics_history_max_age",
+            TimeValue(7, TimeUnit.DAYS),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+        val MINIMUM_TIME_VALUE = TimeValue(1, TimeUnit.SECONDS)
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(
             "plugins.alerting.monitor.max_monitors",
@@ -157,16 +170,60 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val METRICS_STORE_TIME = Setting.positiveTimeSetting(
-            "plugins.alerting.cluster_metrics.metrics_history_max_age",
-            TimeValue(7, TimeUnit.DAYS),
+        val METRICS_STORE_TIME = Setting.timeSetting(
+            METRICS_STORE_TIME_DEFAULT.key,
+            METRICS_STORE_TIME_DEFAULT,
+            StorageValidator(),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val METRICS_EXECUTION_FREQUENCY = Setting.positiveTimeSetting(
-            "plugins.alerting.cluster_metrics.execution_frequency",
-            TimeValue(15, TimeUnit.MINUTES),
+        val METRICS_EXECUTION_FREQUENCY = Setting.timeSetting(
+            METRICS_EXECUTION_FREQUENCY_DEFAULT.key,
+            METRICS_EXECUTION_FREQUENCY_DEFAULT,
+            ExecutionValidator(),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+        internal class ExecutionValidator : Setting.Validator<TimeValue> {
+            override fun validate(value: TimeValue) {}
+
+            override fun validate(value: TimeValue, settings: Map<Setting<*>, Any>) {
+                val storageTime = settings[METRICS_STORE_TIME] as TimeValue
+                log.info("THIS IS STORAGETIME $storageTime")
+                validateSettings(value, storageTime)
+            }
+
+            override fun settings(): MutableIterator<Setting<*>> {
+                val settings = mutableListOf<Setting<*>>(
+                    METRICS_EXECUTION_FREQUENCY,
+                    METRICS_STORE_TIME
+                )
+                return settings.iterator()
+            }
+        }
+
+        internal class StorageValidator : Setting.Validator<TimeValue> {
+            override fun validate(value: TimeValue) {}
+
+            override fun validate(value: TimeValue, settings: Map<Setting<*>, Any>) {
+                val executionTime = settings[METRICS_EXECUTION_FREQUENCY] as TimeValue
+                log.info("THIS IS EXECUTIONTIME $executionTime")
+                validateSettings(executionTime, value)
+            }
+
+            override fun settings(): MutableIterator<Setting<*>> {
+                val settings = mutableListOf<Setting<*>>(
+                    METRICS_EXECUTION_FREQUENCY,
+                    METRICS_STORE_TIME
+                )
+                return settings.iterator()
+            }
+        }
+        private fun validateSettings(executionFrequency: TimeValue, storageTime: TimeValue) {
+            if (executionFrequency > storageTime) {
+                throw java.lang.IllegalArgumentException(
+                    "The execution frequency should be less than the storage time."
+                )
+            }
+        }
     }
 }
