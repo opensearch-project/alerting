@@ -188,13 +188,13 @@ class AlertingSettings(val client: Client) {
         val TOTAL_MAX_ACTIONS_PER_TRIGGER = Setting.intSetting(
             "plugins.alerting.max_actions_across_triggers",
             DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER,
-            -1, MaxActionsPerTriggersValidator(internalClient),
+            0, MaxActionsPerTriggersValidator(internalClient),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
         val TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS = Setting.intSetting(
             "plugins.alerting.total_max_actions_across_triggers",
             DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS,
-            -1, TotalMaxActionsAcrossTriggersValidator(internalClient),
+            0, TotalMaxActionsAcrossTriggersValidator(internalClient),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
@@ -235,7 +235,7 @@ class AlertingSettings(val client: Client) {
         }
 
         private fun validateActionsAcrossTriggers(maxActions: Int, totalMaxActions: Int, client: Client?) {
-            if (totalMaxActions < 0) throw IllegalArgumentException("cannot update")
+            // if (totalMaxActions < 0) throw IllegalArgumentException("cannot update")
 
             if (totalMaxActions == DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS) return
 
@@ -264,7 +264,7 @@ class AlertingSettings(val client: Client) {
         }
 
         private fun validateActionsPerTrigger(maxActions: Int, totalMaxActions: Int, client: Client?) {
-            if (totalMaxActions < 0) throw IllegalArgumentException("cannot update")
+            // if (totalMaxActions < 0) throw IllegalArgumentException("cannot update")
 
             if (totalMaxActions == DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER) return
 
