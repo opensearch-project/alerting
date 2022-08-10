@@ -5,11 +5,13 @@
 
 package org.opensearch.alerting.settings
 
+import org.apache.logging.log4j.LogManager
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
+import org.opensearch.alerting.AlertService
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.Monitor
@@ -198,10 +200,14 @@ class AlertingSettings(val client: Client) {
         )
 
         internal class TotalMaxActionsAcrossTriggersValidator(val client: Client?) : Setting.Validator<Int> {
+            private val logger = LogManager.getLogger(TotalMaxActionsAcrossTriggersValidator::class.java)
+
             override fun validate(value: Int) {}
 
             override fun validate(value: Int, settings: Map<Setting<*>, Any>) {
                 val maxActions = settings[TOTAL_MAX_ACTIONS_PER_TRIGGER] as Int
+                logger.info("zhanncha value=$value")
+                logger.info("zhanncha maxActions=$maxActions")
                 validateActionsAcrossTriggers(maxActions, value, client)
             }
 
