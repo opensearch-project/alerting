@@ -5,13 +5,12 @@
 
 package org.opensearch.alerting.settings
 
-import org.apache.logging.log4j.LogManager
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import org.apache.logging.log4j.LogManager
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.alerting.AlertService
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.Monitor
