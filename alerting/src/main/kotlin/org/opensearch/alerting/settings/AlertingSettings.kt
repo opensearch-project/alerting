@@ -199,7 +199,7 @@ class AlertingSettings(val client: Client) {
         )
 
         internal class TotalMaxActionsAcrossTriggersValidator(val client: Client?) : Setting.Validator<Int> {
-            private val logger = LogManager.getLogger(TotalMaxActionsAcrossTriggersValidator::class.java)
+            private val logger = LogManager.getLogger(AlertingSettings::class.java)
 
             override fun validate(value: Int) {}
 
