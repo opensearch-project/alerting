@@ -8,7 +8,6 @@ package org.opensearch.alerting.settings
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import org.apache.logging.log4j.LogManager
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin
@@ -188,25 +187,21 @@ class AlertingSettings(val client: Client) {
         val TOTAL_MAX_ACTIONS_PER_TRIGGER = Setting.intSetting(
             "plugins.alerting.max_actions_across_triggers",
             DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER,
-            0, MaxActionsPerTriggersValidator(internalClient),
+            -1, MaxActionsPerTriggersValidator(internalClient),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
         val TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS = Setting.intSetting(
             "plugins.alerting.total_max_actions_across_triggers",
             DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS,
-            0, TotalMaxActionsAcrossTriggersValidator(internalClient),
+            -1, TotalMaxActionsAcrossTriggersValidator(internalClient),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         internal class TotalMaxActionsAcrossTriggersValidator(val client: Client?) : Setting.Validator<Int> {
-            private val logger = LogManager.getLogger(AlertingSettings::class.java)
-
             override fun validate(value: Int) {}
 
             override fun validate(value: Int, settings: Map<Setting<*>, Any>) {
                 val maxActions = settings[TOTAL_MAX_ACTIONS_PER_TRIGGER] as Int
-                logger.info("zhanncha value=$value")
-                logger.info("zhanncha maxActions=$maxActions")
                 validateActionsAcrossTriggers(maxActions, value, client)
             }
 
@@ -235,7 +230,7 @@ class AlertingSettings(val client: Client) {
         }
 
         private fun validateActionsAcrossTriggers(maxActions: Int, totalMaxActions: Int, client: Client?) {
-            // if (totalMaxActions < 0) throw IllegalArgumentException("cannot update")
+            if (totalMaxActions < 0) throw IllegalArgumentException("cannot update this invaild value")
 
             if (totalMaxActions == DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS) return
 
@@ -264,7 +259,7 @@ class AlertingSettings(val client: Client) {
         }
 
         private fun validateActionsPerTrigger(maxActions: Int, totalMaxActions: Int, client: Client?) {
-            // if (totalMaxActions < 0) throw IllegalArgumentException("cannot update")
+            if (totalMaxActions < 0) throw IllegalArgumentException("cannot update this invaild value")
 
             if (totalMaxActions == DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER) return
 
