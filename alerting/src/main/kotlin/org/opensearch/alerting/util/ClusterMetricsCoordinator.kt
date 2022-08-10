@@ -107,7 +107,7 @@ class ClusterMetricsCoordinator(
         }
     }
 
-    suspend fun createDocs(client: NodeClient, clusterService: ClusterService) {
+    private suspend fun createDocs(client: NodeClient, clusterService: ClusterService) {
         val currentTime = Instant.now().toString()
         log.info("This is the current time: $currentTime")
         val clusterHealth = client.admin().cluster().health(ClusterHealthRequest()).get().toMap()
@@ -288,7 +288,7 @@ class ClusterMetricsCoordinator(
             log.info("Unable to get index response,  $t")
         }
     }
-    fun checkShardsFailure(response: IndexResponse): String? {
+    private fun checkShardsFailure(response: IndexResponse): String? {
         val failureReasons = StringBuilder()
         if (response.shardInfo.failed > 0) {
             response.shardInfo.failures.forEach {
@@ -300,134 +300,148 @@ class ClusterMetricsCoordinator(
         return null
     }
 
-    fun deleteDocs(client: NodeClient) {
+    private fun deleteDocs(client: NodeClient) {
         val documentAge = metricsStoreTime.toString()
-        val unitTime = documentAge.last()
 
-        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("cluster_status.timestamp").lte("now-$documentAge"))
-            .execute(
-                object : ActionListener<BulkByScrollResponse> {
-                    override fun onResponse(response: BulkByScrollResponse) {
-                    }
+        ClusterMetricsDataPoint.MetricType.values().forEach {
+            DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+                .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+                .filter(QueryBuilders.rangeQuery(it.metricName + ".timestamp").lte("now-$documentAge"))
+                .execute(
+                    object : ActionListener<BulkByScrollResponse> {
+                        override fun onResponse(response: BulkByScrollResponse) {
+                        }
 
-                    override fun onFailure(t: Exception) {
+                        override fun onFailure(t: Exception) {
+                        }
                     }
-                }
-            )
-        log.info("deleted clusterStatus data from $documentAge/$unitTime ago, now-$documentAge")
-
-        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("cpu_usage.timestamp").lte("now-$documentAge"))
-            .execute(
-                object : ActionListener<BulkByScrollResponse> {
-                    override fun onResponse(response: BulkByScrollResponse) {
-                    }
-
-                    override fun onFailure(t: Exception) {
-                    }
-                }
-            )
-        log.info("deleted cpu_usage data from $documentAge/$unitTime ago")
-
-        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("jvm_pressure.timestamp").lte("now-$documentAge"))
-            .execute(
-                object : ActionListener<BulkByScrollResponse> {
-                    override fun onResponse(response: BulkByScrollResponse) {
-                    }
-
-                    override fun onFailure(t: Exception) {
-                    }
-                }
-            )
-        log.info("deleted jvm_pressure data from $documentAge/$unitTime ago")
-
-        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("unassigned_shards.timestamp").lte("now-$documentAge"))
-            .execute(
-                object : ActionListener<BulkByScrollResponse> {
-                    override fun onResponse(response: BulkByScrollResponse) {
-                    }
-
-                    override fun onFailure(t: Exception) {
-                    }
-                }
-            )
-        log.info("deleted unassigned_shards data from $documentAge/$unitTime ago")
-
-        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("number_of_pending_tasks.timestamp").lte("now-$documentAge"))
-            .execute(
-                object : ActionListener<BulkByScrollResponse> {
-                    override fun onResponse(response: BulkByScrollResponse) {
-                    }
-
-                    override fun onFailure(t: Exception) {
-                    }
-                }
-            )
-        log.info("deleted number of pending tasks from $documentAge/$unitTime ago")
-
-        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("active_shards.timestamp").lte("now-$documentAge"))
-            .execute(
-                object : ActionListener<BulkByScrollResponse> {
-                    override fun onResponse(response: BulkByScrollResponse) {
-                    }
-
-                    override fun onFailure(t: Exception) {
-                    }
-                }
-            )
-        log.info("deleted active shards from $documentAge/$unitTime ago")
-
-        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("relocating_shards.timestamp").lte("now-$documentAge"))
-            .execute(
-                object : ActionListener<BulkByScrollResponse> {
-                    override fun onResponse(response: BulkByScrollResponse) {
-                    }
-
-                    override fun onFailure(t: Exception) {
-                    }
-                }
-            )
-        log.info("deleted number of relocating shards from $documentAge/$unitTime ago")
-
-        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("number_of_nodes.timestamp").lte("now-$documentAge"))
-            .execute(
-                object : ActionListener<BulkByScrollResponse> {
-                    override fun onResponse(response: BulkByScrollResponse) {
-                    }
-
-                    override fun onFailure(t: Exception) {
-                    }
-                }
-            )
-        log.info("deleted number of nodes from $documentAge/$unitTime ago")
-
-        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
-            .filter(QueryBuilders.rangeQuery("number_of_data_nodes.timestamp").lte("now-$documentAge"))
-            .execute(
-                object : ActionListener<BulkByScrollResponse> {
-                    override fun onResponse(response: BulkByScrollResponse) {
-                    }
-
-                    override fun onFailure(t: Exception) {
-                    }
-                }
-            )
-        log.info("deleted number of data nodes from $documentAge/$unitTime ago")
+                )
+            log.info("deleted ${it.metricName} data from $documentAge ago")
+        }
+//        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+//            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+//            .filter(QueryBuilders.rangeQuery("cluster_status.timestamp").lte("now-$documentAge"))
+//            .execute(
+//                object : ActionListener<BulkByScrollResponse> {
+//                    override fun onResponse(response: BulkByScrollResponse) {
+//                    }
+//
+//                    override fun onFailure(t: Exception) {
+//                    }
+//                }
+//            )
+//        log.info("deleted clusterStatus data from $documentAge/$unitTime ago, now-$documentAge")
+//
+//        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+//            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+//            .filter(QueryBuilders.rangeQuery("cpu_usage.timestamp").lte("now-$documentAge"))
+//            .execute(
+//                object : ActionListener<BulkByScrollResponse> {
+//                    override fun onResponse(response: BulkByScrollResponse) {
+//                    }
+//
+//                    override fun onFailure(t: Exception) {
+//                    }
+//                }
+//            )
+//        log.info("deleted cpu_usage data from $documentAge/$unitTime ago")
+//
+//        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+//            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+//            .filter(QueryBuilders.rangeQuery("jvm_pressure.timestamp").lte("now-$documentAge"))
+//            .execute(
+//                object : ActionListener<BulkByScrollResponse> {
+//                    override fun onResponse(response: BulkByScrollResponse) {
+//                    }
+//
+//                    override fun onFailure(t: Exception) {
+//                    }
+//                }
+//            )
+//        log.info("deleted jvm_pressure data from $documentAge/$unitTime ago")
+//
+//        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+//            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+//            .filter(QueryBuilders.rangeQuery("unassigned_shards.timestamp").lte("now-$documentAge"))
+//            .execute(
+//                object : ActionListener<BulkByScrollResponse> {
+//                    override fun onResponse(response: BulkByScrollResponse) {
+//                    }
+//
+//                    override fun onFailure(t: Exception) {
+//                    }
+//                }
+//            )
+//        log.info("deleted unassigned_shards data from $documentAge/$unitTime ago")
+//
+//        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+//            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+//            .filter(QueryBuilders.rangeQuery("number_of_pending_tasks.timestamp").lte("now-$documentAge"))
+//            .execute(
+//                object : ActionListener<BulkByScrollResponse> {
+//                    override fun onResponse(response: BulkByScrollResponse) {
+//                    }
+//
+//                    override fun onFailure(t: Exception) {
+//                    }
+//                }
+//            )
+//        log.info("deleted number of pending tasks from $documentAge/$unitTime ago")
+//
+//        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+//            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+//            .filter(QueryBuilders.rangeQuery("active_shards.timestamp").lte("now-$documentAge"))
+//            .execute(
+//                object : ActionListener<BulkByScrollResponse> {
+//                    override fun onResponse(response: BulkByScrollResponse) {
+//                    }
+//
+//                    override fun onFailure(t: Exception) {
+//                    }
+//                }
+//            )
+//        log.info("deleted active shards from $documentAge/$unitTime ago")
+//
+//        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+//            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+//            .filter(QueryBuilders.rangeQuery("relocating_shards.timestamp").lte("now-$documentAge"))
+//            .execute(
+//                object : ActionListener<BulkByScrollResponse> {
+//                    override fun onResponse(response: BulkByScrollResponse) {
+//                    }
+//
+//                    override fun onFailure(t: Exception) {
+//                    }
+//                }
+//            )
+//        log.info("deleted number of relocating shards from $documentAge/$unitTime ago")
+//
+//        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+//            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+//            .filter(QueryBuilders.rangeQuery("number_of_nodes.timestamp").lte("now-$documentAge"))
+//            .execute(
+//                object : ActionListener<BulkByScrollResponse> {
+//                    override fun onResponse(response: BulkByScrollResponse) {
+//                    }
+//
+//                    override fun onFailure(t: Exception) {
+//                    }
+//                }
+//            )
+//        log.info("deleted number of nodes from $documentAge/$unitTime ago")
+//
+//        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+//            .source(ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
+//            .filter(QueryBuilders.rangeQuery("number_of_data_nodes.timestamp").lte("now-$documentAge"))
+//            .execute(
+//                object : ActionListener<BulkByScrollResponse> {
+//                    override fun onResponse(response: BulkByScrollResponse) {
+//                    }
+//
+//                    override fun onFailure(t: Exception) {
+//                    }
+//                }
+//            )
+//        log.info("deleted number of data nodes from $documentAge/$unitTime ago")
     }
 }
