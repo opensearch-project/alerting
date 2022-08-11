@@ -115,13 +115,12 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
     }
 
     fun `test update storage time to less than minimum storage time`() {
-        assertThrows(IllegalArgumentException::class.java) {
-            try {
-                client().updateSettings("plugins.alerting.cluster_metrics.metrics_history_max_age", "30s")
-            } catch (t: ResponseException) {
-                logger.info("LOG THE RESPONSE EXCEPTION OBJECT ${t.response.asMap()}")
-                t
-            }
+        try {
+            client().updateSettings("plugins.alerting.cluster_metrics.metrics_history_max_age", "30s")
+        } catch (t: ResponseException) {
+            val responseMap = t.response.asMap()
+            val errMap = responseMap["error"] as Map<String, Any>
+            assertEquals("illegal_argument_exception", errMap["type"])
         }
     }
 
