@@ -19,6 +19,8 @@ class AlertingSettings {
 
     companion object {
 
+        val MINIMUM_EXECUTION_FREQUENCY = TimeValue(1, TimeUnit.SECONDS)
+        val MINIMUM_STORAGE_TIME = TimeValue(1, TimeUnit.MINUTES)
         const val MONITOR_MAX_INPUTS = 1
         const val MONITOR_MAX_TRIGGERS = 10
         const val DEFAULT_MAX_ACTIONABLE_ALERT_COUNT = 50L
@@ -32,7 +34,6 @@ class AlertingSettings {
             TimeValue(7, TimeUnit.DAYS),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
-        val MINIMUM_TIME_VALUE = TimeValue(1, TimeUnit.SECONDS)
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(
             "plugins.alerting.monitor.max_monitors",
@@ -206,6 +207,7 @@ class AlertingSettings {
 
             override fun validate(value: TimeValue, settings: Map<Setting<*>, Any>) {
                 val executionTime = settings[METRICS_EXECUTION_FREQUENCY] as TimeValue
+                log.info("THIS IS EXECUTIONTIME AS MILLIS ${executionTime.millis()}")
                 log.info("THIS IS EXECUTIONTIME $executionTime")
                 validateSettings(executionTime, value)
             }
@@ -220,8 +222,16 @@ class AlertingSettings {
         }
         private fun validateSettings(executionFrequency: TimeValue, storageTime: TimeValue) {
             if (executionFrequency > storageTime) {
-                throw java.lang.IllegalArgumentException(
+                throw IllegalArgumentException(
                     "The execution frequency should be less than the storage time."
+                )
+            } else if (executionFrequency < MINIMUM_EXECUTION_FREQUENCY) {
+                throw IllegalArgumentException(
+                    "The execution frequency can not be less than 1 second."
+                )
+            } else if (storageTime < MINIMUM_STORAGE_TIME) {
+                throw IllegalArgumentException(
+                    "The storage time can not be less than 1 minute."
                 )
             }
         }
