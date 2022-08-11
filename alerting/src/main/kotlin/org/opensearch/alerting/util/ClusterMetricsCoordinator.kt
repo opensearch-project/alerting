@@ -109,19 +109,19 @@ class ClusterMetricsCoordinator(
 
         ClusterMetricsVisualizationIndex.initFunc(client, clusterService)
 
-        val unassignedShards = clusterHealth["unassigned_shards"].toString()
+        val unassignedShards = clusterHealth[ClusterMetricsDataPoint.MetricType.UNASSIGNED_SHARDS.metricName].toString()
         log.info("This is unassigned shards value: $unassignedShards")
         val clusterStatus = clusterHealth["status"].toString()
         log.info("This is cluster status value: $clusterStatus")
-        val numPending = clusterHealth["number_of_pending_tasks"].toString()
+        val numPending = clusterHealth[ClusterMetricsDataPoint.MetricType.NUMBER_OF_PENDING_TASKS.metricName].toString()
         log.info("This is the number of pending tasks: $numPending")
-        val activeShards = clusterHealth["active_shards"].toString()
+        val activeShards = clusterHealth[ClusterMetricsDataPoint.MetricType.ACTIVE_SHARDS.metricName].toString()
         log.info("This is active shards $activeShards")
-        val relocatingShards = clusterHealth["relocating_shards"].toString()
+        val relocatingShards = clusterHealth[ClusterMetricsDataPoint.MetricType.RELOCATING_SHARDS.metricName].toString()
         log.info("This is relocating shards $relocatingShards")
-        val numNodes = clusterHealth["number_of_nodes"].toString()
+        val numNodes = clusterHealth[ClusterMetricsDataPoint.MetricType.NUMBER_OF_NODES.metricName].toString()
         log.info("This is number of nodes $numNodes")
-        val numDataNodes = clusterHealth["number_of_data_nodes"].toString()
+        val numDataNodes = clusterHealth[ClusterMetricsDataPoint.MetricType.NUMBER_OF_DATA_NODES.metricName].toString()
         log.info("this is number of data nodes $numDataNodes")
 
         val nodesMap = nodeStats["nodes"] as Map<String, Any>
@@ -231,13 +231,14 @@ class ClusterMetricsCoordinator(
                 val indexResponse: IndexResponse = client.suspendUntil { client.index(request, it) }
                 val failureReasons = checkShardsFailure(indexResponse)
                 if (failureReasons != null) {
-                    log.info("Failed to index ${clusterMetricsDataPoint.metric}.", failureReasons)
+                    log.error("Failed to index ${clusterMetricsDataPoint.metric}.", failureReasons)
                 }
             } catch (t: Exception) {
-                log.info("Failed to index ${clusterMetricsDataPoint.metric}.", t)
+                log.error("Failed to index ${clusterMetricsDataPoint.metric}.", t)
             }
         }
     }
+
     private fun checkShardsFailure(response: IndexResponse): String? {
         val failureReasons = StringBuilder()
         if (response.shardInfo.failed > 0) {

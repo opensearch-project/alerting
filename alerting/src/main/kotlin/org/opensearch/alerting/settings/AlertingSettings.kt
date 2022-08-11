@@ -25,15 +25,18 @@ class AlertingSettings {
         val MINIMUM_EXECUTION_FREQUENCY = TimeValue(1, TimeUnit.SECONDS)
         val MINIMUM_STORAGE_TIME = TimeValue(1, TimeUnit.MINUTES)
 
+        val METRICS_EXECUTION_FREQUENCY_DEFAULT_VALUE = TimeValue(15, TimeUnit.MINUTES)
+        val METRICS_STORE_TIME_DEFAULT_VALUE = TimeValue(7, TimeUnit.DAYS)
+
         val METRICS_EXECUTION_FREQUENCY_DEFAULT = Setting.positiveTimeSetting(
             "plugins.alerting.cluster_metrics.execution_frequency",
-            TimeValue(15, TimeUnit.MINUTES),
+            METRICS_EXECUTION_FREQUENCY_DEFAULT_VALUE,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         val METRICS_STORE_TIME_DEFAULT = Setting.positiveTimeSetting(
             "plugins.alerting.cluster_metrics.metrics_history_max_age",
-            TimeValue(7, TimeUnit.DAYS),
+            METRICS_STORE_TIME_DEFAULT_VALUE,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
@@ -229,11 +232,11 @@ class AlertingSettings {
                 )
             } else if (executionFrequency < MINIMUM_EXECUTION_FREQUENCY) {
                 throw IllegalArgumentException(
-                    "The execution frequency can not be less than 1 second."
+                    "The execution frequency can not be less than $MINIMUM_EXECUTION_FREQUENCY"
                 )
             } else if (storageTime < MINIMUM_STORAGE_TIME) {
                 throw IllegalArgumentException(
-                    "The storage time can not be less than 1 minute."
+                    "The storage time can not be less than $MINIMUM_STORAGE_TIME."
                 )
             }
         }

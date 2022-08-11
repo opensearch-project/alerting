@@ -6,6 +6,7 @@
 package org.opensearch.alerting.util.clustermetricscoordinatortest
 
 import org.apache.http.entity.ContentType
+import org.apache.http.entity.ContentType.APPLICATION_JSON
 import org.apache.http.entity.StringEntity
 import org.junit.After
 import org.junit.Before
@@ -13,6 +14,7 @@ import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.ClusterMetricsDataPoint
 import org.opensearch.alerting.opensearchapi.string
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.ClusterMetricsVisualizationIndex
 import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
@@ -37,14 +39,14 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         assertEquals(storageTime, "10m")
     }
 
-    fun `test checkName`() {
+    fun `test check name of index`() {
         // WHEN + THEN, check whether the created index exists and has the name '.opendistro-alerting-cluster-metrics'
         val index = ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX
         val response = client().makeRequest("HEAD", index)
         assertEquals("Index $index does not exist.", RestStatus.OK, response.restStatus())
     }
 
-    fun `test numberDocs`() {
+    fun `test check that number of documents is correct`() {
         // Check that the total number of documents found is divisible by the total number of metric types.
         val response = getResponse()
         val hits = getHits(response)
@@ -70,7 +72,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         assertEquals(mapCheck.values.toSet().size, 1)
     }
 
-    fun `test deleteDocs`() {
+    fun `test deleting docs from index`() {
         val time = getTime()
         createDoc(time)
         Thread.sleep(60000)
@@ -93,7 +95,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         assertTrue(flag)
     }
 
-    fun `test frequency`() {
+    fun `test execution frequency of job`() {
         client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "2m")
         Thread.sleep(300000)
 
@@ -156,12 +158,48 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         assertEquals(storageTime, "400m")
     }
 
+    fun `test simultaneously changing execution frequency and storage time where execution less than storage time`() {
+        val settings = jsonBuilder()
+            .startObject()
+            .startObject("persistent")
+            .field("plugins.alerting.cluster_metrics.execution_frequency", "5m")
+            .field("plugins.alerting.cluster_metrics.metrics_history_max_age", "10m")
+            .endObject()
+            .endObject()
+            .string()
+        val response = client().makeRequest("PUT", "_cluster/settings", StringEntity(settings, APPLICATION_JSON))
+        assertEquals(RestStatus.OK, response.restStatus())
+    }
+    fun `test simultaneously changing execution frequency and storage time where execution greater than storage time`() {
+        val settings = jsonBuilder()
+            .startObject()
+            .startObject("persistent")
+            .field("plugins.alerting.cluster_metrics.execution_frequency", "10m")
+            .field("plugins.alerting.cluster_metrics.metrics_history_max_age", "5m")
+            .endObject()
+            .endObject()
+            .string()
+        try {
+            client().makeRequest("PUT", "_cluster/settings", StringEntity(settings, APPLICATION_JSON))
+        } catch (t: ResponseException) {
+            val responseMap = t.response.asMap()
+            val errMap = responseMap["error"] as Map<String, Any>
+            assertEquals("illegal_argument_exception", errMap["type"])
+        }
+    }
+
     @After
     // Reset the settings back to default, delete the created index.
     fun cleanup() {
         // reset settings
-        client().updateSettings("plugins.alerting.cluster_metrics.metrics_history_max_age", "7d")
-        client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "15m")
+        client().updateSettings(
+            "plugins.alerting.cluster_metrics.metrics_history_max_age",
+            AlertingSettings.METRICS_STORE_TIME_DEFAULT_VALUE
+        )
+        client().updateSettings(
+            "plugins.alerting.cluster_metrics.execution_frequency",
+            AlertingSettings.METRICS_EXECUTION_FREQUENCY_DEFAULT_VALUE
+        )
         client().makeRequest("DELETE", ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
     }
     private fun generateData() {
