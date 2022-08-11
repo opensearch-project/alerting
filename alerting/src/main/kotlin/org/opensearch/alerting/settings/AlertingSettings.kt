@@ -18,17 +18,19 @@ private val log = org.apache.logging.log4j.LogManager.getLogger(AlertingSettings
 class AlertingSettings {
 
     companion object {
-
-        val MINIMUM_EXECUTION_FREQUENCY = TimeValue(1, TimeUnit.SECONDS)
-        val MINIMUM_STORAGE_TIME = TimeValue(1, TimeUnit.MINUTES)
         const val MONITOR_MAX_INPUTS = 1
         const val MONITOR_MAX_TRIGGERS = 10
         const val DEFAULT_MAX_ACTIONABLE_ALERT_COUNT = 50L
+
+        val MINIMUM_EXECUTION_FREQUENCY = TimeValue(1, TimeUnit.SECONDS)
+        val MINIMUM_STORAGE_TIME = TimeValue(1, TimeUnit.MINUTES)
+
         val METRICS_EXECUTION_FREQUENCY_DEFAULT = Setting.positiveTimeSetting(
             "plugins.alerting.cluster_metrics.execution_frequency",
             TimeValue(15, TimeUnit.MINUTES),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+
         val METRICS_STORE_TIME_DEFAULT = Setting.positiveTimeSetting(
             "plugins.alerting.cluster_metrics.metrics_history_max_age",
             TimeValue(7, TimeUnit.DAYS),

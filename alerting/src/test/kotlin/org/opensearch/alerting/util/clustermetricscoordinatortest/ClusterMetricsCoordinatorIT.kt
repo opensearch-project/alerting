@@ -119,7 +119,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
             try {
                 client().updateSettings("plugins.alerting.cluster_metrics.metrics_history_max_age", "30s")
             } catch (t: ResponseException) {
-                logger.info("LOG THE RESPONSE EXCEPTION OBJECT ${t.stackTrace}")
+                logger.info("LOG THE RESPONSE EXCEPTION OBJECT ${t.message}")
             }
         }
     }
