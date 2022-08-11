@@ -265,7 +265,7 @@ class AlertingSettings(val client: Client) {
         }
 
         private fun validateActionsPerTrigger(maxActions: Int, totalMaxActions: Int, client: Client?) {
-            if (totalMaxActions < 0) throw IllegalArgumentException("cannot update this invaild value")
+            if (maxActions < 0) throw IllegalArgumentException("cannot update this invaild value")
 
             if (totalMaxActions == DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER) return
 
