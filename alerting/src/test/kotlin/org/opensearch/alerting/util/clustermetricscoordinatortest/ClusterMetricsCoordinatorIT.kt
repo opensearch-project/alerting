@@ -15,6 +15,7 @@ import org.opensearch.alerting.model.ClusterMetricsDataPoint
 import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.util.ClusterMetricsVisualizationIndex
 import org.opensearch.client.Response
+import org.opensearch.client.ResponseException
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.rest.RestStatus
@@ -115,7 +116,12 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
 
     fun `test update storage time to less than minimum storage time`() {
         assertThrows(IllegalArgumentException::class.java) {
-            client().updateSettings("plugins.alerting.cluster_metrics.metrics_history_max_age", "30s")
+            try {
+                client().updateSettings("plugins.alerting.cluster_metrics.metrics_history_max_age", "30s")
+            } catch (t: ResponseException) {
+                logger.info("LOG THE RESPONSE EXCEPTION OBJECT $t")
+            }
+
         }
     }
 
