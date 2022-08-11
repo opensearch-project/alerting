@@ -5,7 +5,6 @@
 
 package org.opensearch.alerting
 
-import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionResponse
 import org.opensearch.alerting.action.AcknowledgeAlertAction
