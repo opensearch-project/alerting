@@ -119,7 +119,8 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
             try {
                 client().updateSettings("plugins.alerting.cluster_metrics.metrics_history_max_age", "30s")
             } catch (t: ResponseException) {
-                logger.info("LOG THE RESPONSE EXCEPTION OBJECT ${t.localizedMessage}")
+                logger.info("LOG THE RESPONSE EXCEPTION OBJECT ${t.response.asMap()}")
+                t
             }
         }
     }
@@ -130,7 +131,7 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test when execution frequency greater than storage time`() {
+    fun `test update execution frequency greater than storage time`() {
         assertThrows(IllegalArgumentException::class.java) {
             client().updateSettings("plugins.alerting.cluster_metrics.metrics_history_max_age", "20m")
             client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "25m")

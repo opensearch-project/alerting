@@ -112,7 +112,7 @@ import java.util.function.Supplier
  * It also adds [Monitor.XCONTENT_REGISTRY], [SearchInput.XCONTENT_REGISTRY], [QueryLevelTrigger.XCONTENT_REGISTRY],
  * [BucketLevelTrigger.XCONTENT_REGISTRY], [ClusterMetricsInput.XCONTENT_REGISTRY] to the [NamedXContentRegistry] so that we are able to deserialize the custom named objects.
  */
-private val log = LogManager.getLogger(AlertingPlugin::class.java)
+
 internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, ReloadablePlugin, SearchPlugin, PercolatorPluginExt() {
 
     override fun getContextWhitelists(): Map<ScriptContext<*>, List<Whitelist>> {
@@ -245,9 +245,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         clusterMetricsCoordinator = ClusterMetricsCoordinator(settings, client, clusterService, threadPool)
         this.threadPool = threadPool
         this.clusterService = clusterService
-        // create a cluster metrics visualization index upon initialization of alerting plugin
-        // clusterMetricsVisualization = ClusterMetricsVisualizationIndex(client, clusterService, threadPool)
-        // ClusterMetricsVisualizationIndex(client, clusterService)
         return listOf(
             sweeper,
             scheduler,
