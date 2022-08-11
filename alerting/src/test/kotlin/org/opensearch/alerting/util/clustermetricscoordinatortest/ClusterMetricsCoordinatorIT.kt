@@ -113,6 +113,36 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
         assertEquals(diff, 2)
     }
 
+    fun `test update storage time to less than minimum storage time`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            client().updateSettings("plugins.alerting.cluster_metrics.metrics_history_max_age", "30s")
+        }
+    }
+
+    fun `test update frequency to less than minimum frequency`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "1ms")
+        }
+    }
+
+    fun `test when execution frequency greater than storage time`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            client().updateSettings("plugins.alerting.cluster_metrics.metrics_history_max_age", "20m")
+            client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "25m")
+        }
+    }
+
+    fun `test successful client setting update`() {
+        client().updateSettings("plugins.alerting.cluster_metrics.metrics_history_max_age", "400m")
+        client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "12m")
+        val response = getSettings()
+        val persistentMap = response["persistent"] as Map<String, Any>
+        val executionFrequency = persistentMap["plugins.alerting.cluster_metrics.execution_frequency"].toString()
+        val storageTime = persistentMap["plugins.alerting.cluster_metrics.metrics_history_max_age"].toString()
+        assertEquals(executionFrequency, "12m")
+        assertEquals(storageTime, "400m")
+    }
+
     @After
     // Reset the settings back to default, delete the created index.
     fun cleanup() {
