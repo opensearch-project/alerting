@@ -117,8 +117,8 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
     // Reset the settings back to default, delete the created index.
     fun cleanup() {
         // reset settings
-        client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "15m")
         client().updateSettings("plugins.alerting.cluster_metrics.metrics_history_max_age", "7d")
+        client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "15m")
         client().makeRequest("DELETE", ClusterMetricsVisualizationIndex.CLUSTER_METRIC_VISUALIZATION_INDEX)
     }
     private fun generateData() {
