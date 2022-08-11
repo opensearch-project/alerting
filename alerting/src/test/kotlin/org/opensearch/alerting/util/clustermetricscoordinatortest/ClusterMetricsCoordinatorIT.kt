@@ -121,7 +121,6 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
             } catch (t: ResponseException) {
                 logger.info("LOG THE RESPONSE EXCEPTION OBJECT $t")
             }
-
         }
     }
 
