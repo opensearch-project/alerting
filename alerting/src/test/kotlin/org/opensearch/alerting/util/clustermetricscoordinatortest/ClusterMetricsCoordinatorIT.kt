@@ -125,15 +125,23 @@ class ClusterMetricsCoordinatorIT : AlertingRestTestCase() {
     }
 
     fun `test update frequency to less than minimum frequency`() {
-        assertThrows(IllegalArgumentException::class.java) {
+        try {
             client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "1ms")
+        } catch (t: ResponseException) {
+            val responseMap = t.response.asMap()
+            val errMap = responseMap["error"] as Map<String, Any>
+            assertEquals("illegal_argument_exception", errMap["type"])
         }
     }
 
     fun `test update execution frequency greater than storage time`() {
-        assertThrows(IllegalArgumentException::class.java) {
+        try {
             client().updateSettings("plugins.alerting.cluster_metrics.metrics_history_max_age", "20m")
             client().updateSettings("plugins.alerting.cluster_metrics.execution_frequency", "25m")
+        } catch (t: ResponseException) {
+            val responseMap = t.response.asMap()
+            val errMap = responseMap["error"] as Map<String, Any>
+            assertEquals("illegal_argument_exception", errMap["type"])
         }
     }
 
