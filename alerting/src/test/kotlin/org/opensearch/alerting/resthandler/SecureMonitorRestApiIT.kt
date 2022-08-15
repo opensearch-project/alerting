@@ -96,8 +96,13 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     // Create Monitor related security tests
     fun `test create monitor with an user with alerting role`() {
 
-        createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
-        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            getClusterPermissionsFromCustomRole(ALERTING_INDEX_MONITOR_ACCESS)
+        )
         try {
             // randomMonitor has a dummy user, api ignores the User passed as part of monitor, it picks user info from the logged-in user.
             val monitor = randomQueryLevelMonitor().copy(
@@ -113,7 +118,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             assertUserNull(createResponse?.asMap()!!["monitor"] as HashMap<String, Any>)
         } finally {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
-            deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
         }
     }
 
@@ -451,7 +455,13 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         }
         // add alerting roles and search as userOne - must return 1 docs
-        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            TEST_HR_BACKEND_ROLE,
+            getClusterPermissionsFromCustomRole(ALERTING_SEARCH_MONITOR_ONLY_ACCESS)
+        )
         try {
             val userOneSearchResponse = userClient?.makeRequest(
                 "POST",
@@ -462,7 +472,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             assertEquals("Search monitor failed", RestStatus.OK, userOneSearchResponse?.restStatus())
             assertEquals("Monitor not found during search", 1, getDocs(userOneSearchResponse))
         } finally {
-            deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
+            deleteRoleAndRoleMapping(TEST_HR_ROLE)
         }
     }
 
@@ -822,7 +832,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUser(user, user, arrayOf(TEST_HR_BACKEND_ROLE))
         createTestIndex(TEST_HR_INDEX)
-        createCustomIndexRoleWithDocLevelSecurity(TEST_HR_ROLE, TEST_HR_INDEX, TERM_DLS_QUERY, getClusterPermissionsFromCustomRole(ALERTING_INDEX_MONITOR_ACCESS))
+        createIndexRoleWithDocLevelSecurity(TEST_HR_ROLE, TEST_HR_INDEX, TERM_DLS_QUERY, getClusterPermissionsFromCustomRole(ALERTING_INDEX_MONITOR_ACCESS))
         createUserRolesMapping(TEST_HR_ROLE, arrayOf(user))
 
         // Add a doc that is accessible to the user
@@ -872,7 +882,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUser(user, user, arrayOf(TEST_HR_BACKEND_ROLE))
         createTestIndex(TEST_HR_INDEX)
-        createCustomIndexRoleWithDocLevelSecurity(TEST_HR_ROLE, TEST_HR_INDEX, TERM_DLS_QUERY, getClusterPermissionsFromCustomRole(ALERTING_INDEX_MONITOR_ACCESS))
+        createIndexRoleWithDocLevelSecurity(TEST_HR_ROLE, TEST_HR_INDEX, TERM_DLS_QUERY, getClusterPermissionsFromCustomRole(ALERTING_INDEX_MONITOR_ACCESS))
         createUserRolesMapping(TEST_HR_ROLE, arrayOf(user))
 
         // Add a doc that is accessible to the user
