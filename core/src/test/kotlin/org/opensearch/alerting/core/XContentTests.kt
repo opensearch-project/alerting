@@ -8,6 +8,8 @@ package org.opensearch.alerting.core
 import org.opensearch.alerting.core.model.XContentTestBase
 import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.commons.alerting.model.Input
+import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 import kotlin.test.Test

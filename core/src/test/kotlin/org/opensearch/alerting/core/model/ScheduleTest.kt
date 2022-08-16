@@ -7,6 +7,9 @@ package org.opensearch.alerting.core.model
 
 import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.commons.alerting.model.CronSchedule
+import org.opensearch.commons.alerting.model.IntervalSchedule
+import org.opensearch.commons.alerting.model.Schedule
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId

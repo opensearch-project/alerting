@@ -6,6 +6,7 @@
 package org.opensearch.alerting.core.schedule
 
 import org.opensearch.alerting.core.JobRunner
+import org.opensearch.commons.alerting.model.ScheduledJob
 import java.time.Instant
 
 class MockJobRunner : JobRunner {
