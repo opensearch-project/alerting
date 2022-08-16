@@ -185,7 +185,7 @@ class AlertingSettings(val client: Client) {
         )
 
         val TOTAL_MAX_ACTIONS_PER_TRIGGER = Setting.intSetting(
-            "plugins.alerting.max_actions_across_triggers",
+            "plugins.alerting.max_actions_per_trigger",
             DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER,
             -1, MaxActionsPerTriggersValidator(internalClient),
             Setting.Property.NodeScope, Setting.Property.Dynamic
