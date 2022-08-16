@@ -5,7 +5,7 @@
 
 package org.opensearch.alerting.core
 
-import org.opensearch.alerting.core.model.ScheduledJob
+import org.opensearch.commons.alerting.model.ScheduledJob
 import java.time.Instant
 
 interface JobRunner {

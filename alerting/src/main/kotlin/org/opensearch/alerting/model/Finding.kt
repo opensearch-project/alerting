@@ -5,7 +5,6 @@
 
 package org.opensearch.alerting.model
 
-import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.opensearchapi.instant
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
@@ -14,6 +13,7 @@ import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
+import org.opensearch.commons.alerting.model.DocLevelQuery
 import java.io.IOException
 import java.time.Instant
 

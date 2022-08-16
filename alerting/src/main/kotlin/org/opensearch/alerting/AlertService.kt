@@ -18,14 +18,9 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.alerts.AlertError
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.model.ActionExecutionResult
-import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.BucketLevelTrigger
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
-import org.opensearch.alerting.model.Trigger
-import org.opensearch.alerting.model.action.AlertCategory
 import org.opensearch.alerting.opensearchapi.firstFailureOrNull
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -35,18 +30,13 @@ import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.Client
 import org.opensearch.common.bytes.BytesReference
-import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.XContentFactory
-import org.opensearch.common.xcontent.XContentHelper
-import org.opensearch.common.xcontent.XContentParser
-import org.opensearch.common.xcontent.XContentParserUtils
-import org.opensearch.common.xcontent.XContentType
+import org.opensearch.common.xcontent.*
+import org.opensearch.commons.alerting.model.*
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.time.Instant
-import java.util.UUID
+import java.util.*
 
 /** Service that handles CRUD operations for alerts */
 class AlertService(
@@ -93,10 +83,10 @@ class AlertService(
         return monitor.triggers.associateWith { trigger ->
             // Default to an empty map if there are no Alerts found for a Trigger to make Alert categorization logic easier
             (
-                foundAlerts[trigger.id]?.mapNotNull { alert ->
-                    alert.aggregationResultBucket?.let { it.getBucketKeysHash() to alert }
-                }?.toMap()?.toMutableMap() ?: mutableMapOf()
-                )
+                    foundAlerts[trigger.id]?.mapNotNull { alert ->
+                        alert.aggregationResultBucket?.let { it.getBucketKeysHash() to alert }
+                    }?.toMap()?.toMutableMap() ?: mutableMapOf()
+                    )
         }
     }
 

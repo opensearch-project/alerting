@@ -6,23 +6,14 @@
 package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorIndices.Fields.BUCKET_INDICES
-import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorIndices.Fields.PARENT_BUCKET_PATH
-import org.opensearch.alerting.core.model.DocLevelQuery
-import org.opensearch.alerting.model.AggregationResultBucket
-import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.BucketLevelTrigger
-import org.opensearch.alerting.model.BucketLevelTriggerRunResult
-import org.opensearch.alerting.model.DocumentLevelTrigger
-import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.QueryLevelTrigger
-import org.opensearch.alerting.model.QueryLevelTriggerRunResult
+import org.opensearch.alerting.model.*
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.triggercondition.parsers.TriggerExpressionParser
 import org.opensearch.alerting.util.getBucketKeysHash
+import org.opensearch.commons.alerting.model.*
+import org.opensearch.commons.alerting.model.BucketSelectorExtAggregationBuilder.Companion.PARENT_BUCKET_PATH
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
 import org.opensearch.search.aggregations.Aggregation
@@ -85,6 +76,8 @@ class TriggerService(val scriptService: ScriptService) {
         }
     }
 
+    val BUCKET_INDICES = "bucket_indices"
+
     @Suppress("UNCHECKED_CAST")
     fun runBucketLevelTrigger(
         monitor: Monitor,
@@ -95,9 +88,9 @@ class TriggerService(val scriptService: ScriptService) {
             val bucketIndices =
                 ((ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)[trigger.id] as HashMap<*, *>)[BUCKET_INDICES] as List<*>
             val parentBucketPath = (
-                (ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
-                    .get(trigger.id) as HashMap<*, *>
-                )[PARENT_BUCKET_PATH] as String
+                    (ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
+                        .get(trigger.id) as HashMap<*, *>
+                    )[PARENT_BUCKET_PATH] as String
             val aggregationPath = AggregationPath.parse(parentBucketPath)
             // TODO test this part by passing sub-aggregation path
             var parentAgg = (ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)

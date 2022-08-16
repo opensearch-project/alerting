@@ -16,8 +16,6 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.DeleteMonitorAction
 import org.opensearch.alerting.action.DeleteMonitorRequest
-import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
@@ -28,6 +26,8 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
@@ -78,7 +78,7 @@ class TransportDeleteMonitorAction @Inject constructor(
         private val user: User?,
         private val monitorId: String
     ) {
-
+        val DOC_LEVEL_QUERIES_INDEX = ".opensearch-alerting-queries"
         fun resolveUserAndStart() {
             if (user == null) {
                 // Security is disabled, so we can delete the destination without issues
@@ -137,7 +137,7 @@ class TransportDeleteMonitorAction @Inject constructor(
                 object : ActionListener<DeleteResponse> {
                     override fun onResponse(response: DeleteResponse) {
                         val clusterState = clusterService.state()
-                        if (clusterState.routingTable.hasIndex(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)) {
+                        if (clusterState.routingTable.hasIndex(DOC_LEVEL_QUERIES_INDEX)) {
                             deleteDocLevelMonitorQueries()
                         }
                         deleteMetadata()
@@ -181,7 +181,7 @@ class TransportDeleteMonitorAction @Inject constructor(
 
         private fun deleteDocLevelMonitorQueries() {
             DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-                .source(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
+                .source(DOC_LEVEL_QUERIES_INDEX)
                 .filter(QueryBuilders.matchQuery("monitor_id", monitorId))
                 .execute(
                     object : ActionListener<BulkByScrollResponse> {

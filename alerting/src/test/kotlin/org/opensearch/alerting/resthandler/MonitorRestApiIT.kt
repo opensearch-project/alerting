@@ -8,40 +8,13 @@ import org.apache.http.HttpHeaders
 import org.apache.http.entity.ContentType
 import org.apache.http.message.BasicHeader
 import org.apache.http.nio.entity.NStringEntity
-import org.opensearch.alerting.ALERTING_BASE_URI
-import org.opensearch.alerting.ALWAYS_RUN
-import org.opensearch.alerting.ANOMALY_DETECTOR_INDEX
-import org.opensearch.alerting.AlertingRestTestCase
-import org.opensearch.alerting.LEGACY_OPENDISTRO_ALERTING_BASE_URI
+import org.opensearch.alerting.*
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.anomalyDetectorIndexMapping
-import org.opensearch.alerting.core.model.CronSchedule
-import org.opensearch.alerting.core.model.DocLevelMonitorInput
-import org.opensearch.alerting.core.model.DocLevelQuery
-import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
-import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.DocumentLevelTrigger
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.Destination
-import org.opensearch.alerting.randomADMonitor
-import org.opensearch.alerting.randomAction
-import org.opensearch.alerting.randomAlert
-import org.opensearch.alerting.randomAnomalyDetector
-import org.opensearch.alerting.randomAnomalyDetectorWithUser
-import org.opensearch.alerting.randomBucketLevelTrigger
-import org.opensearch.alerting.randomDocumentLevelMonitor
-import org.opensearch.alerting.randomDocumentLevelTrigger
-import org.opensearch.alerting.randomQueryLevelMonitor
-import org.opensearch.alerting.randomQueryLevelTrigger
-import org.opensearch.alerting.randomThrottle
-import org.opensearch.alerting.randomUser
 import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.toJsonString
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.client.ResponseException
 import org.opensearch.client.WarningFailureException
@@ -50,6 +23,7 @@ import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.*
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
@@ -89,7 +63,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val string = BytesReference.bytes(builder).utf8ToString()
         val xcp = createParser(XContentType.JSON.xContent(), string)
         val scheduledJob = ScheduledJob.parse(xcp, monitor.id, monitor.version)
-        assertEquals(monitor, scheduledJob)
+        assertEquals(monitor as Monitor, scheduledJob)
     }
 
     @Throws(Exception::class)
@@ -360,7 +334,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
         val storedMonitor = getMonitor(monitor.id)
 
-        assertEquals("Indexed and retrieved monitor differ", monitor, storedMonitor)
+        assertEquals("Indexed and retrieved monitor differ", monitor as Object, storedMonitor)
     }
 
     @Throws(Exception::class)

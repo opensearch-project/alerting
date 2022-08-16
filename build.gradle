@@ -22,7 +22,7 @@ buildscript {
             opensearch_build += "-SNAPSHOT"
         }
         opensearch_no_snapshot = opensearch_version.replace("-SNAPSHOT","")
-        common_utils_version = System.getProperty("common_utils.version", opensearch_build)
+        common_utils_version = System.getProperty("common_utils.version", "3.0.0.0-SNAPSHOT")
         kotlin_version = '1.6.10'
     }
 
@@ -47,7 +47,7 @@ apply plugin: 'base'
 apply plugin: 'jacoco'
 apply from: 'build-tools/merged-coverage.gradle'
 
-configurations {
+/*configurations {
     ktlint
 }
 
@@ -57,23 +57,23 @@ dependencies {
             attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling, Bundling.EXTERNAL))
         }
     }
-}
+}*/
 
-task ktlint(type: JavaExec, group: "verification") {
-    description = "Check Kotlin code style."
-    main = "com.pinterest.ktlint.Main"
-    classpath = configurations.ktlint
-    args "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
-}
+//task ktlint(type: JavaExec, group: "verification") {
+//    description = "Check Kotlin code style."
+//    main = "com.pinterest.ktlint.Main"
+//    classpath = configurations.ktlint
+//    args "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
+//}
 
-task ktlintFormat(type: JavaExec, group: "formatting") {
-    description = "Fix Kotlin code style deviations."
-    main = "com.pinterest.ktlint.Main"
-    classpath = configurations.ktlint
-    args "-F", "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
-}
+//task ktlintFormat(type: JavaExec, group: "formatting") {
+//    description = "Fix Kotlin code style deviations."
+//    main = "com.pinterest.ktlint.Main"
+//    classpath = configurations.ktlint
+//    args "-F", "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
+//}
 
-check.dependsOn ktlint
+// check.dependsOn ktlint
 
 allprojects {
     group = "org.opensearch"
@@ -86,7 +86,7 @@ allprojects {
     }
     plugins.withId('org.jetbrains.kotlin.jvm') {
         compileKotlin.kotlinOptions.jvmTarget = compileTestKotlin.kotlinOptions.jvmTarget = JavaVersion.VERSION_11
-        compileKotlin.dependsOn ktlint
+        //compileKotlin.dependsOn ktlint
     }
     tasks.withType(AbstractArchiveTask).configureEach {
         preserveFileTimestamps = false

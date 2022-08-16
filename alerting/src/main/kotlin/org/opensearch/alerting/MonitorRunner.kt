@@ -9,28 +9,24 @@ import org.opensearch.OpenSearchSecurityException
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetDestinationsRequest
 import org.opensearch.alerting.action.GetDestinationsResponse
-import org.opensearch.alerting.model.ActionRunResult
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorMetadata
-import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.Table
-import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
-import org.opensearch.alerting.util.destinationmigration.NotificationActionConfigs
+import org.opensearch.alerting.util.destinationmigration.*
 import org.opensearch.alerting.util.destinationmigration.NotificationApiUtils.Companion.getNotificationConfigInfo
-import org.opensearch.alerting.util.destinationmigration.createMessageContent
-import org.opensearch.alerting.util.destinationmigration.getTitle
-import org.opensearch.alerting.util.destinationmigration.publishLegacyNotification
-import org.opensearch.alerting.util.destinationmigration.sendNotification
 import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isTestAction
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.Strings
+import org.opensearch.commons.alerting.model.Action
+import org.opensearch.commons.alerting.model.ActionRunResult
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.MonitorRunResult
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import java.time.Instant
 
@@ -56,8 +52,8 @@ abstract class MonitorRunner {
                 return ActionRunResult(action.id, action.name, mapOf(), true, null, null)
             }
             val actionOutput = mutableMapOf<String, String>()
-            actionOutput[Action.SUBJECT] = if (action.subjectTemplate != null)
-                MonitorRunnerService.compileTemplate(action.subjectTemplate, ctx)
+            actionOutput[Action.SUBJECT] = if (action.getActionSubjectTemplate().isPresent)
+                MonitorRunnerService.compileTemplate(action.getActionSubjectTemplate().get(), ctx)
             else ""
             actionOutput[Action.MESSAGE] = MonitorRunnerService.compileTemplate(action.messageTemplate, ctx)
             if (Strings.isNullOrEmpty(actionOutput[Action.MESSAGE])) {

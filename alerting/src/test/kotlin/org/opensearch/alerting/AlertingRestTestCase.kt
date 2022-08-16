@@ -19,18 +19,10 @@ import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
 import org.opensearch.alerting.action.GetFindingsResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRITE_INDEX
-import org.opensearch.alerting.core.model.DocLevelMonitorInput
-import org.opensearch.alerting.core.model.DocLevelQuery
-import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.BucketLevelTrigger
-import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.FindingWithDocs
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.CustomWebhook
 import org.opensearch.alerting.model.destination.Destination
@@ -49,17 +41,11 @@ import org.opensearch.common.UUIDs
 import org.opensearch.common.io.PathUtils
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
-import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentBuilder
-import org.opensearch.common.xcontent.XContentFactory
+import org.opensearch.common.xcontent.*
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
-import org.opensearch.common.xcontent.XContentParser
-import org.opensearch.common.xcontent.XContentParserUtils
-import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.common.xcontent.json.JsonXContent.jsonXContent
+import org.opensearch.commons.alerting.model.*
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.SearchModule
 import java.net.URLEncoder
@@ -68,13 +54,11 @@ import java.time.Instant
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import java.util.Locale
-import java.util.UUID
+import java.util.*
 import javax.management.MBeanServerInvocationHandler
 import javax.management.ObjectName
 import javax.management.remote.JMXConnectorFactory
 import javax.management.remote.JMXServiceURL
-import kotlin.collections.HashMap
 
 abstract class AlertingRestTestCase : ODFERestTestCase() {
 
@@ -1078,10 +1062,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val request = Request("PUT", "/_plugins/_security/api/internalusers/$name")
         val broles = backendRoles.joinToString { it -> "\"$it\"" }
         var entity = " {\n" +
-            "\"password\": \"$passwd\",\n" +
-            "\"backend_roles\": [$broles],\n" +
-            "\"attributes\": {\n" +
-            "}} "
+                "\"password\": \"$passwd\",\n" +
+                "\"backend_roles\": [$broles],\n" +
+                "\"attributes\": {\n" +
+                "}} "
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
@@ -1089,23 +1073,23 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     fun createIndexRole(name: String, index: String) {
         val request = Request("PUT", "/_plugins/_security/api/roles/$name")
         var entity = "{\n" +
-            "\"cluster_permissions\": [\n" +
-            "],\n" +
-            "\"index_permissions\": [\n" +
-            "{\n" +
-            "\"index_patterns\": [\n" +
-            "\"$index\"\n" +
-            "],\n" +
-            "\"dls\": \"\",\n" +
-            "\"fls\": [],\n" +
-            "\"masked_fields\": [],\n" +
-            "\"allowed_actions\": [\n" +
-            "\"crud\"\n" +
-            "]\n" +
-            "}\n" +
-            "],\n" +
-            "\"tenant_permissions\": []\n" +
-            "}"
+                "\"cluster_permissions\": [\n" +
+                "],\n" +
+                "\"index_permissions\": [\n" +
+                "{\n" +
+                "\"index_patterns\": [\n" +
+                "\"$index\"\n" +
+                "],\n" +
+                "\"dls\": \"\",\n" +
+                "\"fls\": [],\n" +
+                "\"masked_fields\": [],\n" +
+                "\"allowed_actions\": [\n" +
+                "\"crud\"\n" +
+                "]\n" +
+                "}\n" +
+                "],\n" +
+                "\"tenant_permissions\": []\n" +
+                "}"
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
@@ -1113,24 +1097,24 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     fun createCustomIndexRole(name: String, index: String, clusterPermissions: String?) {
         val request = Request("PUT", "/_plugins/_security/api/roles/$name")
         var entity = "{\n" +
-            "\"cluster_permissions\": [\n" +
-            "\"$clusterPermissions\"\n" +
-            "],\n" +
-            "\"index_permissions\": [\n" +
-            "{\n" +
-            "\"index_patterns\": [\n" +
-            "\"$index\"\n" +
-            "],\n" +
-            "\"dls\": \"\",\n" +
-            "\"fls\": [],\n" +
-            "\"masked_fields\": [],\n" +
-            "\"allowed_actions\": [\n" +
-            "\"crud\"\n" +
-            "]\n" +
-            "}\n" +
-            "],\n" +
-            "\"tenant_permissions\": []\n" +
-            "}"
+                "\"cluster_permissions\": [\n" +
+                "\"$clusterPermissions\"\n" +
+                "],\n" +
+                "\"index_permissions\": [\n" +
+                "{\n" +
+                "\"index_patterns\": [\n" +
+                "\"$index\"\n" +
+                "],\n" +
+                "\"dls\": \"\",\n" +
+                "\"fls\": [],\n" +
+                "\"masked_fields\": [],\n" +
+                "\"allowed_actions\": [\n" +
+                "\"crud\"\n" +
+                "]\n" +
+                "}\n" +
+                "],\n" +
+                "\"tenant_permissions\": []\n" +
+                "}"
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
@@ -1138,23 +1122,23 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     fun createIndexRoleWithDocLevelSecurity(name: String, index: String, dlsQuery: String) {
         val request = Request("PUT", "/_plugins/_security/api/roles/$name")
         var entity = "{\n" +
-            "\"cluster_permissions\": [\n" +
-            "],\n" +
-            "\"index_permissions\": [\n" +
-            "{\n" +
-            "\"index_patterns\": [\n" +
-            "\"$index\"\n" +
-            "],\n" +
-            "\"dls\": \"$dlsQuery\",\n" +
-            "\"fls\": [],\n" +
-            "\"masked_fields\": [],\n" +
-            "\"allowed_actions\": [\n" +
-            "\"crud\"\n" +
-            "]\n" +
-            "}\n" +
-            "],\n" +
-            "\"tenant_permissions\": []\n" +
-            "}"
+                "\"cluster_permissions\": [\n" +
+                "],\n" +
+                "\"index_permissions\": [\n" +
+                "{\n" +
+                "\"index_patterns\": [\n" +
+                "\"$index\"\n" +
+                "],\n" +
+                "\"dls\": \"$dlsQuery\",\n" +
+                "\"fls\": [],\n" +
+                "\"masked_fields\": [],\n" +
+                "\"allowed_actions\": [\n" +
+                "\"crud\"\n" +
+                "]\n" +
+                "}\n" +
+                "],\n" +
+                "\"tenant_permissions\": []\n" +
+                "}"
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
@@ -1163,10 +1147,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val request = Request("PUT", "/_plugins/_security/api/rolesmapping/$role")
         val usersStr = users.joinToString { it -> "\"$it\"" }
         var entity = "{                                  \n" +
-            "  \"backend_roles\" : [  ],\n" +
-            "  \"hosts\" : [  ],\n" +
-            "  \"users\" : [$usersStr]\n" +
-            "}"
+                "  \"backend_roles\" : [  ],\n" +
+                "  \"hosts\" : [  ],\n" +
+                "  \"users\" : [$usersStr]\n" +
+                "}"
         request.setJsonEntity(entity)
         client().performRequest(request)
     }

@@ -15,20 +15,8 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRITE_INDEX
-import org.opensearch.alerting.core.model.DocLevelMonitorInput
-import org.opensearch.alerting.core.model.DocLevelQuery
-import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.model.ActionExecutionResult
-import org.opensearch.alerting.model.Alert
+import org.opensearch.alerting.model.*
 import org.opensearch.alerting.model.AlertingConfigAccessor.Companion.getMonitorMetadata
-import org.opensearch.alerting.model.DocumentExecutionContext
-import org.opensearch.alerting.model.DocumentLevelTrigger
-import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
-import org.opensearch.alerting.model.Finding
-import org.opensearch.alerting.model.InputRunResults
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.model.action.PerAlertActionScope
 import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
@@ -44,6 +32,7 @@ import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.*
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.percolator.PercolateQueryBuilderExt
@@ -53,8 +42,7 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortOrder
 import java.io.IOException
 import java.time.Instant
-import java.util.UUID
-import kotlin.collections.HashMap
+import java.util.*
 import kotlin.math.max
 
 object DocumentLevelMonitorRunner : MonitorRunner() {
@@ -251,7 +239,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 listOf(it.first),
                 listOf(it.second),
                 triggerCtx,
-                monitorResult.alertError() ?: triggerResult.alertError()
+                null
+                //monitorResult.alertError() ?: triggerResult.alertError()
             )
             alerts.add(alert)
         }

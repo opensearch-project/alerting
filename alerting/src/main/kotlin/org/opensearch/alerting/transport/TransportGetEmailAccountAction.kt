@@ -15,7 +15,6 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.GetEmailAccountAction
 import org.opensearch.alerting.action.GetEmailAccountRequest
 import org.opensearch.alerting.action.GetEmailAccountResponse
-import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.AlertingException
@@ -28,6 +27,7 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -45,7 +45,8 @@ class TransportGetEmailAccountAction @Inject constructor(
     GetEmailAccountAction.NAME, transportService, actionFilters, ::GetEmailAccountRequest
 ) {
 
-    @Volatile private var allowList = ALLOW_LIST.get(settings)
+    @Volatile
+    private var allowList = ALLOW_LIST.get(settings)
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALLOW_LIST) { allowList = it }

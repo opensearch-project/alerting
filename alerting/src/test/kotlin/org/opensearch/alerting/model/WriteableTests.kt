@@ -5,33 +5,12 @@
 
 package org.opensearch.alerting.model
 
-import org.opensearch.alerting.core.model.SearchInput
-import org.opensearch.alerting.model.action.Action
-import org.opensearch.alerting.model.action.ActionExecutionPolicy
-import org.opensearch.alerting.model.action.Throttle
+import org.opensearch.alerting.*
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
-import org.opensearch.alerting.randomAction
-import org.opensearch.alerting.randomActionExecutionPolicy
-import org.opensearch.alerting.randomActionRunResult
-import org.opensearch.alerting.randomBucketLevelMonitorRunResult
-import org.opensearch.alerting.randomBucketLevelTrigger
-import org.opensearch.alerting.randomBucketLevelTriggerRunResult
-import org.opensearch.alerting.randomDocumentLevelMonitorRunResult
-import org.opensearch.alerting.randomDocumentLevelTrigger
-import org.opensearch.alerting.randomDocumentLevelTriggerRunResult
-import org.opensearch.alerting.randomEmailAccount
-import org.opensearch.alerting.randomEmailGroup
-import org.opensearch.alerting.randomInputRunResults
-import org.opensearch.alerting.randomQueryLevelMonitor
-import org.opensearch.alerting.randomQueryLevelMonitorRunResult
-import org.opensearch.alerting.randomQueryLevelTrigger
-import org.opensearch.alerting.randomQueryLevelTriggerRunResult
-import org.opensearch.alerting.randomThrottle
-import org.opensearch.alerting.randomUser
-import org.opensearch.alerting.randomUserEmpty
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.commons.alerting.model.*
 import org.opensearch.commons.authuser.User
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase

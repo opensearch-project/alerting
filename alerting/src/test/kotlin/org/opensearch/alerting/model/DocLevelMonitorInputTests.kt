@@ -5,19 +5,11 @@
 
 package org.opensearch.alerting.model
 
-import org.opensearch.alerting.core.model.DocLevelMonitorInput
-import org.opensearch.alerting.core.model.DocLevelQuery
-import org.opensearch.alerting.opensearchapi.string
-import org.opensearch.alerting.randomDocLevelMonitorInput
 import org.opensearch.alerting.randomDocLevelQuery
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentBuilder
-import org.opensearch.common.xcontent.XContentType
 import org.opensearch.test.OpenSearchTestCase
-import java.lang.IllegalArgumentException
 
 class DocLevelMonitorInputTests : OpenSearchTestCase() {
-    fun `test DocLevelQuery asTemplateArgs`() {
+    /*fun `test DocLevelQuery asTemplateArgs`() {
         // GIVEN
         val query = randomDocLevelQuery()
 
@@ -29,7 +21,7 @@ class DocLevelMonitorInputTests : OpenSearchTestCase() {
         assertEquals("Template args 'query' field does not match:", templateArgs[DocLevelQuery.QUERY_FIELD], query.query)
         assertEquals("Template args 'name' field does not match:", templateArgs[DocLevelQuery.NAME_FIELD], query.name)
         assertEquals("Template args 'tags' field does not match:", templateArgs[DocLevelQuery.TAGS_FIELD], query.tags)
-    }
+    }*/
 
     fun `test create Doc Level Query with invalid characters for name`() {
         val badString = "query with space"
@@ -58,7 +50,7 @@ class DocLevelMonitorInputTests : OpenSearchTestCase() {
         }
     }
 
-    fun `test DocLevelMonitorInput asTemplateArgs`() {
+    /*fun `test DocLevelMonitorInput asTemplateArgs`() {
         // GIVEN
         val input = randomDocLevelMonitorInput()
 
@@ -91,5 +83,5 @@ class DocLevelMonitorInputTests : OpenSearchTestCase() {
                 (templateArgs[DocLevelMonitorInput.QUERIES_FIELD] as List<*>).contains(it.asTemplateArg())
             )
         }
-    }
+    }*/
 }

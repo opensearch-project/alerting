@@ -26,17 +26,9 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.DocumentLevelMonitorRunner
-import org.opensearch.alerting.action.IndexMonitorAction
 import org.opensearch.alerting.action.IndexMonitorRequest
-import org.opensearch.alerting.action.IndexMonitorResponse
 import org.opensearch.alerting.core.ScheduledJobIndices
-import org.opensearch.alerting.core.model.DocLevelMonitorInput
-import org.opensearch.alerting.core.model.DocLevelMonitorInput.Companion.DOC_LEVEL_INPUT_FIELD
-import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
-import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.model.AlertingConfigAccessor.Companion.getMonitorMetadata
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
@@ -61,6 +53,14 @@ import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.action.IndexMonitorAction
+import org.opensearch.commons.alerting.action.IndexMonitorResponse
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput.Companion.DOC_LEVEL_INPUT_FIELD
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
+import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
@@ -323,12 +323,12 @@ class TransportIndexMonitorAction @Inject constructor(
                 trigger.actions.forEach { action ->
                     if (action.throttle != null) {
                         require(
-                            TimeValue(Duration.of(action.throttle.value.toLong(), action.throttle.unit).toMillis())
+                            TimeValue(Duration.of(action.getActionThrottle().orElseThrow().value.toLong(), action.getActionThrottle().orElseThrow().unit).toMillis())
                                 .compareTo(maxValue) <= 0,
                             { "Can only set throttle period less than or equal to $maxValue" }
                         )
                         require(
-                            TimeValue(Duration.of(action.throttle.value.toLong(), action.throttle.unit).toMillis())
+                            TimeValue(Duration.of(action.getActionThrottle().orElseThrow().value.toLong(), action.getActionThrottle().orElseThrow().unit).toMillis())
                                 .compareTo(minValue) >= 0,
                             { "Can only set throttle period greater than or equal to $minValue" }
                         )

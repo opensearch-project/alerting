@@ -7,14 +7,10 @@ package org.opensearch.alerting
 
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_FINDING_INDEX_PATTERN
-import org.opensearch.alerting.core.model.DocLevelMonitorInput
-import org.opensearch.alerting.core.model.DocLevelQuery
-import org.opensearch.alerting.model.action.ActionExecutionPolicy
-import org.opensearch.alerting.model.action.AlertCategory
-import org.opensearch.alerting.model.action.PerAlertActionScope
-import org.opensearch.alerting.model.action.PerExecutionActionScope
+import org.opensearch.alerting.model.Finding
 import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
+import org.opensearch.commons.alerting.model.*
 import org.opensearch.script.Script
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -56,7 +52,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             for (alertActionResult in triggerResult.objectMap("action_results").values) {
                 for (actionResult in alertActionResult.values) {
                     @Suppress("UNCHECKED_CAST") val actionOutput = (actionResult as Map<String, Map<String, String>>)["output"]
-                        as Map<String, String>
+                            as Map<String, String>
                     assertEquals("Hello ${monitor.name}", actionOutput["subject"])
                     assertEquals("Hello ${monitor.name}", actionOutput["message"])
                 }
@@ -92,6 +88,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertEquals(monitor.name, output["monitor_name"])
         @Suppress("UNCHECKED_CAST")
         val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
         @Suppress("UNCHECKED_CAST")
         val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
         assertEquals("Incorrect search result", 2, matchingDocsToQuery.size)
@@ -125,6 +122,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertEquals(monitor.name, output["monitor_name"])
         @Suppress("UNCHECKED_CAST")
         val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
         @Suppress("UNCHECKED_CAST")
         val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
         assertEquals("Incorrect search result", 2, matchingDocsToQuery.size)
@@ -178,6 +176,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertEquals(monitor.name, output["monitor_name"])
         @Suppress("UNCHECKED_CAST")
         val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
         @Suppress("UNCHECKED_CAST")
         val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
         assertEquals("Incorrect search result", 2, matchingDocsToQuery.size)
@@ -189,7 +188,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
                 assertEquals(actions.size, alertActionResult.values.size)
                 for (actionResult in alertActionResult.values) {
                     @Suppress("UNCHECKED_CAST") val actionOutput = (actionResult as Map<String, Map<String, String>>)["output"]
-                        as Map<String, String>
+                            as Map<String, String>
                     assertEquals("Hello ${monitor.name}", actionOutput["subject"])
                     assertEquals("Hello ${monitor.name}", actionOutput["message"])
                 }
@@ -241,6 +240,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertEquals(monitor.name, output["monitor_name"])
         @Suppress("UNCHECKED_CAST")
         val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
         @Suppress("UNCHECKED_CAST")
         val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
         assertEquals("Incorrect search result", 2, matchingDocsToQuery.size)
@@ -252,7 +252,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
                 assertEquals(actions.size, alertActionResult.values.size)
                 for (actionResult in alertActionResult.values) {
                     @Suppress("UNCHECKED_CAST") val actionOutput = (actionResult as Map<String, Map<String, String>>)["output"]
-                        as Map<String, String>
+                            as Map<String, String>
                     assertEquals("Hello ${monitor.name}", actionOutput["subject"])
                     assertEquals("Hello ${monitor.name}", actionOutput["message"])
                 }
@@ -295,6 +295,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertEquals(monitor.name, output["monitor_name"])
         @Suppress("UNCHECKED_CAST")
         val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
         @Suppress("UNCHECKED_CAST")
         val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
         assertEquals("Incorrect search result", 2, matchingDocsToQuery.size)
@@ -360,6 +361,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertEquals(monitor.name, output["monitor_name"])
         @Suppress("UNCHECKED_CAST")
         val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
         @Suppress("UNCHECKED_CAST")
         val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
         assertEquals("Incorrect search result", 3, matchingDocsToQuery.size)
@@ -408,8 +410,10 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val output = entityAsMap(response)
         val inputResults = output.stringMap("input_results")
         val errorMessage = inputResults?.get("error")
+
         @Suppress("UNCHECKED_CAST")
         val searchResult = (inputResults?.get("results") as List<Map<String, Any>>).firstOrNull()
+
         @Suppress("UNCHECKED_CAST")
         val findings = searchFindings()
 
@@ -447,8 +451,10 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val output = entityAsMap(response)
         val inputResults = output.stringMap("input_results")
         val errorMessage = inputResults?.get("error")
+
         @Suppress("UNCHECKED_CAST")
         val searchResult = (inputResults?.get("results") as List<Map<String, Any>>).firstOrNull()
+
         @Suppress("UNCHECKED_CAST")
         val findings = searchFindings()
 
@@ -500,8 +506,10 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val output = entityAsMap(response)
         val inputResults = output.stringMap("input_results")
         val errorMessage = inputResults?.get("error")
+
         @Suppress("UNCHECKED_CAST")
         val searchResult = (inputResults?.get("results") as List<Map<String, Any>>).firstOrNull()
+
         @Suppress("UNCHECKED_CAST")
         val findings = searchFindings()
 
@@ -561,8 +569,10 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val output = entityAsMap(response)
         val inputResults = output.stringMap("input_results")
         val errorMessage = inputResults?.get("error")
+
         @Suppress("UNCHECKED_CAST")
         val searchResult = (inputResults?.get("results") as List<Map<String, Any>>).firstOrNull()
+
         @Suppress("UNCHECKED_CAST")
         val findings = searchFindings()
 

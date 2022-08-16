@@ -14,8 +14,8 @@ import org.opensearch.action.admin.cluster.state.ClusterStateRequest
 import org.opensearch.action.admin.cluster.stats.ClusterStatsRequest
 import org.opensearch.action.admin.cluster.tasks.PendingClusterTasksRequest
 import org.opensearch.action.admin.indices.recovery.RecoveryRequest
-import org.opensearch.alerting.core.model.ClusterMetricsInput
-import org.opensearch.alerting.core.model.ClusterMetricsInput.ClusterMetricType
+import org.opensearch.commons.alerting.model.ClusterMetricsInput
+import org.opensearch.commons.alerting.model.ClusterMetricsInput.ClusterMetricType
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.json.JsonXContent
 

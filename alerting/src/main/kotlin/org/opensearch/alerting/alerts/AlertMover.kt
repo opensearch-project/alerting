@@ -14,17 +14,11 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_HISTORY_WRITE_INDEX
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
 import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.client.Client
 import org.opensearch.common.bytes.BytesReference
-import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.XContentFactory
-import org.opensearch.common.xcontent.XContentHelper
-import org.opensearch.common.xcontent.XContentParser
-import org.opensearch.common.xcontent.XContentParserUtils
-import org.opensearch.common.xcontent.XContentType
+import org.opensearch.common.xcontent.*
+import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.index.VersionType
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
@@ -89,7 +83,7 @@ suspend fun moveAlerts(client: Client, monitorId: String, monitor: Monitor? = nu
             ?.failure?.cause
         throw RuntimeException(
             "Failed to copy alerts for [$monitorId, ${monitor?.triggers?.map { it.id }}]: " +
-                copyResponse.buildFailureMessage(),
+                    copyResponse.buildFailureMessage(),
             retryCause
         )
     }
@@ -99,7 +93,7 @@ suspend fun moveAlerts(client: Client, monitorId: String, monitor: Monitor? = nu
             ?.failure?.cause
         throw RuntimeException(
             "Failed to delete alerts for [$monitorId, ${monitor?.triggers?.map { it.id }}]: " +
-                deleteResponse.buildFailureMessage(),
+                    deleteResponse.buildFailureMessage(),
             retryCause
         )
     }

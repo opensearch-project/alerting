@@ -12,9 +12,6 @@ import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.SearchMonitorAction
 import org.opensearch.alerting.action.SearchMonitorRequest
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
-import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.context
 import org.opensearch.client.node.NodeClient
@@ -25,18 +22,16 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.ToXContent.EMPTY_PARAMS
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.index.query.QueryBuilders
-import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.*
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
-import org.opensearch.rest.BytesRestResponse
-import org.opensearch.rest.RestChannel
 import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
-import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestRequest.Method.GET
 import org.opensearch.rest.RestRequest.Method.POST
-import org.opensearch.rest.RestResponse
-import org.opensearch.rest.RestStatus
 import org.opensearch.rest.action.RestResponseListener
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.io.IOException
@@ -52,7 +47,8 @@ class RestSearchMonitorAction(
     clusterService: ClusterService
 ) : BaseRestHandler() {
 
-    @Volatile private var filterBy = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile
+    private var filterBy = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.FILTER_BY_BACKEND_ROLES) { filterBy = it }

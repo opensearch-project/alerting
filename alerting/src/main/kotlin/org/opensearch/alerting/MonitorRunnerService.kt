@@ -5,21 +5,13 @@
 
 package org.opensearch.alerting
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.moveAlerts
 import org.opensearch.alerting.core.JobRunner
-import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.script.TriggerExecutionContext
@@ -40,6 +32,10 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.component.AbstractLifecycleComponent
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.commons.alerting.model.Action
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.MonitorRunResult
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
 import org.opensearch.script.TemplateScript
@@ -127,8 +123,10 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 MOVE_ALERTS_BACKOFF_MILLIS.get(monitorCtx.settings),
                 MOVE_ALERTS_BACKOFF_COUNT.get(monitorCtx.settings)
             )
-        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(MOVE_ALERTS_BACKOFF_MILLIS, MOVE_ALERTS_BACKOFF_COUNT) {
-                millis, count ->
+        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(
+            MOVE_ALERTS_BACKOFF_MILLIS,
+            MOVE_ALERTS_BACKOFF_COUNT
+        ) { millis, count ->
             monitorCtx.moveAlertsRetryPolicy = BackoffPolicy.exponentialBackoff(millis, count)
         }
 
@@ -174,7 +172,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         runnerSupervisor.cancel()
     }
 
-    override fun doClose() { }
+    override fun doClose() {}
 
     override fun postIndex(job: ScheduledJob) {
         if (job !is Monitor) {
@@ -244,7 +242,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             // TODO: Remove "AmazonES_all_access" role?
             monitorCtx.settings!!.getAsList("", listOf("all_access", "AmazonES_all_access"))
         } else {
-            monitor.user.roles
+            monitor.getMonitorUser().orElseThrow().roles
         }
     }
 
@@ -259,7 +257,8 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         if (action.throttleEnabled) {
             val result = alert.actionExecutionResults.firstOrNull { r -> r.actionId == action.id }
             val lastExecutionTime: Instant? = result?.lastExecutionTime
-            val throttledTimeBound = currentTime().minus(action.throttle.value.toLong(), action.throttle.unit)
+            val throttledTimeBound =
+                currentTime().minus(action.getActionThrottle().orElseThrow().value.toLong(), action.getActionThrottle().orElseThrow().unit)
             return (lastExecutionTime == null || lastExecutionTime.isBefore(throttledTimeBound))
         }
         return true

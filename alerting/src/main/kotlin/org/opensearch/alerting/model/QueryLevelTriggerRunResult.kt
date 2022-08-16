@@ -10,6 +10,9 @@ import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.commons.alerting.model.ActionRunResult
+import org.opensearch.commons.alerting.model.TriggerRunResult
+import org.opensearch.commons.alerting.model.userErrorMessage
 import org.opensearch.script.ScriptException
 import java.io.IOException
 import java.time.Instant
@@ -30,13 +33,13 @@ data class QueryLevelTriggerRunResult(
         actionResults = sin.readMap() as MutableMap<String, ActionRunResult>
     )
 
-    override fun alertError(): AlertError? {
+    fun alertError(): AlertError? {
         if (error != null) {
             return AlertError(Instant.now(), "Failed evaluating trigger:\n${error!!.userErrorMessage()}")
         }
         for (actionResult in actionResults.values) {
             if (actionResult.error != null) {
-                return AlertError(Instant.now(), "Failed running action:\n${actionResult.error.userErrorMessage()}")
+                return AlertError(Instant.now(), "Failed running action:\n${actionResult.getActionError().get().userErrorMessage()}")
             }
         }
         return null

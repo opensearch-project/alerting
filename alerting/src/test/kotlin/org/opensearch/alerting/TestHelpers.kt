@@ -8,57 +8,19 @@ package org.opensearch.alerting
 import junit.framework.TestCase.assertNull
 import org.apache.http.Header
 import org.apache.http.HttpEntity
-import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
-import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtFilter
 import org.opensearch.alerting.core.model.ClusterMetricsInput
-import org.opensearch.alerting.core.model.DocLevelMonitorInput
-import org.opensearch.alerting.core.model.DocLevelQuery
-import org.opensearch.alerting.core.model.Input
-import org.opensearch.alerting.core.model.IntervalSchedule
-import org.opensearch.alerting.core.model.Schedule
-import org.opensearch.alerting.core.model.SearchInput
-import org.opensearch.alerting.model.ActionExecutionResult
-import org.opensearch.alerting.model.ActionRunResult
-import org.opensearch.alerting.model.AggregationResultBucket
-import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.BucketLevelTrigger
-import org.opensearch.alerting.model.BucketLevelTriggerRunResult
-import org.opensearch.alerting.model.DocumentLevelTrigger
-import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
-import org.opensearch.alerting.model.Finding
-import org.opensearch.alerting.model.InputRunResults
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.model.QueryLevelTrigger
-import org.opensearch.alerting.model.QueryLevelTriggerRunResult
-import org.opensearch.alerting.model.Trigger
-import org.opensearch.alerting.model.action.Action
-import org.opensearch.alerting.model.action.ActionExecutionPolicy
-import org.opensearch.alerting.model.action.ActionExecutionScope
-import org.opensearch.alerting.model.action.AlertCategory
-import org.opensearch.alerting.model.action.PerAlertActionScope
-import org.opensearch.alerting.model.action.PerExecutionActionScope
-import org.opensearch.alerting.model.action.Throttle
+import org.opensearch.alerting.model.*
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailEntry
 import org.opensearch.alerting.model.destination.email.EmailGroup
 import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.util.getBucketKeysHash
-import org.opensearch.client.Request
-import org.opensearch.client.RequestOptions
-import org.opensearch.client.Response
-import org.opensearch.client.RestClient
-import org.opensearch.client.WarningsHandler
+import org.opensearch.client.*
 import org.opensearch.common.UUIDs
 import org.opensearch.common.settings.SecureString
 import org.opensearch.common.settings.Settings
-import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentBuilder
-import org.opensearch.common.xcontent.XContentFactory
-import org.opensearch.common.xcontent.XContentParser
-import org.opensearch.common.xcontent.XContentType
+import org.opensearch.common.xcontent.*
+import org.opensearch.commons.alerting.model.*
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.script.Script
@@ -67,9 +29,7 @@ import org.opensearch.search.SearchModule
 import org.opensearch.search.aggregations.bucket.terms.IncludeExclude
 import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
-import org.opensearch.test.OpenSearchTestCase.randomBoolean
-import org.opensearch.test.OpenSearchTestCase.randomInt
-import org.opensearch.test.OpenSearchTestCase.randomIntBetween
+import org.opensearch.test.OpenSearchTestCase.*
 import org.opensearch.test.rest.OpenSearchRestTestCase
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -288,6 +248,7 @@ val TEST_HR_INDEX = "hr_data"
 val TEST_NON_HR_INDEX = "not_hr_data"
 val TEST_HR_ROLE = "hr_role"
 val TEST_HR_BACKEND_ROLE = "HR"
+
 // Using a triple-quote string for the query so escaped quotes are kept as-is
 // in the request made using triple-quote strings (i.e. createIndexRoleWithDocLevelSecurity).
 // Removing the escape slash in the request causes the security API role request to fail with parsing exception.

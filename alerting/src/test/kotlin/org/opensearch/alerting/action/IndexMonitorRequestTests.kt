@@ -6,10 +6,10 @@
 package org.opensearch.alerting.action
 
 import org.opensearch.action.support.WriteRequest
-import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase

@@ -16,17 +16,15 @@ import org.apache.lucene.util.BytesRef
 import org.hamcrest.CoreMatchers
 import org.opensearch.common.CheckedConsumer
 import org.opensearch.common.settings.Settings
+import org.opensearch.commons.alerting.model.BucketSelectorExtAggregationBuilder
+import org.opensearch.commons.alerting.model.BucketSelectorExtFilter
+import org.opensearch.commons.alerting.model.BucketSelectorIndices
 import org.opensearch.index.mapper.KeywordFieldMapper.KeywordFieldType
 import org.opensearch.index.mapper.MappedFieldType
 import org.opensearch.index.mapper.NumberFieldMapper
 import org.opensearch.index.mapper.NumberFieldMapper.NumberFieldType
 import org.opensearch.index.query.MatchAllQueryBuilder
-import org.opensearch.script.MockScriptEngine
-import org.opensearch.script.Script
-import org.opensearch.script.ScriptEngine
-import org.opensearch.script.ScriptModule
-import org.opensearch.script.ScriptService
-import org.opensearch.script.ScriptType
+import org.opensearch.script.*
 import org.opensearch.search.aggregations.Aggregation
 import org.opensearch.search.aggregations.Aggregator
 import org.opensearch.search.aggregations.AggregatorTestCase
@@ -39,7 +37,7 @@ import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
 import org.opensearch.search.aggregations.metrics.AvgAggregationBuilder
 import org.opensearch.search.aggregations.metrics.ValueCountAggregationBuilder
 import java.io.IOException
-import java.util.Collections
+import java.util.*
 import java.util.function.Consumer
 import java.util.function.Function
 

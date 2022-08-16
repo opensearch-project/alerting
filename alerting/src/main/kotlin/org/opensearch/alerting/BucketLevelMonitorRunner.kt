@@ -6,16 +6,8 @@
 package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
-import org.opensearch.alerting.model.InputRunResults
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.model.action.AlertCategory
-import org.opensearch.alerting.model.action.PerAlertActionScope
-import org.opensearch.alerting.model.action.PerExecutionActionScope
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
@@ -23,6 +15,7 @@ import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.alerting.util.getCombinedTriggerRunResult
+import org.opensearch.commons.alerting.model.*
 import java.time.Instant
 
 object BucketLevelMonitorRunner : MonitorRunner() {
@@ -150,7 +143,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 nextAlerts[trigger.id]?.get(AlertCategory.DEDUPED)?.addAll(dedupedAlerts)
                 nextAlerts[trigger.id]?.get(AlertCategory.NEW)?.addAll(newAlerts)
             }
-        } while (monitorResult.inputResults.afterKeysPresent())
+        } while (monitorResult.inputResults.getAggregateTriggersAfterKey().isPresent)
 
         // The completed Alerts are whatever are left in the currentAlerts.
         // However, this operation will only be done if there was no trigger error, since otherwise the nextAlerts were not collected
@@ -261,8 +254,9 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 monitorCtx.alertService!!.updateActionResultsForBucketLevelAlert(
                     alert.copy(lastNotificationTime = MonitorRunnerService.currentTime()),
                     actionResults,
+                    null
                     // TODO: Update BucketLevelTriggerRunResult.alertError() to retrieve error based on the first failed Action
-                    monitorResult.alertError() ?: triggerResult.alertError()
+                    //monitorResult.getResultError().orElseGet(triggerResult.getResultError().orElse(null))
                 )
             }
 

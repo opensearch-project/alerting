@@ -12,32 +12,8 @@ import org.apache.http.nio.entity.NStringEntity
 import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
-import org.opensearch.alerting.ADMIN
-import org.opensearch.alerting.ALERTING_BASE_URI
-import org.opensearch.alerting.ALERTING_DELETE_MONITOR_ACCESS
-import org.opensearch.alerting.ALERTING_EXECUTE_MONITOR_ACCESS
-import org.opensearch.alerting.ALERTING_FULL_ACCESS_ROLE
-import org.opensearch.alerting.ALERTING_GET_ALERTS_ACCESS
-import org.opensearch.alerting.ALERTING_GET_MONITOR_ACCESS
-import org.opensearch.alerting.ALERTING_INDEX_MONITOR_ACCESS
-import org.opensearch.alerting.ALERTING_SEARCH_MONITOR_ONLY_ACCESS
-import org.opensearch.alerting.ALL_ACCESS_ROLE
-import org.opensearch.alerting.ALWAYS_RUN
-import org.opensearch.alerting.AlertingRestTestCase
-import org.opensearch.alerting.DRYRUN_MONITOR
-import org.opensearch.alerting.TEST_HR_BACKEND_ROLE
-import org.opensearch.alerting.TEST_HR_INDEX
-import org.opensearch.alerting.TEST_HR_ROLE
-import org.opensearch.alerting.TEST_NON_HR_INDEX
-import org.opensearch.alerting.assertUserNull
-import org.opensearch.alerting.core.model.SearchInput
-import org.opensearch.alerting.makeRequest
+import org.opensearch.alerting.*
 import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.randomAction
-import org.opensearch.alerting.randomAlert
-import org.opensearch.alerting.randomQueryLevelMonitor
-import org.opensearch.alerting.randomQueryLevelTrigger
-import org.opensearch.alerting.randomTemplateScript
 import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
 import org.opensearch.client.RestClient
@@ -45,6 +21,8 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.rest.SecureRestClientBuilder
 import org.opensearch.index.query.QueryBuilders
@@ -59,7 +37,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     companion object {
 
         @BeforeClass
-        @JvmStatic fun setup() {
+        @JvmStatic
+        fun setup() {
             // things to execute once and keep around for the class
             org.junit.Assume.assumeTrue(System.getProperty("security", "false")!!.toBoolean())
         }
@@ -102,7 +81,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             val createResponse = userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             assertEquals("Create monitor failed", RestStatus.CREATED, createResponse?.restStatus())
 
-            assertUserNull(createResponse?.asMap()!!["monitor"] as HashMap<String, Any>)
+            //assertUserNull(createResponse?.asMap()!!["monitor"] as HashMap<String, Any>)
         } finally {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
         }
@@ -249,7 +228,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         val monitor = randomQueryLevelMonitor()
         val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
         assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
-        assertUserNull(createResponse.asMap()["monitor"] as HashMap<String, Any>)
+        assertUserNull(createResponse.asMap()["monitor"] as Monitor)
     }
 
     fun `test get monitor with an user with get monitor role`() {
@@ -745,7 +724,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
 
         try {
-            val response = executeMonitor(userClient as RestClient, modifiedMonitor, params = DRYRUN_MONITOR)
+            val response = executeMonitor(userClient as RestClient, modifiedMonitor as Monitor, params = DRYRUN_MONITOR)
             val output = entityAsMap(response)
             val inputResults = output.stringMap("input_results")
             assertTrue("Missing monitor error message", (inputResults?.get("error") as String).isNotEmpty())

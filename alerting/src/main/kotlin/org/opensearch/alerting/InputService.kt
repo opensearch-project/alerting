@@ -8,11 +8,11 @@ package org.opensearch.alerting
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.alerting.core.model.ClusterMetricsInput
-import org.opensearch.alerting.core.model.SearchInput
-import org.opensearch.alerting.model.InputRunResults
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.TriggerAfterKey
+import org.opensearch.commons.alerting.model.ClusterMetricsInput
+import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.model.InputRunResults
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.TriggerAfterKey
 import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.util.AggregationQueryRewriter

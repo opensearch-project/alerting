@@ -18,6 +18,10 @@ import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
+import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.DocumentLevelTrigger
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.authuser.User
 import java.io.IOException
 import java.time.Instant
@@ -219,7 +223,8 @@ data class Alert(
         const val NO_ID = ""
         const val NO_VERSION = Versions.NOT_FOUND
 
-        @JvmStatic @JvmOverloads
+        @JvmStatic
+        @JvmOverloads
         @Throws(IOException::class)
         fun parse(xcp: XContentParser, id: String = NO_ID, version: Long = NO_VERSION): Alert {
 
@@ -326,6 +331,7 @@ data class Alert(
     fun toXContentWithUser(builder: XContentBuilder): XContentBuilder {
         return createXContentBuilder(builder, false)
     }
+
     private fun createXContentBuilder(builder: XContentBuilder, secure: Boolean): XContentBuilder {
         builder.startObject()
             .field(ALERT_ID_FIELD, id)

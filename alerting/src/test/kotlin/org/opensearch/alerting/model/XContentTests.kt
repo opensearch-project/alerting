@@ -5,35 +5,15 @@
 
 package org.opensearch.alerting.model
 
-import org.opensearch.alerting.builder
-import org.opensearch.alerting.core.model.SearchInput
-import org.opensearch.alerting.model.action.Action
-import org.opensearch.alerting.model.action.ActionExecutionPolicy
-import org.opensearch.alerting.model.action.PerExecutionActionScope
-import org.opensearch.alerting.model.action.Throttle
+import org.opensearch.alerting.*
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
 import org.opensearch.alerting.opensearchapi.string
-import org.opensearch.alerting.parser
-import org.opensearch.alerting.randomAction
-import org.opensearch.alerting.randomActionExecutionPolicy
-import org.opensearch.alerting.randomActionExecutionResult
-import org.opensearch.alerting.randomActionWithPolicy
-import org.opensearch.alerting.randomAlert
-import org.opensearch.alerting.randomBucketLevelMonitor
-import org.opensearch.alerting.randomBucketLevelTrigger
-import org.opensearch.alerting.randomEmailAccount
-import org.opensearch.alerting.randomEmailGroup
-import org.opensearch.alerting.randomQueryLevelMonitor
-import org.opensearch.alerting.randomQueryLevelMonitorWithoutUser
-import org.opensearch.alerting.randomQueryLevelTrigger
-import org.opensearch.alerting.randomThrottle
-import org.opensearch.alerting.randomUser
-import org.opensearch.alerting.randomUserEmpty
 import org.opensearch.alerting.toJsonString
 import org.opensearch.alerting.toJsonStringWithUser
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory
+import org.opensearch.commons.alerting.model.*
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
@@ -186,22 +166,22 @@ class XContentTests : OpenSearchTestCase() {
 
     fun `test alert parsing without user`() {
         val alertStr = "{\"id\":\"\",\"version\":-1,\"monitor_id\":\"\",\"schema_version\":0,\"monitor_version\":1," +
-            "\"monitor_name\":\"ARahqfRaJG\",\"trigger_id\":\"fhe1-XQBySl0wQKDBkOG\",\"trigger_name\":\"ffELMuhlro\"," +
-            "\"state\":\"ACTIVE\",\"error_message\":null,\"alert_history\":[],\"severity\":\"1\",\"action_execution_results\"" +
-            ":[{\"action_id\":\"ghe1-XQBySl0wQKDBkOG\",\"last_execution_time\":1601917224583,\"throttled_count\":-1478015168}," +
-            "{\"action_id\":\"gxe1-XQBySl0wQKDBkOH\",\"last_execution_time\":1601917224583,\"throttled_count\":-768533744}]," +
-            "\"start_time\":1601917224599,\"last_notification_time\":null,\"end_time\":null,\"acknowledged_time\":null}"
+                "\"monitor_name\":\"ARahqfRaJG\",\"trigger_id\":\"fhe1-XQBySl0wQKDBkOG\",\"trigger_name\":\"ffELMuhlro\"," +
+                "\"state\":\"ACTIVE\",\"error_message\":null,\"alert_history\":[],\"severity\":\"1\",\"action_execution_results\"" +
+                ":[{\"action_id\":\"ghe1-XQBySl0wQKDBkOG\",\"last_execution_time\":1601917224583,\"throttled_count\":-1478015168}," +
+                "{\"action_id\":\"gxe1-XQBySl0wQKDBkOH\",\"last_execution_time\":1601917224583,\"throttled_count\":-768533744}]," +
+                "\"start_time\":1601917224599,\"last_notification_time\":null,\"end_time\":null,\"acknowledged_time\":null}"
         val parsedAlert = Alert.parse(parser(alertStr))
         assertNull(parsedAlert.monitorUser)
     }
 
     fun `test alert parsing with user as null`() {
         val alertStr = "{\"id\":\"\",\"version\":-1,\"monitor_id\":\"\",\"schema_version\":0,\"monitor_version\":1,\"monitor_user\":null," +
-            "\"monitor_name\":\"ARahqfRaJG\",\"trigger_id\":\"fhe1-XQBySl0wQKDBkOG\",\"trigger_name\":\"ffELMuhlro\"," +
-            "\"state\":\"ACTIVE\",\"error_message\":null,\"alert_history\":[],\"severity\":\"1\",\"action_execution_results\"" +
-            ":[{\"action_id\":\"ghe1-XQBySl0wQKDBkOG\",\"last_execution_time\":1601917224583,\"throttled_count\":-1478015168}," +
-            "{\"action_id\":\"gxe1-XQBySl0wQKDBkOH\",\"last_execution_time\":1601917224583,\"throttled_count\":-768533744}]," +
-            "\"start_time\":1601917224599,\"last_notification_time\":null,\"end_time\":null,\"acknowledged_time\":null}"
+                "\"monitor_name\":\"ARahqfRaJG\",\"trigger_id\":\"fhe1-XQBySl0wQKDBkOG\",\"trigger_name\":\"ffELMuhlro\"," +
+                "\"state\":\"ACTIVE\",\"error_message\":null,\"alert_history\":[],\"severity\":\"1\",\"action_execution_results\"" +
+                ":[{\"action_id\":\"ghe1-XQBySl0wQKDBkOG\",\"last_execution_time\":1601917224583,\"throttled_count\":-1478015168}," +
+                "{\"action_id\":\"gxe1-XQBySl0wQKDBkOH\",\"last_execution_time\":1601917224583,\"throttled_count\":-768533744}]," +
+                "\"start_time\":1601917224599,\"last_notification_time\":null,\"end_time\":null,\"acknowledged_time\":null}"
         val parsedAlert = Alert.parse(parser(alertStr))
         assertNull(parsedAlert.monitorUser)
     }

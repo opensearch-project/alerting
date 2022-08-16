@@ -18,23 +18,23 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.MonitorRunnerService
-import org.opensearch.alerting.action.ExecuteMonitorAction
-import org.opensearch.alerting.action.ExecuteMonitorRequest
-import org.opensearch.alerting.action.ExecuteMonitorResponse
-import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
+import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.ConfigConstants
+import org.opensearch.commons.alerting.action.ExecuteMonitorAction
+import org.opensearch.commons.alerting.action.ExecuteMonitorRequest
+import org.opensearch.commons.alerting.action.ExecuteMonitorResponse
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.authuser.User
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
@@ -59,7 +59,7 @@ class TransportExecuteMonitorAction @Inject constructor(
     @Volatile private var indexTimeout = AlertingSettings.INDEX_TIMEOUT.get(settings)
 
     override fun doExecute(task: Task, execMonitorRequest: ExecuteMonitorRequest, actionListener: ActionListener<ExecuteMonitorResponse>) {
-
+        val DOC_LEVEL_QUERIES_INDEX = ".opensearch-alerting-queries"
         val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
         log.debug("User and roles string from thread context: $userStr")
         val user: User? = User.parse(userStr)
@@ -127,7 +127,7 @@ class TransportExecuteMonitorAction @Inject constructor(
                         scope.launch {
                             if (!docLevelMonitorQueries.docLevelQueryIndexExists()) {
                                 docLevelMonitorQueries.initDocLevelQueryIndex()
-                                log.info("Central Percolation index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX} created")
+                                log.info("Central Percolation index ${DOC_LEVEL_QUERIES_INDEX} created")
                             }
                             docLevelMonitorQueries.indexDocLevelQueries(
                                 monitor,
@@ -135,7 +135,7 @@ class TransportExecuteMonitorAction @Inject constructor(
                                 WriteRequest.RefreshPolicy.IMMEDIATE,
                                 indexTimeout
                             )
-                            log.info("Queries inserted into Percolate index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}")
+                            log.info("Queries inserted into Percolate index ${DOC_LEVEL_QUERIES_INDEX}")
                             executeMonitor(monitor)
                         }
                     } catch (t: Exception) {

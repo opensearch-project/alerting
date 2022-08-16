@@ -11,13 +11,13 @@ import org.opensearch.alerting.action.GetEmailGroupRequest
 import org.opensearch.alerting.util.context
 import org.opensearch.client.node.NodeClient
 import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.action.RestActions
 import org.opensearch.rest.action.RestToXContentListener
 import org.opensearch.search.fetch.subphase.FetchSourceContext
-import java.lang.IllegalArgumentException
 
 /**
  * Rest handlers to retrieve an EmailGroup

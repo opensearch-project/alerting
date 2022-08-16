@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.action
 
+import org.opensearch.commons.alerting.action.IndexMonitorAction
 import org.opensearch.test.OpenSearchTestCase
 
 class IndexMonitorActionTests : OpenSearchTestCase() {

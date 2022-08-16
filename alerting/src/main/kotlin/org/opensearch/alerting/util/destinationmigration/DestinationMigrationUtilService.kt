@@ -12,7 +12,6 @@ import org.opensearch.action.delete.DeleteRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.WriteRequest
-import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
@@ -23,13 +22,9 @@ import org.opensearch.alerting.util.destinationmigration.DestinationConversionUt
 import org.opensearch.alerting.util.destinationmigration.NotificationApiUtils.Companion.createNotificationConfig
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.Strings
-import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.XContentFactory
-import org.opensearch.common.xcontent.XContentParser
-import org.opensearch.common.xcontent.XContentParserUtils
-import org.opensearch.common.xcontent.XContentType
+import org.opensearch.common.xcontent.*
 import org.opensearch.commons.ConfigConstants
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.notifications.action.CreateNotificationConfigRequest
 import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
@@ -70,9 +65,9 @@ class DestinationMigrationUtilService {
                 val configsToMigrate = emailAccountsToMigrate + emailGroupsToMigrate + destinationsToMigrate
                 logger.info(
                     "Need to migrate ${emailAccountsToMigrate.size} email accounts, " +
-                        "${emailGroupsToMigrate.size} email groups and " +
-                        "${destinationsToMigrate.size} destinations " +
-                        "(${configsToMigrate.size} configs total)"
+                            "${emailGroupsToMigrate.size} email groups and " +
+                            "${destinationsToMigrate.size} destinations " +
+                            "(${configsToMigrate.size} configs total)"
                 )
                 if (configsToMigrate.isEmpty()) {
                     finishFlag = true
@@ -135,7 +130,7 @@ class DestinationMigrationUtilService {
                     } else {
                         logger.warn(
                             "Failed to migrate over Destination ${notificationConfigInfo.configId} because failed to " +
-                                "create channel in Notification plugin.",
+                                    "create channel in Notification plugin.",
                             e
                         )
                     }

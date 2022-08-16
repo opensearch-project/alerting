@@ -6,10 +6,10 @@
 package org.opensearch.alerting.util
 
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.alerting.model.BucketLevelTrigger
-import org.opensearch.alerting.model.InputRunResults
-import org.opensearch.alerting.model.Trigger
-import org.opensearch.alerting.model.TriggerAfterKey
+import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.InputRunResults
+import org.opensearch.commons.alerting.model.Trigger
+import org.opensearch.commons.alerting.model.TriggerAfterKey
 import org.opensearch.search.aggregations.AggregationBuilder
 import org.opensearch.search.aggregations.AggregatorFactories
 import org.opensearch.search.aggregations.bucket.SingleBucketAggregation
@@ -51,7 +51,7 @@ class AggregationQueryRewriter {
                         if (factory is CompositeAggregationBuilder) {
                             // if the afterKey from previous result is null, what does it signify?
                             // A) result set exhausted OR  B) first page ?
-                            val afterKey = prevResult.aggTriggersAfterKey[trigger.id]!!.afterKey
+                            val afterKey = prevResult.getAggregateTriggersAfterKey().orElseThrow()[trigger.id]!!.afterKey
                             factory.aggregateAfter(afterKey)
                         } else {
                             throw IllegalStateException("AfterKeys are not expected to be present in non CompositeAggregationBuilder")

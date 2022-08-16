@@ -5,9 +5,8 @@
 
 package org.opensearch.alerting
 
-import org.opensearch.alerting.model.Trigger
+import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.test.OpenSearchTestCase
-import java.lang.IllegalArgumentException
 import java.time.Instant
 
 class MonitorTests : OpenSearchTestCase() {

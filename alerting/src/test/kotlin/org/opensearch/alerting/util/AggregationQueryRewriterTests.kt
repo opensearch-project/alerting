@@ -7,9 +7,6 @@ package org.opensearch.alerting.util
 
 import org.junit.Assert
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.alerting.model.InputRunResults
-import org.opensearch.alerting.model.Trigger
-import org.opensearch.alerting.model.TriggerAfterKey
 import org.opensearch.alerting.randomBucketLevelTrigger
 import org.opensearch.alerting.randomBucketSelectorExtAggregationBuilder
 import org.opensearch.alerting.randomQueryLevelTrigger
@@ -19,6 +16,9 @@ import org.opensearch.common.ParseField
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.json.JsonXContent
+import org.opensearch.commons.alerting.model.InputRunResults
+import org.opensearch.commons.alerting.model.Trigger
+import org.opensearch.commons.alerting.model.TriggerAfterKey
 import org.opensearch.search.aggregations.Aggregation
 import org.opensearch.search.aggregations.AggregationBuilder
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder

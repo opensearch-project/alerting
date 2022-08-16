@@ -6,23 +6,11 @@
 package org.opensearch.alerting
 
 import org.junit.Assert
-import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.alerting.alerts.AlertError
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.core.model.IntervalSchedule
-import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.model.ActionExecutionResult
 import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.Alert.State.ACKNOWLEDGED
-import org.opensearch.alerting.model.Alert.State.ACTIVE
-import org.opensearch.alerting.model.Alert.State.COMPLETED
-import org.opensearch.alerting.model.Alert.State.ERROR
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.action.ActionExecutionPolicy
-import org.opensearch.alerting.model.action.AlertCategory
-import org.opensearch.alerting.model.action.PerAlertActionScope
-import org.opensearch.alerting.model.action.PerExecutionActionScope
-import org.opensearch.alerting.model.action.Throttle
+import org.opensearch.alerting.model.Alert.State.*
 import org.opensearch.alerting.model.destination.CustomWebhook
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.email.Email
@@ -32,6 +20,7 @@ import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.ResponseException
 import org.opensearch.client.WarningFailureException
 import org.opensearch.common.settings.Settings
+import org.opensearch.commons.alerting.model.*
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
@@ -44,10 +33,7 @@ import java.time.Instant
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import java.time.temporal.ChronoUnit.DAYS
-import java.time.temporal.ChronoUnit.MILLIS
-import java.time.temporal.ChronoUnit.MINUTES
-import kotlin.collections.HashMap
+import java.time.temporal.ChronoUnit.*
 
 class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
@@ -99,6 +85,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals(monitor.name, output["monitor_name"])
         @Suppress("UNCHECKED_CAST")
         val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
         @Suppress("UNCHECKED_CAST")
         val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
         assertEquals("Incorrect search result", 1, total["value"])
@@ -402,6 +389,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals(monitor.name, output["monitor_name"])
         @Suppress("UNCHECKED_CAST")
         val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
         @Suppress("UNCHECKED_CAST")
         val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
         assertEquals("Incorrect search result", 1, total["value"])
@@ -665,7 +653,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         val monitor = createMonitor(
             randomQueryLevelMonitor(
                 triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = actions)),
-                schedule = IntervalSchedule(interval = 1, unit = ChronoUnit.MINUTES)
+                schedule = IntervalSchedule(interval = 1, unit = MINUTES)
             )
         )
         val monitorRunResultNotThrottled = entityAsMap(executeMonitor(monitor.id))
@@ -1003,16 +991,16 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             prepareTestAnomalyResult(detectorId, user)
             // for old monitor before enable FGAC, the user field is empty
             val monitor = randomADMonitor(inputs = listOf(adSearchInput(detectorId)), triggers = listOf(adMonitorTrigger()), user = null)
-            val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
+            val response = executeMonitor(monitor as Monitor, params = DRYRUN_MONITOR)
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
-            (output["trigger_results"] as HashMap<String, Any>).forEach {
-                    _, v ->
+            (output["trigger_results"] as HashMap<String, Any>).forEach { _, v ->
                 assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             assertEquals(monitor.name, output["monitor_name"])
             @Suppress("UNCHECKED_CAST")
             val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
             @Suppress("UNCHECKED_CAST")
             val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
             assertEquals("Incorrect search result", 1, total["value"])
@@ -1033,16 +1021,16 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 inputs = listOf(adSearchInput(detectorId)), triggers = listOf(adMonitorTrigger()),
                 user = User(user.name, listOf(), user.roles, user.customAttNames)
             )
-            val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
+            val response = executeMonitor(monitor as Monitor, params = DRYRUN_MONITOR)
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
-            (output["trigger_results"] as HashMap<String, Any>).forEach {
-                    _, v ->
+            (output["trigger_results"] as HashMap<String, Any>).forEach { _, v ->
                 assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             assertEquals(monitor.name, output["monitor_name"])
             @Suppress("UNCHECKED_CAST")
             val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
             @Suppress("UNCHECKED_CAST")
             val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
             assertEquals("Incorrect search result", 1, total["value"])
@@ -1060,15 +1048,15 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             prepareTestAnomalyResult(detectorId, user)
             // Test monitor with same user
             val monitor = randomADMonitor(inputs = listOf(adSearchInput(detectorId)), triggers = listOf(adMonitorTrigger()), user = user)
-            val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
+            val response = executeMonitor(monitor as Monitor, params = DRYRUN_MONITOR)
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
-            (output["trigger_results"] as HashMap<String, Any>).forEach {
-                    _, v ->
+            (output["trigger_results"] as HashMap<String, Any>).forEach { _, v ->
                 assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             @Suppress("UNCHECKED_CAST")
             val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
             @Suppress("UNCHECKED_CAST")
             val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
             assertEquals("Incorrect search result", 3, total["value"])
@@ -1089,15 +1077,15 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 inputs = listOf(adSearchInput(detectorId)),
                 triggers = listOf(adMonitorTrigger()), user = randomUser()
             )
-            val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
+            val response = executeMonitor(monitor as Monitor, params = DRYRUN_MONITOR)
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
-            (output["trigger_results"] as HashMap<String, Any>).forEach {
-                    _, v ->
+            (output["trigger_results"] as HashMap<String, Any>).forEach { _, v ->
                 assertFalse((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             @Suppress("UNCHECKED_CAST")
             val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
             @Suppress("UNCHECKED_CAST")
             val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
             assertEquals("Incorrect search result", 0, total["value"])
@@ -1145,6 +1133,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals(monitor.name, output["monitor_name"])
         @Suppress("UNCHECKED_CAST")
         val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
         @Suppress("UNCHECKED_CAST")
         val buckets = searchResult.stringMap("aggregations")?.stringMap("composite_agg")?.get("buckets") as List<Map<String, Any>>
         assertEquals("Incorrect search result", 2, buckets.size)
@@ -1698,7 +1687,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     }
 
     private fun verifyActionExecutionResultInAlert(alert: Alert, expectedResult: Map<String, Int>):
-        MutableMap<String, ActionExecutionResult> {
+            MutableMap<String, ActionExecutionResult> {
         val actionResult = mutableMapOf<String, ActionExecutionResult>()
         for (result in alert.actionExecutionResults) {
             val expected = expectedResult[result.actionId]

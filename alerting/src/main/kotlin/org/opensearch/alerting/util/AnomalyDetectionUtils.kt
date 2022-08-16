@@ -6,9 +6,9 @@
 package org.opensearch.alerting.util
 
 import org.apache.lucene.search.join.ScoreMode
-import org.opensearch.alerting.core.model.SearchInput
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.common.Strings
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.NestedQueryBuilder
@@ -24,6 +24,7 @@ fun isADMonitor(monitor: Monitor): Boolean {
     if (monitor.inputs.size != 1) {
         return false
     }
+
     val input = monitor.inputs[0]
     // AD monitor can only have 1 anomaly result index.
     if (input is SearchInput && input.indices.size == 1 && input.indices[0] == ".opendistro-anomaly-results*") {

@@ -9,14 +9,9 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.support.WriteRequest
-import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorMetadata
-import org.opensearch.alerting.model.action.Action
-import org.opensearch.alerting.model.action.ActionExecutionPolicy
-import org.opensearch.alerting.model.action.ActionExecutionScope
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
@@ -25,6 +20,7 @@ import org.opensearch.client.Client
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory
+import org.opensearch.commons.alerting.model.*
 
 private val logger = LogManager.getLogger("AlertingUtils")
 
@@ -35,11 +31,11 @@ private val logger = LogManager.getLogger("AlertingUtils")
 fun isValidEmail(email: String): Boolean {
     val validEmailPattern = Regex(
         "(?:[a-z0-9!#\$%&'*+\\/=?^_`{|}~-]+(?:\\.[a-z0-9!#\$%&'*+\\/=?^_`{|}~-]+)*" +
-            "|\"(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21\\x23-\\x5b\\x5d-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])*\")" +
-            "@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" +
-            "|\\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\\.){3}" +
-            "(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:" +
-            "(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21-\\x5a\\x53-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])+)\\])",
+                "|\"(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21\\x23-\\x5b\\x5d-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])*\")" +
+                "@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" +
+                "|\\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\\.){3}" +
+                "(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:" +
+                "(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21-\\x5a\\x53-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])+)\\])",
         RegexOption.IGNORE_CASE
     )
 
@@ -102,7 +98,7 @@ fun defaultToPerExecutionAction(
     if (monitorOrTriggerError != null) {
         logger.debug(
             "Trigger [$triggerId] in monitor [$monitorId] encountered an error. Defaulting to " +
-                "[${ActionExecutionScope.Type.PER_EXECUTION}] for action execution to communicate error."
+                    "[${ActionExecutionScope.Type.PER_EXECUTION}] for action execution to communicate error."
         )
         return true
     }
@@ -115,8 +111,8 @@ fun defaultToPerExecutionAction(
     if (totalActionableAlertCount > maxActionableAlertCount) {
         logger.debug(
             "The total actionable alerts for trigger [$triggerId] in monitor [$monitorId] is [$totalActionableAlertCount] " +
-                "which exceeds the maximum of [$maxActionableAlertCount]. " +
-                "Defaulting to [${ActionExecutionScope.Type.PER_EXECUTION}] for action execution."
+                    "which exceeds the maximum of [$maxActionableAlertCount]. " +
+                    "Defaulting to [${ActionExecutionScope.Type.PER_EXECUTION}] for action execution."
         )
         return true
     }

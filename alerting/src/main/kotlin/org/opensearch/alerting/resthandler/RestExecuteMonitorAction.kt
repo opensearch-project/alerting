@@ -7,13 +7,13 @@ package org.opensearch.alerting.resthandler
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.alerting.action.ExecuteMonitorAction
-import org.opensearch.alerting.action.ExecuteMonitorRequest
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentParser.Token.START_OBJECT
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
+import org.opensearch.commons.alerting.action.ExecuteMonitorAction
+import org.opensearch.commons.alerting.action.ExecuteMonitorRequest
+import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.RestHandler.ReplacedRoute
