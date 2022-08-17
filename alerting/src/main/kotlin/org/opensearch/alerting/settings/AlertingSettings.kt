@@ -232,7 +232,7 @@ class AlertingSettings(val client: Client) {
         private fun validateActionsAcrossTriggers(maxActions: Int, totalMaxActions: Int, client: Client?) {
             if (totalMaxActions == DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS) return
 
-            if (totalMaxActions < -1) throw IllegalArgumentException("cannot update this invaild value, $totalMaxActions")
+            if (totalMaxActions < -1) throw IllegalArgumentException("cannot update this invalid value, $totalMaxActions")
 
             if (maxActions > totalMaxActions) {
                 throw IllegalArgumentException(
@@ -245,8 +245,7 @@ class AlertingSettings(val client: Client) {
                     val monitors = getMonitors(client)
                     val triggers = getTriggers(monitors)
 
-                    var currentAmountOfActions = getCurrentAmountOfActions(triggers)
-                    currentAmountOfActions += maxActions
+                    val currentAmountOfActions = getCurrentAmountOfActions(triggers)
 
                     if (currentAmountOfActions > totalMaxActions)
                         throw IllegalArgumentException(
@@ -261,7 +260,7 @@ class AlertingSettings(val client: Client) {
         private fun validateActionsPerTrigger(maxActions: Int, totalMaxActions: Int, client: Client?) {
             if (maxActions == DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER) return
 
-            if (maxActions < -1) throw IllegalArgumentException("cannot update this invaild value, $maxActions")
+            if (maxActions < -1) throw IllegalArgumentException("cannot update this invalid value, $maxActions")
 
             client?.let {
                 runBlocking {
@@ -269,9 +268,15 @@ class AlertingSettings(val client: Client) {
 
                     for (monitor in monitors) {
                         for (trigger in monitor.triggers) {
-                            if (trigger.actions.size > maxActions)
+                            val amountOfActionsInTrigger = trigger.actions.size
+                            if (amountOfActionsInTrigger > maxActions)
                                 throw IllegalArgumentException(
                                     "The amount of actions in the trigger, $maxActions, should not be greater than $totalMaxActions"
+                                )
+                            else if (amountOfActionsInTrigger > totalMaxActions)
+                                throw IllegalArgumentException(
+                                    "Cannot update the maximum amount of actions per trigger to a value that is not equal or greater " +
+                                        "than the current amount of actions in a single trigger"
                                 )
                         }
                     }
