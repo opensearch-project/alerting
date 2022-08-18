@@ -8,6 +8,7 @@ package org.opensearch.alerting.settings
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import org.apache.logging.log4j.LogManager
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin
@@ -47,6 +48,8 @@ class AlertingSettings(val client: Client) {
         const val UNBOUNDED_ACTIONS_ACROSS_TRIGGERS = -1
         const val DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER = UNBOUNDED_ACTIONS_ACROSS_TRIGGERS
         const val DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS = UNBOUNDED_ACTIONS_ACROSS_TRIGGERS
+
+        private val logger = LogManager.getLogger(AlertingSettings::class.java)
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(
             "plugins.alerting.monitor.max_monitors",
@@ -198,9 +201,15 @@ class AlertingSettings(val client: Client) {
         )
 
         internal class TotalMaxActionsAcrossTriggersValidator(val client: Client?) : Setting.Validator<Int> {
-            override fun validate(value: Int) {}
+            private val logger = LogManager.getLogger(MaxActionsPerTriggersValidator::class.java)
+
+            override fun validate(value: Int) {
+                logger.info("TotalMaxActionsAcrossTriggersValidator validating value $value")
+            }
 
             override fun validate(value: Int, settings: Map<Setting<*>, Any>) {
+                logger.info("TotalMaxActionsAcrossTriggersValidator validating value $value with settings")
+
                 val maxActions = settings[TOTAL_MAX_ACTIONS_PER_TRIGGER] as Int
                 validateActionsAcrossTriggers(maxActions, value, client)
             }
@@ -214,9 +223,15 @@ class AlertingSettings(val client: Client) {
         }
 
         internal class MaxActionsPerTriggersValidator(val client: Client?) : Setting.Validator<Int> {
-            override fun validate(value: Int) {}
+            private val logger = LogManager.getLogger(MaxActionsPerTriggersValidator::class.java)
+
+            override fun validate(value: Int) {
+                logger.info("MaxActionsPerTriggersValidator validating value $value")
+            }
 
             override fun validate(value: Int, settings: Map<Setting<*>, Any>) {
+                logger.info("MaxActionsPerTriggersValidator validating value $value with settings")
+
                 val totalMaxActions = settings[TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS] as Int
                 validateActionsPerTrigger(value, totalMaxActions, client)
             }
@@ -230,6 +245,8 @@ class AlertingSettings(val client: Client) {
         }
 
         private fun validateActionsAcrossTriggers(maxActions: Int, totalMaxActions: Int, client: Client?) {
+            logger.info("validateActionsAcrossTriggers maxActions $maxActions totalMaxActions $totalMaxActions")
+
             if (totalMaxActions == DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS) return
 
             if (totalMaxActions < -1) throw IllegalArgumentException("cannot update this invalid value, $totalMaxActions")
@@ -245,7 +262,12 @@ class AlertingSettings(val client: Client) {
                     val monitors = getMonitors(client)
                     val triggers = getTriggers(monitors)
 
+                    logger.info("validateActionsPerTrigger acquired ${monitors.size} monitors.")
+                    logger.info("validateActionsPerTrigger acquired ${triggers.size} triggers.")
+
                     val currentAmountOfActions = getCurrentAmountOfActions(triggers)
+
+                    logger.info("validateActionsPerTrigger acquired $currentAmountOfActions actions.")
 
                     if (currentAmountOfActions > totalMaxActions)
                         throw IllegalArgumentException(
@@ -258,6 +280,8 @@ class AlertingSettings(val client: Client) {
         }
 
         private fun validateActionsPerTrigger(maxActions: Int, totalMaxActions: Int, client: Client?) {
+            logger.info("validateActionsPerTrigger maxActions $maxActions totalMaxActions $totalMaxActions")
+
             if (maxActions == DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER) return
 
             if (maxActions < -1) throw IllegalArgumentException("cannot update this invalid value, $maxActions")
@@ -266,9 +290,13 @@ class AlertingSettings(val client: Client) {
                 runBlocking {
                     val monitors = getMonitors(client)
 
+                    logger.info("validateActionsPerTrigger acquired ${monitors.size} monitors.")
+
                     for (monitor in monitors) {
                         for (trigger in monitor.triggers) {
                             val amountOfActionsInTrigger = trigger.actions.size
+                            logger.info("validateActionsPerTrigger trigger has $amountOfActionsInTrigger actions.")
+
                             if (amountOfActionsInTrigger > maxActions)
                                 throw IllegalArgumentException(
                                     "The amount of actions in the trigger, $maxActions, should not be greater than $totalMaxActions"
