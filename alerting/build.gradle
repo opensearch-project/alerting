@@ -29,6 +29,30 @@ opensearchplugin {
     extendedPlugins = ['lang-painless']
 }
 
+publishing {
+    publications {
+        pluginZip(MavenPublication) { publication ->
+            pom {
+                name = "opensearch-alerting"
+                description = "OpenSearch Alerting plugin"
+                licenses {
+                    license {
+                        name = "The Apache License, Version 2.0"
+                        url = "http://www.apache.org/licenses/LICENSE-2.0.txt"
+                    }
+                }
+                developers {
+                    developer {
+                        name = "OpenSearch"
+                        url = "https://github.com/opensearch-project/alerting"
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 // Prefer elastic bundled versions for conflicts (primarily with AWS SDK).  We need to specify these manually because
 // opensearchplugin sets ResolutionStrategy.failOnVersionConflict. Luckily it is also nice enough to expose (most of) the
 // versions it uses in ext.versions.
