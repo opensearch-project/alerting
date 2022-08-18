@@ -7,6 +7,10 @@ apply plugin: 'java'
 apply plugin: 'org.jetbrains.kotlin.jvm'
 apply plugin: 'jacoco'
 
+configurations.testImplementation {
+    exclude module: "commons-logging"
+}
+
 dependencies {
     compileOnly "org.opensearch:opensearch:${opensearch_version}"
     implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
@@ -15,7 +19,7 @@ dependencies {
     //implementation "com.cronutils:cron-utils:9.1.6"
     api "org.opensearch.client:opensearch-rest-client:${opensearch_version}"
     implementation 'com.google.googlejavaformat:google-java-format:1.10.0'
-    api "org.opensearch:common-utils:${common_utils_version}"
+    api "org.opensearch:common-utils:${opensearch_build}"
     //implementation 'commons-validator:commons-validator:1.7'
 
     testImplementation "org.opensearch.test:framework:${opensearch_version}"
