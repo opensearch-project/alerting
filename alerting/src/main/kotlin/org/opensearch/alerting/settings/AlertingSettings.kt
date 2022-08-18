@@ -204,11 +204,11 @@ class AlertingSettings(val client: Client) {
             private val logger = LogManager.getLogger(MaxActionsPerTriggersValidator::class.java)
 
             override fun validate(value: Int) {
-                logger.info("TotalMaxActionsAcrossTriggersValidator validating value $value")
+                logger.info("Testing1 TotalMaxActionsAcrossTriggersValidator validating value $value")
             }
 
             override fun validate(value: Int, settings: Map<Setting<*>, Any>) {
-                logger.info("TotalMaxActionsAcrossTriggersValidator validating value $value with settings")
+                logger.info("Testing2 TotalMaxActionsAcrossTriggersValidator validating value $value with settings")
 
                 val maxActions = settings[TOTAL_MAX_ACTIONS_PER_TRIGGER] as Int
                 validateActionsAcrossTriggers(maxActions, value, client)
@@ -226,11 +226,11 @@ class AlertingSettings(val client: Client) {
             private val logger = LogManager.getLogger(MaxActionsPerTriggersValidator::class.java)
 
             override fun validate(value: Int) {
-                logger.info("MaxActionsPerTriggersValidator validating value $value")
+                logger.info("Testing3 MaxActionsPerTriggersValidator validating value $value")
             }
 
             override fun validate(value: Int, settings: Map<Setting<*>, Any>) {
-                logger.info("MaxActionsPerTriggersValidator validating value $value with settings")
+                logger.info("Testing4 MaxActionsPerTriggersValidator validating value $value with settings")
 
                 val totalMaxActions = settings[TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS] as Int
                 validateActionsPerTrigger(value, totalMaxActions, client)
@@ -245,7 +245,7 @@ class AlertingSettings(val client: Client) {
         }
 
         private fun validateActionsAcrossTriggers(maxActions: Int, totalMaxActions: Int, client: Client?) {
-            logger.info("validateActionsAcrossTriggers maxActions $maxActions totalMaxActions $totalMaxActions")
+            logger.info("Testing5 validateActionsAcrossTriggers maxActions $maxActions totalMaxActions $totalMaxActions")
 
             if (totalMaxActions == DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS) return
 
@@ -262,12 +262,12 @@ class AlertingSettings(val client: Client) {
                     val monitors = getMonitors(client)
                     val triggers = getTriggers(monitors)
 
-                    logger.info("validateActionsPerTrigger acquired ${monitors.size} monitors.")
-                    logger.info("validateActionsPerTrigger acquired ${triggers.size} triggers.")
+                    logger.info("Testing6 validateActionsPerTrigger acquired ${monitors.size} monitors.")
+                    logger.info("Testing7 validateActionsPerTrigger acquired ${triggers.size} triggers.")
 
                     val currentAmountOfActions = getCurrentAmountOfActions(triggers)
 
-                    logger.info("validateActionsPerTrigger acquired $currentAmountOfActions actions.")
+                    logger.info("Testing8 validateActionsPerTrigger acquired $currentAmountOfActions actions.")
 
                     if (currentAmountOfActions > totalMaxActions)
                         throw IllegalArgumentException(
@@ -280,7 +280,7 @@ class AlertingSettings(val client: Client) {
         }
 
         private fun validateActionsPerTrigger(maxActions: Int, totalMaxActions: Int, client: Client?) {
-            logger.info("validateActionsPerTrigger maxActions $maxActions totalMaxActions $totalMaxActions")
+            logger.info("Testing9 validateActionsPerTrigger maxActions $maxActions totalMaxActions $totalMaxActions")
 
             if (maxActions == DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER) return
 
@@ -290,12 +290,12 @@ class AlertingSettings(val client: Client) {
                 runBlocking {
                     val monitors = getMonitors(client)
 
-                    logger.info("validateActionsPerTrigger acquired ${monitors.size} monitors.")
+                    logger.info("Testing10 validateActionsPerTrigger acquired ${monitors.size} monitors.")
 
                     for (monitor in monitors) {
                         for (trigger in monitor.triggers) {
                             val amountOfActionsInTrigger = trigger.actions.size
-                            logger.info("validateActionsPerTrigger trigger has $amountOfActionsInTrigger actions.")
+                            logger.info("Testing11 validateActionsPerTrigger trigger has $amountOfActionsInTrigger actions.")
 
                             if (amountOfActionsInTrigger > maxActions)
                                 throw IllegalArgumentException(
