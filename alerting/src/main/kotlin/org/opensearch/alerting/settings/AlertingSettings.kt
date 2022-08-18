@@ -246,6 +246,7 @@ class AlertingSettings(val client: Client) {
 
         private fun validateActionsAcrossTriggers(maxActions: Int, totalMaxActions: Int, client: Client?) {
             logger.info("Testing5 validateActionsAcrossTriggers maxActions $maxActions totalMaxActions $totalMaxActions")
+            logger.info("Testing 13 client is null ${client == null}")
 
             if (totalMaxActions == DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS) return
 
@@ -281,6 +282,7 @@ class AlertingSettings(val client: Client) {
 
         private fun validateActionsPerTrigger(maxActions: Int, totalMaxActions: Int, client: Client?) {
             logger.info("Testing9 validateActionsPerTrigger maxActions $maxActions totalMaxActions $totalMaxActions")
+            logger.info("Testing 12 client is null ${client == null}")
 
             if (maxActions == DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER) return
 
@@ -301,7 +303,7 @@ class AlertingSettings(val client: Client) {
                                 throw IllegalArgumentException(
                                     "The amount of actions in the trigger, $maxActions, should not be greater than $totalMaxActions"
                                 )
-                            else if (amountOfActionsInTrigger > totalMaxActions)
+                            else if (amountOfActionsInTrigger < totalMaxActions)
                                 throw IllegalArgumentException(
                                     "Cannot update the maximum amount of actions per trigger to a value that is not equal or greater " +
                                         "than the current amount of actions in a single trigger"
