@@ -240,7 +240,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         this.threadPool = threadPool
         this.clusterService = clusterService
         alertingSettings = AlertingSettings(client)
-        return listOf(sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator)
+        return listOf(
+            sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator, alertingSettings
+        )
     }
 
     override fun getSettings(): List<Setting<*>> {
