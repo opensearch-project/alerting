@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting
 
+import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionResponse
 import org.opensearch.alerting.action.AcknowledgeAlertAction
@@ -130,6 +131,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         @JvmField val LEGACY_OPENDISTRO_EMAIL_GROUP_BASE_URI = "$LEGACY_OPENDISTRO_DESTINATION_BASE_URI/email_groups"
         @JvmField val FINDING_BASE_URI = "/_plugins/_alerting/findings"
         @JvmField val ALERTING_JOB_TYPES = listOf("monitor")
+        private val logger = LogManager.getLogger(AlertingPlugin::class.java)
     }
 
     lateinit var runner: MonitorRunnerService
@@ -216,6 +218,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         repositoriesServiceSupplier: Supplier<RepositoriesService>
     ): Collection<Any> {
         // Need to figure out how to use the OpenSearch DI classes rather than handwiring things here.
+        logger.info("zhanncha, createComponents call")
+
         val settings = environment.settings()
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
         runner = MonitorRunnerService
@@ -246,6 +250,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     }
 
     override fun getSettings(): List<Setting<*>> {
+        logger.info("zhanncha, getSettings call")
         return listOf(
             ScheduledJobSettings.REQUEST_TIMEOUT,
             ScheduledJobSettings.SWEEP_BACKOFF_MILLIS,
