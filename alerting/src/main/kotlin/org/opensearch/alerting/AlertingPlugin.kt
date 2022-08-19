@@ -30,6 +30,7 @@ import org.opensearch.alerting.core.action.node.ScheduledJobsStatsTransportActio
 import org.opensearch.alerting.core.model.ClusterMetricsInput
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.ScheduledJob
+import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler
 import org.opensearch.alerting.core.schedule.JobScheduler
@@ -143,7 +144,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     lateinit var alertIndices: AlertIndices
     lateinit var clusterService: ClusterService
     lateinit var destinationMigrationCoordinator: DestinationMigrationCoordinator
-    lateinit var alertingSettings: AlertingSettings
+    // lateinit var alertingSettings: AlertingSettings
+    lateinit var client: Client
 
     override fun getRestHandlers(
         settings: Settings,
@@ -243,14 +245,17 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool, scheduledJobIndices)
         this.threadPool = threadPool
         this.clusterService = clusterService
-        alertingSettings = AlertingSettings(client, clusterService)
+        this.client = client
+        // alertingSettings = AlertingSettings(client, clusterService)
         return listOf(
-            sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator, alertingSettings
+            sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator
         )
     }
 
     override fun getSettings(): List<Setting<*>> {
         logger.info("zhanncha, getSettings call")
+        logger.info("zhanncha, clusterService is null ${clusterService.state().routingTable.index(SCHEDULED_JOBS_INDEX) == null}")
+        logger.info("zhanncha, getSettings client is null ${client == null}")
         return listOf(
             ScheduledJobSettings.REQUEST_TIMEOUT,
             ScheduledJobSettings.SWEEP_BACKOFF_MILLIS,
