@@ -239,7 +239,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool, scheduledJobIndices)
         this.threadPool = threadPool
         this.clusterService = clusterService
-        alertingSettings = AlertingSettings(client)
+        alertingSettings = AlertingSettings(client, clusterService)
         return listOf(
             sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator, alertingSettings
         )
