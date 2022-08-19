@@ -251,13 +251,13 @@ String bwcVersion = "1.1.0.0"
 String baseName = "alertingBwcCluster"
 String bwcFilePath = "src/test/resources/bwc"
 String bwcOpenSearchPlugin = "opensearch-alerting-" + bwcVersion + ".zip"
-String bwcRemoteFile = 'https://ci.opensearch.org/ci/dbc/bundle-build/1.1.0/20210930/linux/x64/builds/opensearch/plugins/' + bwcOpenSearchPlugin
+String bwcRemoteFile = 'https://ci.opensearch.org/ci/dbc/bundle-build/1.1.0/2.2.1930/linux/x64/builds/opensearch/plugins/' + bwcOpenSearchPlugin
 
 2.times {i ->
     testClusters {
         "${baseName}$i" {
             testDistribution = "ARCHIVE"
-            versions = ["1.1.0", "2.2.0-SNAPSHOT"]
+            versions = ["1.1.0", "2.2.1-SNAPSHOT"]
             numberOfNodes = 3
             plugin(provider(new Callable<RegularFile>(){
                 @Override
