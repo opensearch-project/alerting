@@ -254,7 +254,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
 
     override fun getSettings(): List<Setting<*>> {
         logger.info("zhanncha, getSettings call")
-        logger.info("zhanncha, clusterService is null ${clusterService == null}")
+        // logger.info("zhanncha, clusterService is null ${clusterService == null}")
         logger.info("zhanncha, getSettings client is null ${client == null}")
         return listOf(
             ScheduledJobSettings.REQUEST_TIMEOUT,
