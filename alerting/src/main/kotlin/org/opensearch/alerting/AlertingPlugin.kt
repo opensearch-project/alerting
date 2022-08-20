@@ -5,6 +5,8 @@
 
 package org.opensearch.alerting
 
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionResponse
@@ -255,7 +257,13 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     override fun getSettings(): List<Setting<*>> {
         logger.info("zhanncha, getSettings call")
         // logger.info("zhanncha, clusterService is null ${clusterService == null}")
-        logger.info("zhanncha, getSettings client is not null ${client != null}")
+        // logger.info("zhanncha, getSettings client is null ${client == null}")
+        client?.let {
+            GlobalScope.launch {
+                val monitors = AlertingSettings.getMonitors(client)
+                logger.info("zhanncha monitors = $monitors")
+            }
+        }
         return listOf(
             ScheduledJobSettings.REQUEST_TIMEOUT,
             ScheduledJobSettings.SWEEP_BACKOFF_MILLIS,
