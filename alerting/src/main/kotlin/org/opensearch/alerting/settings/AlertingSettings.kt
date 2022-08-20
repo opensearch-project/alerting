@@ -17,7 +17,6 @@ import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.Trigger
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.client.Client
-import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.Strings
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.unit.TimeValue
@@ -34,16 +33,14 @@ import java.util.concurrent.TimeUnit
 /**
  * settings specific to [AlertingPlugin]. These settings include things like history index max age, request timeout, etc...
  */
-class AlertingSettings(val client: Client, val clusterServices: ClusterService) {
+class AlertingSettings(val client: Client) {
 
     init {
-        internalClient = client
-        internalClusterServices = clusterServices
+        setClient(client)
     }
 
     companion object {
-        internal var internalClient: Client? = null
-        internal var internalClusterServices: ClusterService? = null
+        private var internalClient: Client? = null
 
         const val MONITOR_MAX_INPUTS = 1
         const val MONITOR_MAX_TRIGGERS = 10
@@ -54,13 +51,8 @@ class AlertingSettings(val client: Client, val clusterServices: ClusterService) 
 
         private val logger = LogManager.getLogger(AlertingSettings::class.java)
 
-        fun totalMaxActionsAcrossTriggers(client: Client): Setting<Int>? {
-            return Setting.intSetting(
-                "plugins.alerting.total_max_actions_across_triggers",
-                DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS,
-                -1, TotalMaxActionsAcrossTriggersValidator(client),
-                Setting.Property.NodeScope, Setting.Property.Dynamic
-            )
+        private fun setClient(client: Client) {
+            internalClient = client
         }
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(
@@ -202,19 +194,17 @@ class AlertingSettings(val client: Client, val clusterServices: ClusterService) 
         val TOTAL_MAX_ACTIONS_PER_TRIGGER = Setting.intSetting(
             "plugins.alerting.max_actions_per_trigger",
             DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER,
-            -1, MaxActionsPerTriggersValidator(internalClient, internalClusterServices),
+            -1, MaxActionsPerTriggersValidator(),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
         val TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS = Setting.intSetting(
             "plugins.alerting.total_max_actions_across_triggers",
             DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS,
-            -1, TotalMaxActionsAcrossTriggersValidator(internalClient),
+            -1, TotalMaxActionsAcrossTriggersValidator(),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        internal class TotalMaxActionsAcrossTriggersValidator(
-            val client: Client?
-        ) : Setting.Validator<Int> {
+        internal class TotalMaxActionsAcrossTriggersValidator() : Setting.Validator<Int> {
             private val logger = LogManager.getLogger(MaxActionsPerTriggersValidator::class.java)
 
             override fun validate(value: Int) {
@@ -225,7 +215,7 @@ class AlertingSettings(val client: Client, val clusterServices: ClusterService) 
                 logger.info("Testing2 TotalMaxActionsAcrossTriggersValidator validating value $value with settings")
 
                 val maxActions = settings[TOTAL_MAX_ACTIONS_PER_TRIGGER] as Int
-                validateActionsAcrossTriggers(maxActions, value, client)
+                validateActionsAcrossTriggers(maxActions, value)
             }
 
             override fun settings(): MutableIterator<Setting<*>> {
@@ -236,7 +226,7 @@ class AlertingSettings(val client: Client, val clusterServices: ClusterService) 
             }
         }
 
-        internal class MaxActionsPerTriggersValidator(val client: Client?, val clusterServices: ClusterService?) : Setting.Validator<Int> {
+        internal class MaxActionsPerTriggersValidator() : Setting.Validator<Int> {
             private val logger = LogManager.getLogger(MaxActionsPerTriggersValidator::class.java)
 
             override fun validate(value: Int) {
@@ -247,7 +237,7 @@ class AlertingSettings(val client: Client, val clusterServices: ClusterService) 
                 logger.info("Testing4 MaxActionsPerTriggersValidator validating value $value with settings")
 
                 val totalMaxActions = settings[TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS] as Int
-                validateActionsPerTrigger(value, totalMaxActions, client, clusterServices)
+                validateActionsPerTrigger(value, totalMaxActions)
             }
 
             override fun settings(): MutableIterator<Setting<*>> {
@@ -258,13 +248,9 @@ class AlertingSettings(val client: Client, val clusterServices: ClusterService) 
             }
         }
 
-        private fun validateActionsAcrossTriggers(
-            maxActions: Int,
-            totalMaxActions: Int,
-            client: Client?
-        ) {
+        private fun validateActionsAcrossTriggers(maxActions: Int, totalMaxActions: Int) {
             logger.info("Testing5 validateActionsAcrossTriggers maxActions $maxActions totalMaxActions $totalMaxActions")
-            logger.info("Testing 13 client is null ${client == null}")
+            logger.info("Testing 13 client is null ${internalClient == null}")
 
             if (totalMaxActions == DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS) return
 
@@ -276,9 +262,9 @@ class AlertingSettings(val client: Client, val clusterServices: ClusterService) 
                         "should not be greater than that of the overall max actions across all triggers of the monitor, $totalMaxActions"
                 )
             }
-            client?.let {
+            internalClient?.let {
                 GlobalScope.launch {
-                    val monitors = getMonitors(client)
+                    val monitors = getMonitors(it)
                     val triggers = getTriggers(monitors)
 
                     logger.info("Testing6 validateActionsPerTrigger acquired ${monitors.size} monitors.")
@@ -298,18 +284,17 @@ class AlertingSettings(val client: Client, val clusterServices: ClusterService) 
             }
         }
 
-        private fun validateActionsPerTrigger(maxActions: Int, totalMaxActions: Int, client: Client?, clusterServices: ClusterService?) {
+        private fun validateActionsPerTrigger(maxActions: Int, totalMaxActions: Int) {
             logger.info("Testing9 validateActionsPerTrigger maxActions $maxActions totalMaxActions $totalMaxActions")
-            logger.info("Testing 12 client is null ${client == null}")
-            logger.info("Testing 14 clusterService is ${clusterServices == null}")
+            logger.info("Testing 12 client is null ${internalClient == null}")
 
             if (maxActions == DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER) return
 
             if (maxActions < -1) throw IllegalArgumentException("cannot update this invalid value, $maxActions")
 
-            client?.let {
+            internalClient?.let {
                 runBlocking {
-                    val monitors = getMonitors(client)
+                    val monitors = getMonitors(it)
 
                     logger.info("Testing10 validateActionsPerTrigger acquired ${monitors.size} monitors.")
 
@@ -333,7 +318,7 @@ class AlertingSettings(val client: Client, val clusterServices: ClusterService) 
             }
         }
 
-        suspend fun getMonitors(client: Client): List<Monitor> {
+        private suspend fun getMonitors(client: Client): List<Monitor> {
             val monitors = mutableListOf<Monitor>()
             val start = 0
             val configName = "monitor"

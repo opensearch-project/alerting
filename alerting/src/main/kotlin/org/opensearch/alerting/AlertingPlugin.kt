@@ -5,9 +5,6 @@
 
 package org.opensearch.alerting
 
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
-import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionResponse
 import org.opensearch.alerting.action.AcknowledgeAlertAction
@@ -32,7 +29,6 @@ import org.opensearch.alerting.core.action.node.ScheduledJobsStatsTransportActio
 import org.opensearch.alerting.core.model.ClusterMetricsInput
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler
 import org.opensearch.alerting.core.schedule.JobScheduler
@@ -134,7 +130,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         @JvmField val LEGACY_OPENDISTRO_EMAIL_GROUP_BASE_URI = "$LEGACY_OPENDISTRO_DESTINATION_BASE_URI/email_groups"
         @JvmField val FINDING_BASE_URI = "/_plugins/_alerting/findings"
         @JvmField val ALERTING_JOB_TYPES = listOf("monitor")
-        private val logger = LogManager.getLogger(AlertingPlugin::class.java)
     }
 
     lateinit var runner: MonitorRunnerService
@@ -146,8 +141,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     lateinit var alertIndices: AlertIndices
     lateinit var clusterService: ClusterService
     lateinit var destinationMigrationCoordinator: DestinationMigrationCoordinator
-    // lateinit var alertingSettings: AlertingSettings
-    lateinit var client: Client
+    lateinit var alertingSettings: AlertingSettings
 
     override fun getRestHandlers(
         settings: Settings,
@@ -222,8 +216,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         repositoriesServiceSupplier: Supplier<RepositoriesService>
     ): Collection<Any> {
         // Need to figure out how to use the OpenSearch DI classes rather than handwiring things here.
-        logger.info("zhanncha, createComponents call")
-
         val settings = environment.settings()
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
         runner = MonitorRunnerService
@@ -247,23 +239,13 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool, scheduledJobIndices)
         this.threadPool = threadPool
         this.clusterService = clusterService
-        this.client = client
-        // alertingSettings = AlertingSettings(client, clusterService)
+        alertingSettings = AlertingSettings(client)
         return listOf(
-            sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator
+            sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator, alertingSettings
         )
     }
 
     override fun getSettings(): List<Setting<*>> {
-        logger.info("zhanncha, getSettings call")
-        // logger.info("zhanncha, clusterService is null ${clusterService == null}")
-        // logger.info("zhanncha, getSettings client is null ${client == null}")
-        client?.let {
-            GlobalScope.launch {
-                val monitors = AlertingSettings.getMonitors(client)
-                logger.info("zhanncha monitors = $monitors")
-            }
-        }
         return listOf(
             ScheduledJobSettings.REQUEST_TIMEOUT,
             ScheduledJobSettings.SWEEP_BACKOFF_MILLIS,
