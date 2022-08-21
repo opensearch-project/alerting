@@ -13,7 +13,6 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.Trigger
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -337,7 +336,6 @@ class AlertingSettings(val client: Client) {
             val searchRequest = SearchRequest()
                 .source(searchSourceBuilder)
                 .indices(AlertIndices.ALL_FINDING_INDEX_PATTERN)
-                .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
             val response: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
             logger.info("Testing14Monitors response=> status: {${response.status()}} \n hits: {${response.hits.totalHits?.value}}")
 
