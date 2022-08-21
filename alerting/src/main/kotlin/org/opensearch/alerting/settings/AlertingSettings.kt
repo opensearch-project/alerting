@@ -337,7 +337,8 @@ class AlertingSettings(val client: Client) {
                 .source(searchSourceBuilder)
                 .indices(AlertIndices.ALL_FINDING_INDEX_PATTERN)
             val response: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
-            logger.info("Testing14Monitors response=> status: {${response.status()}} \n hits: {${response.hits.totalHits?.value}}")
+            logger.info("Testing14Monitors response=> status: {${response.status()}} \n totalhits: {${response.hits.totalHits?.value}}" +
+                    " hits: ${response.hits.hits.size}")
 
             if (response.status() != RestStatus.OK)
                 return emptyList()
@@ -346,6 +347,8 @@ class AlertingSettings(val client: Client) {
                 val xcp = XContentFactory.xContent(XContentType.JSON)
                     .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
 
+                logger.info("Testing15Hits $xcp")
+
                 val monitor = Monitor.parse(
                     xcp = xcp,
                     id = hit.id,
@@ -353,6 +356,7 @@ class AlertingSettings(val client: Client) {
                 )
 
                 monitors.add(monitor)
+                logger.info("Testing16Add-Monitor monitor ${monitor.id} added.")
             }
 
             return monitors
