@@ -12,7 +12,9 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.action.SearchMonitorAction
+import org.opensearch.alerting.action.SearchMonitorRequest
+import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.Trigger
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -331,14 +333,23 @@ class AlertingSettings(val client: Client) {
             val queryBuilder = QueryBuilders.boolQuery()
                 .should(QueryBuilders.existsQuery(configName))
             queryBuilder.filter(QueryBuilders.existsQuery(Monitor.MONITOR_TYPE))
+
             searchSourceBuilder.query(queryBuilder)
+                .seqNoAndPrimaryTerm(true)
+                .version(true)
 
             val searchRequest = SearchRequest()
                 .source(searchSourceBuilder)
-                .indices(AlertIndices.ALL_FINDING_INDEX_PATTERN)
-            val response: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
+                .indices(ALL_ALERT_INDEX_PATTERN) // Could be ALL_FINDING_INDEX_PATTERN
+
+            val searchMonitorRequest = SearchMonitorRequest(searchRequest)
+
+            val response: SearchResponse = client.suspendUntil {
+                client.execute(SearchMonitorAction.INSTANCE, searchMonitorRequest, it)
+            }
+
             logger.info(
-                "Testing14Monitors response=> status: {${response.status()}} \n totalhits: {${response.hits.totalHits?.value}}" +
+                "Testing14Monitors response=> status: {${response.status()}} \n totalHits: {${response.hits.totalHits?.value}}" +
                     " hits: ${response.hits.hits.size}"
             )
 
