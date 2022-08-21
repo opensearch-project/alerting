@@ -252,7 +252,7 @@ class AlertingSettings(val client: Client) {
             logger.info("Testing5 validateActionsAcrossTriggers maxActions $maxActions totalMaxActions $totalMaxActions")
             logger.info("Testing 13 client is null ${internalClient == null}")
 
-            if (totalMaxActions == DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS) return
+            if (maxActions == DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS) return
 
             if (totalMaxActions < -1) throw IllegalArgumentException("cannot update this invalid value, $totalMaxActions")
 
@@ -290,7 +290,7 @@ class AlertingSettings(val client: Client) {
 
             if (maxActions == DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER) return
 
-            if (maxActions < -1) throw IllegalArgumentException("cannot update this invalid value, $maxActions")
+            if (totalMaxActions < -1) throw IllegalArgumentException("cannot update this invalid value, $maxActions")
 
             internalClient?.let {
                 runBlocking {
@@ -337,6 +337,7 @@ class AlertingSettings(val client: Client) {
                 .source(searchSourceBuilder)
                 .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
             val response: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
+            logger.info("Testing14Monitors response=> status: {${response.status()}} \n hits: {${response.hits.totalHits?.value}}")
 
             if (response.status() != RestStatus.OK)
                 return emptyList()
@@ -363,6 +364,8 @@ class AlertingSettings(val client: Client) {
             monitors.map {
                 triggers.addAll(triggers)
             }
+
+            logger.info("Testing15Triggers size: ${triggers.size}")
 
             return triggers
         }
