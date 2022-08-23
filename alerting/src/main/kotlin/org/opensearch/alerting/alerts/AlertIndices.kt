@@ -281,7 +281,7 @@ class AlertIndices(
 
     suspend fun createOrUpdateInitialAlertHistoryIndex(monitor: Monitor) {
         if (monitor.dataSources?.alertsIndex == null || monitor.dataSources.alertsIndex!!.isEmpty()) {
-            return createOrUpdateAlertIndex()
+            return createOrUpdateInitialAlertHistoryIndex()
         }
     }
     suspend fun createOrUpdateInitialAlertHistoryIndex() {
