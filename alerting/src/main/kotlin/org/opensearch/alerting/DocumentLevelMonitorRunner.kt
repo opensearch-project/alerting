@@ -14,10 +14,9 @@ import org.opensearch.action.search.SearchAction
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.WriteRequest
-import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRITE_INDEX
+import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
-import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.ActionExecutionResult
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.AlertingConfigAccessor.Companion.getMonitorMetadata
@@ -33,6 +32,7 @@ import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.updateMonitorMetadata
@@ -71,9 +71,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         var monitorResult = MonitorRunResult<DocumentLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
 
         try {
-            monitorCtx.alertIndices!!.createOrUpdateAlertIndex()
-            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex()
-            monitorCtx.alertIndices!!.createOrUpdateInitialFindingHistoryIndex()
+            monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor)
+            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(monitor)
+            monitorCtx.alertIndices!!.createOrUpdateInitialFindingHistoryIndex(monitor)
         } catch (e: Exception) {
             val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
             logger.error("Error setting up alerts and findings indices for monitor: $id", e)
@@ -87,7 +87,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             return monitorResult.copy(error = AlertingException.wrap(e))
         }
 
-        monitorCtx.docLevelMonitorQueries!!.initDocLevelQueryIndex()
+        monitorCtx.docLevelMonitorQueries!!.initDocLevelQueryIndex(monitor)
         monitorCtx.docLevelMonitorQueries!!.indexDocLevelQueries(
             monitor = monitor,
             monitorId = monitor.id,
@@ -291,7 +291,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 alert.copy(actionExecutionResults = actionExecutionResults)
             }
 
-            monitorCtx.retryPolicy?.let { monitorCtx.alertService!!.saveAlerts(updatedAlerts, it) }
+            monitorCtx.retryPolicy?.let { monitorCtx.alertService!!.saveAlerts(monitor, updatedAlerts, it) }
         }
         return triggerResult
     }
@@ -320,7 +320,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         logger.debug("Findings: $findingStr")
 
         if (shouldCreateFinding) {
-            val indexRequest = IndexRequest(FINDING_HISTORY_WRITE_INDEX)
+            val indexRequest = IndexRequest(AlertIndices.getOrDefaultFindingsHistoryIndex(monitor))
                 .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
                 .source(findingStr, XContentType.JSON)
                 .id(finding.id)
@@ -507,7 +507,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         }
         boolQueryBuilder.filter(percolateQueryBuilder)
 
-        val searchRequest = SearchRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
+        val queryIndex = DocLevelMonitorQueries.getOrDefaultQueryIndex(monitor)
+        val searchRequest = SearchRequest(queryIndex)
         val searchSourceBuilder = SearchSourceBuilder()
         searchSourceBuilder.query(boolQueryBuilder)
         searchRequest.source(searchSourceBuilder)
@@ -517,7 +518,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         }
 
         if (response.status() !== RestStatus.OK) {
-            throw IOException("Failed to search percolate index: ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}")
+            throw IOException("Failed to search percolate index: $queryIndex")
         }
         return response.hits
     }

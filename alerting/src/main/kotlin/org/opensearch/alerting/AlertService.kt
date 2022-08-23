@@ -277,16 +277,17 @@ class AlertService(
         } ?: listOf()
     }
 
-    suspend fun saveAlerts(alerts: List<Alert>, retryPolicy: BackoffPolicy, allowUpdatingAcknowledgedAlert: Boolean = false) {
+    suspend fun saveAlerts(monitor: Monitor, alerts: List<Alert>, retryPolicy: BackoffPolicy, allowUpdatingAcknowledgedAlert: Boolean = false) {
         var requestsToRetry = alerts.flatMap { alert ->
             // We don't want to set the version when saving alerts because the MonitorRunner has first priority when writing alerts.
             // In the rare event that a user acknowledges an alert between when it's read and when it's written
             // back we're ok if that acknowledgement is lost. It's easier to get the user to retry than for the runner to
             // spend time reloading the alert and writing it back.
+            val alertIndex = AlertIndices.getOrDefaultAlertIndex(monitor)
             when (alert.state) {
                 Alert.State.ACTIVE, Alert.State.ERROR -> {
                     listOf<DocWriteRequest<*>>(
-                        IndexRequest(AlertIndices.ALERT_INDEX)
+                        IndexRequest(alertIndex)
                             .routing(alert.monitorId)
                             .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                             .id(if (alert.id != Alert.NO_ID) alert.id else null)
@@ -297,7 +298,7 @@ class AlertService(
                     // and updated by the MonitorRunner
                     if (allowUpdatingAcknowledgedAlert) {
                         listOf<DocWriteRequest<*>>(
-                            IndexRequest(AlertIndices.ALERT_INDEX)
+                            IndexRequest(alertIndex)
                                 .routing(alert.monitorId)
                                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                                 .id(if (alert.id != Alert.NO_ID) alert.id else null)
@@ -311,7 +312,7 @@ class AlertService(
                 }
                 Alert.State.COMPLETED -> {
                     listOfNotNull<DocWriteRequest<*>>(
-                        DeleteRequest(AlertIndices.ALERT_INDEX, alert.id)
+                        DeleteRequest(alertIndex, alert.id)
                             .routing(alert.monitorId),
                         // Only add completed alert to history index if history is enabled
                         if (alertIndices.isAlertHistoryEnabled()) {

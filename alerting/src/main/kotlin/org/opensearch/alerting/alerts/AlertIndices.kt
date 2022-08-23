@@ -23,6 +23,7 @@ import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_HISTORY_WRITE_INDEX
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
+import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_HISTORY_ENABLED
@@ -101,6 +102,9 @@ class AlertIndices(
         /** The alias of the index in which to write alert history */
         const val ALERT_HISTORY_WRITE_INDEX = ".opendistro-alerting-alert-history-write"
 
+        /** The alias of the index in which to write alert history */
+        const val ALERT_HISTORY_WRITE_INDEX_SUFFIX = "-history-write"
+
         /** The alias of the index in which to write alert finding */
         const val FINDING_HISTORY_WRITE_INDEX = ".opensearch-alerting-finding-history-write"
 
@@ -116,6 +120,9 @@ class AlertIndices(
         /** The index name pattern to create finding history indices */
         const val FINDING_HISTORY_INDEX_PATTERN = "<.opensearch-alerting-finding-history-{now/d}-1>"
 
+        /** The index name pattern to create finding history indices */
+        const val FINDING_HISTORY_INDEX_PATTERN_SUFFIX = "<-history-{now/d}-1>"
+
         /** The index name pattern to query all alerts, history and current alerts. */
         const val ALL_ALERT_INDEX_PATTERN = ".opendistro-alerting-alert*"
 
@@ -129,6 +136,23 @@ class AlertIndices(
         @JvmStatic
         fun findingMapping() =
             AlertIndices::class.java.getResource("finding_mapping.json").readText()
+
+        @JvmStatic
+        fun getOrDefaultAlertIndex(monitor: Monitor): String {
+            var alertIndex = ALERT_INDEX
+            if (monitor.dataSources != null && monitor.dataSources.alertsIndex != null) {
+                alertIndex = monitor.dataSources.alertsIndex!!
+            }
+            return alertIndex
+        }
+
+        @JvmStatic
+        fun getOrDefaultFindingsHistoryIndex(monitor: Monitor): String {
+            if (monitor.dataSources?.findingsIndex == null || monitor.dataSources.findingsIndex!!.isEmpty()) {
+                return FINDING_HISTORY_WRITE_INDEX
+            }
+            return monitor.dataSources.findingsIndex!!
+        }
 
         private val logger = LogManager.getLogger(AlertIndices::class.java)
     }
@@ -243,7 +267,31 @@ class AlertIndices(
         }
         alertIndexInitialized
     }
+    suspend fun createOrUpdateAlertIndex(monitor: Monitor) {
 
+        if (monitor.dataSources?.alertsIndex == null || monitor.dataSources.alertsIndex!!.isEmpty()) {
+            return createOrUpdateAlertIndex()
+        }
+        val alertsIndex = monitor.dataSources.alertsIndex
+        if (!clusterService.state().routingTable().hasIndex(alertsIndex)) {
+            alertIndexInitialized = createIndex(alertsIndex!!, alertMapping())
+        } else {
+            updateIndexMapping(alertsIndex!!, alertMapping())
+        }
+    }
+
+    suspend fun createOrUpdateInitialAlertHistoryIndex(monitor: Monitor) {
+        if (monitor.dataSources?.alertsIndex == null || monitor.dataSources.alertsIndex!!.isEmpty()) {
+            return createOrUpdateAlertIndex()
+        }
+        val alertsIndex = monitor.dataSources.alertsIndex
+        val alertHistoryWriteIndex = alertsIndex + ALERT_HISTORY_WRITE_INDEX_SUFFIX
+        if (!clusterService.state().routingTable().hasIndex(alertHistoryWriteIndex)) {
+            createIndex(alertHistoryWriteIndex, alertMapping())
+        } else {
+            updateIndexMapping(alertHistoryWriteIndex, alertMapping(), false)
+        }
+    }
     suspend fun createOrUpdateInitialAlertHistoryIndex() {
         if (!alertHistoryIndexInitialized) {
             alertHistoryIndexInitialized = createIndex(ALERT_HISTORY_INDEX_PATTERN, alertMapping(), ALERT_HISTORY_WRITE_INDEX)
@@ -271,6 +319,21 @@ class AlertIndices(
             updateIndexMapping(FINDING_HISTORY_WRITE_INDEX, findingMapping(), true)
         }
         findingHistoryIndexInitialized
+    }
+
+    suspend fun createOrUpdateInitialFindingHistoryIndex(monitor: Monitor) {
+        if (monitor.dataSources?.findingsIndex == null || monitor.dataSources.findingsIndex!!.isEmpty()) {
+            return createOrUpdateInitialFindingHistoryIndex()
+        }
+        val findingsIndex = monitor.dataSources.findingsIndex!!
+        if (!clusterService.state().routingTable().hasIndex(findingsIndex)) {
+            createIndex(
+                findingsIndex,
+                findingMapping()
+            )
+        } else {
+            updateIndexMapping(findingsIndex, findingMapping(), false)
+        }
     }
 
     private suspend fun createIndex(index: String, schemaMapping: String, alias: String? = null): Boolean {

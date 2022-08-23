@@ -442,9 +442,9 @@ class TransportIndexMonitorAction @Inject constructor(
 
         @Suppress("UNCHECKED_CAST")
         private suspend fun indexDocLevelMonitorQueries(monitor: Monitor, monitorId: String, refreshPolicy: RefreshPolicy) {
-            if (!docLevelMonitorQueries.docLevelQueryIndexExists()) {
-                docLevelMonitorQueries.initDocLevelQueryIndex()
-                log.info("Central Percolation index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX} created")
+            if (!docLevelMonitorQueries.docLevelQueryIndexExists(monitor)) {
+                docLevelMonitorQueries.initDocLevelQueryIndex(monitor)
+                log.info("Central Percolation index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX} created") // todo account for configurable index name in log lines
             }
             docLevelMonitorQueries.indexDocLevelQueries(
                 monitor,

@@ -35,6 +35,22 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         fun docLevelQueriesMappings(): String {
             return DocLevelMonitorQueries::class.java.classLoader.getResource("mappings/doc-level-queries.json").readText()
         }
+        @JvmStatic
+        fun getOrDefaultQueryIndex(monitor: Monitor): String {
+            var queryIndex = ScheduledJob.DOC_LEVEL_QUERIES_INDEX
+            if (monitor.dataSources != null && monitor.dataSources.queryIndex != null) {
+                queryIndex = monitor.dataSources.queryIndex!!
+            }
+            return queryIndex
+        }
+        @JvmStatic
+        fun getOrDefaultQueryIndexMapping(monitor: Monitor): String {
+            var queryIndex = ScheduledJob.DOC_LEVEL_QUERIES_INDEX
+            if (monitor.dataSources != null && monitor.dataSources.queryIndex != null) {
+                queryIndex = monitor.dataSources.queryIndex!!
+            }
+            return queryIndex
+        }
     }
 
     suspend fun initDocLevelQueryIndex(): Boolean {
@@ -57,6 +73,38 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             }
         }
         return true
+    }
+    suspend fun initDocLevelQueryIndex(monitor: Monitor): Boolean {
+
+        if (monitor.dataSources == null || monitor.dataSources.queryIndex == null || monitor.dataSources.queryIndex!!.isEmpty()) {
+            return initDocLevelQueryIndex()
+        }
+        val queryIndex = monitor.dataSources.queryIndex
+
+        if (!clusterService.state().routingTable.hasIndex(queryIndex)) {
+            val indexRequest = CreateIndexRequest(queryIndex)
+                .mapping(getOrDefaultQueryIndexMapping(monitor))
+                .settings(
+                    Settings.builder().put("index.hidden", true)
+                        .build()
+                )
+            return try {
+                val createIndexResponse: CreateIndexResponse = client.suspendUntil { client.admin().indices().create(indexRequest, it) }
+                createIndexResponse.isAcknowledged
+            } catch (t: ResourceAlreadyExistsException) {
+                if (t.message?.contains("already exists") == true) {
+                    true
+                } else {
+                    throw t
+                }
+            }
+        }
+        return true
+    }
+
+    fun docLevelQueryIndexExists(monitor: Monitor): Boolean {
+        val clusterState = clusterService.state()
+        return clusterState.routingTable.hasIndex(getOrDefaultQueryIndex(monitor))
     }
 
     fun docLevelQueryIndexExists(): Boolean {
@@ -100,8 +148,9 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                             "${it.key}_${indexName}_$monitorId" to it.value
                         }
                     }
+                    val queryIndex = getOrDefaultQueryIndex(monitor)
 
-                    val updateMappingRequest = PutMappingRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
+                    val updateMappingRequest = PutMappingRequest(queryIndex)
                     updateMappingRequest.source(mapOf<String, Any>("properties" to updatedProperties))
                     val updateMappingResponse: AcknowledgedResponse = client.suspendUntil {
                         client.admin().indices().putMapping(updateMappingRequest, it)
@@ -114,7 +163,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                             properties.forEach { prop ->
                                 query = query.replace("${prop.key}:", "${prop.key}_${indexName}_$monitorId:")
                             }
-                            val indexRequest = IndexRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
+                            val indexRequest = IndexRequest(queryIndex)
                                 .id(it.id + "_${indexName}_$monitorId")
                                 .source(
                                     mapOf(

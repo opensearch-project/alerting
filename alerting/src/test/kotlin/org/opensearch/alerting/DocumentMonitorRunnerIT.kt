@@ -7,6 +7,7 @@ package org.opensearch.alerting
 
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_FINDING_INDEX_PATTERN
+import org.opensearch.alerting.core.model.DataSources
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.model.action.ActionExecutionPolicy
@@ -577,6 +578,162 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             assertTrue("Found doc that doesn't match query: $it", nonMatchingDocIds.intersect(docIds).isEmpty())
             assertFalse("Found an unexpected finding $it", matchingDocIds.intersect(docIds).isNotEmpty())
         }
+    }
+
+    fun `test execute monitor stores findings in custom index`() {
+
+        val testIndex = createTestIndex()
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+                "message" : "This is an error from IAD region",
+                "test_strict_date_time" : "$testTime",
+                "test_field" : "us-west-2"
+            }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val alertCategories = AlertCategory.values()
+        val actionExecutionScope = PerAlertActionScope(
+            actionableAlerts = (1..randomInt(alertCategories.size)).map { alertCategories[it - 1] }.toSet()
+        )
+        val actionExecutionPolicy = ActionExecutionPolicy(actionExecutionScope)
+        val actions = (0..randomInt(10)).map {
+            randomActionWithPolicy(
+                template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+                destinationId = createDestination().id,
+                actionExecutionPolicy = actionExecutionPolicy
+            )
+        }
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = actions)
+        val customFindingsIndex = "custom_findings_index"
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources = DataSources(findingsIndex = customFindingsIndex)
+            )
+        )
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex, "5", testDoc)
+
+        val response = executeMonitor(monitor.id)
+
+        val output = entityAsMap(response)
+
+        assertEquals(monitor.name, output["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
+        @Suppress("UNCHECKED_CAST")
+        val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
+        assertEquals("Incorrect search result", 2, matchingDocsToQuery.size)
+        assertTrue(
+            "Incorrect search result",
+            matchingDocsToQuery.containsAll(listOf("1|$testIndex", "5|$testIndex"))
+        )
+
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertEquals(2, triggerResult.objectMap("action_results").values.size)
+            for (alertActionResult in triggerResult.objectMap("action_results").values) {
+                assertEquals(actions.size, alertActionResult.values.size)
+                for (actionResult in alertActionResult.values) {
+                    @Suppress("UNCHECKED_CAST") val actionOutput =
+                        (actionResult as Map<String, Map<String, String>>)["output"]
+                            as Map<String, String>
+                    assertEquals("Hello ${monitor.name}", actionOutput["subject"])
+                    assertEquals("Hello ${monitor.name}", actionOutput["message"])
+                }
+            }
+        }
+
+        val alerts = searchAlertsWithFilter(monitor = monitor, indices = customFindingsIndex)
+        assertEquals("Alert saved for test monitor", 2, alerts.size)
+
+        val findings = searchFindings(monitor, customFindingsIndex)
+        assertEquals("Findings saved for test monitor", 2, findings.size)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
+        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("5"))
+    }
+
+    fun `test execute monitor stores alerts in custom index`() {
+        val testIndex = createTestIndex()
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+                "message" : "This is an error from IAD region",
+                "test_strict_date_time" : "$testTime",
+                "test_field" : "us-west-2"
+            }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val alertCategories = AlertCategory.values()
+        val actionExecutionScope = PerAlertActionScope(
+            actionableAlerts = (1..randomInt(alertCategories.size)).map { alertCategories[it - 1] }.toSet()
+        )
+        val actionExecutionPolicy = ActionExecutionPolicy(actionExecutionScope)
+        val actions = (0..randomInt(10)).map {
+            randomActionWithPolicy(
+                template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+                destinationId = createDestination().id,
+                actionExecutionPolicy = actionExecutionPolicy
+            )
+        }
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = actions)
+        val customAlertsIndex = "my_alerts_index"
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput), triggers = listOf(trigger),
+                dataSources = DataSources(alertsIndex = customAlertsIndex)
+            )
+        )
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex, "5", testDoc)
+
+        val response = executeMonitor(monitor.id)
+
+        val output = entityAsMap(response)
+
+        assertEquals(monitor.name, output["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
+        @Suppress("UNCHECKED_CAST")
+        val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
+        assertEquals("Incorrect search result", 2, matchingDocsToQuery.size)
+        assertTrue(
+            "Incorrect search result",
+            matchingDocsToQuery.containsAll(listOf("1|$testIndex", "5|$testIndex"))
+        )
+
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertEquals(2, triggerResult.objectMap("action_results").values.size)
+            for (alertActionResult in triggerResult.objectMap("action_results").values) {
+                assertEquals(actions.size, alertActionResult.values.size)
+                for (actionResult in alertActionResult.values) {
+                    @Suppress("UNCHECKED_CAST") val actionOutput =
+                        (actionResult as Map<String, Map<String, String>>)["output"]
+                            as Map<String, String>
+                    assertEquals("Hello ${monitor.name}", actionOutput["subject"])
+                    assertEquals("Hello ${monitor.name}", actionOutput["message"])
+                }
+            }
+        }
+
+        val alerts = searchAlertsWithFilter(monitor = monitor, indices = customAlertsIndex)
+        assertEquals("Alert saved for test monitor", 2, alerts.size)
+
+        val findings = searchFindings(monitor)
+        assertEquals("Findings saved for test monitor", 2, findings.size)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
+        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("5"))
     }
 
     @Suppress("UNCHECKED_CAST")

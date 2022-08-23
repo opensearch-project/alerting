@@ -81,7 +81,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
 
         // Don't save alerts if this is a test monitor
         if (!dryrun && monitor.id != Monitor.NO_ID) {
-            monitorCtx.retryPolicy?.let { monitorCtx.alertService!!.saveAlerts(updatedAlerts, it) }
+            monitorCtx.retryPolicy?.let { monitorCtx.alertService!!.saveAlerts(monitor, updatedAlerts, it) }
         }
         return monitorResult.copy(triggerResults = triggerResults)
     }

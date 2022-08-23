@@ -7,6 +7,7 @@ package org.opensearch.alerting.model
 
 import org.opensearch.alerting.core.model.ClusterMetricsInput
 import org.opensearch.alerting.core.model.CronSchedule
+import org.opensearch.alerting.core.model.DataSources
 import org.opensearch.alerting.core.model.Input
 import org.opensearch.alerting.core.model.Schedule
 import org.opensearch.alerting.core.model.ScheduledJob
@@ -55,7 +56,8 @@ data class Monitor(
     val schemaVersion: Int = NO_SCHEMA_VERSION,
     val inputs: List<Input>,
     val triggers: List<Trigger>,
-    val uiMetadata: Map<String, Any>
+    val uiMetadata: Map<String, Any>,
+    val dataSources: DataSources? = null
 ) : ScheduledJob {
 
     override val type = MONITOR_TYPE
@@ -112,7 +114,10 @@ data class Monitor(
         schemaVersion = sin.readInt(),
         inputs = sin.readList((Input)::readFrom),
         triggers = sin.readList((Trigger)::readFrom),
-        uiMetadata = suppressWarning(sin.readMap())
+        uiMetadata = suppressWarning(sin.readMap()),
+        dataSources = if (sin.readBoolean()) {
+            DataSources(sin)
+        } else null
     )
 
     // This enum classifies different Monitors
@@ -160,7 +165,13 @@ data class Monitor(
             .field(TRIGGERS_FIELD, triggers.toTypedArray())
             .optionalTimeField(LAST_UPDATE_TIME_FIELD, lastUpdateTime)
         if (uiMetadata.isNotEmpty()) builder.field(UI_METADATA_FIELD, uiMetadata)
+        if (dataSources == null) {
+            builder.nullField(DATA_SOURCES_FIELD)
+        } else {
+            builder.field(DATA_SOURCES_FIELD, dataSources)
+        }
         if (params.paramAsBoolean("with_type", false)) builder.endObject()
+
         return builder.endObject()
     }
 
@@ -202,6 +213,7 @@ data class Monitor(
             it.writeTo(out)
         }
         out.writeMap(uiMetadata)
+        dataSources?.writeTo(out)
     }
 
     companion object {
@@ -219,6 +231,7 @@ data class Monitor(
         const val INPUTS_FIELD = "inputs"
         const val LAST_UPDATE_TIME_FIELD = "last_update_time"
         const val UI_METADATA_FIELD = "ui_metadata"
+        const val DATA_SOURCES_FIELD = "data_sources"
         const val ENABLED_TIME_FIELD = "enabled_time"
 
         // This is defined here instead of in ScheduledJob to avoid having the ScheduledJob class know about all
@@ -245,6 +258,7 @@ data class Monitor(
             var schemaVersion = NO_SCHEMA_VERSION
             val triggers: MutableList<Trigger> = mutableListOf()
             val inputs: MutableList<Input> = mutableListOf()
+            var dataSources: DataSources? = null
 
             ensureExpectedToken(Token.START_OBJECT, xcp.currentToken(), xcp)
             while (xcp.nextToken() != Token.END_OBJECT) {
@@ -282,6 +296,7 @@ data class Monitor(
                     ENABLED_TIME_FIELD -> enabledTime = xcp.instant()
                     LAST_UPDATE_TIME_FIELD -> lastUpdateTime = xcp.instant()
                     UI_METADATA_FIELD -> uiMetadata = xcp.map()
+                    DATA_SOURCES_FIELD -> dataSources = if (xcp.currentToken() == Token.VALUE_NULL) null else DataSources.parse(xcp)
                     else -> {
                         xcp.skipChildren()
                     }
@@ -306,7 +321,8 @@ data class Monitor(
                 schemaVersion,
                 inputs.toList(),
                 triggers.toList(),
-                uiMetadata
+                uiMetadata,
+                dataSources
             )
         }
 
