@@ -81,7 +81,7 @@ configurations.testImplementation {
 dependencies {
     compileOnly "org.opensearch.plugin:opensearch-scripting-painless-spi:${versions.opensearch}"
     api "org.opensearch.plugin:percolator-client:${opensearch_version}"
-
+    api "org.opensearch:common-utils:${opensearch_build}"
     // OpenSearch Nanny state
     implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
     implementation "org.jetbrains.kotlin:kotlin-stdlib-common:${kotlin_version}"
