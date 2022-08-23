@@ -102,9 +102,6 @@ class AlertIndices(
         /** The alias of the index in which to write alert history */
         const val ALERT_HISTORY_WRITE_INDEX = ".opendistro-alerting-alert-history-write"
 
-        /** The alias of the index in which to write alert history */
-        const val ALERT_HISTORY_WRITE_INDEX_SUFFIX = "-history-write"
-
         /** The alias of the index in which to write alert finding */
         const val FINDING_HISTORY_WRITE_INDEX = ".opensearch-alerting-finding-history-write"
 
@@ -119,9 +116,6 @@ class AlertIndices(
 
         /** The index name pattern to create finding history indices */
         const val FINDING_HISTORY_INDEX_PATTERN = "<.opensearch-alerting-finding-history-{now/d}-1>"
-
-        /** The index name pattern to create finding history indices */
-        const val FINDING_HISTORY_INDEX_PATTERN_SUFFIX = "<-history-{now/d}-1>"
 
         /** The index name pattern to query all alerts, history and current alerts. */
         const val ALL_ALERT_INDEX_PATTERN = ".opendistro-alerting-alert*"
@@ -254,7 +248,12 @@ class AlertIndices(
         return alertIndexInitialized && alertHistoryIndexInitialized
     }
 
-    fun isAlertHistoryEnabled(): Boolean = alertHistoryEnabled
+    fun isAlertHistoryEnabled(monitor: Monitor): Boolean {
+        if (monitor.dataSources?.alertsIndex != null) {
+            return false
+        }
+        return alertHistoryEnabled
+    }
 
     fun isFindingHistoryEnabled(): Boolean = findingHistoryEnabled
 
@@ -283,13 +282,6 @@ class AlertIndices(
     suspend fun createOrUpdateInitialAlertHistoryIndex(monitor: Monitor) {
         if (monitor.dataSources?.alertsIndex == null || monitor.dataSources.alertsIndex!!.isEmpty()) {
             return createOrUpdateAlertIndex()
-        }
-        val alertsIndex = monitor.dataSources.alertsIndex
-        val alertHistoryWriteIndex = alertsIndex + ALERT_HISTORY_WRITE_INDEX_SUFFIX
-        if (!clusterService.state().routingTable().hasIndex(alertHistoryWriteIndex)) {
-            createIndex(alertHistoryWriteIndex, alertMapping())
-        } else {
-            updateIndexMapping(alertHistoryWriteIndex, alertMapping(), false)
         }
     }
     suspend fun createOrUpdateInitialAlertHistoryIndex() {

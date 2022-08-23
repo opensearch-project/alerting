@@ -278,12 +278,12 @@ class AlertService(
     }
 
     suspend fun saveAlerts(monitor: Monitor, alerts: List<Alert>, retryPolicy: BackoffPolicy, allowUpdatingAcknowledgedAlert: Boolean = false) {
+        val alertIndex = AlertIndices.getOrDefaultAlertIndex(monitor)
         var requestsToRetry = alerts.flatMap { alert ->
             // We don't want to set the version when saving alerts because the MonitorRunner has first priority when writing alerts.
             // In the rare event that a user acknowledges an alert between when it's read and when it's written
             // back we're ok if that acknowledgement is lost. It's easier to get the user to retry than for the runner to
             // spend time reloading the alert and writing it back.
-            val alertIndex = AlertIndices.getOrDefaultAlertIndex(monitor)
             when (alert.state) {
                 Alert.State.ACTIVE, Alert.State.ERROR -> {
                     listOf<DocWriteRequest<*>>(
@@ -315,7 +315,7 @@ class AlertService(
                         DeleteRequest(alertIndex, alert.id)
                             .routing(alert.monitorId),
                         // Only add completed alert to history index if history is enabled
-                        if (alertIndices.isAlertHistoryEnabled()) {
+                        if (alertIndices.isAlertHistoryEnabled(monitor)) {
                             IndexRequest(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
                                 .routing(alert.monitorId)
                                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
@@ -350,9 +350,10 @@ class AlertService(
      * The Alerts are required with their indexed ID so that when the new Alerts are updated after the Action execution,
      * the ID is available for the index request so that the existing Alert can be updated, instead of creating a duplicate Alert document.
      */
-    suspend fun saveNewAlerts(alerts: List<Alert>, retryPolicy: BackoffPolicy): List<Alert> {
+    suspend fun saveNewAlerts(monitor: Monitor, alerts: List<Alert>, retryPolicy: BackoffPolicy): List<Alert> {
         val savedAlerts = mutableListOf<Alert>()
         var alertsBeingIndexed = alerts
+        val alertIndex = AlertIndices.getOrDefaultAlertIndex(monitor)
         var requestsToRetry: MutableList<IndexRequest> = alerts.map { alert ->
             if (alert.state != Alert.State.ACTIVE) {
                 throw IllegalStateException("Unexpected attempt to save new alert [$alert] with state [${alert.state}]")
@@ -360,7 +361,7 @@ class AlertService(
             if (alert.id != Alert.NO_ID) {
                 throw IllegalStateException("Unexpected attempt to save new alert [$alert] with an existing alert ID [${alert.id}]")
             }
-            IndexRequest(AlertIndices.ALERT_INDEX)
+            IndexRequest(alertIndex)
                 .routing(alert.monitorId)
                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
         }.toMutableList()

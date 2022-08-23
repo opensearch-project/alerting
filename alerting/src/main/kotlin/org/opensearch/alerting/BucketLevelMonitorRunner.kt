@@ -136,7 +136,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                  */
                 if (!dryrun && monitor.id != Monitor.NO_ID) {
                     monitorCtx.alertService!!.saveAlerts(monitor, dedupedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = true)
-                    newAlerts = monitorCtx.alertService!!.saveNewAlerts(newAlerts, monitorCtx.retryPolicy!!)
+                    newAlerts = monitorCtx.alertService!!.saveNewAlerts(monitor, newAlerts, monitorCtx.retryPolicy!!)
                 }
 
                 // Store deduped and new Alerts to accumulate across pages
