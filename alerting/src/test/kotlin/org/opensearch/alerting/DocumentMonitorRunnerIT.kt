@@ -650,7 +650,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             }
         }
 
-        val alerts = searchAlertsWithFilter(monitor = monitor, indices = customFindingsIndex)
+        val alerts = searchAlertsWithFilter(monitor = monitor)
         assertEquals("Alert saved for test monitor", 2, alerts.size)
 
         val findings = searchFindings(monitor, customFindingsIndex)
