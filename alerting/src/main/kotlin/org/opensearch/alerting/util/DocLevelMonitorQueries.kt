@@ -38,16 +38,16 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         @JvmStatic
         fun getOrDefaultQueryIndex(monitor: Monitor): String {
             var queryIndex = ScheduledJob.DOC_LEVEL_QUERIES_INDEX
-            if (monitor.dataSources != null && monitor.dataSources.queryIndex != null) {
+            if (monitor.dataSources?.queryIndex != null) {
                 queryIndex = monitor.dataSources.queryIndex!!
             }
             return queryIndex
         }
         @JvmStatic
         fun getOrDefaultQueryIndexMapping(monitor: Monitor): String {
-            var queryIndex = ScheduledJob.DOC_LEVEL_QUERIES_INDEX
-            if (monitor.dataSources != null && monitor.dataSources.queryIndex != null) {
-                queryIndex = monitor.dataSources.queryIndex!!
+            var queryIndex = docLevelQueriesMappings()
+            if (monitor.dataSources?.queryIndex != null && monitor.dataSources.queryIndexMapping != null) {
+                queryIndex = monitor.dataSources.queryIndexMapping!!
             }
             return queryIndex
         }

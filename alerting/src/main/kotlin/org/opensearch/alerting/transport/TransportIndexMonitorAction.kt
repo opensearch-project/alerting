@@ -444,7 +444,7 @@ class TransportIndexMonitorAction @Inject constructor(
         private suspend fun indexDocLevelMonitorQueries(monitor: Monitor, monitorId: String, refreshPolicy: RefreshPolicy) {
             if (!docLevelMonitorQueries.docLevelQueryIndexExists(monitor)) {
                 docLevelMonitorQueries.initDocLevelQueryIndex(monitor)
-                log.info("Central Percolation index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX} created") // todo account for configurable index name in log lines
+                log.info("Central Percolation index ${DocLevelMonitorQueries.getOrDefaultQueryIndex(monitor)} created")
             }
             docLevelMonitorQueries.indexDocLevelQueries(
                 monitor,
@@ -452,7 +452,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 refreshPolicy,
                 indexTimeout
             )
-            log.debug("Queries inserted into Percolate index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}")
+            log.debug("Queries inserted into Percolate index ${DocLevelMonitorQueries.getOrDefaultQueryIndex(monitor)}")
         }
 
         private suspend fun updateMonitor() {
