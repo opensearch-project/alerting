@@ -1,8 +1,10 @@
 package org.opensearch.alerting.model;
 
 import org.opensearch.alerting.core.model.IntervalSchedule;
+import org.opensearch.commons.model2.model.Schedule;
 
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -25,13 +27,16 @@ public class Model2ModelTranslator {
     val triggers: List<Trigger>,
     val uiMetadata: Map<String, Any>
      */
+
+
     public static Monitor fromModel2(final org.opensearch.commons.model2.model.Monitor monitor2) {
         return new Monitor(
                 monitor2.id, // id
                 monitor2.version, // version
                 monitor2.name, // name
                 true, // enabled
-                new IntervalSchedule(100, ChronoUnit.SECONDS, Instant.now()), // schedule
+                new IntervalSchedule(3, ChronoUnit.SECONDS, Instant.now()),
+                //TODO: monitor2.schedule.type.equals("cron") ? new CronSchedule(monitor2.schedule) : new IntervalSchedule(), // schedule
                 Instant.now(), // last update
                 Instant.now(), // enabled time
                 Monitor.MonitorType.valueOf(monitor2.monitor_type), // monitor type
@@ -47,6 +52,8 @@ public class Model2ModelTranslator {
                 monitor.getId(),
                 monitor.getMonitorType().getValue(),
                 monitor.getVersion(),
+                // TODO: align the Kotlin Schedule model with the Model2 Schedule model
+                new Schedule(monitor.getSchedule().getClass().getName(), ZoneId.systemDefault(), 100, ChronoUnit.SECONDS, "chrono"),
                 monitor.getName(),
                 monitor.getLastUpdateTime().toEpochMilli(),
                 "milliseconds",
