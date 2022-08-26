@@ -50,18 +50,9 @@ public class TransportExecuteMonitorAction2 extends TransportAction<ExecuteMonit
                     null,
                     Model2ModelTranslator.fromModel2(request.monitor));
 
-            this.client.execute(org.opensearch.alerting.action.ExecuteMonitorAction.Companion.getINSTANCE(), xRequest, new ActionListener<>() {
-                @Override
-                public void onResponse(final org.opensearch.alerting.action.ExecuteMonitorResponse response) {
-                    final ExecuteMonitorResponse xResponse = new ExecuteMonitorResponse(response.getMonitorRunResult().getMonitorName());
-                    actionListener.onResponse(xResponse);
-                }
-
-                @Override
-                public void onFailure(final Exception e) {
-                    actionListener.onFailure(e);
-                }
-            });
+            this.client.execute(org.opensearch.alerting.action.ExecuteMonitorAction.Companion.getINSTANCE(), xRequest,
+                    ActionListener.map(actionListener, response ->
+                            new ExecuteMonitorResponse(response.getMonitorRunResult().getMonitorName())));
         } catch (final Exception e) {
             actionListener.onFailure(e);
         }

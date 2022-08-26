@@ -7,20 +7,7 @@ package org.opensearch.alerting
 
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionResponse
-import org.opensearch.alerting.action.AcknowledgeAlertAction
-import org.opensearch.alerting.action.DeleteMonitorAction
-import org.opensearch.alerting.action.ExecuteMonitorAction
-import org.opensearch.alerting.action.GetAlertsAction
-import org.opensearch.alerting.action.GetDestinationsAction
-import org.opensearch.alerting.action.GetEmailAccountAction
-import org.opensearch.alerting.action.GetEmailGroupAction
-import org.opensearch.alerting.action.GetFindingsAction
-import org.opensearch.alerting.action.GetMonitorAction
-import org.opensearch.alerting.action.IndexMonitorAction
-import org.opensearch.alerting.action.IndexMonitorAction2
-import org.opensearch.alerting.action.SearchEmailAccountAction
-import org.opensearch.alerting.action.SearchEmailGroupAction
-import org.opensearch.alerting.action.SearchMonitorAction
+import org.opensearch.alerting.action.*
 import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.JobSweeper
@@ -57,20 +44,7 @@ import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroAlertingSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings
-import org.opensearch.alerting.transport.TransportAcknowledgeAlertAction
-import org.opensearch.alerting.transport.TransportDeleteMonitorAction
-import org.opensearch.alerting.transport.TransportExecuteMonitorAction
-import org.opensearch.alerting.transport.TransportGetAlertsAction
-import org.opensearch.alerting.transport.TransportGetDestinationsAction
-import org.opensearch.alerting.transport.TransportGetEmailAccountAction
-import org.opensearch.alerting.transport.TransportGetEmailGroupAction
-import org.opensearch.alerting.transport.TransportGetFindingsSearchAction
-import org.opensearch.alerting.transport.TransportGetMonitorAction
-import org.opensearch.alerting.transport.TransportIndexMonitorAction
-import org.opensearch.alerting.transport.TransportIndexMonitorAction2
-import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
-import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
-import org.opensearch.alerting.transport.TransportSearchMonitorAction
+import org.opensearch.alerting.transport.*
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
 import org.opensearch.client.Client
@@ -188,7 +162,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(GetAlertsAction.INSTANCE, TransportGetAlertsAction::class.java),
             ActionPlugin.ActionHandler(GetFindingsAction.INSTANCE, TransportGetFindingsSearchAction::class.java),
                 // sap<->alerting bridge actions
-            ActionPlugin.ActionHandler(IndexMonitorAction2.INSTANCE,TransportIndexMonitorAction2::class.java)
+            ActionPlugin.ActionHandler(org.opensearch.commons.model2.action.IndexMonitorAction.ALERTING_BRIDGE_INSTANCE,TransportIndexMonitorAction2::class.java),
+            ActionPlugin.ActionHandler(ExecuteMonitorAction2.INSTANCE, TransportExecuteMonitorAction2::class.java)
         )
     }
 

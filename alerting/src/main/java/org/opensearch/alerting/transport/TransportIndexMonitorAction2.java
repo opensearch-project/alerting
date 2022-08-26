@@ -5,7 +5,6 @@ import org.apache.logging.log4j.Logger;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.TransportAction;
-import org.opensearch.alerting.action.IndexMonitorAction;
 import org.opensearch.alerting.action.IndexMonitorAction2;
 import org.opensearch.alerting.model.Model2ModelTranslator;
 import org.opensearch.client.Client;
@@ -50,24 +49,15 @@ public class TransportIndexMonitorAction2 extends TransportAction<IndexMonitorRe
                     request.method,
                     Model2ModelTranslator.fromModel2(request.monitor));
 
-            this.client.execute(IndexMonitorAction.Companion.getINSTANCE(), xRequest, new ActionListener<>() {
-                @Override
-                public void onResponse(final org.opensearch.alerting.action.IndexMonitorResponse response) {
-                    final IndexMonitorResponse xResponse = new IndexMonitorResponse(
-                            response.getId(),
-                            response.getVersion(),
-                            response.getSeqNo(),
-                            response.getVersion(),
-                            response.getStatus(),
-                            Model2ModelTranslator.toModel2(response.getMonitor()));
-                    actionListener.onResponse(xResponse);
-                }
-
-                @Override
-                public void onFailure(final Exception e) {
-                    actionListener.onFailure(e);
-                }
-            });
+            this.client.execute(org.opensearch.alerting.action.IndexMonitorAction.Companion.getINSTANCE(), xRequest,
+                    ActionListener.map(actionListener,
+                            response -> new IndexMonitorResponse(
+                                    response.getId(),
+                                    response.getVersion(),
+                                    response.getSeqNo(),
+                                    response.getVersion(),
+                                    response.getStatus(),
+                                    Model2ModelTranslator.toModel2(response.getMonitor()))));
         } catch (final Exception e) {
             actionListener.onFailure(e);
         }
