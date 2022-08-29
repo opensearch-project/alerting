@@ -17,24 +17,24 @@ import java.io.IOException
 
 data class DataSources(
     val queryIndex: String? = null,
-    val queryIndexMapping: String? = null,
     val findingsIndex: String? = null,
     val alertsIndex: String? = null,
+    val queryIndexFieldProperties: Map<String, String>? = mapOf()
 ) : Writeable, ToXContentObject {
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
-        sin.readOptionalString(), // queryIndex
-        sin.readOptionalString(), // queryIndexMapping
-        sin.readOptionalString(), // findingsIndex
-        sin.readOptionalString(), // alertIndex
+        queryIndex = sin.readOptionalString(),
+        findingsIndex = sin.readOptionalString(),
+        alertsIndex = sin.readOptionalString(),
+        queryIndexFieldProperties = sin.readMap() as Map<String, String>?
     )
 
     fun asTemplateArg(): Map<String, Any> {
         return mapOf(
             QUERY_INDEX_FIELD to queryIndex,
-            QUERY_INDEX_MAPPING_FIELD to queryIndexMapping,
             FINDINGS_INDEX_FIELD to findingsIndex,
-            ALERTS_INDEX_FIELD to alertsIndex
+            ALERTS_INDEX_FIELD to alertsIndex,
+            QUERY_INDEX_FIELD_PROPERTIES_FIELD to queryIndexFieldProperties
         ) as Map<String, Any>
     }
 
@@ -43,32 +43,30 @@ data class DataSources(
         if (queryIndex != null) {
             builder.field(QUERY_INDEX_FIELD, queryIndex)
         }
-        if (queryIndexMapping != null) {
-            builder.field(QUERY_INDEX_MAPPING_FIELD, queryIndexMapping)
-        }
         if (findingsIndex != null) {
             builder.field(FINDINGS_INDEX_FIELD, findingsIndex)
         }
         if (alertsIndex != null) {
             builder.field(ALERTS_INDEX_FIELD, alertsIndex)
         }
+        builder.field(QUERY_INDEX_FIELD_PROPERTIES_FIELD, queryIndexFieldProperties)
         builder.endObject()
         return builder
     }
 
     companion object {
         const val QUERY_INDEX_FIELD = "query_index"
-        const val QUERY_INDEX_MAPPING_FIELD = "query_index_mapping"
         const val FINDINGS_INDEX_FIELD = "findings_index"
         const val ALERTS_INDEX_FIELD = "alerts_index"
+        const val QUERY_INDEX_FIELD_PROPERTIES_FIELD = "query_index_field_properties"
 
         @JvmStatic
         @Throws(IOException::class)
         fun parse(xcp: XContentParser): DataSources {
             var queryIndex: String? = null
-            var queryIndexMapping: String? = null
             var findingsIndex: String? = null
             var alertsIndex: String? = null
+            var queryIndexFieldProperties: Map<String, String> = mapOf()
 
             XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.currentToken(), xcp)
             while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
@@ -77,16 +75,16 @@ data class DataSources(
 
                 when (fieldName) {
                     QUERY_INDEX_FIELD -> queryIndex = xcp.text()
-                    QUERY_INDEX_MAPPING_FIELD -> queryIndexMapping = xcp.text()
                     FINDINGS_INDEX_FIELD -> findingsIndex = xcp.text()
                     ALERTS_INDEX_FIELD -> alertsIndex = xcp.text()
+                    QUERY_INDEX_FIELD_PROPERTIES_FIELD -> queryIndexFieldProperties = xcp.map() as Map<String, String>
                 }
             }
             return DataSources(
                 queryIndex = queryIndex,
-                queryIndexMapping = queryIndexMapping,
                 findingsIndex = findingsIndex,
-                alertsIndex = alertsIndex
+                alertsIndex = alertsIndex,
+                queryIndexFieldProperties = queryIndexFieldProperties
             )
         }
     }
@@ -94,8 +92,8 @@ data class DataSources(
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {
         out.writeOptionalString(queryIndex)
-        out.writeOptionalString(queryIndexMapping)
         out.writeOptionalString(findingsIndex)
         out.writeOptionalString(alertsIndex)
+        out.writeMap(queryIndexFieldProperties)
     }
 }

@@ -43,14 +43,6 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             }
             return queryIndex
         }
-        @JvmStatic
-        fun getOrDefaultQueryIndexMapping(monitor: Monitor): String {
-            var queryIndex = docLevelQueriesMappings()
-            if (monitor.dataSources?.queryIndex != null && monitor.dataSources.queryIndexMapping != null) {
-                queryIndex = monitor.dataSources.queryIndexMapping!!
-            }
-            return queryIndex
-        }
     }
 
     suspend fun initDocLevelQueryIndex(): Boolean {
@@ -76,14 +68,14 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
     }
     suspend fun initDocLevelQueryIndex(monitor: Monitor): Boolean {
 
-        if (monitor.dataSources == null || monitor.dataSources.queryIndex == null || monitor.dataSources.queryIndex!!.isEmpty()) {
+        if (monitor.dataSources?.queryIndex.isNullOrEmpty()) {
             return initDocLevelQueryIndex()
         }
-        val queryIndex = monitor.dataSources.queryIndex
+        val queryIndex = monitor.dataSources?.queryIndex
 
         if (!clusterService.state().routingTable.hasIndex(queryIndex)) {
             val indexRequest = CreateIndexRequest(queryIndex)
-                .mapping(getOrDefaultQueryIndexMapping(monitor))
+                .mapping(docLevelQueriesMappings())
                 .settings(
                     Settings.builder().put("index.hidden", true)
                         .build()
