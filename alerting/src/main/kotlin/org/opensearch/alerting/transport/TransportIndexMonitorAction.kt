@@ -12,6 +12,7 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchSecurityException
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
+import org.opensearch.action.ActionRequest
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
 import org.opensearch.action.admin.indices.get.GetIndexRequest
 import org.opensearch.action.admin.indices.get.GetIndexResponse
@@ -26,17 +27,8 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.DocumentLevelMonitorRunner
-import org.opensearch.alerting.action.IndexMonitorAction
-import org.opensearch.alerting.action.IndexMonitorRequest
-import org.opensearch.alerting.action.IndexMonitorResponse
 import org.opensearch.alerting.core.ScheduledJobIndices
-import org.opensearch.alerting.core.model.DocLevelMonitorInput
-import org.opensearch.alerting.core.model.DocLevelMonitorInput.Companion.DOC_LEVEL_INPUT_FIELD
-import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
-import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.model.AlertingConfigAccessor.Companion.getMonitorMetadata
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
@@ -61,7 +53,17 @@ import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.IndexMonitorRequest
+import org.opensearch.commons.alerting.action.IndexMonitorResponse
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput.Companion.DOC_LEVEL_INPUT_FIELD
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
+import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.utils.recreateObject
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
@@ -86,8 +88,8 @@ class TransportIndexMonitorAction @Inject constructor(
     val clusterService: ClusterService,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry
-) : HandledTransportAction<IndexMonitorRequest, IndexMonitorResponse>(
-    IndexMonitorAction.NAME, transportService, actionFilters, ::IndexMonitorRequest
+) : HandledTransportAction<ActionRequest, IndexMonitorResponse>(
+    AlertingActions.INDEX_MONITOR_ACTION_NAME, transportService, actionFilters, ::IndexMonitorRequest
 ),
     SecureTransportAction {
 
@@ -107,7 +109,10 @@ class TransportIndexMonitorAction @Inject constructor(
         listenFilterBySettingChange(clusterService)
     }
 
-    override fun doExecute(task: Task, request: IndexMonitorRequest, actionListener: ActionListener<IndexMonitorResponse>) {
+    override fun doExecute(task: Task, req: ActionRequest, actionListener: ActionListener<IndexMonitorResponse>) {
+        val request = req as? IndexMonitorRequest
+            ?: recreateObject(req) { IndexMonitorRequest(it) }
+        log.info("hit here1")
         val user = readUserFromThreadContext(client)
 
         if (!validateUserBackendRoles(user, actionListener)) {
@@ -132,6 +137,7 @@ class TransportIndexMonitorAction @Inject constructor(
         request: IndexMonitorRequest,
         user: User?
     ) {
+        log.info("hit here2")
         val indices = mutableListOf<String>()
         // todo: for doc level alerting: check if index is present before monitor is created.
         val searchInputs = request.monitor.inputs.filter { it.name() == SearchInput.SEARCH_FIELD || it.name() == DOC_LEVEL_INPUT_FIELD }
@@ -146,6 +152,7 @@ class TransportIndexMonitorAction @Inject constructor(
             searchRequest,
             object : ActionListener<SearchResponse> {
                 override fun onResponse(searchResponse: SearchResponse) {
+                    log.info("hit here4")
                     // User has read access to configured indices in the monitor, now create monitor with out user context.
                     client.threadPool().threadContext.stashContext().use {
                         IndexMonitorHandler(client, actionListener, request, user).resolveUserAndStart()
@@ -199,11 +206,13 @@ class TransportIndexMonitorAction @Inject constructor(
 
         fun resolveUserAndStart() {
             if (user == null) {
+                log.info("hit here5")
                 // Security is disabled, add empty user to Monitor. user is null for older versions.
                 request.monitor = request.monitor
                     .copy(user = User("", listOf(), listOf(), listOf()))
                 start()
             } else {
+                log.info("hit here6")
                 request.monitor = request.monitor
                     .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttNames))
                 start()
@@ -252,6 +261,7 @@ class TransportIndexMonitorAction @Inject constructor(
 
         fun start() {
             if (!scheduledJobIndices.scheduledJobIndexExists()) {
+                log.info("hit here7")
                 scheduledJobIndices.initScheduledJobIndex(object : ActionListener<CreateIndexResponse> {
                     override fun onResponse(response: CreateIndexResponse) {
                         onCreateMappingsResponse(response)
@@ -261,6 +271,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     }
                 })
             } else if (!IndexUtils.scheduledJobIndexUpdated) {
+                log.info("hit here8")
                 IndexUtils.updateIndexMapping(
                     SCHEDULED_JOBS_INDEX,
                     ScheduledJobIndices.scheduledJobMappings(), clusterService.state(), client.admin().indices(),
@@ -274,6 +285,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     }
                 )
             } else {
+                log.info("hit here9")
                 prepareMonitorIndexing()
             }
         }
@@ -288,6 +300,7 @@ class TransportIndexMonitorAction @Inject constructor(
             // Below check needs to be async operations and needs to be refactored issue#269
             // checkForDisallowedDestinations(allowList)
 
+            log.info("hit here10")
             try {
                 validateActionThrottle(request.monitor, maxActionThrottle, TimeValue.timeValueMinutes(1))
             } catch (e: RuntimeException) {
@@ -296,10 +309,12 @@ class TransportIndexMonitorAction @Inject constructor(
             }
 
             if (request.method == RestRequest.Method.PUT) {
+                log.info("hit here11")
                 scope.launch {
                     updateMonitor()
                 }
             } else {
+                log.info("hit here12")
                 val query = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery("${Monitor.MONITOR_TYPE}.type", Monitor.MONITOR_TYPE))
                 val searchSource = SearchSourceBuilder().query(query).timeout(requestTimeout)
                 val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
@@ -307,10 +322,12 @@ class TransportIndexMonitorAction @Inject constructor(
                     searchRequest,
                     object : ActionListener<SearchResponse> {
                         override fun onResponse(searchResponse: SearchResponse) {
+                            log.info("hit here14")
                             onSearchResponse(searchResponse)
                         }
 
                         override fun onFailure(t: Exception) {
+                            log.info("hit here15")
                             actionListener.onFailure(AlertingException.wrap(t))
                         }
                     }
@@ -323,12 +340,12 @@ class TransportIndexMonitorAction @Inject constructor(
                 trigger.actions.forEach { action ->
                     if (action.throttle != null) {
                         require(
-                            TimeValue(Duration.of(action.throttle.value.toLong(), action.throttle.unit).toMillis())
+                            TimeValue(Duration.of(action.throttle!!.value.toLong(), action.throttle!!.unit).toMillis())
                                 .compareTo(maxValue) <= 0,
                             { "Can only set throttle period less than or equal to $maxValue" }
                         )
                         require(
-                            TimeValue(Duration.of(action.throttle.value.toLong(), action.throttle.unit).toMillis())
+                            TimeValue(Duration.of(action.throttle!!.value.toLong(), action.throttle!!.unit).toMillis())
                                 .compareTo(minValue) >= 0,
                             { "Can only set throttle period greater than or equal to $minValue" }
                         )
@@ -343,7 +360,7 @@ class TransportIndexMonitorAction @Inject constructor(
         private fun onSearchResponse(response: SearchResponse) {
             val totalHits = response.hits.totalHits?.value
             if (totalHits != null && totalHits >= maxMonitors) {
-                log.error("This request would create more than the allowed monitors [$maxMonitors].")
+                log.info("This request would create more than the allowed monitors [$maxMonitors].")
                 actionListener.onFailure(
                     AlertingException.wrap(
                         IllegalArgumentException(
@@ -352,6 +369,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     )
                 )
             } else {
+                log.info("hit here16")
                 scope.launch {
                     indexMonitor()
                 }
@@ -364,7 +382,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 prepareMonitorIndexing()
                 IndexUtils.scheduledJobIndexUpdated()
             } else {
-                log.error("Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged.")
+                log.info("Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged.")
                 actionListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException(
@@ -381,7 +399,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 IndexUtils.scheduledJobIndexUpdated()
                 prepareMonitorIndexing()
             } else {
-                log.error("Update ${ScheduledJob.SCHEDULED_JOBS_INDEX} mappings call not acknowledged.")
+                log.info("Update ${ScheduledJob.SCHEDULED_JOBS_INDEX} mappings call not acknowledged.")
                 actionListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException(
@@ -402,17 +420,22 @@ class TransportIndexMonitorAction @Inject constructor(
                 .setIfSeqNo(request.seqNo)
                 .setIfPrimaryTerm(request.primaryTerm)
                 .timeout(indexTimeout)
+            log.info("hit here17")
 
             try {
                 val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
                 val failureReasons = checkShardsFailure(indexResponse)
+                log.info("hit here18")
                 if (failureReasons != null) {
+                    log.info("hit here19")
+                    log.info(failureReasons.toString())
                     actionListener.onFailure(
                         AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), indexResponse.status()))
                     )
                     return
                 }
                 metadata = metadata.copy(monitorId = indexResponse.id, id = "${indexResponse.id}-metadata")
+                log.info("hit here20")
 
                 // In case the metadata fails to be created, the monitor runner should have logic to recreate and index the metadata.
                 // This is currently being handled in DocumentLevelMonitor as its the only current monitor to use metadata currently.
@@ -424,18 +447,21 @@ class TransportIndexMonitorAction @Inject constructor(
                     .id(metadata.id)
                     .timeout(indexTimeout)
                 client.suspendUntil<Client, IndexResponse> { client.index(metadataIndexRequest, it) }
+                log.info("hit here21")
 
                 if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
                     indexDocLevelMonitorQueries(request.monitor, indexResponse.id, request.refreshPolicy)
                 }
 
+                log.info("hit here24")
                 actionListener.onResponse(
                     IndexMonitorResponse(
                         indexResponse.id, indexResponse.version, indexResponse.seqNo,
-                        indexResponse.primaryTerm, RestStatus.CREATED, request.monitor
+                        indexResponse.primaryTerm, request.monitor
                     )
                 )
             } catch (t: Exception) {
+                log.info("hit here22")
                 actionListener.onFailure(AlertingException.wrap(t))
             }
         }
@@ -544,7 +570,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 actionListener.onResponse(
                     IndexMonitorResponse(
                         indexResponse.id, indexResponse.version, indexResponse.seqNo,
-                        indexResponse.primaryTerm, RestStatus.CREATED, request.monitor
+                        indexResponse.primaryTerm, request.monitor
                     )
                 )
             } catch (t: Exception) {

@@ -8,41 +8,19 @@ package org.opensearch.alerting
 import junit.framework.TestCase.assertNull
 import org.apache.http.Header
 import org.apache.http.HttpEntity
-import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
-import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtFilter
-import org.opensearch.alerting.core.model.ClusterMetricsInput
-import org.opensearch.alerting.core.model.DocLevelMonitorInput
-import org.opensearch.alerting.core.model.DocLevelQuery
-import org.opensearch.alerting.core.model.Input
-import org.opensearch.alerting.core.model.IntervalSchedule
-import org.opensearch.alerting.core.model.Schedule
-import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.model.ActionExecutionResult
 import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
-import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.InputRunResults
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
-import org.opensearch.alerting.model.Trigger
-import org.opensearch.alerting.model.action.Action
-import org.opensearch.alerting.model.action.ActionExecutionPolicy
-import org.opensearch.alerting.model.action.ActionExecutionScope
-import org.opensearch.alerting.model.action.AlertCategory
-import org.opensearch.alerting.model.action.PerAlertActionScope
-import org.opensearch.alerting.model.action.PerExecutionActionScope
-import org.opensearch.alerting.model.action.Throttle
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailEntry
 import org.opensearch.alerting.model.destination.email.EmailGroup
-import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.Request
 import org.opensearch.client.RequestOptions
@@ -59,6 +37,28 @@ import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
+import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtFilter
+import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.ClusterMetricsInput
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
+import org.opensearch.commons.alerting.model.DocLevelQuery
+import org.opensearch.commons.alerting.model.DocumentLevelTrigger
+import org.opensearch.commons.alerting.model.Input
+import org.opensearch.commons.alerting.model.IntervalSchedule
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.QueryLevelTrigger
+import org.opensearch.commons.alerting.model.Schedule
+import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.model.Trigger
+import org.opensearch.commons.alerting.model.action.Action
+import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
+import org.opensearch.commons.alerting.model.action.ActionExecutionScope
+import org.opensearch.commons.alerting.model.action.AlertCategory
+import org.opensearch.commons.alerting.model.action.PerAlertActionScope
+import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
+import org.opensearch.commons.alerting.model.action.Throttle
+import org.opensearch.commons.alerting.util.string
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.script.Script
@@ -526,16 +526,6 @@ fun randomActionRunResult(): ActionRunResult {
         "1234", "test-action", map,
         false, Instant.now(), null
     )
-}
-
-fun Monitor.toJsonString(): String {
-    val builder = XContentFactory.jsonBuilder()
-    return this.toXContent(builder, ToXContent.EMPTY_PARAMS).string()
-}
-
-fun Monitor.toJsonStringWithUser(): String {
-    val builder = XContentFactory.jsonBuilder()
-    return this.toXContentWithUser(builder, ToXContent.EMPTY_PARAMS).string()
 }
 
 fun Alert.toJsonString(): String {

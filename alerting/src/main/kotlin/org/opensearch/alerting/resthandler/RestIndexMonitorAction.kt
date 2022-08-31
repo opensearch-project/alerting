@@ -7,13 +7,6 @@ package org.opensearch.alerting.resthandler
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.alerting.action.IndexMonitorAction
-import org.opensearch.alerting.action.IndexMonitorRequest
-import org.opensearch.alerting.action.IndexMonitorResponse
-import org.opensearch.alerting.model.BucketLevelTrigger
-import org.opensearch.alerting.model.DocumentLevelTrigger
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.util.IF_PRIMARY_TERM
 import org.opensearch.alerting.util.IF_SEQ_NO
 import org.opensearch.alerting.util.REFRESH
@@ -21,6 +14,13 @@ import org.opensearch.client.node.NodeClient
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentParser.Token
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
+import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.IndexMonitorRequest
+import org.opensearch.commons.alerting.action.IndexMonitorResponse
+import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.DocumentLevelTrigger
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
@@ -77,6 +77,7 @@ class RestIndexMonitorAction : BaseRestHandler() {
         if (request.method() == PUT && Monitor.NO_ID == id) {
             throw IllegalArgumentException("Missing monitor ID")
         }
+        log.info("hit here-1")
 
         // Validate request by parsing JSON to Monitor
         val xcp = request.contentParser()
@@ -116,8 +117,9 @@ class RestIndexMonitorAction : BaseRestHandler() {
         }
         val indexMonitorRequest = IndexMonitorRequest(id, seqNo, primaryTerm, refreshPolicy, request.method(), monitor)
 
+        log.info("hit here0")
         return RestChannelConsumer { channel ->
-            client.execute(IndexMonitorAction.INSTANCE, indexMonitorRequest, indexMonitorResponse(channel, request.method()))
+            client.execute(AlertingActions.INDEX_MONITOR_ACTION_TYPE, indexMonitorRequest, indexMonitorResponse(channel, request.method()))
         }
     }
 

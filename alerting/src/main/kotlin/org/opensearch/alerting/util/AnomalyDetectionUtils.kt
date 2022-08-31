@@ -6,9 +6,9 @@
 package org.opensearch.alerting.util
 
 import org.apache.lucene.search.join.ScoreMode
-import org.opensearch.alerting.core.model.SearchInput
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.common.Strings
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.NestedQueryBuilder
