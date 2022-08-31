@@ -19,22 +19,33 @@ data class DataSources(
     val queryIndex: String? = null,
     val findingsIndex: String? = null,
     val alertsIndex: String? = null,
-    val queryIndexFieldProperties: Map<String, String>? = mapOf()
+    val queryIndexMappingsByType: Map<String, Map<String, String>> = mapOf()
 ) : Writeable, ToXContentObject {
+
+    init {
+        if (queryIndexMappingsByType.isNotEmpty()) {
+            require(queryIndex != null && queryIndex.isNotEmpty()) {
+                "Custom query index mappings are applicable only if custom query index is used for monitor."
+            }
+        }
+    }
+
     @Throws(IOException::class)
+    @Suppress("UNCHECKED_CAST")
     constructor(sin: StreamInput) : this(
         queryIndex = sin.readOptionalString(),
         findingsIndex = sin.readOptionalString(),
         alertsIndex = sin.readOptionalString(),
-        queryIndexFieldProperties = sin.readMap() as Map<String, String>?
+        queryIndexMappingsByType = sin.readMap() as Map<String, Map<String, String>>
     )
 
+    @Suppress("UNCHECKED_CAST")
     fun asTemplateArg(): Map<String, Any> {
         return mapOf(
             QUERY_INDEX_FIELD to queryIndex,
             FINDINGS_INDEX_FIELD to findingsIndex,
             ALERTS_INDEX_FIELD to alertsIndex,
-            QUERY_INDEX_FIELD_PROPERTIES_FIELD to queryIndexFieldProperties
+            QUERY_INDEX_MAPPINGS_BY_TYPE to queryIndexMappingsByType
         ) as Map<String, Any>
     }
 
@@ -49,7 +60,7 @@ data class DataSources(
         if (alertsIndex != null) {
             builder.field(ALERTS_INDEX_FIELD, alertsIndex)
         }
-        builder.field(QUERY_INDEX_FIELD_PROPERTIES_FIELD, queryIndexFieldProperties)
+        builder.field(QUERY_INDEX_MAPPINGS_BY_TYPE, queryIndexMappingsByType as Map<String, Any>)
         builder.endObject()
         return builder
     }
@@ -58,15 +69,16 @@ data class DataSources(
         const val QUERY_INDEX_FIELD = "query_index"
         const val FINDINGS_INDEX_FIELD = "findings_index"
         const val ALERTS_INDEX_FIELD = "alerts_index"
-        const val QUERY_INDEX_FIELD_PROPERTIES_FIELD = "query_index_field_properties"
+        const val QUERY_INDEX_MAPPINGS_BY_TYPE = "query_index_mappings_by_type"
 
         @JvmStatic
         @Throws(IOException::class)
+        @Suppress("UNCHECKED_CAST")
         fun parse(xcp: XContentParser): DataSources {
             var queryIndex: String? = null
             var findingsIndex: String? = null
             var alertsIndex: String? = null
-            var queryIndexFieldProperties: Map<String, String> = mapOf()
+            var queryIndexMappingsByType: Map<String, Map<String, String>> = mapOf()
 
             XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.currentToken(), xcp)
             while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
@@ -77,14 +89,14 @@ data class DataSources(
                     QUERY_INDEX_FIELD -> queryIndex = xcp.text()
                     FINDINGS_INDEX_FIELD -> findingsIndex = xcp.text()
                     ALERTS_INDEX_FIELD -> alertsIndex = xcp.text()
-                    QUERY_INDEX_FIELD_PROPERTIES_FIELD -> queryIndexFieldProperties = xcp.map() as Map<String, String>
+                    QUERY_INDEX_MAPPINGS_BY_TYPE -> queryIndexMappingsByType = xcp.map() as Map<String, Map<String, String>>
                 }
             }
             return DataSources(
                 queryIndex = queryIndex,
                 findingsIndex = findingsIndex,
                 alertsIndex = alertsIndex,
-                queryIndexFieldProperties = queryIndexFieldProperties
+                queryIndexMappingsByType = queryIndexMappingsByType
             )
         }
     }
@@ -94,6 +106,6 @@ data class DataSources(
         out.writeOptionalString(queryIndex)
         out.writeOptionalString(findingsIndex)
         out.writeOptionalString(alertsIndex)
-        out.writeMap(queryIndexFieldProperties)
+        out.writeMap(queryIndexMappingsByType as Map<String, Any>)
     }
 }
