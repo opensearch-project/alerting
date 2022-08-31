@@ -17,13 +17,13 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.util.IndexUtils
 
 class IndexUtils {
 
     companion object {
         const val _META = "_meta"
         const val SCHEMA_VERSION = "schema_version"
-        const val NO_SCHEMA_VERSION = 0
 
         var scheduledJobIndexSchemaVersion: Int
             private set
@@ -90,7 +90,7 @@ class IndexUtils {
                 }
                 xcp.nextToken()
             }
-            return NO_SCHEMA_VERSION
+            return IndexUtils.NO_SCHEMA_VERSION
         }
 
         @JvmStatic
@@ -100,7 +100,7 @@ class IndexUtils {
 
         @JvmStatic
         fun shouldUpdateIndex(index: IndexMetadata, mapping: String): Boolean {
-            var oldVersion = NO_SCHEMA_VERSION
+            var oldVersion = IndexUtils.NO_SCHEMA_VERSION
             val newVersion = getSchemaVersion(mapping)
 
             val indexMapping = index.mapping()?.sourceAsMap()

@@ -16,6 +16,9 @@ import org.apache.lucene.util.BytesRef
 import org.hamcrest.CoreMatchers
 import org.opensearch.common.CheckedConsumer
 import org.opensearch.common.settings.Settings
+import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
+import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtFilter
+import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorIndices
 import org.opensearch.index.mapper.KeywordFieldMapper.KeywordFieldType
 import org.opensearch.index.mapper.MappedFieldType
 import org.opensearch.index.mapper.NumberFieldMapper

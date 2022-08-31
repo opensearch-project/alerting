@@ -5,7 +5,6 @@
 
 package org.opensearch.alerting.core.settings
 
-import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.common.settings.Setting
 
 /**

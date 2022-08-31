@@ -8,7 +8,6 @@ package org.opensearch.alerting.core
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.action.search.SearchRequest
-import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.core.schedule.JobScheduler
 import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEEPER_ENABLED
@@ -38,6 +37,7 @@ import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.index.engine.Engine
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.QueryBuilders

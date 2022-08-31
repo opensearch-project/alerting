@@ -31,14 +31,14 @@ class org.opensearch.alerting.script.QueryLevelTriggerExecutionContext {
     Exception getError()
 }
 
-class org.opensearch.alerting.model.Monitor {
+class org.opensearch.commons.alerting.model.Monitor {
     String getId()
     long getVersion()
     String getName()
     boolean getEnabled()
 }
 
-class org.opensearch.alerting.model.QueryLevelTrigger {
+class org.opensearch.commons.alerting.model.QueryLevelTrigger {
     String getId()
     String getName()
     String getSeverity()

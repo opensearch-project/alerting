@@ -17,9 +17,6 @@ class LegacyOpenDistroAlertingSettings {
 
     companion object {
 
-        const val MONITOR_MAX_INPUTS = 1
-        const val MONITOR_MAX_TRIGGERS = 10
-
         val ALERTING_MAX_MONITORS = Setting.intSetting(
             "opendistro.alerting.monitor.max_monitors",
             1000,

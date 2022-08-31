@@ -7,14 +7,14 @@ package org.opensearch.alerting
 
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_FINDING_INDEX_PATTERN
-import org.opensearch.alerting.core.model.DocLevelMonitorInput
-import org.opensearch.alerting.core.model.DocLevelQuery
-import org.opensearch.alerting.model.action.ActionExecutionPolicy
-import org.opensearch.alerting.model.action.AlertCategory
-import org.opensearch.alerting.model.action.PerAlertActionScope
-import org.opensearch.alerting.model.action.PerExecutionActionScope
 import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
+import org.opensearch.commons.alerting.model.DocLevelQuery
+import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
+import org.opensearch.commons.alerting.model.action.AlertCategory
+import org.opensearch.commons.alerting.model.action.PerAlertActionScope
+import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
 import org.opensearch.script.Script
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter

@@ -6,8 +6,8 @@
 package org.opensearch.alerting.triggeraction
 
 import org.junit.Assert
-import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.triggercondition.parsers.TriggerExpressionParser
+import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.test.OpenSearchTestCase
 
 class TriggerExpressionResolverTests : OpenSearchTestCase() {
