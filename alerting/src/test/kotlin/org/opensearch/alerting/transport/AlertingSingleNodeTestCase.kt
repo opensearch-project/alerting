@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.transport
 
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope
 import org.opensearch.action.admin.indices.refresh.RefreshAction
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
 import org.opensearch.action.support.WriteRequest
@@ -36,6 +37,7 @@ import java.util.*
  * A test that keep a singleton node started for all tests that can be used to get
  * references to Guice injectors in unit tests.
  */
+@ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
 
     protected val index: String = randomAlphaOfLength(10).lowercase(Locale.ROOT)

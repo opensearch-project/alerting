@@ -132,7 +132,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                         )
 
                     val updatedProperties = properties.entries.associate {
-                        if (monitor.dataSources?.queryIndexMappingsByType?.isNotEmpty()!!) {
+                        if (monitor.dataSources?.queryIndexMappingsByType?.isNotEmpty() == true) {
                             val mappingsByType = monitor.dataSources.queryIndexMappingsByType
                             if (it.value.containsKey("type") && mappingsByType.containsKey(it.value["type"]!!)) {
                                 val newVal = it.value.toMutableMap()
