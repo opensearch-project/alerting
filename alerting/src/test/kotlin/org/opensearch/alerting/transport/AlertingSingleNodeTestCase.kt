@@ -38,9 +38,7 @@ import java.util.*
  */
 abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
 
-    companion object {
-        val index: String = randomAlphaOfLength(10).lowercase(Locale.ROOT)
-    }
+    protected val index: String = randomAlphaOfLength(10).lowercase(Locale.ROOT)
 
     override fun setUp() {
         super.setUp()
