@@ -11,6 +11,7 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.GetSuggestionsAction
 import org.opensearch.alerting.action.GetSuggestionsRequest
 import org.opensearch.alerting.action.GetSuggestionsResponse
+import org.opensearch.alerting.rules.inputs.util.SuggestionsObjectListener
 import org.opensearch.alerting.rules.util.RuleExecutor
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
@@ -55,18 +56,39 @@ class TransportGetSuggestionsAction @Inject constructor(
                 actionListener.onResponse(GetSuggestionsResponse(suggestions, RestStatus.OK))
             }
 
-            val suggestionInput = getSuggestionsRequest.input
+            val input = getSuggestionsRequest.input
+            if (input.async) {
+                input.getObject(
+                    object : SuggestionsObjectListener {
+                        override fun onGetResponse(obj: Any) {
+                            getSuggestions(obj)
+                        }
 
-            val obj: Any
+                        override fun onFailure(e: Exception) {
+                            actionListener.onFailure(AlertingException.wrap(e))
+                        }
+                    },
+                    client,
+                    xContentRegistry
+                )
+            } else {
+                val obj = input.getObject(
+                    object : SuggestionsObjectListener {
+                        override fun onGetResponse(obj: Any) {
+                            actionListener.onFailure(
+                                AlertingException.wrap(
+                                    IllegalStateException("Inputs that don't use async object retrieval must not provide object here")
+                                )
+                            )
+                        }
 
-            try {
-                obj = suggestionInput.getObject(client, xContentRegistry)
-            } catch (e: Exception) {
-                actionListener.onFailure(AlertingException.wrap(e))
-                return
+                        override fun onFailure(e: Exception) {
+                            actionListener.onFailure(AlertingException.wrap(e))
+                        }
+                    }
+                ) ?: actionListener.onFailure(AlertingException.wrap(IllegalStateException("objects passed inline cannot be null")))
+                getSuggestions(obj)
             }
-
-            getSuggestions(obj)
         }
     }
 }

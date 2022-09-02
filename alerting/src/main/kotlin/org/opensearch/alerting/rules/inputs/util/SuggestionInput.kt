@@ -17,6 +17,7 @@ import org.opensearch.common.xcontent.XContentParser
 interface SuggestionInput<I, out T> : Writeable {
 
     var rawInput: I?
+    var async: Boolean
 
     /**
      * Parameters:
@@ -31,8 +32,6 @@ interface SuggestionInput<I, out T> : Writeable {
      * it found
      * -- OR --
      * Throw an error if the input was invalid in some way
-     *
-     * Must only be called in REST handler
      */
     fun parseInput(xcp: XContentParser)
 
@@ -44,22 +43,50 @@ interface SuggestionInput<I, out T> : Writeable {
      * xContentRegistry: a NamedXContentRegistry that can be used to create
      * parsers (for example, a parser for a GetResponse from an index)
      *
-     * Throws:
+     * callback: use to relay information back to the caller of your SuggestionInput
+     * you have access to the following functions:
+     *
+     * onGetResponse(obj: Any): Only use if your implementation involves async object retrieval
+     * (for example, retrieving a Monitor from an index). Provide your result object
+     * by calling this onGetResponse() rather than returning it.
+     *
+     * onFailure(e: Exception): Use to relay/throw errors cleanly
+     *
+     * What It Does:
+     * Uses the non-null value of rawInput to retrieve the object
+     * of type T
+     *
+     * If this involves async object retrieval (this.async == true), make use of the given client
+     * and XContentRegistry, and provide the object by using the given callback's onGetResposne() rather
+     * than returning synchronously out of the function
+     *
+     * If this does not involve async object retrieval (this.async == false), do not use any of the given
+     * params (as they will all be null), and provide the object by returning it out of the function
+     *
+     * Must Throw:
+     * Use the given ActionListener.onFailure() to throw:
+     *
      * IllegalStateException if rawInput is null. parseInput() must
      * be called first to make rawInput non-null before getObject()
      * is called
      *
-     * Uses the non-null value of rawInput to retrieve the object
-     * of type T, making use of the given client and XContentRegistry
-     * if necessary
+     * IllegalStateException if the input requires async object
+     * retrieval (this.async == true), and at least one of the params
+     * with default values are null
      *
      * Returns:
-     * the object of type T that the value of rawInput describes
+     * null: if async object retrieval was involved
+     * - OR -
+     * T: if async object retrieval was not involved
+     *
      * for example:
-     * if rawInput is a String monitorId, return the Monitor object that has that id
-     * if rawInput is itself a Monitor, return that very Monitor
+     *
+     * if rawInput is a String monitorId, async Monitor retrieval from an index is involved, so null is returned,
+     * and the object is instead provided in the given callback
+     *
+     * if rawInput is itself a Monitor, async Monitor retrieval is not required, so return rawInput: Monitor itself
      */
-    fun getObject(client: Client, xContentRegistry: NamedXContentRegistry): T
+    fun getObject(callback: SuggestionsObjectListener, client: Client? = null, xContentRegistry: NamedXContentRegistry? = null): T?
 
     /**
      * Implementations of this interface must also include a companion object
