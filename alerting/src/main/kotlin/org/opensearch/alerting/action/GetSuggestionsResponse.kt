@@ -1,3 +1,8 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package org.opensearch.alerting.action
 
 import org.opensearch.action.ActionResponse
@@ -12,7 +17,6 @@ import java.io.IOException
 class GetSuggestionsResponse : ActionResponse, ToXContentObject {
     var suggestions: List<String>
     var status: RestStatus
-    // TODO: do we need id, primaryTerm, seqNo, etc, what are they used for?
 
     constructor(
         suggestions: List<String>,
