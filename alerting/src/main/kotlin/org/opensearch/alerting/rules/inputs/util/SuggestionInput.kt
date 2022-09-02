@@ -92,7 +92,7 @@ interface SuggestionInput<I, out T> : Writeable {
      * Implementations of this interface must also include a companion object
      * that implements:
      *
-     * fun readFrom(sin: StreamInput): T
+     * fun readFrom(sin: StreamInput): SuggestionInput<I, out T>
      */
 
     companion object {
