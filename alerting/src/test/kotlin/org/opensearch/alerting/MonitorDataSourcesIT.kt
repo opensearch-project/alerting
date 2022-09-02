@@ -6,6 +6,7 @@
 package org.opensearch.alerting
 
 import org.junit.Assert
+import org.opensearch.action.admin.cluster.state.ClusterStateRequest
 import org.opensearch.alerting.core.model.DataSources
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
@@ -101,12 +102,13 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customQueryIndex = "custom_alerts_index"
+        val analyzer = "whitespace"
         var monitor = randomDocumentLevelMonitor(
             inputs = listOf(docLevelInput),
             triggers = listOf(trigger),
             dataSources = DataSources(
                 queryIndex = customQueryIndex,
-                queryIndexMappingsByType = mapOf(Pair("text", mapOf(Pair("analyzer", "rule_analyzer")))),
+                queryIndexMappingsByType = mapOf(Pair("text", mapOf(Pair("analyzer", analyzer)))),
             )
         )
         val monitorResponse = createMonitor(monitor)
@@ -124,6 +126,9 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
+        val clusterStateResponse = client().admin().cluster().state(ClusterStateRequest().indices(customQueryIndex).metadata(true)).get()
+        val mapping = clusterStateResponse.state.metadata.index(customQueryIndex).mapping()
+        Assert.assertTrue(mapping?.source()?.string()?.contains("\"analyzer\":\"$analyzer\"") == true)
     }
 
     fun `test execute monitor with custom findings index`() {

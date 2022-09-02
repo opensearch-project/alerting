@@ -132,22 +132,17 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                         )
 
                     val updatedProperties = properties.entries.associate {
+                        val newVal = it.value.toMutableMap()
                         if (monitor.dataSources?.queryIndexMappingsByType?.isNotEmpty() == true) {
                             val mappingsByType = monitor.dataSources.queryIndexMappingsByType
                             if (it.value.containsKey("type") && mappingsByType.containsKey(it.value["type"]!!)) {
-                                val newVal = it.value.toMutableMap()
                                 mappingsByType[it.value["type"]]?.entries?.forEach { iter: Map.Entry<String, String> ->
                                     newVal[iter.key] = iter.value
                                 }
                             }
                         }
-                        if (it.value.containsKey("path")) {
-                            val newVal = it.value.toMutableMap()
-                            newVal["path"] = "${it.value["path"]}_${indexName}_$monitorId"
-                            "${it.key}_${indexName}_$monitorId" to newVal
-                        } else {
-                            "${it.key}_${indexName}_$monitorId" to it.value
-                        }
+                        if (it.value.containsKey("path")) newVal["path"] = "${it.value["path"]}_${indexName}_$monitorId"
+                        "${it.key}_${indexName}_$monitorId" to newVal
                     }
                     val queryIndex = getOrDefaultQueryIndex(monitor)
 
