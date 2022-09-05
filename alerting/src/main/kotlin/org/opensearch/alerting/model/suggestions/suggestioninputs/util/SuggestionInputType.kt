@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting.rules.inputs.util
+package org.opensearch.alerting.model.suggestions.suggestioninputs.util
 
 enum class SuggestionInputType(val value: String) {
     MONITOR_ID("monitorId");

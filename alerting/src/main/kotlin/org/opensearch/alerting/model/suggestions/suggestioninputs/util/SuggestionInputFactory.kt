@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting.rules.inputs.util
+package org.opensearch.alerting.model.suggestions.suggestioninputs.util
 
-import org.opensearch.alerting.rules.inputs.MonitorIDInput
+import org.opensearch.alerting.model.suggestions.suggestioninputs.MonitorIDInput
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.xcontent.XContentParser
 

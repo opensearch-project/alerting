@@ -11,8 +11,8 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.GetSuggestionsAction
 import org.opensearch.alerting.action.GetSuggestionsRequest
 import org.opensearch.alerting.action.GetSuggestionsResponse
-import org.opensearch.alerting.rules.inputs.util.SuggestionsObjectListener
-import org.opensearch.alerting.rules.util.RuleExecutor
+import org.opensearch.alerting.model.suggestions.rules.util.RuleExecutor
+import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionsObjectListener
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
@@ -51,17 +51,19 @@ class TransportGetSuggestionsAction @Inject constructor(
         }
 
         client.threadPool().threadContext.stashContext().use {
-            val getSuggestions = fun(obj: Any) {
-                val suggestions = RuleExecutor.getSuggestions(obj)
+            val getSuggestions = fun(obj: Any, component: String) {
+                val suggestions = RuleExecutor.getSuggestions(obj, component)
                 actionListener.onResponse(GetSuggestionsResponse(suggestions, RestStatus.OK))
             }
 
             val input = getSuggestionsRequest.input
+            val component = getSuggestionsRequest.component
+
             if (input.async) {
                 input.getObject(
                     object : SuggestionsObjectListener {
                         override fun onGetResponse(obj: Any) {
-                            getSuggestions(obj)
+                            getSuggestions(obj, component)
                         }
 
                         override fun onFailure(e: Exception) {
@@ -87,7 +89,7 @@ class TransportGetSuggestionsAction @Inject constructor(
                         }
                     }
                 ) ?: actionListener.onFailure(AlertingException.wrap(IllegalStateException("objects passed inline cannot be null")))
-                getSuggestions(obj)
+                getSuggestions(obj, component)
             }
         }
     }

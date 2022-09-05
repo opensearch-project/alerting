@@ -7,16 +7,16 @@ package org.opensearch.alerting.action
 
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionRequestValidationException
-import org.opensearch.alerting.rules.inputs.util.SuggestionInput
-import org.opensearch.alerting.rules.inputs.util.SuggestionInputFactory
-import org.opensearch.alerting.rules.inputs.util.SuggestionInputType
+import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionInput
+import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionInputFactory
+import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionInputType
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.XContentParser
 import java.io.IOException
 
 class GetSuggestionsRequest : ActionRequest {
-    val inputType: SuggestionInputType
+    private val inputType: SuggestionInputType
     val component: String
     val input: SuggestionInput<*, Any> // TODO: is * safe here?
 

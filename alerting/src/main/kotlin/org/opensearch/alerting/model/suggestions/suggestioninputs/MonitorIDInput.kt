@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting.rules.inputs
+package org.opensearch.alerting.model.suggestions.suggestioninputs
 
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
@@ -11,8 +11,8 @@ import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.rules.inputs.util.SuggestionInput
-import org.opensearch.alerting.rules.inputs.util.SuggestionsObjectListener
+import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionInput
+import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionsObjectListener
 import org.opensearch.client.Client
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput

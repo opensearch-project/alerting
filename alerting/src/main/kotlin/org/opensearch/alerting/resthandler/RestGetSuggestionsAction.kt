@@ -9,8 +9,8 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.GetSuggestionsAction
 import org.opensearch.alerting.action.GetSuggestionsRequest
-import org.opensearch.alerting.rules.inputs.util.SuggestionInput
-import org.opensearch.alerting.rules.inputs.util.SuggestionInputType
+import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionInput
+import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionInputType
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.xcontent.XContentParser.Token
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken

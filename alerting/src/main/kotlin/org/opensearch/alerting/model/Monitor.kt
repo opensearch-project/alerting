@@ -312,7 +312,7 @@ data class Monitor(
 
         @JvmStatic
         @Throws(IOException::class)
-        fun readFrom(sin: StreamInput): Monitor {
+        fun readFrom(sin: StreamInput): Monitor? {
             return Monitor(sin)
         }
 
