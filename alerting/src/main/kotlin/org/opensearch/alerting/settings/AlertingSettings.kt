@@ -5,57 +5,23 @@
 
 package org.opensearch.alerting.settings
 
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import org.apache.logging.log4j.LogManager
-import org.opensearch.action.search.SearchRequest
-import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.alerting.action.SearchMonitorAction
-import org.opensearch.alerting.action.SearchMonitorRequest
-import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.Trigger
-import org.opensearch.alerting.opensearchapi.suspendUntil
-import org.opensearch.client.Client
-import org.opensearch.common.Strings
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.unit.TimeValue
-import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.XContentFactory
-import org.opensearch.common.xcontent.XContentType
-import org.opensearch.index.query.QueryBuilders
-import org.opensearch.rest.RestStatus
-import org.opensearch.search.builder.SearchSourceBuilder
-import org.opensearch.search.fetch.subphase.FetchSourceContext
 import java.util.concurrent.TimeUnit
 
 /**
  * settings specific to [AlertingPlugin]. These settings include things like history index max age, request timeout, etc...
  */
-class AlertingSettings(val client: Client) {
-
-    init {
-        setClient(client)
-    }
+class AlertingSettings {
 
     companion object {
-        private var internalClient: Client? = null
-
         const val MONITOR_MAX_INPUTS = 1
         const val MONITOR_MAX_TRIGGERS = 10
         const val DEFAULT_MAX_ACTIONABLE_ALERT_COUNT = 50L
         const val UNBOUNDED_ACTIONS_ACROSS_TRIGGERS = -1
         const val DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER = UNBOUNDED_ACTIONS_ACROSS_TRIGGERS
         const val DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS = UNBOUNDED_ACTIONS_ACROSS_TRIGGERS
-
-        private val logger = LogManager.getLogger(AlertingSettings::class.java)
-
-        private fun setClient(client: Client) {
-            internalClient = client
-        }
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(
             "plugins.alerting.monitor.max_monitors",
@@ -206,19 +172,10 @@ class AlertingSettings(val client: Client) {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        internal class TotalMaxActionsAcrossTriggersValidator() : Setting.Validator<Int> {
-            private val logger = LogManager.getLogger(MaxActionsPerTriggersValidator::class.java)
+        internal class TotalMaxActionsAcrossTriggersValidator : Setting.Validator<Int> {
+            override fun validate(value: Int) {}
 
-            override fun validate(value: Int) {
-                logger.info("Testing1 TotalMaxActionsAcrossTriggersValidator validating value $value")
-            }
-
-            override fun validate(value: Int, settings: Map<Setting<*>, Any>) {
-                logger.info("Testing2 TotalMaxActionsAcrossTriggersValidator validating value $value with settings")
-
-                val maxActions = settings[TOTAL_MAX_ACTIONS_PER_TRIGGER] as Int
-                validateActionsAcrossTriggers(maxActions, value)
-            }
+            override fun validate(value: Int, settings: Map<Setting<*>, Any>) {}
 
             override fun settings(): MutableIterator<Setting<*>> {
                 val settings = mutableListOf<Setting<*>>(
@@ -229,18 +186,9 @@ class AlertingSettings(val client: Client) {
         }
 
         internal class MaxActionsPerTriggersValidator() : Setting.Validator<Int> {
-            private val logger = LogManager.getLogger(MaxActionsPerTriggersValidator::class.java)
+            override fun validate(value: Int) {}
 
-            override fun validate(value: Int) {
-                logger.info("Testing3 MaxActionsPerTriggersValidator validating value $value")
-            }
-
-            override fun validate(value: Int, settings: Map<Setting<*>, Any>) {
-                logger.info("Testing4 MaxActionsPerTriggersValidator validating value $value with settings")
-
-                val totalMaxActions = settings[TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS] as Int
-                validateActionsPerTrigger(value, totalMaxActions)
-            }
+            override fun validate(value: Int, settings: Map<Setting<*>, Any>) {}
 
             override fun settings(): MutableIterator<Setting<*>> {
                 val settings = mutableListOf<Setting<*>>(
@@ -248,153 +196,6 @@ class AlertingSettings(val client: Client) {
                 )
                 return settings.iterator()
             }
-        }
-
-        private fun validateActionsAcrossTriggers(maxActions: Int, totalMaxActions: Int) {
-            logger.info("Testing5 validateActionsAcrossTriggers maxActions $maxActions totalMaxActions $totalMaxActions")
-            logger.info("Testing 13 client is null ${internalClient == null}")
-
-            if (maxActions == DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS) return
-
-            if (totalMaxActions < -1) throw IllegalArgumentException("cannot update this invalid value, $totalMaxActions")
-
-            if (maxActions > totalMaxActions) {
-                throw IllegalArgumentException(
-                    "The limit number of actions for a single trigger, $maxActions, " +
-                        "should not be greater than that of the overall max actions across all triggers of the monitor, $totalMaxActions"
-                )
-            }
-            internalClient?.let {
-                GlobalScope.launch {
-                    val monitors = getMonitors(it)
-                    val triggers = getTriggers(monitors)
-
-                    logger.info("Testing6 validateActionsPerTrigger acquired ${monitors.size} monitors.")
-                    logger.info("Testing7 validateActionsPerTrigger acquired ${triggers.size} triggers.")
-
-                    val currentAmountOfActions = getCurrentAmountOfActions(triggers)
-
-                    logger.info("Testing8 validateActionsPerTrigger acquired $currentAmountOfActions actions.")
-
-                    if (currentAmountOfActions > totalMaxActions)
-                        throw IllegalArgumentException(
-                            "The amount of actions that the client wants to update plus the amount of actions that " +
-                                "already exist, $currentAmountOfActions should not be greater than  that of the " +
-                                "overall max actions across all triggers of the monitor, $totalMaxActions"
-                        )
-                }
-            }
-        }
-
-        private fun validateActionsPerTrigger(maxActions: Int, totalMaxActions: Int) {
-            logger.info("Testing9 validateActionsPerTrigger maxActions $maxActions totalMaxActions $totalMaxActions")
-            logger.info("Testing 12 client is null ${internalClient == null}")
-
-            if (maxActions == DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER) return
-
-            if (totalMaxActions < -1) throw IllegalArgumentException("cannot update this invalid value, $maxActions")
-
-            internalClient?.let {
-                runBlocking {
-                    val monitors = getMonitors(it)
-
-                    logger.info("Testing10 validateActionsPerTrigger acquired ${monitors.size} monitors.")
-
-                    for (monitor in monitors) {
-                        for (trigger in monitor.triggers) {
-                            val amountOfActionsInTrigger = trigger.actions.size
-                            logger.info("Testing11 validateActionsPerTrigger trigger has $amountOfActionsInTrigger actions.")
-
-                            if (amountOfActionsInTrigger > maxActions)
-                                throw IllegalArgumentException(
-                                    "The amount of actions in the trigger, $maxActions, should not be greater than $totalMaxActions"
-                                )
-                            else if (amountOfActionsInTrigger < totalMaxActions)
-                                throw IllegalArgumentException(
-                                    "Cannot update the maximum amount of actions per trigger to a value that is not equal or greater " +
-                                        "than the current amount of actions in a single trigger"
-                                )
-                        }
-                    }
-                }
-            }
-        }
-
-        private suspend fun getMonitors(client: Client): List<Monitor> {
-            val monitors = mutableListOf<Monitor>()
-            val start = 0
-            val configName = "monitor"
-
-            val searchSourceBuilder = SearchSourceBuilder()
-                .from(start)
-                .fetchSource(FetchSourceContext(true, Strings.EMPTY_ARRAY, Strings.EMPTY_ARRAY))
-                .seqNoAndPrimaryTerm(true)
-                .version(true)
-            val queryBuilder = QueryBuilders.boolQuery()
-                .should(QueryBuilders.existsQuery(configName))
-            queryBuilder.filter(QueryBuilders.existsQuery(Monitor.MONITOR_TYPE))
-
-            searchSourceBuilder.query(queryBuilder)
-                .seqNoAndPrimaryTerm(true)
-                .version(true)
-
-            val searchRequest = SearchRequest()
-                .source(searchSourceBuilder)
-                .indices(ALL_ALERT_INDEX_PATTERN) // Could be ALL_FINDING_INDEX_PATTERN
-
-            val searchMonitorRequest = SearchMonitorRequest(searchRequest)
-
-            val response: SearchResponse = client.suspendUntil {
-                client.execute(SearchMonitorAction.INSTANCE, searchMonitorRequest, it)
-            }
-
-            logger.info(
-                "Testing14Monitors response=> status: {${response.status()}} \n totalHits: {${response.hits.totalHits?.value}}" +
-                    " hits: ${response.hits.hits.size}"
-            )
-
-            if (response.status() != RestStatus.OK)
-                return emptyList()
-
-            for (hit in response.hits) {
-                val xcp = XContentFactory.xContent(XContentType.JSON)
-                    .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
-
-                logger.info("Testing15Hits $xcp")
-
-                val monitor = Monitor.parse(
-                    xcp = xcp,
-                    id = hit.id,
-                    version = hit.version
-                )
-
-                monitors.add(monitor)
-                logger.info("Testing16Add-Monitor monitor ${monitor.id} added.")
-            }
-
-            return monitors
-        }
-
-        private fun getTriggers(monitors: List<Monitor>): List<Trigger> {
-            val triggers = mutableListOf<Trigger>()
-
-            monitors.map {
-                triggers.addAll(triggers)
-            }
-
-            logger.info("Testing15Triggers size: ${triggers.size}")
-
-            return triggers
-        }
-
-        private fun getCurrentAmountOfActions(triggers: List<Trigger>): Int {
-            var currentAmountOfActions = 0
-
-            currentAmountOfActions += triggers.sumOf { trigger ->
-                trigger.actions.size
-            }
-
-            return currentAmountOfActions
         }
     }
 }
