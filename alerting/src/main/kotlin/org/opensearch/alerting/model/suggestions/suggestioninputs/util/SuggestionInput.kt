@@ -31,7 +31,12 @@ interface SuggestionInput<I, out T> : Writeable {
      * This function must either populate the rawInput field above with the value
      * it found
      * -- OR --
-     * Throw an error if the input was invalid in some way
+     * Throw an error if the input format was invalid in some way
+     *
+     * Ways of input being invalid:
+     * - input object contains no fields
+     * - input object contains more than 1 field (input is expected to contain exactly 1 field with the same name
+     *   as the value of inputType)
      */
     fun parseInput(xcp: XContentParser)
 

@@ -37,6 +37,8 @@ class MonitorObjInput() : SuggestionInput<Monitor, Monitor> {
         val monitor: Monitor = Monitor.parse(xcp)
 
         this.rawInput = monitor
+
+        ensureExpectedToken(Token.END_OBJECT, xcp.currentToken(), xcp) // that should be the only field in the object
     }
 
     override fun getObject(callback: SuggestionsObjectListener, client: Client?, xContentRegistry: NamedXContentRegistry?): Monitor? {

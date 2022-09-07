@@ -10,6 +10,6 @@ import org.opensearch.action.ActionType
 class GetSuggestionsAction private constructor() : ActionType<GetSuggestionsResponse>(NAME, ::GetSuggestionsResponse) {
     companion object {
         val INSTANCE = GetSuggestionsAction()
-        const val NAME = "cluster:admin/opensearch/alerting/suggestions/get" // TODO: is this an ok name to use?
+        const val NAME = "cluster:admin/opensearch/suggestions/get"
     }
 }

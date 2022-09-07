@@ -170,7 +170,7 @@ class SuggestionsRestApiIT : AlertingRestTestCase() {
         var builder = XContentFactory.jsonBuilder()
         builder.startObject()
         builder.field("inputType", "monitorObj")
-        builder.field("component", "monitor.notComp")
+        builder.field("component", "monitor.notAComponent")
         builder.startObject("input")
         builder.field("monitorObj")
         builder = monitor.toXContent(builder, ToXContent.EMPTY_PARAMS)
@@ -183,12 +183,57 @@ class SuggestionsRestApiIT : AlertingRestTestCase() {
         val responseBody = response.asMap()
 
         // GetSuggestionsResponse.kt always puts a List<String> in response, so this cast is ok
-        val s = responseBody["suggestions"]
         val suggestions = responseBody["suggestions"] as List<String>
 
         assertEquals(1, suggestions.size) // should only contain the "component not found" message
         val msg = suggestions[0]
         assertEquals("no suggestions found for given component in given object, or the supplied component is invalid", msg)
+    }
+
+    fun `test asking for suggestions with input object containing no fields`() {
+        val monitor = createRandomMonitor()
+        val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+
+        val builder = XContentFactory.jsonBuilder()
+        builder.startObject()
+        builder.field("inputType", "monitorId")
+        builder.field("component", "monitor")
+        builder.startObject("input")
+        // no input contents
+        builder.endObject() // input
+        builder.endObject()
+
+        val httpEntity = StringEntity(shuffleXContent(builder).string(), APPLICATION_JSON)
+
+        try {
+            client().makeRequest("POST", SUGGESTIONS_BASE_URI, emptyMap(), httpEntity)
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())
+        }
+    }
+
+    fun `test asking for suggestions with input object containing more than one field`() {
+        val monitor = createRandomMonitor()
+        val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+        val monitorId = createResponse.asMap()["_id"] as String
+
+        val builder = XContentFactory.jsonBuilder()
+        builder.startObject()
+        builder.field("inputType", "monitorId")
+        builder.field("component", "monitor")
+        builder.startObject("input")
+        builder.field("monitorId", monitorId)
+        builder.field("extraField", "thisShouldntBeHere") // extra field
+        builder.endObject() // input
+        builder.endObject()
+
+        val httpEntity = StringEntity(shuffleXContent(builder).string(), APPLICATION_JSON)
+
+        try {
+            client().makeRequest("POST", SUGGESTIONS_BASE_URI, emptyMap(), httpEntity)
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())
+        }
     }
 
     // INPUT SPECIFIC TESTS
@@ -247,7 +292,7 @@ class SuggestionsRestApiIT : AlertingRestTestCase() {
         builder.field("inputType", "monitorId")
         builder.field("component", "monitor")
         builder.startObject("input")
-        builder.field("monitorObj", monitorId) // inputType is monitorId but field "monitorObj" is used
+        builder.field("monitorObj", monitorId) // inputType is monitorId but wrong field name is used
         builder.endObject() // input
         builder.endObject()
 
@@ -310,7 +355,7 @@ class SuggestionsRestApiIT : AlertingRestTestCase() {
         builder.field("inputType", "monitorObj")
         builder.field("component", "monitor")
         builder.startObject("input")
-        builder.field("monitorId") // inputType is monitorObj but field "monitorId" is used
+        builder.field("monitorId") // inputType is monitorObj but wrong field name is used
         builder = monitor.toXContent(builder, ToXContent.EMPTY_PARAMS)
         builder.endObject() // input
         builder.endObject()
