@@ -30,8 +30,6 @@ class MonitorIDInput() : SuggestionInput<String, Monitor> {
     override var rawInput: String? = null
     override var async = true
 
-    var obj: Monitor? = null
-
     constructor(sin: StreamInput) : this() {
         rawInput = sin.readOptionalString() // TODO: readString() or readOptionalString()?
         async = sin.readBoolean()
@@ -51,9 +49,9 @@ class MonitorIDInput() : SuggestionInput<String, Monitor> {
         ensureExpectedToken(Token.START_OBJECT, xcp.currentToken(), xcp) // start of input {} block
         ensureExpectedToken(Token.FIELD_NAME, xcp.nextToken(), xcp) // name field, should be "monitorId"
         if (xcp.currentName() != MONITOR_ID_FIELD) {
-            throw IllegalArgumentException("input must contain exactly one field named \"monitorId\" that stores a valid monitor id")
+            throw IllegalArgumentException("for inputType = monitorId, input must contain exactly one field named \"monitorId\" that stores a valid monitor id")
         }
-        xcp.nextToken() // the value stored in the monitorId field, the monitor id itself
+        ensureExpectedToken(Token.VALUE_STRING, xcp.nextToken(), xcp) // the value stored in the monitorId field, the monitor id itself
         val monitorId: String = xcp.text()
 
         this.rawInput = monitorId
@@ -73,7 +71,7 @@ class MonitorIDInput() : SuggestionInput<String, Monitor> {
             object : ActionListener<GetResponse> {
                 override fun onResponse(response: GetResponse) {
                     if (!response.isExists) {
-                        callback.onFailure(OpenSearchStatusException("Monitor with ID $rawInput not found", RestStatus.NOT_FOUND))
+                        callback.onFailure(OpenSearchStatusException("Monitor with ID $rawInput not found, please ensure the monitor id is valid", RestStatus.NOT_FOUND))
                     }
 
                     if (!response.isSourceEmpty) {

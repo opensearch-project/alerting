@@ -6,8 +6,8 @@
 package org.opensearch.alerting.model.suggestions.suggestioninputs.util
 
 enum class SuggestionInputType(val value: String) {
-    MONITOR_ID("monitorId");
-    // MONITOR_OBJ("monitorObj");
+    MONITOR_ID("monitorId"),
+    MONITOR_OBJ("monitorObj");
 
     override fun toString(): String {
         return value

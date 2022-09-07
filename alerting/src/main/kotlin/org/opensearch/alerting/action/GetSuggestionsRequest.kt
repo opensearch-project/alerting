@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.action
 
+import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionRequestValidationException
 import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionInput
@@ -14,6 +15,8 @@ import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.XContentParser
 import java.io.IOException
+
+private val log = LogManager.getLogger(GetSuggestionsRequest::class.java)
 
 class GetSuggestionsRequest : ActionRequest {
     private val inputType: SuggestionInputType

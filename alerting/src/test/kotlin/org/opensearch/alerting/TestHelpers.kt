@@ -279,6 +279,7 @@ fun randomScript(source: String = "return " + OpenSearchRestTestCase.randomBoole
 val ADMIN = "admin"
 val ALERTING_BASE_URI = "/_plugins/_alerting/monitors"
 val DESTINATION_BASE_URI = "/_plugins/_alerting/destinations"
+val SUGGESTIONS_BASE_URI = "/_plugins/suggestions/alerting"
 val LEGACY_OPENDISTRO_ALERTING_BASE_URI = "/_opendistro/_alerting/monitors"
 val LEGACY_OPENDISTRO_DESTINATION_BASE_URI = "/_opendistro/_alerting/destinations"
 val ALWAYS_RUN = Script("return true")
