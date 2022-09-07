@@ -16,16 +16,35 @@ import org.opensearch.common.xcontent.XContentParserUtils
 import java.io.IOException
 
 data class DataSources(
+    /** Configures a custom query index name for the monitor. Creates a new index if index with given name not present.*/
     val queryIndex: String? = null,
+
+    /** Configures a custom index to store findings for a monitor. Creates a new index if index with given name not present.
+     *  If index is pre-existing, mapping is updated*/
     val findingsIndex: String? = null,
+
+    /** Configures a custom index to store alerts for a monitor. Creates a new index if index with given name not present.
+     *  If index is pre-existing, mapping is updated. */
     val alertsIndex: String? = null,
+
+    /** Configures custom mappings by field type for query index.
+     * Custom query index mappings are configurable, only if a custom query index is configured too. */
     val queryIndexMappingsByType: Map<String, Map<String, String>> = mapOf()
+
 ) : Writeable, ToXContentObject {
 
     init {
         if (queryIndexMappingsByType.isNotEmpty()) {
             require(queryIndex != null && queryIndex.isNotEmpty()) {
-                "Custom query index mappings are applicable only if custom query index is used for monitor."
+                "Custom query index mappings are configurable only if a custom query index is configured too."
+            }
+            require(
+                queryIndexMappingsByType.size == 1 &&
+                    queryIndexMappingsByType.containsKey("text") &&
+                    queryIndexMappingsByType.get("text")?.size == 1 &&
+                    queryIndexMappingsByType.get("text")!!.containsKey("analyzer")
+            ) {
+                "Custom query index mappings are currently configurable only for 'text' fields and mapping parameter can only be 'analyzer'"
             }
         }
     }

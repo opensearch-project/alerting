@@ -82,6 +82,9 @@ class RestIndexMonitorAction : BaseRestHandler() {
         val xcp = request.contentParser()
         ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
         val monitor = Monitor.parse(xcp, id).copy(lastUpdateTime = Instant.now())
+        if (monitor.dataSources != null) { // Data Sources will currently be supported only at transport layer.
+            throw IllegalArgumentException("Data Sources field is not allowed.")
+        }
         val monitorType = monitor.monitorType
         val triggers = monitor.triggers
         when (monitorType) {
