@@ -13,12 +13,14 @@ import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorRunResult
+import org.opensearch.alerting.model.Trigger
 import org.opensearch.alerting.model.action.AlertCategory
 import org.opensearch.alerting.model.action.PerAlertActionScope
 import org.opensearch.alerting.model.action.PerExecutionActionScope
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
@@ -75,6 +77,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         val nextAlerts = mutableMapOf<String, MutableMap<AlertCategory, MutableList<Alert>>>()
         var firstIteration = true
         var firstPageOfInputResults = InputRunResults(listOf(), null)
+        val maxActionsPerTrigger = AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.get(monitorCtx.settings)
         do {
             // TODO: Since a composite aggregation is being used for the input query, the total bucket count cannot be determined.
             //  If a setting is imposed that limits buckets that can be processed for Bucket-Level Monitors, we'd need to iterate over
@@ -161,6 +164,13 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     ?.addAll(monitorCtx.alertService!!.convertToCompletedAlerts(keysToAlertsMap))
         }
         for (trigger in monitor.triggers) {
+            if (!shouldProcessTrigger(trigger, maxActionsPerTrigger)) {
+                triggerResults[trigger.id] = BucketLevelTriggerRunResult(
+                    trigger.name,
+                    Exception("Unable to run ${trigger.id} as it contains more actions than the maximum allowed."), emptyMap()
+                )
+                continue
+            }
             val alertsToUpdate = mutableSetOf<Alert>()
             val completedAlertsToUpdate = mutableSetOf<Alert>()
             // Filter ACKNOWLEDGED Alerts from the deduped list so they do not have Actions executed for them.
@@ -295,5 +305,10 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             AlertCategory.COMPLETED ->
                 ctx.copy(dedupedAlerts = emptyList(), newAlerts = emptyList(), completedAlerts = listOf(alert), error = error)
         }
+    }
+
+    private fun shouldProcessTrigger(trigger: Trigger, maxActionsPerTrigger: Int): Boolean {
+        return if (maxActionsPerTrigger == AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER) true
+        else trigger.actions.size <= maxActionsPerTrigger
     }
 }

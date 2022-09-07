@@ -11,9 +11,11 @@ import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
+import org.opensearch.alerting.model.Trigger
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.isADMonitor
 import java.time.Instant
 
@@ -28,6 +30,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
         dryrun: Boolean
     ): MonitorRunResult<QueryLevelTriggerRunResult> {
         val roles = MonitorRunnerService.getRolesForMonitor(monitor)
+        val maxActionsPerTrigger = AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.get(monitorCtx.settings)
         logger.debug("Running monitor: ${monitor.name} with roles: $roles Thread: ${Thread.currentThread().name}")
 
         if (periodStart == periodEnd) {
@@ -60,6 +63,13 @@ object QueryLevelMonitorRunner : MonitorRunner() {
         val updatedAlerts = mutableListOf<Alert>()
         val triggerResults = mutableMapOf<String, QueryLevelTriggerRunResult>()
         for (trigger in monitor.triggers) {
+            if (!shouldProcessTrigger(trigger, maxActionsPerTrigger)) {
+                triggerResults[trigger.id] = QueryLevelTriggerRunResult(
+                    trigger.name, false,
+                    Exception("Unable to run ${trigger.id} as it contains more actions than the maxmimum allowed.")
+                )
+                continue
+            }
             val currentAlert = currentAlerts[trigger]
             val triggerCtx = QueryLevelTriggerExecutionContext(monitor, trigger as QueryLevelTrigger, monitorResult, currentAlert)
             val triggerResult = monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger, triggerCtx)
@@ -84,5 +94,10 @@ object QueryLevelMonitorRunner : MonitorRunner() {
             monitorCtx.retryPolicy?.let { monitorCtx.alertService!!.saveAlerts(updatedAlerts, it) }
         }
         return monitorResult.copy(triggerResults = triggerResults)
+    }
+
+    private fun shouldProcessTrigger(trigger: Trigger, maxActionsPerTrigger: Int): Boolean {
+        return if (maxActionsPerTrigger == AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER) true
+        else trigger.actions.size <= maxActionsPerTrigger
     }
 }
