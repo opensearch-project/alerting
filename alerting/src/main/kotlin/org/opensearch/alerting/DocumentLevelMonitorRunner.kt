@@ -320,7 +320,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         logger.debug("Findings: $findingStr")
 
         if (shouldCreateFinding) {
-            val indexRequest = IndexRequest(AlertIndices.getOrDefaultFindingsHistoryIndex(monitor))
+            val indexRequest = IndexRequest(AlertIndices.getOrDefaultFindingsHistoryIndex(monitor.dataSources))
                 .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
                 .source(findingStr, XContentType.JSON)
                 .id(finding.id)
