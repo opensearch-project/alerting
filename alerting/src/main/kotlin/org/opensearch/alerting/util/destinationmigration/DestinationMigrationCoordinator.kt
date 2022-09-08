@@ -52,7 +52,7 @@ class DestinationMigrationCoordinator(
             DestinationMigrationUtilService.finishFlag = false
         }
         if (
-            event.localNodeMaster() &&
+            event.localNodeClusterManager() &&
             !runningLock &&
             (scheduledMigration == null || scheduledMigration!!.isCancelled)
         ) {
@@ -62,7 +62,7 @@ class DestinationMigrationCoordinator(
             } finally {
                 runningLock = false
             }
-        } else if (!event.localNodeMaster()) {
+        } else if (!event.localNodeClusterManager()) {
             scheduledMigration?.cancel()
         }
     }
