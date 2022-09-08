@@ -187,7 +187,7 @@ class SuggestionsRestApiIT : AlertingRestTestCase() {
 
         assertEquals(1, suggestions.size) // should only contain the "component not found" message
         val msg = suggestions[0]
-        assertEquals("no suggestions found for given component in given object, or the supplied component is invalid", msg)
+        assertEquals("no suggestions found for given object and its given component, or the supplied object or component is invalid", msg)
     }
 
     fun `test asking for suggestions with input object containing no fields`() {

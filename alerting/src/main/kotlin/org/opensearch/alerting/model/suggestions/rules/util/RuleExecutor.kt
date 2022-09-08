@@ -14,9 +14,9 @@ object RuleExecutor {
 
         // TODO: theres a difference between supplying an invalid component,
         // TODO: and the framework not having Rules for that component, this
-        // TODO: doesn't account for both very cleanly/explicitly
+        // TODO: doesn't account for that difference very cleanly/explicitly
         if (relevantRules.isEmpty()) {
-            return listOf("no suggestions found for given component in given object, or the supplied component is invalid")
+            return listOf("no suggestions found for given object and its given component, or the supplied object or component is invalid")
         }
 
         val suggestions = mutableListOf<String>()

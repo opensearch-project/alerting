@@ -74,27 +74,11 @@ class RestGetSuggestionsAction : BaseRestHandler() {
             val newXcp = request.contentParser()
             prepareXcp(newXcp)
 
-            val getSuggestionsRequest = GetSuggestionsRequest(inputType, component, newXcp) // xcp already pointing to beginning of input{} object
+            val getSuggestionsRequest = GetSuggestionsRequest(inputType, component, newXcp) // newXcp already pointing to beginning of input{} object
 
-            log.info("reached client.execute")
             client.execute(GetSuggestionsAction.INSTANCE, getSuggestionsRequest, RestToXContentListener(channel))
         }
     }
-
-//    private fun validateInputs(request: RestRequest) {
-//        if (!request.hasParam(SuggestionInput.INPUT_FIELD) || !request.hasParam(SuggestionInput.INPUT_TYPE_FIELD) || !request.hasParam(SuggestionInput.COMPONENT_FIELD)) {
-//            throw IllegalArgumentException(
-//                "request body must contain input, inputType, and component fields, ${request.hasParam(SuggestionInput.INPUT_FIELD)}," +
-//                    "${request.hasParam(SuggestionInput.INPUT_TYPE_FIELD)}, ${request.hasParam(SuggestionInput.COMPONENT_FIELD)}"
-//            )
-//        }
-//
-//        val inputType = request.param(SuggestionInput.INPUT_TYPE_FIELD)
-//        val allowedInputTypes = SuggestionInputType.values().map { it.value }
-//        if (!allowedInputTypes.contains(inputType)) {
-//            throw IllegalArgumentException("invalid input type, must be one of $allowedInputTypes")
-//        }
-//    }
 
     // prepare by making it point to the start of the "input{}" object rather
     // than the start of the entire request body
