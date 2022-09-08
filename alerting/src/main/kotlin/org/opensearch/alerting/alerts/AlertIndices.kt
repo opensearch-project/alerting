@@ -150,7 +150,7 @@ class AlertIndices(
 
     @Volatile private var requestTimeout = AlertingSettings.REQUEST_TIMEOUT.get(settings)
 
-    @Volatile private var isMaster = false
+    @Volatile private var isClusterManager = false
 
     // for JobsMonitor to report
     var lastRolloverTime: TimeValue? = null
@@ -192,12 +192,12 @@ class AlertIndices(
     }
 
     override fun clusterChanged(event: ClusterChangedEvent) {
-        // Instead of using a LocalNodeMasterListener to track master changes, this service will
+        // Instead of using a LocalNodeClusterManagerListener to track master changes, this service will
         // track them here to avoid conditions where master listener events run after other
         // listeners that depend on what happened in the master listener
-        if (this.isMaster != event.localNodeMaster()) {
-            this.isMaster = event.localNodeMaster()
-            if (this.isMaster) {
+        if (this.isClusterManager != event.localNodeClusterManager()) {
+            this.isClusterManager = event.localNodeClusterManager()
+            if (this.isClusterManager) {
                 onMaster()
             } else {
                 offMaster()
