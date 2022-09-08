@@ -9,3 +9,7 @@ out/
 .project
 .settings
 .vscode
+# Ignore downloaded zip files when running integTest
+alerting/src/test/resources/bwc*
+alerting/src/test/resources/notifications-core*
+alerting/src/test/resources/notifications*
