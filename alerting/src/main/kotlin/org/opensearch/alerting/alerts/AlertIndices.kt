@@ -23,8 +23,7 @@ import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_HISTORY_WRITE_INDEX
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
-import org.opensearch.alerting.core.model.DataSources
-import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.DataSources
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_HISTORY_ENABLED
@@ -250,8 +249,8 @@ class AlertIndices(
         return alertIndexInitialized && alertHistoryIndexInitialized
     }
 
-    fun isAlertHistoryEnabled(monitor: Monitor): Boolean {
-        if (monitor.dataSources?.alertsIndex != null) {
+    fun isAlertHistoryEnabled(dataSources: DataSources?): Boolean {
+        if (dataSources?.alertsIndex == null || dataSources.alertsIndex == ALERT_INDEX) {
             return false
         }
         return alertHistoryEnabled
@@ -269,7 +268,7 @@ class AlertIndices(
         alertIndexInitialized
     }
     suspend fun createOrUpdateAlertIndex(dataSources: DataSources?) {
-        if (dataSources?.alertsIndex == null || dataSources.alertsIndex!!.isEmpty()) {
+        if (dataSources?.alertsIndex == null || dataSources.alertsIndex == ALERT_INDEX) {
             return createOrUpdateAlertIndex()
         }
         val alertsIndex = dataSources.alertsIndex
@@ -281,7 +280,7 @@ class AlertIndices(
     }
 
     suspend fun createOrUpdateInitialAlertHistoryIndex(dataSources: DataSources?) {
-        if (dataSources?.alertsIndex == null || dataSources.alertsIndex!!.isEmpty()) {
+        if (dataSources?.alertsIndex == null || dataSources.alertsIndex == ALERT_INDEX) {
             return createOrUpdateInitialAlertHistoryIndex()
         }
     }
@@ -315,10 +314,10 @@ class AlertIndices(
     }
 
     suspend fun createOrUpdateInitialFindingHistoryIndex(dataSources: DataSources?) {
-        if (dataSources?.findingsIndex == null || dataSources.findingsIndex!!.isEmpty()) {
+        if (dataSources?.findingsIndex == null || dataSources.findingsIndex != FINDING_HISTORY_WRITE_INDEX) {
             return createOrUpdateInitialFindingHistoryIndex()
         }
-        val findingsIndex = dataSources.findingsIndex!!
+        val findingsIndex = dataSources.findingsIndex
         if (!clusterService.state().routingTable().hasIndex(findingsIndex)) {
             createIndex(
                 findingsIndex,

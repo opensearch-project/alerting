@@ -291,7 +291,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 alert.copy(actionExecutionResults = actionExecutionResults)
             }
 
-            monitorCtx.retryPolicy?.let { monitorCtx.alertService!!.saveAlerts(monitor, updatedAlerts, it) }
+            monitorCtx.retryPolicy?.let { monitorCtx.alertService!!.saveAlerts(monitor.dataSources, updatedAlerts, it) }
         }
         return triggerResult
     }

@@ -7,7 +7,6 @@ package org.opensearch.alerting.model
 
 import org.opensearch.alerting.core.model.ClusterMetricsInput
 import org.opensearch.alerting.core.model.CronSchedule
-import org.opensearch.alerting.core.model.DataSources
 import org.opensearch.alerting.core.model.Input
 import org.opensearch.alerting.core.model.Schedule
 import org.opensearch.alerting.core.model.ScheduledJob
@@ -57,7 +56,7 @@ data class Monitor(
     val inputs: List<Input>,
     val triggers: List<Trigger>,
     val uiMetadata: Map<String, Any>,
-    val dataSources: DataSources? = null
+    val dataSources: DataSources? = DataSources()
 ) : ScheduledJob {
 
     override val type = MONITOR_TYPE
@@ -258,7 +257,7 @@ data class Monitor(
             var schemaVersion = NO_SCHEMA_VERSION
             val triggers: MutableList<Trigger> = mutableListOf()
             val inputs: MutableList<Input> = mutableListOf()
-            var dataSources: DataSources? = null
+            var dataSources: DataSources? = DataSources()
 
             ensureExpectedToken(Token.START_OBJECT, xcp.currentToken(), xcp)
             while (xcp.nextToken() != Token.END_OBJECT) {

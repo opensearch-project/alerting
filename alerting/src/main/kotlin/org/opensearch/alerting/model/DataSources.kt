@@ -3,8 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting.core.model
+package org.opensearch.alerting.model
 
+import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.io.stream.Writeable
@@ -17,15 +19,15 @@ import java.io.IOException
 
 data class DataSources(
     /** Configures a custom query index name for the monitor. Creates a new index if index with given name not present.*/
-    val queryIndex: String? = null,
+    val queryIndex: String = ScheduledJob.DOC_LEVEL_QUERIES_INDEX,
 
     /** Configures a custom index to store findings for a monitor. Creates a new index if index with given name not present.
      *  If index is pre-existing, mapping is updated*/
-    val findingsIndex: String? = null,
+    val findingsIndex: String = AlertIndices.FINDING_HISTORY_WRITE_INDEX,
 
     /** Configures a custom index to store alerts for a monitor. Creates a new index if index with given name not present.
      *  If index is pre-existing, mapping is updated. */
-    val alertsIndex: String? = null,
+    val alertsIndex: String = AlertIndices.ALERT_INDEX,
 
     /** Configures custom mappings by field type for query index.
      * Custom query index mappings are configurable, only if a custom query index is configured too. */
@@ -34,8 +36,17 @@ data class DataSources(
 ) : Writeable, ToXContentObject {
 
     init {
+        require(queryIndex.isNotEmpty()) {
+            "Query index cannot be empty"
+        }
+        require(findingsIndex.isNotEmpty()) {
+            "Findings index cannot be empty"
+        }
+        require(alertsIndex.isNotEmpty()) {
+            "Alerts index cannot be empty"
+        }
         if (queryIndexMappingsByType.isNotEmpty()) {
-            require(queryIndex != null && queryIndex.isNotEmpty()) {
+            require(queryIndex != ScheduledJob.DOC_LEVEL_QUERIES_INDEX) {
                 "Custom query index mappings are configurable only if a custom query index is configured too."
             }
             require(
@@ -52,9 +63,9 @@ data class DataSources(
     @Throws(IOException::class)
     @Suppress("UNCHECKED_CAST")
     constructor(sin: StreamInput) : this(
-        queryIndex = sin.readOptionalString(),
-        findingsIndex = sin.readOptionalString(),
-        alertsIndex = sin.readOptionalString(),
+        queryIndex = sin.readString(),
+        findingsIndex = sin.readString(),
+        alertsIndex = sin.readString(),
         queryIndexMappingsByType = sin.readMap() as Map<String, Map<String, String>>
     )
 
@@ -70,15 +81,9 @@ data class DataSources(
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         builder.startObject()
-        if (queryIndex != null) {
-            builder.field(QUERY_INDEX_FIELD, queryIndex)
-        }
-        if (findingsIndex != null) {
-            builder.field(FINDINGS_INDEX_FIELD, findingsIndex)
-        }
-        if (alertsIndex != null) {
-            builder.field(ALERTS_INDEX_FIELD, alertsIndex)
-        }
+        builder.field(QUERY_INDEX_FIELD, queryIndex)
+        builder.field(FINDINGS_INDEX_FIELD, findingsIndex)
+        builder.field(ALERTS_INDEX_FIELD, alertsIndex)
         builder.field(QUERY_INDEX_MAPPINGS_BY_TYPE, queryIndexMappingsByType as Map<String, Any>)
         builder.endObject()
         return builder
@@ -94,9 +99,9 @@ data class DataSources(
         @Throws(IOException::class)
         @Suppress("UNCHECKED_CAST")
         fun parse(xcp: XContentParser): DataSources {
-            var queryIndex: String? = null
-            var findingsIndex: String? = null
-            var alertsIndex: String? = null
+            var queryIndex = ""
+            var findingsIndex = ""
+            var alertsIndex = ""
             var queryIndexMappingsByType: Map<String, Map<String, String>> = mapOf()
 
             XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.currentToken(), xcp)

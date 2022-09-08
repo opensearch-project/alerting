@@ -135,8 +135,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                  * will still execute with the Alert information in the ctx but the Alerts may not be visible.
                  */
                 if (!dryrun && monitor.id != Monitor.NO_ID) {
-                    monitorCtx.alertService!!.saveAlerts(monitor, dedupedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = true)
-                    newAlerts = monitorCtx.alertService!!.saveNewAlerts(monitor, newAlerts, monitorCtx.retryPolicy!!)
+                    monitorCtx.alertService!!.saveAlerts(monitor.dataSources, dedupedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = true)
+                    newAlerts = monitorCtx.alertService!!.saveNewAlerts(monitor.dataSources, newAlerts, monitorCtx.retryPolicy!!)
                 }
 
                 // Store deduped and new Alerts to accumulate across pages
@@ -269,10 +269,10 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             // Update Alerts with action execution results (if it's not a test Monitor).
             // ACKNOWLEDGED Alerts should not be saved here since actions are not executed for them.
             if (!dryrun && monitor.id != Monitor.NO_ID) {
-                monitorCtx.alertService!!.saveAlerts(monitor, updatedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = false)
+                monitorCtx.alertService!!.saveAlerts(monitor.dataSources, updatedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = false)
                 // Save any COMPLETED Alerts that were not covered in updatedAlerts
                 monitorCtx.alertService!!.saveAlerts(
-                    monitor,
+                    monitor.dataSources,
                     completedAlertsToUpdate.toList(),
                     monitorCtx.retryPolicy!!,
                     allowUpdatingAcknowledgedAlert = false

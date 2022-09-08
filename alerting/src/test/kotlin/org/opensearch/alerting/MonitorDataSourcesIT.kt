@@ -7,9 +7,9 @@ package org.opensearch.alerting
 
 import org.junit.Assert
 import org.opensearch.action.admin.cluster.state.ClusterStateRequest
-import org.opensearch.alerting.core.model.DataSources
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
+import org.opensearch.alerting.model.DataSources
 import org.opensearch.alerting.transport.AlertingSingleNodeTestCase
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
