@@ -44,8 +44,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
 
         var monitorResult = MonitorRunResult<BucketLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
         val currentAlerts = try {
-            monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor)
-            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(monitor)
+            monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor.dataSources)
+            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(monitor.dataSources)
             monitorCtx.alertService!!.loadCurrentAlertsForBucketLevelMonitor(monitor)
         } catch (e: Exception) {
             // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts

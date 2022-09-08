@@ -23,6 +23,7 @@ import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_HISTORY_WRITE_INDEX
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
+import org.opensearch.alerting.core.model.DataSources
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
@@ -132,20 +133,21 @@ class AlertIndices(
             AlertIndices::class.java.getResource("finding_mapping.json").readText()
 
         @JvmStatic
-        fun getOrDefaultAlertIndex(monitor: Monitor): String {
+        fun getOrDefaultAlertIndex(dataSources: DataSources?): String {
             var alertIndex = ALERT_INDEX
-            if (monitor.dataSources != null && monitor.dataSources.alertsIndex != null) {
-                alertIndex = monitor.dataSources.alertsIndex!!
+            if (!dataSources?.alertsIndex.isNullOrEmpty()) {
+                alertIndex = dataSources?.alertsIndex!!
             }
             return alertIndex
         }
 
         @JvmStatic
-        fun getOrDefaultFindingsHistoryIndex(monitor: Monitor): String {
-            if (monitor.dataSources?.findingsIndex == null || monitor.dataSources.findingsIndex!!.isEmpty()) {
-                return FINDING_HISTORY_WRITE_INDEX
+        fun getOrDefaultFindingsHistoryIndex(dataSources: DataSources?): String {
+            var findingsIndex = FINDING_HISTORY_WRITE_INDEX
+            if (!dataSources?.findingsIndex.isNullOrEmpty()) {
+                findingsIndex = dataSources?.findingsIndex!!
             }
-            return monitor.dataSources.findingsIndex!!
+            return findingsIndex
         }
 
         private val logger = LogManager.getLogger(AlertIndices::class.java)
@@ -266,12 +268,11 @@ class AlertIndices(
         }
         alertIndexInitialized
     }
-    suspend fun createOrUpdateAlertIndex(monitor: Monitor) {
-
-        if (monitor.dataSources?.alertsIndex == null || monitor.dataSources.alertsIndex!!.isEmpty()) {
+    suspend fun createOrUpdateAlertIndex(dataSources: DataSources?) {
+        if (dataSources?.alertsIndex == null || dataSources.alertsIndex!!.isEmpty()) {
             return createOrUpdateAlertIndex()
         }
-        val alertsIndex = monitor.dataSources.alertsIndex
+        val alertsIndex = dataSources.alertsIndex
         if (!clusterService.state().routingTable().hasIndex(alertsIndex)) {
             alertIndexInitialized = createIndex(alertsIndex!!, alertMapping())
         } else {
@@ -279,8 +280,8 @@ class AlertIndices(
         }
     }
 
-    suspend fun createOrUpdateInitialAlertHistoryIndex(monitor: Monitor) {
-        if (monitor.dataSources?.alertsIndex == null || monitor.dataSources.alertsIndex!!.isEmpty()) {
+    suspend fun createOrUpdateInitialAlertHistoryIndex(dataSources: DataSources?) {
+        if (dataSources?.alertsIndex == null || dataSources.alertsIndex!!.isEmpty()) {
             return createOrUpdateInitialAlertHistoryIndex()
         }
     }
@@ -313,11 +314,11 @@ class AlertIndices(
         findingHistoryIndexInitialized
     }
 
-    suspend fun createOrUpdateInitialFindingHistoryIndex(monitor: Monitor) {
-        if (monitor.dataSources?.findingsIndex == null || monitor.dataSources.findingsIndex!!.isEmpty()) {
+    suspend fun createOrUpdateInitialFindingHistoryIndex(dataSources: DataSources?) {
+        if (dataSources?.findingsIndex == null || dataSources.findingsIndex!!.isEmpty()) {
             return createOrUpdateInitialFindingHistoryIndex()
         }
-        val findingsIndex = monitor.dataSources.findingsIndex!!
+        val findingsIndex = dataSources.findingsIndex!!
         if (!clusterService.state().routingTable().hasIndex(findingsIndex)) {
             createIndex(
                 findingsIndex,

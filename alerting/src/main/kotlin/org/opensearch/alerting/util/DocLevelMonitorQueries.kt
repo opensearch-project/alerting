@@ -17,6 +17,7 @@ import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.alerting.core.model.DataSources
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.core.model.ScheduledJob
@@ -36,10 +37,10 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             return DocLevelMonitorQueries::class.java.classLoader.getResource("mappings/doc-level-queries.json").readText()
         }
         @JvmStatic
-        fun getOrDefaultQueryIndex(monitor: Monitor): String {
+        fun getOrDefaultQueryIndex(dataSources: DataSources?): String {
             var queryIndex = ScheduledJob.DOC_LEVEL_QUERIES_INDEX
-            if (monitor.dataSources?.queryIndex != null) {
-                queryIndex = monitor.dataSources.queryIndex!!
+            if (!dataSources?.queryIndex.isNullOrEmpty()) {
+                queryIndex = dataSources?.queryIndex!!
             }
             return queryIndex
         }
@@ -66,13 +67,11 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         }
         return true
     }
-    suspend fun initDocLevelQueryIndex(monitor: Monitor): Boolean {
-
-        if (monitor.dataSources?.queryIndex.isNullOrEmpty()) {
+    suspend fun initDocLevelQueryIndex(dataSources: DataSources?): Boolean {
+        if (dataSources?.queryIndex.isNullOrEmpty()) {
             return initDocLevelQueryIndex()
         }
-        val queryIndex = monitor.dataSources?.queryIndex
-
+        val queryIndex = dataSources?.queryIndex
         if (!clusterService.state().routingTable.hasIndex(queryIndex)) {
             val indexRequest = CreateIndexRequest(queryIndex)
                 .mapping(docLevelQueriesMappings())
@@ -94,9 +93,9 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         return true
     }
 
-    fun docLevelQueryIndexExists(monitor: Monitor): Boolean {
+    fun docLevelQueryIndexExists(dataSources: DataSources?): Boolean {
         val clusterState = clusterService.state()
-        return clusterState.routingTable.hasIndex(getOrDefaultQueryIndex(monitor))
+        return clusterState.routingTable.hasIndex(getOrDefaultQueryIndex(dataSources))
     }
 
     fun docLevelQueryIndexExists(): Boolean {
@@ -144,7 +143,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                         if (it.value.containsKey("path")) newVal["path"] = "${it.value["path"]}_${indexName}_$monitorId"
                         "${it.key}_${indexName}_$monitorId" to newVal
                     }
-                    val queryIndex = getOrDefaultQueryIndex(monitor)
+                    val queryIndex = getOrDefaultQueryIndex(monitor.dataSources)
 
                     val updateMappingRequest = PutMappingRequest(queryIndex)
                     updateMappingRequest.source(mapOf<String, Any>("properties" to updatedProperties))

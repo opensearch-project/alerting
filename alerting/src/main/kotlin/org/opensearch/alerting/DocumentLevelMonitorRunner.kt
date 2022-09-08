@@ -71,9 +71,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         var monitorResult = MonitorRunResult<DocumentLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
 
         try {
-            monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor)
-            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(monitor)
-            monitorCtx.alertIndices!!.createOrUpdateInitialFindingHistoryIndex(monitor)
+            monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor.dataSources)
+            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(monitor.dataSources)
+            monitorCtx.alertIndices!!.createOrUpdateInitialFindingHistoryIndex(monitor.dataSources)
         } catch (e: Exception) {
             val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
             logger.error("Error setting up alerts and findings indices for monitor: $id", e)
@@ -87,7 +87,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             return monitorResult.copy(error = AlertingException.wrap(e))
         }
 
-        monitorCtx.docLevelMonitorQueries!!.initDocLevelQueryIndex(monitor)
+        monitorCtx.docLevelMonitorQueries!!.initDocLevelQueryIndex(monitor.dataSources)
         monitorCtx.docLevelMonitorQueries!!.indexDocLevelQueries(
             monitor = monitor,
             monitorId = monitor.id,
@@ -507,7 +507,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         }
         boolQueryBuilder.filter(percolateQueryBuilder)
 
-        val queryIndex = DocLevelMonitorQueries.getOrDefaultQueryIndex(monitor)
+        val queryIndex = DocLevelMonitorQueries.getOrDefaultQueryIndex(monitor.dataSources)
         val searchRequest = SearchRequest(queryIndex)
         val searchSourceBuilder = SearchSourceBuilder()
         searchSourceBuilder.query(boolQueryBuilder)
