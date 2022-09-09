@@ -278,7 +278,12 @@ class AlertService(
         } ?: listOf()
     }
 
-    suspend fun saveAlerts(dataSources: DataSources?, alerts: List<Alert>, retryPolicy: BackoffPolicy, allowUpdatingAcknowledgedAlert: Boolean = false) {
+    suspend fun saveAlerts(
+        dataSources: DataSources?,
+        alerts: List<Alert>,
+        retryPolicy: BackoffPolicy,
+        allowUpdatingAcknowledgedAlert: Boolean = false
+    ) {
         val alertIndex = dataSources?.alertsIndex
         var requestsToRetry = alerts.flatMap { alert ->
             // We don't want to set the version when saving alerts because the MonitorRunner has first priority when writing alerts.

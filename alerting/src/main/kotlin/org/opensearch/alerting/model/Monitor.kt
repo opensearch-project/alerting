@@ -116,7 +116,9 @@ data class Monitor(
         uiMetadata = suppressWarning(sin.readMap()),
         dataSources = if (sin.readBoolean()) {
             DataSources(sin)
-        } else null
+        } else {
+            DataSources()
+        }
     )
 
     // This enum classifies different Monitors
@@ -212,6 +214,7 @@ data class Monitor(
             it.writeTo(out)
         }
         out.writeMap(uiMetadata)
+        out.writeBoolean(dataSources != null)
         dataSources?.writeTo(out)
     }
 
@@ -295,7 +298,8 @@ data class Monitor(
                     ENABLED_TIME_FIELD -> enabledTime = xcp.instant()
                     LAST_UPDATE_TIME_FIELD -> lastUpdateTime = xcp.instant()
                     UI_METADATA_FIELD -> uiMetadata = xcp.map()
-                    DATA_SOURCES_FIELD -> dataSources = if (xcp.currentToken() == Token.VALUE_NULL) null else DataSources.parse(xcp)
+                    DATA_SOURCES_FIELD -> dataSources = if (xcp.currentToken() == Token.VALUE_NULL) DataSources()
+                    else DataSources.parse(xcp)
                     else -> {
                         xcp.skipChildren()
                     }

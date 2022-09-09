@@ -127,9 +127,9 @@ data class DataSources(
 
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {
-        out.writeOptionalString(queryIndex)
-        out.writeOptionalString(findingsIndex)
-        out.writeOptionalString(alertsIndex)
+        out.writeString(queryIndex)
+        out.writeString(findingsIndex)
+        out.writeString(alertsIndex)
         out.writeMap(queryIndexMappingsByType as Map<String, Any>)
     }
 }
