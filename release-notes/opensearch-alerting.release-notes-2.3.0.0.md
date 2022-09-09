@@ -9,4 +9,4 @@ Compatible with OpenSearch 2.3.0
 * Bumped version to 2.3.0. ([#547](https://github.com/opensearch-project/alerting/pull/547))
 
 ### Documentation
-* Added 2.3 release notes. ([#]())
+* Added 2.3 release notes. ([#551](https://github.com/opensearch-project/alerting/pull/551))
