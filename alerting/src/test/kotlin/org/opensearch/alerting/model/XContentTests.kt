@@ -133,46 +133,6 @@ class XContentTests : OpenSearchTestCase() {
         assertFailsWith<IllegalArgumentException>("Monitor name is null") { Monitor.parse(parser(monitorStringWithoutName)) }
     }
 
-    fun `test monitor parsing with no dataSources for bwc`() {
-        val monitorStringWithoutName = """
-            {
-                "type": "monitor",
-                "monitor_type": "doc_level_monitor",
-                "name": "network_monitor",
-                "enabled": true,
-                "createdBy": "chip",
-                "schedule": {
-                  "period": {
-                    "interval": 1,
-                    "unit": "MINUTES"
-                  }
-                },
-                "inputs": [
-                  {
-                    "doc_level_input": {
-                      "description": "windows-powershell",
-                      "indices": [
-                        "network"
-                      ],
-                      "queries": [
-                        {
-                          "severity": "5",
-                          "query": "(operation: \"RpcAsyncInstallPrinterDriverFromPackage\") OR (operation: \"RpcAsyncAddPrintProcessor\") OR (operation: \"RpcAddPrintProcessor\") OR (operation: \"RpcAddPrinterDriverEx\") OR (operation: \"RpcAddPrinterDriver\") OR (operation: \"RpcAsyncAddPrinterDriver\")",
-                          "name": "46",
-                          "id": "46",
-                          "tags": []
-                        }
-                      ]
-                    }
-                  }
-                ],
-                "triggers": []
-            }
-        """.trimIndent()
-
-        assertFailsWith<IllegalArgumentException>("Monitor name is null") { Monitor.parse(parser(monitorStringWithoutName)) }
-    }
-
     fun `test monitor parsing with no schedule`() {
         val monitorStringWithoutSchedule = """
             {
