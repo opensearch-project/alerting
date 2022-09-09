@@ -11,7 +11,7 @@ import org.opensearch.action.admin.indices.create.CreateIndexRequest
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
-import org.opensearch.alerting.core.model.ScheduledJob
+import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.alerting.model.DataSources
 import org.opensearch.alerting.transport.AlertingSingleNodeTestCase
 import org.opensearch.common.settings.Settings
@@ -135,12 +135,6 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(mapping?.source()?.string()?.contains("\"analyzer\":\"$analyzer\"") == true)
     }
 
-    fun `test monitor bwc`() {
-        val request = CreateIndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX).mapping(ScheduledJobIndices.scheduledJobMappings())
-            .settings(Settings.builder().put("index.hidden", true).build())
-        client().admin().indices().create(request)
-    }
-
     fun `test execute monitor with custom findings index`() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
@@ -172,7 +166,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute pre-existing monitorand update`() {
-        val request = CreateIndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX).mapping(ScheduledJobIndices.scheduledJobMappings())
+        val request = CreateIndexRequest(SCHEDULED_JOBS_INDEX).mapping(ScheduledJobIndices.scheduledJobMappings())
             .settings(Settings.builder().put("index.hidden", true).build())
         client().admin().indices().create(request)
         val monitorStringWithoutName = """
@@ -230,7 +224,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         }
         """.trimIndent()
         val monitorId = "abc"
-        indexDoc(ScheduledJob.SCHEDULED_JOBS_INDEX, monitorId, monitorStringWithoutName)
+        indexDoc(SCHEDULED_JOBS_INDEX, monitorId, monitorStringWithoutName)
         val getMonitorResponse = getMonitorResponse(monitorId)
         Assert.assertNotNull(getMonitorResponse)
         Assert.assertNotNull(getMonitorResponse.monitor)
