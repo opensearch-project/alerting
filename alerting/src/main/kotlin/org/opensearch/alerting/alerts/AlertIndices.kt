@@ -314,7 +314,7 @@ class AlertIndices(
     }
 
     suspend fun createOrUpdateInitialFindingHistoryIndex(dataSources: DataSources?) {
-        if (dataSources?.findingsIndex == null || dataSources.findingsIndex != FINDING_HISTORY_WRITE_INDEX) {
+        if (dataSources?.findingsIndex == null || dataSources.findingsIndex == FINDING_HISTORY_WRITE_INDEX) {
             return createOrUpdateInitialFindingHistoryIndex()
         }
         val findingsIndex = dataSources.findingsIndex

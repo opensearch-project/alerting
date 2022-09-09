@@ -92,6 +92,7 @@ dependencies {
 
     testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlin_version}"
     testImplementation "org.mockito:mockito-core:4.6.1"
+    testImplementation "org.opensearch.plugin:reindex-client:${opensearch_version}"
 }
 
 javadoc.enabled = false // turn off javadoc as it barfs on Kotlin code

@@ -13,6 +13,8 @@ import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorResponse
+import org.opensearch.alerting.action.GetMonitorAction
+import org.opensearch.alerting.action.GetMonitorRequest
 import org.opensearch.alerting.action.IndexMonitorAction
 import org.opensearch.alerting.action.IndexMonitorRequest
 import org.opensearch.alerting.action.IndexMonitorResponse
@@ -25,10 +27,12 @@ import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.index.query.TermQueryBuilder
+import org.opensearch.index.reindex.ReindexPlugin
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.plugins.Plugin
 import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.test.OpenSearchSingleNodeTestCase
 import java.time.Instant
 import java.util.*
@@ -82,6 +86,18 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         return client().execute(IndexMonitorAction.INSTANCE, request).actionGet()
     }
 
+    protected fun updateMonitor(monitor: Monitor, monitorId: String): IndexMonitorResponse? {
+        val request = IndexMonitorRequest(
+            monitorId = monitorId,
+            seqNo = SequenceNumbers.UNASSIGNED_SEQ_NO,
+            primaryTerm = SequenceNumbers.UNASSIGNED_PRIMARY_TERM,
+            refreshPolicy = WriteRequest.RefreshPolicy.parse("true"),
+            method = RestRequest.Method.PUT,
+            monitor = monitor
+        )
+        return client().execute(IndexMonitorAction.INSTANCE, request).actionGet()
+    }
+
     protected fun searchAlerts(id: String, indices: String = AlertIndices.ALERT_INDEX, refresh: Boolean = true): List<Alert> {
         try {
             if (refresh) refreshIndex(indices)
@@ -122,8 +138,17 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         }.filter { finding -> finding.monitorId == id }
     }
 
+    protected fun getMonitorResponse(
+        monitorId: String,
+        version: Long = 1L,
+        fetchSourceContext: FetchSourceContext = FetchSourceContext.FETCH_SOURCE
+    ) = client().execute(
+        GetMonitorAction.INSTANCE,
+        GetMonitorRequest(monitorId, version, RestRequest.Method.GET, fetchSourceContext)
+    ).get()
+
     override fun getPlugins(): List<Class<out Plugin>> {
-        return listOf(AlertingPlugin::class.java)
+        return listOf(AlertingPlugin::class.java, ReindexPlugin::class.java)
     }
 
     override fun resetNodeAfterTest(): Boolean {
