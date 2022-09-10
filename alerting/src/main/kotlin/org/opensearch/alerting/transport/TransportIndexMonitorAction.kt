@@ -442,7 +442,7 @@ class TransportIndexMonitorAction @Inject constructor(
 
         @Suppress("UNCHECKED_CAST")
         private suspend fun indexDocLevelMonitorQueries(monitor: Monitor, monitorId: String, refreshPolicy: RefreshPolicy) {
-            val queryIndex = DocLevelMonitorQueries.getOrDefaultQueryIndex(monitor.dataSources)
+            val queryIndex = monitor.dataSources.queryIndex
             if (!docLevelMonitorQueries.docLevelQueryIndexExists(monitor.dataSources)) {
                 docLevelMonitorQueries.initDocLevelQueryIndex(monitor.dataSources)
                 log.info("Central Percolation index $queryIndex created")

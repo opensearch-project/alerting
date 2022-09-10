@@ -131,24 +131,6 @@ class AlertIndices(
         fun findingMapping() =
             AlertIndices::class.java.getResource("finding_mapping.json").readText()
 
-        @JvmStatic
-        fun getOrDefaultAlertIndex(dataSources: DataSources?): String {
-            var alertIndex = ALERT_INDEX
-            if (!dataSources?.alertsIndex.isNullOrEmpty()) {
-                alertIndex = dataSources?.alertsIndex!!
-            }
-            return alertIndex
-        }
-
-        @JvmStatic
-        fun getOrDefaultFindingsHistoryIndex(dataSources: DataSources?): String {
-            var findingsIndex = FINDING_HISTORY_WRITE_INDEX
-            if (!dataSources?.findingsIndex.isNullOrEmpty()) {
-                findingsIndex = dataSources?.findingsIndex!!
-            }
-            return findingsIndex
-        }
-
         private val logger = LogManager.getLogger(AlertIndices::class.java)
     }
 
@@ -249,8 +231,8 @@ class AlertIndices(
         return alertIndexInitialized && alertHistoryIndexInitialized
     }
 
-    fun isAlertHistoryEnabled(dataSources: DataSources?): Boolean {
-        if (dataSources?.alertsIndex == null || dataSources.alertsIndex == ALERT_INDEX) {
+    fun isAlertHistoryEnabled(dataSources: DataSources): Boolean {
+        if (dataSources.alertsIndex == null || dataSources.alertsIndex == ALERT_INDEX) {
             return false
         }
         return alertHistoryEnabled
@@ -267,8 +249,8 @@ class AlertIndices(
         }
         alertIndexInitialized
     }
-    suspend fun createOrUpdateAlertIndex(dataSources: DataSources?) {
-        if (dataSources?.alertsIndex == null || dataSources.alertsIndex == ALERT_INDEX) {
+    suspend fun createOrUpdateAlertIndex(dataSources: DataSources) {
+        if (dataSources.alertsIndex == null || dataSources.alertsIndex == ALERT_INDEX) {
             return createOrUpdateAlertIndex()
         }
         val alertsIndex = dataSources.alertsIndex
@@ -279,8 +261,8 @@ class AlertIndices(
         }
     }
 
-    suspend fun createOrUpdateInitialAlertHistoryIndex(dataSources: DataSources?) {
-        if (dataSources?.alertsIndex == null || dataSources.alertsIndex == ALERT_INDEX) {
+    suspend fun createOrUpdateInitialAlertHistoryIndex(dataSources: DataSources) {
+        if (dataSources.alertsIndex == null || dataSources.alertsIndex == ALERT_INDEX) {
             return createOrUpdateInitialAlertHistoryIndex()
         }
     }
@@ -313,8 +295,8 @@ class AlertIndices(
         findingHistoryIndexInitialized
     }
 
-    suspend fun createOrUpdateInitialFindingHistoryIndex(dataSources: DataSources?) {
-        if (dataSources?.findingsIndex == null || dataSources.findingsIndex == FINDING_HISTORY_WRITE_INDEX) {
+    suspend fun createOrUpdateInitialFindingHistoryIndex(dataSources: DataSources) {
+        if (dataSources.findingsIndex == null || dataSources.findingsIndex == FINDING_HISTORY_WRITE_INDEX) {
             return createOrUpdateInitialFindingHistoryIndex()
         }
         val findingsIndex = dataSources.findingsIndex

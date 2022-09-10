@@ -279,12 +279,12 @@ class AlertService(
     }
 
     suspend fun saveAlerts(
-        dataSources: DataSources?,
+        dataSources: DataSources,
         alerts: List<Alert>,
         retryPolicy: BackoffPolicy,
         allowUpdatingAcknowledgedAlert: Boolean = false
     ) {
-        val alertIndex = dataSources?.alertsIndex
+        val alertIndex = dataSources.alertsIndex
         var requestsToRetry = alerts.flatMap { alert ->
             // We don't want to set the version when saving alerts because the MonitorRunner has first priority when writing alerts.
             // In the rare event that a user acknowledges an alert between when it's read and when it's written
@@ -356,10 +356,9 @@ class AlertService(
      * The Alerts are required with their indexed ID so that when the new Alerts are updated after the Action execution,
      * the ID is available for the index request so that the existing Alert can be updated, instead of creating a duplicate Alert document.
      */
-    suspend fun saveNewAlerts(dataSources: DataSources?, alerts: List<Alert>, retryPolicy: BackoffPolicy): List<Alert> {
+    suspend fun saveNewAlerts(dataSources: DataSources, alerts: List<Alert>, retryPolicy: BackoffPolicy): List<Alert> {
         val savedAlerts = mutableListOf<Alert>()
         var alertsBeingIndexed = alerts
-        val alertIndex = AlertIndices.getOrDefaultAlertIndex(dataSources)
         var requestsToRetry: MutableList<IndexRequest> = alerts.map { alert ->
             if (alert.state != Alert.State.ACTIVE) {
                 throw IllegalStateException("Unexpected attempt to save new alert [$alert] with state [${alert.state}]")
@@ -367,7 +366,7 @@ class AlertService(
             if (alert.id != Alert.NO_ID) {
                 throw IllegalStateException("Unexpected attempt to save new alert [$alert] with an existing alert ID [${alert.id}]")
             }
-            IndexRequest(alertIndex)
+            IndexRequest(dataSources.alertsIndex)
                 .routing(alert.monitorId)
                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
         }.toMutableList()

@@ -14,7 +14,6 @@ import org.opensearch.action.search.SearchAction
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.WriteRequest
-import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.model.ActionExecutionResult
@@ -32,7 +31,6 @@ import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.util.AlertingException
-import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.updateMonitorMetadata
@@ -320,7 +318,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         logger.debug("Findings: $findingStr")
 
         if (shouldCreateFinding) {
-            val indexRequest = IndexRequest(AlertIndices.getOrDefaultFindingsHistoryIndex(monitor.dataSources))
+            val indexRequest = IndexRequest(monitor.dataSources.alertsIndex)
                 .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
                 .source(findingStr, XContentType.JSON)
                 .id(finding.id)
@@ -507,7 +505,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         }
         boolQueryBuilder.filter(percolateQueryBuilder)
 
-        val queryIndex = DocLevelMonitorQueries.getOrDefaultQueryIndex(monitor.dataSources)
+        val queryIndex = monitor.dataSources.queryIndex
         val searchRequest = SearchRequest(queryIndex)
         val searchSourceBuilder = SearchSourceBuilder()
         searchSourceBuilder.query(boolQueryBuilder)

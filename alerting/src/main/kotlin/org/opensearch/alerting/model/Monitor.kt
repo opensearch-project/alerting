@@ -56,7 +56,7 @@ data class Monitor(
     val inputs: List<Input>,
     val triggers: List<Trigger>,
     val uiMetadata: Map<String, Any>,
-    val dataSources: DataSources? = DataSources()
+    val dataSources: DataSources = DataSources()
 ) : ScheduledJob {
 
     override val type = MONITOR_TYPE
@@ -166,11 +166,7 @@ data class Monitor(
             .field(TRIGGERS_FIELD, triggers.toTypedArray())
             .optionalTimeField(LAST_UPDATE_TIME_FIELD, lastUpdateTime)
         if (uiMetadata.isNotEmpty()) builder.field(UI_METADATA_FIELD, uiMetadata)
-        if (dataSources == null) {
-            builder.nullField(DATA_SOURCES_FIELD)
-        } else {
-            builder.field(DATA_SOURCES_FIELD, dataSources)
-        }
+        builder.field(DATA_SOURCES_FIELD, dataSources)
         if (params.paramAsBoolean("with_type", false)) builder.endObject()
 
         return builder.endObject()
@@ -214,8 +210,8 @@ data class Monitor(
             it.writeTo(out)
         }
         out.writeMap(uiMetadata)
-        out.writeBoolean(dataSources != null)
-        dataSources?.writeTo(out)
+        out.writeBoolean(dataSources != null) // for backward compatibility with pre-existing monitors which don't have datasources field
+        dataSources.writeTo(out)
     }
 
     companion object {
@@ -260,7 +256,7 @@ data class Monitor(
             var schemaVersion = NO_SCHEMA_VERSION
             val triggers: MutableList<Trigger> = mutableListOf()
             val inputs: MutableList<Input> = mutableListOf()
-            var dataSources: DataSources? = DataSources()
+            var dataSources = DataSources()
 
             ensureExpectedToken(Token.START_OBJECT, xcp.currentToken(), xcp)
             while (xcp.nextToken() != Token.END_OBJECT) {

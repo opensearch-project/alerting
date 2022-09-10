@@ -36,14 +36,6 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         fun docLevelQueriesMappings(): String {
             return DocLevelMonitorQueries::class.java.classLoader.getResource("mappings/doc-level-queries.json").readText()
         }
-        @JvmStatic
-        fun getOrDefaultQueryIndex(dataSources: DataSources?): String {
-            var queryIndex = ScheduledJob.DOC_LEVEL_QUERIES_INDEX
-            if (!dataSources?.queryIndex.isNullOrEmpty()) {
-                queryIndex = dataSources?.queryIndex!!
-            }
-            return queryIndex
-        }
     }
 
     suspend fun initDocLevelQueryIndex(): Boolean {
@@ -67,11 +59,11 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         }
         return true
     }
-    suspend fun initDocLevelQueryIndex(dataSources: DataSources?): Boolean {
-        if (dataSources?.queryIndex.isNullOrEmpty()) {
+    suspend fun initDocLevelQueryIndex(dataSources: DataSources): Boolean {
+        if (dataSources.queryIndex.isNullOrEmpty()) {
             return initDocLevelQueryIndex()
         }
-        val queryIndex = dataSources?.queryIndex
+        val queryIndex = dataSources.queryIndex
         if (!clusterService.state().routingTable.hasIndex(queryIndex)) {
             val indexRequest = CreateIndexRequest(queryIndex)
                 .mapping(docLevelQueriesMappings())
@@ -93,9 +85,9 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         return true
     }
 
-    fun docLevelQueryIndexExists(dataSources: DataSources?): Boolean {
+    fun docLevelQueryIndexExists(dataSources: DataSources): Boolean {
         val clusterState = clusterService.state()
-        return clusterState.routingTable.hasIndex(getOrDefaultQueryIndex(dataSources))
+        return clusterState.routingTable.hasIndex(dataSources.queryIndex)
     }
 
     fun docLevelQueryIndexExists(): Boolean {
@@ -132,7 +124,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
 
                     val updatedProperties = properties.entries.associate {
                         val newVal = it.value.toMutableMap()
-                        if (monitor.dataSources?.queryIndexMappingsByType?.isNotEmpty() == true) {
+                        if (monitor.dataSources.queryIndexMappingsByType.isNotEmpty()) {
                             val mappingsByType = monitor.dataSources.queryIndexMappingsByType
                             if (it.value.containsKey("type") && mappingsByType.containsKey(it.value["type"]!!)) {
                                 mappingsByType[it.value["type"]]?.entries?.forEach { iter: Map.Entry<String, String> ->
@@ -143,7 +135,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                         if (it.value.containsKey("path")) newVal["path"] = "${it.value["path"]}_${indexName}_$monitorId"
                         "${it.key}_${indexName}_$monitorId" to newVal
                     }
-                    val queryIndex = getOrDefaultQueryIndex(monitor.dataSources)
+                    val queryIndex = monitor.dataSources.queryIndex
 
                     val updateMappingRequest = PutMappingRequest(queryIndex)
                     updateMappingRequest.source(mapOf<String, Any>("properties" to updatedProperties))
