@@ -168,7 +168,6 @@ data class Monitor(
         if (uiMetadata.isNotEmpty()) builder.field(UI_METADATA_FIELD, uiMetadata)
         builder.field(DATA_SOURCES_FIELD, dataSources)
         if (params.paramAsBoolean("with_type", false)) builder.endObject()
-
         return builder.endObject()
     }
 

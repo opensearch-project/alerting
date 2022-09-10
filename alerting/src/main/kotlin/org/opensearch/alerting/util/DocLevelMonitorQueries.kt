@@ -60,7 +60,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         return true
     }
     suspend fun initDocLevelQueryIndex(dataSources: DataSources): Boolean {
-        if (dataSources.queryIndex.isNullOrEmpty()) {
+        if (dataSources.queryIndex == ScheduledJob.DOC_LEVEL_QUERIES_INDEX) {
             return initDocLevelQueryIndex()
         }
         val queryIndex = dataSources.queryIndex
