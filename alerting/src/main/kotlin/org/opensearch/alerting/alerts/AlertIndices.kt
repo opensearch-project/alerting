@@ -232,10 +232,10 @@ class AlertIndices(
     }
 
     fun isAlertHistoryEnabled(dataSources: DataSources): Boolean {
-        if (dataSources.alertsIndex == null || dataSources.alertsIndex == ALERT_INDEX) {
-            return false
+        if (dataSources.alertsIndex == ALERT_INDEX) {
+            return alertHistoryEnabled
         }
-        return alertHistoryEnabled
+        return false
     }
 
     fun isFindingHistoryEnabled(): Boolean = findingHistoryEnabled
@@ -250,7 +250,7 @@ class AlertIndices(
         alertIndexInitialized
     }
     suspend fun createOrUpdateAlertIndex(dataSources: DataSources) {
-        if (dataSources.alertsIndex == null || dataSources.alertsIndex == ALERT_INDEX) {
+        if (dataSources.alertsIndex == ALERT_INDEX) {
             return createOrUpdateAlertIndex()
         }
         val alertsIndex = dataSources.alertsIndex
@@ -262,7 +262,7 @@ class AlertIndices(
     }
 
     suspend fun createOrUpdateInitialAlertHistoryIndex(dataSources: DataSources) {
-        if (dataSources.alertsIndex == null || dataSources.alertsIndex == ALERT_INDEX) {
+        if (dataSources.alertsIndex == ALERT_INDEX) {
             return createOrUpdateInitialAlertHistoryIndex()
         }
     }
@@ -296,7 +296,7 @@ class AlertIndices(
     }
 
     suspend fun createOrUpdateInitialFindingHistoryIndex(dataSources: DataSources) {
-        if (dataSources.findingsIndex == null || dataSources.findingsIndex == FINDING_HISTORY_WRITE_INDEX) {
+        if (dataSources.findingsIndex == FINDING_HISTORY_WRITE_INDEX) {
             return createOrUpdateInitialFindingHistoryIndex()
         }
         val findingsIndex = dataSources.findingsIndex
@@ -343,7 +343,7 @@ class AlertIndices(
             return
         }
 
-        var putMappingRequest: PutMappingRequest = PutMappingRequest(targetIndex)
+        val putMappingRequest: PutMappingRequest = PutMappingRequest(targetIndex)
             .source(mapping, XContentType.JSON)
         val updateResponse: AcknowledgedResponse = client.admin().indices().suspendUntil { putMapping(putMappingRequest, it) }
         if (updateResponse.isAcknowledged) {
