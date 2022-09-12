@@ -23,6 +23,9 @@ interface Rule<in T> {
      * for in a Monitor. Describe your Rule's design pattern/choice
      * by implementing the very check it will perform.
      *
+     * Params:
+     * - obj: the object that the Rule will check
+     *
      * Returns null if the given object passed the Rule's check
      * ie the Rule could not find its inefficient config
      * choice in the given object, meaning the object
