@@ -20,6 +20,7 @@ import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.core.model.ScheduledJob
+import org.opensearch.alerting.model.DataSources
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.client.Client
@@ -58,6 +59,36 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         }
         return true
     }
+    suspend fun initDocLevelQueryIndex(dataSources: DataSources): Boolean {
+        if (dataSources.queryIndex == ScheduledJob.DOC_LEVEL_QUERIES_INDEX) {
+            return initDocLevelQueryIndex()
+        }
+        val queryIndex = dataSources.queryIndex
+        if (!clusterService.state().routingTable.hasIndex(queryIndex)) {
+            val indexRequest = CreateIndexRequest(queryIndex)
+                .mapping(docLevelQueriesMappings())
+                .settings(
+                    Settings.builder().put("index.hidden", true)
+                        .build()
+                )
+            return try {
+                val createIndexResponse: CreateIndexResponse = client.suspendUntil { client.admin().indices().create(indexRequest, it) }
+                createIndexResponse.isAcknowledged
+            } catch (t: ResourceAlreadyExistsException) {
+                if (t.message?.contains("already exists") == true) {
+                    true
+                } else {
+                    throw t
+                }
+            }
+        }
+        return true
+    }
+
+    fun docLevelQueryIndexExists(dataSources: DataSources): Boolean {
+        val clusterState = clusterService.state()
+        return clusterState.routingTable.hasIndex(dataSources.queryIndex)
+    }
 
     fun docLevelQueryIndexExists(): Boolean {
         val clusterState = clusterService.state()
@@ -92,16 +123,21 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                         )
 
                     val updatedProperties = properties.entries.associate {
-                        if (it.value.containsKey("path")) {
-                            val newVal = it.value.toMutableMap()
-                            newVal["path"] = "${it.value["path"]}_${indexName}_$monitorId"
-                            "${it.key}_${indexName}_$monitorId" to newVal
-                        } else {
-                            "${it.key}_${indexName}_$monitorId" to it.value
+                        val newVal = it.value.toMutableMap()
+                        if (monitor.dataSources.queryIndexMappingsByType.isNotEmpty()) {
+                            val mappingsByType = monitor.dataSources.queryIndexMappingsByType
+                            if (it.value.containsKey("type") && mappingsByType.containsKey(it.value["type"]!!)) {
+                                mappingsByType[it.value["type"]]?.entries?.forEach { iter: Map.Entry<String, String> ->
+                                    newVal[iter.key] = iter.value
+                                }
+                            }
                         }
+                        if (it.value.containsKey("path")) newVal["path"] = "${it.value["path"]}_${indexName}_$monitorId"
+                        "${it.key}_${indexName}_$monitorId" to newVal
                     }
+                    val queryIndex = monitor.dataSources.queryIndex
 
-                    val updateMappingRequest = PutMappingRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
+                    val updateMappingRequest = PutMappingRequest(queryIndex)
                     updateMappingRequest.source(mapOf<String, Any>("properties" to updatedProperties))
                     val updateMappingResponse: AcknowledgedResponse = client.suspendUntil {
                         client.admin().indices().putMapping(updateMappingRequest, it)
@@ -114,7 +150,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                             properties.forEach { prop ->
                                 query = query.replace("${prop.key}:", "${prop.key}_${indexName}_$monitorId:")
                             }
-                            val indexRequest = IndexRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
+                            val indexRequest = IndexRequest(queryIndex)
                                 .id(it.id + "_${indexName}_$monitorId")
                                 .source(
                                     mapOf(

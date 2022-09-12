@@ -10,6 +10,8 @@ import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.IndexMonitorAction
 import org.opensearch.alerting.action.IndexMonitorRequest
 import org.opensearch.alerting.action.IndexMonitorResponse
+import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.Monitor
@@ -82,6 +84,7 @@ class RestIndexMonitorAction : BaseRestHandler() {
         val xcp = request.contentParser()
         ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
         val monitor = Monitor.parse(xcp, id).copy(lastUpdateTime = Instant.now())
+        validateDataSources(monitor)
         val monitorType = monitor.monitorType
         val triggers = monitor.triggers
         when (monitorType) {
@@ -118,6 +121,18 @@ class RestIndexMonitorAction : BaseRestHandler() {
 
         return RestChannelConsumer { channel ->
             client.execute(IndexMonitorAction.INSTANCE, indexMonitorRequest, indexMonitorResponse(channel, request.method()))
+        }
+    }
+
+    private fun validateDataSources(monitor: Monitor) { // Data Sources will currently be supported only at transport layer.
+        if (monitor.dataSources != null) {
+            if (
+                monitor.dataSources.queryIndex != ScheduledJob.DOC_LEVEL_QUERIES_INDEX ||
+                monitor.dataSources.findingsIndex != AlertIndices.FINDING_HISTORY_WRITE_INDEX ||
+                monitor.dataSources.alertsIndex != AlertIndices.ALERT_INDEX
+            ) {
+                throw IllegalArgumentException("Custom Data Sources are not allowed.")
+            }
         }
     }
 

@@ -36,8 +36,8 @@ object QueryLevelMonitorRunner : MonitorRunner() {
 
         var monitorResult = MonitorRunResult<QueryLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
         val currentAlerts = try {
-            monitorCtx.alertIndices!!.createOrUpdateAlertIndex()
-            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex()
+            monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor.dataSources)
+            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(monitor.dataSources)
             monitorCtx.alertService!!.loadCurrentAlertsForQueryLevelMonitor(monitor)
         } catch (e: Exception) {
             // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
@@ -81,7 +81,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
 
         // Don't save alerts if this is a test monitor
         if (!dryrun && monitor.id != Monitor.NO_ID) {
-            monitorCtx.retryPolicy?.let { monitorCtx.alertService!!.saveAlerts(updatedAlerts, it) }
+            monitorCtx.retryPolicy?.let { monitorCtx.alertService!!.saveAlerts(monitor.dataSources, updatedAlerts, it) }
         }
         return monitorResult.copy(triggerResults = triggerResults)
     }

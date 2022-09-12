@@ -44,8 +44,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
 
         var monitorResult = MonitorRunResult<BucketLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
         val currentAlerts = try {
-            monitorCtx.alertIndices!!.createOrUpdateAlertIndex()
-            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex()
+            monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor.dataSources)
+            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(monitor.dataSources)
             monitorCtx.alertService!!.loadCurrentAlertsForBucketLevelMonitor(monitor)
         } catch (e: Exception) {
             // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
@@ -135,8 +135,10 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                  * will still execute with the Alert information in the ctx but the Alerts may not be visible.
                  */
                 if (!dryrun && monitor.id != Monitor.NO_ID) {
-                    monitorCtx.alertService!!.saveAlerts(dedupedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = true)
-                    newAlerts = monitorCtx.alertService!!.saveNewAlerts(newAlerts, monitorCtx.retryPolicy!!)
+                    monitorCtx.alertService!!.saveAlerts(
+                        monitor.dataSources, dedupedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = true
+                    )
+                    newAlerts = monitorCtx.alertService!!.saveNewAlerts(monitor.dataSources, newAlerts, monitorCtx.retryPolicy!!)
                 }
 
                 // Store deduped and new Alerts to accumulate across pages
@@ -269,9 +271,12 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             // Update Alerts with action execution results (if it's not a test Monitor).
             // ACKNOWLEDGED Alerts should not be saved here since actions are not executed for them.
             if (!dryrun && monitor.id != Monitor.NO_ID) {
-                monitorCtx.alertService!!.saveAlerts(updatedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = false)
+                monitorCtx.alertService!!.saveAlerts(
+                    monitor.dataSources, updatedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = false
+                )
                 // Save any COMPLETED Alerts that were not covered in updatedAlerts
                 monitorCtx.alertService!!.saveAlerts(
+                    monitor.dataSources,
                     completedAlertsToUpdate.toList(),
                     monitorCtx.retryPolicy!!,
                     allowUpdatingAcknowledgedAlert = false
