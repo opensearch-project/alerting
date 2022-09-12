@@ -171,56 +171,56 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         client().admin().indices().create(request)
         val monitorStringWithoutName = """
         {
-        	"monitor": {
-        		"type": "monitor",
-        		"schema_version": 0,
-        		"name": "UayEuXpZtb",
-        		"monitor_type": "doc_level_monitor",
-        		"user": {
-        			"name": "",
-        			"backend_roles": [],
-        			"roles": [],
-        			"custom_attribute_names": [],
-        			"user_requested_tenant": null
-        		},
-        		"enabled": true,
-        		"enabled_time": 1662753436791,
-        		"schedule": {
-        			"period": {
-        				"interval": 5,
-        				"unit": "MINUTES"
-        			}
-        		},
-        		"inputs": [{
-        			"doc_level_input": {
-        				"description": "description",
-        				"indices": [
-        					"$index"
-        				],
-        				"queries": [{
-        					"id": "63efdcce-b5a1-49f4-a25f-6b5f9496a755",
-        					"name": "3",
-        					"query": "test_field:\"us-west-2\"",
-        					"tags": []
-        				}]
-        			}
-        		}],
-        		"triggers": [{
-        			"document_level_trigger": {
-        				"id": "OGnTI4MBv6qt0ATc9Phk",
-        				"name": "mrbHRMevYI",
-        				"severity": "1",
-        				"condition": {
-        					"script": {
-        						"source": "return true",
-        						"lang": "painless"
-        					}
-        				},
-        				"actions": []
-        			}
-        		}],
-        		"last_update_time": 1662753436791
-        	}
+        "monitor": {
+        "type": "monitor",
+        "schema_version": 0,
+        "name": "UayEuXpZtb",
+        "monitor_type": "doc_level_monitor",
+        "user": {
+        "name": "",
+        "backend_roles": [],
+        "roles": [],
+        "custom_attribute_names": [],
+        "user_requested_tenant": null
+        },
+        "enabled": true,
+        "enabled_time": 1662753436791,
+        "schedule": {
+        "period": {
+        "interval": 5,
+        "unit": "MINUTES"
+        }
+        },
+        "inputs": [{
+        "doc_level_input": {
+        "description": "description",
+        "indices": [
+        "$index"
+        ],
+        "queries": [{
+        "id": "63efdcce-b5a1-49f4-a25f-6b5f9496a755",
+        "name": "3",
+        "query": "test_field:\"us-west-2\"",
+        "tags": []
+        }]
+        }
+        }],
+        "triggers": [{
+        "document_level_trigger": {
+        "id": "OGnTI4MBv6qt0ATc9Phk",
+        "name": "mrbHRMevYI",
+        "severity": "1",
+        "condition": {
+        "script": {
+        "source": "return true",
+        "lang": "painless"
+        }
+        },
+        "actions": []
+        }
+        }],
+        "last_update_time": 1662753436791
+        }
         }
         """.trimIndent()
         val monitorId = "abc"
