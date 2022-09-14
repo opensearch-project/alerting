@@ -22,14 +22,13 @@ import org.opensearch.action.admin.cluster.tasks.PendingClusterTasksRequest
 import org.opensearch.action.admin.cluster.tasks.PendingClusterTasksResponse
 import org.opensearch.action.admin.indices.recovery.RecoveryRequest
 import org.opensearch.action.admin.indices.recovery.RecoveryResponse
-import org.opensearch.alerting.core.model.ClusterMetricsInput
-import org.opensearch.alerting.core.model.ClusterMetricsInput.ClusterMetricType
 import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.settings.SupportedClusterMetricsSettings
 import org.opensearch.alerting.settings.SupportedClusterMetricsSettings.Companion.resolveToActionRequest
 import org.opensearch.client.Client
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.support.XContentMapValues
+import org.opensearch.commons.alerting.model.ClusterMetricsInput
 
 /**
  * Calls the appropriate transport action for the API requested in the [clusterMetricsInput].
@@ -40,17 +39,17 @@ import org.opensearch.common.xcontent.support.XContentMapValues
 fun executeTransportAction(clusterMetricsInput: ClusterMetricsInput, client: Client): ActionResponse {
     val request = resolveToActionRequest(clusterMetricsInput)
     return when (clusterMetricsInput.clusterMetricType) {
-        ClusterMetricType.CAT_PENDING_TASKS -> client.admin().cluster().pendingClusterTasks(request as PendingClusterTasksRequest).get()
-        ClusterMetricType.CAT_RECOVERY -> client.admin().indices().recoveries(request as RecoveryRequest).get()
-        ClusterMetricType.CAT_SNAPSHOTS -> client.admin().cluster().getSnapshots(request as GetSnapshotsRequest).get()
-        ClusterMetricType.CAT_TASKS -> client.admin().cluster().listTasks(request as ListTasksRequest).get()
-        ClusterMetricType.CLUSTER_HEALTH -> client.admin().cluster().health(request as ClusterHealthRequest).get()
-        ClusterMetricType.CLUSTER_SETTINGS -> {
+        ClusterMetricsInput.ClusterMetricType.CAT_PENDING_TASKS -> client.admin().cluster().pendingClusterTasks(request as PendingClusterTasksRequest).get()
+        ClusterMetricsInput.ClusterMetricType.CAT_RECOVERY -> client.admin().indices().recoveries(request as RecoveryRequest).get()
+        ClusterMetricsInput.ClusterMetricType.CAT_SNAPSHOTS -> client.admin().cluster().getSnapshots(request as GetSnapshotsRequest).get()
+        ClusterMetricsInput.ClusterMetricType.CAT_TASKS -> client.admin().cluster().listTasks(request as ListTasksRequest).get()
+        ClusterMetricsInput.ClusterMetricType.CLUSTER_HEALTH -> client.admin().cluster().health(request as ClusterHealthRequest).get()
+        ClusterMetricsInput.ClusterMetricType.CLUSTER_SETTINGS -> {
             val metadata = client.admin().cluster().state(request as ClusterStateRequest).get().state.metadata
             return ClusterGetSettingsResponse(metadata.persistentSettings(), metadata.transientSettings(), Settings.EMPTY)
         }
-        ClusterMetricType.CLUSTER_STATS -> client.admin().cluster().clusterStats(request as ClusterStatsRequest).get()
-        ClusterMetricType.NODES_STATS -> client.admin().cluster().nodesStats(request as NodesStatsRequest).get()
+        ClusterMetricsInput.ClusterMetricType.CLUSTER_STATS -> client.admin().cluster().clusterStats(request as ClusterStatsRequest).get()
+        ClusterMetricsInput.ClusterMetricType.NODES_STATS -> client.admin().cluster().nodesStats(request as NodesStatsRequest).get()
         else -> throw IllegalArgumentException("Unsupported API request type: ${request.javaClass.name}")
     }
 }
@@ -64,35 +63,35 @@ fun ActionResponse.toMap(): Map<String, Any> {
     return when (this) {
         is ClusterHealthResponse -> redactFieldsFromResponse(
             this.convertToMap(),
-            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricType.CLUSTER_HEALTH.defaultPath)
+            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CLUSTER_HEALTH.defaultPath)
         )
         is ClusterStatsResponse -> redactFieldsFromResponse(
             this.convertToMap(),
-            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricType.CLUSTER_STATS.defaultPath)
+            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CLUSTER_STATS.defaultPath)
         )
         is ClusterGetSettingsResponse -> redactFieldsFromResponse(
             this.convertToMap(),
-            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricType.CLUSTER_SETTINGS.defaultPath)
+            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CLUSTER_SETTINGS.defaultPath)
         )
         is NodesStatsResponse -> redactFieldsFromResponse(
             this.convertToMap(),
-            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricType.NODES_STATS.defaultPath)
+            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.NODES_STATS.defaultPath)
         )
         is PendingClusterTasksResponse -> redactFieldsFromResponse(
             this.convertToMap(),
-            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricType.CAT_PENDING_TASKS.defaultPath)
+            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CAT_PENDING_TASKS.defaultPath)
         )
         is RecoveryResponse -> redactFieldsFromResponse(
             this.convertToMap(),
-            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricType.CAT_RECOVERY.defaultPath)
+            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CAT_RECOVERY.defaultPath)
         )
         is GetSnapshotsResponse -> redactFieldsFromResponse(
             this.convertToMap(),
-            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricType.CAT_SNAPSHOTS.defaultPath)
+            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CAT_SNAPSHOTS.defaultPath)
         )
         is ListTasksResponse -> redactFieldsFromResponse(
             this.convertToMap(),
-            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricType.CAT_TASKS.defaultPath)
+            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CAT_TASKS.defaultPath)
         )
         else -> throw IllegalArgumentException("Unsupported ActionResponse type: ${this.javaClass.name}")
     }

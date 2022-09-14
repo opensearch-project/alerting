@@ -5,11 +5,11 @@
 
 package org.opensearch.alerting.triggercondition.resolvers
 
-import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.triggercondition.tokens.ExpressionToken
 import org.opensearch.alerting.triggercondition.tokens.TriggerExpressionConstant
 import org.opensearch.alerting.triggercondition.tokens.TriggerExpressionOperator
 import org.opensearch.alerting.triggercondition.tokens.TriggerExpressionToken
+import org.opensearch.commons.alerting.model.DocLevelQuery
 import java.util.Optional
 import java.util.Stack
 

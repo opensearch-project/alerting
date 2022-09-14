@@ -6,10 +6,6 @@
 package org.opensearch.alerting.model
 
 import org.opensearch.alerting.alerts.AlertError
-import org.opensearch.alerting.opensearchapi.instant
-import org.opensearch.alerting.opensearchapi.optionalTimeField
-import org.opensearch.alerting.opensearchapi.optionalUserField
-import org.opensearch.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.io.stream.Writeable
@@ -18,6 +14,14 @@ import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
+import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.DocumentLevelTrigger
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.QueryLevelTrigger
+import org.opensearch.commons.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
+import org.opensearch.commons.alerting.util.instant
+import org.opensearch.commons.alerting.util.optionalTimeField
+import org.opensearch.commons.alerting.util.optionalUserField
 import org.opensearch.commons.authuser.User
 import java.io.IOException
 import java.time.Instant

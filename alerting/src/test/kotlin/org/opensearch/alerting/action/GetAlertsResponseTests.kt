@@ -8,11 +8,11 @@ package org.opensearch.alerting.action
 import org.junit.Assert
 import org.opensearch.alerting.builder
 import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.randomUser
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.commons.alerting.util.string
 import org.opensearch.test.OpenSearchTestCase
 import java.time.Instant
 import java.util.Collections
