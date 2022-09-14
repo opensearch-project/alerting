@@ -447,9 +447,10 @@ class TransportIndexMonitorAction @Inject constructor(
 
         @Suppress("UNCHECKED_CAST")
         private suspend fun indexDocLevelMonitorQueries(monitor: Monitor, monitorId: String, refreshPolicy: RefreshPolicy) {
-            if (!docLevelMonitorQueries.docLevelQueryIndexExists()) {
-                docLevelMonitorQueries.initDocLevelQueryIndex()
-                log.info("Central Percolation index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX} created")
+            val queryIndex = monitor.dataSources.queryIndex
+            if (!docLevelMonitorQueries.docLevelQueryIndexExists(monitor.dataSources)) {
+                docLevelMonitorQueries.initDocLevelQueryIndex(monitor.dataSources)
+                log.info("Central Percolation index $queryIndex created")
             }
             docLevelMonitorQueries.indexDocLevelQueries(
                 monitor,
@@ -457,7 +458,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 refreshPolicy,
                 indexTimeout
             )
-            log.debug("Queries inserted into Percolate index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}")
+            log.debug("Queries inserted into Percolate index $queryIndex")
         }
 
         private suspend fun updateMonitor() {

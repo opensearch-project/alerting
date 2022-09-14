@@ -41,6 +41,7 @@ import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelec
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtFilter
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
+import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
@@ -167,6 +168,25 @@ fun randomDocumentLevelMonitor(
         name = name, monitorType = Monitor.MonitorType.DOC_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
         uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
+    )
+}
+
+fun randomDocumentLevelMonitor(
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    user: User? = randomUser(),
+    inputs: List<Input> = listOf(DocLevelMonitorInput("description", listOf("index"), emptyList())),
+    schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
+    enabled: Boolean = randomBoolean(),
+    triggers: List<Trigger> = (1..randomInt(10)).map { randomQueryLevelTrigger() },
+    enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
+    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+    withMetadata: Boolean = false,
+    dataSources: DataSources
+): Monitor {
+    return Monitor(
+        name = name, monitorType = Monitor.MonitorType.DOC_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
+        schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
+        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf(), dataSources = dataSources
     )
 }
 
