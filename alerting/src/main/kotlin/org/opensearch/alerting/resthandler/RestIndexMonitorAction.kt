@@ -77,7 +77,6 @@ class RestIndexMonitorAction : BaseRestHandler() {
         if (request.method() == PUT && Monitor.NO_ID == id) {
             throw IllegalArgumentException("Missing monitor ID")
         }
-        log.info("hit here-1")
 
         // Validate request by parsing JSON to Monitor
         val xcp = request.contentParser()
@@ -117,7 +116,6 @@ class RestIndexMonitorAction : BaseRestHandler() {
         }
         val indexMonitorRequest = IndexMonitorRequest(id, seqNo, primaryTerm, refreshPolicy, request.method(), monitor)
 
-        log.info("hit here0")
         return RestChannelConsumer { channel ->
             client.execute(AlertingActions.INDEX_MONITOR_ACTION_TYPE, indexMonitorRequest, indexMonitorResponse(channel, request.method()))
         }

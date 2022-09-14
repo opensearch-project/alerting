@@ -112,7 +112,6 @@ class TransportIndexMonitorAction @Inject constructor(
     override fun doExecute(task: Task, req: ActionRequest, actionListener: ActionListener<IndexMonitorResponse>) {
         val request = req as? IndexMonitorRequest
             ?: recreateObject(req) { IndexMonitorRequest(it) }
-        log.info("hit here1")
         val user = readUserFromThreadContext(client)
 
         if (!validateUserBackendRoles(user, actionListener)) {
@@ -137,7 +136,6 @@ class TransportIndexMonitorAction @Inject constructor(
         request: IndexMonitorRequest,
         user: User?
     ) {
-        log.info("hit here2")
         val indices = mutableListOf<String>()
         // todo: for doc level alerting: check if index is present before monitor is created.
         val searchInputs = request.monitor.inputs.filter { it.name() == SearchInput.SEARCH_FIELD || it.name() == DOC_LEVEL_INPUT_FIELD }
@@ -152,7 +150,6 @@ class TransportIndexMonitorAction @Inject constructor(
             searchRequest,
             object : ActionListener<SearchResponse> {
                 override fun onResponse(searchResponse: SearchResponse) {
-                    log.info("hit here4")
                     // User has read access to configured indices in the monitor, now create monitor with out user context.
                     client.threadPool().threadContext.stashContext().use {
                         IndexMonitorHandler(client, actionListener, request, user).resolveUserAndStart()
@@ -206,13 +203,11 @@ class TransportIndexMonitorAction @Inject constructor(
 
         fun resolveUserAndStart() {
             if (user == null) {
-                log.info("hit here5")
                 // Security is disabled, add empty user to Monitor. user is null for older versions.
                 request.monitor = request.monitor
                     .copy(user = User("", listOf(), listOf(), listOf()))
                 start()
             } else {
-                log.info("hit here6")
                 request.monitor = request.monitor
                     .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttNames))
                 start()
@@ -261,7 +256,6 @@ class TransportIndexMonitorAction @Inject constructor(
 
         fun start() {
             if (!scheduledJobIndices.scheduledJobIndexExists()) {
-                log.info("hit here7")
                 scheduledJobIndices.initScheduledJobIndex(object : ActionListener<CreateIndexResponse> {
                     override fun onResponse(response: CreateIndexResponse) {
                         onCreateMappingsResponse(response)
@@ -271,7 +265,6 @@ class TransportIndexMonitorAction @Inject constructor(
                     }
                 })
             } else if (!IndexUtils.scheduledJobIndexUpdated) {
-                log.info("hit here8")
                 IndexUtils.updateIndexMapping(
                     SCHEDULED_JOBS_INDEX,
                     ScheduledJobIndices.scheduledJobMappings(), clusterService.state(), client.admin().indices(),
@@ -285,7 +278,6 @@ class TransportIndexMonitorAction @Inject constructor(
                     }
                 )
             } else {
-                log.info("hit here9")
                 prepareMonitorIndexing()
             }
         }
@@ -300,7 +292,6 @@ class TransportIndexMonitorAction @Inject constructor(
             // Below check needs to be async operations and needs to be refactored issue#269
             // checkForDisallowedDestinations(allowList)
 
-            log.info("hit here10")
             try {
                 validateActionThrottle(request.monitor, maxActionThrottle, TimeValue.timeValueMinutes(1))
             } catch (e: RuntimeException) {
@@ -309,12 +300,10 @@ class TransportIndexMonitorAction @Inject constructor(
             }
 
             if (request.method == RestRequest.Method.PUT) {
-                log.info("hit here11")
                 scope.launch {
                     updateMonitor()
                 }
             } else {
-                log.info("hit here12")
                 val query = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery("${Monitor.MONITOR_TYPE}.type", Monitor.MONITOR_TYPE))
                 val searchSource = SearchSourceBuilder().query(query).timeout(requestTimeout)
                 val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
@@ -322,12 +311,10 @@ class TransportIndexMonitorAction @Inject constructor(
                     searchRequest,
                     object : ActionListener<SearchResponse> {
                         override fun onResponse(searchResponse: SearchResponse) {
-                            log.info("hit here14")
                             onSearchResponse(searchResponse)
                         }
 
                         override fun onFailure(t: Exception) {
-                            log.info("hit here15")
                             actionListener.onFailure(AlertingException.wrap(t))
                         }
                     }
@@ -369,7 +356,6 @@ class TransportIndexMonitorAction @Inject constructor(
                     )
                 )
             } else {
-                log.info("hit here16")
                 scope.launch {
                     indexMonitor()
                 }
@@ -420,14 +406,11 @@ class TransportIndexMonitorAction @Inject constructor(
                 .setIfSeqNo(request.seqNo)
                 .setIfPrimaryTerm(request.primaryTerm)
                 .timeout(indexTimeout)
-            log.info("hit here17")
 
             try {
                 val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
                 val failureReasons = checkShardsFailure(indexResponse)
-                log.info("hit here18")
                 if (failureReasons != null) {
-                    log.info("hit here19")
                     log.info(failureReasons.toString())
                     actionListener.onFailure(
                         AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), indexResponse.status()))
@@ -435,7 +418,6 @@ class TransportIndexMonitorAction @Inject constructor(
                     return
                 }
                 metadata = metadata.copy(monitorId = indexResponse.id, id = "${indexResponse.id}-metadata")
-                log.info("hit here20")
 
                 // In case the metadata fails to be created, the monitor runner should have logic to recreate and index the metadata.
                 // This is currently being handled in DocumentLevelMonitor as its the only current monitor to use metadata currently.
@@ -447,13 +429,11 @@ class TransportIndexMonitorAction @Inject constructor(
                     .id(metadata.id)
                     .timeout(indexTimeout)
                 client.suspendUntil<Client, IndexResponse> { client.index(metadataIndexRequest, it) }
-                log.info("hit here21")
 
                 if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
                     indexDocLevelMonitorQueries(request.monitor, indexResponse.id, request.refreshPolicy)
                 }
 
-                log.info("hit here24")
                 actionListener.onResponse(
                     IndexMonitorResponse(
                         indexResponse.id, indexResponse.version, indexResponse.seqNo,
@@ -461,7 +441,6 @@ class TransportIndexMonitorAction @Inject constructor(
                     )
                 )
             } catch (t: Exception) {
-                log.info("hit here22")
                 actionListener.onFailure(AlertingException.wrap(t))
             }
         }
