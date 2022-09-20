@@ -139,12 +139,13 @@ class TransportGetFindingsSearchAction @Inject constructor(
 
     suspend fun resolveFindingsIndexName(findingsRequest: GetFindingsRequest): String {
         var indexName = ""
-        // findingIndexName has highest priority, so use that if available
+
         if (findingsRequest.findingIndexName.isNullOrEmpty() == false) {
+            // findingIndexName has highest priority, so use that if available
             indexName = findingsRequest.findingIndexName
-        // second best is monitorId.
-        // We will use it to fetch monitor and then read indexName from dataSources field of monitor
         } else if (findingsRequest.monitorId != null) {
+            // second best is monitorId.
+            // We will use it to fetch monitor and then read indexName from dataSources field of monitor
             withContext(Dispatchers.IO) {
                 val getMonitorRequest = GetMonitorRequest(findingsRequest.monitorId, -3L, RestRequest.Method.GET, null)
                 val getMonitorResponse: GetMonitorResponse =
@@ -153,8 +154,8 @@ class TransportGetFindingsSearchAction @Inject constructor(
                     }
                 indexName = getMonitorResponse.monitor?.dataSources?.findingsIndex ?: ALL_FINDING_INDEX_PATTERN
             }
-        // default is ALL_FINDING_INDEX_PATTERN for bwc and when these 2 parameters are not passed
         } else {
+            // default is ALL_FINDING_INDEX_PATTERN for bwc and when these 2 parameters are not passed
             indexName = ALL_FINDING_INDEX_PATTERN
         }
         return indexName
