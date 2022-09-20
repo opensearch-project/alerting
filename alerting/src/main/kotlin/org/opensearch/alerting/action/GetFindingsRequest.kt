@@ -16,7 +16,7 @@ class GetFindingsRequest : ActionRequest {
     val findingId: String?
     val table: Table
     val monitorId: String?
-    val findingIndexName: String?
+    val findingIndex: String?
 
     constructor(
         findingId: String?,
@@ -27,7 +27,7 @@ class GetFindingsRequest : ActionRequest {
         this.findingId = findingId
         this.table = table
         this.monitorId = monitorId
-        this.findingIndexName = findingIndexName
+        this.findingIndex = findingIndexName
     }
 
     @Throws(IOException::class)
@@ -47,6 +47,6 @@ class GetFindingsRequest : ActionRequest {
         out.writeOptionalString(findingId)
         table.writeTo(out)
         out.writeOptionalString(monitorId)
-        out.writeOptionalString(findingIndexName)
+        out.writeOptionalString(findingIndex)
     }
 }

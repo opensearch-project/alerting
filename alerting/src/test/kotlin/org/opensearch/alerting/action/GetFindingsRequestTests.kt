@@ -26,7 +26,7 @@ class GetFindingsRequestTests : OpenSearchTestCase() {
 
         assertEquals("1", newReq.monitorId)
         assertEquals("2121", newReq.findingId)
-        assertEquals("finding_index_name", newReq.findingIndexName)
+        assertEquals("finding_index_name", newReq.findingIndex)
         assertEquals(table, newReq.table)
     }
 

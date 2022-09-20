@@ -138,25 +138,27 @@ class TransportGetFindingsSearchAction @Inject constructor(
     }
 
     suspend fun resolveFindingsIndexName(findingsRequest: GetFindingsRequest): String {
-        var indexName = ""
+        var indexName = ALL_FINDING_INDEX_PATTERN
 
-        if (findingsRequest.findingIndexName.isNullOrEmpty() == false) {
-            // findingIndexName has highest priority, so use that if available
-            indexName = findingsRequest.findingIndexName
-        } else if (findingsRequest.monitorId != null) {
+        if (findingsRequest.findingIndex.isNullOrEmpty() == false) {
+            // findingIndex has highest priority, so use that if available
+            indexName = findingsRequest.findingIndex
+        } else if (findingsRequest.monitorId.isNullOrEmpty() == false) {
             // second best is monitorId.
             // We will use it to fetch monitor and then read indexName from dataSources field of monitor
             withContext(Dispatchers.IO) {
-                val getMonitorRequest = GetMonitorRequest(findingsRequest.monitorId, -3L, RestRequest.Method.GET, null)
+                val getMonitorRequest = GetMonitorRequest(
+                    findingsRequest.monitorId,
+                    -3L,
+                    RestRequest.Method.GET,
+                    FetchSourceContext.FETCH_SOURCE
+                )
                 val getMonitorResponse: GetMonitorResponse =
                     this@TransportGetFindingsSearchAction.client.suspendUntil {
                         execute(GetMonitorAction.INSTANCE, getMonitorRequest, it)
                     }
                 indexName = getMonitorResponse.monitor?.dataSources?.findingsIndex ?: ALL_FINDING_INDEX_PATTERN
             }
-        } else {
-            // default is ALL_FINDING_INDEX_PATTERN for bwc and when these 2 parameters are not passed
-            indexName = ALL_FINDING_INDEX_PATTERN
         }
         return indexName
     }
