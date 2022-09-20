@@ -280,6 +280,47 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         }
     }
 
+    fun `test execute GetFindingsAction with unknown findingIndex param`() {
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customFindingsIndex = "custom_findings_index"
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(findingsIndex = customFindingsIndex)
+        )
+        val monitorResponse = createMonitor(monitor)
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+        indexDoc(index, "1", testDoc)
+        val monitorId = monitorResponse.id
+        val executeMonitorResponse = executeMonitor(monitor, monitorId, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        searchAlerts(monitorId)
+        val findings = searchFindings(monitorId, customFindingsIndex)
+        assertEquals("Findings saved for test monitor", 1, findings.size)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
+        // fetch findings - don't send monitorId or findingIndexName. It should fall back to hardcoded finding index name
+        try {
+            getFindings(findings.get(0).id, null, "unknown_finding_index_123456789")
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning GetMonitor Action error ",
+                    it.contains("no such index")
+                )
+            }
+        }
+    }
+
     fun `test execute pre-existing monitorand update`() {
         val request = CreateIndexRequest(SCHEDULED_JOBS_INDEX).mapping(ScheduledJobIndices.scheduledJobMappings())
             .settings(Settings.builder().put("index.hidden", true).build())
