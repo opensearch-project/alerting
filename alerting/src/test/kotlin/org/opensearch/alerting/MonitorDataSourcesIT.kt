@@ -8,11 +8,14 @@ package org.opensearch.alerting
 import org.junit.Assert
 import org.opensearch.action.admin.cluster.state.ClusterStateRequest
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
+import org.opensearch.alerting.action.GetAlertsAction
+import org.opensearch.alerting.action.GetAlertsRequest
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.alerting.model.DataSources
+import org.opensearch.alerting.model.Table
 import org.opensearch.alerting.transport.AlertingSingleNodeTestCase
 import org.opensearch.common.settings.Settings
 import java.time.ZonedDateTime
@@ -44,6 +47,24 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
+        val table = Table("asc", "id", null, 1, 0, "")
+        var getAlertsResponse = client()
+            .execute(GetAlertsAction.INSTANCE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 0)
+        getAlertsResponse = client()
+            .execute(GetAlertsAction.INSTANCE, GetAlertsRequest(table, "ALL", "ALL", id, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 0)
+        try {
+            client()
+                .execute(GetAlertsAction.INSTANCE, GetAlertsRequest(table, "ALL", "ALL", null, "wrong_alert_index"))
+                .get()
+            fail()
+        } catch (e: Exception) {
+        }
     }
 
     fun `test execute monitor with custom alerts index`() {
@@ -72,6 +93,17 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         val alerts = searchAlerts(id, customAlertsIndex)
         assertEquals("Alert saved for test monitor", 1, alerts.size)
+        val table = Table("asc", "id", null, 1, 0, "")
+        var getAlertsResponse = client()
+            .execute(GetAlertsAction.INSTANCE, GetAlertsRequest(table, "ALL", "ALL", null, customAlertsIndex))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        getAlertsResponse = client()
+            .execute(GetAlertsAction.INSTANCE, GetAlertsRequest(table, "ALL", "ALL", id, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
     }
 
     fun `test execute monitor with custom query index`() {
@@ -99,6 +131,17 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
+        val table = Table("asc", "id", null, 1, 0, "")
+        var getAlertsResponse = client()
+            .execute(GetAlertsAction.INSTANCE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        getAlertsResponse = client()
+            .execute(GetAlertsAction.INSTANCE, GetAlertsRequest(table, "ALL", "ALL", id, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
     }
 
     fun `test execute monitor with custom query index and custom field mappings`() {
@@ -133,6 +176,17 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val clusterStateResponse = client().admin().cluster().state(ClusterStateRequest().indices(customQueryIndex).metadata(true)).get()
         val mapping = clusterStateResponse.state.metadata.index(customQueryIndex).mapping()
         Assert.assertTrue(mapping?.source()?.string()?.contains("\"analyzer\":\"$analyzer\"") == true)
+        val table = Table("asc", "id", null, 1, 0, "")
+        var getAlertsResponse = client()
+            .execute(GetAlertsAction.INSTANCE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        getAlertsResponse = client()
+            .execute(GetAlertsAction.INSTANCE, GetAlertsRequest(table, "ALL", "ALL", id, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
     }
 
     fun `test execute monitor with custom findings index`() {
@@ -163,6 +217,17 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val findings = searchFindings(id, customFindingsIndex)
         assertEquals("Findings saved for test monitor", 1, findings.size)
         assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
+        val table = Table("asc", "id", null, 1, 0, "")
+        var getAlertsResponse = client()
+            .execute(GetAlertsAction.INSTANCE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        getAlertsResponse = client()
+            .execute(GetAlertsAction.INSTANCE, GetAlertsRequest(table, "ALL", "ALL", id, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
     }
 
     fun `test execute pre-existing monitorand update`() {
@@ -269,5 +334,16 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("2"))
         val customAlertsIndexAlerts = searchAlerts(monitorId, customAlertsIndex)
         assertEquals("Alert saved for test monitor", 1, customAlertsIndexAlerts.size)
+        val table = Table("asc", "id", null, 1, 0, "")
+        var getAlertsResponse = client()
+            .execute(GetAlertsAction.INSTANCE, GetAlertsRequest(table, "ALL", "ALL", null, customAlertsIndex))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        getAlertsResponse = client()
+            .execute(GetAlertsAction.INSTANCE, GetAlertsRequest(table, "ALL", "ALL", monitorId, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
     }
 }

@@ -14,6 +14,8 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.GetAlertsAction
 import org.opensearch.alerting.action.GetAlertsRequest
 import org.opensearch.alerting.action.GetAlertsResponse
+import org.opensearch.alerting.action.GetMonitorRequest
+import org.opensearch.alerting.action.GetMonitorResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.opensearchapi.addFilter
@@ -32,7 +34,9 @@ import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.search.sort.SortBuilders
 import org.opensearch.search.sort.SortOrder
 import org.opensearch.tasks.Task
@@ -47,7 +51,8 @@ class TransportGetAlertsAction @Inject constructor(
     clusterService: ClusterService,
     actionFilters: ActionFilters,
     val settings: Settings,
-    val xContentRegistry: NamedXContentRegistry
+    val xContentRegistry: NamedXContentRegistry,
+    val transportGetMonitorAction: TransportGetMonitorAction
 ) : HandledTransportAction<GetAlertsRequest, GetAlertsResponse>(
     GetAlertsAction.NAME, transportService, actionFilters, ::GetAlertsRequest
 ),
@@ -85,7 +90,6 @@ class TransportGetAlertsAction @Inject constructor(
         if (getAlertsRequest.monitorId != null) {
             queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getAlertsRequest.monitorId))
         }
-
         if (!tableProp.searchString.isNullOrBlank()) {
             queryBuilder
                 .must(
@@ -103,13 +107,49 @@ class TransportGetAlertsAction @Inject constructor(
             .sort(sortBuilder)
             .size(tableProp.size)
             .from(tableProp.startIndex)
+        var alertIndex = AlertIndices.ALL_ALERT_INDEX_PATTERN
+        if (!getAlertsRequest.alertIndex.isNullOrEmpty()) {
+            alertIndex = getAlertsRequest.alertIndex
+            getAlerts(searchSourceBuilder, alertIndex, actionListener, user)
+        } else if (getAlertsRequest.monitorId != null) {
+            transportGetMonitorAction.execute(
+                GetMonitorRequest(
+                    getAlertsRequest.monitorId,
+                    -3L,
+                    RestRequest.Method.GET,
+                    FetchSourceContext.FETCH_SOURCE
+                ),
+                object : ActionListener<GetMonitorResponse> {
+                    override fun onResponse(getMonitorResponse: GetMonitorResponse) {
+                        if (getMonitorResponse.monitor != null) {
+                            alertIndex = getMonitorResponse.monitor!!.dataSources.alertsIndex
+                            getAlerts(searchSourceBuilder, alertIndex, actionListener, user)
+                        }
+                    }
 
+                    override fun onFailure(t: Exception) {
+                        actionListener.onFailure(t)
+                    }
+                }
+            )
+        } else {
+            getAlerts(searchSourceBuilder, alertIndex, actionListener, user)
+        }
+    }
+
+    private fun getAlerts(
+        searchSourceBuilder: SearchSourceBuilder,
+        alertIndex: String,
+        actionListener: ActionListener<GetAlertsResponse>,
+        user: User?
+    ) {
         client.threadPool().threadContext.stashContext().use {
-            resolve(searchSourceBuilder, actionListener, user)
+            resolve(alertIndex, searchSourceBuilder, actionListener, user)
         }
     }
 
     fun resolve(
+        alertIndex: String,
         searchSourceBuilder: SearchSourceBuilder,
         actionListener: ActionListener<GetAlertsResponse>,
         user: User?
@@ -117,25 +157,25 @@ class TransportGetAlertsAction @Inject constructor(
         // user is null when: 1/ security is disabled. 2/when user is super-admin.
         if (user == null) {
             // user is null when: 1/ security is disabled. 2/when user is super-admin.
-            search(searchSourceBuilder, actionListener)
+            search(alertIndex, searchSourceBuilder, actionListener)
         } else if (!doFilterForUser(user)) {
             // security is enabled and filterby is disabled.
-            search(searchSourceBuilder, actionListener)
+            search(alertIndex, searchSourceBuilder, actionListener)
         } else {
             // security is enabled and filterby is enabled.
             try {
                 log.info("Filtering result by: ${user.backendRoles}")
                 addFilter(user, searchSourceBuilder, "monitor_user.backend_roles.keyword")
-                search(searchSourceBuilder, actionListener)
+                search(alertIndex, searchSourceBuilder, actionListener)
             } catch (ex: IOException) {
                 actionListener.onFailure(AlertingException.wrap(ex))
             }
         }
     }
 
-    fun search(searchSourceBuilder: SearchSourceBuilder, actionListener: ActionListener<GetAlertsResponse>) {
+    fun search(alertIndex: String, searchSourceBuilder: SearchSourceBuilder, actionListener: ActionListener<GetAlertsResponse>) {
         val searchRequest = SearchRequest()
-            .indices(AlertIndices.ALL_ALERT_INDEX_PATTERN)
+            .indices(alertIndex)
             .source(searchSourceBuilder)
 
         client.search(
