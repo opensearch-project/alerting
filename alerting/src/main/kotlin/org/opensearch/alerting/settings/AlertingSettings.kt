@@ -5,7 +5,9 @@
 
 package org.opensearch.alerting.settings
 
+import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.unit.TimeValue
 import java.util.concurrent.TimeUnit
@@ -22,6 +24,8 @@ class AlertingSettings {
         const val UNBOUNDED_ACTIONS_ACROSS_TRIGGERS = -1
         const val DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER = UNBOUNDED_ACTIONS_ACROSS_TRIGGERS
         const val DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS = UNBOUNDED_ACTIONS_ACROSS_TRIGGERS
+
+        private val logger = LogManager.getLogger(AlertingSettings::class.java)
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(
             "plugins.alerting.monitor.max_monitors",
@@ -185,10 +189,15 @@ class AlertingSettings {
             }
         }
 
-        internal class MaxActionsPerTriggersValidator() : Setting.Validator<Int> {
+        internal class MaxActionsPerTriggersValidator : Setting.Validator<Int> {
             override fun validate(value: Int) {}
 
-            override fun validate(value: Int, settings: Map<Setting<*>, Any>) {}
+            override fun validate(value: Int, settings: Map<Setting<*>, Any>) {
+                if (value > MonitorRunnerService.monitorCtx.totalMaxActionsAcrossTriggers)
+                    logger.warn(
+                        "Updating maximum amount of actions per trigger to a bigger value than the maximum allowed actions across triggers."
+                    )
+            }
 
             override fun settings(): MutableIterator<Setting<*>> {
                 val settings = mutableListOf<Setting<*>>(

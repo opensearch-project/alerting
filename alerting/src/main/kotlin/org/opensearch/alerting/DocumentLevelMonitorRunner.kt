@@ -28,12 +28,10 @@ import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.model.Trigger
 import org.opensearch.alerting.model.action.PerAlertActionScope
 import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
-import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
@@ -224,9 +222,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         queryToDocIds: Map<DocLevelQuery, Set<String>>,
         dryrun: Boolean
     ): DocumentLevelTriggerRunResult {
-        val maxActionsPerTrigger = AlertingSettings.TOTAL_MAX_ACTIONS_PER_TRIGGER.get(monitorCtx.settings)
-
-        if (!shouldProcessTrigger(trigger, maxActionsPerTrigger))
+        if (!shouldProcessTrigger(trigger, MonitorRunnerService.monitorCtx.maxActionsPerTrigger))
             return DocumentLevelTriggerRunResult(
                 trigger.name, emptyList(),
                 Exception("Unable to run ${trigger.id} as it contains more actions than the maximum allowed.")
@@ -546,10 +542,5 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
             Pair(hit.id, sourceRef)
         }
-    }
-
-    private fun shouldProcessTrigger(trigger: Trigger, maxActionsPerTrigger: Int): Boolean {
-        return if (maxActionsPerTrigger == AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER) true
-        else trigger.actions.size <= maxActionsPerTrigger
     }
 }

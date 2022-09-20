@@ -14,6 +14,7 @@ import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.Table
+import org.opensearch.alerting.model.Trigger
 import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
@@ -21,6 +22,7 @@ import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.destinationmigration.NotificationActionConfigs
 import org.opensearch.alerting.util.destinationmigration.NotificationApiUtils.Companion.getNotificationConfigInfo
 import org.opensearch.alerting.util.destinationmigration.createMessageContent
@@ -183,5 +185,10 @@ abstract class MonitorRunner {
 
     protected fun createMonitorMetadata(monitorId: String): MonitorMetadata {
         return MonitorMetadata("$monitorId-metadata", monitorId, emptyList(), emptyMap())
+    }
+
+    fun shouldProcessTrigger(trigger: Trigger, maxActionsPerTrigger: Int): Boolean {
+        return if (maxActionsPerTrigger == AlertingSettings.UNBOUNDED_ACTIONS_ACROSS_TRIGGERS) true
+        else trigger.actions.size <= maxActionsPerTrigger
     }
 }
