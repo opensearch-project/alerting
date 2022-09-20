@@ -45,8 +45,7 @@ class RestGetFindingsAction : BaseRestHandler() {
         val size = request.paramAsInt("size", 20)
         val startIndex = request.paramAsInt("startIndex", 0)
         val searchString = request.param("searchString", "")
-        val monitorId = request.param("monitorId", null)
-        val findingIndexName = request.param("findingIndexName", null)
+
         val table = Table(
             sortOrder,
             sortString,
@@ -58,9 +57,7 @@ class RestGetFindingsAction : BaseRestHandler() {
 
         val getFindingsSearchRequest = GetFindingsRequest(
             findingID,
-            table,
-            monitorId,
-            findingIndexName
+            table
         )
         return RestChannelConsumer {
                 channel ->

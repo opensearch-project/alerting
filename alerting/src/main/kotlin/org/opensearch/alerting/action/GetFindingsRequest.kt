@@ -21,8 +21,8 @@ class GetFindingsRequest : ActionRequest {
     constructor(
         findingId: String?,
         table: Table,
-        monitorId: String?,
-        findingIndexName: String?
+        monitorId: String? = null,
+        findingIndexName: String? = null
     ) : super() {
         this.findingId = findingId
         this.table = table
