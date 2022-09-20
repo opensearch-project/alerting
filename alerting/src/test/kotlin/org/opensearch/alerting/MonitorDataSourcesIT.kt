@@ -64,6 +64,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 .get()
             fail()
         } catch (e: Exception) {
+            Assert.assertTrue(e.message!!.contains("IndexNotFoundException"))
         }
     }
 

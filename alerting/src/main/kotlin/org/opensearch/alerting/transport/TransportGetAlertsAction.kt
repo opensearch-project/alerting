@@ -5,6 +5,10 @@
 
 package org.opensearch.alerting.transport
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionListener
 import org.opensearch.action.search.SearchRequest
@@ -14,11 +18,13 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.GetAlertsAction
 import org.opensearch.alerting.action.GetAlertsRequest
 import org.opensearch.alerting.action.GetAlertsResponse
+import org.opensearch.alerting.action.GetMonitorAction
 import org.opensearch.alerting.action.GetMonitorRequest
 import org.opensearch.alerting.action.GetMonitorResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.opensearchapi.addFilter
+import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
@@ -44,6 +50,7 @@ import org.opensearch.transport.TransportService
 import java.io.IOException
 
 private val log = LogManager.getLogger(TransportGetAlertsAction::class.java)
+private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
 class TransportGetAlertsAction @Inject constructor(
     transportService: TransportService,
@@ -107,48 +114,53 @@ class TransportGetAlertsAction @Inject constructor(
             .sort(sortBuilder)
             .size(tableProp.size)
             .from(tableProp.startIndex)
+
+        client.threadPool().threadContext.stashContext().use {
+            scope.launch {
+                try {
+                    val alertIndex = resolveAlertsIndexName(getAlertsRequest)
+                    getAlerts(alertIndex, searchSourceBuilder, actionListener, user)
+                } catch (t: Exception) {
+                    log.error("Failed to get alerts", t)
+                    if (t is AlertingException) {
+                        actionListener.onFailure(t)
+                    } else {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                    }
+                }
+            }
+        }
+    }
+
+    /** Precedence order for resolving alert index to be queried:
+     1. alertIndex param.
+     2. alert index mentioned in monitor data sources.
+     3. Default alert indices pattern
+     */
+    suspend fun resolveAlertsIndexName(getAlertsRequest: GetAlertsRequest): String {
         var alertIndex = AlertIndices.ALL_ALERT_INDEX_PATTERN
-        if (!getAlertsRequest.alertIndex.isNullOrEmpty()) {
+        if (getAlertsRequest.alertIndex.isNullOrEmpty() == false) {
             alertIndex = getAlertsRequest.alertIndex
-            getAlerts(searchSourceBuilder, alertIndex, actionListener, user)
-        } else if (getAlertsRequest.monitorId != null) {
-            transportGetMonitorAction.execute(
-                GetMonitorRequest(
+        } else if (getAlertsRequest.monitorId.isNullOrEmpty() == false)
+            withContext(Dispatchers.IO) {
+                val getMonitorRequest = GetMonitorRequest(
                     getAlertsRequest.monitorId,
                     -3L,
                     RestRequest.Method.GET,
                     FetchSourceContext.FETCH_SOURCE
-                ),
-                object : ActionListener<GetMonitorResponse> {
-                    override fun onResponse(getMonitorResponse: GetMonitorResponse) {
-                        if (getMonitorResponse.monitor != null) {
-                            alertIndex = getMonitorResponse.monitor!!.dataSources.alertsIndex
-                            getAlerts(searchSourceBuilder, alertIndex, actionListener, user)
-                        }
+                )
+                val getMonitorResponse: GetMonitorResponse =
+                    transportGetMonitorAction.client.suspendUntil {
+                        execute(GetMonitorAction.INSTANCE, getMonitorRequest, it)
                     }
-
-                    override fun onFailure(t: Exception) {
-                        actionListener.onFailure(t)
-                    }
+                if (getMonitorResponse.monitor != null) {
+                    alertIndex = getMonitorResponse.monitor!!.dataSources.alertsIndex
                 }
-            )
-        } else {
-            getAlerts(searchSourceBuilder, alertIndex, actionListener, user)
-        }
+            }
+        return alertIndex
     }
 
-    private fun getAlerts(
-        searchSourceBuilder: SearchSourceBuilder,
-        alertIndex: String,
-        actionListener: ActionListener<GetAlertsResponse>,
-        user: User?
-    ) {
-        client.threadPool().threadContext.stashContext().use {
-            resolve(alertIndex, searchSourceBuilder, actionListener, user)
-        }
-    }
-
-    fun resolve(
+    fun getAlerts(
         alertIndex: String,
         searchSourceBuilder: SearchSourceBuilder,
         actionListener: ActionListener<GetAlertsResponse>,
