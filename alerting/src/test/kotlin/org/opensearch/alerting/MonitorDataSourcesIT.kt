@@ -165,6 +165,57 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
     }
 
+    fun `test execute monitor with custom findings index and GetFindingsAction`() {
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customFindingsIndex = "custom_findings_index"
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(findingsIndex = customFindingsIndex)
+        )
+        val monitorResponse = createMonitor(monitor)
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+        indexDoc(index, "1", testDoc)
+        val monitorId = monitorResponse.id
+        val executeMonitorResponse = executeMonitor(monitor, monitorId, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        searchAlerts(monitorId)
+        val findings = searchFindings(monitorId, customFindingsIndex)
+        assertEquals("Findings saved for test monitor", 1, findings.size)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
+        // fetch findings - pass monitorId as reference to finding_index
+        val findingsFromAPI1 = getFindings(findings.get(0).id, monitorId, null)
+        assertEquals(
+            "Findings mismatch between manually searched and fetched via GetFindingsAction",
+            findings.get(0).id,
+            findingsFromAPI1.get(0).id
+        )
+        // fetch findings - pass both monitorId and findingIndexName name. Monitor id should be ignored
+        val findingsFromAPI2 = getFindings(findings.get(0).id, "incorrect_monitor_id", customFindingsIndex)
+        assertEquals(
+            "Findings mismatch between manually searched and fetched via GetFindingsAction",
+            findings.get(0).id,
+            findingsFromAPI2.get(0).id
+        )
+        // fetch findings - don't send monitorId or findingIndexName. It should fall back to hardcoded finding index name
+        val findingsFromAPI3 = getFindings(findings.get(0).id, null, null)
+        assertEquals(
+            "Unexpected result when fetching findings from default finding index",
+            0,
+            findingsFromAPI3.size
+        )
+    }
+
     fun `test execute pre-existing monitorand update`() {
         val request = CreateIndexRequest(SCHEDULED_JOBS_INDEX).mapping(ScheduledJobIndices.scheduledJobMappings())
             .settings(Settings.builder().put("index.hidden", true).build())

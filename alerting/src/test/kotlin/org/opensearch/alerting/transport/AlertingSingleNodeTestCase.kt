@@ -13,6 +13,9 @@ import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorResponse
+import org.opensearch.alerting.action.GetFindingsAction
+import org.opensearch.alerting.action.GetFindingsRequest
+import org.opensearch.alerting.action.GetFindingsResponse
 import org.opensearch.alerting.action.GetMonitorAction
 import org.opensearch.alerting.action.GetMonitorRequest
 import org.opensearch.alerting.action.IndexMonitorAction
@@ -22,6 +25,7 @@ import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.Table
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentType
@@ -136,6 +140,23 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
             val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
             Finding.parse(xcp)
         }.filter { finding -> finding.monitorId == id }
+    }
+
+    protected fun getFindings(
+        findingId: String,
+        monitorId: String?,
+        findingIndexName: String?,
+    ): List<Finding> {
+
+        val getFindingsRequest = GetFindingsRequest(
+            findingId,
+            Table("asc", "monitor_id", null, 100, 0, null),
+            monitorId,
+            findingIndexName
+        )
+        val getFindingsResponse: GetFindingsResponse = client().execute(GetFindingsAction.INSTANCE, getFindingsRequest).get()
+
+        return getFindingsResponse.findings.map { it.finding }.toList()
     }
 
     protected fun getMonitorResponse(
