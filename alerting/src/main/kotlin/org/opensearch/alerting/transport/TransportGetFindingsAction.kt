@@ -130,6 +130,8 @@ class TransportGetFindingsSearchAction @Inject constructor(
                     val indexName = resolveFindingsIndexName(getFindingsRequest)
                     val getFindingsResponse = search(searchSourceBuilder, indexName)
                     actionListener.onResponse(getFindingsResponse)
+                } catch (t: AlertingException) {
+                    actionListener.onFailure(t)
                 } catch (t: Exception) {
                     actionListener.onFailure(AlertingException.wrap(t))
                 }
