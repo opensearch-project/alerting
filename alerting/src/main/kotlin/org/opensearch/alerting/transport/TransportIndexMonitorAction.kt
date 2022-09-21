@@ -7,7 +7,6 @@ package org.opensearch.alerting.transport
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchSecurityException
@@ -201,7 +200,7 @@ class TransportIndexMonitorAction @Inject constructor(
     private fun validateActionsAcrossTriggers(totalMaxActions: Int) {
         if (totalMaxActions == AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS) return
 
-        GlobalScope.launch {
+        scope.launch {
             val monitors = getMonitors(client)
             val triggers = getTriggers(monitors)
 

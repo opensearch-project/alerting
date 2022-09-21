@@ -35,6 +35,7 @@ import org.opensearch.client.node.NodeClient
 import org.opensearch.common.Strings
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import java.time.Instant
+import kotlin.math.min
 
 abstract class MonitorRunner {
 
@@ -187,8 +188,11 @@ abstract class MonitorRunner {
         return MonitorMetadata("$monitorId-metadata", monitorId, emptyList(), emptyMap())
     }
 
-    fun shouldProcessTrigger(trigger: Trigger, maxActionsPerTrigger: Int): Boolean {
-        return if (maxActionsPerTrigger == AlertingSettings.UNBOUNDED_ACTIONS_ACROSS_TRIGGERS) true
-        else trigger.actions.size <= maxActionsPerTrigger
+    /**
+     @return [Int] amount of actions that are allowed to be processed within a given trigger.
+     */
+    fun actionsToProcessInTrigger(trigger: Trigger, maxActionsPerTrigger: Int): List<Action> {
+        return if (maxActionsPerTrigger == AlertingSettings.UNBOUNDED_ACTIONS_ACROSS_TRIGGERS) trigger.actions
+        else trigger.actions.subList(0, min(trigger.actions.size, maxActionsPerTrigger) - 1)
     }
 }

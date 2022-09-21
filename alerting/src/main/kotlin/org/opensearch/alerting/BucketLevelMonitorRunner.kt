@@ -161,13 +161,6 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     ?.addAll(monitorCtx.alertService!!.convertToCompletedAlerts(keysToAlertsMap))
         }
         for (trigger in monitor.triggers) {
-            if (!shouldProcessTrigger(trigger, MonitorRunnerService.monitorCtx.maxActionsPerTrigger)) {
-                triggerResults[trigger.id] = BucketLevelTriggerRunResult(
-                    trigger.name,
-                    Exception("Unable to run ${trigger.id} as it contains more actions than the maximum allowed."), emptyMap()
-                )
-                continue
-            }
             val alertsToUpdate = mutableSetOf<Alert>()
             val completedAlertsToUpdate = mutableSetOf<Alert>()
             // Filter ACKNOWLEDGED Alerts from the deduped list so they do not have Actions executed for them.
@@ -195,7 +188,15 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 totalActionableAlertCount = dedupedAlerts.size + newAlerts.size + completedAlerts.size,
                 monitorOrTriggerError = monitorOrTriggerError
             )
-            for (action in trigger.actions) {
+
+            val actionsToBeProcessed = actionsToProcessInTrigger(trigger, MonitorRunnerService.monitorCtx.maxActionsPerTrigger)
+            if (trigger.actions.size > actionsToBeProcessed.size)
+                logger.warn(
+                    "Some actions from trigger ${trigger.name} will not be processed as they would exceed the maximum" +
+                        " amount of allowed actions per trigger."
+                )
+
+            for (action in actionsToBeProcessed) {
                 // ActionExecutionPolicy should not be null for Bucket-Level Monitors since it has a default config when not set explicitly
                 val actionExecutionScope = action.getActionExecutionPolicy(monitor)!!.actionExecutionScope
                 if (actionExecutionScope is PerAlertActionScope && !shouldDefaultToPerExecution) {

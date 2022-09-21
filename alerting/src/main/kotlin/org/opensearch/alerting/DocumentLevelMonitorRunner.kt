@@ -222,12 +222,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         queryToDocIds: Map<DocLevelQuery, Set<String>>,
         dryrun: Boolean
     ): DocumentLevelTriggerRunResult {
-        if (!shouldProcessTrigger(trigger, MonitorRunnerService.monitorCtx.maxActionsPerTrigger))
-            return DocumentLevelTriggerRunResult(
-                trigger.name, emptyList(),
-                Exception("Unable to run ${trigger.id} as it contains more actions than the maximum allowed.")
-            )
-
         val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger)
         val triggerResult = monitorCtx.triggerService!!.runDocLevelTrigger(monitor, trigger, queryToDocIds)
 
@@ -270,7 +264,14 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             monitorOrTriggerError = actionCtx.error
         )
 
-        for (action in trigger.actions) {
+        val actionsToBeProcessed = actionsToProcessInTrigger(trigger, MonitorRunnerService.monitorCtx.maxActionsPerTrigger)
+        if (trigger.actions.size > actionsToBeProcessed.size)
+            logger.warn(
+                "Some actions from trigger ${trigger.name} will not be processed as they would exceed the maximum" +
+                    " amount of allowed actions per trigger."
+            )
+
+        for (action in actionsToBeProcessed) {
             val actionExecutionScope = action.getActionExecutionPolicy(monitor)!!.actionExecutionScope
             if (actionExecutionScope is PerAlertActionScope && !shouldDefaultToPerExecution) {
                 for (alert in alerts) {

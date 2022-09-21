@@ -60,13 +60,6 @@ object QueryLevelMonitorRunner : MonitorRunner() {
         val updatedAlerts = mutableListOf<Alert>()
         val triggerResults = mutableMapOf<String, QueryLevelTriggerRunResult>()
         for (trigger in monitor.triggers) {
-            if (!shouldProcessTrigger(trigger, MonitorRunnerService.monitorCtx.maxActionsPerTrigger)) {
-                triggerResults[trigger.id] = QueryLevelTriggerRunResult(
-                    trigger.name, false,
-                    Exception("Unable to run ${trigger.id} as it contains more actions than the maxmimum allowed.")
-                )
-                continue
-            }
             val currentAlert = currentAlerts[trigger]
             val triggerCtx = QueryLevelTriggerExecutionContext(monitor, trigger as QueryLevelTrigger, monitorResult, currentAlert)
             val triggerResult = monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger, triggerCtx)
@@ -74,7 +67,14 @@ object QueryLevelMonitorRunner : MonitorRunner() {
 
             if (monitorCtx.triggerService!!.isQueryLevelTriggerActionable(triggerCtx, triggerResult)) {
                 val actionCtx = triggerCtx.copy(error = monitorResult.error ?: triggerResult.error)
-                for (action in trigger.actions) {
+
+                val actionsToBeProcessed = actionsToProcessInTrigger(trigger, MonitorRunnerService.monitorCtx.maxActionsPerTrigger)
+                if (trigger.actions.size > actionsToBeProcessed.size)
+                    logger.warn(
+                        "Some actions from trigger ${trigger.name} will not be processed as they would exceed the maximum" +
+                            " amount of allowed actions per trigger."
+                    )
+                for (action in actionsToBeProcessed) {
                     triggerResult.actionResults[action.id] = this.runAction(action, actionCtx, monitorCtx, monitor, dryrun)
                 }
             }
