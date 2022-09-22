@@ -12,7 +12,6 @@ import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.apache.lucene.search.join.ScoreMode
 import org.opensearch.action.ActionListener
-import org.opensearch.action.ActionRequest
 import org.opensearch.action.get.MultiGetRequest
 import org.opensearch.action.get.MultiGetResponse
 import org.opensearch.action.search.SearchRequest
@@ -43,7 +42,6 @@ import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.utils.recreateObject
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestRequest
@@ -64,7 +62,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
     actionFilters: ActionFilters,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry
-) : HandledTransportAction<ActionRequest, GetFindingsResponse> (
+) : HandledTransportAction<GetFindingsRequest, GetFindingsResponse> (
     GetFindingsAction.NAME, transportService, actionFilters, ::GetFindingsRequest
 ),
     SecureTransportAction {
@@ -77,12 +75,10 @@ class TransportGetFindingsSearchAction @Inject constructor(
 
     override fun doExecute(
         task: Task,
-        req: ActionRequest,
+        getFindingsRequest: GetFindingsRequest,
         actionListener: ActionListener<GetFindingsResponse>
     ) {
-        val request = req as? GetFindingsRequest
-            ?: recreateObject(req) { GetFindingsRequest(it) }
-        val tableProp = request.table
+        val tableProp = getFindingsRequest.table
 
         val sortBuilder = SortBuilders
             .fieldSort(tableProp.sortString)
@@ -101,8 +97,8 @@ class TransportGetFindingsSearchAction @Inject constructor(
 
         val queryBuilder = QueryBuilders.boolQuery()
 
-        if (!request.findingId.isNullOrBlank())
-            queryBuilder.filter(QueryBuilders.termQuery("_id", request.findingId))
+        if (!getFindingsRequest.findingId.isNullOrBlank())
+            queryBuilder.filter(QueryBuilders.termQuery("_id", getFindingsRequest.findingId))
 
         if (!tableProp.searchString.isNullOrBlank()) {
             queryBuilder
@@ -131,7 +127,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
         client.threadPool().threadContext.stashContext().use {
             scope.launch {
                 try {
-                    val indexName = resolveFindingsIndexName(request)
+                    val indexName = resolveFindingsIndexName(getFindingsRequest)
                     val getFindingsResponse = search(searchSourceBuilder, indexName)
                     actionListener.onResponse(getFindingsResponse)
                 } catch (t: AlertingException) {
