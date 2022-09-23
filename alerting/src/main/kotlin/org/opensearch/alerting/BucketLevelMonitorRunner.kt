@@ -190,11 +190,6 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             )
 
             val actionsToBeProcessed = actionsToProcessInTrigger(trigger, MonitorRunnerService.monitorCtx.maxActionsPerTrigger)
-            if (trigger.actions.size > actionsToBeProcessed.size)
-                logger.warn(
-                    "Some actions from trigger ${trigger.name} will not be processed as they would exceed the maximum" +
-                        " amount of allowed actions per trigger."
-                )
 
             for (action in actionsToBeProcessed) {
                 // ActionExecutionPolicy should not be null for Bucket-Level Monitors since it has a default config when not set explicitly

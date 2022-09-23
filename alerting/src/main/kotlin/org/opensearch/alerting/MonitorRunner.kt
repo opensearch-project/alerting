@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting
 
+import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchSecurityException
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetDestinationsRequest
@@ -38,6 +39,7 @@ import java.time.Instant
 import kotlin.math.min
 
 abstract class MonitorRunner {
+    private val logger = LogManager.getLogger(javaClass)
 
     abstract suspend fun runMonitor(
         monitor: Monitor,
@@ -193,6 +195,15 @@ abstract class MonitorRunner {
      */
     fun actionsToProcessInTrigger(trigger: Trigger, maxActionsPerTrigger: Int): List<Action> {
         return if (maxActionsPerTrigger == AlertingSettings.UNBOUNDED_ACTIONS_ACROSS_TRIGGERS) trigger.actions
-        else trigger.actions.subList(0, min(trigger.actions.size, maxActionsPerTrigger) - 1)
+        else {
+            val actionsToProcessInTrigger = trigger.actions.subList(0, min(trigger.actions.size, maxActionsPerTrigger) - 1)
+
+            if (trigger.actions.size > actionsToProcessInTrigger.size)
+                logger.warn(
+                    "Some actions from trigger ${trigger.name} will not be processed as they would exceed the maximum" +
+                        " amount of allowed actions per trigger."
+                )
+            actionsToProcessInTrigger
+        }
     }
 }
