@@ -31,7 +31,7 @@ class MonitorIDInput() : SuggestionInput<String, Monitor> {
     override var async = true
 
     constructor(sin: StreamInput) : this() {
-        rawInput = sin.readOptionalString() // TODO: readString() or readOptionalString()?
+        rawInput = sin.readOptionalString()
         async = sin.readBoolean()
     }
 
