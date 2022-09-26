@@ -22,6 +22,7 @@ import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTrigger
+import org.opensearch.alerting.model.DataSources
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.model.Trigger
@@ -277,7 +278,13 @@ class AlertService(
         } ?: listOf()
     }
 
-    suspend fun saveAlerts(alerts: List<Alert>, retryPolicy: BackoffPolicy, allowUpdatingAcknowledgedAlert: Boolean = false) {
+    suspend fun saveAlerts(
+        dataSources: DataSources,
+        alerts: List<Alert>,
+        retryPolicy: BackoffPolicy,
+        allowUpdatingAcknowledgedAlert: Boolean = false
+    ) {
+        val alertIndex = dataSources.alertsIndex
         var requestsToRetry = alerts.flatMap { alert ->
             // We don't want to set the version when saving alerts because the MonitorRunner has first priority when writing alerts.
             // In the rare event that a user acknowledges an alert between when it's read and when it's written
@@ -286,7 +293,7 @@ class AlertService(
             when (alert.state) {
                 Alert.State.ACTIVE, Alert.State.ERROR -> {
                     listOf<DocWriteRequest<*>>(
-                        IndexRequest(AlertIndices.ALERT_INDEX)
+                        IndexRequest(alertIndex)
                             .routing(alert.monitorId)
                             .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                             .id(if (alert.id != Alert.NO_ID) alert.id else null)
@@ -297,7 +304,7 @@ class AlertService(
                     // and updated by the MonitorRunner
                     if (allowUpdatingAcknowledgedAlert) {
                         listOf<DocWriteRequest<*>>(
-                            IndexRequest(AlertIndices.ALERT_INDEX)
+                            IndexRequest(alertIndex)
                                 .routing(alert.monitorId)
                                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                                 .id(if (alert.id != Alert.NO_ID) alert.id else null)
@@ -311,10 +318,10 @@ class AlertService(
                 }
                 Alert.State.COMPLETED -> {
                     listOfNotNull<DocWriteRequest<*>>(
-                        DeleteRequest(AlertIndices.ALERT_INDEX, alert.id)
+                        DeleteRequest(alertIndex, alert.id)
                             .routing(alert.monitorId),
                         // Only add completed alert to history index if history is enabled
-                        if (alertIndices.isAlertHistoryEnabled()) {
+                        if (alertIndices.isAlertHistoryEnabled(dataSources)) {
                             IndexRequest(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
                                 .routing(alert.monitorId)
                                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
@@ -349,7 +356,7 @@ class AlertService(
      * The Alerts are required with their indexed ID so that when the new Alerts are updated after the Action execution,
      * the ID is available for the index request so that the existing Alert can be updated, instead of creating a duplicate Alert document.
      */
-    suspend fun saveNewAlerts(alerts: List<Alert>, retryPolicy: BackoffPolicy): List<Alert> {
+    suspend fun saveNewAlerts(dataSources: DataSources, alerts: List<Alert>, retryPolicy: BackoffPolicy): List<Alert> {
         val savedAlerts = mutableListOf<Alert>()
         var alertsBeingIndexed = alerts
         var requestsToRetry: MutableList<IndexRequest> = alerts.map { alert ->
@@ -359,7 +366,7 @@ class AlertService(
             if (alert.id != Alert.NO_ID) {
                 throw IllegalStateException("Unexpected attempt to save new alert [$alert] with an existing alert ID [${alert.id}]")
             }
-            IndexRequest(AlertIndices.ALERT_INDEX)
+            IndexRequest(dataSources.alertsIndex)
                 .routing(alert.monitorId)
                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
         }.toMutableList()

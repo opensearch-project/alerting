@@ -23,6 +23,7 @@ import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_HISTORY_WRITE_INDEX
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
+import org.opensearch.alerting.model.DataSources
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_HISTORY_ENABLED
@@ -150,7 +151,7 @@ class AlertIndices(
 
     @Volatile private var requestTimeout = AlertingSettings.REQUEST_TIMEOUT.get(settings)
 
-    @Volatile private var isMaster = false
+    @Volatile private var isClusterManager = false
 
     // for JobsMonitor to report
     var lastRolloverTime: TimeValue? = null
@@ -192,12 +193,12 @@ class AlertIndices(
     }
 
     override fun clusterChanged(event: ClusterChangedEvent) {
-        // Instead of using a LocalNodeMasterListener to track master changes, this service will
+        // Instead of using a LocalNodeClusterManagerListener to track master changes, this service will
         // track them here to avoid conditions where master listener events run after other
         // listeners that depend on what happened in the master listener
-        if (this.isMaster != event.localNodeMaster()) {
-            this.isMaster = event.localNodeMaster()
-            if (this.isMaster) {
+        if (this.isClusterManager != event.localNodeClusterManager()) {
+            this.isClusterManager = event.localNodeClusterManager()
+            if (this.isClusterManager) {
                 onMaster()
             } else {
                 offMaster()
@@ -230,7 +231,12 @@ class AlertIndices(
         return alertIndexInitialized && alertHistoryIndexInitialized
     }
 
-    fun isAlertHistoryEnabled(): Boolean = alertHistoryEnabled
+    fun isAlertHistoryEnabled(dataSources: DataSources): Boolean {
+        if (dataSources.alertsIndex == ALERT_INDEX) {
+            return alertHistoryEnabled
+        }
+        return false
+    }
 
     fun isFindingHistoryEnabled(): Boolean = findingHistoryEnabled
 
@@ -243,7 +249,23 @@ class AlertIndices(
         }
         alertIndexInitialized
     }
+    suspend fun createOrUpdateAlertIndex(dataSources: DataSources) {
+        if (dataSources.alertsIndex == ALERT_INDEX) {
+            return createOrUpdateAlertIndex()
+        }
+        val alertsIndex = dataSources.alertsIndex
+        if (!clusterService.state().routingTable().hasIndex(alertsIndex)) {
+            alertIndexInitialized = createIndex(alertsIndex!!, alertMapping())
+        } else {
+            updateIndexMapping(alertsIndex!!, alertMapping())
+        }
+    }
 
+    suspend fun createOrUpdateInitialAlertHistoryIndex(dataSources: DataSources) {
+        if (dataSources.alertsIndex == ALERT_INDEX) {
+            return createOrUpdateInitialAlertHistoryIndex()
+        }
+    }
     suspend fun createOrUpdateInitialAlertHistoryIndex() {
         if (!alertHistoryIndexInitialized) {
             alertHistoryIndexInitialized = createIndex(ALERT_HISTORY_INDEX_PATTERN, alertMapping(), ALERT_HISTORY_WRITE_INDEX)
@@ -271,6 +293,21 @@ class AlertIndices(
             updateIndexMapping(FINDING_HISTORY_WRITE_INDEX, findingMapping(), true)
         }
         findingHistoryIndexInitialized
+    }
+
+    suspend fun createOrUpdateInitialFindingHistoryIndex(dataSources: DataSources) {
+        if (dataSources.findingsIndex == FINDING_HISTORY_WRITE_INDEX) {
+            return createOrUpdateInitialFindingHistoryIndex()
+        }
+        val findingsIndex = dataSources.findingsIndex
+        if (!clusterService.state().routingTable().hasIndex(findingsIndex)) {
+            createIndex(
+                findingsIndex,
+                findingMapping()
+            )
+        } else {
+            updateIndexMapping(findingsIndex, findingMapping(), false)
+        }
     }
 
     private suspend fun createIndex(index: String, schemaMapping: String, alias: String? = null): Boolean {
@@ -306,7 +343,7 @@ class AlertIndices(
             return
         }
 
-        var putMappingRequest: PutMappingRequest = PutMappingRequest(targetIndex)
+        val putMappingRequest: PutMappingRequest = PutMappingRequest(targetIndex)
             .source(mapping, XContentType.JSON)
         val updateResponse: AcknowledgedResponse = client.admin().indices().suspendUntil { putMapping(putMappingRequest, it) }
         if (updateResponse.isAcknowledged) {

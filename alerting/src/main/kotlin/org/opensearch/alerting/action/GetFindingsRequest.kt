@@ -15,19 +15,27 @@ import java.io.IOException
 class GetFindingsRequest : ActionRequest {
     val findingId: String?
     val table: Table
+    val monitorId: String?
+    val findingIndex: String?
 
     constructor(
         findingId: String?,
-        table: Table
+        table: Table,
+        monitorId: String? = null,
+        findingIndexName: String? = null
     ) : super() {
         this.findingId = findingId
         this.table = table
+        this.monitorId = monitorId
+        this.findingIndex = findingIndexName
     }
 
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
         findingId = sin.readOptionalString(),
-        table = Table.readFrom(sin)
+        table = Table.readFrom(sin),
+        monitorId = sin.readOptionalString(),
+        findingIndexName = sin.readOptionalString()
     )
 
     override fun validate(): ActionRequestValidationException? {
@@ -38,5 +46,7 @@ class GetFindingsRequest : ActionRequest {
     override fun writeTo(out: StreamOutput) {
         out.writeOptionalString(findingId)
         table.writeTo(out)
+        out.writeOptionalString(monitorId)
+        out.writeOptionalString(findingIndex)
     }
 }

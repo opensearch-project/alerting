@@ -17,17 +17,20 @@ class GetAlertsRequest : ActionRequest {
     val severityLevel: String
     val alertState: String
     val monitorId: String?
+    val alertIndex: String?
 
     constructor(
         table: Table,
         severityLevel: String,
         alertState: String,
-        monitorId: String?
+        monitorId: String?,
+        alertIndex: String?,
     ) : super() {
         this.table = table
         this.severityLevel = severityLevel
         this.alertState = alertState
         this.monitorId = monitorId
+        this.alertIndex = alertIndex
     }
 
     @Throws(IOException::class)
@@ -35,7 +38,8 @@ class GetAlertsRequest : ActionRequest {
         table = Table.readFrom(sin),
         severityLevel = sin.readString(),
         alertState = sin.readString(),
-        monitorId = sin.readOptionalString()
+        monitorId = sin.readOptionalString(),
+        alertIndex = sin.readOptionalString()
     )
 
     override fun validate(): ActionRequestValidationException? {
@@ -48,5 +52,6 @@ class GetAlertsRequest : ActionRequest {
         out.writeString(severityLevel)
         out.writeString(alertState)
         out.writeOptionalString(monitorId)
+        out.writeOptionalString(alertIndex)
     }
 }

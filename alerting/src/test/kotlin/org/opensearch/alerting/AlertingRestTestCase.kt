@@ -76,6 +76,9 @@ import javax.management.remote.JMXConnectorFactory
 import javax.management.remote.JMXServiceURL
 import kotlin.collections.HashMap
 
+/**
+ * Superclass for tests that interact with an external test cluster using OpenSearch's RestClient
+ */
 abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected val isDebuggingTest = DisableOnDebug(null).isDebugging
