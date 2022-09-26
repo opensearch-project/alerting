@@ -109,20 +109,20 @@ class TransportIndexMonitorAction @Inject constructor(
         listenFilterBySettingChange(clusterService)
     }
 
-    override fun doExecute(task: Task, req: ActionRequest, actionListener: ActionListener<IndexMonitorResponse>) {
-        val request = req as? IndexMonitorRequest
-            ?: recreateObject(req) { IndexMonitorRequest(it) }
+    override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<IndexMonitorResponse>) {
+        val transformedRequest = request as? IndexMonitorRequest
+            ?: recreateObject(request) { IndexMonitorRequest(it) }
         val user = readUserFromThreadContext(client)
 
         if (!validateUserBackendRoles(user, actionListener)) {
             return
         }
 
-        if (!isADMonitor(request.monitor)) {
-            checkIndicesAndExecute(client, actionListener, request, user)
+        if (!isADMonitor(transformedRequest.monitor)) {
+            checkIndicesAndExecute(client, actionListener, transformedRequest, user)
         } else {
             // check if user has access to any anomaly detector for AD monitor
-            checkAnomalyDetectorAndExecute(client, actionListener, request, user)
+            checkAnomalyDetectorAndExecute(client, actionListener, transformedRequest, user)
         }
     }
 
