@@ -194,7 +194,7 @@ class AlertingSettings {
 
             override fun validate(value: Int, settings: Map<Setting<*>, Any>) {
                 if (value > MonitorRunnerService.monitorCtx.totalMaxActionsAcrossTriggers)
-                    logger.warn(
+                    throw IllegalArgumentException(
                         "Updating maximum amount of actions per trigger to a bigger value than the maximum allowed actions across triggers."
                     )
             }
