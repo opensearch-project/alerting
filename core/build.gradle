@@ -7,6 +7,14 @@ apply plugin: 'java'
 apply plugin: 'org.jetbrains.kotlin.jvm'
 apply plugin: 'jacoco'
 
+configurations.all {
+    if (it.state != Configuration.State.UNRESOLVED) return
+    resolutionStrategy {
+        // TODO - Can be removed once OpenSearch core uses a non-vulnerable SnakeYaml version
+        force "org.yaml:snakeyaml:1.32"
+    }
+}
+
 dependencies {
     compileOnly "org.opensearch:opensearch:${opensearch_version}"
     implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
