@@ -28,11 +28,11 @@ import org.opensearch.rest.RestStatus
 
 class MonitorIDInput() : SuggestionInput<String, Monitor> {
 
-    override var rawInput: String? = null
+    override lateinit var rawInput: String
     override var async = true
 
     constructor(sin: StreamInput) : this() {
-        rawInput = sin.readOptionalString()
+        rawInput = sin.readString()
         async = sin.readBoolean()
     }
 
@@ -62,12 +62,11 @@ class MonitorIDInput() : SuggestionInput<String, Monitor> {
 
     override fun getObject(callback: SuggestionsObjectListener, client: Client?, xContentRegistry: NamedXContentRegistry?): Monitor? {
         // check to ensure that parseInput was called first and rawInput is not null
-        if (rawInput == null) {
-            throw IllegalStateException("input was not parsed to get monitorId, parseInput() must be called first")
-        } else if (client == null || xContentRegistry == null) {
+        if (client == null || xContentRegistry == null) {
             throw IllegalStateException("if the input requires async object retrieval, callback can't be null)")
         }
 
+        // TODO: check user context, make sure they get 404 if they dont have access to the monitor
         val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX).id(this.rawInput)
         client.get(
             getRequest,
@@ -98,7 +97,7 @@ class MonitorIDInput() : SuggestionInput<String, Monitor> {
     }
 
     override fun writeTo(out: StreamOutput) {
-        out.writeOptionalString(rawInput)
+        out.writeString(rawInput)
         out.writeBoolean(async)
     }
 

@@ -16,7 +16,7 @@ import org.opensearch.common.xcontent.XContentParser
  */
 interface SuggestionInput<I, out T> : Writeable {
 
-    var rawInput: I?
+    var rawInput: I
     var async: Boolean
 
     /**

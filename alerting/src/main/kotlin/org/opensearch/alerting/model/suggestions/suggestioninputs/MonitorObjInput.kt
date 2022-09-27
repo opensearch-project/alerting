@@ -19,7 +19,7 @@ import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
 
 class MonitorObjInput() : SuggestionInput<Monitor, Monitor> {
 
-    override var rawInput: Monitor? = null
+    override lateinit var rawInput: Monitor
     override var async = false
 
     constructor(sin: StreamInput) : this() {
@@ -43,14 +43,11 @@ class MonitorObjInput() : SuggestionInput<Monitor, Monitor> {
     }
 
     override fun getObject(callback: SuggestionsObjectListener, client: Client?, xContentRegistry: NamedXContentRegistry?): Monitor? {
-        if (rawInput == null) {
-            throw IllegalStateException("input was not parsed to get monitor, parseInput() must be called first")
-        }
         return rawInput
     }
 
     override fun writeTo(out: StreamOutput) {
-        rawInput?.writeTo(out)
+        rawInput.writeTo(out)
         out.writeBoolean(async)
     }
 
