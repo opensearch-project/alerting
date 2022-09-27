@@ -13,8 +13,14 @@ object RuleExecutor {
     const val NO_SUGGESTIONS_FOUND = "no suggestions found for given object and its given component, or the supplied object or component is invalid"
 
     fun getSuggestions(obj: Any, component: String): List<String> {
+        val objType: SuggestionObjectType
+        try {
+            objType = SuggestionObjectType.enumFromClass(obj::class)
+        } catch (e: Exception) {
+            throw IllegalStateException("given object type is invalid")
+        }
         val relevantRules = RuleFactory.getRules(
-            SuggestionObjectType.enumFromClass(obj::class),
+            objType,
             component
         )
 

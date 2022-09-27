@@ -16,12 +16,10 @@ import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.XContentParser
 import java.io.IOException
 
-private val log = LogManager.getLogger(GetSuggestionsRequest::class.java)
-
 class GetSuggestionsRequest : ActionRequest {
     private val inputType: SuggestionInputType
     val component: String
-    val input: SuggestionInput<*, Any> // TODO: is * safe here?
+    val input: SuggestionInput<*, Any>
 
     constructor(
         inputType: SuggestionInputType,

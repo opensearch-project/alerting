@@ -55,7 +55,12 @@ class RestGetSuggestionsAction : BaseRestHandler() {
                         if (!allowedInputTypes.contains(rawInputType)) {
                             throw IllegalArgumentException("invalid inputType, must be one of $allowedInputTypes")
                         }
-                        inputType = SuggestionInputType.enumFromStr(rawInputType)
+                        try {
+                            inputType = SuggestionInputType.enumFromStr(rawInputType)
+                        } catch (e: Exception) {
+                            throw IllegalArgumentException("invalid inputType, must be one of $allowedInputTypes")
+                        }
+
                     }
                     SuggestionInput.COMPONENT_FIELD -> component = xcp.text()
                     SuggestionInput.INPUT_FIELD -> {
