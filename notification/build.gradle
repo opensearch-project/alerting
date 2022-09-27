@@ -9,6 +9,13 @@ apply plugin: 'jacoco'
 apply plugin: 'maven-publish'
 apply plugin: 'signing'
 
+configurations.all {
+    if (it.state != Configuration.State.UNRESOLVED) return
+    resolutionStrategy {
+        force "commons-codec:commons-codec:1.13"
+    }
+}
+
 dependencies {
     compileOnly "org.opensearch:opensearch:${opensearch_version}"
     compile "org.apache.httpcomponents:httpcore:4.4.5"
