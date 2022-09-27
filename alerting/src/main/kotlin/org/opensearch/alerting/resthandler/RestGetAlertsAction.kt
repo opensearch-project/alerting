@@ -7,10 +7,10 @@ package org.opensearch.alerting.resthandler
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.alerting.action.GetAlertsAction
-import org.opensearch.alerting.action.GetAlertsRequest
-import org.opensearch.alerting.model.Table
 import org.opensearch.client.node.NodeClient
+import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.GetAlertsRequest
+import org.opensearch.commons.alerting.model.Table
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.RestHandler.ReplacedRoute
@@ -66,10 +66,10 @@ class RestGetAlertsAction : BaseRestHandler() {
             searchString
         )
 
-        val getAlertsRequest = GetAlertsRequest(table, severityLevel, alertState, monitorId)
+        val getAlertsRequest = GetAlertsRequest(table, severityLevel, alertState, monitorId, null)
         return RestChannelConsumer {
                 channel ->
-            client.execute(GetAlertsAction.INSTANCE, getAlertsRequest, RestToXContentListener(channel))
+            client.execute(AlertingActions.GET_ALERTS_ACTION_TYPE, getAlertsRequest, RestToXContentListener(channel))
         }
     }
 }

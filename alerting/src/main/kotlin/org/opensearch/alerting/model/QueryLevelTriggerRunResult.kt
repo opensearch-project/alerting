@@ -5,11 +5,11 @@
 
 package org.opensearch.alerting.model
 
-import org.opensearch.alerting.alerts.AlertError
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.commons.alerting.alerts.AlertError
 import org.opensearch.script.ScriptException
 import java.io.IOException
 import java.time.Instant

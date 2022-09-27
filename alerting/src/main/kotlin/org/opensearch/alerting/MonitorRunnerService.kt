@@ -15,7 +15,6 @@ import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.moveAlerts
 import org.opensearch.alerting.core.JobRunner
-import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.opensearchapi.retry
@@ -36,6 +35,7 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.component.AbstractLifecycleComponent
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.action.Action

@@ -12,7 +12,6 @@ import org.opensearch.alerting.action.GetDestinationsResponse
 import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.model.Table
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -30,6 +29,7 @@ import org.opensearch.alerting.util.isTestAction
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.Strings
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.Table
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import java.time.Instant

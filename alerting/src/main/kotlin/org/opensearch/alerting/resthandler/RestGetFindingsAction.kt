@@ -7,10 +7,10 @@ package org.opensearch.alerting.resthandler
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.alerting.action.GetFindingsAction
-import org.opensearch.alerting.action.GetFindingsRequest
-import org.opensearch.alerting.model.Table
 import org.opensearch.client.node.NodeClient
+import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.GetFindingsRequest
+import org.opensearch.commons.alerting.model.Table
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.RestHandler.Route
@@ -61,7 +61,7 @@ class RestGetFindingsAction : BaseRestHandler() {
         )
         return RestChannelConsumer {
                 channel ->
-            client.execute(GetFindingsAction.INSTANCE, getFindingsSearchRequest, RestToXContentListener(channel))
+            client.execute(AlertingActions.GET_FINDINGS_ACTION_TYPE, getFindingsSearchRequest, RestToXContentListener(channel))
         }
     }
 }
