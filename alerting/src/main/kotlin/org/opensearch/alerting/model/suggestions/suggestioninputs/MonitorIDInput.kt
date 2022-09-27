@@ -12,6 +12,7 @@ import org.opensearch.action.get.GetResponse
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionInput
+import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionInputCompanion
 import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionsObjectListener
 import org.opensearch.client.Client
 import org.opensearch.common.io.stream.StreamInput
@@ -101,11 +102,11 @@ class MonitorIDInput() : SuggestionInput<String, Monitor> {
         out.writeBoolean(async)
     }
 
-    companion object {
+    companion object : SuggestionInputCompanion<String, Monitor> {
         const val MONITOR_ID_FIELD = "monitorId"
 
         @JvmStatic
-        fun readFrom(sin: StreamInput): MonitorIDInput {
+        override fun readFrom(sin: StreamInput): MonitorIDInput {
             return MonitorIDInput(sin)
         }
     }

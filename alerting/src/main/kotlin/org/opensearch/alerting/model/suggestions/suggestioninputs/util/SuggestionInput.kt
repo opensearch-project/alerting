@@ -95,9 +95,7 @@ interface SuggestionInput<I, out T> : Writeable {
 
     /**
      * Implementations of this interface must also include a companion object
-     * that implements:
-     *
-     * fun readFrom(sin: StreamInput): SuggestionInput<I, out T>
+     * that implements the SuggestionInputCompanion interface (also in this package)
      */
 
     companion object {

@@ -7,6 +7,7 @@ package org.opensearch.alerting.model.suggestions.suggestioninputs
 
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionInput
+import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionInputCompanion
 import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionsObjectListener
 import org.opensearch.client.Client
 import org.opensearch.common.io.stream.StreamInput
@@ -53,11 +54,11 @@ class MonitorObjInput() : SuggestionInput<Monitor, Monitor> {
         out.writeBoolean(async)
     }
 
-    companion object {
+    companion object : SuggestionInputCompanion<Monitor, Monitor> {
         const val MONITOR_OBJ_FIELD = "monitorObj"
 
         @JvmStatic
-        fun readFrom(sin: StreamInput): MonitorObjInput {
+        override fun readFrom(sin: StreamInput): MonitorObjInput {
             return MonitorObjInput(sin)
         }
     }
