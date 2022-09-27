@@ -5,7 +5,6 @@
 
 package org.opensearch.alerting.action
 
-import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionRequestValidationException
 import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionInput
