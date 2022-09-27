@@ -39,7 +39,8 @@ import org.opensearch.commons.alerting.model.ClusterMetricsInput
 fun executeTransportAction(clusterMetricsInput: ClusterMetricsInput, client: Client): ActionResponse {
     val request = resolveToActionRequest(clusterMetricsInput)
     return when (clusterMetricsInput.clusterMetricType) {
-        ClusterMetricsInput.ClusterMetricType.CAT_PENDING_TASKS -> client.admin().cluster().pendingClusterTasks(request as PendingClusterTasksRequest).get()
+        ClusterMetricsInput.ClusterMetricType.CAT_PENDING_TASKS -> client.admin().cluster()
+            .pendingClusterTasks(request as PendingClusterTasksRequest).get()
         ClusterMetricsInput.ClusterMetricType.CAT_RECOVERY -> client.admin().indices().recoveries(request as RecoveryRequest).get()
         ClusterMetricsInput.ClusterMetricType.CAT_SNAPSHOTS -> client.admin().cluster().getSnapshots(request as GetSnapshotsRequest).get()
         ClusterMetricsInput.ClusterMetricType.CAT_TASKS -> client.admin().cluster().listTasks(request as ListTasksRequest).get()

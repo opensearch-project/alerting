@@ -5,9 +5,9 @@
 
 package org.opensearch.alerting.script
 
-import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
+import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import java.time.Instant

@@ -9,7 +9,6 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.support.WriteRequest
-import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.destination.Destination
@@ -20,6 +19,7 @@ import org.opensearch.client.Client
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory
+import org.opensearch.commons.alerting.model.AggregationResultBucket
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.action.Action

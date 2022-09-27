@@ -16,16 +16,19 @@ import org.opensearch.alerting.action.ExecuteMonitorResponse
 import org.opensearch.alerting.action.GetMonitorAction
 import org.opensearch.alerting.action.GetMonitorRequest
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.Finding
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.GetFindingsRequest
+import org.opensearch.commons.alerting.action.GetFindingsResponse
 import org.opensearch.commons.alerting.action.IndexMonitorRequest
 import org.opensearch.commons.alerting.action.IndexMonitorResponse
+import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.Table
 import org.opensearch.index.query.TermQueryBuilder
 import org.opensearch.index.reindex.ReindexPlugin
 import org.opensearch.index.seqno.SequenceNumbers
@@ -136,6 +139,23 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
             val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
             Finding.parse(xcp)
         }.filter { finding -> finding.monitorId == id }
+    }
+
+    protected fun getFindings(
+        findingId: String,
+        monitorId: String?,
+        findingIndexName: String?,
+    ): List<Finding> {
+
+        val getFindingsRequest = GetFindingsRequest(
+            findingId,
+            Table("asc", "monitor_id", null, 100, 0, null),
+            monitorId,
+            findingIndexName
+        )
+        val getFindingsResponse: GetFindingsResponse = client().execute(AlertingActions.GET_FINDINGS_ACTION_TYPE, getFindingsRequest).get()
+
+        return getFindingsResponse.findings.map { it.finding }.toList()
     }
 
     protected fun getMonitorResponse(

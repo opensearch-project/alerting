@@ -6,14 +6,7 @@
 package org.opensearch.alerting
 
 import org.junit.Assert
-import org.opensearch.alerting.alerts.AlertError
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.model.ActionExecutionResult
-import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.Alert.State.ACKNOWLEDGED
-import org.opensearch.alerting.model.Alert.State.ACTIVE
-import org.opensearch.alerting.model.Alert.State.COMPLETED
-import org.opensearch.alerting.model.Alert.State.ERROR
 import org.opensearch.alerting.model.destination.CustomWebhook
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.email.Email
@@ -24,6 +17,14 @@ import org.opensearch.client.ResponseException
 import org.opensearch.client.WarningFailureException
 import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
+import org.opensearch.commons.alerting.alerts.AlertError
+import org.opensearch.commons.alerting.model.ActionExecutionResult
+import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.Alert.State
+import org.opensearch.commons.alerting.model.Alert.State.ACKNOWLEDGED
+import org.opensearch.commons.alerting.model.Alert.State.ACTIVE
+import org.opensearch.commons.alerting.model.Alert.State.COMPLETED
+import org.opensearch.commons.alerting.model.Alert.State.ERROR
 import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput
@@ -1738,7 +1739,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     private fun verifyAlert(
         alert: Alert,
         monitor: Monitor,
-        expectedState: Alert.State = ACTIVE,
+        expectedState: State = ACTIVE,
         expectNotification: Boolean = true
     ) {
         assertNotNull(alert.id)

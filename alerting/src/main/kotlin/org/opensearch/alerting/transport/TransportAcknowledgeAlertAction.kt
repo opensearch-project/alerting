@@ -23,7 +23,6 @@ import org.opensearch.alerting.action.AcknowledgeAlertAction
 import org.opensearch.alerting.action.AcknowledgeAlertRequest
 import org.opensearch.alerting.action.AcknowledgeAlertResponse
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
@@ -38,6 +37,7 @@ import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.util.optionalTimeField
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder

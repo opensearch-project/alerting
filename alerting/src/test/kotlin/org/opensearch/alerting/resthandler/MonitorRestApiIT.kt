@@ -17,7 +17,6 @@ import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.anomalyDetectorIndexMapping
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.makeRequest
-import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.randomADMonitor
@@ -42,6 +41,7 @@ import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.CronSchedule
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery

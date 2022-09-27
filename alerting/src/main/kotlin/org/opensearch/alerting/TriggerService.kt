@@ -6,8 +6,6 @@
 package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.alerting.model.AggregationResultBucket
-import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
@@ -18,6 +16,8 @@ import org.opensearch.alerting.triggercondition.parsers.TriggerExpressionParser
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorIndices.Fields.BUCKET_INDICES
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorIndices.Fields.PARENT_BUCKET_PATH
+import org.opensearch.commons.alerting.model.AggregationResultBucket
+import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
