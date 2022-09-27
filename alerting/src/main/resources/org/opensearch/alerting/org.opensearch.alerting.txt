@@ -1,4 +1,4 @@
-# Copyright OpenSearch Contributors
+    # Copyright OpenSearch Contributors
 # SPDX-License-Identifier: Apache-2.0
 
 # Painless definition of classes used by alerting plugin
@@ -45,7 +45,7 @@ class org.opensearch.commons.alerting.model.QueryLevelTrigger {
     List getActions()
 }
 
-class org.opensearch.alerting.model.Alert {
+class org.opensearch.commons.alerting.model.Alert {
     String getId()
     long getVersion()
     boolean isAcknowledged()
