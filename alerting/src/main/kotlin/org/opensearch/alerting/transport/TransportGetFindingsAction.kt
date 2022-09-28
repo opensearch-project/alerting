@@ -12,6 +12,7 @@ import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.apache.lucene.search.join.ScoreMode
 import org.opensearch.action.ActionListener
+import org.opensearch.action.ActionRequest
 import org.opensearch.action.get.MultiGetRequest
 import org.opensearch.action.get.MultiGetResponse
 import org.opensearch.action.search.SearchRequest
@@ -63,7 +64,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
     actionFilters: ActionFilters,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry
-) : HandledTransportAction<GetFindingsRequest, GetFindingsResponse> (
+) : HandledTransportAction<ActionRequest, GetFindingsResponse> (
     AlertingActions.GET_FINDINGS_ACTION_NAME, transportService, actionFilters, ::GetFindingsRequest
 ),
     SecureTransportAction {
@@ -76,7 +77,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
 
     override fun doExecute(
         task: Task,
-        request: GetFindingsRequest,
+        request: ActionRequest,
         actionListener: ActionListener<GetFindingsResponse>
     ) {
         val getFindingsRequest = request as? GetFindingsRequest

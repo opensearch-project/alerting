@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionListener
+import org.opensearch.action.ActionRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
@@ -61,7 +62,7 @@ class TransportGetAlertsAction @Inject constructor(
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry,
     val transportGetMonitorAction: TransportGetMonitorAction
-) : HandledTransportAction<GetAlertsRequest, GetAlertsResponse>(
+) : HandledTransportAction<ActionRequest, GetAlertsResponse>(
     AlertingActions.GET_ALERTS_ACTION_NAME, transportService, actionFilters, ::GetAlertsRequest
 ),
     SecureTransportAction {
@@ -75,7 +76,7 @@ class TransportGetAlertsAction @Inject constructor(
 
     override fun doExecute(
         task: Task,
-        request: GetAlertsRequest,
+        request: ActionRequest,
         actionListener: ActionListener<GetAlertsResponse>
     ) {
         val getAlertsRequest = request as? GetAlertsRequest
