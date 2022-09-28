@@ -42,6 +42,7 @@ import org.opensearch.commons.alerting.action.GetFindingsResponse
 import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.FindingDocument
 import org.opensearch.commons.alerting.model.FindingWithDocs
+import org.opensearch.commons.utils.recreateObject
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestRequest
@@ -75,9 +76,11 @@ class TransportGetFindingsSearchAction @Inject constructor(
 
     override fun doExecute(
         task: Task,
-        getFindingsRequest: GetFindingsRequest,
+        request: GetFindingsRequest,
         actionListener: ActionListener<GetFindingsResponse>
     ) {
+        val getFindingsRequest = request as? GetFindingsRequest
+            ?: recreateObject(request) { GetFindingsRequest(it) }
         val tableProp = getFindingsRequest.table
 
         val sortBuilder = SortBuilders

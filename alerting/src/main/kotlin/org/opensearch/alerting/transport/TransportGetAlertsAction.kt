@@ -38,6 +38,7 @@ import org.opensearch.commons.alerting.action.GetAlertsRequest
 import org.opensearch.commons.alerting.action.GetAlertsResponse
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.utils.recreateObject
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestRequest
@@ -74,9 +75,11 @@ class TransportGetAlertsAction @Inject constructor(
 
     override fun doExecute(
         task: Task,
-        getAlertsRequest: GetAlertsRequest,
+        request: GetAlertsRequest,
         actionListener: ActionListener<GetAlertsResponse>
     ) {
+        val getAlertsRequest = request as? GetAlertsRequest
+            ?: recreateObject(request) { GetAlertsRequest(it) }
         val user = readUserFromThreadContext(client)
 
         val tableProp = getAlertsRequest.table
