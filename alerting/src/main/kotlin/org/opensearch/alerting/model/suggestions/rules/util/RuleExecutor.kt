@@ -12,13 +12,18 @@ object RuleExecutor {
     // TODO: doesn't account for that difference very cleanly/explicitly
     const val NO_SUGGESTIONS_FOUND = "no suggestions found for given object and its given component, or the supplied object or component is invalid"
 
-    fun getSuggestions(obj: Any, component: String): List<String> {
+    fun getSuggestions(obj: Any, component: ComponentType): List<String> {
         val objType: SuggestionObjectType
         try {
             objType = SuggestionObjectType.enumFromClass(obj::class)
         } catch (e: Exception) {
             throw IllegalStateException("given object type is invalid")
         }
+
+        if (component == ComponentType.NOT_SUPPORTED_COMPONENT) {
+            return listOf(NO_SUGGESTIONS_FOUND)
+        }
+
         val relevantRules = RuleFactory.getRules(
             objType,
             component

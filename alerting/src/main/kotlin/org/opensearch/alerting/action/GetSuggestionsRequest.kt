@@ -7,6 +7,7 @@ package org.opensearch.alerting.action
 
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionRequestValidationException
+import org.opensearch.alerting.model.suggestions.rules.util.ComponentType
 import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionInput
 import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionInputFactory
 import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionInputType
@@ -19,12 +20,12 @@ import java.io.IOException
 
 class GetSuggestionsRequest : ActionRequest {
     private val inputType: SuggestionInputType
-    val component: String
+    val component: ComponentType
     val input: SuggestionInput<*, Any>
 
     constructor(
         inputType: SuggestionInputType,
-        component: String,
+        component: ComponentType,
         xcp: XContentParser
     ) : super() {
         this.inputType = inputType
@@ -35,13 +36,13 @@ class GetSuggestionsRequest : ActionRequest {
     @Throws(IOException::class)
     constructor(sin: StreamInput) : super() {
         this.inputType = sin.readEnum(SuggestionInputType::class.java) // inputType
-        this.component = sin.readString() // component
+        this.component = sin.readEnum(ComponentType::class.java) // component
         this.input = SuggestionInputFactory.getInput(this.inputType, sin)
     }
 
     override fun writeTo(out: StreamOutput) {
         out.writeEnum(inputType)
-        out.writeString(component)
+        out.writeEnum(component)
         input.writeTo(out)
     }
 
@@ -53,7 +54,7 @@ class GetSuggestionsRequest : ActionRequest {
         @JvmStatic
         fun parse(request: RestRequest): GetSuggestionsRequest {
             var inputType: SuggestionInputType? = null
-            var component: String? = null
+            var component: ComponentType? = null
             var hasInput = false
 
             val xcp = request.contentParser()
@@ -70,13 +71,26 @@ class GetSuggestionsRequest : ActionRequest {
                         if (!allowedInputTypes.contains(rawInputType)) {
                             throw IllegalArgumentException("invalid inputType, must be one of $allowedInputTypes")
                         }
-                        try {
+                        try { // TODO: just checked if rawInputType was in the enum class, could this be overkill?
                             inputType = SuggestionInputType.enumFromStr(rawInputType)
                         } catch (e: Exception) {
                             throw IllegalArgumentException("invalid inputType, must be one of $allowedInputTypes")
                         }
                     }
-                    SuggestionInput.COMPONENT_FIELD -> component = xcp.text()
+                    SuggestionInput.COMPONENT_FIELD -> {
+                        // TODO: when there are multiple ComponentType classes, loop all over to find which enum the given text belongs to and use that
+                        val rawComponent = xcp.text()
+                        val supportedComponents = ComponentType.values().map { it.value }
+                        if (!supportedComponents.contains(rawComponent)) {
+                            component = ComponentType.NOT_SUPPORTED_COMPONENT
+                        } else {
+                            try {
+                                component = ComponentType.enumFromStr(rawComponent)
+                            } catch (e: Exception) {
+                                throw IllegalArgumentException("invalid component")
+                            }
+                        }
+                    }
                     SuggestionInput.INPUT_FIELD -> {
                         XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.currentToken(), xcp)
                         hasInput = true

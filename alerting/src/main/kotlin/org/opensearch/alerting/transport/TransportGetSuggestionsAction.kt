@@ -11,6 +11,7 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.GetSuggestionsAction
 import org.opensearch.alerting.action.GetSuggestionsRequest
 import org.opensearch.alerting.action.GetSuggestionsResponse
+import org.opensearch.alerting.model.suggestions.rules.util.ComponentType
 import org.opensearch.alerting.model.suggestions.rules.util.RuleExecutor
 import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionsObjectListener
 import org.opensearch.alerting.settings.AlertingSettings
@@ -51,7 +52,7 @@ class TransportGetSuggestionsAction @Inject constructor(
         }
 
         client.threadPool().threadContext.stashContext().use {
-            val getSuggestions = fun(obj: Any, component: String) {
+            val getSuggestions = fun(obj: Any, component: ComponentType) {
                 val suggestions = RuleExecutor.getSuggestions(obj, component)
                 actionListener.onResponse(GetSuggestionsResponse(suggestions, RestStatus.OK))
             }

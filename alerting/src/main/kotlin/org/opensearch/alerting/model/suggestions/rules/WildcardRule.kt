@@ -7,13 +7,14 @@ package org.opensearch.alerting.model.suggestions.rules
 
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.suggestions.rules.util.ComponentType
 import org.opensearch.alerting.model.suggestions.rules.util.Rule
 import org.opensearch.alerting.model.suggestions.rules.util.SuggestionObjectType
 
 object WildcardRule : Rule<Monitor> {
 
     override val objType = SuggestionObjectType.MONITOR
-    override val component = "monitor.inputs.search.indices"
+    override val component = ComponentType.MONITOR_QUERY
 
     // dummy example rule that checks for wildcard expressions in index declarations
     override fun evaluate(obj: Monitor): String? {

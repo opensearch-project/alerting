@@ -12,7 +12,7 @@ package org.opensearch.alerting.model.suggestions.rules.util
 interface Rule<in T> {
 
     val objType: SuggestionObjectType
-    val component: String
+    val component: ComponentType
 
     /**
      * Evaluate the given object against the Rule.

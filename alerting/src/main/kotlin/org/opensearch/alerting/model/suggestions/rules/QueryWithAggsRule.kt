@@ -7,12 +7,13 @@ package org.opensearch.alerting.model.suggestions.rules
 
 import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.suggestions.rules.util.ComponentType
 import org.opensearch.alerting.model.suggestions.rules.util.Rule
 import org.opensearch.alerting.model.suggestions.rules.util.SuggestionObjectType
 
 object QueryWithAggsRule : Rule<Monitor> {
     override val objType = SuggestionObjectType.MONITOR
-    override val component = "monitor.inputs.search.query"
+    override val component = ComponentType.MONITOR_QUERY
 
     // the contents of this Rule's suggestion are the same every time an object
     // fails this Rule's check, so declare it as a constant
