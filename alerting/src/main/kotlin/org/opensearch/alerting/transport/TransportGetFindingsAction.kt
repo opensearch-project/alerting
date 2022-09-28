@@ -12,6 +12,7 @@ import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.apache.lucene.search.join.ScoreMode
 import org.opensearch.action.ActionListener
+import org.opensearch.action.ActionRequest
 import org.opensearch.action.get.MultiGetRequest
 import org.opensearch.action.get.MultiGetResponse
 import org.opensearch.action.search.SearchRequest
@@ -42,6 +43,7 @@ import org.opensearch.commons.alerting.action.GetFindingsResponse
 import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.FindingDocument
 import org.opensearch.commons.alerting.model.FindingWithDocs
+import org.opensearch.commons.utils.recreateObject
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestRequest
@@ -62,7 +64,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
     actionFilters: ActionFilters,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry
-) : HandledTransportAction<GetFindingsRequest, GetFindingsResponse> (
+) : HandledTransportAction<ActionRequest, GetFindingsResponse> (
     AlertingActions.GET_FINDINGS_ACTION_NAME, transportService, actionFilters, ::GetFindingsRequest
 ),
     SecureTransportAction {
@@ -75,9 +77,11 @@ class TransportGetFindingsSearchAction @Inject constructor(
 
     override fun doExecute(
         task: Task,
-        getFindingsRequest: GetFindingsRequest,
+        request: ActionRequest,
         actionListener: ActionListener<GetFindingsResponse>
     ) {
+        val getFindingsRequest = request as? GetFindingsRequest
+            ?: recreateObject(request) { GetFindingsRequest(it) }
         val tableProp = getFindingsRequest.table
 
         val sortBuilder = SortBuilders
