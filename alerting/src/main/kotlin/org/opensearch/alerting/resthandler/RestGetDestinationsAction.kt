@@ -89,7 +89,7 @@ class RestGetDestinationsAction : BaseRestHandler() {
             destinationType
         )
         return RestChannelConsumer {
-            channel ->
+                channel ->
             client.execute(GetDestinationsAction.INSTANCE, getDestinationsRequest, RestToXContentListener(channel))
         }
     }
