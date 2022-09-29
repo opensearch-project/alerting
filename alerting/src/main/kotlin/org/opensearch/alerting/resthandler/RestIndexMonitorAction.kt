@@ -126,7 +126,7 @@ class RestIndexMonitorAction : BaseRestHandler() {
     }
 
     private fun validateOwner(owner: String?) {
-        if (owner != null || owner != "alerting") {
+        if (owner != "alerting") {
             throw IllegalArgumentException("Invalid owner field")
         }
     }
