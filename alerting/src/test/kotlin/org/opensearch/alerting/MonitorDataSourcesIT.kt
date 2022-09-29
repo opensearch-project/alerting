@@ -41,6 +41,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         }"""
         assertFalse(monitorResponse?.id.isNullOrEmpty())
         monitor = monitorResponse!!.monitor
+        Assert.assertEquals(monitor.owner, "alerting")
         indexDoc(index, "1", testDoc)
         val id = monitorResponse.id
         val executeMonitorResponse = executeMonitor(monitor, id, true)
@@ -87,6 +88,47 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         }"""
         assertFalse(monitorResponse?.id.isNullOrEmpty())
         monitor = monitorResponse!!.monitor
+        indexDoc(index, "1", testDoc)
+        val id = monitorResponse.id
+        val executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        val alerts = searchAlerts(id, customAlertsIndex)
+        assertEquals("Alert saved for test monitor", 1, alerts.size)
+        val table = Table("asc", "id", null, 1, 0, "")
+        var getAlertsResponse = client()
+            .execute(GetAlertsAction.INSTANCE, GetAlertsRequest(table, "ALL", "ALL", null, customAlertsIndex))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        getAlertsResponse = client()
+            .execute(GetAlertsAction.INSTANCE, GetAlertsRequest(table, "ALL", "ALL", id, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+    }
+
+    fun `test execute monitor with owner field`() {
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customAlertsIndex = "custom_alerts_index"
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(alertsIndex = customAlertsIndex),
+            owner = "owner"
+        )
+        val monitorResponse = createMonitor(monitor)
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+        Assert.assertEquals(monitor.owner, "owner")
         indexDoc(index, "1", testDoc)
         val id = monitorResponse.id
         val executeMonitorResponse = executeMonitor(monitor, id, false)
@@ -473,6 +515,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val updateMonitorResponse = updateMonitor(
             monitor.copy(
                 id = monitorId,
+                owner = "security_analytics_plugin",
                 dataSources = DataSources(
                     alertsIndex = customAlertsIndex,
                     queryIndex = customQueryIndex,
@@ -482,6 +525,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             monitorId
         )
         Assert.assertNotNull(updateMonitorResponse)
+        Assert.assertEquals(updateMonitorResponse!!.monitor.owner, "security_analytics_plugin")
         indexDoc(index, "2", testDoc)
         if (updateMonitorResponse != null) {
             executeMonitorResponse = executeMonitor(updateMonitorResponse.monitor, monitorId, false)

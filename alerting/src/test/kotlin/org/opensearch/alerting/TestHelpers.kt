@@ -181,6 +181,26 @@ fun randomDocumentLevelMonitor(
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     withMetadata: Boolean = false,
+    dataSources: DataSources,
+    owner: String
+): Monitor {
+    return Monitor(
+        name = name, monitorType = Monitor.MonitorType.DOC_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
+        schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
+        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf(), dataSources = dataSources, owner = owner
+    )
+}
+
+fun randomDocumentLevelMonitor(
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    user: User? = randomUser(),
+    inputs: List<Input> = listOf(DocLevelMonitorInput("description", listOf("index"), emptyList())),
+    schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
+    enabled: Boolean = randomBoolean(),
+    triggers: List<Trigger> = (1..randomInt(10)).map { randomQueryLevelTrigger() },
+    enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
+    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+    withMetadata: Boolean = false,
     dataSources: DataSources
 ): Monitor {
     return Monitor(
