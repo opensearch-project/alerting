@@ -14,11 +14,10 @@ import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionInput
 import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionInputCompanion
 import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionsObjectListener
-import org.opensearch.client.Client
+import org.opensearch.alerting.transport.TransportGetSuggestionsAction
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParser.Token
@@ -60,13 +59,12 @@ class MonitorIDInput() : SuggestionInput<String, Monitor> {
         ensureExpectedToken(Token.END_OBJECT, xcp.nextToken(), xcp) // that should be the only field in the object
     }
 
-    override fun getObject(callback: SuggestionsObjectListener, client: Client?, xContentRegistry: NamedXContentRegistry?): Monitor? {
-        // check to ensure that parseInput was called first and rawInput is not null
-        if (client == null || xContentRegistry == null) {
-            throw IllegalStateException("if the input requires async object retrieval, callback can't be null)")
-        }
+    override fun <S: Any> getObject(callback: SuggestionsObjectListener, transport: TransportGetSuggestionsAction, actionListener: ActionListener<S>): Monitor? {
+        val client = transport.getClient()
+        val xContentRegistry = transport.xContentRegistry
 
-        // TODO: check user context, make sure they get 404 if they dont have access to the monitor
+        val user = transport.readUserFromThreadContext(client)
+
         val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX).id(this.rawInput)
         client.get(
             getRequest,
@@ -82,6 +80,19 @@ class MonitorIDInput() : SuggestionInput<String, Monitor> {
                             response.sourceAsBytesRef, XContentType.JSON
                         ).use { xcp ->
                             val monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
+
+                            // make sure user has access to this monitor
+                            if (!transport.checkUserPermissionsWithResource(
+                                    user,
+                                    monitor.user,
+                                    actionListener,
+                                    "monitor",
+                                    rawInput
+                                )
+                            ) {
+                                return
+                            }
+
                             callback.onGetResponse(monitor)
                         }
                     }
@@ -95,6 +106,42 @@ class MonitorIDInput() : SuggestionInput<String, Monitor> {
 
         return null
     }
+
+    //    override fun getObject(callback: SuggestionsObjectListener, client: Client?, xContentRegistry: NamedXContentRegistry?): Monitor? {
+//        // check to ensure that parseInput was called first and rawInput is not null
+//        if (client == null || xContentRegistry == null) {
+//            throw IllegalStateException("if the input requires async object retrieval, callback can't be null)")
+//        }
+//
+//        // TODO: check user context, make sure they get 404 if they dont have access to the monitor
+//        val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX).id(this.rawInput)
+//        client.get(
+//            getRequest,
+//            object : ActionListener<GetResponse> {
+//                override fun onResponse(response: GetResponse) {
+//                    if (!response.isExists) {
+//                        callback.onFailure(OpenSearchStatusException("Monitor with ID $rawInput not found, please ensure the monitor id is valid", RestStatus.NOT_FOUND))
+//                    }
+//
+//                    if (!response.isSourceEmpty) {
+//                        XContentHelper.createParser(
+//                            xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+//                            response.sourceAsBytesRef, XContentType.JSON
+//                        ).use { xcp ->
+//                            val monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
+//                            callback.onGetResponse(monitor)
+//                        }
+//                    }
+//                }
+//
+//                override fun onFailure(e: Exception) {
+//                    callback.onFailure(e)
+//                }
+//            }
+//        )
+//
+//        return null
+//    }
 
     override fun writeTo(out: StreamOutput) {
         out.writeString(rawInput)

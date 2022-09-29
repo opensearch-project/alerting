@@ -5,14 +5,14 @@
 
 package org.opensearch.alerting.model.suggestions.suggestioninputs
 
+import org.opensearch.action.ActionListener
 import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionInput
 import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionInputCompanion
 import org.opensearch.alerting.model.suggestions.suggestioninputs.util.SuggestionsObjectListener
-import org.opensearch.client.Client
+import org.opensearch.alerting.transport.TransportGetSuggestionsAction
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParser.Token
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
@@ -42,7 +42,7 @@ class MonitorObjInput() : SuggestionInput<Monitor, Monitor> {
         ensureExpectedToken(Token.END_OBJECT, xcp.currentToken(), xcp) // that should be the only field in the object
     }
 
-    override fun getObject(callback: SuggestionsObjectListener, client: Client?, xContentRegistry: NamedXContentRegistry?): Monitor? {
+    override fun <S: Any> getObject(callback: SuggestionsObjectListener, transport: TransportGetSuggestionsAction, actionListener: ActionListener<S>): Monitor {
         return rawInput
     }
 

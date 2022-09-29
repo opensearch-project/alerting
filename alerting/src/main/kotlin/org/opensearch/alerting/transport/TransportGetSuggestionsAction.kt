@@ -43,7 +43,6 @@ class TransportGetSuggestionsAction @Inject constructor(
         listenFilterBySettingChange(clusterService)
     }
 
-    // TODO: checkUserPermissionsWithResource somewhere in here???
     override fun doExecute(task: Task, getSuggestionsRequest: GetSuggestionsRequest, actionListener: ActionListener<GetSuggestionsResponse>) {
         val user = readUserFromThreadContext(client)
 
@@ -71,8 +70,8 @@ class TransportGetSuggestionsAction @Inject constructor(
                             actionListener.onFailure(AlertingException.wrap(e))
                         }
                     },
-                    client,
-                    xContentRegistry
+                    this,
+                    actionListener
                 )
             } else {
                 val obj = input.getObject(
@@ -88,10 +87,16 @@ class TransportGetSuggestionsAction @Inject constructor(
                         override fun onFailure(e: Exception) {
                             actionListener.onFailure(AlertingException.wrap(e))
                         }
-                    }
+                    },
+                    this,
+                    actionListener
                 ) ?: actionListener.onFailure(AlertingException.wrap(IllegalStateException("objects passed inline cannot be null")))
                 getSuggestions(obj, component)
             }
         }
+    }
+
+    fun getClient() : Client {
+        return this.client
     }
 }

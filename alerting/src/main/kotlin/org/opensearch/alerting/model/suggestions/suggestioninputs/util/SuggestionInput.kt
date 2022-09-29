@@ -5,9 +5,9 @@
 
 package org.opensearch.alerting.model.suggestions.suggestioninputs.util
 
-import org.opensearch.client.Client
+import org.opensearch.action.ActionListener
+import org.opensearch.alerting.transport.TransportGetSuggestionsAction
 import org.opensearch.common.io.stream.Writeable
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentParser
 
 /**
@@ -91,7 +91,7 @@ interface SuggestionInput<I, out T> : Writeable {
      *
      * if rawInput is itself a Monitor, async Monitor retrieval is not required, so return rawInput: Monitor itself
      */
-    fun getObject(callback: SuggestionsObjectListener, client: Client? = null, xContentRegistry: NamedXContentRegistry? = null): T?
+    fun <S: Any> getObject(callback: SuggestionsObjectListener, transport: TransportGetSuggestionsAction, actionListener: ActionListener<S>): T?
 
     /**
      * Implementations of this interface must also include a companion object
