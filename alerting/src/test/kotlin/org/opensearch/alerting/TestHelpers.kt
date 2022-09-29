@@ -181,7 +181,7 @@ fun randomDocumentLevelMonitor(
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     withMetadata: Boolean = false,
-    dataSources: DataSources,
+    dataSources: DataSources = DataSources(),
     owner: String
 ): Monitor {
     return Monitor(
