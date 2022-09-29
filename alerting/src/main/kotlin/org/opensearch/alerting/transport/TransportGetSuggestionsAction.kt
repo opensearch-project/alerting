@@ -96,7 +96,7 @@ class TransportGetSuggestionsAction @Inject constructor(
         }
     }
 
-    fun getClient() : Client {
+    fun getClient(): Client {
         return this.client
     }
 }

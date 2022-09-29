@@ -42,7 +42,7 @@ class MonitorObjInput() : SuggestionInput<Monitor, Monitor> {
         ensureExpectedToken(Token.END_OBJECT, xcp.currentToken(), xcp) // that should be the only field in the object
     }
 
-    override fun <S: Any> getObject(callback: SuggestionsObjectListener, transport: TransportGetSuggestionsAction, actionListener: ActionListener<S>): Monitor {
+    override fun <S : Any> getObject(callback: SuggestionsObjectListener, transport: TransportGetSuggestionsAction, actionListener: ActionListener<S>): Monitor {
         return rawInput
     }
 

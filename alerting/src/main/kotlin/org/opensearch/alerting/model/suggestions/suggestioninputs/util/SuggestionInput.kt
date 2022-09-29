@@ -91,7 +91,7 @@ interface SuggestionInput<I, out T> : Writeable {
      *
      * if rawInput is itself a Monitor, async Monitor retrieval is not required, so return rawInput: Monitor itself
      */
-    fun <S: Any> getObject(callback: SuggestionsObjectListener, transport: TransportGetSuggestionsAction, actionListener: ActionListener<S>): T?
+    fun <S : Any> getObject(callback: SuggestionsObjectListener, transport: TransportGetSuggestionsAction, actionListener: ActionListener<S>): T?
 
     /**
      * Implementations of this interface must also include a companion object

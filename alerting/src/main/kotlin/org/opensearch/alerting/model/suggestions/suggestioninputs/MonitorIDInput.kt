@@ -59,7 +59,7 @@ class MonitorIDInput() : SuggestionInput<String, Monitor> {
         ensureExpectedToken(Token.END_OBJECT, xcp.nextToken(), xcp) // that should be the only field in the object
     }
 
-    override fun <S: Any> getObject(callback: SuggestionsObjectListener, transport: TransportGetSuggestionsAction, actionListener: ActionListener<S>): Monitor? {
+    override fun <S : Any> getObject(callback: SuggestionsObjectListener, transport: TransportGetSuggestionsAction, actionListener: ActionListener<S>): Monitor? {
         val client = transport.getClient()
         val xContentRegistry = transport.xContentRegistry
 
