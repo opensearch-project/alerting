@@ -48,7 +48,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(monitor.owner, "alerting")
         indexDoc(index, "1", testDoc)
         val id = monitorResponse.id
-        val executeMonitorResponse = executeMonitor(monitor, id, false)
+        val executeMonitorResponse = executeMonitor(monitor, id, true)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
