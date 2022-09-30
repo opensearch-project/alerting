@@ -8,8 +8,11 @@ package org.opensearch.alerting
 import org.junit.Assert
 import org.opensearch.action.admin.cluster.state.ClusterStateRequest
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
+import org.opensearch.action.search.SearchRequest
 import org.opensearch.alerting.action.GetAlertsAction
 import org.opensearch.alerting.action.GetAlertsRequest
+import org.opensearch.alerting.action.SearchMonitorAction
+import org.opensearch.alerting.action.SearchMonitorRequest
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
@@ -18,6 +21,7 @@ import org.opensearch.alerting.model.DataSources
 import org.opensearch.alerting.model.Table
 import org.opensearch.alerting.transport.AlertingSingleNodeTestCase
 import org.opensearch.common.settings.Settings
+import org.opensearch.index.query.MatchQueryBuilder
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit.MILLIS
@@ -44,7 +48,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(monitor.owner, "alerting")
         indexDoc(index, "1", testDoc)
         val id = monitorResponse.id
-        val executeMonitorResponse = executeMonitor(monitor, id, true)
+        val executeMonitorResponse = executeMonitor(monitor, id, false)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
@@ -493,7 +497,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertNotNull(getMonitorResponse)
         Assert.assertNotNull(getMonitorResponse.monitor)
         val monitor = getMonitorResponse.monitor
-
+        val sr = SearchRequest(SCHEDULED_JOBS_INDEX)
+        val g =
+            client().execute(SearchMonitorAction.INSTANCE, SearchMonitorRequest(sr))
+                .get()
+        Assert.assertNotNull(g)
+        Assert.assertEquals(g.hits.hits.size, 1)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
             "message" : "This is an error from IAD region",
@@ -546,5 +555,16 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+
+        val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX)
+        var searchMonitorResponse =
+            client().execute(SearchMonitorAction.INSTANCE, SearchMonitorRequest(searchRequest))
+                .get()
+        Assert.assertEquals(searchMonitorResponse.hits.hits.size, 0)
+        searchRequest.source().query(MatchQueryBuilder("monitor.owner", "security_analytics_plugin"))
+        searchMonitorResponse =
+            client().execute(SearchMonitorAction.INSTANCE, SearchMonitorRequest(searchRequest))
+                .get()
+        Assert.assertEquals(searchMonitorResponse.hits.hits.size, 1)
     }
 }
