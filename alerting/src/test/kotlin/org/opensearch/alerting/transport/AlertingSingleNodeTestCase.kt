@@ -10,6 +10,8 @@ import org.opensearch.action.admin.indices.refresh.RefreshAction
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.action.DeleteMonitorAction
+import org.opensearch.alerting.action.DeleteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorResponse
@@ -166,6 +168,13 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     ) = client().execute(
         GetMonitorAction.INSTANCE,
         GetMonitorRequest(monitorId, version, RestRequest.Method.GET, fetchSourceContext)
+    ).get()
+
+    protected fun deleteMonitor(
+        monitorId: String,
+    ) = client().execute(
+        DeleteMonitorAction.INSTANCE,
+        DeleteMonitorRequest(monitorId, WriteRequest.RefreshPolicy.IMMEDIATE)
     ).get()
 
     override fun getPlugins(): List<Class<out Plugin>> {

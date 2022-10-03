@@ -189,6 +189,13 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        var queryIndexSearchResponse = client().search(SearchRequest(customQueryIndex)).get()
+        Assert.assertNotNull(queryIndexSearchResponse)
+        Assert.assertTrue(queryIndexSearchResponse.hits.hits.size > 0)
+        deleteMonitor(id)
+        queryIndexSearchResponse = client().search(SearchRequest(customQueryIndex)).get()
+        Assert.assertNotNull(queryIndexSearchResponse)
+        Assert.assertEquals(queryIndexSearchResponse.hits.hits.size, 0)
     }
 
     fun `test execute monitor with custom query index and custom field mappings`() {
