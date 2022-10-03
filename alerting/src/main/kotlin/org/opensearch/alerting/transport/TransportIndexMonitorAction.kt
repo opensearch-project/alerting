@@ -198,8 +198,6 @@ class TransportIndexMonitorAction @Inject constructor(
     }
 
     private fun validateActionsAcrossTriggers(totalMaxActions: Int) {
-        if (totalMaxActions == AlertingSettings.DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS) return
-
         scope.launch {
             val monitors = getMonitors(client)
             val triggers = getTriggers(monitors)

@@ -194,7 +194,7 @@ abstract class MonitorRunner {
      @return [Int] amount of actions that are allowed to be processed within a given trigger.
      */
     fun actionsToProcessInTrigger(trigger: Trigger, maxActionsPerTrigger: Int): List<Action> {
-        return if (maxActionsPerTrigger == AlertingSettings.UNBOUNDED_ACTIONS_ACROSS_TRIGGERS) trigger.actions
+        return if (maxActionsPerTrigger == AlertingSettings.UNBOUNDED_ACTIONS_FOR_TRIGGERS) trigger.actions
         else {
             val actionsToProcessInTrigger = trigger.actions.subList(0, min(trigger.actions.size, maxActionsPerTrigger) - 1)
 

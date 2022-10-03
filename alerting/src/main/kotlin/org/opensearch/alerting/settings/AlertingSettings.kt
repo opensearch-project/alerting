@@ -21,9 +21,9 @@ class AlertingSettings {
         const val MONITOR_MAX_INPUTS = 1
         const val MONITOR_MAX_TRIGGERS = 10
         const val DEFAULT_MAX_ACTIONABLE_ALERT_COUNT = 50L
-        const val UNBOUNDED_ACTIONS_ACROSS_TRIGGERS = -1
-        const val DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER = UNBOUNDED_ACTIONS_ACROSS_TRIGGERS
-        const val DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS = UNBOUNDED_ACTIONS_ACROSS_TRIGGERS
+        const val UNBOUNDED_ACTIONS_FOR_TRIGGERS = -1
+        const val DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER = UNBOUNDED_ACTIONS_FOR_TRIGGERS
+        const val DEFAULT_TOTAL_MAX_ACTIONS_ACROSS_TRIGGERS = UNBOUNDED_ACTIONS_FOR_TRIGGERS
 
         private val logger = LogManager.getLogger(AlertingSettings::class.java)
 
@@ -179,7 +179,12 @@ class AlertingSettings {
         internal class TotalMaxActionsAcrossTriggersValidator : Setting.Validator<Int> {
             override fun validate(value: Int) {}
 
-            override fun validate(value: Int, settings: Map<Setting<*>, Any>) {}
+            override fun validate(value: Int, settings: Map<Setting<*>, Any>) {
+                if (value <= MonitorRunnerService.monitorCtx.totalMaxActionsAcrossTriggers)
+                    throw IllegalArgumentException(
+                        "Updating total max actions across triggers to a lower value than the one currently set is not permitted."
+                    )
+            }
 
             override fun settings(): MutableIterator<Setting<*>> {
                 val settings = mutableListOf<Setting<*>>(
