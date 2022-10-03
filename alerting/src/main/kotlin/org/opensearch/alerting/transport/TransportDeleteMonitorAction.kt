@@ -132,7 +132,7 @@ class TransportDeleteMonitorAction @Inject constructor(
                 object : ActionListener<DeleteResponse> {
                     override fun onResponse(response: DeleteResponse) {
                         val clusterState = clusterService.state()
-                        if (clusterState.routingTable.hasIndex(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)) {
+                        if (clusterState.routingTable.hasIndex(monitor.dataSources.queryIndex)) {
                             deleteDocLevelMonitorQueries(monitor)
                         }
                         deleteMetadata()

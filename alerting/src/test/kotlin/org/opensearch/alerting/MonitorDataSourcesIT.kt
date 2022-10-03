@@ -22,9 +22,11 @@ import org.opensearch.alerting.model.Table
 import org.opensearch.alerting.transport.AlertingSingleNodeTestCase
 import org.opensearch.common.settings.Settings
 import org.opensearch.index.query.MatchQueryBuilder
+import org.opensearch.test.OpenSearchTestCase
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit.MILLIS
+import java.util.concurrent.TimeUnit
 
 class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
@@ -193,9 +195,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertNotNull(queryIndexSearchResponse)
         Assert.assertTrue(queryIndexSearchResponse.hits.hits.size > 0)
         deleteMonitor(id)
-        queryIndexSearchResponse = client().search(SearchRequest(customQueryIndex)).get()
-        Assert.assertNotNull(queryIndexSearchResponse)
-        Assert.assertEquals(queryIndexSearchResponse.hits.hits.size, 0)
+        val docDeletedChecker: () -> Boolean = {
+            queryIndexSearchResponse = client().search(SearchRequest(customQueryIndex)).get()
+            Assert.assertNotNull(queryIndexSearchResponse)
+            queryIndexSearchResponse.hits.hits.isEmpty()
+        }
+        OpenSearchTestCase.waitUntil(docDeletedChecker, 5, TimeUnit.SECONDS)
     }
 
     fun `test execute monitor with custom query index and custom field mappings`() {
