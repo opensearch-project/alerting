@@ -56,7 +56,8 @@ data class Monitor(
     val inputs: List<Input>,
     val triggers: List<Trigger>,
     val uiMetadata: Map<String, Any>,
-    val dataSources: DataSources = DataSources()
+    val dataSources: DataSources = DataSources(),
+    val owner: String? = "alerting"
 ) : ScheduledJob {
 
     override val type = MONITOR_TYPE
@@ -118,7 +119,8 @@ data class Monitor(
             DataSources(sin)
         } else {
             DataSources()
-        }
+        },
+        owner = sin.readOptionalString()
     )
 
     // This enum classifies different Monitors
@@ -167,6 +169,7 @@ data class Monitor(
             .optionalTimeField(LAST_UPDATE_TIME_FIELD, lastUpdateTime)
         if (uiMetadata.isNotEmpty()) builder.field(UI_METADATA_FIELD, uiMetadata)
         builder.field(DATA_SOURCES_FIELD, dataSources)
+        builder.field(OWNER_FIELD, owner)
         if (params.paramAsBoolean("with_type", false)) builder.endObject()
         return builder.endObject()
     }
@@ -211,6 +214,7 @@ data class Monitor(
         out.writeMap(uiMetadata)
         out.writeBoolean(dataSources != null) // for backward compatibility with pre-existing monitors which don't have datasources field
         dataSources.writeTo(out)
+        out.writeOptionalString(owner)
     }
 
     companion object {
@@ -229,6 +233,7 @@ data class Monitor(
         const val LAST_UPDATE_TIME_FIELD = "last_update_time"
         const val UI_METADATA_FIELD = "ui_metadata"
         const val DATA_SOURCES_FIELD = "data_sources"
+        const val OWNER_FIELD = "owner"
         const val ENABLED_TIME_FIELD = "enabled_time"
 
         // This is defined here instead of in ScheduledJob to avoid having the ScheduledJob class know about all
@@ -256,6 +261,7 @@ data class Monitor(
             val triggers: MutableList<Trigger> = mutableListOf()
             val inputs: MutableList<Input> = mutableListOf()
             var dataSources = DataSources()
+            var owner = "alerting"
 
             ensureExpectedToken(Token.START_OBJECT, xcp.currentToken(), xcp)
             while (xcp.nextToken() != Token.END_OBJECT) {
@@ -295,6 +301,8 @@ data class Monitor(
                     UI_METADATA_FIELD -> uiMetadata = xcp.map()
                     DATA_SOURCES_FIELD -> dataSources = if (xcp.currentToken() == Token.VALUE_NULL) DataSources()
                     else DataSources.parse(xcp)
+                    OWNER_FIELD -> owner = if (xcp.currentToken() == Token.VALUE_NULL) owner
+                    else xcp.text()
                     else -> {
                         xcp.skipChildren()
                     }
@@ -320,7 +328,8 @@ data class Monitor(
                 inputs.toList(),
                 triggers.toList(),
                 uiMetadata,
-                dataSources
+                dataSources,
+                owner
             )
         }
 

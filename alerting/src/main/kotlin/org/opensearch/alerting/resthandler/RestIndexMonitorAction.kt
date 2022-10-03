@@ -85,6 +85,7 @@ class RestIndexMonitorAction : BaseRestHandler() {
         ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
         val monitor = Monitor.parse(xcp, id).copy(lastUpdateTime = Instant.now())
         validateDataSources(monitor)
+        validateOwner(monitor.owner)
         val monitorType = monitor.monitorType
         val triggers = monitor.triggers
         when (monitorType) {
@@ -121,6 +122,12 @@ class RestIndexMonitorAction : BaseRestHandler() {
 
         return RestChannelConsumer { channel ->
             client.execute(IndexMonitorAction.INSTANCE, indexMonitorRequest, indexMonitorResponse(channel, request.method()))
+        }
+    }
+
+    private fun validateOwner(owner: String?) {
+        if (owner != "alerting") {
+            throw IllegalArgumentException("Invalid owner field")
         }
     }
 

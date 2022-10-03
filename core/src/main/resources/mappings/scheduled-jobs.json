@@ -18,6 +18,15 @@
             }
           }
         },
+        "owner": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
         "monitor_type": {
           "type": "keyword"
         },
