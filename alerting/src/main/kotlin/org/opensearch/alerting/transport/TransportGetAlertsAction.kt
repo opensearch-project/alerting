@@ -99,14 +99,10 @@ class TransportGetAlertsAction @Inject constructor(
         if (getAlertsRequest.alertState != "ALL")
             queryBuilder.filter(QueryBuilders.termQuery("state", getAlertsRequest.alertState))
 
-        if (getAlertsRequest.monitorId != null || getAlertsRequest.monitorIds.isNullOrEmpty() == false) {
-            val qb = QueryBuilders.boolQuery()
-            if (getAlertsRequest.monitorId.isNullOrEmpty() == false) {
-                qb.must(QueryBuilders.termsQuery("monitor_id", getAlertsRequest.monitorId))
-            }
-            if (getAlertsRequest.monitorIds.isNullOrEmpty() == false)
-                getAlertsRequest.monitorIds.forEach { id -> qb.must(QueryBuilders.termsQuery("monitor_id", getAlertsRequest.monitorId)) }
-            queryBuilder.filter(qb)
+        if (getAlertsRequest.monitorId != null) {
+            queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getAlertsRequest.monitorId))
+        } else if (getAlertsRequest.monitorIds.isNullOrEmpty() == false) {
+            queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getAlertsRequest.monitorIds))
         }
         if (!tableProp.searchString.isNullOrBlank()) {
             queryBuilder
