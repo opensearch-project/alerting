@@ -5,6 +5,8 @@
 
 package org.opensearch.alerting.model.destination
 
+import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentParser
@@ -27,10 +29,16 @@ data class SNS(val topicARN: String, val roleARN: String) : ToXContent {
             .endObject()
     }
 
+    @Throws(IOException::class)
+    fun writeTo(out: StreamOutput) {
+        out.writeString(topicARN)
+        out.writeString(roleARN)
+    }
+
     companion object {
 
-        private val SNS_ARN_REGEX = Pattern.compile("^arn:aws(-[^:]+)?:sns:([a-zA-Z0-9-]+):([0-9]{12}):([a-zA-Z0-9-_]+)$")
-        private val IAM_ARN_REGEX = Pattern.compile("^arn:aws(-[^:]+)?:iam::([0-9]{12}):([a-zA-Z0-9-/_]+)$")
+        private val SNS_ARN_REGEX = Pattern.compile("^arn:aws(-[^:]+)?:sns:([a-zA-Z0-9-]+):([0-9]{12}):([a-zA-Z_0-9+=,.@\\-_/]+)$")
+        private val IAM_ARN_REGEX = Pattern.compile("^arn:aws(-[^:]+)?:iam::([0-9]{12}):([a-zA-Z_0-9+=,.@\\-_/]+)$")
 
         const val TOPIC_ARN_FIELD = "topic_arn"
         const val ROLE_ARN_FIELD = "role_arn"
@@ -58,6 +66,17 @@ data class SNS(val topicARN: String, val roleARN: String) : ToXContent {
                 requireNotNull(topicARN) { "SNS Action topic_arn is null" },
                 requireNotNull(roleARN) { "SNS Action role_arn is null" }
             )
+        }
+
+        @JvmStatic
+        @Throws(IOException::class)
+        fun readFrom(sin: StreamInput): SNS? {
+            return if (sin.readBoolean()) {
+                SNS(
+                    topicARN = sin.readString(),
+                    roleARN = sin.readString()
+                )
+            } else null
         }
     }
 }

@@ -25,6 +25,7 @@ import org.opensearch.commons.destination.message.LegacyBaseMessage
 import org.opensearch.commons.destination.message.LegacyChimeMessage
 import org.opensearch.commons.destination.message.LegacyCustomWebhookMessage
 import org.opensearch.commons.destination.message.LegacyEmailMessage
+import org.opensearch.commons.destination.message.LegacySNSMessage
 import org.opensearch.commons.destination.message.LegacySlackMessage
 import java.io.IOException
 import java.time.Instant
@@ -45,6 +46,7 @@ data class Destination(
     val lastUpdateTime: Instant,
     val chime: Chime?,
     val slack: Slack?,
+    val sns: SNS?,
     val customWebhook: CustomWebhook?,
     val email: Email?
 ) : ToXContent {
@@ -95,6 +97,8 @@ data class Destination(
         chime?.writeTo(out)
         out.writeBoolean(slack != null)
         slack?.writeTo(out)
+        out.writeBoolean(sns != null)
+        sns?.writeTo(out)
         out.writeBoolean(customWebhook != null)
         customWebhook?.writeTo(out)
         out.writeBoolean(email != null)
@@ -117,6 +121,7 @@ data class Destination(
         const val LAST_UPDATE_TIME_FIELD = "last_update_time"
         const val CHIME = "chime"
         const val SLACK = "slack"
+        const val SNS_TYPE = "sns"
         const val CUSTOMWEBHOOK = "custom_webhook"
         const val EMAIL = "email"
 
@@ -140,6 +145,7 @@ data class Destination(
             var user: User? = null
             lateinit var type: String
             var slack: Slack? = null
+            var sns: SNS? = null
             var chime: Chime? = null
             var customWebhook: CustomWebhook? = null
             var email: Email? = null
@@ -167,6 +173,9 @@ data class Destination(
                     }
                     SLACK -> {
                         slack = Slack.parse(xcp)
+                    }
+                    SNS_TYPE -> {
+                        sns = SNS.parse(xcp)
                     }
                     CUSTOMWEBHOOK -> {
                         customWebhook = CustomWebhook.parse(xcp)
@@ -197,6 +206,7 @@ data class Destination(
                 lastUpdateTime ?: Instant.now(),
                 chime,
                 slack,
+                sns,
                 customWebhook,
                 email
             )
@@ -230,6 +240,7 @@ data class Destination(
                 lastUpdateTime = sin.readInstant(),
                 chime = Chime.readFrom(sin),
                 slack = Slack.readFrom(sin),
+                sns = SNS.readFrom(sin),
                 customWebhook = CustomWebhook.readFrom(sin),
                 email = Email.readFrom(sin)
             )
@@ -256,6 +267,15 @@ data class Destination(
                 destinationMessage = LegacySlackMessage.Builder(name)
                     .withUrl(slack?.url)
                     .withMessage(messageContent)
+                    .build()
+            }
+            DestinationType.SNS -> {
+                destinationMessage = LegacySNSMessage.Builder(name)
+                    .withRole(sns?.roleARN)
+                    .withTopicArn(sns?.topicARN)
+                    .withClusterName(destinationCtx.clusterName)
+                    .withSubject(compiledSubject)
+                    .withMessage(compiledMessage)
                     .build()
             }
             DestinationType.CUSTOM_WEBHOOK -> {
@@ -287,6 +307,7 @@ data class Destination(
             DestinationType.CHIME -> content = chime?.convertToMap()?.get(type.value)
             DestinationType.SLACK -> content = slack?.convertToMap()?.get(type.value)
             DestinationType.CUSTOM_WEBHOOK -> content = customWebhook?.convertToMap()?.get(type.value)
+            DestinationType.SNS -> content = sns?.convertToMap()?.get(type.value)
             DestinationType.EMAIL -> content = email?.convertToMap()?.get(type.value)
             DestinationType.TEST_ACTION -> content = "dummy"
         }

@@ -21,7 +21,8 @@ import org.opensearch.common.xcontent.NamedXContentRegistry
 class DestinationContextFactory(
     val client: Client,
     val xContentRegistry: NamedXContentRegistry,
-    private var destinationSettings: Map<String, SecureDestinationSettings>
+    private var destinationSettings: Map<String, SecureDestinationSettings>,
+    private val clusterName: String
 ) {
 
     fun updateDestinationSettings(destinationSettings: Map<String, SecureDestinationSettings>) {
@@ -29,7 +30,7 @@ class DestinationContextFactory(
     }
 
     suspend fun getDestinationContext(destination: Destination): DestinationContext {
-        var destinationContext = DestinationContext()
+        var destinationContext = DestinationContext(clusterName = clusterName)
         // Populate DestinationContext based on Destination type
         if (destination.type == DestinationType.EMAIL) {
             val email = destination.email
