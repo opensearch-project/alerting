@@ -78,24 +78,7 @@ class TransportDeleteMonitorAction @Inject constructor(
         private val user: User?,
         private val monitorId: String
     ) {
-
         fun resolveUserAndStart() {
-            if (user == null) {
-                // Security is disabled, so we can delete the destination without issues
-                deleteMonitor()
-            } else if (!doFilterForUser(user)) {
-                // security is enabled and filterby is disabled.
-                deleteMonitor()
-            } else {
-                try {
-                    start()
-                } catch (ex: IOException) {
-                    actionListener.onFailure(AlertingException.wrap(ex))
-                }
-            }
-        }
-
-        fun start() {
             val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, monitorId)
             client.get(
                 getRequest,
@@ -124,21 +107,33 @@ class TransportDeleteMonitorAction @Inject constructor(
         }
 
         private fun onGetResponse(monitor: Monitor) {
-            if (!checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", monitorId)) {
-                return
+            if (user == null) {
+                // Security is disabled, so we can delete the destination without issues
+                deleteMonitor(monitor)
+            } else if (!doFilterForUser(user)) {
+                // security is enabled and filterby is disabled.
+                deleteMonitor(monitor)
             } else {
-                deleteMonitor()
+                try {
+                    if (!checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", monitorId)) {
+                        return
+                    } else {
+                        deleteMonitor(monitor)
+                    }
+                } catch (ex: IOException) {
+                    actionListener.onFailure(AlertingException.wrap(ex))
+                }
             }
         }
 
-        private fun deleteMonitor() {
+        private fun deleteMonitor(monitor: Monitor) {
             client.delete(
                 deleteRequest,
                 object : ActionListener<DeleteResponse> {
                     override fun onResponse(response: DeleteResponse) {
                         val clusterState = clusterService.state()
-                        if (clusterState.routingTable.hasIndex(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)) {
-                            deleteDocLevelMonitorQueries()
+                        if (clusterState.routingTable.hasIndex(monitor.dataSources.queryIndex)) {
+                            deleteDocLevelMonitorQueries(monitor)
                         }
                         deleteMetadata()
 
@@ -179,9 +174,9 @@ class TransportDeleteMonitorAction @Inject constructor(
             )
         }
 
-        private fun deleteDocLevelMonitorQueries() {
+        private fun deleteDocLevelMonitorQueries(monitor: Monitor) {
             DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-                .source(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
+                .source(monitor.dataSources.queryIndex)
                 .filter(QueryBuilders.matchQuery("monitor_id", monitorId))
                 .execute(
                     object : ActionListener<BulkByScrollResponse> {

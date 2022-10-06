@@ -13,6 +13,7 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.SearchMonitorAction
 import org.opensearch.alerting.action.SearchMonitorRequest
+import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
@@ -21,6 +22,10 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.commons.authuser.User
+import org.opensearch.index.query.BoolQueryBuilder
+import org.opensearch.index.query.ExistsQueryBuilder
+import org.opensearch.index.query.MatchQueryBuilder
+import org.opensearch.index.query.QueryBuilders
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 
@@ -43,6 +48,14 @@ class TransportSearchMonitorAction @Inject constructor(
     }
 
     override fun doExecute(task: Task, searchMonitorRequest: SearchMonitorRequest, actionListener: ActionListener<SearchResponse>) {
+        val searchSourceBuilder = searchMonitorRequest.searchRequest.source()
+        val queryBuilder = if (searchSourceBuilder.query() == null) BoolQueryBuilder()
+        else QueryBuilders.boolQuery().must(searchSourceBuilder.query())
+        queryBuilder.filter(QueryBuilders.existsQuery(Monitor.MONITOR_TYPE))
+        searchSourceBuilder.query(queryBuilder)
+            .seqNoAndPrimaryTerm(true)
+            .version(true)
+        addOwnerFieldIfNotExists(searchMonitorRequest.searchRequest)
         val user = readUserFromThreadContext(client)
         client.threadPool().threadContext.stashContext().use {
             resolve(searchMonitorRequest, actionListener, user)
@@ -77,5 +90,17 @@ class TransportSearchMonitorAction @Inject constructor(
                 }
             }
         )
+    }
+
+    private fun addOwnerFieldIfNotExists(searchRequest: SearchRequest) {
+        if (searchRequest.source().query() == null || searchRequest.source().query().toString().contains("monitor.owner") == false) {
+            var boolQueryBuilder: BoolQueryBuilder = if (searchRequest.source().query() == null) BoolQueryBuilder()
+            else QueryBuilders.boolQuery().must(searchRequest.source().query())
+            val bqb = BoolQueryBuilder()
+            bqb.should().add(BoolQueryBuilder().mustNot(ExistsQueryBuilder("monitor.owner")))
+            bqb.should().add(BoolQueryBuilder().must(MatchQueryBuilder("monitor.owner", "alerting")))
+            boolQueryBuilder.filter(bqb)
+            searchRequest.source().query(boolQueryBuilder)
+        }
     }
 }
