@@ -15,7 +15,7 @@ class AlertingSettingsIT : AlertingRestTestCase() {
             // Give some time for settings to update
             Thread.sleep(5000)
         } catch (e: Exception) {
-            assertTrue(e is IllegalArgumentException)
+            assert(MonitorRunnerService.monitorCtx.totalMaxActionsAcrossTriggers != -10)
         }
     }
 
@@ -25,7 +25,7 @@ class AlertingSettingsIT : AlertingRestTestCase() {
             // Give some time for settings to update
             Thread.sleep(5000)
         } catch (e: Exception) {
-            assertTrue(e is IllegalArgumentException)
+            assert(MonitorRunnerService.monitorCtx.totalMaxActionsAcrossTriggers != 10)
         }
     }
 }
