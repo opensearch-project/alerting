@@ -11,9 +11,6 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.NEVER_RUN
-import org.opensearch.alerting.core.model.DocLevelMonitorInput
-import org.opensearch.alerting.core.model.DocLevelQuery
-import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.randomDocumentLevelMonitor
 import org.opensearch.alerting.randomDocumentLevelTrigger
@@ -22,6 +19,9 @@ import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent.jsonXContent
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
+import org.opensearch.commons.alerting.model.DocLevelQuery
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.rest.RestStatus
 
 class AlertIndicesIT : AlertingRestTestCase() {

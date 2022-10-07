@@ -6,15 +6,15 @@
 package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.util.isADMonitor
+import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import java.time.Instant
 
 object QueryLevelMonitorRunner : MonitorRunner() {

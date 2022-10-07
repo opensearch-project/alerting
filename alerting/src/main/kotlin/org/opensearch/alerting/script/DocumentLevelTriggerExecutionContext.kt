@@ -5,9 +5,9 @@
 
 package org.opensearch.alerting.script
 
-import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.DocumentLevelTrigger
-import org.opensearch.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.DocumentLevelTrigger
+import org.opensearch.commons.alerting.model.Monitor
 import java.time.Instant
 
 data class DocumentLevelTriggerExecutionContext(

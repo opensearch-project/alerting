@@ -6,12 +6,12 @@
 package org.opensearch.alerting.action
 
 import org.junit.Assert
-import org.opensearch.alerting.alerts.AlertError
-import org.opensearch.alerting.model.ActionExecutionResult
-import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.randomUser
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.commons.alerting.alerts.AlertError
+import org.opensearch.commons.alerting.model.ActionExecutionResult
+import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.test.OpenSearchTestCase
 import java.time.Instant
 

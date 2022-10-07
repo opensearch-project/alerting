@@ -4,13 +4,13 @@
  */
 package org.opensearch.alerting
 
-import org.opensearch.alerting.core.model.Input
-import org.opensearch.alerting.core.model.IntervalSchedule
-import org.opensearch.alerting.core.model.Schedule
-import org.opensearch.alerting.core.model.SearchInput
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.QueryLevelTrigger
-import org.opensearch.alerting.model.Trigger
+import org.opensearch.commons.alerting.model.Input
+import org.opensearch.commons.alerting.model.IntervalSchedule
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.QueryLevelTrigger
+import org.opensearch.commons.alerting.model.Schedule
+import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.QueryBuilders

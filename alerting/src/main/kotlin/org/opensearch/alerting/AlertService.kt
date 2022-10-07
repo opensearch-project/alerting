@@ -15,18 +15,9 @@ import org.opensearch.action.delete.DeleteRequest
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.alerting.alerts.AlertError
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.model.ActionExecutionResult
 import org.opensearch.alerting.model.ActionRunResult
-import org.opensearch.alerting.model.AggregationResultBucket
-import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.BucketLevelTrigger
-import org.opensearch.alerting.model.DataSources
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
-import org.opensearch.alerting.model.Trigger
-import org.opensearch.alerting.model.action.AlertCategory
 import org.opensearch.alerting.opensearchapi.firstFailureOrNull
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -43,6 +34,15 @@ import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.alerts.AlertError
+import org.opensearch.commons.alerting.model.ActionExecutionResult
+import org.opensearch.commons.alerting.model.AggregationResultBucket
+import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.DataSources
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.Trigger
+import org.opensearch.commons.alerting.model.action.AlertCategory
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.builder.SearchSourceBuilder
@@ -293,7 +293,7 @@ class AlertService(
             when (alert.state) {
                 Alert.State.ACTIVE, Alert.State.ERROR -> {
                     listOf<DocWriteRequest<*>>(
-                        IndexRequest(alertIndex)
+                        IndexRequest(AlertIndices.ALERT_INDEX)
                             .routing(alert.monitorId)
                             .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                             .id(if (alert.id != Alert.NO_ID) alert.id else null)
@@ -304,7 +304,7 @@ class AlertService(
                     // and updated by the MonitorRunner
                     if (allowUpdatingAcknowledgedAlert) {
                         listOf<DocWriteRequest<*>>(
-                            IndexRequest(alertIndex)
+                            IndexRequest(AlertIndices.ALERT_INDEX)
                                 .routing(alert.monitorId)
                                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                                 .id(if (alert.id != Alert.NO_ID) alert.id else null)
@@ -318,7 +318,7 @@ class AlertService(
                 }
                 Alert.State.COMPLETED -> {
                     listOfNotNull<DocWriteRequest<*>>(
-                        DeleteRequest(alertIndex, alert.id)
+                        DeleteRequest(AlertIndices.ALERT_INDEX, alert.id)
                             .routing(alert.monitorId),
                         // Only add completed alert to history index if history is enabled
                         if (alertIndices.isAlertHistoryEnabled(dataSources)) {
@@ -366,7 +366,7 @@ class AlertService(
             if (alert.id != Alert.NO_ID) {
                 throw IllegalStateException("Unexpected attempt to save new alert [$alert] with an existing alert ID [${alert.id}]")
             }
-            IndexRequest(dataSources.alertsIndex)
+            IndexRequest(AlertIndices.ALERT_INDEX)
                 .routing(alert.monitorId)
                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
         }.toMutableList()

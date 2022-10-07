@@ -14,15 +14,16 @@ import org.opensearch.action.admin.cluster.state.ClusterStateRequest
 import org.opensearch.action.admin.cluster.stats.ClusterStatsRequest
 import org.opensearch.action.admin.cluster.tasks.PendingClusterTasksRequest
 import org.opensearch.action.admin.indices.recovery.RecoveryRequest
-import org.opensearch.alerting.core.model.ClusterMetricsInput
-import org.opensearch.alerting.core.model.ClusterMetricsInput.ClusterMetricType
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.json.JsonXContent
+import org.opensearch.commons.alerting.model.ClusterMetricsInput
+import org.opensearch.commons.alerting.model.ClusterMetricsInput.ClusterMetricType
+import org.opensearch.commons.alerting.util.IndexUtils.Companion.supportedClusterMetricsSettings
 
 /**
  * A class that supports storing a unique set of API paths that can be accessed by general users.
  */
-class SupportedClusterMetricsSettings {
+class SupportedClusterMetricsSettings : org.opensearch.commons.alerting.settings.SupportedClusterMetricsSettings {
     companion object {
         const val RESOURCE_FILE = "supported_json_payloads.json"
 
@@ -131,9 +132,17 @@ class SupportedClusterMetricsSettings {
          * @param clusterMetricsInput The [ClusterMetricsInput] to validate.
          * @throws IllegalArgumentException when supportedApiList does not contain the provided path.
          */
-        fun validateApiType(clusterMetricsInput: ClusterMetricsInput) {
+        fun validateApiTyped(clusterMetricsInput: ClusterMetricsInput) {
             if (!supportedApiList.keys.contains(clusterMetricsInput.clusterMetricType.defaultPath))
                 throw IllegalArgumentException("API path not in supportedApiList.")
         }
+    }
+
+    constructor() {
+        supportedClusterMetricsSettings = this
+    }
+
+    override fun validateApiType(clusterMetricsInput: ClusterMetricsInput) {
+        validateApiTyped(clusterMetricsInput)
     }
 }

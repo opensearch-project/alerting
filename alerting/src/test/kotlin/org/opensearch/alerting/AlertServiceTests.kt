@@ -9,11 +9,6 @@ import org.junit.Before
 import org.mockito.Mockito
 import org.opensearch.Version
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.model.AggregationResultBucket
-import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.BucketLevelTrigger
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.action.AlertCategory
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.Client
@@ -23,6 +18,11 @@ import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.commons.alerting.model.AggregationResultBucket
+import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.action.AlertCategory
 import org.opensearch.test.ClusterServiceUtils
 import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.threadpool.ThreadPool

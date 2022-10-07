@@ -7,15 +7,15 @@ package org.opensearch.alerting
 
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_FINDING_INDEX_PATTERN
-import org.opensearch.alerting.core.model.DocLevelMonitorInput
-import org.opensearch.alerting.core.model.DocLevelQuery
-import org.opensearch.alerting.model.DataSources
-import org.opensearch.alerting.model.action.ActionExecutionPolicy
-import org.opensearch.alerting.model.action.AlertCategory
-import org.opensearch.alerting.model.action.PerAlertActionScope
-import org.opensearch.alerting.model.action.PerExecutionActionScope
 import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
+import org.opensearch.commons.alerting.model.DataSources
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
+import org.opensearch.commons.alerting.model.DocLevelQuery
+import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
+import org.opensearch.commons.alerting.model.action.AlertCategory
+import org.opensearch.commons.alerting.model.action.PerAlertActionScope
+import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
 import org.opensearch.script.Script
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -616,47 +616,6 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
                         findingsIndex = "custom_findings_index",
                         alertsIndex = "custom_alerts_index",
                     )
-                )
-            )
-            fail("Expected create monitor to fail")
-        } catch (e: ResponseException) {
-            assertTrue(e.message!!.contains("illegal_argument_exception"))
-        }
-    }
-
-    fun `test execute monitor with non-null owner`() {
-
-        val testIndex = createTestIndex()
-        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
-        val testDoc = """{
-                "message" : "This is an error from IAD region",
-                "test_strict_date_time" : "$testTime",
-                "test_field" : "us-west-2"
-            }"""
-
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
-        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
-
-        val alertCategories = AlertCategory.values()
-        val actionExecutionScope = PerAlertActionScope(
-            actionableAlerts = (1..randomInt(alertCategories.size)).map { alertCategories[it - 1] }.toSet()
-        )
-        val actionExecutionPolicy = ActionExecutionPolicy(actionExecutionScope)
-        val actions = (0..randomInt(10)).map {
-            randomActionWithPolicy(
-                template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
-                destinationId = createDestination().id,
-                actionExecutionPolicy = actionExecutionPolicy
-            )
-        }
-
-        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = actions)
-        try {
-            createMonitor(
-                randomDocumentLevelMonitor(
-                    inputs = listOf(docLevelInput),
-                    triggers = listOf(trigger),
-                    owner = "owner"
                 )
             )
             fail("Expected create monitor to fail")

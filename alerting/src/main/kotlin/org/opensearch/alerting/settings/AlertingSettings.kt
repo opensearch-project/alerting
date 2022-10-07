@@ -16,9 +16,6 @@ import java.util.concurrent.TimeUnit
 class AlertingSettings {
 
     companion object {
-
-        const val MONITOR_MAX_INPUTS = 1
-        const val MONITOR_MAX_TRIGGERS = 10
         const val DEFAULT_MAX_ACTIONABLE_ALERT_COUNT = 50L
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(

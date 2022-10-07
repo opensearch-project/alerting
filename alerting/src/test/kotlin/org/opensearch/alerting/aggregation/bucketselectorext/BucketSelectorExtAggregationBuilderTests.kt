@@ -6,6 +6,8 @@
 package org.opensearch.alerting.aggregation.bucketselectorext
 
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
+import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtFilter
 import org.opensearch.plugins.SearchPlugin
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptType
