@@ -536,7 +536,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 if (currentMonitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
                     client.suspendUntil<Client, BulkByScrollResponse> {
                         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-                            .source(request.monitor.dataSources.queryIndex)
+                            .source(currentMonitor.dataSources.queryIndex)
                             .filter(QueryBuilders.matchQuery("monitor_id", currentMonitor.id))
                             .execute(it)
                     }
