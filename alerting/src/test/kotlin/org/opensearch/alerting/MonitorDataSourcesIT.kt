@@ -445,7 +445,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         }
     }
 
-    fun `test execute pre-existing monitorand update`() {
+    fun `test execute pre-existing monitor and update`() {
         val request = CreateIndexRequest(SCHEDULED_JOBS_INDEX).mapping(ScheduledJobIndices.scheduledJobMappings())
             .settings(Settings.builder().put("index.hidden", true).build())
         client().admin().indices().create(request)
@@ -530,8 +530,9 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val alerts = searchAlerts(monitorId)
         assertEquals(alerts.size, 1)
 
-        val customAlertsIndex = "custom_alerts_index"
         val customQueryIndex = "custom_query_index"
+        Assert.assertFalse(client().admin().cluster().state(ClusterStateRequest()).get().state.routingTable.hasIndex(customQueryIndex))
+        val customAlertsIndex = "custom_alerts_index"
         val customFindingsIndex = "custom_findings_index"
         val updateMonitorResponse = updateMonitor(
             monitor.copy(
@@ -548,9 +549,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertNotNull(updateMonitorResponse)
         Assert.assertEquals(updateMonitorResponse!!.monitor.owner, "security_analytics_plugin")
         indexDoc(index, "2", testDoc)
-        if (updateMonitorResponse != null) {
-            executeMonitorResponse = executeMonitor(updateMonitorResponse.monitor, monitorId, false)
-        }
+        executeMonitorResponse = executeMonitor(updateMonitorResponse.monitor, monitorId, false)
+        Assert.assertTrue(client().admin().cluster().state(ClusterStateRequest()).get().state.routingTable.hasIndex(customQueryIndex))
         val findings = searchFindings(monitorId, customFindingsIndex)
         assertEquals("Findings saved for test monitor", 1, findings.size)
         assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("2"))
