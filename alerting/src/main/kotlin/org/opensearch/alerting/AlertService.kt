@@ -293,7 +293,7 @@ class AlertService(
             when (alert.state) {
                 Alert.State.ACTIVE, Alert.State.ERROR -> {
                     listOf<DocWriteRequest<*>>(
-                        IndexRequest(AlertIndices.ALERT_INDEX)
+                        IndexRequest(alertIndex)
                             .routing(alert.monitorId)
                             .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                             .id(if (alert.id != Alert.NO_ID) alert.id else null)
@@ -304,7 +304,7 @@ class AlertService(
                     // and updated by the MonitorRunner
                     if (allowUpdatingAcknowledgedAlert) {
                         listOf<DocWriteRequest<*>>(
-                            IndexRequest(AlertIndices.ALERT_INDEX)
+                            IndexRequest(alertIndex)
                                 .routing(alert.monitorId)
                                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                                 .id(if (alert.id != Alert.NO_ID) alert.id else null)
@@ -318,7 +318,7 @@ class AlertService(
                 }
                 Alert.State.COMPLETED -> {
                     listOfNotNull<DocWriteRequest<*>>(
-                        DeleteRequest(AlertIndices.ALERT_INDEX, alert.id)
+                        DeleteRequest(alertIndex, alert.id)
                             .routing(alert.monitorId),
                         // Only add completed alert to history index if history is enabled
                         if (alertIndices.isAlertHistoryEnabled(dataSources)) {
@@ -366,7 +366,7 @@ class AlertService(
             if (alert.id != Alert.NO_ID) {
                 throw IllegalStateException("Unexpected attempt to save new alert [$alert] with an existing alert ID [${alert.id}]")
             }
-            IndexRequest(AlertIndices.ALERT_INDEX)
+            IndexRequest(dataSources.alertsIndex)
                 .routing(alert.monitorId)
                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
         }.toMutableList()
