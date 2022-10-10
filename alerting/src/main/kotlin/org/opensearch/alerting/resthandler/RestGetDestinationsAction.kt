@@ -9,9 +9,9 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetDestinationsRequest
-import org.opensearch.alerting.model.Table
 import org.opensearch.alerting.util.context
 import org.opensearch.client.node.NodeClient
+import org.opensearch.commons.alerting.model.Table
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.RestHandler.ReplacedRoute

@@ -12,6 +12,7 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchSecurityException
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
+import org.opensearch.action.ActionRequest
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
 import org.opensearch.action.admin.indices.get.GetIndexRequest
 import org.opensearch.action.admin.indices.get.GetIndexResponse
@@ -26,17 +27,8 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.DocumentLevelMonitorRunner
-import org.opensearch.alerting.action.IndexMonitorAction
-import org.opensearch.alerting.action.IndexMonitorRequest
-import org.opensearch.alerting.action.IndexMonitorResponse
 import org.opensearch.alerting.core.ScheduledJobIndices
-import org.opensearch.alerting.core.model.DocLevelMonitorInput
-import org.opensearch.alerting.core.model.DocLevelMonitorInput.Companion.DOC_LEVEL_INPUT_FIELD
-import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
-import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.model.AlertingConfigAccessor.Companion.getMonitorMetadata
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
@@ -61,7 +53,17 @@ import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.IndexMonitorRequest
+import org.opensearch.commons.alerting.action.IndexMonitorResponse
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput.Companion.DOC_LEVEL_INPUT_FIELD
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
+import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.utils.recreateObject
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
@@ -86,8 +88,8 @@ class TransportIndexMonitorAction @Inject constructor(
     val clusterService: ClusterService,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry
-) : HandledTransportAction<IndexMonitorRequest, IndexMonitorResponse>(
-    IndexMonitorAction.NAME, transportService, actionFilters, ::IndexMonitorRequest
+) : HandledTransportAction<ActionRequest, IndexMonitorResponse>(
+    AlertingActions.INDEX_MONITOR_ACTION_NAME, transportService, actionFilters, ::IndexMonitorRequest
 ),
     SecureTransportAction {
 
@@ -107,18 +109,20 @@ class TransportIndexMonitorAction @Inject constructor(
         listenFilterBySettingChange(clusterService)
     }
 
-    override fun doExecute(task: Task, request: IndexMonitorRequest, actionListener: ActionListener<IndexMonitorResponse>) {
+    override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<IndexMonitorResponse>) {
+        val transformedRequest = request as? IndexMonitorRequest
+            ?: recreateObject(request) { IndexMonitorRequest(it) }
         val user = readUserFromThreadContext(client)
 
         if (!validateUserBackendRoles(user, actionListener)) {
             return
         }
 
-        if (!isADMonitor(request.monitor)) {
-            checkIndicesAndExecute(client, actionListener, request, user)
+        if (!isADMonitor(transformedRequest.monitor)) {
+            checkIndicesAndExecute(client, actionListener, transformedRequest, user)
         } else {
             // check if user has access to any anomaly detector for AD monitor
-            checkAnomalyDetectorAndExecute(client, actionListener, request, user)
+            checkAnomalyDetectorAndExecute(client, actionListener, transformedRequest, user)
         }
     }
 
@@ -323,12 +327,12 @@ class TransportIndexMonitorAction @Inject constructor(
                 trigger.actions.forEach { action ->
                     if (action.throttle != null) {
                         require(
-                            TimeValue(Duration.of(action.throttle.value.toLong(), action.throttle.unit).toMillis())
+                            TimeValue(Duration.of(action.throttle!!.value.toLong(), action.throttle!!.unit).toMillis())
                                 .compareTo(maxValue) <= 0,
                             { "Can only set throttle period less than or equal to $maxValue" }
                         )
                         require(
-                            TimeValue(Duration.of(action.throttle.value.toLong(), action.throttle.unit).toMillis())
+                            TimeValue(Duration.of(action.throttle!!.value.toLong(), action.throttle!!.unit).toMillis())
                                 .compareTo(minValue) >= 0,
                             { "Can only set throttle period greater than or equal to $minValue" }
                         )
@@ -343,7 +347,7 @@ class TransportIndexMonitorAction @Inject constructor(
         private fun onSearchResponse(response: SearchResponse) {
             val totalHits = response.hits.totalHits?.value
             if (totalHits != null && totalHits >= maxMonitors) {
-                log.error("This request would create more than the allowed monitors [$maxMonitors].")
+                log.info("This request would create more than the allowed monitors [$maxMonitors].")
                 actionListener.onFailure(
                     AlertingException.wrap(
                         IllegalArgumentException(
@@ -364,7 +368,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 prepareMonitorIndexing()
                 IndexUtils.scheduledJobIndexUpdated()
             } else {
-                log.error("Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged.")
+                log.info("Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged.")
                 actionListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException(
@@ -381,7 +385,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 IndexUtils.scheduledJobIndexUpdated()
                 prepareMonitorIndexing()
             } else {
-                log.error("Update ${ScheduledJob.SCHEDULED_JOBS_INDEX} mappings call not acknowledged.")
+                log.info("Update ${ScheduledJob.SCHEDULED_JOBS_INDEX} mappings call not acknowledged.")
                 actionListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException(
@@ -407,6 +411,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
                 val failureReasons = checkShardsFailure(indexResponse)
                 if (failureReasons != null) {
+                    log.info(failureReasons.toString())
                     actionListener.onFailure(
                         AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), indexResponse.status()))
                     )
@@ -432,7 +437,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 actionListener.onResponse(
                     IndexMonitorResponse(
                         indexResponse.id, indexResponse.version, indexResponse.seqNo,
-                        indexResponse.primaryTerm, RestStatus.CREATED, request.monitor
+                        indexResponse.primaryTerm, request.monitor
                     )
                 )
             } catch (t: Exception) {
@@ -545,7 +550,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 actionListener.onResponse(
                     IndexMonitorResponse(
                         indexResponse.id, indexResponse.version, indexResponse.seqNo,
-                        indexResponse.primaryTerm, RestStatus.CREATED, request.monitor
+                        indexResponse.primaryTerm, request.monitor
                     )
                 )
             } catch (t: Exception) {

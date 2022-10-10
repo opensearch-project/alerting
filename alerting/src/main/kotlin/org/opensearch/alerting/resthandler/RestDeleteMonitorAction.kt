@@ -8,11 +8,10 @@ import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.alerting.action.DeleteMonitorAction
-import org.opensearch.alerting.action.DeleteMonitorRequest
-import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.util.REFRESH
 import org.opensearch.client.node.NodeClient
+import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.DeleteMonitorRequest
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.RestHandler.ReplacedRoute
@@ -60,7 +59,7 @@ class RestDeleteMonitorAction : BaseRestHandler() {
         val deleteMonitorRequest = DeleteMonitorRequest(monitorId, refreshPolicy)
 
         return RestChannelConsumer { channel ->
-            client.execute(DeleteMonitorAction.INSTANCE, deleteMonitorRequest, RestToXContentListener(channel))
+            client.execute(AlertingActions.DELETE_MONITOR_ACTION_TYPE, deleteMonitorRequest, RestToXContentListener(channel))
         }
     }
 }

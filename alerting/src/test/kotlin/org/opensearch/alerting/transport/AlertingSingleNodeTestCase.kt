@@ -10,28 +10,25 @@ import org.opensearch.action.admin.indices.refresh.RefreshAction
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.alerting.action.DeleteMonitorAction
-import org.opensearch.alerting.action.DeleteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorResponse
-import org.opensearch.alerting.action.GetFindingsAction
-import org.opensearch.alerting.action.GetFindingsRequest
-import org.opensearch.alerting.action.GetFindingsResponse
 import org.opensearch.alerting.action.GetMonitorAction
 import org.opensearch.alerting.action.GetMonitorRequest
-import org.opensearch.alerting.action.IndexMonitorAction
-import org.opensearch.alerting.action.IndexMonitorRequest
-import org.opensearch.alerting.action.IndexMonitorResponse
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.Finding
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.Table
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent
+import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.GetFindingsRequest
+import org.opensearch.commons.alerting.action.GetFindingsResponse
+import org.opensearch.commons.alerting.action.IndexMonitorRequest
+import org.opensearch.commons.alerting.action.IndexMonitorResponse
+import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.Finding
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.Table
 import org.opensearch.index.query.TermQueryBuilder
 import org.opensearch.index.reindex.ReindexPlugin
 import org.opensearch.index.seqno.SequenceNumbers
@@ -89,7 +86,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
             method = RestRequest.Method.POST,
             monitor = monitor
         )
-        return client().execute(IndexMonitorAction.INSTANCE, request).actionGet()
+        return client().execute(AlertingActions.INDEX_MONITOR_ACTION_TYPE, request).actionGet()
     }
 
     protected fun updateMonitor(monitor: Monitor, monitorId: String): IndexMonitorResponse? {
@@ -101,7 +98,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
             method = RestRequest.Method.PUT,
             monitor = monitor
         )
-        return client().execute(IndexMonitorAction.INSTANCE, request).actionGet()
+        return client().execute(AlertingActions.INDEX_MONITOR_ACTION_TYPE, request).actionGet()
     }
 
     protected fun searchAlerts(id: String, indices: String = AlertIndices.ALERT_INDEX, refresh: Boolean = true): List<Alert> {
@@ -156,7 +153,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
             monitorId,
             findingIndexName
         )
-        val getFindingsResponse: GetFindingsResponse = client().execute(GetFindingsAction.INSTANCE, getFindingsRequest).get()
+        val getFindingsResponse: GetFindingsResponse = client().execute(AlertingActions.GET_FINDINGS_ACTION_TYPE, getFindingsRequest).get()
 
         return getFindingsResponse.findings.map { it.finding }.toList()
     }
@@ -168,13 +165,6 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     ) = client().execute(
         GetMonitorAction.INSTANCE,
         GetMonitorRequest(monitorId, version, RestRequest.Method.GET, fetchSourceContext)
-    ).get()
-
-    protected fun deleteMonitor(
-        monitorId: String,
-    ) = client().execute(
-        DeleteMonitorAction.INSTANCE,
-        DeleteMonitorRequest(monitorId, WriteRequest.RefreshPolicy.IMMEDIATE)
     ).get()
 
     override fun getPlugins(): List<Class<out Plugin>> {

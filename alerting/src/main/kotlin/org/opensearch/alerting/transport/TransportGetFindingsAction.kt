@@ -12,22 +12,17 @@ import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.apache.lucene.search.join.ScoreMode
 import org.opensearch.action.ActionListener
+import org.opensearch.action.ActionRequest
 import org.opensearch.action.get.MultiGetRequest
 import org.opensearch.action.get.MultiGetResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.alerting.action.GetFindingsAction
-import org.opensearch.alerting.action.GetFindingsRequest
-import org.opensearch.alerting.action.GetFindingsResponse
 import org.opensearch.alerting.action.GetMonitorAction
 import org.opensearch.alerting.action.GetMonitorRequest
 import org.opensearch.alerting.action.GetMonitorResponse
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_FINDING_INDEX_PATTERN
-import org.opensearch.alerting.model.Finding
-import org.opensearch.alerting.model.FindingDocument
-import org.opensearch.alerting.model.FindingWithDocs
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
@@ -42,6 +37,13 @@ import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.GetFindingsRequest
+import org.opensearch.commons.alerting.action.GetFindingsResponse
+import org.opensearch.commons.alerting.model.Finding
+import org.opensearch.commons.alerting.model.FindingDocument
+import org.opensearch.commons.alerting.model.FindingWithDocs
+import org.opensearch.commons.utils.recreateObject
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestRequest
@@ -62,8 +64,8 @@ class TransportGetFindingsSearchAction @Inject constructor(
     actionFilters: ActionFilters,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry
-) : HandledTransportAction<GetFindingsRequest, GetFindingsResponse> (
-    GetFindingsAction.NAME, transportService, actionFilters, ::GetFindingsRequest
+) : HandledTransportAction<ActionRequest, GetFindingsResponse> (
+    AlertingActions.GET_FINDINGS_ACTION_NAME, transportService, actionFilters, ::GetFindingsRequest
 ),
     SecureTransportAction {
 
@@ -75,9 +77,11 @@ class TransportGetFindingsSearchAction @Inject constructor(
 
     override fun doExecute(
         task: Task,
-        getFindingsRequest: GetFindingsRequest,
+        request: ActionRequest,
         actionListener: ActionListener<GetFindingsResponse>
     ) {
+        val getFindingsRequest = request as? GetFindingsRequest
+            ?: recreateObject(request) { GetFindingsRequest(it) }
         val tableProp = getFindingsRequest.table
 
         val sortBuilder = SortBuilders
@@ -144,13 +148,13 @@ class TransportGetFindingsSearchAction @Inject constructor(
 
         if (findingsRequest.findingIndex.isNullOrEmpty() == false) {
             // findingIndex has highest priority, so use that if available
-            indexName = findingsRequest.findingIndex
+            indexName = findingsRequest.findingIndex!!
         } else if (findingsRequest.monitorId.isNullOrEmpty() == false) {
             // second best is monitorId.
             // We will use it to fetch monitor and then read indexName from dataSources field of monitor
             withContext(Dispatchers.IO) {
                 val getMonitorRequest = GetMonitorRequest(
-                    findingsRequest.monitorId,
+                    findingsRequest.monitorId!!,
                     -3L,
                     RestRequest.Method.GET,
                     FetchSourceContext.FETCH_SOURCE

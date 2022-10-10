@@ -16,15 +16,11 @@ import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.search.ShardSearchFailure
 import org.opensearch.client.OpenSearchClient
-import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.util.concurrent.ThreadContext
 import org.opensearch.common.util.concurrent.ThreadContext.StoredContext
 import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentHelper
-import org.opensearch.common.xcontent.XContentParser
-import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.InjectSecurity
 import org.opensearch.commons.authuser.User
@@ -36,7 +32,6 @@ import org.opensearch.rest.RestStatus.BAD_GATEWAY
 import org.opensearch.rest.RestStatus.GATEWAY_TIMEOUT
 import org.opensearch.rest.RestStatus.SERVICE_UNAVAILABLE
 import org.opensearch.search.builder.SearchSourceBuilder
-import java.time.Instant
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -142,42 +137,11 @@ fun SearchResponse.firstFailureOrNull(): ShardSearchFailure? {
     return shardFailures?.getOrNull(0)
 }
 
-fun XContentParser.instant(): Instant? {
-    return when {
-        currentToken() == XContentParser.Token.VALUE_NULL -> null
-        currentToken().isValue -> Instant.ofEpochMilli(longValue())
-        else -> {
-            XContentParserUtils.throwUnknownToken(currentToken(), tokenLocation)
-            null // unreachable
-        }
-    }
-}
-
-fun XContentBuilder.optionalTimeField(name: String, instant: Instant?): XContentBuilder {
-    if (instant == null) {
-        return nullField(name)
-    }
-    // second name as readableName should be different than first name
-    return this.timeField(name, "${name}_in_millis", instant.toEpochMilli())
-}
-
-fun XContentBuilder.optionalUserField(name: String, user: User?): XContentBuilder {
-    if (user == null) {
-        return nullField(name)
-    }
-    return this.field(name, user)
-}
-
 fun addFilter(user: User, searchSourceBuilder: SearchSourceBuilder, fieldName: String) {
     val filterBackendRoles = QueryBuilders.termsQuery(fieldName, user.backendRoles)
     val queryBuilder = searchSourceBuilder.query() as BoolQueryBuilder
     searchSourceBuilder.query(queryBuilder.filter(filterBackendRoles))
 }
-
-/**
- * Extension function for ES 6.3 and above that duplicates the ES 6.2 XContentBuilder.string() method.
- */
-fun XContentBuilder.string(): String = BytesReference.bytes(this).utf8ToString()
 
 /**
  * Converts [OpenSearchClient] methods that take a callback into a kotlin suspending function.
