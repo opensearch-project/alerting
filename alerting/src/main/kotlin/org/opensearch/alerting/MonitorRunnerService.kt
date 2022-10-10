@@ -154,7 +154,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     fun registerDestinationSettings(): MonitorRunnerService {
         monitorCtx.destinationSettings = loadDestinationSettings(monitorCtx.settings!!)
         monitorCtx.destinationContextFactory =
-            DestinationContextFactory(monitorCtx.client!!, monitorCtx.xContentRegistry!!, monitorCtx.destinationSettings!!)
+            DestinationContextFactory(monitorCtx.client!!, monitorCtx.xContentRegistry!!, monitorCtx.destinationSettings!!, monitorCtx.settings!!.get("cluster.name"))
         return this
     }
 
