@@ -365,6 +365,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             lastUpdateTime = Instant.now(),
             chime = null,
             slack = null,
+            sns = null,
             customWebhook = null,
             email = null
         )
@@ -380,7 +381,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             chime = null,
             slack = slack,
             customWebhook = null,
-            email = null
+            email = null,
+            sns = null
         )
     }
 
@@ -394,7 +396,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             chime = chime,
             slack = null,
             customWebhook = null,
-            email = null
+            email = null,
+            sns = null
         )
     }
 
@@ -419,7 +422,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             chime = null,
             slack = null,
             customWebhook = customWebhook,
-            email = null
+            email = null,
+            sns = null
         )
     }
 
@@ -1075,6 +1079,12 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             .filter { destinationType -> destinationType != DestinationType.EMAIL }
             .joinToString(prefix = "[", postfix = "]") { string -> "\"$string\"" }
         client().updateSettings(DestinationSettings.ALLOW_LIST.key, allowedDestinations)
+    }
+
+    fun isEmailAllowed(): Boolean {
+        val settings = client().getClusterSettings(mapOf("include_defaults" to "true"))
+        val allowedList = (settings.opendistroSettings()?.get("destination") as Map<String, List<String>>)?.get("allow_list")
+        return allowedList?.contains("email") ?: true
     }
 
     fun createUser(name: String, passwd: String, backendRoles: Array<String>) {
