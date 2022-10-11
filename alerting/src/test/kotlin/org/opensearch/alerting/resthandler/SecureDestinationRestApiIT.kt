@@ -72,7 +72,8 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
             chime = chime,
             slack = null,
             customWebhook = null,
-            email = null
+            email = null,
+            sns = null
         )
         val createdDestination = createDestination(destination = destination)
         assertEquals("Incorrect destination name", createdDestination.name, "test")
@@ -90,7 +91,8 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
             chime = null,
             slack = slack,
             customWebhook = null,
-            email = null
+            email = null,
+            sns = null
         )
 
         // 1. create a destination as admin user
@@ -117,7 +119,8 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
             chime = null,
             slack = slack,
             customWebhook = null,
-            email = null
+            email = null,
+            sns = null
         )
 
         // 1. create a destination as admin user
