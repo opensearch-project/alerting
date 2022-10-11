@@ -107,6 +107,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         val updatedLastRunContext = lastRunContext.toMutableMap()
 
+        val queryIdToDocIds = mutableMapOf<String, MutableSet<String>>()
         val queryToDocIds = mutableMapOf<DocLevelQuery, MutableSet<String>>()
         val inputRunResults = mutableMapOf<String, MutableSet<String>>()
         val docsToQueries = mutableMapOf<String, MutableList<String>>()
@@ -160,18 +161,13 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     val matchedQueriesForDocs = getMatchedQueries(monitorCtx, matchingDocs.map { it.second }, monitor, indexName)
 
                     matchedQueriesForDocs.forEach { hit ->
-                        val (id, query) = Pair(
-                            hit.id.replace("_${indexName}_${monitor.id}", ""),
-                            ((hit.sourceAsMap["query"] as HashMap<*, *>)["query_string"] as HashMap<*, *>)["query"].toString()
-                                .replace("_${indexName}_${monitor.id}", "")
-                        )
-                        val docLevelQuery = DocLevelQuery(id, id, query)
+                        val id = hit.id.replace("_${indexName}_${monitor.id}", "")
 
                         val docIndices = hit.field("_percolator_document_slot").values.map { it.toString().toInt() }
                         docIndices.forEach { idx ->
                             val docIndex = "${matchingDocs[idx].first}|$indexName"
-                            queryToDocIds.getOrPut(docLevelQuery) { mutableSetOf() }.add(docIndex)
-                            inputRunResults.getOrPut(docLevelQuery.id) { mutableSetOf() }.add(docIndex)
+                            queryIdToDocIds.getOrPut(id) { mutableSetOf() }.add(docIndex)
+                            inputRunResults.getOrPut(id) { mutableSetOf() }.add(docIndex)
                             docsToQueries.getOrPut(docIndex) { mutableListOf() }.add(id)
                         }
                     }
@@ -184,6 +180,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         }
 
         monitorResult = monitorResult.copy(inputResults = InputRunResults(listOf(inputRunResults)))
+
+        queries.forEach {
+            if (queryIdToDocIds.containsKey(it.id)) {
+                queryToDocIds[it] = queryIdToDocIds[it.id]!!
+            }
+        }
 
         val idQueryMap: Map<String, DocLevelQuery> = queries.associateBy { it.id }
 
