@@ -107,7 +107,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         val updatedLastRunContext = lastRunContext.toMutableMap()
 
-        val queryIdToDocIds = mutableMapOf<String, MutableSet<String>>()
         val queryToDocIds = mutableMapOf<DocLevelQuery, MutableSet<String>>()
         val inputRunResults = mutableMapOf<String, MutableSet<String>>()
         val docsToQueries = mutableMapOf<String, MutableList<String>>()
@@ -166,7 +165,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                         val docIndices = hit.field("_percolator_document_slot").values.map { it.toString().toInt() }
                         docIndices.forEach { idx ->
                             val docIndex = "${matchingDocs[idx].first}|$indexName"
-                            queryIdToDocIds.getOrPut(id) { mutableSetOf() }.add(docIndex)
                             inputRunResults.getOrPut(id) { mutableSetOf() }.add(docIndex)
                             docsToQueries.getOrPut(docIndex) { mutableListOf() }.add(id)
                         }
@@ -181,9 +179,14 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         monitorResult = monitorResult.copy(inputResults = InputRunResults(listOf(inputRunResults)))
 
+        /*
+         populate the map queryToDocIds with pairs of <DocLevelQuery object from queries in monitor metadata &
+         list of matched docId from inputRunResults>
+         this fixes the issue of passing id, name, tags fields of DocLevelQuery object correctly to TriggerExpressionParser
+         */
         queries.forEach {
-            if (queryIdToDocIds.containsKey(it.id)) {
-                queryToDocIds[it] = queryIdToDocIds[it.id]!!
+            if (inputRunResults.containsKey(it.id)) {
+                queryToDocIds[it] = inputRunResults[it.id]!!
             }
         }
 
