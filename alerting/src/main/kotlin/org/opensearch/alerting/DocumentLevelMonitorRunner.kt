@@ -162,18 +162,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     val matchedQueriesForDocs = getMatchedQueries(monitorCtx, matchingDocs.map { it.second }, monitor, indexName)
 
                     matchedQueriesForDocs.forEach { hit ->
-                        val (id, query) = Pair(
-                            hit.id.replace("_${indexName}_${monitor.id}", ""),
-                            ((hit.sourceAsMap["query"] as HashMap<*, *>)["query_string"] as HashMap<*, *>)["query"].toString()
-                                .replace("_${indexName}_${monitor.id}", "")
-                        )
-                        val docLevelQuery = DocLevelQuery(id, id, query)
+                        val id = hit.id.replace("_${indexName}_${monitor.id}", "")
 
                         val docIndices = hit.field("_percolator_document_slot").values.map { it.toString().toInt() }
                         docIndices.forEach { idx ->
                             val docIndex = "${matchingDocs[idx].first}|$indexName"
-                            queryToDocIds.getOrPut(docLevelQuery) { mutableSetOf() }.add(docIndex)
-                            inputRunResults.getOrPut(docLevelQuery.id) { mutableSetOf() }.add(docIndex)
+                            inputRunResults.getOrPut(id) { mutableSetOf() }.add(docIndex)
                             docsToQueries.getOrPut(docIndex) { mutableListOf() }.add(id)
                         }
                     }
@@ -186,6 +180,17 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         }
 
         monitorResult = monitorResult.copy(inputResults = InputRunResults(listOf(inputRunResults)))
+
+        /*
+         populate the map queryToDocIds with pairs of <DocLevelQuery object from queries in monitor metadata &
+         list of matched docId from inputRunResults>
+         this fixes the issue of passing id, name, tags fields of DocLevelQuery object correctly to TriggerExpressionParser
+         */
+        queries.forEach {
+            if (inputRunResults.containsKey(it.id)) {
+                queryToDocIds[it] = inputRunResults[it.id]!!
+            }
+        }
 
         val idQueryMap: Map<String, DocLevelQuery> = queries.associateBy { it.id }
 

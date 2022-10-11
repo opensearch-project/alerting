@@ -139,6 +139,46 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("5"))
     }
 
+    fun `test execute monitor with tag as trigger condition generates alerts and findings`() {
+        val testIndex = createTestIndex()
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", tags = listOf("test_tag"))
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = Script("query[tag=test_tag]"))
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex, "5", testDoc)
+
+        val response = executeMonitor(monitor.id)
+
+        val output = entityAsMap(response)
+
+        assertEquals(monitor.name, output["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
+        assertEquals("Incorrect search result", 2, matchingDocsToQuery.size)
+        assertTrue("Incorrect search result", matchingDocsToQuery.containsAll(listOf("1|$testIndex", "5|$testIndex")))
+
+        val alerts = searchAlertsWithFilter(monitor)
+        assertEquals("Alert saved for test monitor", 2, alerts.size)
+
+        val findings = searchFindings(monitor)
+        assertEquals("Findings saved for test monitor", 2, findings.size)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
+        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("5"))
+    }
+
     fun `test execute monitor generates alerts and findings with per alert execution for actions`() {
         val testIndex = createTestIndex()
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
