@@ -775,6 +775,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 lastUpdateTime = Instant.now(),
                 chime = null,
                 slack = null,
+                sns = null,
                 customWebhook = null,
                 email = email
             )
@@ -803,6 +804,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 lastUpdateTime = Instant.now(),
                 chime = null,
                 slack = null,
+                sns = null,
                 customWebhook = customWebhook,
                 email = null
             )
@@ -979,6 +981,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                     lastUpdateTime = Instant.now(),
                     chime = null,
                     slack = null,
+                    sns = null,
                     customWebhook = customWebhook,
                     email = null
                 )

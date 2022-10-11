@@ -32,7 +32,8 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             chime = chime,
             slack = null,
             customWebhook = null,
-            email = null
+            email = null,
+            sns = null
         )
         val createdDestination = createDestination(destination = destination)
         assertEquals("Incorrect destination name", createdDestination.name, "test")
@@ -50,7 +51,8 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             chime = null,
             slack = null,
             customWebhook = customWebhook,
-            email = null
+            email = null,
+            sns = null
         )
         val createdDestination = createDestination(destination = destination)
         assertEquals("Incorrect destination name", createdDestination.name, "test")
@@ -71,7 +73,8 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             chime = null,
             slack = null,
             customWebhook = customWebhook,
-            email = null
+            email = null,
+            sns = null
         )
         val createdDestination = createDestination(destination = destination)
         assertEquals("Incorrect destination name", createdDestination.name, "test")
@@ -95,7 +98,8 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             chime = null,
             slack = null,
             customWebhook = null,
-            email = email
+            email = email,
+            sns = null
         )
 
         val createdDestination = createDestination(destination = destination)
@@ -132,7 +136,8 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             chime = null,
             slack = slack,
             customWebhook = null,
-            email = null
+            email = null,
+            sns = null
         )
 
         val inputMap = HashMap<String, Any>()
@@ -164,7 +169,8 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             chime = null,
             slack = slack,
             customWebhook = null,
-            email = null
+            email = null,
+            sns = null
         )
 
         val inputMap = HashMap<String, Any>()

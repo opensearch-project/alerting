@@ -106,7 +106,7 @@ class DestinationTests : OpenSearchTestCase() {
     fun `test chime destination create using stream`() {
         val chimeDest = Destination(
             "1234", 0L, 1, 1, 1, DestinationType.CHIME, "TestChimeDest",
-            randomUser(), Instant.now(), Chime("test.com"), null, null, null
+            randomUser(), Instant.now(), Chime("test.com"), null, null, null, null
         )
 
         val out = BytesStreamOutput()
@@ -130,7 +130,7 @@ class DestinationTests : OpenSearchTestCase() {
     fun `test slack destination create using stream`() {
         val slackDest = Destination(
             "2345", 1L, 2, 1, 1, DestinationType.SLACK, "TestSlackDest",
-            randomUser(), Instant.now(), null, Slack("mytest.com"), null, null
+            randomUser(), Instant.now(), null, Slack("mytest.com"), null, null, null
         )
 
         val out = BytesStreamOutput()
@@ -162,6 +162,7 @@ class DestinationTests : OpenSearchTestCase() {
             "TestSlackDest",
             randomUser(),
             Instant.now(),
+            null,
             null,
             null,
             CustomWebhook(
@@ -207,6 +208,7 @@ class DestinationTests : OpenSearchTestCase() {
             "TestSlackDest",
             randomUser(),
             Instant.now(),
+            null,
             null,
             null,
             CustomWebhook(
@@ -259,6 +261,7 @@ class DestinationTests : OpenSearchTestCase() {
             "TestEmailDest",
             randomUser(),
             Instant.now(),
+            null,
             null,
             null,
             null,

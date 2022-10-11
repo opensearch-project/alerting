@@ -45,6 +45,7 @@ class GetDestinationsResponseTests : OpenSearchTestCase() {
             null,
             slack,
             null,
+            null,
             null
         )
 

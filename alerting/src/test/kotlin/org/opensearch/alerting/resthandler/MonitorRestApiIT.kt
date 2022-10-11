@@ -269,6 +269,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
                 chime = chime,
                 slack = null,
                 customWebhook = null,
+                sns = null,
                 email = null
             )
             val chimeDestination = createDestination(destination = destination)
@@ -1033,6 +1034,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             chime = chime,
             slack = null,
             customWebhook = null,
+            sns = null,
             email = null
         )
         createDestination(destination)
