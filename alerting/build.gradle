@@ -36,6 +36,7 @@ publishing {
             pom {
                 name = "opensearch-alerting"
                 description = "OpenSearch Alerting plugin"
+                groupId = "org.opensearch.plugin"
                 licenses {
                     license {
                         name = "The Apache License, Version 2.0"
