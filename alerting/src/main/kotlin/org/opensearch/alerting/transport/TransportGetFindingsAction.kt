@@ -104,6 +104,12 @@ class TransportGetFindingsSearchAction @Inject constructor(
         if (!getFindingsRequest.findingId.isNullOrBlank())
             queryBuilder.filter(QueryBuilders.termQuery("_id", getFindingsRequest.findingId))
 
+        if (getFindingsRequest.monitorId != null) {
+            queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getFindingsRequest.monitorId))
+        } else if (getFindingsRequest.monitorIds.isNullOrEmpty() == false) {
+            queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getFindingsRequest.monitorIds))
+        }
+
         if (!tableProp.searchString.isNullOrBlank()) {
             queryBuilder
                 .should(

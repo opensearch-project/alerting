@@ -101,6 +101,8 @@ class TransportGetAlertsAction @Inject constructor(
 
         if (getAlertsRequest.monitorId != null) {
             queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getAlertsRequest.monitorId))
+        } else if (getAlertsRequest.monitorIds.isNullOrEmpty() == false) {
+            queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getAlertsRequest.monitorIds))
         }
         if (!tableProp.searchString.isNullOrBlank()) {
             queryBuilder
