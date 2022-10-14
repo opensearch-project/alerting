@@ -180,6 +180,8 @@ class AlertingSettings {
             override fun validate(value: Int) {}
 
             override fun validate(value: Int, settings: Map<Setting<*>, Any>) {
+                if (MonitorRunnerService.monitorCtx.totalMaxActionsAcrossTriggers == UNBOUNDED_ACTIONS_FOR_TRIGGERS)
+                    return
                 if (value <= MonitorRunnerService.monitorCtx.totalMaxActionsAcrossTriggers)
                     throw IllegalArgumentException(
                         "Updating total max actions across triggers to a lower value than the one currently set is not permitted."
@@ -198,6 +200,10 @@ class AlertingSettings {
             override fun validate(value: Int) {}
 
             override fun validate(value: Int, settings: Map<Setting<*>, Any>) {
+                if (MonitorRunnerService.monitorCtx.totalMaxActionsAcrossTriggers == UNBOUNDED_ACTIONS_FOR_TRIGGERS
+                        || MonitorRunnerService.monitorCtx.maxActionsPerTrigger == UNBOUNDED_ACTIONS_FOR_TRIGGERS)
+                    return
+
                 if (value > MonitorRunnerService.monitorCtx.totalMaxActionsAcrossTriggers)
                     throw IllegalArgumentException(
                         "Updating maximum amount of actions per trigger to a bigger value than the maximum allowed actions across triggers."
