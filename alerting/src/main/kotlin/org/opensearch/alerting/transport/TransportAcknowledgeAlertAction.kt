@@ -19,9 +19,6 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.update.UpdateRequest
-import org.opensearch.alerting.action.AcknowledgeAlertAction
-import org.opensearch.alerting.action.AcknowledgeAlertRequest
-import org.opensearch.alerting.action.AcknowledgeAlertResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
@@ -37,8 +34,12 @@ import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
+import org.opensearch.commons.alerting.action.AcknowledgeAlertResponse
+import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.util.optionalTimeField
+import org.opensearch.commons.utils.recreateObject
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
@@ -56,7 +57,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<AcknowledgeAlertRequest, AcknowledgeAlertResponse>(
-    AcknowledgeAlertAction.NAME, transportService, actionFilters, ::AcknowledgeAlertRequest
+    AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_NAME, transportService, actionFilters, ::AcknowledgeAlertRequest
 ) {
 
     @Volatile private var isAlertHistoryEnabled = AlertingSettings.ALERT_HISTORY_ENABLED.get(settings)
@@ -65,7 +66,13 @@ class TransportAcknowledgeAlertAction @Inject constructor(
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERT_HISTORY_ENABLED) { isAlertHistoryEnabled = it }
     }
 
-    override fun doExecute(task: Task, request: AcknowledgeAlertRequest, actionListener: ActionListener<AcknowledgeAlertResponse>) {
+    override fun doExecute(
+        task: Task,
+        acknowledgeAlertRequest: AcknowledgeAlertRequest,
+        actionListener: ActionListener<AcknowledgeAlertResponse>
+    ) {
+        val request = acknowledgeAlertRequest as? AcknowledgeAlertRequest
+            ?: recreateObject(acknowledgeAlertRequest) { AcknowledgeAlertRequest(it) }
         client.threadPool().threadContext.stashContext().use {
             scope.launch {
                 AcknowledgeHandler(client, actionListener, request).start()
