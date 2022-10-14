@@ -18,8 +18,6 @@ import java.util.concurrent.TimeUnit
 class AlertingSettings {
 
     companion object {
-        const val MONITOR_MAX_INPUTS = 1
-        const val MONITOR_MAX_TRIGGERS = 10
         const val DEFAULT_MAX_ACTIONABLE_ALERT_COUNT = 50L
         const val UNBOUNDED_ACTIONS_FOR_TRIGGERS = -1
         const val DEFAULT_TOTAL_MAX_ACTIONS_PER_TRIGGER = UNBOUNDED_ACTIONS_FOR_TRIGGERS
@@ -200,8 +198,9 @@ class AlertingSettings {
             override fun validate(value: Int) {}
 
             override fun validate(value: Int, settings: Map<Setting<*>, Any>) {
-                if (MonitorRunnerService.monitorCtx.totalMaxActionsAcrossTriggers == UNBOUNDED_ACTIONS_FOR_TRIGGERS
-                        || MonitorRunnerService.monitorCtx.maxActionsPerTrigger == UNBOUNDED_ACTIONS_FOR_TRIGGERS)
+                if (MonitorRunnerService.monitorCtx.totalMaxActionsAcrossTriggers == UNBOUNDED_ACTIONS_FOR_TRIGGERS ||
+                    MonitorRunnerService.monitorCtx.maxActionsPerTrigger == UNBOUNDED_ACTIONS_FOR_TRIGGERS
+                )
                     return
 
                 if (value > MonitorRunnerService.monitorCtx.totalMaxActionsAcrossTriggers)

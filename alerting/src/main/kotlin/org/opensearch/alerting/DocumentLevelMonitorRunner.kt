@@ -14,20 +14,11 @@ import org.opensearch.action.search.SearchAction
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.WriteRequest
-import org.opensearch.alerting.core.model.DocLevelMonitorInput
-import org.opensearch.alerting.core.model.DocLevelQuery
-import org.opensearch.alerting.model.ActionExecutionResult
-import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.model.AlertingConfigAccessor.Companion.getMonitorMetadata
 import org.opensearch.alerting.model.DocumentExecutionContext
-import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
-import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.InputRunResults
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.model.action.PerAlertActionScope
-import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.util.AlertingException
@@ -42,6 +33,15 @@ import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.ActionExecutionResult
+import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
+import org.opensearch.commons.alerting.model.DocLevelQuery
+import org.opensearch.commons.alerting.model.DocumentLevelTrigger
+import org.opensearch.commons.alerting.model.Finding
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.action.PerAlertActionScope
+import org.opensearch.commons.alerting.util.string
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.percolator.PercolateQueryBuilderExt
@@ -160,18 +160,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     val matchedQueriesForDocs = getMatchedQueries(monitorCtx, matchingDocs.map { it.second }, monitor, indexName)
 
                     matchedQueriesForDocs.forEach { hit ->
-                        val (id, query) = Pair(
-                            hit.id.replace("_${indexName}_${monitor.id}", ""),
-                            ((hit.sourceAsMap["query"] as HashMap<*, *>)["query_string"] as HashMap<*, *>)["query"].toString()
-                                .replace("_${indexName}_${monitor.id}", "")
-                        )
-                        val docLevelQuery = DocLevelQuery(id, id, query)
+                        val id = hit.id.replace("_${indexName}_${monitor.id}", "")
 
                         val docIndices = hit.field("_percolator_document_slot").values.map { it.toString().toInt() }
                         docIndices.forEach { idx ->
                             val docIndex = "${matchingDocs[idx].first}|$indexName"
-                            queryToDocIds.getOrPut(docLevelQuery) { mutableSetOf() }.add(docIndex)
-                            inputRunResults.getOrPut(docLevelQuery.id) { mutableSetOf() }.add(docIndex)
+                            inputRunResults.getOrPut(id) { mutableSetOf() }.add(docIndex)
                             docsToQueries.getOrPut(docIndex) { mutableListOf() }.add(id)
                         }
                     }
@@ -184,6 +178,17 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         }
 
         monitorResult = monitorResult.copy(inputResults = InputRunResults(listOf(inputRunResults)))
+
+        /*
+         populate the map queryToDocIds with pairs of <DocLevelQuery object from queries in monitor metadata &
+         list of matched docId from inputRunResults>
+         this fixes the issue of passing id, name, tags fields of DocLevelQuery object correctly to TriggerExpressionParser
+         */
+        queries.forEach {
+            if (inputRunResults.containsKey(it.id)) {
+                queryToDocIds[it] = inputRunResults[it.id]!!
+            }
+        }
 
         val idQueryMap: Map<String, DocLevelQuery> = queries.associateBy { it.id }
 

@@ -11,18 +11,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionListener
+import org.opensearch.action.ActionRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.alerting.action.GetAlertsAction
-import org.opensearch.alerting.action.GetAlertsRequest
-import org.opensearch.alerting.action.GetAlertsResponse
 import org.opensearch.alerting.action.GetMonitorAction
 import org.opensearch.alerting.action.GetMonitorRequest
 import org.opensearch.alerting.action.GetMonitorResponse
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.model.Alert
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
@@ -37,7 +34,12 @@ import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.GetAlertsRequest
+import org.opensearch.commons.alerting.action.GetAlertsResponse
+import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.utils.recreateObject
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestRequest
@@ -60,12 +62,13 @@ class TransportGetAlertsAction @Inject constructor(
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry,
     val transportGetMonitorAction: TransportGetMonitorAction
-) : HandledTransportAction<GetAlertsRequest, GetAlertsResponse>(
-    GetAlertsAction.NAME, transportService, actionFilters, ::GetAlertsRequest
+) : HandledTransportAction<ActionRequest, GetAlertsResponse>(
+    AlertingActions.GET_ALERTS_ACTION_NAME, transportService, actionFilters, ::GetAlertsRequest
 ),
     SecureTransportAction {
 
-    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile
+    override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
         listenFilterBySettingChange(clusterService)
@@ -73,9 +76,11 @@ class TransportGetAlertsAction @Inject constructor(
 
     override fun doExecute(
         task: Task,
-        getAlertsRequest: GetAlertsRequest,
+        request: ActionRequest,
         actionListener: ActionListener<GetAlertsResponse>
     ) {
+        val getAlertsRequest = request as? GetAlertsRequest
+            ?: recreateObject(request) { GetAlertsRequest(it) }
         val user = readUserFromThreadContext(client)
 
         val tableProp = getAlertsRequest.table
@@ -96,6 +101,8 @@ class TransportGetAlertsAction @Inject constructor(
 
         if (getAlertsRequest.monitorId != null) {
             queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getAlertsRequest.monitorId))
+        } else if (getAlertsRequest.monitorIds.isNullOrEmpty() == false) {
+            queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getAlertsRequest.monitorIds))
         }
         if (!tableProp.searchString.isNullOrBlank()) {
             queryBuilder
@@ -140,11 +147,11 @@ class TransportGetAlertsAction @Inject constructor(
     suspend fun resolveAlertsIndexName(getAlertsRequest: GetAlertsRequest): String {
         var alertIndex = AlertIndices.ALL_ALERT_INDEX_PATTERN
         if (getAlertsRequest.alertIndex.isNullOrEmpty() == false) {
-            alertIndex = getAlertsRequest.alertIndex
+            alertIndex = getAlertsRequest.alertIndex!!
         } else if (getAlertsRequest.monitorId.isNullOrEmpty() == false)
             withContext(Dispatchers.IO) {
                 val getMonitorRequest = GetMonitorRequest(
-                    getAlertsRequest.monitorId,
+                    getAlertsRequest.monitorId!!,
                     -3L,
                     RestRequest.Method.GET,
                     FetchSourceContext.FETCH_SOURCE

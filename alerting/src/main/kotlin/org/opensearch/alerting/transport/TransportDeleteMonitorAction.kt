@@ -8,16 +8,13 @@ package org.opensearch.alerting.transport
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
+import org.opensearch.action.ActionRequest
 import org.opensearch.action.delete.DeleteRequest
 import org.opensearch.action.delete.DeleteResponse
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.alerting.action.DeleteMonitorAction
-import org.opensearch.alerting.action.DeleteMonitorRequest
-import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
@@ -28,7 +25,13 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.DeleteMonitorRequest
+import org.opensearch.commons.alerting.action.DeleteMonitorResponse
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.utils.recreateObject
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
@@ -47,8 +50,8 @@ class TransportDeleteMonitorAction @Inject constructor(
     val clusterService: ClusterService,
     settings: Settings,
     val xContentRegistry: NamedXContentRegistry
-) : HandledTransportAction<DeleteMonitorRequest, DeleteResponse>(
-    DeleteMonitorAction.NAME, transportService, actionFilters, ::DeleteMonitorRequest
+) : HandledTransportAction<ActionRequest, DeleteMonitorResponse>(
+    AlertingActions.DELETE_MONITOR_ACTION_NAME, transportService, actionFilters, ::DeleteMonitorRequest
 ),
     SecureTransportAction {
 
@@ -58,22 +61,24 @@ class TransportDeleteMonitorAction @Inject constructor(
         listenFilterBySettingChange(clusterService)
     }
 
-    override fun doExecute(task: Task, request: DeleteMonitorRequest, actionListener: ActionListener<DeleteResponse>) {
+    override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<DeleteMonitorResponse>) {
+        val transformedRequest = request as? DeleteMonitorRequest
+            ?: recreateObject(request) { DeleteMonitorRequest(it) }
         val user = readUserFromThreadContext(client)
-        val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, request.monitorId)
-            .setRefreshPolicy(request.refreshPolicy)
+        val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, transformedRequest.monitorId)
+            .setRefreshPolicy(transformedRequest.refreshPolicy)
 
         if (!validateUserBackendRoles(user, actionListener)) {
             return
         }
         client.threadPool().threadContext.stashContext().use {
-            DeleteMonitorHandler(client, actionListener, deleteRequest, user, request.monitorId).resolveUserAndStart()
+            DeleteMonitorHandler(client, actionListener, deleteRequest, user, transformedRequest.monitorId).resolveUserAndStart()
         }
     }
 
     inner class DeleteMonitorHandler(
         private val client: Client,
-        private val actionListener: ActionListener<DeleteResponse>,
+        private val actionListener: ActionListener<DeleteMonitorResponse>,
         private val deleteRequest: DeleteRequest,
         private val user: User?,
         private val monitorId: String
@@ -137,7 +142,7 @@ class TransportDeleteMonitorAction @Inject constructor(
                         }
                         deleteMetadata()
 
-                        actionListener.onResponse(response)
+                        actionListener.onResponse(DeleteMonitorResponse(response.id, response.version))
                     }
 
                     override fun onFailure(t: Exception) {

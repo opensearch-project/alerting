@@ -8,6 +8,7 @@ package org.opensearch.alerting.model
 import org.junit.Assert
 import org.opensearch.alerting.randomAlert
 import org.opensearch.alerting.randomAlertWithAggregationResultBucket
+import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.test.OpenSearchTestCase
 
 class AlertTests : OpenSearchTestCase() {

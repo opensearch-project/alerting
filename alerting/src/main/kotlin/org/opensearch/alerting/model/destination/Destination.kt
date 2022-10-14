@@ -8,11 +8,7 @@ package org.opensearch.alerting.model.destination
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.model.destination.email.Email
 import org.opensearch.alerting.opensearchapi.convertToMap
-import org.opensearch.alerting.opensearchapi.instant
-import org.opensearch.alerting.opensearchapi.optionalTimeField
-import org.opensearch.alerting.opensearchapi.optionalUserField
 import org.opensearch.alerting.util.DestinationType
-import org.opensearch.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
 import org.opensearch.alerting.util.destinationmigration.DestinationConversionUtils.Companion.convertAlertingToNotificationMethodType
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
@@ -20,6 +16,10 @@ import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
+import org.opensearch.commons.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
+import org.opensearch.commons.alerting.util.instant
+import org.opensearch.commons.alerting.util.optionalTimeField
+import org.opensearch.commons.alerting.util.optionalUserField
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.destination.message.LegacyBaseMessage
 import org.opensearch.commons.destination.message.LegacyChimeMessage

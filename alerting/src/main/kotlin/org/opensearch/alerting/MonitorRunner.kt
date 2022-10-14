@@ -11,12 +11,8 @@ import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetDestinationsRequest
 import org.opensearch.alerting.action.GetDestinationsResponse
 import org.opensearch.alerting.model.ActionRunResult
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.model.Table
-import org.opensearch.alerting.model.Trigger
-import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -34,6 +30,10 @@ import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isTestAction
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.Strings
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.Table
+import org.opensearch.commons.alerting.model.Trigger
+import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import java.time.Instant
 import kotlin.math.min
@@ -62,7 +62,7 @@ abstract class MonitorRunner {
             }
             val actionOutput = mutableMapOf<String, String>()
             actionOutput[Action.SUBJECT] = if (action.subjectTemplate != null)
-                MonitorRunnerService.compileTemplate(action.subjectTemplate, ctx)
+                MonitorRunnerService.compileTemplate(action.subjectTemplate!!, ctx)
             else ""
             actionOutput[Action.MESSAGE] = MonitorRunnerService.compileTemplate(action.messageTemplate, ctx)
             if (Strings.isNullOrEmpty(actionOutput[Action.MESSAGE])) {

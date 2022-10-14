@@ -6,10 +6,10 @@
 package org.opensearch.alerting.core.schedule
 
 import org.junit.Before
-import org.opensearch.alerting.core.model.CronSchedule
-import org.opensearch.alerting.core.model.IntervalSchedule
 import org.opensearch.alerting.core.model.MockScheduledJob
 import org.opensearch.common.settings.Settings
+import org.opensearch.commons.alerting.model.CronSchedule
+import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
 import java.time.ZoneId

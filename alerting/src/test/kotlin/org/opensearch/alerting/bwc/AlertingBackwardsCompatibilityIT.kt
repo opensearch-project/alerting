@@ -10,9 +10,9 @@ import org.apache.http.entity.StringEntity
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.builder.SearchSourceBuilder

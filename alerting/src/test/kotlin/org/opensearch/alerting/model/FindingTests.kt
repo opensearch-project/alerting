@@ -6,6 +6,7 @@
 package org.opensearch.alerting.model
 
 import org.opensearch.alerting.randomFinding
+import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.test.OpenSearchTestCase
 
 class FindingTests : OpenSearchTestCase() {
