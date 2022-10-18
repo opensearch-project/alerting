@@ -21,6 +21,7 @@ import org.opensearch.commons.alerting.model.Table
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit.MILLIS
+import java.util.stream.Collectors
 
 class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
@@ -504,10 +505,28 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         var alertsResponseForRequestWithoutCustomIndex = client()
             .execute(
                 AlertingActions.GET_ALERTS_ACTION_TYPE,
-                GetAlertsRequest(table, "ALL", "ALL", null, null, listOf(id, id1, "1", "2"))
+                GetAlertsRequest(table, "ALL", "ALL", null, null, monitorIds = listOf(id, id1, "1", "2"))
             )
             .get()
         Assert.assertTrue(alertsResponseForRequestWithoutCustomIndex != null)
         Assert.assertTrue(alertsResponseForRequestWithoutCustomIndex.alerts.size == 2)
+        val alertIds = getAlertsResponse.alerts.stream().map { alert -> alert.id }.collect(Collectors.toList())
+        var getAlertsByAlertIds = client()
+            .execute(
+                AlertingActions.GET_ALERTS_ACTION_TYPE,
+                GetAlertsRequest(table, "ALL", "ALL", null, null, alertIds = alertIds)
+            )
+            .get()
+        Assert.assertTrue(getAlertsByAlertIds != null)
+        Assert.assertTrue(getAlertsByAlertIds.alerts.size == 2)
+
+        var getAlertsByWrongAlertIds = client()
+            .execute(
+                AlertingActions.GET_ALERTS_ACTION_TYPE,
+                GetAlertsRequest(table, "ALL", "ALL", null, null, alertIds = listOf("1", "2"))
+            )
+            .get()
+        Assert.assertTrue(getAlertsByWrongAlertIds != null)
+        Assert.assertEquals(getAlertsByWrongAlertIds.alerts.size, 0)
     }
 }
