@@ -8,9 +8,11 @@ package org.opensearch.alerting
 import org.junit.Assert
 import org.opensearch.action.admin.cluster.state.ClusterStateRequest
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
+import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.transport.AlertingSingleNodeTestCase
 import org.opensearch.common.settings.Settings
+import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.GetAlertsRequest
 import org.opensearch.commons.alerting.model.DataSources
@@ -106,6 +108,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        val alertId = getAlertsResponse.alerts.get(0).id
+        val acknowledgeAlertResponse = client().execute(
+            AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_TYPE,
+            AcknowledgeAlertRequest(id, listOf(alertId), WriteRequest.RefreshPolicy.IMMEDIATE)
+        ).get()
+        Assert.assertEquals(acknowledgeAlertResponse.acknowledged.size, 1)
     }
 
     fun `test execute monitor with custom query index`() {
@@ -526,6 +534,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 GetAlertsRequest(table, "ALL", "ALL", null, null, alertIds = listOf("1", "2"))
             )
             .get()
+
         Assert.assertTrue(getAlertsByWrongAlertIds != null)
         Assert.assertEquals(getAlertsByWrongAlertIds.alerts.size, 0)
     }
