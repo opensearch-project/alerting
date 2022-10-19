@@ -64,7 +64,7 @@ class AlertService(
 
     suspend fun loadCurrentAlertsForQueryLevelMonitor(monitor: Monitor): Map<Trigger, Alert?> {
         val searchAlertsResponse: SearchResponse = searchAlerts(
-            monitorId = monitor.id,
+            monitor = monitor,
             size = monitor.triggers.size * 2 // We expect there to be only a single in-progress alert so fetch 2 to check
         )
 
@@ -83,7 +83,7 @@ class AlertService(
 
     suspend fun loadCurrentAlertsForBucketLevelMonitor(monitor: Monitor): Map<Trigger, MutableMap<String, Alert>> {
         val searchAlertsResponse: SearchResponse = searchAlerts(
-            monitorId = monitor.id,
+            monitor = monitor,
             // TODO: This should be limited based on a circuit breaker that limits Alerts
             size = MAX_BUCKET_LEVEL_MONITOR_ALERT_SEARCH_COUNT
         )
@@ -351,7 +351,7 @@ class AlertService(
     /**
      * This is a separate method created specifically for saving new Alerts during the Bucket-Level Monitor run.
      * Alerts are saved in two batches during the execution of an Bucket-Level Monitor, once before the Actions are executed
-     * and once afterwards. This method saves Alerts to the [AlertIndices.ALERT_INDEX] but returns the same Alerts with their document IDs.
+     * and once afterwards. This method saves Alerts to the monitor's alertIndex but returns the same Alerts with their document IDs.
      *
      * The Alerts are required with their indexed ID so that when the new Alerts are updated after the Action execution,
      * the ID is available for the index request so that the existing Alert can be updated, instead of creating a duplicate Alert document.
@@ -420,12 +420,15 @@ class AlertService(
     }
 
     /**
-     * Searches for Alerts in the [AlertIndices.ALERT_INDEX].
+     * Searches for Alerts in the monitor's alertIndex.
      *
      * @param monitorId The Monitor to get Alerts for
      * @param size The number of search hits (Alerts) to return
      */
-    private suspend fun searchAlerts(monitorId: String, size: Int): SearchResponse {
+    private suspend fun searchAlerts(monitor: Monitor, size: Int): SearchResponse {
+        val monitorId = monitor.id
+        val alertIndex = monitor.dataSources.alertsIndex
+
         val queryBuilder = QueryBuilders.boolQuery()
             .filter(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, monitorId))
 
@@ -433,7 +436,7 @@ class AlertService(
             .size(size)
             .query(queryBuilder)
 
-        val searchRequest = SearchRequest(AlertIndices.ALERT_INDEX)
+        val searchRequest = SearchRequest(alertIndex)
             .routing(monitorId)
             .source(searchSourceBuilder)
         val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
