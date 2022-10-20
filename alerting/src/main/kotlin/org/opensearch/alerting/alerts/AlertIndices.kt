@@ -449,6 +449,7 @@ class AlertIndices(
         logger.error("info deleteOldIndices")
         val clusterStateRequest = ClusterStateRequest()
             .clear()
+            .indices(indices)
             .metadata(true)
             .local(true)
             .indicesOptions(IndicesOptions.strictExpand())
