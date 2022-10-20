@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ResourceNotFoundException
 import org.opensearch.action.ActionListener
+import org.opensearch.action.ActionRequest
 import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.delete.DeleteRequest
@@ -65,7 +66,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry,
     val transportGetMonitorAction: TransportGetMonitorAction
-) : HandledTransportAction<AcknowledgeAlertRequest, AcknowledgeAlertResponse>(
+) : HandledTransportAction<ActionRequest, AcknowledgeAlertResponse>(
     AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_NAME, transportService, actionFilters, ::AcknowledgeAlertRequest
 ) {
 
@@ -78,7 +79,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
 
     override fun doExecute(
         task: Task,
-        acknowledgeAlertRequest: AcknowledgeAlertRequest,
+        acknowledgeAlertRequest: ActionRequest,
         actionListener: ActionListener<AcknowledgeAlertResponse>
     ) {
         val request = acknowledgeAlertRequest as? AcknowledgeAlertRequest
