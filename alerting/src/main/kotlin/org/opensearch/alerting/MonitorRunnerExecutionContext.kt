@@ -17,8 +17,11 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.script.ScriptService
 import org.opensearch.threadpool.ThreadPool
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentMap
 
 data class MonitorRunnerExecutionContext(
 
@@ -33,6 +36,7 @@ data class MonitorRunnerExecutionContext(
     var triggerService: TriggerService? = null,
     var alertService: AlertService? = null,
     var docLevelMonitorQueries: DocLevelMonitorQueries? = null,
+    var monitorMap: ConcurrentMap<String, Monitor> = ConcurrentHashMap(),
 
     @Volatile var retryPolicy: BackoffPolicy? = null,
     @Volatile var moveAlertsRetryPolicy: BackoffPolicy? = null,

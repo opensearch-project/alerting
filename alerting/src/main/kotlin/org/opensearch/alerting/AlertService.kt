@@ -284,7 +284,9 @@ class AlertService(
         retryPolicy: BackoffPolicy,
         allowUpdatingAcknowledgedAlert: Boolean = false
     ) {
-        val alertIndex = dataSources.alertsIndex
+        val alertsIndex = dataSources.alertsIndex
+        val alertsHistoryIndex = dataSources.alertsHistoryIndex
+
         var requestsToRetry = alerts.flatMap { alert ->
             // We don't want to set the version when saving alerts because the MonitorRunner has first priority when writing alerts.
             // In the rare event that a user acknowledges an alert between when it's read and when it's written
@@ -293,7 +295,7 @@ class AlertService(
             when (alert.state) {
                 Alert.State.ACTIVE, Alert.State.ERROR -> {
                     listOf<DocWriteRequest<*>>(
-                        IndexRequest(alertIndex)
+                        IndexRequest(alertsIndex)
                             .routing(alert.monitorId)
                             .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                             .id(if (alert.id != Alert.NO_ID) alert.id else null)
@@ -304,7 +306,7 @@ class AlertService(
                     // and updated by the MonitorRunner
                     if (allowUpdatingAcknowledgedAlert) {
                         listOf<DocWriteRequest<*>>(
-                            IndexRequest(alertIndex)
+                            IndexRequest(alertsIndex)
                                 .routing(alert.monitorId)
                                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                                 .id(if (alert.id != Alert.NO_ID) alert.id else null)
@@ -318,11 +320,11 @@ class AlertService(
                 }
                 Alert.State.COMPLETED -> {
                     listOfNotNull<DocWriteRequest<*>>(
-                        DeleteRequest(alertIndex, alert.id)
+                        DeleteRequest(alertsIndex, alert.id)
                             .routing(alert.monitorId),
                         // Only add completed alert to history index if history is enabled
-                        if (alertIndices.isAlertHistoryEnabled(dataSources)) {
-                            IndexRequest(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
+                        if (alertIndices.isAlertHistoryEnabled()) {
+                            IndexRequest(alertsHistoryIndex)
                                 .routing(alert.monitorId)
                                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                                 .id(alert.id)

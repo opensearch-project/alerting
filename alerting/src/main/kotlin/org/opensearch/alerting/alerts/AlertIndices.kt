@@ -231,11 +231,8 @@ class AlertIndices(
         return alertIndexInitialized && alertHistoryIndexInitialized
     }
 
-    fun isAlertHistoryEnabled(dataSources: DataSources): Boolean {
-        if (dataSources.alertsIndex == ALERT_INDEX) {
-            return alertHistoryEnabled
-        }
-        return false
+    fun isAlertHistoryEnabled(): Boolean {
+        return alertHistoryEnabled
     }
 
     fun isFindingHistoryEnabled(): Boolean = findingHistoryEnabled
@@ -265,12 +262,17 @@ class AlertIndices(
         if (dataSources.alertsIndex == ALERT_INDEX) {
             return createOrUpdateInitialAlertHistoryIndex()
         }
+        if (!clusterService.state().metadata.hasAlias(dataSources.alertsHistoryIndex)) {
+            createIndex(dataSources.alertsHistoryIndexPattern, alertMapping(), dataSources.alertsHistoryIndex)
+        } else {
+            updateIndexMapping(dataSources.alertsHistoryIndex, alertMapping(), true)
+        }
     }
     suspend fun createOrUpdateInitialAlertHistoryIndex() {
         if (!alertHistoryIndexInitialized) {
             alertHistoryIndexInitialized = createIndex(ALERT_HISTORY_INDEX_PATTERN, alertMapping(), ALERT_HISTORY_WRITE_INDEX)
             if (alertHistoryIndexInitialized)
-                IndexUtils.lastUpdatedAlertHistoryIndex = IndexUtils.getIndexNameWithAlias(
+                IndexUtils.lastUpdatedAlertHistoryIndex = IndexUtils.getBackingWriteIndexForAlias(
                     clusterService.state(),
                     ALERT_HISTORY_WRITE_INDEX
                 )
@@ -284,7 +286,7 @@ class AlertIndices(
         if (!findingHistoryIndexInitialized) {
             findingHistoryIndexInitialized = createIndex(FINDING_HISTORY_INDEX_PATTERN, findingMapping(), FINDING_HISTORY_WRITE_INDEX)
             if (findingHistoryIndexInitialized) {
-                IndexUtils.lastUpdatedFindingHistoryIndex = IndexUtils.getIndexNameWithAlias(
+                IndexUtils.lastUpdatedFindingHistoryIndex = IndexUtils.getBackingWriteIndexForAlias(
                     clusterService.state(),
                     FINDING_HISTORY_WRITE_INDEX
                 )
@@ -300,13 +302,15 @@ class AlertIndices(
             return createOrUpdateInitialFindingHistoryIndex()
         }
         val findingsIndex = dataSources.findingsIndex
+        val findingsIndexPattern = dataSources.findingsIndexPattern
         if (!clusterService.state().routingTable().hasIndex(findingsIndex)) {
             createIndex(
-                findingsIndex,
-                findingMapping()
+                findingsIndexPattern,
+                findingMapping(),
+                findingsIndex
             )
         } else {
-            updateIndexMapping(findingsIndex, findingMapping(), false)
+            updateIndexMapping(findingsIndex, findingMapping(), true)
         }
     }
 
@@ -336,9 +340,10 @@ class AlertIndices(
         val clusterState = clusterService.state()
         var targetIndex = index
         if (alias) {
-            targetIndex = IndexUtils.getIndexNameWithAlias(clusterState, index)
+            targetIndex = IndexUtils.getBackingWriteIndexForAlias(clusterState, index)
         }
 
+        // TODO call getMapping and compare actual mappings here instead of this
         if (targetIndex == IndexUtils.lastUpdatedAlertHistoryIndex || targetIndex == IndexUtils.lastUpdatedFindingHistoryIndex) {
             return
         }
@@ -429,7 +434,6 @@ class AlertIndices(
         logger.error("info deleteOldIndices")
         val clusterStateRequest = ClusterStateRequest()
             .clear()
-            .indices(indices)
             .metadata(true)
             .local(true)
             .indicesOptions(IndicesOptions.strictExpand())

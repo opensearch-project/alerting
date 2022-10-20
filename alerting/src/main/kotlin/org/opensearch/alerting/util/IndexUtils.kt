@@ -94,8 +94,11 @@ class IndexUtils {
         }
 
         @JvmStatic
-        fun getIndexNameWithAlias(clusterState: ClusterState, alias: String): String {
-            return clusterState.metadata.indices.first { it.value.aliases.containsKey(alias) }.key
+        fun getBackingWriteIndexForAlias(clusterState: ClusterState, alias: String): String {
+            return clusterState.metadata.indices.first {
+                it.value.aliases.containsKey(alias) &&
+                it.value.settings.get("is_write_index") == "true"
+            }.key
         }
 
         @JvmStatic
