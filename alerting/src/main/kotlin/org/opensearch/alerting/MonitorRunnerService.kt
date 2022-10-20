@@ -184,7 +184,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             try {
                 monitorCtx.monitorMap.put(job.id, job)
                 monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
-                    if (monitorCtx.alertIndices!!.isAlertInitialized()) {
+                    if (monitorCtx.alertIndices!!.isAlertInitialized(job.dataSources)) {
                         moveAlerts(monitorCtx.client!!, job.id, job, true)
                     }
                 }

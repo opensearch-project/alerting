@@ -231,6 +231,21 @@ class AlertIndices(
         return alertIndexInitialized && alertHistoryIndexInitialized
     }
 
+    fun isAlertInitialized(dataSources: DataSources): Boolean {
+        val alertsIndex = dataSources.alertsIndex
+        val alertsHistoryIndex = dataSources.alertsHistoryIndex
+        if (alertsIndex == ALERT_INDEX && alertsHistoryIndex == ALERT_HISTORY_WRITE_INDEX) {
+            return alertIndexInitialized && alertHistoryIndexInitialized
+        }
+        if (
+            clusterService.state().metadata.indices.containsKey(alertsIndex) &&
+            clusterService.state().metadata.indices.containsKey(alertsHistoryIndex)
+        ) {
+            return true
+        }
+        return false
+    }
+
     fun isAlertHistoryEnabled(): Boolean {
         return alertHistoryEnabled
     }
