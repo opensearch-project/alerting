@@ -97,7 +97,7 @@ class IndexUtils {
         fun getBackingWriteIndexForAlias(clusterState: ClusterState, alias: String): String {
             return clusterState.metadata.indices.first {
                 it.value.aliases.containsKey(alias) &&
-                it.value.settings.get("is_write_index") == "true"
+                    it.value.settings.get("is_write_index") == "true"
             }.key
         }
 

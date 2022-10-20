@@ -52,7 +52,6 @@ suspend fun moveAlerts(client: Client, monitorId: String, monitor: Monitor?, isP
         boolQuery.mustNot(QueryBuilders.termsQuery(Alert.TRIGGER_ID_FIELD, monitor.triggers.map { it.id }))
     }
 
-
     val activeAlertsQuery = SearchSourceBuilder.searchSource()
         .query(boolQuery)
         .version(true)
