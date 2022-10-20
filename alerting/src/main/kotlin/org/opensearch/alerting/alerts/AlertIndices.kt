@@ -239,7 +239,7 @@ class AlertIndices(
         }
         if (
             clusterService.state().metadata.indices.containsKey(alertsIndex) &&
-            clusterService.state().metadata.indices.containsKey(alertsHistoryIndex)
+            clusterService.state().metadata.hasAlias(alertsHistoryIndex)
         ) {
             return true
         }
@@ -287,7 +287,7 @@ class AlertIndices(
         if (!alertHistoryIndexInitialized) {
             alertHistoryIndexInitialized = createIndex(ALERT_HISTORY_INDEX_PATTERN, alertMapping(), ALERT_HISTORY_WRITE_INDEX)
             if (alertHistoryIndexInitialized)
-                IndexUtils.lastUpdatedAlertHistoryIndex = IndexUtils.getBackingWriteIndexForAlias(
+                IndexUtils.lastUpdatedAlertHistoryIndex = IndexUtils.getIndexNameWithAlias(
                     clusterService.state(),
                     ALERT_HISTORY_WRITE_INDEX
                 )
@@ -301,7 +301,7 @@ class AlertIndices(
         if (!findingHistoryIndexInitialized) {
             findingHistoryIndexInitialized = createIndex(FINDING_HISTORY_INDEX_PATTERN, findingMapping(), FINDING_HISTORY_WRITE_INDEX)
             if (findingHistoryIndexInitialized) {
-                IndexUtils.lastUpdatedFindingHistoryIndex = IndexUtils.getBackingWriteIndexForAlias(
+                IndexUtils.lastUpdatedFindingHistoryIndex = IndexUtils.getIndexNameWithAlias(
                     clusterService.state(),
                     FINDING_HISTORY_WRITE_INDEX
                 )
@@ -355,7 +355,7 @@ class AlertIndices(
         val clusterState = clusterService.state()
         var targetIndex = index
         if (alias) {
-            targetIndex = IndexUtils.getBackingWriteIndexForAlias(clusterState, index)
+            targetIndex = IndexUtils.getIndexNameWithAlias(clusterState, index)
         }
 
         // TODO call getMapping and compare actual mappings here instead of this

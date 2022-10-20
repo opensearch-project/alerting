@@ -41,14 +41,14 @@ import org.opensearch.search.builder.SearchSourceBuilder
  * 3. Delete alerts from monitor's DataSources.alertsIndex
  * 4. Schedule a retry if there were any failures
  */
-suspend fun moveAlerts(client: Client, monitorId: String, monitor: Monitor?, isPostIndex: Boolean) {
+suspend fun moveAlerts(client: Client, monitorId: String, monitor: Monitor?) {
     var alertIndex = monitor?.dataSources?.alertsIndex ?: ALERT_INDEX
     var alertHistoryIndex = monitor?.dataSources?.alertsHistoryIndex ?: ALERT_HISTORY_WRITE_INDEX
 
     val boolQuery = QueryBuilders.boolQuery()
         .filter(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, monitorId))
 
-    if (isPostIndex && monitor != null) {
+    if (monitor != null) {
         boolQuery.mustNot(QueryBuilders.termsQuery(Alert.TRIGGER_ID_FIELD, monitor.triggers.map { it.id }))
     }
 

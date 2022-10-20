@@ -182,10 +182,9 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
         launch {
             try {
-                monitorCtx.monitorMap.put(job.id, job)
                 monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
                     if (monitorCtx.alertIndices!!.isAlertInitialized(job.dataSources)) {
-                        moveAlerts(monitorCtx.client!!, job.id, job, true)
+                        moveAlerts(monitorCtx.client!!, job.id, job)
                     }
                 }
             } catch (e: Exception) {
@@ -197,13 +196,9 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     override fun postDelete(jobId: String) {
         launch {
             try {
-                val monitor = monitorCtx.monitorMap.remove(jobId)
-                if (monitor == null) {
-                    logger.warn("can't find monitor [$jobId] in monitorMap")
-                }
                 monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
                     if (monitorCtx.alertIndices!!.isAlertInitialized()) {
-                        moveAlerts(monitorCtx.client!!, jobId, monitor, false)
+                        moveAlerts(monitorCtx.client!!, jobId, null)
                     }
                 }
             } catch (e: Exception) {
