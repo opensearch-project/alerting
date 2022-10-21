@@ -52,7 +52,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     private val logger = LogManager.getLogger(javaClass)
 
     var monitorCtx: MonitorRunnerExecutionContext = MonitorRunnerExecutionContext()
-
     private lateinit var runnerSupervisor: Job
     override val coroutineContext: CoroutineContext
         get() = Dispatchers.Default + runnerSupervisor
@@ -184,7 +183,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         launch {
             try {
                 monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
-                    if (monitorCtx.alertIndices!!.isAlertInitialized()) {
+                    if (monitorCtx.alertIndices!!.isAlertInitialized(job.dataSources)) {
                         moveAlerts(monitorCtx.client!!, job.id, job)
                     }
                 }
