@@ -147,6 +147,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
         }
 
         private suspend fun onSearchResponse(response: SearchResponse, monitor: Monitor) {
+            val alertsHistoryIndex = monitor.dataSources.alertsHistoryIndex
             val updateRequests = mutableListOf<UpdateRequest>()
             val copyRequests = mutableListOf<IndexRequest>()
             response.hits.forEach { hit ->
@@ -176,7 +177,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                             )
                         updateRequests.add(updateRequest)
                     } else {
-                        val copyRequest = IndexRequest(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
+                        val copyRequest = IndexRequest(alertsHistoryIndex)
                             .routing(request.monitorId)
                             .id(alert.id)
                             .source(
