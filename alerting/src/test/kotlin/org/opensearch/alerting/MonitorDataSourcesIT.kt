@@ -25,6 +25,7 @@ import org.opensearch.test.OpenSearchTestCase
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit.MILLIS
+import java.util.concurrent.TimeUnit
 import java.util.stream.Collectors
 
 class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
@@ -496,20 +497,22 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         indexDoc(index, "1", testDoc)
         val monitorId = monitorResponse.id
         val executeMonitorResponse = executeMonitor(monitor, monitorId, false)
+        var alertsBefore = searchAlerts(monitorId, customAlertsIndex)
+        Assert.assertEquals(2, alertsBefore.size)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 2)
         // Remove 1 trigger from monitor to force moveAlerts call to move alerts to history index
         monitor = monitor.copy(triggers = listOf(trigger1))
         updateMonitor(monitor, monitorId)
-        executeMonitor(monitor, monitorId, false)
+
         var alerts = listOf<Alert>()
-        OpenSearchTestCase.waitUntil {
+        OpenSearchTestCase.waitUntil({
             alerts = searchAlerts(monitorId, customAlertsHistoryIndex)
             if (alerts.size == 1) {
                 return@waitUntil true
             }
             return@waitUntil false
-        }
+        }, 30, TimeUnit.SECONDS)
         assertEquals("Alerts from custom history index", 1, alerts.size)
     }
 
