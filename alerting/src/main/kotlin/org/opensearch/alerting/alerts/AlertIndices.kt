@@ -231,11 +231,23 @@ class AlertIndices(
         return alertIndexInitialized && alertHistoryIndexInitialized
     }
 
-    fun isAlertHistoryEnabled(dataSources: DataSources): Boolean {
-        if (dataSources.alertsIndex == ALERT_INDEX) {
-            return alertHistoryEnabled
+    fun isAlertInitialized(dataSources: DataSources): Boolean {
+        val alertsIndex = dataSources.alertsIndex
+        val alertsHistoryIndex = dataSources.alertsHistoryIndex
+        if (alertsIndex == ALERT_INDEX && alertsHistoryIndex == ALERT_HISTORY_WRITE_INDEX) {
+            return alertIndexInitialized && alertHistoryIndexInitialized
+        }
+        if (
+            clusterService.state().metadata.indices.containsKey(alertsIndex) &&
+            clusterService.state().metadata.hasAlias(alertsHistoryIndex)
+        ) {
+            return true
         }
         return false
+    }
+
+    fun isAlertHistoryEnabled(): Boolean {
+        return alertHistoryEnabled
     }
 
     fun isFindingHistoryEnabled(): Boolean = findingHistoryEnabled
@@ -264,6 +276,19 @@ class AlertIndices(
     suspend fun createOrUpdateInitialAlertHistoryIndex(dataSources: DataSources) {
         if (dataSources.alertsIndex == ALERT_INDEX) {
             return createOrUpdateInitialAlertHistoryIndex()
+        }
+        if (!clusterService.state().metadata.hasAlias(dataSources.alertsHistoryIndex)) {
+            createIndex(
+                dataSources.alertsHistoryIndexPattern ?: ALERT_HISTORY_INDEX_PATTERN,
+                alertMapping(),
+                dataSources.alertsHistoryIndex
+            )
+        } else {
+            updateIndexMapping(
+                dataSources.alertsHistoryIndex ?: ALERT_HISTORY_WRITE_INDEX,
+                alertMapping(),
+                true
+            )
         }
     }
     suspend fun createOrUpdateInitialAlertHistoryIndex() {
@@ -300,13 +325,15 @@ class AlertIndices(
             return createOrUpdateInitialFindingHistoryIndex()
         }
         val findingsIndex = dataSources.findingsIndex
+        val findingsIndexPattern = dataSources.findingsIndexPattern ?: FINDING_HISTORY_INDEX_PATTERN
         if (!clusterService.state().routingTable().hasIndex(findingsIndex)) {
             createIndex(
-                findingsIndex,
-                findingMapping()
+                findingsIndexPattern,
+                findingMapping(),
+                findingsIndex
             )
         } else {
-            updateIndexMapping(findingsIndex, findingMapping(), false)
+            updateIndexMapping(findingsIndex, findingMapping(), true)
         }
     }
 
@@ -339,6 +366,7 @@ class AlertIndices(
             targetIndex = IndexUtils.getIndexNameWithAlias(clusterState, index)
         }
 
+        // TODO call getMapping and compare actual mappings here instead of this
         if (targetIndex == IndexUtils.lastUpdatedAlertHistoryIndex || targetIndex == IndexUtils.lastUpdatedFindingHistoryIndex) {
             return
         }
