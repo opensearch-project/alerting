@@ -10,30 +10,50 @@ on:
 
 jobs:
   build:
+    env:
+      BUILD_ARGS: ${{ matrix.os_build_args }}
+      WORKING_DIR: ${{ matrix.working_directory }}.
     strategy:
       matrix:
         java: [11, 17]
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        include:
+          - os: windows-latest
+            os_build_args: -x integTest -x jacocoTestReport
+            working_directory: X:\
+            os_java_options: -Xmx4096M
+          - os: macos-latest
+            os_build_args: -x integTest -x jacocoTestReport
     # Job name
     name: Build Alerting with JDK ${{ matrix.java }}
     # This job runs on Linux
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     steps:
       # This step uses the checkout Github action: https://github.com/actions/checkout
       - name: Checkout Branch
         uses: actions/checkout@v2
+      # This is a hack, but this step creates a link to the X: mounted drive, which makes the path
+      # short enough to work on Windows
+      - name: Shorten Path
+        if: ${{ matrix.os == 'windows-latest' }}
+        run: subst 'X:' .
       # This step uses the setup-java Github action: https://github.com/actions/setup-java
       - name: Set Up JDK ${{ matrix.java }}
         uses: actions/setup-java@v1
         with:
           java-version: ${{ matrix.java }}
       - name: Build and run with Gradle
-        run: ./gradlew build
+        working-directory: ${{ env.WORKING_DIR }}
+        run: ./gradlew build ${{ env.BUILD_ARGS }}
+        env:
+          _JAVA_OPTIONS: ${{ matrix.os_java_options }}
       - name: Create Artifact Path
         run: |
           mkdir -p alerting-artifacts
           cp ./alerting/build/distributions/*.zip alerting-artifacts
       # This step uses the codecov-action Github action: https://github.com/codecov/codecov-action
       - name: Upload Coverage Report
+        if: ${{ matrix.os == 'ubuntu-latest' }}
         uses: codecov/codecov-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -41,5 +61,5 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v1
         with:
-          name: alerting-plugin
+          name: alerting-plugin-${{ matrix.os }}
           path: alerting-artifacts
