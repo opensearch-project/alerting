@@ -516,6 +516,76 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals("Alerts from custom history index", 1, alerts.size)
     }
 
+    fun `test search custom alerts history index after alert ack`() {
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+        val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customAlertsIndex = "custom_alerts_index"
+        val customAlertsHistoryIndex = "custom_alerts_history_index"
+        val customAlertsHistoryIndexPattern = "<custom_alerts_history_index-{now/d}-1>"
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger1, trigger2),
+            dataSources = DataSources(
+                alertsIndex = customAlertsIndex,
+                alertsHistoryIndex = customAlertsHistoryIndex,
+                alertsHistoryIndexPattern = customAlertsHistoryIndexPattern
+            )
+        )
+        val monitorResponse = createMonitor(monitor)
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+        indexDoc(index, "1", testDoc)
+        val monitorId = monitorResponse.id
+        val executeMonitorResponse = executeMonitor(monitor, monitorId, false)
+        var alertsBefore = searchAlerts(monitorId, customAlertsIndex)
+        Assert.assertEquals(2, alertsBefore.size)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 2)
+
+        var alerts = listOf<Alert>()
+        OpenSearchTestCase.waitUntil({
+            alerts = searchAlerts(monitorId, customAlertsIndex)
+            if (alerts.size == 1) {
+                return@waitUntil true
+            }
+            return@waitUntil false
+        }, 30, TimeUnit.SECONDS)
+        assertEquals("Alerts from custom index", 2, alerts.size)
+
+        val ackReq = AcknowledgeAlertRequest(monitorId, alerts.map { it.id }.toMutableList(), WriteRequest.RefreshPolicy.IMMEDIATE)
+        client().execute(AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_TYPE, ackReq).get()
+
+        // verify alerts moved from alert index to alert history index
+        alerts = listOf<Alert>()
+        OpenSearchTestCase.waitUntil({
+            alerts = searchAlerts(monitorId, customAlertsHistoryIndex)
+            if (alerts.size == 1) {
+                return@waitUntil true
+            }
+            return@waitUntil false
+        }, 30, TimeUnit.SECONDS)
+        assertEquals("Alerts from custom history index", 2, alerts.size)
+
+        // verify alerts deleted from alert index
+        alerts = listOf<Alert>()
+        OpenSearchTestCase.waitUntil({
+            alerts = searchAlerts(monitorId, customAlertsIndex)
+            if (alerts.size == 1) {
+                return@waitUntil true
+            }
+            return@waitUntil false
+        }, 30, TimeUnit.SECONDS)
+        assertEquals("Alerts from custom history index", 0, alerts.size)
+    }
+
     fun `test get alerts by list of monitors containing both existent and non-existent ids`() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
