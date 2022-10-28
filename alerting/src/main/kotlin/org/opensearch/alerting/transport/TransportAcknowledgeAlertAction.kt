@@ -24,7 +24,6 @@ import org.opensearch.action.update.UpdateRequest
 import org.opensearch.alerting.action.GetMonitorAction
 import org.opensearch.alerting.action.GetMonitorRequest
 import org.opensearch.alerting.action.GetMonitorResponse
-import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
@@ -161,7 +160,6 @@ class TransportAcknowledgeAlertAction @Inject constructor(
 
                 if (alert.state == Alert.State.ACTIVE) {
                     if (
-                        monitor.dataSources.alertsIndex != AlertIndices.ALERT_INDEX ||
                         alert.findingIds.isEmpty() ||
                         !isAlertHistoryEnabled
                     ) {
