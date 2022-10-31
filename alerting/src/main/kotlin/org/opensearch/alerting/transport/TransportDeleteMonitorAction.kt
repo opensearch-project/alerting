@@ -150,6 +150,7 @@ class TransportDeleteMonitorAction @Inject constructor(
                 DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
                     .source(monitor.dataSources.queryIndex)
                     .filter(QueryBuilders.matchQuery("monitor_id", monitorId))
+                    .refresh(true)
                     .execute(
                         object : ActionListener<BulkByScrollResponse> {
                             override fun onResponse(response: BulkByScrollResponse) = cont.resume(response)
