@@ -400,6 +400,16 @@ class TransportIndexMonitorAction @Inject constructor(
         private suspend fun indexMonitor() {
             var metadata = createMetadata()
 
+            if (user != null) {
+                // Use the backend roles which is an intersection of the requested backend roles and the user's backend roles.
+                // Admins can pass in any backend role. Also if no backend role is passed in, all the user's backend roles are used.
+                val rbacRoles = if (request.rbacRoles.isNullOrEmpty())
+                    user.backendRoles.toSet()
+                else if (!isAdmin(user)) request.rbacRoles!!.intersect(user.backendRoles).toSet()
+                else request.rbacRoles!!
+                request.monitor = request.monitor.copy(user = User(user.name, rbacRoles.toList(), user.roles, user.customAttNames))
+            }
+
             val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
                 .setRefreshPolicy(request.refreshPolicy)
                 .source(request.monitor.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
@@ -493,6 +503,27 @@ class TransportIndexMonitorAction @Inject constructor(
             // incorrect.
             if (request.monitor.enabled && currentMonitor.enabled)
                 request.monitor = request.monitor.copy(enabledTime = currentMonitor.enabledTime)
+
+            // On update monitor check which backend roles to associate to the monitor
+            if (user != null) {
+                if (!request.rbacRoles.isNullOrEmpty()) {
+                    if (isAdmin(user)) {
+                        request.monitor = request.monitor.copy(
+                            user = User(user.name, request.rbacRoles, user.roles, user.customAttNames)
+                        )
+                    } else {
+                        val rolesToRemove = user.backendRoles.filter { !request.rbacRoles!!.contains(it) }
+                        val updatedRbac = currentMonitor.user!!.backendRoles.filter { !rolesToRemove.contains(it) }.toMutableSet()
+                        updatedRbac.addAll(request.monitor.user!!.backendRoles)
+                        request.monitor = request.monitor.copy(
+                            user = User(user.name, updatedRbac.toList(), user.roles, user.customAttNames)
+                        )
+                    }
+                } else {
+                    request.monitor = request.monitor
+                        .copy(user = User(user.name, currentMonitor.user!!.backendRoles, user.roles, user.customAttNames))
+                }
+            }
 
             request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
             val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
