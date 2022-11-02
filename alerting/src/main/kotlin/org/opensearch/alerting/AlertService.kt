@@ -236,7 +236,8 @@ class AlertService(
         monitor: Monitor,
         trigger: BucketLevelTrigger,
         currentAlerts: MutableMap<String, Alert>,
-        aggResultBuckets: List<AggregationResultBucket>
+        aggResultBuckets: List<AggregationResultBucket>,
+        findings: List<String>
     ): Map<AlertCategory, List<Alert>> {
         val dedupedAlerts = mutableListOf<Alert>()
         val newAlerts = mutableListOf<Alert>()
@@ -256,7 +257,8 @@ class AlertService(
                     monitor = monitor, trigger = trigger, startTime = currentTime,
                     lastNotificationTime = null, state = Alert.State.ACTIVE, errorMessage = null,
                     errorHistory = mutableListOf(), actionExecutionResults = mutableListOf(),
-                    schemaVersion = IndexUtils.alertIndexSchemaVersion, aggregationResultBucket = aggAlertBucket
+                    schemaVersion = IndexUtils.alertIndexSchemaVersion, aggregationResultBucket = aggAlertBucket,
+                    findingIds = findings
                 )
                 newAlerts.add(newAlert)
             }
