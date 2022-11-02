@@ -99,6 +99,10 @@ class TransportGetAlertsAction @Inject constructor(
         if (getAlertsRequest.alertState != "ALL")
             queryBuilder.filter(QueryBuilders.termQuery("state", getAlertsRequest.alertState))
 
+        if (getAlertsRequest.alertIds.isNullOrEmpty() == false) {
+            queryBuilder.filter(QueryBuilders.termsQuery("id", getAlertsRequest.alertIds))
+        }
+
         if (getAlertsRequest.monitorId != null) {
             queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getAlertsRequest.monitorId))
         } else if (getAlertsRequest.monitorIds.isNullOrEmpty() == false) {
