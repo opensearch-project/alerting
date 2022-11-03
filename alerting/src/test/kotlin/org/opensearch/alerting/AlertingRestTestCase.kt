@@ -106,8 +106,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return entityAsMap(this)
     }
 
-    private fun createMonitorEntityWithBackendRoles(monitor: Monitor, rbacRoles: List<String>): HttpEntity {
-        if (rbacRoles.isNullOrEmpty()) {
+    private fun createMonitorEntityWithBackendRoles(monitor: Monitor, rbacRoles: List<String>?): HttpEntity {
+        if (rbacRoles == null) {
             return monitor.toHttpEntity()
         }
         val temp = monitor.toJsonString()
@@ -120,7 +120,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun createMonitorWithClient(
         client: RestClient,
         monitor: Monitor,
-        rbacRoles: List<String> = emptyList(),
+        rbacRoles: List<String>? = null,
         refresh: Boolean = true
     ): Monitor {
         val response = client.makeRequest(

@@ -121,21 +121,35 @@ class TransportIndexMonitorAction @Inject constructor(
         if (
             user != null &&
             !isAdmin(user) &&
-            transformedRequest.rbacRoles != null &&
-            transformedRequest.rbacRoles?.stream()?.anyMatch { !user.backendRoles.contains(it) } == true
+            transformedRequest.rbacRoles != null
         ) {
-            log.debug(
-                "User specified backend roles, ${transformedRequest.rbacRoles}, " +
-                    "that they don' have access to. User backend roles: ${user.backendRoles}"
-            )
-            actionListener.onFailure(
-                AlertingException.wrap(
-                    OpenSearchStatusException(
-                        "User specified backend roles that they don' have access to. Contact administrator", RestStatus.FORBIDDEN
+            if (transformedRequest.rbacRoles?.stream()?.anyMatch { !user.backendRoles.contains(it) } == true) {
+                log.debug(
+                    "User specified backend roles, ${transformedRequest.rbacRoles}, " +
+                        "that they don' have access to. User backend roles: ${user.backendRoles}"
+                )
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "User specified backend roles that they don't have access to. Contact administrator", RestStatus.FORBIDDEN
+                        )
                     )
                 )
-            )
-            return
+                return
+            } else if (transformedRequest.rbacRoles?.isEmpty() == true) {
+                log.debug(
+                    "Non-admin user are not allowed to specify an empty set of backend roles. " +
+                        "Please don't pass in the parameter or pass in at least one backend role."
+                )
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "Non-admin user are not allowed to specify an empty set of backend roles.", RestStatus.FORBIDDEN
+                        )
+                    )
+                )
+                return
+            }
         }
 
         if (!isADMonitor(transformedRequest.monitor)) {

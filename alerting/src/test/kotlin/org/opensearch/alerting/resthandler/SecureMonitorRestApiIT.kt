@@ -411,6 +411,68 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    fun `test create monitor with enable filter by with no backend roles`() {
+        enableFilterBy()
+        if (!isHttps()) {
+            // if security is disabled and filter by is enabled, we can't create monitor
+            // refer: `test create monitor with enable filter by`
+            return
+        }
+        val monitor = randomQueryLevelMonitor(enabled = true)
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf(TEST_HR_BACKEND_ROLE, "role2"),
+            false
+        )
+
+        try {
+            createMonitorWithClient(userClient!!, monitor = monitor, listOf())
+            fail("Expected exception since a non-admin user is trying to create a monitor with no backend roles")
+        } catch (e: ResponseException) {
+            assertEquals("Create monitor failed", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
+        } finally {
+            createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf())
+            createUserRolesMapping(READALL_AND_MONITOR_ROLE, arrayOf())
+        }
+    }
+
+    fun `test create monitor as admin with enable filter by with no backend roles`() {
+        enableFilterBy()
+        if (!isHttps()) {
+            // if security is disabled and filter by is enabled, we can't create monitor
+            // refer: `test create monitor with enable filter by`
+            return
+        }
+        val monitor = randomQueryLevelMonitor(enabled = true)
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf(TEST_HR_BACKEND_ROLE, "role2"),
+            false
+        )
+
+        val createdMonitor = createMonitorWithClient(client(), monitor = monitor, listOf())
+        assertNotNull("The monitor was not created", createdMonitor)
+
+        try {
+            userClient?.makeRequest(
+                "GET",
+                "$ALERTING_BASE_URI/${createdMonitor.id}",
+                null,
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+            )
+            fail("Expected Forbidden exception")
+        } catch (e: ResponseException) {
+            assertEquals("Get monitor failed", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
+        } finally {
+            createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf())
+            createUserRolesMapping(READALL_AND_MONITOR_ROLE, arrayOf())
+        }
+    }
+
     fun `test create monitor with enable filter by with roles user has no access and throw exception`() {
         enableFilterBy()
         if (!isHttps()) {
@@ -541,6 +603,80 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
             deleteUser(getUser)
             getUserClient?.close()
+            createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf())
+            createUserRolesMapping(READALL_AND_MONITOR_ROLE, arrayOf())
+        }
+    }
+
+    fun `test update monitor with enable filter by with no backend roles`() {
+        enableFilterBy()
+        if (!isHttps()) {
+            // if security is disabled and filter by is enabled, we can't create monitor
+            // refer: `test create monitor with enable filter by`
+            return
+        }
+        val monitor = randomQueryLevelMonitor(enabled = true)
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf(TEST_HR_BACKEND_ROLE, "role2"),
+            false
+        )
+
+        val createdMonitor = createMonitorWithClient(userClient!!, monitor = monitor, listOf("role2"))
+        assertNotNull("The monitor was not created", createdMonitor)
+
+        try {
+            updateMonitorWithClient(userClient!!, createdMonitor, listOf())
+        } catch (e: ResponseException) {
+            assertEquals("Update monitor failed", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
+        } finally {
+            createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf())
+            createUserRolesMapping(READALL_AND_MONITOR_ROLE, arrayOf())
+        }
+    }
+
+    fun `test update monitor as admin with enable filter by with no backend roles`() {
+        enableFilterBy()
+        if (!isHttps()) {
+            // if security is disabled and filter by is enabled, we can't create monitor
+            // refer: `test create monitor with enable filter by`
+            return
+        }
+        val monitor = randomQueryLevelMonitor(enabled = true)
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf(TEST_HR_BACKEND_ROLE, "role2"),
+            false
+        )
+
+        val createdMonitor = createMonitorWithClient(client(), monitor = monitor, listOf(TEST_HR_BACKEND_ROLE))
+        assertNotNull("The monitor was not created", createdMonitor)
+
+        val getMonitorResponse = userClient?.makeRequest(
+            "GET",
+            "$ALERTING_BASE_URI/${createdMonitor.id}",
+            null,
+            BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        )
+        assertEquals("Get monitor failed", RestStatus.OK, getMonitorResponse?.restStatus())
+
+        val updatedMonitor = updateMonitorWithClient(client(), createdMonitor, listOf())
+
+        try {
+            userClient?.makeRequest(
+                "GET",
+                "$ALERTING_BASE_URI/${updatedMonitor.id}",
+                null,
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+            )
+            fail("Expected Forbidden exception")
+        } catch (e: ResponseException) {
+            assertEquals("Get monitor failed", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
+        } finally {
             createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf())
             createUserRolesMapping(READALL_AND_MONITOR_ROLE, arrayOf())
         }
