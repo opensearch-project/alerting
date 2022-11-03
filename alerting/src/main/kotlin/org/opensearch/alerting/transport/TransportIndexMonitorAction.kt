@@ -45,6 +45,7 @@ import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
+import org.opensearch.common.io.stream.NamedWriteableRegistry
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
@@ -87,7 +88,8 @@ class TransportIndexMonitorAction @Inject constructor(
     val docLevelMonitorQueries: DocLevelMonitorQueries,
     val clusterService: ClusterService,
     val settings: Settings,
-    val xContentRegistry: NamedXContentRegistry
+    val xContentRegistry: NamedXContentRegistry,
+    val namedWriteableRegistry: NamedWriteableRegistry,
 ) : HandledTransportAction<ActionRequest, IndexMonitorResponse>(
     AlertingActions.INDEX_MONITOR_ACTION_NAME, transportService, actionFilters, ::IndexMonitorRequest
 ),
@@ -111,7 +113,10 @@ class TransportIndexMonitorAction @Inject constructor(
 
     override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<IndexMonitorResponse>) {
         val transformedRequest = request as? IndexMonitorRequest
-            ?: recreateObject(request) { IndexMonitorRequest(it) }
+            ?: recreateObject(request, namedWriteableRegistry) {
+                IndexMonitorRequest(it)
+            }
+
         val user = readUserFromThreadContext(client)
 
         if (!validateUserBackendRoles(user, actionListener)) {
