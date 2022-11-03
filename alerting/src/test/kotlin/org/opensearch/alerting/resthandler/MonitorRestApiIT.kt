@@ -24,6 +24,7 @@ import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomAlert
 import org.opensearch.alerting.randomAnomalyDetector
 import org.opensearch.alerting.randomAnomalyDetectorWithUser
+import org.opensearch.alerting.randomBucketLevelMonitor
 import org.opensearch.alerting.randomBucketLevelTrigger
 import org.opensearch.alerting.randomDocumentLevelMonitor
 import org.opensearch.alerting.randomDocumentLevelTrigger
@@ -95,6 +96,21 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     @Throws(Exception::class)
     fun `test creating a monitor`() {
         val monitor = randomQueryLevelMonitor()
+
+        val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+
+        assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
+        val responseBody = createResponse.asMap()
+        val createdId = responseBody["_id"] as String
+        val createdVersion = responseBody["_version"] as Int
+        assertNotEquals("response is missing Id", Monitor.NO_ID, createdId)
+        assertTrue("incorrect version", createdVersion > 0)
+        assertEquals("Incorrect Location header", "$ALERTING_BASE_URI/$createdId", createResponse.getHeader("Location"))
+    }
+
+    @Throws(Exception::class)
+    fun `test creating a bucket monitor`() {
+        val monitor = randomBucketLevelMonitor()
 
         val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
 
