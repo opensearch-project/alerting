@@ -118,6 +118,26 @@ class TransportIndexMonitorAction @Inject constructor(
             return
         }
 
+        if (
+            user != null &&
+            !isAdmin(user) &&
+            transformedRequest.rbacRoles != null &&
+            transformedRequest.rbacRoles?.stream()?.anyMatch { !user.backendRoles.contains(it) } == true
+        ) {
+            log.debug(
+                "User specified backend roles, ${transformedRequest.rbacRoles}, " +
+                    "that they don' have access to. User backend roles: ${user.backendRoles}"
+            )
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "User specified backend roles that they don' have access to. Contact administrator", RestStatus.FORBIDDEN
+                    )
+                )
+            )
+            return
+        }
+
         if (!isADMonitor(transformedRequest.monitor)) {
             checkIndicesAndExecute(client, actionListener, transformedRequest, user)
         } else {
@@ -403,7 +423,7 @@ class TransportIndexMonitorAction @Inject constructor(
             if (user != null) {
                 // Use the backend roles which is an intersection of the requested backend roles and the user's backend roles.
                 // Admins can pass in any backend role. Also if no backend role is passed in, all the user's backend roles are used.
-                val rbacRoles = if (request.rbacRoles.isNullOrEmpty()) user.backendRoles.toSet()
+                val rbacRoles = if (request.rbacRoles == null) user.backendRoles.toSet()
                 else if (!isAdmin(user)) request.rbacRoles?.intersect(user.backendRoles)?.toSet()
                 else request.rbacRoles
 
@@ -509,7 +529,7 @@ class TransportIndexMonitorAction @Inject constructor(
 
             // On update monitor check which backend roles to associate to the monitor
             if (user != null) {
-                if (!request.rbacRoles.isNullOrEmpty()) {
+                if (request.rbacRoles != null) {
                     if (isAdmin(user)) {
                         request.monitor = request.monitor.copy(
                             user = User(user.name, request.rbacRoles, user.roles, user.customAttNames)
@@ -517,9 +537,10 @@ class TransportIndexMonitorAction @Inject constructor(
                     } else {
                         val rolesToRemove = user.backendRoles
                         request.rbacRoles.orEmpty().let { rolesToRemove.removeAll(it) }
+                        val rolesToAdd = request.rbacRoles?.intersect(user.backendRoles)
                         val updatedRbac = currentMonitor.user?.backendRoles
                         updatedRbac?.removeAll(rolesToRemove)
-                        request.rbacRoles.orEmpty().let { updatedRbac?.addAll(it) }
+                        rolesToAdd.orEmpty().let { updatedRbac?.addAll(it) }
                         request.monitor = request.monitor.copy(
                             user = User(user.name, updatedRbac.orEmpty(), user.roles, user.customAttNames)
                         )
