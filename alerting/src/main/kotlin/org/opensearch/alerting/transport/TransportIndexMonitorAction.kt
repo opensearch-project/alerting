@@ -403,11 +403,15 @@ class TransportIndexMonitorAction @Inject constructor(
             if (user != null) {
                 // Use the backend roles which is an intersection of the requested backend roles and the user's backend roles.
                 // Admins can pass in any backend role. Also if no backend role is passed in, all the user's backend roles are used.
-                val rbacRoles = if (request.rbacRoles.isNullOrEmpty())
+                val rbacRoles = if (request.rbacRoles.isNullOrEmpty()) {
                     user.backendRoles.toSet()
-                else if (!isAdmin(user)) request.rbacRoles!!.intersect(user.backendRoles).toSet()
-                else request.rbacRoles!!
+                } else if (!isAdmin(user)) {
+                    request.rbacRoles!!.intersect(user.backendRoles).toSet()
+                } else {
+                    request.rbacRoles!!
+                }
                 request.monitor = request.monitor.copy(user = User(user.name, rbacRoles.toList(), user.roles, user.customAttNames))
+                log.debug("Created monitor's backend roles: $rbacRoles")
             }
 
             val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
@@ -512,9 +516,11 @@ class TransportIndexMonitorAction @Inject constructor(
                             user = User(user.name, request.rbacRoles, user.roles, user.customAttNames)
                         )
                     } else {
-                        val rolesToRemove = user.backendRoles.filter { !request.rbacRoles!!.contains(it) }
-                        val updatedRbac = currentMonitor.user!!.backendRoles.filter { !rolesToRemove.contains(it) }.toMutableSet()
-                        updatedRbac.addAll(request.monitor.user!!.backendRoles)
+                        val rolesToRemove = user.backendRoles
+                        rolesToRemove.removeAll(request.rbacRoles!!)
+                        val updatedRbac = currentMonitor.user!!.backendRoles
+                        updatedRbac.removeAll(rolesToRemove)
+                        updatedRbac.addAll(request.rbacRoles!!)
                         request.monitor = request.monitor.copy(
                             user = User(user.name, updatedRbac.toList(), user.roles, user.customAttNames)
                         )
@@ -523,6 +529,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     request.monitor = request.monitor
                         .copy(user = User(user.name, currentMonitor.user!!.backendRoles, user.roles, user.customAttNames))
                 }
+                log.debug("Update monitor backend roles to: ${request.monitor.user?.backendRoles}")
             }
 
             request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
