@@ -15,6 +15,7 @@ import org.opensearch.action.delete.DeleteRequest
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
+import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
@@ -383,7 +384,7 @@ class AlertService(
         // If the index request is to be retried, the Alert is saved separately as well so that its relative ordering is maintained in
         // relation to index request in the retried bulk request for when it eventually succeeds.
         retryPolicy.retry(logger, listOf(RestStatus.TOO_MANY_REQUESTS)) {
-            val bulkRequest = BulkRequest().add(requestsToRetry)
+            val bulkRequest = BulkRequest().add(requestsToRetry).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
             val bulkResponse: BulkResponse = client.suspendUntil { client.bulk(bulkRequest, it) }
             // TODO: This is only used to retrieve the retryCause, could instead fetch it from the bulkResponse iteration below
             val failedResponses = (bulkResponse.items ?: arrayOf()).filter { it.isFailed }

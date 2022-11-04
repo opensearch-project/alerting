@@ -46,7 +46,7 @@ import org.opensearch.search.aggregations.AggregatorFactories
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.time.Instant
-import java.util.*
+import java.util.UUID
 
 object BucketLevelMonitorRunner : MonitorRunner() {
     private val logger = LogManager.getLogger(javaClass)
@@ -139,15 +139,16 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                  * existing Alerts in a way the user can easily view them since they will have all been moved to the history index.
                  */
                 if (triggerResults[trigger.id]?.error != null) continue
-                val findings = if (monitor.dataSources.findingsEnabled == true) createFindings(
-                    triggerResult,
-                    monitor,
-                    monitorCtx,
-                    periodStart,
-                    periodEnd,
-                    !dryrun && monitor.id != Monitor.NO_ID
-                )
-                else emptyList()
+                val findings =
+                    if (monitor.triggers.size == 1 && monitor.dataSources.findingsEnabled == true) createFindings(
+                        triggerResult,
+                        monitor,
+                        monitorCtx,
+                        periodStart,
+                        periodEnd,
+                        !dryrun && monitor.id != Monitor.NO_ID
+                    )
+                    else emptyList()
                 // TODO: Should triggerResult's aggregationResultBucket be a list? If not, getCategorizedAlertsForBucketLevelMonitor can
                 //  be refactored to use a map instead
                 val categorizedAlerts = monitorCtx.alertService!!.getCategorizedAlertsForBucketLevelMonitor(
@@ -330,10 +331,15 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             if (input is SearchInput) {
                 val bucketValues: Set<String> = triggerResult.aggregationResultBuckets.keys
                 val query = input.query
-                var fieldName: String = ""
+                var fieldName = ""
+                var grouByFields = 0 // if number of fields used to group by > 1 we won't calculate findings
                 for (aggFactory in (query.aggregations() as AggregatorFactories.Builder).aggregatorFactories) {
                     val sources = (aggFactory as CompositeAggregationBuilder).sources()
                     for (source in sources) {
+                        if (grouByFields > 0) {
+                            return listOf()
+                        }
+                        grouByFields++
                         fieldName = source.field()
                     }
                 }
