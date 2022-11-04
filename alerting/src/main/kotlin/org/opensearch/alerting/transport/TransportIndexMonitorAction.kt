@@ -123,6 +123,40 @@ class TransportIndexMonitorAction @Inject constructor(
             return
         }
 
+        if (
+            user != null &&
+            !isAdmin(user) &&
+            transformedRequest.rbacRoles != null
+        ) {
+            if (transformedRequest.rbacRoles?.stream()?.anyMatch { !user.backendRoles.contains(it) } == true) {
+                log.debug(
+                    "User specified backend roles, ${transformedRequest.rbacRoles}, " +
+                        "that they don' have access to. User backend roles: ${user.backendRoles}"
+                )
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "User specified backend roles that they don't have access to. Contact administrator", RestStatus.FORBIDDEN
+                        )
+                    )
+                )
+                return
+            } else if (transformedRequest.rbacRoles?.isEmpty() == true) {
+                log.debug(
+                    "Non-admin user are not allowed to specify an empty set of backend roles. " +
+                        "Please don't pass in the parameter or pass in at least one backend role."
+                )
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "Non-admin user are not allowed to specify an empty set of backend roles.", RestStatus.FORBIDDEN
+                        )
+                    )
+                )
+                return
+            }
+        }
+
         if (!isADMonitor(transformedRequest.monitor)) {
             checkIndicesAndExecute(client, actionListener, transformedRequest, user)
         } else {
@@ -405,6 +439,19 @@ class TransportIndexMonitorAction @Inject constructor(
         private suspend fun indexMonitor() {
             var metadata = createMetadata()
 
+            if (user != null) {
+                // Use the backend roles which is an intersection of the requested backend roles and the user's backend roles.
+                // Admins can pass in any backend role. Also if no backend role is passed in, all the user's backend roles are used.
+                val rbacRoles = if (request.rbacRoles == null) user.backendRoles.toSet()
+                else if (!isAdmin(user)) request.rbacRoles?.intersect(user.backendRoles)?.toSet()
+                else request.rbacRoles
+
+                request.monitor = request.monitor.copy(
+                    user = User(user.name, rbacRoles.orEmpty().toList(), user.roles, user.customAttNames)
+                )
+                log.debug("Created monitor's backend roles: $rbacRoles")
+            }
+
             val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
                 .setRefreshPolicy(request.refreshPolicy)
                 .source(request.monitor.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
@@ -498,6 +545,42 @@ class TransportIndexMonitorAction @Inject constructor(
             // incorrect.
             if (request.monitor.enabled && currentMonitor.enabled)
                 request.monitor = request.monitor.copy(enabledTime = currentMonitor.enabledTime)
+
+            /**
+             * On update monitor check which backend roles to associate to the monitor.
+             * Below are 2 examples of how the logic works
+             *
+             * Example 1, say we have a Monitor with backend roles [a, b, c, d] associated with it.
+             * If I'm User A (non-admin user) and I have backend roles [a, b, c] associated with me and I make a request to update
+             * the Monitor's backend roles to [a, b]. This would mean that the roles to remove are [c] and the roles to add are [a, b].
+             * The Monitor's backend roles would then be [a, b, d].
+             *
+             * Example 2, say we have a Monitor with backend roles [a, b, c, d] associated with it.
+             * If I'm User A (admin user) and I have backend roles [a, b, c] associated with me and I make a request to update
+             * the Monitor's backend roles to [a, b]. This would mean that the roles to remove are [c, d] and the roles to add are [a, b].
+             * The Monitor's backend roles would then be [a, b].
+             */
+            if (user != null) {
+                if (request.rbacRoles != null) {
+                    if (isAdmin(user)) {
+                        request.monitor = request.monitor.copy(
+                            user = User(user.name, request.rbacRoles, user.roles, user.customAttNames)
+                        )
+                    } else {
+                        // rolesToRemove: these are the backend roles to remove from the monitor
+                        val rolesToRemove = user.backendRoles - request.rbacRoles.orEmpty()
+                        // remove the monitor's roles with rolesToRemove and add any roles passed into the request.rbacRoles
+                        val updatedRbac = currentMonitor.user?.backendRoles.orEmpty() - rolesToRemove + request.rbacRoles.orEmpty()
+                        request.monitor = request.monitor.copy(
+                            user = User(user.name, updatedRbac, user.roles, user.customAttNames)
+                        )
+                    }
+                } else {
+                    request.monitor = request.monitor
+                        .copy(user = User(user.name, currentMonitor.user!!.backendRoles, user.roles, user.customAttNames))
+                }
+                log.debug("Update monitor backend roles to: ${request.monitor.user?.backendRoles}")
+            }
 
             request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
             val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
