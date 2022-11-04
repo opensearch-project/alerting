@@ -139,7 +139,7 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
             user,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
-            TEST_HR_BACKEND_ROLE,
+            listOf(TEST_HR_BACKEND_ROLE),
             getClusterPermissionsFromCustomRole(ALERTING_GET_DESTINATION_ACCESS)
         )
 
