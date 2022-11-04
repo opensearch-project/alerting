@@ -151,6 +151,11 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 index
             ).source("test_alias.field_a", "type=alias,path=message")
         ).get()
+        client().admin().indices().putMapping(
+            PutMappingRequest(
+                index
+            ).source("test_alias2", "type=alias,path=test_field")
+        ).get()
 
         val id = monitorResponse.id
         val executeMonitorResponse = executeMonitor(monitor, id, false)
