@@ -22,10 +22,8 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.ToXContent.EMPTY_PARAMS
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
-import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.BytesRestResponse
@@ -97,14 +95,6 @@ class RestSearchMonitorAction(
         searchSourceBuilder.parseXContent(request.contentOrSourceParamParser())
         searchSourceBuilder.fetchSource(context(request))
 
-        val queryBuilder = QueryBuilders.boolQuery().must(searchSourceBuilder.query())
-        if (index == SCHEDULED_JOBS_INDEX) {
-            queryBuilder.filter(QueryBuilders.existsQuery(Monitor.MONITOR_TYPE))
-        }
-
-        searchSourceBuilder.query(queryBuilder)
-            .seqNoAndPrimaryTerm(true)
-            .version(true)
         val searchRequest = SearchRequest()
             .source(searchSourceBuilder)
             .indices(index)
