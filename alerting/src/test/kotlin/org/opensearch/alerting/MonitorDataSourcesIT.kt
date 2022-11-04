@@ -8,6 +8,7 @@ package org.opensearch.alerting
 import org.junit.Assert
 import org.opensearch.action.admin.cluster.state.ClusterStateRequest
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
+import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.support.WriteRequest
@@ -138,12 +139,19 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
             "message" : "This is an error from IAD region",
+            "source.port": 12345,
             "test_strict_date_time" : "$testTime",
             "test_field" : "us-west-2"
         }"""
+        indexDoc(index, "1", testDoc)
         assertFalse(monitorResponse?.id.isNullOrEmpty())
         monitor = monitorResponse!!.monitor
-        indexDoc(index, "1", testDoc)
+        client().admin().indices().putMapping(
+            PutMappingRequest(
+                index
+            ).source("test_alias.field_a", "type=alias,path=message")
+        ).get()
+
         val id = monitorResponse.id
         val executeMonitorResponse = executeMonitor(monitor, id, false)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
