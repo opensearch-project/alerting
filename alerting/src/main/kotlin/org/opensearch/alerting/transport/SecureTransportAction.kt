@@ -61,7 +61,7 @@ interface SecureTransportAction {
     /**
      *  'all_access' role users are treated as admins.
      */
-    private fun isAdmin(user: User?): Boolean {
+    fun isAdmin(user: User?): Boolean {
         return when {
             user == null -> {
                 false

@@ -84,6 +84,8 @@ class RestIndexMonitorAction : BaseRestHandler() {
         val xcp = request.contentParser()
         ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
         val monitor = Monitor.parse(xcp, id).copy(lastUpdateTime = Instant.now())
+        val rbacRoles = request.contentParser().map()["rbac_roles"] as List<String>?
+
         validateDataSources(monitor)
         validateOwner(monitor.owner)
         val monitorType = monitor.monitorType
@@ -118,7 +120,7 @@ class RestIndexMonitorAction : BaseRestHandler() {
         } else {
             WriteRequest.RefreshPolicy.IMMEDIATE
         }
-        val indexMonitorRequest = IndexMonitorRequest(id, seqNo, primaryTerm, refreshPolicy, request.method(), monitor)
+        val indexMonitorRequest = IndexMonitorRequest(id, seqNo, primaryTerm, refreshPolicy, request.method(), monitor, rbacRoles)
 
         return RestChannelConsumer { channel ->
             client.execute(AlertingActions.INDEX_MONITOR_ACTION_TYPE, indexMonitorRequest, indexMonitorResponse(channel, request.method()))
