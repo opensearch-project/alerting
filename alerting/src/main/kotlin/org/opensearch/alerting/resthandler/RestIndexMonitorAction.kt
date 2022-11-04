@@ -85,6 +85,7 @@ class RestIndexMonitorAction : BaseRestHandler() {
         ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
         val monitor = Monitor.parse(xcp, id).copy(lastUpdateTime = Instant.now())
         validateDataSources(monitor)
+        validateOwner(monitor.owner)
         val monitorType = monitor.monitorType
         val triggers = monitor.triggers
         when (monitorType) {
@@ -133,6 +134,12 @@ class RestIndexMonitorAction : BaseRestHandler() {
             ) {
                 throw IllegalArgumentException("Custom Data Sources are not allowed.")
             }
+        }
+    }
+
+    private fun validateOwner(owner: String?) {
+        if (owner != "alerting") {
+            throw IllegalArgumentException("Invalid owner field")
         }
     }
 
