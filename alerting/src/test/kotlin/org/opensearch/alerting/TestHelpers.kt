@@ -181,12 +181,13 @@ fun randomDocumentLevelMonitor(
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     withMetadata: Boolean = false,
-    dataSources: DataSources
+    dataSources: DataSources,
+    owner: String? = null
 ): Monitor {
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.DOC_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
-        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf(), dataSources = dataSources
+        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf(), dataSources = dataSources, owner = owner
     )
 }
 
