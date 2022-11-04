@@ -669,4 +669,45 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
     private fun Map<String, Any>.objectMap(key: String): Map<String, Map<String, Any>> {
         return this[key] as Map<String, Map<String, Any>>
     }
+
+    fun `test execute monitor with non-null owner`() {
+
+        val testIndex = createTestIndex()
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+                "message" : "This is an error from IAD region",
+                "test_strict_date_time" : "$testTime",
+                "test_field" : "us-west-2"
+            }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val alertCategories = AlertCategory.values()
+        val actionExecutionScope = PerAlertActionScope(
+            actionableAlerts = (1..randomInt(alertCategories.size)).map { alertCategories[it - 1] }.toSet()
+        )
+        val actionExecutionPolicy = ActionExecutionPolicy(actionExecutionScope)
+        val actions = (0..randomInt(10)).map {
+            randomActionWithPolicy(
+                template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+                destinationId = createDestination().id,
+                actionExecutionPolicy = actionExecutionPolicy
+            )
+        }
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = actions)
+        try {
+            createMonitor(
+                randomDocumentLevelMonitor(
+                    inputs = listOf(docLevelInput),
+                    triggers = listOf(trigger),
+                    owner = "owner"
+                )
+            )
+            fail("Expected create monitor to fail")
+        } catch (e: ResponseException) {
+            assertTrue(e.message!!.contains("illegal_argument_exception"))
+        }
+    }
 }
