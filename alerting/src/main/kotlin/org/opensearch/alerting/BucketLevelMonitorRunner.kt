@@ -6,8 +6,9 @@
 package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.action.bulk.BulkRequest
+import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.index.IndexRequest
-import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.WriteRequest
@@ -16,6 +17,7 @@ import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
+import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
@@ -23,7 +25,6 @@ import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.alerting.util.getCombinedTriggerRunResult
-import org.opensearch.client.Client
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
@@ -39,6 +40,7 @@ import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
 import org.opensearch.commons.alerting.util.string
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptType
 import org.opensearch.script.TemplateScript
@@ -380,12 +382,14 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         monitorCtx: MonitorRunnerExecutionContext,
         shouldCreateFinding: Boolean
     ): List<String> {
-        val docIdsByIndexName: MutableMap<String, List<String>> = mutableMapOf()
+        val docIdsByIndexName: MutableMap<String, MutableList<String>> = mutableMapOf()
         for (hit in searchResponse.hits.hits) {
             val ids = docIdsByIndexName.getOrDefault(hit.index, mutableListOf())
+            ids.add(hit.id)
             docIdsByIndexName[hit.index] = ids
         }
         val findings = mutableListOf<String>()
+        var requestsToRetry: MutableList<IndexRequest> = mutableListOf()
         docIdsByIndexName.entries.forEach { it ->
             run {
                 val finding = Finding(
@@ -402,17 +406,27 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 logger.debug("Findings: $findingStr")
                 if (shouldCreateFinding) {
                     val indexRequest = IndexRequest(monitor.dataSources.findingsIndex)
-                        .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
                         .source(findingStr, XContentType.JSON)
                         .id(finding.id)
                         .routing(finding.id)
-
-                    monitorCtx.client!!.suspendUntil<Client, IndexResponse> {
-                        monitorCtx.client!!.index(indexRequest, it)
+                    requestsToRetry.add(indexRequest)
+                }
+                findings.add(finding.id)
+            }
+        }
+        if (requestsToRetry.isEmpty()) return listOf()
+        monitorCtx.retryPolicy!!.retry(logger, listOf(RestStatus.TOO_MANY_REQUESTS)) {
+            val bulkRequest = BulkRequest().add(requestsToRetry).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+            val bulkResponse: BulkResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.bulk(bulkRequest, it) }
+            requestsToRetry = mutableListOf()
+            val findingsBeingRetried = mutableListOf<Alert>()
+            bulkResponse.items.forEach { item ->
+                if (item.isFailed) {
+                    if (item.status() == RestStatus.TOO_MANY_REQUESTS) {
+                        requestsToRetry.add(bulkRequest.requests()[item.itemId] as IndexRequest)
+                        findingsBeingRetried.add(findingsBeingRetried[item.itemId])
                     }
                 }
-
-                findings.add(finding.id)
             }
         }
         return findings

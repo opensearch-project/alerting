@@ -1274,7 +1274,6 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals("Alerts not saved", 2, currentAlerts.size)
         currentAlerts.forEach {
             verifyAlert(it, monitor, ACTIVE)
-            Assert.assertEquals("expected no findings for alert", it.findingIds.size, 0)
         }
 
         // Acknowledge one of the Alerts
@@ -1386,6 +1385,78 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         currentAlerts.forEach { alert ->
             Assert.assertEquals("expected findings for alert", alert.findingIds.size, 1)
         }
+        val findings = searchFindings(monitor)
+        assertEquals("Findings saved for test monitor", 1, findings.size)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("2"))
+    }
+
+    fun `test bucket-level monitor with findings enabled for multiple group by fields`() {
+        val testIndex = createTestIndex()
+        insertSampleTimeSerializedData(
+            testIndex,
+            listOf(
+                "test_value_1",
+                "test_value_2"
+            )
+        )
+
+        val query = QueryBuilders.rangeQuery("test_strict_date_time")
+            .gt("{{period_end}}||-10d")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
+        val compositeSources = listOf(
+            TermsValuesSourceBuilder("test_field").field("test_field"),
+            TermsValuesSourceBuilder("number").field("number")
+        )
+        val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
+        val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
+        val triggerScript = """
+            params.docCount > 0
+        """.trimIndent()
+
+        // For the Actions ensure that there is at least one and any PER_ALERT actions contain ACTIVE, DEDUPED and COMPLETED in its policy
+        // so that the assertions done later in this test don't fail.
+        // The config is being mutated this way to still maintain the randomness in configuration (like including other ActionExecutionScope).
+        val actions = randomActionsForBucketLevelTrigger(min = 1).map {
+            if (it.actionExecutionPolicy?.actionExecutionScope is PerAlertActionScope) {
+                it.copy(
+                    actionExecutionPolicy = ActionExecutionPolicy(
+                        PerAlertActionScope(setOf(AlertCategory.NEW, AlertCategory.DEDUPED, AlertCategory.COMPLETED))
+                    )
+                )
+            } else {
+                it
+            }
+        }
+        var trigger = randomBucketLevelTrigger(actions = actions)
+        trigger = trigger.copy(
+            bucketSelector = BucketSelectorExtAggregationBuilder(
+                name = trigger.id,
+                bucketsPathsMap = mapOf("docCount" to "_count"),
+                script = Script(triggerScript),
+                parentBucketPath = "composite_agg",
+                filter = null
+            )
+        )
+        val monitor = createMonitor(
+            randomBucketLevelMonitor(
+                inputs = listOf(input),
+                enabled = false,
+                triggers = listOf(trigger),
+                dataSources = DataSources(findingsEnabled = true)
+            )
+        )
+        executeMonitor(monitor.id)
+
+        // Check created Alerts
+        var currentAlerts = searchAlerts(monitor)
+        assertEquals("Alerts not saved", 2, currentAlerts.size)
+        currentAlerts.forEach { alert ->
+            Assert.assertEquals("expected findings for alert", alert.findingIds.size, 0)
+        }
+        val findings = searchFindings(monitor)
+        assertEquals("Findings saved for test monitor", 0, findings.size)
     }
 
     @Suppress("UNCHECKED_CAST")
