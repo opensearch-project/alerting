@@ -312,9 +312,13 @@ class TransportIndexMonitorAction @Inject constructor(
                                 val request = ClusterHealthRequest()
                                     .indices(SCHEDULED_JOBS_INDEX)
                                     .waitForYellowStatus()
-                                val response: ClusterHealthResponse = client.suspendUntil { execute(ClusterHealthAction.INSTANCE, request, it) }
+                                val response: ClusterHealthResponse = client.suspendUntil {
+                                    execute(ClusterHealthAction.INSTANCE, request, it)
+                                }
                                 if (response.isTimedOut) {
-                                    actionListener.onFailure(OpenSearchException("Cannot determine that the $SCHEDULED_JOBS_INDEX index is healthy"))
+                                    actionListener.onFailure(
+                                        OpenSearchException("Cannot determine that the $SCHEDULED_JOBS_INDEX index is healthy")
+                                    )
                                 }
                                 // Retry mapping of monitor
                                 onCreateMappingsResponse(true)
