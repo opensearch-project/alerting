@@ -12,6 +12,7 @@ Compatible with OpenSearch 2.4.0
 * Custom history indices ([#616](https://github.com/opensearch-project/alerting/pull/616]))
 * adds filtering on owner field in search monitor action ([#641](https://github.com/opensearch-project/alerting/pull/641]))
 * Support to specify backend roles for monitors ([#635](https://github.com/opensearch-project/alerting/pull/635]))
+* Adds findings in bucket level monitor ([#636](https://github.com/opensearch-project/alerting/pull/636]))
 
 ### Refactoring
 * moving over data models from alerting to common-utils ([#556](https://github.com/opensearch-project/alerting/pull/556]))
