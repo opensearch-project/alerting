@@ -779,7 +779,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             """
                 "properties" : {
                   "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
-                  "test_field" : { "type" : "keyword" }
+                  "test_field" : { "type" : "keyword" },
+                  "number" : { "type" : "keyword" }
                 }
             """.trimIndent()
         )
@@ -866,7 +867,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             val testDoc = """
                 {
                   "test_strict_date_time": "$testTime",
-                  "test_field": "$value"
+                  "test_field": "$value",
+                   "number": "$i"
                 }
             """.trimIndent()
             // Indexing documents with deterministic doc id to allow for easy selected deletion during testing
