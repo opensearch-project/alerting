@@ -32,6 +32,11 @@ private val log = LogManager.getLogger(DocLevelMonitorQueries::class.java)
 
 class DocLevelMonitorQueries(private val client: Client, private val clusterService: ClusterService) {
     companion object {
+
+        val PROPERTIES = "properties"
+        val NESTED = "nested"
+        val TYPE = "type"
+
         @JvmStatic
         fun docLevelQueriesMappings(): String {
             return DocLevelMonitorQueries::class.java.classLoader.getResource("mappings/doc-level-queries.json").readText()
@@ -95,6 +100,22 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         return clusterState.routingTable.hasIndex(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
     }
 
+    /**
+     * From given index mapping node, extracts fieldName -> fieldProperties pair
+     */
+    fun extractField(node: MutableMap<String, Any>, currentPath: String): Pair<String, MutableMap<String, Any>> {
+        if (node.containsKey(PROPERTIES)) {
+            return extractField(node.get(PROPERTIES) as MutableMap<String, Any>, currentPath)
+        } else if (node.containsKey(NESTED)) {
+            return extractField(node.get(NESTED) as MutableMap<String, Any>, currentPath)
+        } else if (node.size == 1 && node.containsKey(TYPE) == false) {
+            val iter = node.iterator().next()
+            return extractField(iter.value as MutableMap<String, Any>, currentPath + "." + iter.key)
+        } else {
+            return Pair(currentPath, node)
+        }
+    }
+
     suspend fun indexDocLevelQueries(
         monitor: Monitor,
         monitorId: String,
@@ -123,17 +144,19 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                         )
 
                     val updatedProperties = properties.entries.associate {
-                        val newVal = it.value.toMutableMap()
+                        var (fieldName, fieldProps) = extractField(it.value as MutableMap<String, Any>, it.key)
+                        val newProps = fieldProps
                         if (monitor.dataSources.queryIndexMappingsByType.isNotEmpty()) {
                             val mappingsByType = monitor.dataSources.queryIndexMappingsByType
                             if (it.value.containsKey("type") && mappingsByType.containsKey(it.value["type"]!!)) {
                                 mappingsByType[it.value["type"]]?.entries?.forEach { iter: Map.Entry<String, String> ->
-                                    newVal[iter.key] = iter.value
+                                    newProps[iter.key] = iter.value
                                 }
                             }
                         }
-                        if (it.value.containsKey("path")) newVal["path"] = "${it.value["path"]}_${indexName}_$monitorId"
-                        "${it.key}_${indexName}_$monitorId" to newVal
+
+                        if (fieldProps.containsKey("path")) newProps["path"] = "${fieldProps["path"]}_${indexName}_$monitorId"
+                        "${fieldName}_${indexName}_$monitorId" to newProps
                     }
                     val queryIndex = monitor.dataSources.queryIndex
 
