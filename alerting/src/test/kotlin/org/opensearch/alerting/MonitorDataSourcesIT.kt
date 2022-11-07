@@ -244,17 +244,19 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals(0, searchResponse.hits.hits.size)
     }
 
-    fun `test execute monitor with custom findings index`() {
+    fun `test execute monitor with custom findings index and pattern`() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
+        val customFindingsIndexPattern = "<custom_findings_index-{now/d}-1>"
         var monitor = randomDocumentLevelMonitor(
             inputs = listOf(docLevelInput),
             triggers = listOf(trigger),
-            dataSources = DataSources(findingsIndex = customFindingsIndex)
+            dataSources = DataSources(findingsIndex = customFindingsIndex, findingsIndexPattern = customFindingsIndexPattern)
         )
         val monitorResponse = createMonitor(monitor)
+        client().admin().indices().refresh(RefreshRequest("*"))
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
             "message" : "This is an error from IAD region",
@@ -265,24 +267,26 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         monitor = monitorResponse!!.monitor
         indexDoc(index, "1", testDoc)
         val id = monitorResponse.id
-        val executeMonitorResponse = executeMonitor(monitor, id, false)
+        var executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        resolveIndex("custom_findings_index-2022.11.06-1")
+
+        var findings = searchFindings(id, "custom_findings_index*", true)
+        assertEquals("Findings saved for test monitor", 1, findings.size)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
+
+        indexDoc(index, "2", testDoc)
+        executeMonitorResponse = executeMonitor(monitor, id, false)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
-        val findings = searchFindings(id, customFindingsIndex)
-        assertEquals("Findings saved for test monitor", 1, findings.size)
-        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
-        val table = Table("asc", "id", null, 1, 0, "")
-        var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
-            .get()
-        Assert.assertTrue(getAlertsResponse != null)
-        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
-        getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, null))
-            .get()
-        Assert.assertTrue(getAlertsResponse != null)
-        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        findings = searchFindings(id, "custom_findings_index*", true)
+        assertEquals("Findings saved for test monitor", 2, findings.size)
+        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("2"))
+
+        val indices = getAllIndicesFromPattern("custom_findings_index*")
+        Assert.assertTrue(indices.size > 0)
     }
 
     fun `test execute pre-existing monitorand update`() {
