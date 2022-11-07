@@ -270,7 +270,6 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         var executeMonitorResponse = executeMonitor(monitor, id, false)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
-        resolveIndex("custom_findings_index-2022.11.06-1")
 
         var findings = searchFindings(id, "custom_findings_index*", true)
         assertEquals("Findings saved for test monitor", 1, findings.size)
@@ -286,7 +285,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("2"))
 
         val indices = getAllIndicesFromPattern("custom_findings_index*")
-        Assert.assertTrue(indices.size > 0)
+        Assert.assertTrue(indices.isNotEmpty())
     }
 
     fun `test execute pre-existing monitorand update`() {
