@@ -140,6 +140,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val testDoc = """{
             "message" : "This is an error from IAD region",
             "source.port": 12345,
+            "source.ip": 12345,
+            "source.ipv6": 12345,
             "test_strict_date_time" : "$testTime",
             "test_field" : "us-west-2"
         }"""
@@ -149,7 +151,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         client().admin().indices().putMapping(
             PutMappingRequest(
                 index
-            ).source("test_alias.field_a", "type=alias,path=message")
+            ).source("test_alias.field_a", "type=alias,path=source.port")
         ).get()
         client().admin().indices().putMapping(
             PutMappingRequest(
