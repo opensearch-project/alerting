@@ -326,7 +326,7 @@ class AlertIndices(
         }
         val findingsIndex = dataSources.findingsIndex
         val findingsIndexPattern = dataSources.findingsIndexPattern ?: FINDING_HISTORY_INDEX_PATTERN
-        if (!clusterService.state().metadata().hasAlias(findingsIndexPattern)) {
+        if (!clusterService.state().metadata().hasAlias(findingsIndex)) {
             createIndex(
                 findingsIndexPattern,
                 findingMapping(),
