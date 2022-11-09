@@ -32,6 +32,11 @@ private val log = LogManager.getLogger(DocLevelMonitorQueries::class.java)
 
 class DocLevelMonitorQueries(private val client: Client, private val clusterService: ClusterService) {
     companion object {
+
+        val PROPERTIES = "properties"
+        val NESTED = "nested"
+        val TYPE = "type"
+
         @JvmStatic
         fun docLevelQueriesMappings(): String {
             return DocLevelMonitorQueries::class.java.classLoader.getResource("mappings/doc-level-queries.json").readText()
@@ -95,6 +100,58 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         return clusterState.routingTable.hasIndex(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
     }
 
+    /**
+     * Does a DFS traversal of index mappings tree.
+     * Calls processLeafFn on every leaf node.
+     * Populates flattenPaths list with full paths of leaf nodes
+     * @param node current node which we're visiting
+     * @param currentPath current node path from root node
+     * @param processLeafFn leaf processor function which is called on every leaf discovered
+     * @param flattenPaths list of full paths of all leaf nodes relative to root
+     */
+    fun traverseMappingsAndUpdate(
+        node: MutableMap<String, Any>,
+        currentPath: String,
+        processLeafFn: (String, MutableMap<String, Any>) -> Triple<String, String, MutableMap<String, Any>>,
+        flattenPaths: MutableList<String>
+    ) {
+        // If node contains "properties" property then it is internal(non-leaf) node
+        if (node.containsKey(PROPERTIES)) {
+            return traverseMappingsAndUpdate(node.get(PROPERTIES) as MutableMap<String, Any>, currentPath, processLeafFn, flattenPaths)
+        } else if (node.containsKey(TYPE) == false) {
+            // If there is no "type" property, this is either internal(non-leaf) node or leaf node
+            // newNodes will hold list of updated leaf properties
+            var newNodes = ArrayList<Triple<String, String, Any>>(node.size)
+            node.entries.forEach {
+                // Compute full path relative to root
+                val fullPath = if (currentPath.isEmpty()) it.key
+                else "$currentPath.${it.key}"
+                val nodeProps = it.value as MutableMap<String, Any>
+                // If it has type property and type is not "nested" then this is a leaf
+                if (nodeProps.containsKey(TYPE) && nodeProps[TYPE] != NESTED) {
+                    // At this point we know full path of node, so we add it to output array
+                    flattenPaths.add(fullPath)
+                    // Calls processLeafFn and gets old node name, new node name and new properties of node.
+                    // This is all information we need to update this node
+                    val (oldName, newName, props) = processLeafFn(it.key, it.value as MutableMap<String, Any>)
+                    newNodes.add(Triple(oldName, newName, props))
+                } else {
+                    // Internal(non-leaf) node - visit children
+                    traverseMappingsAndUpdate(nodeProps[PROPERTIES] as MutableMap<String, Any>, fullPath, processLeafFn, flattenPaths)
+                }
+            }
+            // Here we can update all processed leaves in tree
+            newNodes.forEach {
+                // If we renamed leaf, we have to remove it first
+                if (it.first != it.second) {
+                    node.remove(it.first)
+                }
+                // Put new properties of leaf
+                node.put(it.second, it.third)
+            }
+        }
+    }
+
     suspend fun indexDocLevelQueries(
         monitor: Monitor,
         monitorId: String,
@@ -113,28 +170,39 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         }
         val indices = getIndexResponse.indices()
 
+        // Run through each backing index and apply appropriate mappings to query index
         indices?.forEach { indexName ->
             if (clusterState.routingTable.hasIndex(indexName)) {
                 val indexMetadata = clusterState.metadata.index(indexName)
                 if (indexMetadata.mapping()?.sourceAsMap?.get("properties") != null) {
                     val properties = (
                         (indexMetadata.mapping()?.sourceAsMap?.get("properties"))
-                            as Map<String, Map<String, Any>>
+                            as MutableMap<String, Any>
                         )
-
-                    val updatedProperties = properties.entries.associate {
-                        val newVal = it.value.toMutableMap()
-                        if (monitor.dataSources.queryIndexMappingsByType.isNotEmpty()) {
-                            val mappingsByType = monitor.dataSources.queryIndexMappingsByType
-                            if (it.value.containsKey("type") && mappingsByType.containsKey(it.value["type"]!!)) {
-                                mappingsByType[it.value["type"]]?.entries?.forEach { iter: Map.Entry<String, String> ->
-                                    newVal[iter.key] = iter.value
+                    // Node processor function is used to process leaves of index mappings tree
+                    //
+                    val leafNodeProcessor =
+                        fun(fieldName: String, props: MutableMap<String, Any>): Triple<String, String, MutableMap<String, Any>> {
+                            val newProps = props.toMutableMap()
+                            if (monitor.dataSources.queryIndexMappingsByType.isNotEmpty()) {
+                                val mappingsByType = monitor.dataSources.queryIndexMappingsByType
+                                if (props.containsKey("type") && mappingsByType.containsKey(props["type"]!!)) {
+                                    mappingsByType[props["type"]]?.entries?.forEach { iter: Map.Entry<String, String> ->
+                                        newProps[iter.key] = iter.value
+                                    }
                                 }
                             }
+                            if (props.containsKey("path")) {
+                                newProps["path"] = "${props["path"]}_${indexName}_$monitorId"
+                            }
+                            return Triple(fieldName, "${fieldName}_${indexName}_$monitorId", newProps)
                         }
-                        if (it.value.containsKey("path")) newVal["path"] = "${it.value["path"]}_${indexName}_$monitorId"
-                        "${it.key}_${indexName}_$monitorId" to newVal
-                    }
+                    // Traverse and update index mappings here while extracting flatten field paths
+                    val flattenPaths = mutableListOf<String>()
+                    traverseMappingsAndUpdate(properties, "", leafNodeProcessor, flattenPaths)
+                    // Updated mappings ready to be applied on queryIndex
+                    val updatedProperties = properties
+
                     val queryIndex = monitor.dataSources.queryIndex
 
                     val updateMappingRequest = PutMappingRequest(queryIndex)
@@ -147,8 +215,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                         val indexRequests = mutableListOf<IndexRequest>()
                         queries.forEach {
                             var query = it.query
-                            properties.forEach { prop ->
-                                query = query.replace("${prop.key}:", "${prop.key}_${indexName}_$monitorId:")
+                            flattenPaths.forEach { fieldPath ->
+                                query = query.replace("$fieldPath:", "${fieldPath}_${indexName}_$monitorId:")
                             }
                             val indexRequest = IndexRequest(queryIndex)
                                 .id(it.id + "_${indexName}_$monitorId")
