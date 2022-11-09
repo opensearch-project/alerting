@@ -260,7 +260,7 @@ data class Destination(
             }
             DestinationType.CUSTOM_WEBHOOK -> {
                 destinationMessage = LegacyCustomWebhookMessage.Builder(name)
-                    .withUrl(getLegacyCustomWebhookMessageURL(customWebhook))
+                    .withUrl(getLegacyCustomWebhookMessageURL(customWebhook, compiledMessage))
                     .withHeaderParams(customWebhook?.headerParams)
                     .withMessage(compiledMessage).build()
             }
@@ -296,7 +296,7 @@ data class Destination(
         return content
     }
 
-    private fun getLegacyCustomWebhookMessageURL(customWebhook: CustomWebhook?): String {
+    private fun getLegacyCustomWebhookMessageURL(customWebhook: CustomWebhook?, message: String): String {
         return LegacyCustomWebhookMessage.Builder(name)
             .withUrl(customWebhook?.url)
             .withScheme(customWebhook?.scheme)
@@ -304,6 +304,7 @@ data class Destination(
             .withPort(customWebhook?.port)
             .withPath(customWebhook?.path)
             .withQueryParams(customWebhook?.queryParams)
+            .withMessage(message)
             .build().uri.toString()
     }
 }
