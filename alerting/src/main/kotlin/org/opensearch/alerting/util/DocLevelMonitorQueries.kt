@@ -118,8 +118,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         // If node contains "properties" property then it is internal(non-leaf) node
         if (node.containsKey(PROPERTIES)) {
             return traverseMappingsAndUpdate(node.get(PROPERTIES) as MutableMap<String, Any>, currentPath, processLeafFn, flattenPaths)
-        // If there is no "type" property, this is either internal(non-leaf) node or leaf node
         } else if (node.containsKey(TYPE) == false) {
+            // If there is no "type" property, this is either internal(non-leaf) node or leaf node
             // newNodes will hold list of updated leaf properties
             var newNodes = ArrayList<Triple<String, String, Any>>(node.size)
             node.entries.forEach {
@@ -135,8 +135,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     // This is all information we need to update this node
                     val (oldName, newName, props) = processLeafFn(it.key, it.value as MutableMap<String, Any>)
                     newNodes.add(Triple(oldName, newName, props))
-                // Internal(non-leaf) node - visit children
                 } else {
+                    // Internal(non-leaf) node - visit children
                     traverseMappingsAndUpdate(nodeProps[PROPERTIES] as MutableMap<String, Any>, fullPath, processLeafFn, flattenPaths)
                 }
             }
