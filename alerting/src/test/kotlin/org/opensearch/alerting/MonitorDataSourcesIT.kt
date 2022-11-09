@@ -31,6 +31,7 @@ import org.opensearch.test.OpenSearchTestCase
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit.MILLIS
+import java.util.Map
 import java.util.concurrent.TimeUnit
 import java.util.stream.Collectors
 
@@ -126,39 +127,45 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute monitor with custom query index`() {
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
-        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
+        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4")
+        val docQuery3 = DocLevelQuery(query = "source.ip.v4.v0:120", name = "5")
+        val docQuery4 = DocLevelQuery(query = "alias.some.fff:\"us-west-2\"", name = "6")
+        val docQuery5 = DocLevelQuery(query = "message:\"This is an error from IAD region\"", name = "7")
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(docQuery1, docQuery2, docQuery3, docQuery4, docQuery5)
+        )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customFindingsIndex = "custom_findings_index"
+        val customFindingsIndexPattern = "custom_findings_index-1"
         val customQueryIndex = "custom_alerts_index"
         var monitor = randomDocumentLevelMonitor(
             inputs = listOf(docLevelInput),
             triggers = listOf(trigger),
-            dataSources = DataSources(queryIndex = customQueryIndex)
+            dataSources = DataSources(
+                queryIndex = customQueryIndex,
+                findingsIndex = customFindingsIndex,
+                findingsIndexPattern = customFindingsIndexPattern
+            )
         )
         val monitorResponse = createMonitor(monitor)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        // Trying to test here few different "nesting" situations and "wierd" characters
         val testDoc = """{
             "message" : "This is an error from IAD region",
-            "source.port": 12345,
-            "source.ip": 12345,
-            "source.ipv6": 12345,
+            "source.ip.v6.v1" : 12345,
+            "source.ip.v6.v2" : 16645,
+            "source.ip.v4.v0" : 120,
+            "test_bad_char" : "\u0000", 
             "test_strict_date_time" : "$testTime",
-            "test_field" : "us-west-2"
+            "test_field.some_other_field" : "us-west-2"
         }"""
         indexDoc(index, "1", testDoc)
+        client().admin().indices().putMapping(
+            PutMappingRequest(index).source("alias.some.fff", "type=alias,path=test_field.some_other_field")
+        )
         assertFalse(monitorResponse?.id.isNullOrEmpty())
         monitor = monitorResponse!!.monitor
-        client().admin().indices().putMapping(
-            PutMappingRequest(
-                index
-            ).source("test_alias.field_a", "type=alias,path=source.port")
-        ).get()
-        client().admin().indices().putMapping(
-            PutMappingRequest(
-                index
-            ).source("test_alias2", "type=alias,path=test_field")
-        ).get()
-
         val id = monitorResponse.id
         val executeMonitorResponse = executeMonitor(monitor, id, false)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
@@ -170,11 +177,85 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
-        getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, null))
+        val findings = searchFindings(id, customFindingsIndex)
+        assertEquals("Findings saved for test monitor", 1, findings.size)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
+        assertEquals("Didn't match all 5 queries", 5, findings[0].docLevelQueries.size)
+    }
+
+    fun `test execute monitor with custom query index and nested mappings`() {
+        val docQuery1 = DocLevelQuery(query = "message:\"msg 1 2 3 4\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customFindingsIndex = "custom_findings_index"
+        val customFindingsIndexPattern = "custom_findings_index-1"
+        val customQueryIndex = "custom_alerts_index"
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(
+                queryIndex = customQueryIndex,
+                findingsIndex = customFindingsIndex,
+                findingsIndexPattern = customFindingsIndexPattern
+            )
+        )
+        val monitorResponse = createMonitor(monitor)
+
+        // We are verifying here that index with nested mappings and nested aliases
+        // won't break query matching
+
+        // Create index mappings
+        val m: MutableMap<String, Any> = HashMap()
+        val m1: MutableMap<String, Any> = HashMap()
+        m1["title"] = Map.of("type", "text")
+        m1["category"] = Map.of("type", "keyword")
+        m["rule"] = Map.of("type", "nested", "properties", m1)
+        val properties = Map.of<String, Any>("properties", m)
+
+        client().admin().indices().putMapping(
+            PutMappingRequest(
+                index
+            ).source(properties)
+        ).get()
+
+        // Put alias for nested fields
+        val mm: MutableMap<String, Any> = HashMap()
+        val mm1: MutableMap<String, Any> = HashMap()
+        mm1["title_alias"] = Map.of("type", "alias", "path", "rule.title")
+        mm["rule"] = Map.of("type", "nested", "properties", mm1)
+        val properties1 = Map.of<String, Any>("properties", mm)
+        client().admin().indices().putMapping(
+            PutMappingRequest(
+                index
+            ).source(properties1)
+        ).get()
+
+        val testDoc = """{
+            "rule": {"title": "some_title"},
+            "message": "msg 1 2 3 4"
+        }"""
+        indexDoc(index, "2", testDoc)
+
+        client().admin().indices().putMapping(
+            PutMappingRequest(index).source("alias.some.fff", "type=alias,path=test_field.some_other_field")
+        )
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+        val id = monitorResponse.id
+        val executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        searchAlerts(id)
+        val table = Table("asc", "id", null, 1, 0, "")
+        var getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        val findings = searchFindings(id, customFindingsIndex)
+        assertEquals("Findings saved for test monitor", 1, findings.size)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("2"))
+        assertEquals("Didn't match all 4 queries", 1, findings[0].docLevelQueries.size)
     }
 
     fun `test execute monitor with custom query index and custom field mappings`() {
