@@ -12,6 +12,8 @@ import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.action.SearchMonitorAction
+import org.opensearch.alerting.action.SearchMonitorRequest
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.transport.AlertingSingleNodeTestCase
 import org.opensearch.common.settings.Settings
@@ -25,6 +27,7 @@ import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.model.Table
+import org.opensearch.index.query.MatchQueryBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase
@@ -340,17 +343,19 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals(0, searchResponse.hits.hits.size)
     }
 
-    fun `test execute monitor with custom findings index`() {
+    fun `test execute monitor with custom findings index and pattern`() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
+        val customFindingsIndexPattern = "<custom_findings_index-{now/d}-1>"
         var monitor = randomDocumentLevelMonitor(
             inputs = listOf(docLevelInput),
             triggers = listOf(trigger),
-            dataSources = DataSources(findingsIndex = customFindingsIndex)
+            dataSources = DataSources(findingsIndex = customFindingsIndex, findingsIndexPattern = customFindingsIndexPattern)
         )
         val monitorResponse = createMonitor(monitor)
+        client().admin().indices().refresh(RefreshRequest("*"))
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
             "message" : "This is an error from IAD region",
@@ -361,24 +366,25 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         monitor = monitorResponse!!.monitor
         indexDoc(index, "1", testDoc)
         val id = monitorResponse.id
-        val executeMonitorResponse = executeMonitor(monitor, id, false)
+        var executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+
+        var findings = searchFindings(id, "custom_findings_index*", true)
+        assertEquals("Findings saved for test monitor", 1, findings.size)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
+
+        indexDoc(index, "2", testDoc)
+        executeMonitorResponse = executeMonitor(monitor, id, false)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
-        val findings = searchFindings(id, customFindingsIndex)
-        assertEquals("Findings saved for test monitor", 1, findings.size)
-        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
-        val table = Table("asc", "id", null, 1, 0, "")
-        var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
-            .get()
-        Assert.assertTrue(getAlertsResponse != null)
-        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
-        getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, null))
-            .get()
-        Assert.assertTrue(getAlertsResponse != null)
-        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        findings = searchFindings(id, "custom_findings_index*", true)
+        assertEquals("Findings saved for test monitor", 2, findings.size)
+        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("2"))
+
+        val indices = getAllIndicesFromPattern("custom_findings_index*")
+        Assert.assertTrue(indices.isNotEmpty())
     }
 
     fun `test execute pre-existing monitorand update`() {
@@ -467,6 +473,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val updateMonitorResponse = updateMonitor(
             monitor.copy(
                 id = monitorId,
+                owner = "security_analytics_plugin",
                 dataSources = DataSources(
                     alertsIndex = customAlertsIndex,
                     queryIndex = customQueryIndex,
@@ -476,6 +483,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             monitorId
         )
         Assert.assertNotNull(updateMonitorResponse)
+        Assert.assertEquals(updateMonitorResponse!!.monitor.owner, "security_analytics_plugin")
         indexDoc(index, "2", testDoc)
         if (updateMonitorResponse != null) {
             executeMonitorResponse = executeMonitor(updateMonitorResponse.monitor, monitorId, false)
@@ -496,6 +504,16 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX)
+        var searchMonitorResponse =
+            client().execute(SearchMonitorAction.INSTANCE, SearchMonitorRequest(searchRequest))
+                .get()
+        Assert.assertEquals(searchMonitorResponse.hits.hits.size, 0)
+        searchRequest.source().query(MatchQueryBuilder("monitor.owner", "security_analytics_plugin"))
+        searchMonitorResponse =
+            client().execute(SearchMonitorAction.INSTANCE, SearchMonitorRequest(searchRequest))
+                .get()
+        Assert.assertEquals(searchMonitorResponse.hits.hits.size, 1)
     }
 
     fun `test execute GetFindingsAction with monitorId param`() {
@@ -574,6 +592,47 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 )
             }
         }
+    }
+
+    fun `test execute monitor with owner field`() {
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customAlertsIndex = "custom_alerts_index"
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(alertsIndex = customAlertsIndex),
+            owner = "owner"
+        )
+        val monitorResponse = createMonitor(monitor)
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+        Assert.assertEquals(monitor.owner, "owner")
+        indexDoc(index, "1", testDoc)
+        val id = monitorResponse.id
+        val executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        val alerts = searchAlerts(id, customAlertsIndex)
+        assertEquals("Alert saved for test monitor", 1, alerts.size)
+        val table = Table("asc", "id", null, 1, 0, "")
+        var getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, customAlertsIndex))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
     }
 
     fun `test execute GetFindingsAction with unknown findingIndex param`() {

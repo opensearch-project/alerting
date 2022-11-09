@@ -106,10 +106,26 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return entityAsMap(this)
     }
 
-    protected fun createMonitorWithClient(client: RestClient, monitor: Monitor, refresh: Boolean = true): Monitor {
+    private fun createMonitorEntityWithBackendRoles(monitor: Monitor, rbacRoles: List<String>?): HttpEntity {
+        if (rbacRoles == null) {
+            return monitor.toHttpEntity()
+        }
+        val temp = monitor.toJsonString()
+        val toReplace = temp.lastIndexOf("}")
+        val rbacString = rbacRoles.joinToString { "\"$it\"" }
+        val jsonString = temp.substring(0, toReplace) + ", \"rbac_roles\": [$rbacString] }"
+        return StringEntity(jsonString, APPLICATION_JSON)
+    }
+
+    protected fun createMonitorWithClient(
+        client: RestClient,
+        monitor: Monitor,
+        rbacRoles: List<String>? = null,
+        refresh: Boolean = true
+    ): Monitor {
         val response = client.makeRequest(
             "POST", "$ALERTING_BASE_URI?refresh=$refresh", emptyMap(),
-            monitor.toHttpEntity()
+            createMonitorEntityWithBackendRoles(monitor, rbacRoles)
         )
         assertEquals("Unable to create a new monitor", RestStatus.CREATED, response.restStatus())
 
@@ -123,7 +139,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun createMonitor(monitor: Monitor, refresh: Boolean = true): Monitor {
-        return createMonitorWithClient(client(), monitor, refresh)
+        return createMonitorWithClient(client(), monitor, emptyList(), refresh)
     }
 
     protected fun deleteMonitor(monitor: Monitor, refresh: Boolean = true): Response {
@@ -499,6 +515,21 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return getMonitor(monitorId = monitor.id)
     }
 
+    protected fun updateMonitorWithClient(
+        client: RestClient,
+        monitor: Monitor,
+        rbacRoles: List<String> = emptyList(),
+        refresh: Boolean = true
+    ): Monitor {
+        val response = client.makeRequest(
+            "PUT", "${monitor.relativeUrl()}?refresh=$refresh",
+            emptyMap(), createMonitorEntityWithBackendRoles(monitor, rbacRoles)
+        )
+        assertEquals("Unable to update a monitor", RestStatus.OK, response.restStatus())
+        assertUserNull(response.asMap()["monitor"] as Map<String, Any>)
+        return getMonitor(monitorId = monitor.id)
+    }
+
     protected fun getMonitor(monitorId: String, header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")): Monitor {
         val response = client().makeRequest("GET", "$ALERTING_BASE_URI/$monitorId", null, header)
         assertEquals("Unable to get monitor $monitorId", RestStatus.OK, response.restStatus())
@@ -748,7 +779,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             """
                 "properties" : {
                   "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
-                  "test_field" : { "type" : "keyword" }
+                  "test_field" : { "type" : "keyword" },
+                  "number" : { "type" : "keyword" }
                 }
             """.trimIndent()
         )
@@ -835,7 +867,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             val testDoc = """
                 {
                   "test_strict_date_time": "$testTime",
-                  "test_field": "$value"
+                  "test_field": "$value",
+                   "number": "$i"
                 }
             """.trimIndent()
             // Indexing documents with deterministic doc id to allow for easy selected deletion during testing
@@ -1089,6 +1122,18 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client().performRequest(request)
     }
 
+    fun patchUserBackendRoles(name: String, backendRoles: Array<String>) {
+        val request = Request("PATCH", "/_plugins/_security/api/internalusers/$name")
+        val broles = backendRoles.joinToString { "\"$it\"" }
+        var entity = " [{\n" +
+            "\"op\": \"replace\",\n" +
+            "\"path\": \"/backend_roles\",\n" +
+            "\"value\": [$broles]\n" +
+            "}]"
+        request.setJsonEntity(entity)
+        client().performRequest(request)
+    }
+
     fun createIndexRole(name: String, index: String) {
         val request = Request("PUT", "/_plugins/_security/api/roles/$name")
         var entity = "{\n" +
@@ -1174,6 +1219,22 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client().performRequest(request)
     }
 
+    fun updateRoleMapping(role: String, users: List<String>, addUser: Boolean) {
+        val request = Request("PATCH", "/_plugins/_security/api/rolesmapping/$role")
+        val usersStr = users.joinToString { it -> "\"$it\"" }
+
+        val op = if (addUser) "add" else "remove"
+
+        val entity = "[{\n" +
+            "  \"op\" : \"$op\",\n" +
+            "  \"path\" : \"/users\",\n" +
+            "  \"value\" : [$usersStr]\n" +
+            "}]"
+
+        request.setJsonEntity(entity)
+        client().performRequest(request)
+    }
+
     fun deleteUser(name: String) {
         client().makeRequest("DELETE", "/_plugins/_security/api/internalusers/$name")
     }
@@ -1202,13 +1263,29 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         user: String,
         index: String,
         role: String,
-        backendRole: String,
+        backendRoles: List<String>,
         clusterPermissions: String?
     ) {
-        createUser(user, user, arrayOf(backendRole))
+        createUser(user, user, backendRoles.toTypedArray())
         createTestIndex(index)
         createCustomIndexRole(role, index, clusterPermissions)
         createUserRolesMapping(role, arrayOf(user))
+    }
+
+    fun createUserWithRoles(
+        user: String,
+        roles: List<String>,
+        backendRoles: List<String>,
+        isExistingRole: Boolean
+    ) {
+        createUser(user, user, backendRoles.toTypedArray())
+        for (role in roles) {
+            if (isExistingRole) {
+                updateRoleMapping(role, listOf(user), true)
+            } else {
+                createUserRolesMapping(role, arrayOf(user))
+            }
+        }
     }
 
     fun createUserWithDocLevelSecurityTestData(

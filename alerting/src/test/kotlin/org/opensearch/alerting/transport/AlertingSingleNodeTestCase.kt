@@ -6,6 +6,8 @@
 package org.opensearch.alerting.transport
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope
+import org.opensearch.action.admin.indices.get.GetIndexRequestBuilder
+import org.opensearch.action.admin.indices.get.GetIndexResponse
 import org.opensearch.action.admin.indices.refresh.RefreshAction
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
 import org.opensearch.action.support.WriteRequest
@@ -52,6 +54,15 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     override fun setUp() {
         super.setUp()
         createTestIndex()
+    }
+
+    protected fun getAllIndicesFromPattern(pattern: String): List<String> {
+        val getIndexResponse = (
+            client().admin().indices().prepareGetIndex()
+                .setIndices(pattern) as GetIndexRequestBuilder
+            ).get() as GetIndexResponse
+        getIndexResponse
+        return getIndexResponse.indices().toList()
     }
 
     protected fun executeMonitor(monitor: Monitor, id: String, dryRun: Boolean = true): ExecuteMonitorResponse? {

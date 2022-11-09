@@ -9,10 +9,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
+import org.opensearch.OpenSearchException
 import org.opensearch.OpenSearchSecurityException
 import org.opensearch.OpenSearchStatusException
+import org.opensearch.ResourceAlreadyExistsException
 import org.opensearch.action.ActionListener
 import org.opensearch.action.ActionRequest
+import org.opensearch.action.admin.cluster.health.ClusterHealthAction
+import org.opensearch.action.admin.cluster.health.ClusterHealthRequest
+import org.opensearch.action.admin.cluster.health.ClusterHealthResponse
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
 import org.opensearch.action.admin.indices.get.GetIndexRequest
 import org.opensearch.action.admin.indices.get.GetIndexResponse
@@ -45,6 +50,7 @@ import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
+import org.opensearch.common.io.stream.NamedWriteableRegistry
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
@@ -87,7 +93,8 @@ class TransportIndexMonitorAction @Inject constructor(
     val docLevelMonitorQueries: DocLevelMonitorQueries,
     val clusterService: ClusterService,
     val settings: Settings,
-    val xContentRegistry: NamedXContentRegistry
+    val xContentRegistry: NamedXContentRegistry,
+    val namedWriteableRegistry: NamedWriteableRegistry,
 ) : HandledTransportAction<ActionRequest, IndexMonitorResponse>(
     AlertingActions.INDEX_MONITOR_ACTION_NAME, transportService, actionFilters, ::IndexMonitorRequest
 ),
@@ -111,11 +118,48 @@ class TransportIndexMonitorAction @Inject constructor(
 
     override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<IndexMonitorResponse>) {
         val transformedRequest = request as? IndexMonitorRequest
-            ?: recreateObject(request) { IndexMonitorRequest(it) }
+            ?: recreateObject(request, namedWriteableRegistry) {
+                IndexMonitorRequest(it)
+            }
+
         val user = readUserFromThreadContext(client)
 
         if (!validateUserBackendRoles(user, actionListener)) {
             return
+        }
+
+        if (
+            user != null &&
+            !isAdmin(user) &&
+            transformedRequest.rbacRoles != null
+        ) {
+            if (transformedRequest.rbacRoles?.stream()?.anyMatch { !user.backendRoles.contains(it) } == true) {
+                log.debug(
+                    "User specified backend roles, ${transformedRequest.rbacRoles}, " +
+                        "that they don' have access to. User backend roles: ${user.backendRoles}"
+                )
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "User specified backend roles that they don't have access to. Contact administrator", RestStatus.FORBIDDEN
+                        )
+                    )
+                )
+                return
+            } else if (transformedRequest.rbacRoles?.isEmpty() == true) {
+                log.debug(
+                    "Non-admin user are not allowed to specify an empty set of backend roles. " +
+                        "Please don't pass in the parameter or pass in at least one backend role."
+                )
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "Non-admin user are not allowed to specify an empty set of backend roles.", RestStatus.FORBIDDEN
+                        )
+                    )
+                )
+                return
+            }
         }
 
         if (!isADMonitor(transformedRequest.monitor)) {
@@ -258,10 +302,30 @@ class TransportIndexMonitorAction @Inject constructor(
             if (!scheduledJobIndices.scheduledJobIndexExists()) {
                 scheduledJobIndices.initScheduledJobIndex(object : ActionListener<CreateIndexResponse> {
                     override fun onResponse(response: CreateIndexResponse) {
-                        onCreateMappingsResponse(response)
+                        onCreateMappingsResponse(response.isAcknowledged)
                     }
                     override fun onFailure(t: Exception) {
-                        actionListener.onFailure(AlertingException.wrap(t))
+                        // https://github.com/opensearch-project/alerting/issues/646
+                        if (t is ResourceAlreadyExistsException && t.message?.contains("already exists") == true) {
+                            scope.launch {
+                                // Wait for the yellow status
+                                val request = ClusterHealthRequest()
+                                    .indices(SCHEDULED_JOBS_INDEX)
+                                    .waitForYellowStatus()
+                                val response: ClusterHealthResponse = client.suspendUntil {
+                                    execute(ClusterHealthAction.INSTANCE, request, it)
+                                }
+                                if (response.isTimedOut) {
+                                    actionListener.onFailure(
+                                        OpenSearchException("Cannot determine that the $SCHEDULED_JOBS_INDEX index is healthy")
+                                    )
+                                }
+                                // Retry mapping of monitor
+                                onCreateMappingsResponse(true)
+                            }
+                        } else {
+                            actionListener.onFailure(AlertingException.wrap(t))
+                        }
                     }
                 })
             } else if (!IndexUtils.scheduledJobIndexUpdated) {
@@ -307,6 +371,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 val query = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery("${Monitor.MONITOR_TYPE}.type", Monitor.MONITOR_TYPE))
                 val searchSource = SearchSourceBuilder().query(query).timeout(requestTimeout)
                 val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
+
                 client.search(
                     searchRequest,
                     object : ActionListener<SearchResponse> {
@@ -362,8 +427,8 @@ class TransportIndexMonitorAction @Inject constructor(
             }
         }
 
-        private fun onCreateMappingsResponse(response: CreateIndexResponse) {
-            if (response.isAcknowledged) {
+        private fun onCreateMappingsResponse(isAcknowledged: Boolean) {
+            if (isAcknowledged) {
                 log.info("Created $SCHEDULED_JOBS_INDEX with mappings.")
                 prepareMonitorIndexing()
                 IndexUtils.scheduledJobIndexUpdated()
@@ -399,6 +464,19 @@ class TransportIndexMonitorAction @Inject constructor(
 
         private suspend fun indexMonitor() {
             var metadata = createMetadata()
+
+            if (user != null) {
+                // Use the backend roles which is an intersection of the requested backend roles and the user's backend roles.
+                // Admins can pass in any backend role. Also if no backend role is passed in, all the user's backend roles are used.
+                val rbacRoles = if (request.rbacRoles == null) user.backendRoles.toSet()
+                else if (!isAdmin(user)) request.rbacRoles?.intersect(user.backendRoles)?.toSet()
+                else request.rbacRoles
+
+                request.monitor = request.monitor.copy(
+                    user = User(user.name, rbacRoles.orEmpty().toList(), user.roles, user.customAttNames)
+                )
+                log.debug("Created monitor's backend roles: $rbacRoles")
+            }
 
             val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
                 .setRefreshPolicy(request.refreshPolicy)
@@ -493,6 +571,42 @@ class TransportIndexMonitorAction @Inject constructor(
             // incorrect.
             if (request.monitor.enabled && currentMonitor.enabled)
                 request.monitor = request.monitor.copy(enabledTime = currentMonitor.enabledTime)
+
+            /**
+             * On update monitor check which backend roles to associate to the monitor.
+             * Below are 2 examples of how the logic works
+             *
+             * Example 1, say we have a Monitor with backend roles [a, b, c, d] associated with it.
+             * If I'm User A (non-admin user) and I have backend roles [a, b, c] associated with me and I make a request to update
+             * the Monitor's backend roles to [a, b]. This would mean that the roles to remove are [c] and the roles to add are [a, b].
+             * The Monitor's backend roles would then be [a, b, d].
+             *
+             * Example 2, say we have a Monitor with backend roles [a, b, c, d] associated with it.
+             * If I'm User A (admin user) and I have backend roles [a, b, c] associated with me and I make a request to update
+             * the Monitor's backend roles to [a, b]. This would mean that the roles to remove are [c, d] and the roles to add are [a, b].
+             * The Monitor's backend roles would then be [a, b].
+             */
+            if (user != null) {
+                if (request.rbacRoles != null) {
+                    if (isAdmin(user)) {
+                        request.monitor = request.monitor.copy(
+                            user = User(user.name, request.rbacRoles, user.roles, user.customAttNames)
+                        )
+                    } else {
+                        // rolesToRemove: these are the backend roles to remove from the monitor
+                        val rolesToRemove = user.backendRoles - request.rbacRoles.orEmpty()
+                        // remove the monitor's roles with rolesToRemove and add any roles passed into the request.rbacRoles
+                        val updatedRbac = currentMonitor.user?.backendRoles.orEmpty() - rolesToRemove + request.rbacRoles.orEmpty()
+                        request.monitor = request.monitor.copy(
+                            user = User(user.name, updatedRbac, user.roles, user.customAttNames)
+                        )
+                    }
+                } else {
+                    request.monitor = request.monitor
+                        .copy(user = User(user.name, currentMonitor.user!!.backendRoles, user.roles, user.customAttNames))
+                }
+                log.debug("Update monitor backend roles to: ${request.monitor.user?.backendRoles}")
+            }
 
             request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
             val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
