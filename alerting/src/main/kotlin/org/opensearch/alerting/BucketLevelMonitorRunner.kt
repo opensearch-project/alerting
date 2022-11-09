@@ -46,6 +46,7 @@ import org.opensearch.script.ScriptType
 import org.opensearch.script.TemplateScript
 import org.opensearch.search.aggregations.AggregatorFactories
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
+import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.time.Instant
 import java.util.UUID
@@ -71,6 +72,9 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         val currentAlerts = try {
             monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor.dataSources)
             monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(monitor.dataSources)
+            if (monitor.dataSources.findingsEnabled == true) {
+                monitorCtx.alertIndices!!.createOrUpdateInitialFindingHistoryIndex(monitor.dataSources)
+            }
             monitorCtx.alertService!!.loadCurrentAlertsForBucketLevelMonitor(monitor)
         } catch (e: Exception) {
             // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
@@ -142,15 +146,19 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                  */
                 if (triggerResults[trigger.id]?.error != null) continue
                 val findings =
-                    if (monitor.triggers.size == 1 && monitor.dataSources.findingsEnabled == true) createFindings(
-                        triggerResult,
-                        monitor,
-                        monitorCtx,
-                        periodStart,
-                        periodEnd,
-                        !dryrun && monitor.id != Monitor.NO_ID
-                    )
-                    else emptyList()
+                    if (monitor.triggers.size == 1 && monitor.dataSources.findingsEnabled == true) {
+                        logger.debug("Creating bucket level findings")
+                        createFindings(
+                            triggerResult,
+                            monitor,
+                            monitorCtx,
+                            periodStart,
+                            periodEnd,
+                            !dryrun && monitor.id != Monitor.NO_ID
+                        )
+                    } else {
+                        emptyList()
+                    }
                 // TODO: Should triggerResult's aggregationResultBucket be a list? If not, getCategorizedAlertsForBucketLevelMonitor can
                 //  be refactored to use a map instead
                 val categorizedAlerts = monitorCtx.alertService!!.getCategorizedAlertsForBucketLevelMonitor(
@@ -334,15 +342,30 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 val bucketValues: Set<String> = triggerResult.aggregationResultBuckets.keys
                 val query = input.query
                 var fieldName = ""
-                var grouByFields = 0 // if number of fields used to group by > 1 we won't calculate findings
+
                 for (aggFactory in (query.aggregations() as AggregatorFactories.Builder).aggregatorFactories) {
-                    val sources = (aggFactory as CompositeAggregationBuilder).sources()
-                    for (source in sources) {
-                        if (grouByFields > 0) {
+                    when (aggFactory) {
+                        is CompositeAggregationBuilder -> {
+                            var grouByFields = 0 // if number of fields used to group by > 1 we won't calculate findings
+                            val sources = aggFactory.sources()
+                            for (source in sources) {
+                                if (grouByFields > 0) {
+                                    logger.error("grouByFields > 0. not generating findings for bucket level monitor ${monitor.id}")
+                                    return listOf()
+                                }
+                                grouByFields++
+                                fieldName = source.field()
+                            }
+                        }
+                        is TermsAggregationBuilder -> {
+                            fieldName = aggFactory.field()
+                        }
+                        else -> {
+                            logger.error(
+                                "Bucket level monitor findings supported only for composite and term aggs. Found [{${aggFactory.type}}]"
+                            )
                             return listOf()
                         }
-                        grouByFields++
-                        fieldName = source.field()
                     }
                 }
                 if (fieldName != "") {
@@ -370,6 +393,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                         }
                     val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(sr, it) }
                     return createFindingPerIndex(searchResponse, monitor, monitorCtx, shouldCreateFinding)
+                } else {
+                    logger.error("Couldn't resolve groupBy field. Not generating bucket level monitor findings for monitor %${monitor.id}")
                 }
             }
         }
@@ -403,8 +428,9 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 )
 
                 val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
-                logger.debug("Findings: $findingStr")
+                logger.debug("Bucket level monitor ${monitor.id} Findings: $findingStr")
                 if (shouldCreateFinding) {
+                    logger.debug("Saving bucket level monitor findings for monitor ${monitor.id}")
                     val indexRequest = IndexRequest(monitor.dataSources.findingsIndex)
                         .source(findingStr, XContentType.JSON)
                         .id(finding.id)
