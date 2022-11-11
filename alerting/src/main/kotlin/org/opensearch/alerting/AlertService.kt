@@ -256,7 +256,7 @@ class AlertService(
                 // New Alert
                 val newAlert = Alert(
                     monitor = monitor, trigger = trigger, startTime = currentTime,
-                    lastNotificationTime = null, state = Alert.State.ACTIVE, errorMessage = null,
+                    lastNotificationTime = currentTime, state = Alert.State.ACTIVE, errorMessage = null,
                     errorHistory = mutableListOf(), actionExecutionResults = mutableListOf(),
                     schemaVersion = IndexUtils.alertIndexSchemaVersion, aggregationResultBucket = aggAlertBucket,
                     findingIds = findings
