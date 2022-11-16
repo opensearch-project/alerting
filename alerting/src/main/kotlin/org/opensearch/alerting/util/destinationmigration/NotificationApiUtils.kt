@@ -145,8 +145,9 @@ fun NotificationConfigInfo.getTitle(subject: String?): String {
     val defaultTitle = "Alerting-Notification Action"
     if (this.notificationConfig.configType == ConfigType.EMAIL) {
         return if (subject.isNullOrEmpty()) defaultTitle else subject
+    } else if (this.notificationConfig.configType == ConfigType.SLACK) {
+        return " "
     }
-
     return defaultTitle
 }
 
