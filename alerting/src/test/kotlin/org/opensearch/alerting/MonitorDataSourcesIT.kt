@@ -17,6 +17,11 @@ import org.opensearch.alerting.action.SearchMonitorRequest
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.transport.AlertingSingleNodeTestCase
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.XContentFactory
+import org.opensearch.common.xcontent.XContentParser
+import org.opensearch.common.xcontent.XContentParserUtils
+import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.DeleteMonitorRequest
@@ -25,10 +30,13 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
+import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.model.Table
+import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.MatchQueryBuilder
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.index.query.TermsQueryBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase
 import java.time.ZonedDateTime
@@ -151,6 +159,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 findingsIndexPattern = customFindingsIndexPattern
             )
         )
+        val dataSources = monitor.dataSources
         val monitorResponse = createMonitor(monitor)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         // Trying to test here few different "nesting" situations and "wierd" characters
@@ -184,6 +193,40 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals("Findings saved for test monitor", 1, findings.size)
         assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
         assertEquals("Didn't match all 5 queries", 5, findings[0].docLevelQueries.size)
+        val findingsSearchRequest = SearchRequest(dataSources.findingsIndex)
+        val searchResponse = client().search(findingsSearchRequest).get()
+        val findings1 = mutableListOf<Finding>()
+        for (hit in searchResponse.hits) {
+            val xcp = XContentFactory.xContent(XContentType.JSON)
+                .createParser(xContentRegistry(), LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
+            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+            val finding = Finding.parse(xcp)
+            findings1.add(finding)
+        }
+        logger.error("sashank: response: {}", finalQueryResponse)
+        val indexToRelatedDocIdsMap = mutableMapOf<String, MutableList<String>>()
+        for (finding in findings1) {
+            val ids = indexToRelatedDocIdsMap.getOrDefault(index, mutableListOf())
+            ids.addAll(finding.relatedDocIds)
+            indexToRelatedDocIdsMap[index] = ids
+        }
+        val toTypedArray = indexToRelatedDocIdsMap.keys.stream().collect(Collectors.toList()).toTypedArray()
+
+        val searchFindings = SearchRequest().indices(*toTypedArray)
+        val bqb = QueryBuilders.boolQuery()
+        indexToRelatedDocIdsMap.forEach { entry ->
+            bqb
+                .should()
+                .add(
+                    BoolQueryBuilder()
+                        .must(MatchQueryBuilder("_index", entry.value))
+                        .must(TermsQueryBuilder("_id", entry.value))
+                )
+        }
+        searchFindings.source(SearchSourceBuilder().query(bqb))
+        val finalQueryResponse = client().search(searchFindings).get()
+        logger.error("sashank: response: {}", finalQueryResponse)
+        assertTrue(finalQueryResponse.hits.hits.size == 1)
     }
 
     fun `test execute monitor with custom query index and nested mappings`() {
