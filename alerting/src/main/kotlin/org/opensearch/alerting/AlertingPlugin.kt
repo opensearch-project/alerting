@@ -16,6 +16,7 @@ import org.opensearch.alerting.action.GetEmailAccountAction
 import org.opensearch.alerting.action.GetEmailGroupAction
 import org.opensearch.alerting.action.GetFindingsAction
 import org.opensearch.alerting.action.GetMonitorAction
+import org.opensearch.alerting.action.GetSuggestionsAction
 import org.opensearch.alerting.action.IndexMonitorAction
 import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
@@ -47,6 +48,7 @@ import org.opensearch.alerting.resthandler.RestGetEmailAccountAction
 import org.opensearch.alerting.resthandler.RestGetEmailGroupAction
 import org.opensearch.alerting.resthandler.RestGetFindingsAction
 import org.opensearch.alerting.resthandler.RestGetMonitorAction
+import org.opensearch.alerting.resthandler.RestGetSuggestionsAction
 import org.opensearch.alerting.resthandler.RestIndexMonitorAction
 import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
 import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
@@ -65,6 +67,7 @@ import org.opensearch.alerting.transport.TransportGetEmailAccountAction
 import org.opensearch.alerting.transport.TransportGetEmailGroupAction
 import org.opensearch.alerting.transport.TransportGetFindingsSearchAction
 import org.opensearch.alerting.transport.TransportGetMonitorAction
+import org.opensearch.alerting.transport.TransportGetSuggestionsAction
 import org.opensearch.alerting.transport.TransportIndexMonitorAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
@@ -122,6 +125,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         @JvmField val UI_METADATA_EXCLUDE = arrayOf("monitor.${Monitor.UI_METADATA_FIELD}")
         @JvmField val MONITOR_BASE_URI = "/_plugins/_alerting/monitors"
         @JvmField val DESTINATION_BASE_URI = "/_plugins/_alerting/destinations"
+        @JvmField val SUGGESTIONS_BASE_URI = "/_plugins/suggestions/alerting"
         @JvmField val LEGACY_OPENDISTRO_MONITOR_BASE_URI = "/_opendistro/_alerting/monitors"
         @JvmField val LEGACY_OPENDISTRO_DESTINATION_BASE_URI = "/_opendistro/_alerting/destinations"
         @JvmField val EMAIL_ACCOUNT_BASE_URI = "$DESTINATION_BASE_URI/email_accounts"
@@ -165,7 +169,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestGetEmailGroupAction(),
             RestGetDestinationsAction(),
             RestGetAlertsAction(),
-            RestGetFindingsAction()
+            RestGetFindingsAction(),
+            RestGetSuggestionsAction()
         )
     }
 
@@ -184,8 +189,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(SearchEmailGroupAction.INSTANCE, TransportSearchEmailGroupAction::class.java),
             ActionPlugin.ActionHandler(GetDestinationsAction.INSTANCE, TransportGetDestinationsAction::class.java),
             ActionPlugin.ActionHandler(GetAlertsAction.INSTANCE, TransportGetAlertsAction::class.java),
-            ActionPlugin.ActionHandler(GetFindingsAction.INSTANCE, TransportGetFindingsSearchAction::class.java)
-
+            ActionPlugin.ActionHandler(GetFindingsAction.INSTANCE, TransportGetFindingsSearchAction::class.java),
+            ActionPlugin.ActionHandler(GetSuggestionsAction.INSTANCE, TransportGetSuggestionsAction::class.java)
         )
     }
 
