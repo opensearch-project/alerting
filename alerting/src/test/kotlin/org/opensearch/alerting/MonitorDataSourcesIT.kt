@@ -219,7 +219,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 .should()
                 .add(
                     BoolQueryBuilder()
-                        .must(MatchQueryBuilder("_index", entry.value))
+                        .must(MatchQueryBuilder("_index", entry.key))
                         .must(TermsQueryBuilder("_id", entry.value))
                 )
         }
