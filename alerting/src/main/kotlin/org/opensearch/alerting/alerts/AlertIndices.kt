@@ -162,7 +162,9 @@ class AlertIndices(
 
     private var alertIndexInitialized: Boolean = false
 
-    private var scheduledRollover: Cancellable? = null
+    private var scheduledAlertRollover: Cancellable? = null
+
+    private var scheduledFindingRollover: Cancellable? = null
 
     fun onMaster() {
         try {
@@ -170,9 +172,9 @@ class AlertIndices(
             rolloverAlertHistoryIndex()
             rolloverFindingHistoryIndex()
             // schedule the next rollover for approx MAX_AGE later
-            scheduledRollover = threadPool
+            scheduledAlertRollover = threadPool
                 .scheduleWithFixedDelay({ rolloverAndDeleteAlertHistoryIndices() }, alertHistoryRolloverPeriod, executorName())
-            scheduledRollover = threadPool
+            scheduledFindingRollover = threadPool
                 .scheduleWithFixedDelay({ rolloverAndDeleteFindingHistoryIndices() }, findingHistoryRolloverPeriod, executorName())
         } catch (e: Exception) {
             // This should be run on cluster startup
@@ -185,7 +187,8 @@ class AlertIndices(
     }
 
     fun offMaster() {
-        scheduledRollover?.cancel()
+        scheduledAlertRollover?.cancel()
+        scheduledFindingRollover?.cancel()
     }
 
     private fun executorName(): String {
@@ -213,16 +216,16 @@ class AlertIndices(
 
     private fun rescheduleAlertRollover() {
         if (clusterService.state().nodes.isLocalNodeElectedMaster) {
-            scheduledRollover?.cancel()
-            scheduledRollover = threadPool
+            scheduledAlertRollover?.cancel()
+            scheduledAlertRollover = threadPool
                 .scheduleWithFixedDelay({ rolloverAndDeleteAlertHistoryIndices() }, alertHistoryRolloverPeriod, executorName())
         }
     }
 
     private fun rescheduleFindingRollover() {
         if (clusterService.state().nodes.isLocalNodeElectedMaster) {
-            scheduledRollover?.cancel()
-            scheduledRollover = threadPool
+            scheduledFindingRollover?.cancel()
+            scheduledFindingRollover = threadPool
                 .scheduleWithFixedDelay({ rolloverAndDeleteFindingHistoryIndices() }, findingHistoryRolloverPeriod, executorName())
         }
     }
