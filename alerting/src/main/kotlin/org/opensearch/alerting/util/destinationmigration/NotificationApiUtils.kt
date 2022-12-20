@@ -143,7 +143,7 @@ suspend fun NotificationConfigInfo.sendNotification(client: Client, title: Strin
  */
 fun NotificationConfigInfo.getTitle(subject: String?): String {
     val defaultTitle = "Alerting-Notification Action"
-    if (this.notificationConfig.configType == ConfigType.EMAIL || this.notificationConfig.configType == ConfigType.EMAIL) {
+    if (this.notificationConfig.configType == ConfigType.EMAIL || this.notificationConfig.configType == ConfigType.SNS) {
         return if (subject.isNullOrEmpty()) defaultTitle else subject
     }
 
