@@ -138,12 +138,12 @@ suspend fun NotificationConfigInfo.sendNotification(client: Client, title: Strin
 }
 
 /**
- * For most channel types, a placeholder Alerting title will be used but the email channel will
- * use the subject, so it appears as the actual subject of the email.
+ * For most channel types, a placeholder Alerting title will be used but the email channel/SNS notification will
+ * use the subject, so it appears as the actual subject of the email/SNS notification.
  */
 fun NotificationConfigInfo.getTitle(subject: String?): String {
     val defaultTitle = "Alerting-Notification Action"
-    if (this.notificationConfig.configType == ConfigType.EMAIL) {
+    if (this.notificationConfig.configType == ConfigType.EMAIL || this.notificationConfig.configType == ConfigType.SNS) {
         return if (subject.isNullOrEmpty()) defaultTitle else subject
     }
 
