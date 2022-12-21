@@ -13,12 +13,16 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
 import org.opensearch.action.ActionRequest
+import org.opensearch.action.admin.indices.delete.DeleteIndexRequest
 import org.opensearch.action.delete.DeleteRequest
 import org.opensearch.action.delete.DeleteResponse
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
+import org.opensearch.action.search.SearchRequest
+import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
@@ -42,6 +46,7 @@ import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
 import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.rest.RestStatus
+import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import kotlin.coroutines.resume
@@ -143,20 +148,37 @@ class TransportDeleteMonitorAction @Inject constructor(
 
         private suspend fun deleteDocLevelMonitorQueries(monitor: Monitor) {
             val clusterState = clusterService.state()
-            if (!clusterState.routingTable.hasIndex(monitor.dataSources.queryIndex)) {
-                return
-            }
-            val response: BulkByScrollResponse = suspendCoroutine { cont ->
-                DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-                    .source(monitor.dataSources.queryIndex)
-                    .filter(QueryBuilders.matchQuery("monitor_id", monitorId))
-                    .refresh(true)
-                    .execute(
-                        object : ActionListener<BulkByScrollResponse> {
-                            override fun onResponse(response: BulkByScrollResponse) = cont.resume(response)
-                            override fun onFailure(t: Exception) = cont.resumeWithException(t)
-                        }
-                    )
+            monitor.sourceToQueryIndexMapping.forEach { (_, queryIndex) ->
+
+                if (!clusterState.routingTable.hasIndex(queryIndex)) {
+                    return
+                }
+                // Delete all queries added by this monitor
+                val response: BulkByScrollResponse = suspendCoroutine { cont ->
+                    DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+                        .source(queryIndex)
+                        .filter(QueryBuilders.matchQuery("monitor_id", monitorId))
+                        .refresh(true)
+                        .execute(
+                            object : ActionListener<BulkByScrollResponse> {
+                                override fun onResponse(response: BulkByScrollResponse) = cont.resume(response)
+                                override fun onFailure(t: Exception) = cont.resumeWithException(t)
+                            }
+                        )
+                }
+
+                // Get document count on that index to check if we should delete it
+                val searchResponse: SearchResponse = client.suspendUntil {
+                    search(SearchRequest(queryIndex).source(SearchSourceBuilder().size(0)), it)
+                }
+                if (searchResponse.hits.totalHits.value == 0L) {
+                    val ack: AcknowledgedResponse = client.suspendUntil {
+                        client.admin().indices().delete(DeleteIndexRequest(queryIndex), it)
+                    }
+                    if (ack.isAcknowledged == false) {
+                        log.error("Failed to delete concrete queryIndex:$queryIndex during monitor deletion")
+                    }
+                }
             }
         }
     }

@@ -6,6 +6,7 @@
 package org.opensearch.alerting.transport
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope
+import org.opensearch.action.admin.indices.exists.indices.IndicesExistsRequest
 import org.opensearch.action.admin.indices.get.GetIndexRequestBuilder
 import org.opensearch.action.admin.indices.get.GetIndexResponse
 import org.opensearch.action.admin.indices.refresh.RefreshAction
@@ -86,6 +87,16 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     protected fun indexDoc(index: String, id: String, doc: String) {
         client().prepareIndex(index).setId(id)
             .setSource(doc, XContentType.JSON).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE).get()
+    }
+
+    protected fun assertIndexExists(index: String) {
+        val indexExistsResponse = client().admin().indices().exists(IndicesExistsRequest(index)).get()
+        assertTrue(indexExistsResponse.isExists)
+    }
+
+    protected fun assertIndexNotExists(index: String) {
+        val indexExistsResponse = client().admin().indices().exists(IndicesExistsRequest(index)).get()
+        assertFalse(indexExistsResponse.isExists)
     }
 
     protected fun createMonitor(monitor: Monitor): IndexMonitorResponse? {

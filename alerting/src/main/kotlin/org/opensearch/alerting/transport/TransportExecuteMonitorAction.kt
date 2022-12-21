@@ -125,7 +125,7 @@ class TransportExecuteMonitorAction @Inject constructor(
                 if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
                     try {
                         scope.launch {
-                            if (!docLevelMonitorQueries.docLevelQueryIndexExists()) {
+                            if (!docLevelMonitorQueries.docLevelQueryIndexExists(monitor.dataSources)) {
                                 docLevelMonitorQueries.initDocLevelQueryIndex(monitor.dataSources)
                                 log.info("Central Percolation index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX} created")
                             }

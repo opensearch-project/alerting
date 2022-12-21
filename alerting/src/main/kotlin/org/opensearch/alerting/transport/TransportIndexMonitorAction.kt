@@ -509,7 +509,25 @@ class TransportIndexMonitorAction @Inject constructor(
                 client.suspendUntil<Client, IndexResponse> { client.index(metadataIndexRequest, it) }
 
                 if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
-                    indexDocLevelMonitorQueries(request.monitor, indexResponse.id, request.refreshPolicy)
+                    val updatedMonitor = indexDocLevelMonitorQueries(request.monitor, indexResponse.id, request.refreshPolicy)
+                    // During indexing of queries we might need to rollover queryIndex in case max mapping field limit is reached in current one
+                    // In that case we have to update sourceIndex --> queryIndex mapping stored inside monitor.
+                    // If this mapping is updated we need to store updated monitor doc to index
+                    val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
+                        .setRefreshPolicy(request.refreshPolicy)
+                        .source(updatedMonitor.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+                        .id(updatedMonitor.id)
+                        .setIfSeqNo(indexResponse.seqNo)
+                        .setIfPrimaryTerm(indexResponse.primaryTerm)
+                        .timeout(indexTimeout)
+                    val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
+                    val failureReasons = checkShardsFailure(indexResponse)
+                    if (failureReasons != null) {
+                        actionListener.onFailure(
+                            AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), indexResponse.status()))
+                        )
+                        return
+                    }
                 }
 
                 actionListener.onResponse(
@@ -524,19 +542,21 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         @Suppress("UNCHECKED_CAST")
-        private suspend fun indexDocLevelMonitorQueries(monitor: Monitor, monitorId: String, refreshPolicy: RefreshPolicy) {
+        private suspend fun indexDocLevelMonitorQueries(monitor: Monitor, monitorId: String, refreshPolicy: RefreshPolicy): Monitor {
             val queryIndex = monitor.dataSources.queryIndex
             if (!docLevelMonitorQueries.docLevelQueryIndexExists(monitor.dataSources)) {
                 docLevelMonitorQueries.initDocLevelQueryIndex(monitor.dataSources)
                 log.info("Central Percolation index $queryIndex created")
             }
-            docLevelMonitorQueries.indexDocLevelQueries(
+            val updatedMonitor = docLevelMonitorQueries.indexDocLevelQueries(
                 monitor,
                 monitorId,
                 refreshPolicy,
                 indexTimeout
             )
             log.debug("Queries inserted into Percolate index $queryIndex")
+
+            return updatedMonitor
         }
 
         private suspend fun updateMonitor() {
@@ -659,7 +679,27 @@ class TransportIndexMonitorAction @Inject constructor(
                             .filter(QueryBuilders.matchQuery("monitor_id", currentMonitor.id))
                             .execute(it)
                     }
-                    indexDocLevelMonitorQueries(request.monitor, currentMonitor.id, request.refreshPolicy)
+                    val updatedMonitor = indexDocLevelMonitorQueries(request.monitor, currentMonitor.id, request.refreshPolicy)
+                    // During indexing of queries we might need to rollover queryIndex in case max mapping field limit is reached in current one
+                    // In that case we have to update sourceIndex --> queryIndex mapping stored inside monitor.
+                    // If this mapping is updated we need to store updated monitor doc to index
+                    if (updatedMonitor.lastUpdateTime != currentMonitor.lastUpdateTime) {
+                        val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
+                            .setRefreshPolicy(request.refreshPolicy)
+                            .source(updatedMonitor.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+                            .id(request.monitorId)
+                            .setIfSeqNo(request.seqNo)
+                            .setIfPrimaryTerm(request.primaryTerm)
+                            .timeout(indexTimeout)
+                        val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
+                        val failureReasons = checkShardsFailure(indexResponse)
+                        if (failureReasons != null) {
+                            actionListener.onFailure(
+                                AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), indexResponse.status()))
+                            )
+                            return
+                        }
+                    }
                 }
                 actionListener.onResponse(
                     IndexMonitorResponse(

@@ -132,3 +132,13 @@ suspend fun updateMonitorMetadata(client: Client, settings: Settings, monitorMet
 
     return client.suspendUntil { client.index(indexRequest, it) }
 }
+
+suspend fun updateMonitor(client: Client, settings: Settings, monitor: Monitor): IndexResponse {
+    val indexRequest = IndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
+        .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+        .source(monitor.toXContentWithUser(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+        .id(monitor.id)
+        .timeout(AlertingSettings.INDEX_TIMEOUT.get(settings))
+
+    return client.suspendUntil { client.index(indexRequest, it) }
+}
