@@ -90,7 +90,7 @@ abstract class MonitorRunner {
     ): String {
         val config = getConfigForNotificationAction(action, monitorCtx)
         if (config.destination == null && config.channel == null) {
-            throw IllegalStateException("Unable to find a Notification Channel or Destination config with id [${action.id}]")
+            throw IllegalStateException("Unable to find a Notification Channel or Destination config with id [${action.destinationId}]")
         }
 
         // Adding a check on TEST_ACTION Destination type here to avoid supporting it as a LegacyBaseMessage type
