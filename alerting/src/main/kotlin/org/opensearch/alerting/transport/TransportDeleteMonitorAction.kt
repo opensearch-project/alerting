@@ -23,6 +23,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
@@ -106,8 +107,8 @@ class TransportDeleteMonitorAction @Inject constructor(
 
                 if (canDelete) {
                     val deleteResponse = deleteMonitor(monitor)
-                    deleteMetadata(monitor)
                     deleteDocLevelMonitorQueries(monitor)
+                    deleteMetadata(monitor)
                     actionListener.onResponse(DeleteMonitorResponse(deleteResponse.id, deleteResponse.version))
                 } else {
                     actionListener.onFailure(
@@ -148,7 +149,8 @@ class TransportDeleteMonitorAction @Inject constructor(
 
         private suspend fun deleteDocLevelMonitorQueries(monitor: Monitor) {
             val clusterState = clusterService.state()
-            monitor.sourceToQueryIndexMapping.forEach { (_, queryIndex) ->
+            val metadata = MonitorMetadataService.getMetadata(monitor)
+            metadata?.sourceToQueryIndexMapping?.forEach { (_, queryIndex) ->
 
                 if (!clusterState.routingTable.hasIndex(queryIndex)) {
                     return

@@ -15,18 +15,16 @@ import org.opensearch.action.search.SearchAction
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.WriteRequest
-import org.opensearch.alerting.model.AlertingConfigAccessor.Companion.getMonitorMetadata
 import org.opensearch.alerting.model.DocumentExecutionContext
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.InputRunResults
+import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
-import org.opensearch.alerting.util.updateMonitor
-import org.opensearch.alerting.util.updateMonitorMetadata
 import org.opensearch.client.Client
 import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
@@ -54,7 +52,6 @@ import org.opensearch.search.sort.SortOrder
 import java.io.IOException
 import java.time.Instant
 import java.util.UUID
-import kotlin.collections.HashMap
 import kotlin.math.max
 
 object DocumentLevelMonitorRunner : MonitorRunner() {
@@ -87,24 +84,21 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             return monitorResult.copy(error = AlertingException.wrap(e))
         }
 
+        var (monitorMetadata, _) = MonitorMetadataService.getOrCreateMetadata(monitor)
+
         monitorCtx.docLevelMonitorQueries!!.initDocLevelQueryIndex(monitor.dataSources)
-        val updatedMonitor = monitorCtx.docLevelMonitorQueries!!.indexDocLevelQueries(
+        monitorCtx.docLevelMonitorQueries!!.indexDocLevelQueries(
             monitor = monitor,
             monitorId = monitor.id,
+            monitorMetadata,
             indexTimeout = monitorCtx.indexTimeout!!
         )
 
-        val docLevelMonitorInput = updatedMonitor.inputs[0] as DocLevelMonitorInput
+        val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
         val index = docLevelMonitorInput.indices[0]
         val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
 
-        var monitorMetadata = getMonitorMetadata(monitorCtx.client!!, monitorCtx.xContentRegistry!!, "${updatedMonitor.id}-metadata")
-        if (monitorMetadata == null) {
-            monitorMetadata = createMonitorMetadata(updatedMonitor.id)
-        }
-
-        val isTempMonitor = dryrun || updatedMonitor.id == Monitor.NO_ID
-        val monitorLastUpdateTimeInitial = updatedMonitor.lastUpdateTime
+        val isTempMonitor = dryrun || monitor.id == Monitor.NO_ID
         val lastRunContext = if (monitorMetadata.lastRunContext.isNullOrEmpty()) mutableMapOf()
         else monitorMetadata.lastRunContext.toMutableMap() as MutableMap<String, MutableMap<String, Any>>
 
@@ -160,7 +154,13 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 val matchingDocs = getMatchingDocs(monitor, monitorCtx, docExecutionContext, indexName)
 
                 if (matchingDocs.isNotEmpty()) {
-                    val matchedQueriesForDocs = getMatchedQueries(monitorCtx, matchingDocs.map { it.second }, monitor, indexName)
+                    val matchedQueriesForDocs = getMatchedQueries(
+                        monitorCtx,
+                        matchingDocs.map { it.second },
+                        monitor,
+                        monitorMetadata,
+                        indexName
+                    )
 
                     matchedQueriesForDocs.forEach { hit ->
                         val id = hit.id.replace("_${indexName}_${monitor.id}", "")
@@ -201,7 +201,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 monitorCtx,
                 monitorResult,
                 it as DocumentLevelTrigger,
-                updatedMonitor,
+                monitor,
                 idQueryMap,
                 docsToQueries,
                 queryToDocIds,
@@ -211,12 +211,10 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         // Don't update monitor if this is a test monitor
         if (!isTempMonitor) {
-            updateMonitorMetadata(monitorCtx.client!!, monitorCtx.settings!!, monitorMetadata.copy(lastRunContext = updatedLastRunContext))
-            // During insertion of queries to queryIndex, we might rollover queryIndex
-            // and add new source --> query index mapping. We update monitor at the end of run here to save those changes
-            if (monitor.lastUpdateTime != monitorLastUpdateTimeInitial) {
-                updateMonitor(monitorCtx.client!!, monitorCtx.settings!!, updatedMonitor)
-            }
+            MonitorMetadataService.upsertMetadata(
+                monitorMetadata.copy(lastRunContext = updatedLastRunContext),
+                true
+            )
         }
 
         // TODO: Update the Document as part of the Trigger and return back the trigger action result
@@ -508,6 +506,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         monitorCtx: MonitorRunnerExecutionContext,
         docs: List<BytesReference>,
         monitor: Monitor,
+        monitorMetadata: MonitorMetadata,
         index: String
     ): SearchHits {
         val boolQueryBuilder = BoolQueryBuilder().filter(QueryBuilders.matchQuery("index", index))
@@ -518,7 +517,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         }
         boolQueryBuilder.filter(percolateQueryBuilder)
 
-        val queryIndex = monitor.sourceToQueryIndexMapping[index + monitor.id]
+        val queryIndex = monitorMetadata.sourceToQueryIndexMapping[index + monitor.id]
         if (queryIndex == null) {
             val message = "Failed to resolve concrete queryIndex from sourceIndex during monitor execution!" +
                 " sourceIndex:$index queryIndex:${monitor.dataSources.queryIndex}"

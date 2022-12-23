@@ -17,6 +17,7 @@ import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorRequest
@@ -129,9 +130,11 @@ class TransportExecuteMonitorAction @Inject constructor(
                                 docLevelMonitorQueries.initDocLevelQueryIndex(monitor.dataSources)
                                 log.info("Central Percolation index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX} created")
                             }
+                            val (metadata, _) = MonitorMetadataService.getOrCreateMetadata(monitor)
                             docLevelMonitorQueries.indexDocLevelQueries(
                                 monitor,
                                 monitor.id,
+                                metadata,
                                 WriteRequest.RefreshPolicy.IMMEDIATE,
                                 indexTimeout
                             )

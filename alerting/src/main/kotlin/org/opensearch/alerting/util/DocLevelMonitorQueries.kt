@@ -21,6 +21,7 @@ import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
@@ -32,7 +33,6 @@ import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.rest.RestStatus
-import java.time.Instant
 
 private val log = LogManager.getLogger(DocLevelMonitorQueries::class.java)
 
@@ -77,10 +77,12 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         if (dataSources.queryIndex == ScheduledJob.DOC_LEVEL_QUERIES_INDEX) {
             return initDocLevelQueryIndex()
         }
-        val queryIndex = dataSources.queryIndex
-        if (!clusterService.state().routingTable.hasIndex(queryIndex)) {
-            val indexRequest = CreateIndexRequest(queryIndex)
+        val alias = dataSources.queryIndex
+        val indexPattern = dataSources.queryIndex + "-1"
+        if (!clusterService.state().metadata.hasAlias(alias)) {
+            val indexRequest = CreateIndexRequest(indexPattern)
                 .mapping(docLevelQueriesMappings())
+                .alias(Alias(alias))
                 .settings(
                     Settings.builder().put("index.hidden", true)
                         .build()
@@ -164,12 +166,10 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
     suspend fun indexDocLevelQueries(
         monitor: Monitor,
         monitorId: String,
+        monitorMetadata: MonitorMetadata,
         refreshPolicy: RefreshPolicy = RefreshPolicy.IMMEDIATE,
         indexTimeout: TimeValue
-    ): Monitor {
-        // We will potentially update monitor to add new rollover'd query indices and their mappings to source indices
-        var updatedMonitor = monitor.copy(id = monitorId)
-
+    ) {
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
         val index = docLevelMonitorInput.indices[0]
         val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
@@ -214,20 +214,20 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     traverseMappingsAndUpdate(properties, "", leafNodeProcessor, flattenPaths)
                     // Updated mappings ready to be applied on queryIndex
                     val updatedProperties = properties
-
-                    var (updateMappingResponse, concreteQueryIndex, monitor) = updateQueryIndexMappings(
-                        updatedMonitor,
+                    // Updates mappings of concrete queryIndex. This can rollover queryIndex if field mapping limit is reached.
+                    var (updateMappingResponse, concreteQueryIndex) = updateQueryIndexMappings(
+                        monitor,
+                        monitorMetadata,
                         indexName,
                         updatedProperties
                     )
-                    updatedMonitor = monitor
+
                     if (updateMappingResponse.isAcknowledged) {
                         doIndexAllQueries(concreteQueryIndex, indexName, monitorId, queries, flattenPaths, refreshPolicy, indexTimeout)
                     }
                 }
             }
         }
-        return updatedMonitor
     }
 
     private suspend fun doIndexAllQueries(
@@ -272,11 +272,11 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
 
     private suspend fun updateQueryIndexMappings(
         monitor: Monitor,
+        monitorMetadata: MonitorMetadata,
         sourceIndex: String,
         updatedProperties: MutableMap<String, Any>
-    ): Triple<AcknowledgedResponse, String, Monitor> {
-        var updatedMonitor = monitor
-        var targetQueryIndex = monitor.sourceToQueryIndexMapping[sourceIndex + monitor.id]
+    ): Pair<AcknowledgedResponse, String> {
+        var targetQueryIndex = monitorMetadata.sourceToQueryIndexMapping[sourceIndex + monitor.id]
         if (targetQueryIndex == null) {
             // queryIndex is alias which will always have only 1 backing index which is writeIndex
             // This is due to a fact that that _rollover API would maintain only single index under alias
@@ -289,8 +289,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR)
                 )
             }
-            monitor.sourceToQueryIndexMapping[sourceIndex + monitor.id] = targetQueryIndex
-            updatedMonitor = monitor.copy(lastUpdateTime = Instant.now())
+            monitorMetadata.sourceToQueryIndexMapping[sourceIndex + monitor.id] = targetQueryIndex
         }
         val updateMappingRequest = PutMappingRequest(targetQueryIndex)
         updateMappingRequest.source(mapOf<String, Any>("properties" to updatedProperties))
@@ -299,26 +298,32 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             updateMappingResponse = client.suspendUntil {
                 client.admin().indices().putMapping(updateMappingRequest, it)
             }
+            return Pair(updateMappingResponse, targetQueryIndex)
         } catch (e: Exception) {
             // If we reached limit for total number of fields in mappings, do a rollover here
             if (e.message?.contains("Limit of total fields") == true) {
                 targetQueryIndex = rolloverQueryIndex(monitor)
+            } else {
+                throw AlertingException.wrap(e)
             }
         }
-        // Check if we had to do rollover
+        // We did rollover, so try to apply mappings again on new targetQueryIndex
         if (targetQueryIndex.isNotEmpty()) {
-            // add newly created index to monitor object so that we can fetch it later on, when either applying mappings or running queries
-            monitor.sourceToQueryIndexMapping[sourceIndex + monitor.id] = targetQueryIndex
-            updatedMonitor = monitor.copy(lastUpdateTime = Instant.now())
+            // add newly created index to monitor's metadata object so that we can fetch it later on, when either applying mappings or running queries
+            monitorMetadata.sourceToQueryIndexMapping[sourceIndex + monitor.id] = targetQueryIndex
+
             // PUT mappings to newly created index
             val updateMappingRequest = PutMappingRequest(targetQueryIndex)
             updateMappingRequest.source(mapOf<String, Any>("properties" to updatedProperties))
             updateMappingResponse = client.suspendUntil {
                 client.admin().indices().putMapping(updateMappingRequest, it)
             }
+        } else {
+            val failureMessage = "Failed to resolve targetQueryIndex!"
+            log.error(failureMessage)
+            throw AlertingException(failureMessage, RestStatus.INTERNAL_SERVER_ERROR, IllegalStateException(failureMessage))
         }
-
-        return Triple(updateMappingResponse, targetQueryIndex, updatedMonitor)
+        return Pair(updateMappingResponse, targetQueryIndex)
     }
 
     private suspend fun rolloverQueryIndex(monitor: Monitor): String? {
@@ -340,6 +345,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR)
             )
         }
+        // TODO copy settings here too?
         return response.newIndex
     }
 

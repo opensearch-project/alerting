@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting
+package org.opensearch.alerting.monitors
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +12,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.bulk.BackoffPolicy
+import org.opensearch.alerting.AlertService
+import org.opensearch.alerting.InputService
+import org.opensearch.alerting.TriggerService
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.moveAlerts
 import org.opensearch.alerting.core.JobRunner
@@ -57,57 +60,57 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         get() = Dispatchers.Default + runnerSupervisor
 
     fun registerClusterService(clusterService: ClusterService): MonitorRunnerService {
-        this.monitorCtx.clusterService = clusterService
+        monitorCtx.clusterService = clusterService
         return this
     }
 
     fun registerClient(client: Client): MonitorRunnerService {
-        this.monitorCtx.client = client
+        monitorCtx.client = client
         return this
     }
 
     fun registerNamedXContentRegistry(xContentRegistry: NamedXContentRegistry): MonitorRunnerService {
-        this.monitorCtx.xContentRegistry = xContentRegistry
+        monitorCtx.xContentRegistry = xContentRegistry
         return this
     }
 
     fun registerScriptService(scriptService: ScriptService): MonitorRunnerService {
-        this.monitorCtx.scriptService = scriptService
+        monitorCtx.scriptService = scriptService
         return this
     }
 
     fun registerSettings(settings: Settings): MonitorRunnerService {
-        this.monitorCtx.settings = settings
+        monitorCtx.settings = settings
         return this
     }
 
     fun registerThreadPool(threadPool: ThreadPool): MonitorRunnerService {
-        this.monitorCtx.threadPool = threadPool
+        monitorCtx.threadPool = threadPool
         return this
     }
 
     fun registerAlertIndices(alertIndices: AlertIndices): MonitorRunnerService {
-        this.monitorCtx.alertIndices = alertIndices
+        monitorCtx.alertIndices = alertIndices
         return this
     }
 
     fun registerInputService(inputService: InputService): MonitorRunnerService {
-        this.monitorCtx.inputService = inputService
+        monitorCtx.inputService = inputService
         return this
     }
 
     fun registerTriggerService(triggerService: TriggerService): MonitorRunnerService {
-        this.monitorCtx.triggerService = triggerService
+        monitorCtx.triggerService = triggerService
         return this
     }
 
     fun registerAlertService(alertService: AlertService): MonitorRunnerService {
-        this.monitorCtx.alertService = alertService
+        monitorCtx.alertService = alertService
         return this
     }
 
     fun registerDocLevelMonitorQueries(docLevelMonitorQueries: DocLevelMonitorQueries): MonitorRunnerService {
-        this.monitorCtx.docLevelMonitorQueries = docLevelMonitorQueries
+        monitorCtx.docLevelMonitorQueries = docLevelMonitorQueries
         return this
     }
 

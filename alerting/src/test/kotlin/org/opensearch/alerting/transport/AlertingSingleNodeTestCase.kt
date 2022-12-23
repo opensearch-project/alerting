@@ -6,11 +6,13 @@
 package org.opensearch.alerting.transport
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope
-import org.opensearch.action.admin.indices.exists.indices.IndicesExistsRequest
+import org.opensearch.action.admin.indices.alias.get.GetAliasesRequest
+import org.opensearch.action.admin.indices.get.GetIndexRequest
 import org.opensearch.action.admin.indices.get.GetIndexRequestBuilder
 import org.opensearch.action.admin.indices.get.GetIndexResponse
 import org.opensearch.action.admin.indices.refresh.RefreshAction
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
+import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.ExecuteMonitorAction
@@ -41,7 +43,7 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.test.OpenSearchSingleNodeTestCase
 import java.time.Instant
-import java.util.*
+import java.util.Locale
 
 /**
  * A test that keep a singleton node started for all tests that can be used to get
@@ -90,13 +92,30 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     }
 
     protected fun assertIndexExists(index: String) {
-        val indexExistsResponse = client().admin().indices().exists(IndicesExistsRequest(index)).get()
-        assertTrue(indexExistsResponse.isExists)
+        val getIndexResponse =
+            client().admin().indices().getIndex(
+                GetIndexRequest().indices(index).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN)
+            ).get()
+        assertTrue(getIndexResponse.indices.size > 0)
     }
 
     protected fun assertIndexNotExists(index: String) {
-        val indexExistsResponse = client().admin().indices().exists(IndicesExistsRequest(index)).get()
-        assertFalse(indexExistsResponse.isExists)
+        val getIndexResponse =
+            client().admin().indices().getIndex(
+                GetIndexRequest().indices(index).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN)
+            ).get()
+        assertFalse(getIndexResponse.indices.size > 0)
+    }
+
+    protected fun assertAliasNotExists(alias: String) {
+        val aliasesResponse = client().admin().indices().getAliases(GetAliasesRequest()).get()
+        val foundAlias = aliasesResponse.aliases.values().forEach {
+            it.value.forEach {
+                if (it.alias == alias) {
+                    fail("alias exists, but it shouldn't")
+                }
+            }
+        }
     }
 
     protected fun createMonitor(monitor: Monitor): IndexMonitorResponse? {

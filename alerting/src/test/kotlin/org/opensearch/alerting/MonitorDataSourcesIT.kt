@@ -10,6 +10,7 @@ import org.opensearch.action.admin.cluster.state.ClusterStateRequest
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
 import org.opensearch.action.admin.indices.get.GetIndexRequest
 import org.opensearch.action.admin.indices.get.GetIndexResponse
+import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
 import org.opensearch.action.search.SearchRequest
@@ -294,9 +295,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
-        val clusterStateResponse = client().admin().cluster().state(ClusterStateRequest().indices(customQueryIndex).metadata(true)).get()
-        val mapping = clusterStateResponse.state.metadata.index(customQueryIndex).mapping()
-        Assert.assertTrue(mapping?.source()?.string()?.contains("\"analyzer\":\"$analyzer\"") == true)
+        val mapping = client().admin().indices().getMappings(GetMappingsRequest().indices(customQueryIndex)).get()
+        Assert.assertTrue(mapping.toString().contains("\"analyzer\":\"$analyzer\""))
     }
 
     fun `test delete monitor deletes all queries and metadata too`() {
@@ -329,8 +329,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(monitorId)
         val clusterStateResponse = client().admin().cluster().state(ClusterStateRequest().indices(customQueryIndex).metadata(true)).get()
-        val mapping = clusterStateResponse.state.metadata.index(customQueryIndex).mapping()
-        Assert.assertTrue(mapping?.source()?.string()?.contains("\"analyzer\":\"$analyzer\"") == true)
+        val mapping = client().admin().indices().getMappings(GetMappingsRequest().indices(customQueryIndex)).get()
+        Assert.assertTrue(mapping.toString().contains("\"analyzer\":\"$analyzer\"") == true)
         // Verify queries exist
         var searchResponse = client().search(
             SearchRequest(customQueryIndex).source(SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
@@ -339,7 +339,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         client().execute(
             AlertingActions.DELETE_MONITOR_ACTION_TYPE, DeleteMonitorRequest(monitorId, WriteRequest.RefreshPolicy.IMMEDIATE)
         ).get()
-        assertIndexNotExists(customQueryIndex)
+        assertIndexNotExists(customQueryIndex + "*")
+        assertAliasNotExists(customQueryIndex)
     }
 
     fun `test execute monitor with custom findings index and pattern`() {
@@ -386,7 +387,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(indices.isNotEmpty())
     }
 
-    fun `test execute pre-existing monitorand update`() {
+    fun `test execute pre-existing monitor and update`() {
         val request = CreateIndexRequest(SCHEDULED_JOBS_INDEX).mapping(ScheduledJobIndices.scheduledJobMappings())
             .settings(Settings.builder().put("index.hidden", true).build())
         client().admin().indices().create(request)
@@ -464,7 +465,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             Assert.assertNotNull(executeMonitorResponse.monitorRunResult.monitorName)
         }
         val alerts = searchAlerts(monitorId)
-        assertEquals(alerts.size, 1)
+        assertEquals(1, alerts.size)
 
         val customAlertsIndex = "custom_alerts_index"
         val customQueryIndex = "custom_query_index"
