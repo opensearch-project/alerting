@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting.monitors
+package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.model.MonitorRunResult

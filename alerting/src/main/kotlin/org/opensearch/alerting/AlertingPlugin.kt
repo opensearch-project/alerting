@@ -235,6 +235,12 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         this.threadPool = threadPool
         this.clusterService = clusterService
 
+        MonitorMetadataFactory.initialize(
+            client,
+            clusterService,
+            xContentRegistry,
+            settings
+        )
         MonitorMetadataService.initialize(
             client,
             clusterService,

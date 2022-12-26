@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting.monitors
+package org.opensearch.alerting
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -12,9 +12,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.bulk.BackoffPolicy
-import org.opensearch.alerting.AlertService
-import org.opensearch.alerting.InputService
-import org.opensearch.alerting.TriggerService
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.moveAlerts
 import org.opensearch.alerting.core.JobRunner

@@ -5,10 +5,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import org.apache.logging.log4j.LogManager
+import org.opensearch.ExceptionsHelper
+import org.opensearch.OpenSearchSecurityException
 import org.opensearch.action.DocWriteRequest
 import org.opensearch.action.DocWriteResponse
 import org.opensearch.action.admin.indices.get.GetIndexRequest
 import org.opensearch.action.admin.indices.get.GetIndexResponse
+import org.opensearch.action.admin.indices.stats.IndicesStatsAction
+import org.opensearch.action.admin.indices.stats.IndicesStatsRequest
+import org.opensearch.action.admin.indices.stats.IndicesStatsResponse
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.index.IndexRequest
@@ -33,6 +38,7 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.RestStatus
+import org.opensearch.transport.RemoteTransportException
 
 private val log = LogManager.getLogger(MonitorMetadataService::class.java)
 
@@ -97,14 +103,14 @@ object MonitorMetadataService :
         }
     }
 
-    suspend fun getOrCreateMetadata(monitor: Monitor): Pair<MonitorMetadata, Boolean> {
+    suspend fun getOrCreateMetadata(monitor: Monitor, createWithRunContext: Boolean = true): Pair<MonitorMetadata, Boolean> {
         try {
             val created = true
             val metadata = getMetadata(monitor)
             return if (metadata != null) {
                 metadata to !created
             } else {
-                val newMetadata = createNewMetadata(monitor)
+                val newMetadata = createNewMetadata(monitor, createWithRunContext = createWithRunContext)
                 upsertMetadata(newMetadata, updating = false) to created
             }
         } catch (e: Exception) {
@@ -156,12 +162,14 @@ object MonitorMetadataService :
         }
     }
 
-    private suspend fun createNewMetadata(monitor: Monitor): MonitorMetadata {
+    private suspend fun createNewMetadata(monitor: Monitor, createWithRunContext: Boolean): MonitorMetadata {
         val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR)
             (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
         else null
-        val runContext = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) createFullRunContext(monitorIndex)
-        else emptyMap()
+        val runContext =
+            if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR && createWithRunContext)
+                createFullRunContext(monitorIndex)
+            else emptyMap()
         return MonitorMetadata(
             id = "${monitor.id}-metadata",
             seqNo = SequenceNumbers.UNASSIGNED_SEQ_NO,
@@ -177,16 +185,52 @@ object MonitorMetadataService :
         index: String?,
         existingRunContext: MutableMap<String, MutableMap<String, Any>>? = null
     ): MutableMap<String, MutableMap<String, Any>> {
-        if (index == null) return mutableMapOf()
-        val getIndexRequest = GetIndexRequest().indices(index)
-        val getIndexResponse: GetIndexResponse = client.suspendUntil {
-            client.admin().indices().getIndex(getIndexRequest, it)
+        val lastRunContext = existingRunContext?.toMutableMap() ?: mutableMapOf()
+        try {
+            if (index == null) return mutableMapOf()
+            val getIndexRequest = GetIndexRequest().indices(index)
+            val getIndexResponse: GetIndexResponse = client.suspendUntil {
+                client.admin().indices().getIndex(getIndexRequest, it)
+            }
+            val indices = getIndexResponse.indices()
+
+            indices.forEach { indexName ->
+                if (!lastRunContext.containsKey(indexName)) {
+                    lastRunContext[indexName] = createRunContextForIndex(index)
+                }
+            }
+        } catch (e: RemoteTransportException) {
+            val unwrappedException = ExceptionsHelper.unwrapCause(e) as Exception
+            throw AlertingException("Failed fetching index stats", RestStatus.INTERNAL_SERVER_ERROR, unwrappedException)
+        } catch (e: OpenSearchSecurityException) {
+            throw AlertingException(
+                "Failed fetching index stats - missing required index permissions: ${e.localizedMessage}",
+                RestStatus.INTERNAL_SERVER_ERROR,
+                e
+            )
+        } catch (e: Exception) {
+            throw AlertingException("Failed fetching index stats", RestStatus.INTERNAL_SERVER_ERROR, e)
         }
-        val indices = getIndexResponse.indices()
-        val lastRunContext = existingRunContext?.toMutableMap() ?: mutableMapOf<String, MutableMap<String, Any>>()
-        indices.forEach { indexName ->
-            if (!lastRunContext.containsKey(indexName))
-                lastRunContext[indexName] = DocumentLevelMonitorRunner.createRunContext(clusterService, client, indexName)
+        return lastRunContext
+    }
+
+    suspend fun createRunContextForIndex(index: String, createdRecently: Boolean = false): MutableMap<String, Any> {
+        val request = IndicesStatsRequest().indices(index).clear()
+        val response: IndicesStatsResponse = client.suspendUntil { execute(IndicesStatsAction.INSTANCE, request, it) }
+        if (response.status != RestStatus.OK) {
+            val errorMessage = "Failed fetching index stats for index:$index"
+            throw AlertingException(errorMessage, RestStatus.INTERNAL_SERVER_ERROR, IllegalStateException(errorMessage))
+        }
+        val shards = response.shards.filter { it.shardRouting.primary() && it.shardRouting.active() }
+        val lastRunContext = HashMap<String, Any>()
+        lastRunContext["index"] = index
+        val count = shards.size
+        lastRunContext["shards_count"] = count
+
+        for (shard in shards) {
+            lastRunContext[shard.shardRouting.id.toString()] =
+                if (createdRecently) -1L
+                else shard.seqNoStats?.globalCheckpoint ?: SequenceNumbers.UNASSIGNED_SEQ_NO
         }
         return lastRunContext
     }

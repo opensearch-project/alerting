@@ -491,7 +491,6 @@ class TransportIndexMonitorAction @Inject constructor(
                     return
                 }
                 request.monitor = request.monitor.copy(id = indexResponse.id)
-                val metadataId = MonitorMetadata.getId(request.monitor)
                 var (metadata, created) = MonitorMetadataService.getOrCreateMetadata(request.monitor)
                 if (created == false) {
                     log.warn("Metadata doc id:${metadata.id} exists, but it shouldn't!")
@@ -620,21 +619,20 @@ class TransportIndexMonitorAction @Inject constructor(
                     )
                     return
                 }
-
+                var updatedMetadata: MonitorMetadata
                 val (metadata, created) = MonitorMetadataService.getOrCreateMetadata(request.monitor)
                 // Recreate runContext if metadata exists
-                if (created == false) {
-                    MonitorMetadataService.recreateRunContext(metadata, currentMonitor)
-                }
                 // Delete and insert all queries from/to queryIndex
-                if (currentMonitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                if (created == false && currentMonitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                    updatedMetadata = MonitorMetadataService.recreateRunContext(metadata, currentMonitor)
+                    updatedMetadata = MonitorMetadataService.upsertMetadata(updatedMetadata, updating = true)
                     client.suspendUntil<Client, BulkByScrollResponse> {
                         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
                             .source(currentMonitor.dataSources.queryIndex)
                             .filter(QueryBuilders.matchQuery("monitor_id", currentMonitor.id))
                             .execute(it)
                     }
-                    indexDocLevelMonitorQueries(request.monitor, currentMonitor.id, metadata, request.refreshPolicy)
+                    indexDocLevelMonitorQueries(request.monitor, currentMonitor.id, updatedMetadata, request.refreshPolicy)
                 }
                 actionListener.onResponse(
                     IndexMonitorResponse(

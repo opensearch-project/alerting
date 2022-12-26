@@ -84,7 +84,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             return monitorResult.copy(error = AlertingException.wrap(e))
         }
 
-        var (monitorMetadata, _) = MonitorMetadataService.getOrCreateMetadata(monitor)
+        var (monitorMetadata, _) = MonitorMetadataService.getOrCreateMetadata(monitor, createWithRunContext = false)
 
         monitorCtx.docLevelMonitorQueries!!.initDocLevelQueryIndex(monitor.dataSources)
         monitorCtx.docLevelMonitorQueries!!.indexDocLevelQueries(
@@ -126,7 +126,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 // Prepare lastRunContext for each index
                 val indexLastRunContext = lastRunContext.getOrPut(indexName) {
                     val indexCreatedRecently = createdRecently(monitor, indexName, periodStart, periodEnd, getIndexResponse)
-                    createRunContext(monitorCtx.clusterService!!, monitorCtx.client!!, indexName, indexCreatedRecently)
+                    MonitorMetadataService.createRunContextForIndex(indexName, indexCreatedRecently)
                 }
 
                 // Prepare updatedLastRunContext for each index

@@ -3,12 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting.monitors
+package org.opensearch.alerting
 
 import org.opensearch.action.bulk.BackoffPolicy
-import org.opensearch.alerting.AlertService
-import org.opensearch.alerting.InputService
-import org.opensearch.alerting.TriggerService
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.settings.AlertingSettings
