@@ -177,7 +177,6 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val resp = client().admin().indices().execute(
             FieldCapabilitiesAction.INSTANCE, FieldCapabilitiesRequest().indices(index).fields("*")
         ).get()
-        println(resp.indices.iterator())
         assertFalse(monitorResponse?.id.isNullOrEmpty())
         monitor = monitorResponse!!.monitor
         val id = monitorResponse.id
@@ -874,7 +873,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(getAlertsByWrongAlertIds.alerts.size, 0)
     }
 
-    fun `test queryIndex rollover success`() {
+    fun `test queryIndex rollover and delete monitor success`() {
 
         val testSourceIndex = "test_source_index"
         createIndex(testSourceIndex, Settings.EMPTY)
@@ -921,14 +920,14 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(alerts != null)
         Assert.assertTrue(alerts.size == 1)
 
-        // Both monitors used same queryIndex. Since source index has close to limit amount of fields in mappings,
+        // Both monitors used same queryIndex alias. Since source index has close to limit amount of fields in mappings,
         // we expect that creation of second monitor would rollover queryIndex
-        val getIndexResponse: GetIndexResponse =
+        var getIndexResponse: GetIndexResponse =
             client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
         assertEquals(2, getIndexResponse.indices.size)
         assertEquals(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "-000001", getIndexResponse.indices[0])
         assertEquals(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "-000002", getIndexResponse.indices[1])
-        // Now we'll verify that execution of both monitors work
+        // Now we'll verify that execution of both monitors still works
         indexDoc(testSourceIndex, "3", testDoc)
         // Exec Monitor #1
         executeMonitorResponse = executeMonitor(monitor, monitorResponse.id, false)
@@ -946,6 +945,23 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         alerts = searchAlerts(monitorResponse2.id)
         Assert.assertTrue(alerts != null)
         Assert.assertTrue(alerts.size == 2)
+        // Delete monitor #1
+        client().execute(
+            AlertingActions.DELETE_MONITOR_ACTION_TYPE, DeleteMonitorRequest(monitorResponse.id, WriteRequest.RefreshPolicy.IMMEDIATE)
+        ).get()
+        // Expect first concrete queryIndex to be delete since that one was only used by this monitor
+        getIndexResponse =
+            client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+        assertEquals(1, getIndexResponse.indices.size)
+        assertEquals(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "-000002", getIndexResponse.indices[0])
+        // Delete monitor #2
+        client().execute(
+            AlertingActions.DELETE_MONITOR_ACTION_TYPE, DeleteMonitorRequest(monitorResponse2.id, WriteRequest.RefreshPolicy.IMMEDIATE)
+        ).get()
+        // Expect first concrete queryIndex to be delete since that one was only used by this monitor
+        getIndexResponse =
+            client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+        assertEquals(0, getIndexResponse.indices.size)
     }
 
     fun `test queryIndex rollover failure source_index field count over limit`() {
