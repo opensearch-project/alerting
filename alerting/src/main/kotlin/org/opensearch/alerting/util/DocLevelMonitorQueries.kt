@@ -39,10 +39,10 @@ private val log = LogManager.getLogger(DocLevelMonitorQueries::class.java)
 class DocLevelMonitorQueries(private val client: Client, private val clusterService: ClusterService) {
     companion object {
 
-        val PROPERTIES = "properties"
-        val NESTED = "nested"
-        val TYPE = "type"
-
+        const val PROPERTIES = "properties"
+        const val NESTED = "nested"
+        const val TYPE = "type"
+        const val INDEX_PATTERN_SUFIX = "-000001"
         @JvmStatic
         fun docLevelQueriesMappings(): String {
             return DocLevelMonitorQueries::class.java.classLoader.getResource("mappings/doc-level-queries.json").readText()
@@ -52,7 +52,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
     suspend fun initDocLevelQueryIndex(): Boolean {
         if (!docLevelQueryIndexExists()) {
             val alias = ScheduledJob.DOC_LEVEL_QUERIES_INDEX
-            val indexPattern = ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "-1"
+            val indexPattern = ScheduledJob.DOC_LEVEL_QUERIES_INDEX + INDEX_PATTERN_SUFIX
             val indexRequest = CreateIndexRequest(indexPattern)
                 .mapping(docLevelQueriesMappings())
                 .alias(Alias(alias))
@@ -78,7 +78,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             return initDocLevelQueryIndex()
         }
         val alias = dataSources.queryIndex
-        val indexPattern = dataSources.queryIndex + "-1"
+        val indexPattern = dataSources.queryIndex + INDEX_PATTERN_SUFIX
         if (!clusterService.state().metadata.hasAlias(alias)) {
             val indexRequest = CreateIndexRequest(indexPattern)
                 .mapping(docLevelQueriesMappings())
@@ -303,6 +303,25 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             // If we reached limit for total number of fields in mappings, do a rollover here
             if (e.message?.contains("Limit of total fields") == true) {
                 targetQueryIndex = rolloverQueryIndex(monitor)
+                try {
+                    // PUT mappings to newly created index
+                    val updateMappingRequest = PutMappingRequest(targetQueryIndex)
+                    updateMappingRequest.source(mapOf<String, Any>("properties" to updatedProperties))
+                    updateMappingResponse = client.suspendUntil {
+                        client.admin().indices().putMapping(updateMappingRequest, it)
+                    }
+                } catch (e: Exception) {
+                    // If we reached limit for total number of fields in mappings after rollover
+                    // it means that source index has more then (FIELD_LIMIT - 3) fields (every query index has 3 fields defined)
+                    if (e.message?.contains("Limit of total fields") == true) {
+                        val errorMessage =
+                            "Monitor [${monitorMetadata.monitorId}] can't process index [$sourceIndex] due to field mapping limit"
+                        log.error(errorMessage)
+                        throw AlertingException(errorMessage, RestStatus.INTERNAL_SERVER_ERROR, e)
+                    } else {
+                        throw AlertingException.wrap(e)
+                    }
+                }
             } else {
                 throw AlertingException.wrap(e)
             }
@@ -311,13 +330,6 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         if (targetQueryIndex.isNotEmpty()) {
             // add newly created index to monitor's metadata object so that we can fetch it later on, when either applying mappings or running queries
             monitorMetadata.sourceToQueryIndexMapping[sourceIndex + monitor.id] = targetQueryIndex
-
-            // PUT mappings to newly created index
-            val updateMappingRequest = PutMappingRequest(targetQueryIndex)
-            updateMappingRequest.source(mapOf<String, Any>("properties" to updatedProperties))
-            updateMappingResponse = client.suspendUntil {
-                client.admin().indices().putMapping(updateMappingRequest, it)
-            }
         } else {
             val failureMessage = "Failed to resolve targetQueryIndex!"
             log.error(failureMessage)
@@ -327,9 +339,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
     }
 
     private suspend fun rolloverQueryIndex(monitor: Monitor): String? {
-
         val queryIndex = monitor.dataSources.queryIndex
-        val queryIndexPattern = monitor.dataSources.queryIndex + "-1"
+        val queryIndexPattern = monitor.dataSources.queryIndex + INDEX_PATTERN_SUFIX
 
         val request = RolloverRequest(queryIndex, null)
         request.createIndexRequest.index(queryIndexPattern)
@@ -345,7 +356,6 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR)
             )
         }
-        // TODO copy settings here too?
         return response.newIndex
     }
 
