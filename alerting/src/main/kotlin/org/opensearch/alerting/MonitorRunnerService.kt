@@ -57,57 +57,57 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         get() = Dispatchers.Default + runnerSupervisor
 
     fun registerClusterService(clusterService: ClusterService): MonitorRunnerService {
-        monitorCtx.clusterService = clusterService
+        this.monitorCtx.clusterService = clusterService
         return this
     }
 
     fun registerClient(client: Client): MonitorRunnerService {
-        monitorCtx.client = client
+        this.monitorCtx.client = client
         return this
     }
 
     fun registerNamedXContentRegistry(xContentRegistry: NamedXContentRegistry): MonitorRunnerService {
-        monitorCtx.xContentRegistry = xContentRegistry
+        this.monitorCtx.xContentRegistry = xContentRegistry
         return this
     }
 
     fun registerScriptService(scriptService: ScriptService): MonitorRunnerService {
-        monitorCtx.scriptService = scriptService
+        this.monitorCtx.scriptService = scriptService
         return this
     }
 
     fun registerSettings(settings: Settings): MonitorRunnerService {
-        monitorCtx.settings = settings
+        this.monitorCtx.settings = settings
         return this
     }
 
     fun registerThreadPool(threadPool: ThreadPool): MonitorRunnerService {
-        monitorCtx.threadPool = threadPool
+        this.monitorCtx.threadPool = threadPool
         return this
     }
 
     fun registerAlertIndices(alertIndices: AlertIndices): MonitorRunnerService {
-        monitorCtx.alertIndices = alertIndices
+        this.monitorCtx.alertIndices = alertIndices
         return this
     }
 
     fun registerInputService(inputService: InputService): MonitorRunnerService {
-        monitorCtx.inputService = inputService
+        this.monitorCtx.inputService = inputService
         return this
     }
 
     fun registerTriggerService(triggerService: TriggerService): MonitorRunnerService {
-        monitorCtx.triggerService = triggerService
+        this.monitorCtx.triggerService = triggerService
         return this
     }
 
     fun registerAlertService(alertService: AlertService): MonitorRunnerService {
-        monitorCtx.alertService = alertService
+        this.monitorCtx.alertService = alertService
         return this
     }
 
     fun registerDocLevelMonitorQueries(docLevelMonitorQueries: DocLevelMonitorQueries): MonitorRunnerService {
-        monitorCtx.docLevelMonitorQueries = docLevelMonitorQueries
+        this.monitorCtx.docLevelMonitorQueries = docLevelMonitorQueries
         return this
     }
 
