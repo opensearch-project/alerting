@@ -30,6 +30,7 @@ import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.ScheduledJob.Companion.DOC_LEVEL_QUERIES_INDEX
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.model.Table
 import org.opensearch.index.query.MatchQueryBuilder
@@ -1056,5 +1057,39 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         alerts = searchAlerts(monitorResponse2.id)
         Assert.assertTrue(alerts != null)
         Assert.assertTrue(alerts.size == 2)
+    }
+
+    fun `test queryIndex bwc`() {
+        createIndex(DOC_LEVEL_QUERIES_INDEX, Settings.builder().put("index.hidden", true).build())
+        assertIndexExists(DOC_LEVEL_QUERIES_INDEX)
+
+        val testSourceIndex = "test_source_index"
+        createIndex(testSourceIndex, Settings.EMPTY)
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+        // This doc should create 999 fields in mapping, only 1 field less then limit
+        val docPayload = "{\"test_field\" : \"us-west-2\" }"
+        // Create monitor
+        try {
+            var monitorResponse = createMonitor(monitor)
+            indexDoc(testSourceIndex, "1", docPayload)
+            var executeMonitorResponse = executeMonitor(monitor, monitorResponse!!.id, false)
+            Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+            Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+            refreshIndex(AlertIndices.ALERT_INDEX)
+            val alerts = searchAlerts(monitorResponse.id)
+            Assert.assertTrue(alerts != null)
+            Assert.assertTrue(alerts.size == 1)
+            // check if DOC_LEVEL_QUERIES_INDEX alias exists
+            assertAliasExists(DOC_LEVEL_QUERIES_INDEX)
+        } catch (e: Exception) {
+            fail("Exception happend but it shouldn't!")
+        }
     }
 }

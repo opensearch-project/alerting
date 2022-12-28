@@ -56,7 +56,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             // as our alias, to avoid name clash.
             if (clusterService.state().metadata.hasIndex(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)) {
                 val acknowledgedResponse: AcknowledgedResponse = client.suspendUntil {
-                    admin().indices().delete(DeleteIndexRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX))
+                    admin().indices().delete(DeleteIndexRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX), it)
                 }
                 if (!acknowledgedResponse.isAcknowledged) {
                     val errorMessage = "Deletion of old queryIndex [${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}] index is not acknowledged!"
@@ -94,7 +94,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         // as our alias, to avoid name clash.
         if (clusterService.state().metadata.hasIndex(dataSources.queryIndex)) {
             val acknowledgedResponse: AcknowledgedResponse = client.suspendUntil {
-                admin().indices().delete(DeleteIndexRequest(dataSources.queryIndex))
+                admin().indices().delete(DeleteIndexRequest(dataSources.queryIndex), it)
             }
             if (!acknowledgedResponse.isAcknowledged) {
                 val errorMessage = "Deletion of old queryIndex [${dataSources.queryIndex}] index is not acknowledged!"

@@ -118,6 +118,18 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         }
     }
 
+    protected fun assertAliasExists(alias: String) {
+        val aliasesResponse = client().admin().indices().getAliases(GetAliasesRequest()).get()
+        val foundAlias = aliasesResponse.aliases.values().forEach {
+            it.value.forEach {
+                if (it.alias == alias) {
+                    return
+                }
+            }
+        }
+        fail("alias doesn't exists, but it should")
+    }
+
     protected fun createMonitor(monitor: Monitor): IndexMonitorResponse? {
         val request = IndexMonitorRequest(
             monitorId = Monitor.NO_ID,
