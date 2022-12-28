@@ -11,6 +11,7 @@ import org.opensearch.ResourceAlreadyExistsException
 import org.opensearch.action.admin.indices.alias.Alias
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
+import org.opensearch.action.admin.indices.delete.DeleteIndexRequest
 import org.opensearch.action.admin.indices.get.GetIndexRequest
 import org.opensearch.action.admin.indices.get.GetIndexResponse
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
@@ -42,7 +43,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         const val PROPERTIES = "properties"
         const val NESTED = "nested"
         const val TYPE = "type"
-        const val INDEX_PATTERN_SUFIX = "-000001"
+        const val INDEX_PATTERN_SUFFIX = "-000001"
         @JvmStatic
         fun docLevelQueriesMappings(): String {
             return DocLevelMonitorQueries::class.java.classLoader.getResource("mappings/doc-level-queries.json").readText()
@@ -51,8 +52,20 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
 
     suspend fun initDocLevelQueryIndex(): Boolean {
         if (!docLevelQueryIndexExists()) {
+            // Since we changed queryIndex to be alias now, for backwards compatibility, we have to delete index with same name
+            // as our alias, to avoid name clash.
+            if (clusterService.state().metadata.hasIndex(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)) {
+                val acknowledgedResponse: AcknowledgedResponse = client.suspendUntil {
+                    admin().indices().delete(DeleteIndexRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX))
+                }
+                if (!acknowledgedResponse.isAcknowledged) {
+                    val errorMessage = "Deletion of old queryIndex [${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}] index is not acknowledged!"
+                    log.error(errorMessage)
+                    throw AlertingException.wrap(OpenSearchStatusException(errorMessage, RestStatus.INTERNAL_SERVER_ERROR))
+                }
+            }
             val alias = ScheduledJob.DOC_LEVEL_QUERIES_INDEX
-            val indexPattern = ScheduledJob.DOC_LEVEL_QUERIES_INDEX + INDEX_PATTERN_SUFIX
+            val indexPattern = ScheduledJob.DOC_LEVEL_QUERIES_INDEX + INDEX_PATTERN_SUFFIX
             val indexRequest = CreateIndexRequest(indexPattern)
                 .mapping(docLevelQueriesMappings())
                 .alias(Alias(alias))
@@ -77,8 +90,20 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         if (dataSources.queryIndex == ScheduledJob.DOC_LEVEL_QUERIES_INDEX) {
             return initDocLevelQueryIndex()
         }
+        // Since we changed queryIndex to be alias now, for backwards compatibility, we have to delete index with same name
+        // as our alias, to avoid name clash.
+        if (clusterService.state().metadata.hasIndex(dataSources.queryIndex)) {
+            val acknowledgedResponse: AcknowledgedResponse = client.suspendUntil {
+                admin().indices().delete(DeleteIndexRequest(dataSources.queryIndex))
+            }
+            if (!acknowledgedResponse.isAcknowledged) {
+                val errorMessage = "Deletion of old queryIndex [${dataSources.queryIndex}] index is not acknowledged!"
+                log.error(errorMessage)
+                throw AlertingException.wrap(OpenSearchStatusException(errorMessage, RestStatus.INTERNAL_SERVER_ERROR))
+            }
+        }
         val alias = dataSources.queryIndex
-        val indexPattern = dataSources.queryIndex + INDEX_PATTERN_SUFIX
+        val indexPattern = dataSources.queryIndex + INDEX_PATTERN_SUFFIX
         if (!clusterService.state().metadata.hasAlias(alias)) {
             val indexRequest = CreateIndexRequest(indexPattern)
                 .mapping(docLevelQueriesMappings())
@@ -340,7 +365,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
 
     private suspend fun rolloverQueryIndex(monitor: Monitor): String? {
         val queryIndex = monitor.dataSources.queryIndex
-        val queryIndexPattern = monitor.dataSources.queryIndex + INDEX_PATTERN_SUFIX
+        val queryIndexPattern = monitor.dataSources.queryIndex + INDEX_PATTERN_SUFFIX
 
         val request = RolloverRequest(queryIndex, null)
         request.createIndexRequest.index(queryIndexPattern)

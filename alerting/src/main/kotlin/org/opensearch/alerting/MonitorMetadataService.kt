@@ -37,6 +37,8 @@ import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
+import org.opensearch.common.xcontent.XContentParser
+import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.Monitor
@@ -134,6 +136,7 @@ object MonitorMetadataService :
                     xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                     getResponse.sourceAsBytesRef, XContentType.JSON
                 )
+                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
                 MonitorMetadata.parse(xcp)
             } else {
                 null

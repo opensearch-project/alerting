@@ -512,6 +512,10 @@
         "last_run_context": {
           "type": "object",
           "enabled": false
+        },
+        "source_to_query_index_mapping": {
+          "type": "object",
+          "enabled": false
         }
       }
     }

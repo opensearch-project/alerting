@@ -13,8 +13,6 @@ import org.opensearch.action.admin.indices.get.GetIndexResponse
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
-import org.opensearch.action.fieldcaps.FieldCapabilitiesAction
-import org.opensearch.action.fieldcaps.FieldCapabilitiesRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.action.SearchMonitorAction
@@ -174,9 +172,6 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         client().admin().indices().putMapping(
             PutMappingRequest(index).source("alias.some.fff", "type=alias,path=test_field.some_other_field")
         )
-        val resp = client().admin().indices().execute(
-            FieldCapabilitiesAction.INSTANCE, FieldCapabilitiesRequest().indices(index).fields("*")
-        ).get()
         assertFalse(monitorResponse?.id.isNullOrEmpty())
         monitor = monitorResponse!!.monitor
         val id = monitorResponse.id

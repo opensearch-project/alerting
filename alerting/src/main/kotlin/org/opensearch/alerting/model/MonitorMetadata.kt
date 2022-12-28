@@ -84,7 +84,7 @@ data class MonitorMetadata(
             var lastRunContext: Map<String, Any> = mapOf()
             var sourceToQueryIndexMapping: MutableMap<String, String> = mutableMapOf()
 
-            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.currentToken(), xcp)
             while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
                 val fieldName = xcp.currentName()
                 xcp.nextToken()
