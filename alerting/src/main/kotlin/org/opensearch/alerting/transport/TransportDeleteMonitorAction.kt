@@ -107,7 +107,7 @@ class TransportDeleteMonitorAction @Inject constructor(
 
                 if (canDelete) {
                     val deleteResponse = deleteMonitor(monitor)
-                    deleteDocLevelMonitorQueries(monitor)
+                    deleteDocLevelMonitorQueriesAndIndices(monitor)
                     deleteMetadata(monitor)
                     actionListener.onResponse(DeleteMonitorResponse(deleteResponse.id, deleteResponse.version))
                 } else {
@@ -147,7 +147,7 @@ class TransportDeleteMonitorAction @Inject constructor(
             val deleteResponse: DeleteResponse = client.suspendUntil { delete(deleteRequest, it) }
         }
 
-        private suspend fun deleteDocLevelMonitorQueries(monitor: Monitor) {
+        private suspend fun deleteDocLevelMonitorQueriesAndIndices(monitor: Monitor) {
             val clusterState = clusterService.state()
             val metadata = MonitorMetadataService.getMetadata(monitor)
             metadata?.sourceToQueryIndexMapping?.forEach { (_, queryIndex) ->
