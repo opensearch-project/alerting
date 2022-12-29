@@ -917,12 +917,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(alerts.size == 1)
 
         // Both monitors used same queryIndex alias. Since source index has close to limit amount of fields in mappings,
-        // we expect that creation of second monitor would rollover queryIndex
+        // we expect that creation of second monitor would trigger rollover of queryIndex
         var getIndexResponse: GetIndexResponse =
             client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
         assertEquals(2, getIndexResponse.indices.size)
-        assertEquals(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "-000001", getIndexResponse.indices[0])
-        assertEquals(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "-000002", getIndexResponse.indices[1])
+        assertEquals(DOC_LEVEL_QUERIES_INDEX + "-000001", getIndexResponse.indices[0])
+        assertEquals(DOC_LEVEL_QUERIES_INDEX + "-000002", getIndexResponse.indices[1])
         // Now we'll verify that execution of both monitors still works
         indexDoc(testSourceIndex, "3", testDoc)
         // Exec Monitor #1
@@ -945,7 +945,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         client().execute(
             AlertingActions.DELETE_MONITOR_ACTION_TYPE, DeleteMonitorRequest(monitorResponse.id, WriteRequest.RefreshPolicy.IMMEDIATE)
         ).get()
-        // Expect first concrete queryIndex to be delete since that one was only used by this monitor
+        // Expect first concrete queryIndex to be deleted since that one was only used by this monitor
         getIndexResponse =
             client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
         assertEquals(1, getIndexResponse.indices.size)
@@ -954,7 +954,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         client().execute(
             AlertingActions.DELETE_MONITOR_ACTION_TYPE, DeleteMonitorRequest(monitorResponse2.id, WriteRequest.RefreshPolicy.IMMEDIATE)
         ).get()
-        // Expect first concrete queryIndex to be delete since that one was only used by this monitor
+        // Expect second concrete queryIndex to be deleted since that one was only used by this monitor
         getIndexResponse =
             client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
         assertEquals(0, getIndexResponse.indices.size)
@@ -980,7 +980,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         }
         docPayload.append("\"test_field\" : \"us-west-2\" }")
         indexDoc(testSourceIndex, "1", docPayload.toString())
-        // Create monitor
+        // Create monitor and expect failure.
+        // queryIndex has 3 fields in mappings initially so 999 + 3 > 1000(default limit)
         try {
             createMonitor(monitor)
         } catch (e: Exception) {
@@ -1034,8 +1035,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(alerts != null)
         Assert.assertTrue(alerts.size == 1)
 
-        // Both monitors used same queryIndex. Since source index has close to limit amount of fields in mappings,
-        // we expect that creation of second monitor would rollover queryIndex
+        // Both monitors used same queryIndex. Since source index has well below limit amount of fields in mappings,
+        // we expect only 1 backing queryIndex
         val getIndexResponse: GetIndexResponse =
             client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
         assertEquals(1, getIndexResponse.indices.size)
