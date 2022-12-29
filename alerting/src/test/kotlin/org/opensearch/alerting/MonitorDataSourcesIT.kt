@@ -1060,7 +1060,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(alerts.size == 2)
     }
 
-    fun `test queryIndex bwc`() {
+    fun `test queryIndex bwc when index was not an alias`() {
         createIndex(DOC_LEVEL_QUERIES_INDEX, Settings.builder().put("index.hidden", true).build())
         assertIndexExists(DOC_LEVEL_QUERIES_INDEX)
 
