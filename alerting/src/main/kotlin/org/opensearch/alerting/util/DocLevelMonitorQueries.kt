@@ -338,6 +338,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 } catch (e: Exception) {
                     // If we reached limit for total number of fields in mappings after rollover
                     // it means that source index has more then (FIELD_LIMIT - 3) fields (every query index has 3 fields defined)
+                    // TODO maybe split queries/mappings between multiple query indices?
                     if (e.message?.contains("Limit of total fields") == true) {
                         val errorMessage =
                             "Monitor [${monitorMetadata.monitorId}] can't process index [$sourceIndex] due to field mapping limit"
