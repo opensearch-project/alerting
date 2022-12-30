@@ -498,6 +498,8 @@ class TransportIndexMonitorAction @Inject constructor(
                 if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
                     indexDocLevelMonitorQueries(request.monitor, indexResponse.id, metadata, request.refreshPolicy)
                 }
+                // When inserting queries in queryIndex we could update sourceToQueryIndexMapping
+                MonitorMetadataService.upsertMetadata(metadata, updating = true)
 
                 actionListener.onResponse(
                     IndexMonitorResponse(
@@ -625,7 +627,6 @@ class TransportIndexMonitorAction @Inject constructor(
                 // Delete and insert all queries from/to queryIndex
                 if (created == false && currentMonitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
                     updatedMetadata = MonitorMetadataService.recreateRunContext(metadata, currentMonitor)
-                    updatedMetadata = MonitorMetadataService.upsertMetadata(updatedMetadata, updating = true)
                     client.suspendUntil<Client, BulkByScrollResponse> {
                         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
                             .source(currentMonitor.dataSources.queryIndex)
@@ -633,6 +634,7 @@ class TransportIndexMonitorAction @Inject constructor(
                             .execute(it)
                     }
                     indexDocLevelMonitorQueries(request.monitor, currentMonitor.id, updatedMetadata, request.refreshPolicy)
+                    MonitorMetadataService.upsertMetadata(updatedMetadata, updating = true)
                 }
                 actionListener.onResponse(
                     IndexMonitorResponse(

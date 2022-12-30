@@ -337,9 +337,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             SearchRequest(customQueryIndex).source(SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
         ).get()
         assertNotEquals(0, searchResponse.hits.hits.size)
-        client().execute(
-            AlertingActions.DELETE_MONITOR_ACTION_TYPE, DeleteMonitorRequest(monitorId, WriteRequest.RefreshPolicy.IMMEDIATE)
-        ).get()
+
+        deleteMonitor(monitorId)
         assertIndexNotExists(customQueryIndex + "*")
         assertAliasNotExists(customQueryIndex)
     }
@@ -1000,8 +999,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             inputs = listOf(docLevelInput),
             triggers = listOf(trigger)
         )
-        // This doc should create close to 1000 (limit) fields in index mapping. It's easier to add mappings like this then via api
-        val docPayload: StringBuilder = StringBuilder(100000)
+        // Create doc with 11 fields
+        val docPayload: StringBuilder = StringBuilder(1000)
         docPayload.append("{")
         for (i in 1..10) {
             docPayload.append(""" "id$i":$i,""")
@@ -1058,6 +1057,62 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         alerts = searchAlerts(monitorResponse2.id)
         Assert.assertTrue(alerts != null)
         Assert.assertTrue(alerts.size == 2)
+    }
+
+    /**
+     * 1. Create monitor with input source_index with 900 fields in mappings - can fit 1 in queryIndex
+     * 2. Update monitor and change input source_index to a new one with 900 fields in mappings
+     * 3. Expect queryIndex rollover resulting in 2 backing indices
+     * 4. Delete monitor and expect that all backing indices are deleted
+     * */
+    fun `test updating monitor no execution queryIndex rolling over`() {
+        val testSourceIndex1 = "test_source_index1"
+        val testSourceIndex2 = "test_source_index2"
+        createIndex(testSourceIndex1, Settings.EMPTY)
+        createIndex(testSourceIndex2, Settings.EMPTY)
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex1), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+        // This doc should create close to 1000 (limit) fields in index mapping. It's easier to add mappings like this then via api
+        val docPayload: StringBuilder = StringBuilder(100000)
+        docPayload.append("{")
+        for (i in 1..899) {
+            docPayload.append(""" "id$i":$i,""")
+        }
+        docPayload.append("\"test_field\" : \"us-west-2\" }")
+        // Indexing docs here as an easier means to set index mappings
+        indexDoc(testSourceIndex1, "1", docPayload.toString())
+        indexDoc(testSourceIndex2, "1", docPayload.toString())
+        // Create monitor
+        var monitorResponse = createMonitor(monitor)
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+
+        // Update monitor and change input
+        val updatedMonitor = monitor.copy(
+            inputs = listOf(
+                DocLevelMonitorInput("description", listOf(testSourceIndex2), listOf(docQuery))
+            )
+        )
+        updateMonitor(updatedMonitor, updatedMonitor.id)
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+
+        // Expect queryIndex to rollover after setting new source_index with close to limit amount of fields in mappings
+        var getIndexResponse: GetIndexResponse =
+            client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+        assertEquals(2, getIndexResponse.indices.size)
+
+        deleteMonitor(updatedMonitor.id)
+        waitUntil {
+            getIndexResponse =
+                client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+            return@waitUntil getIndexResponse.indices.isEmpty()
+        }
+        assertEquals(0, getIndexResponse.indices.size)
     }
 
     fun `test queryIndex bwc when index was not an alias`() {

@@ -26,6 +26,7 @@ import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.DeleteMonitorRequest
 import org.opensearch.commons.alerting.action.GetFindingsRequest
 import org.opensearch.commons.alerting.action.GetFindingsResponse
 import org.opensearch.commons.alerting.action.IndexMonitorRequest
@@ -152,6 +153,13 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
             monitor = monitor
         )
         return client().execute(AlertingActions.INDEX_MONITOR_ACTION_TYPE, request).actionGet()
+    }
+
+    protected fun deleteMonitor(monitorId: String): Boolean {
+        client().execute(
+            AlertingActions.DELETE_MONITOR_ACTION_TYPE, DeleteMonitorRequest(monitorId, WriteRequest.RefreshPolicy.IMMEDIATE)
+        ).get()
+        return true
     }
 
     protected fun searchAlerts(id: String, indices: String = AlertIndices.ALERT_INDEX, refresh: Boolean = true): List<Alert> {
