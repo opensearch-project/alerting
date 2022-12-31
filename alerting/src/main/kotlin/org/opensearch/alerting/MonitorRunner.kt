@@ -10,7 +10,6 @@ import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetDestinationsRequest
 import org.opensearch.alerting.action.GetDestinationsResponse
 import org.opensearch.alerting.model.ActionRunResult
-import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
@@ -179,9 +178,5 @@ abstract class MonitorRunner {
         }
 
         return NotificationActionConfigs(destination, channel)
-    }
-
-    protected fun createMonitorMetadata(monitorId: String): MonitorMetadata {
-        return MonitorMetadata("$monitorId-metadata", monitorId, emptyList(), emptyMap())
     }
 }

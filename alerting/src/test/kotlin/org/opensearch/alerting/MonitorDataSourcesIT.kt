@@ -8,11 +8,16 @@ package org.opensearch.alerting
 import org.junit.Assert
 import org.opensearch.action.admin.cluster.state.ClusterStateRequest
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
+import org.opensearch.action.admin.indices.get.GetIndexRequest
+import org.opensearch.action.admin.indices.get.GetIndexResponse
+import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest
+import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.action.SearchMonitorAction
 import org.opensearch.alerting.action.SearchMonitorRequest
+import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.transport.AlertingSingleNodeTestCase
 import org.opensearch.common.settings.Settings
@@ -24,6 +29,8 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
+import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.ScheduledJob.Companion.DOC_LEVEL_QUERIES_INDEX
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.model.Table
 import org.opensearch.index.query.MatchQueryBuilder
@@ -33,6 +40,7 @@ import org.opensearch.test.OpenSearchTestCase
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit.MILLIS
+import java.util.Map
 import java.util.concurrent.TimeUnit
 import java.util.stream.Collectors
 
@@ -128,25 +136,45 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute monitor with custom query index`() {
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
-        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
+        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4")
+        val docQuery3 = DocLevelQuery(query = "source.ip.v4.v0:120", name = "5")
+        val docQuery4 = DocLevelQuery(query = "alias.some.fff:\"us-west-2\"", name = "6")
+        val docQuery5 = DocLevelQuery(query = "message:\"This is an error from IAD region\"", name = "7")
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(docQuery1, docQuery2, docQuery3, docQuery4, docQuery5)
+        )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customFindingsIndex = "custom_findings_index"
+        val customFindingsIndexPattern = "custom_findings_index-1"
         val customQueryIndex = "custom_alerts_index"
         var monitor = randomDocumentLevelMonitor(
             inputs = listOf(docLevelInput),
             triggers = listOf(trigger),
-            dataSources = DataSources(queryIndex = customQueryIndex)
+            dataSources = DataSources(
+                queryIndex = customQueryIndex,
+                findingsIndex = customFindingsIndex,
+                findingsIndexPattern = customFindingsIndexPattern
+            )
         )
         val monitorResponse = createMonitor(monitor)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        // Trying to test here few different "nesting" situations and "wierd" characters
         val testDoc = """{
             "message" : "This is an error from IAD region",
+            "source.ip.v6.v1" : 12345,
+            "source.ip.v6.v2" : 16645,
+            "source.ip.v4.v0" : 120,
+            "test_bad_char" : "\u0000", 
             "test_strict_date_time" : "$testTime",
-            "test_field" : "us-west-2"
+            "test_field.some_other_field" : "us-west-2"
         }"""
+        indexDoc(index, "1", testDoc)
+        client().admin().indices().putMapping(
+            PutMappingRequest(index).source("alias.some.fff", "type=alias,path=test_field.some_other_field")
+        )
         assertFalse(monitorResponse?.id.isNullOrEmpty())
         monitor = monitorResponse!!.monitor
-        indexDoc(index, "1", testDoc)
         val id = monitorResponse.id
         val executeMonitorResponse = executeMonitor(monitor, id, false)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
@@ -158,11 +186,85 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
-        getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, null))
+        val findings = searchFindings(id, customFindingsIndex)
+        assertEquals("Findings saved for test monitor", 1, findings.size)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
+        assertEquals("Didn't match all 5 queries", 5, findings[0].docLevelQueries.size)
+    }
+
+    fun `test execute monitor with custom query index and nested mappings`() {
+        val docQuery1 = DocLevelQuery(query = "message:\"msg 1 2 3 4\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customFindingsIndex = "custom_findings_index"
+        val customFindingsIndexPattern = "custom_findings_index-1"
+        val customQueryIndex = "custom_alerts_index"
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(
+                queryIndex = customQueryIndex,
+                findingsIndex = customFindingsIndex,
+                findingsIndexPattern = customFindingsIndexPattern
+            )
+        )
+        val monitorResponse = createMonitor(monitor)
+
+        // We are verifying here that index with nested mappings and nested aliases
+        // won't break query matching
+
+        // Create index mappings
+        val m: MutableMap<String, Any> = HashMap()
+        val m1: MutableMap<String, Any> = HashMap()
+        m1["title"] = Map.of("type", "text")
+        m1["category"] = Map.of("type", "keyword")
+        m["rule"] = Map.of("type", "nested", "properties", m1)
+        val properties = Map.of<String, Any>("properties", m)
+
+        client().admin().indices().putMapping(
+            PutMappingRequest(
+                index
+            ).source(properties)
+        ).get()
+
+        // Put alias for nested fields
+        val mm: MutableMap<String, Any> = HashMap()
+        val mm1: MutableMap<String, Any> = HashMap()
+        mm1["title_alias"] = Map.of("type", "alias", "path", "rule.title")
+        mm["rule"] = Map.of("type", "nested", "properties", mm1)
+        val properties1 = Map.of<String, Any>("properties", mm)
+        client().admin().indices().putMapping(
+            PutMappingRequest(
+                index
+            ).source(properties1)
+        ).get()
+
+        val testDoc = """{
+            "rule": {"title": "some_title"},
+            "message": "msg 1 2 3 4"
+        }"""
+        indexDoc(index, "2", testDoc)
+
+        client().admin().indices().putMapping(
+            PutMappingRequest(index).source("alias.some.fff", "type=alias,path=test_field.some_other_field")
+        )
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+        val id = monitorResponse.id
+        val executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        searchAlerts(id)
+        val table = Table("asc", "id", null, 1, 0, "")
+        var getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        val findings = searchFindings(id, customFindingsIndex)
+        assertEquals("Findings saved for test monitor", 1, findings.size)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("2"))
+        assertEquals("Didn't match all 4 queries", 1, findings[0].docLevelQueries.size)
     }
 
     fun `test execute monitor with custom query index and custom field mappings`() {
@@ -194,16 +296,15 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
-        val clusterStateResponse = client().admin().cluster().state(ClusterStateRequest().indices(customQueryIndex).metadata(true)).get()
-        val mapping = clusterStateResponse.state.metadata.index(customQueryIndex).mapping()
-        Assert.assertTrue(mapping?.source()?.string()?.contains("\"analyzer\":\"$analyzer\"") == true)
+        val mapping = client().admin().indices().getMappings(GetMappingsRequest().indices(customQueryIndex)).get()
+        Assert.assertTrue(mapping.toString().contains("\"analyzer\":\"$analyzer\""))
     }
 
     fun `test delete monitor deletes all queries and metadata too`() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        val customQueryIndex = "custom_alerts_index"
+        val customQueryIndex = "custom_query_index"
         val analyzer = "whitespace"
         var monitor = randomDocumentLevelMonitor(
             inputs = listOf(docLevelInput),
@@ -229,22 +330,17 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(monitorId)
         val clusterStateResponse = client().admin().cluster().state(ClusterStateRequest().indices(customQueryIndex).metadata(true)).get()
-        val mapping = clusterStateResponse.state.metadata.index(customQueryIndex).mapping()
-        Assert.assertTrue(mapping?.source()?.string()?.contains("\"analyzer\":\"$analyzer\"") == true)
+        val mapping = client().admin().indices().getMappings(GetMappingsRequest().indices(customQueryIndex)).get()
+        Assert.assertTrue(mapping.toString().contains("\"analyzer\":\"$analyzer\"") == true)
         // Verify queries exist
         var searchResponse = client().search(
             SearchRequest(customQueryIndex).source(SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
         ).get()
         assertNotEquals(0, searchResponse.hits.hits.size)
-        client().execute(
-            AlertingActions.DELETE_MONITOR_ACTION_TYPE, DeleteMonitorRequest(monitorId, WriteRequest.RefreshPolicy.IMMEDIATE)
-        ).get()
-        client().admin().indices().refresh(RefreshRequest(customQueryIndex)).get()
-        // Verify queries are deleted
-        searchResponse = client().search(
-            SearchRequest(customQueryIndex).source(SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
-        ).get()
-        assertEquals(0, searchResponse.hits.hits.size)
+
+        deleteMonitor(monitorId)
+        assertIndexNotExists(customQueryIndex + "*")
+        assertAliasNotExists(customQueryIndex)
     }
 
     fun `test execute monitor with custom findings index and pattern`() {
@@ -291,7 +387,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(indices.isNotEmpty())
     }
 
-    fun `test execute pre-existing monitorand update`() {
+    fun `test execute pre-existing monitor and update`() {
         val request = CreateIndexRequest(SCHEDULED_JOBS_INDEX).mapping(ScheduledJobIndices.scheduledJobMappings())
             .settings(Settings.builder().put("index.hidden", true).build())
         client().admin().indices().create(request)
@@ -369,11 +465,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             Assert.assertNotNull(executeMonitorResponse.monitorRunResult.monitorName)
         }
         val alerts = searchAlerts(monitorId)
-        assertEquals(alerts.size, 1)
+        assertEquals(1, alerts.size)
 
         val customAlertsIndex = "custom_alerts_index"
         val customQueryIndex = "custom_query_index"
-        Assert.assertFalse(client().admin().cluster().state(ClusterStateRequest()).get().state.routingTable.hasIndex(customQueryIndex))
         val customFindingsIndex = "custom_findings_index"
         val updateMonitorResponse = updateMonitor(
             monitor.copy(
@@ -390,8 +485,9 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertNotNull(updateMonitorResponse)
         Assert.assertEquals(updateMonitorResponse!!.monitor.owner, "security_analytics_plugin")
         indexDoc(index, "2", testDoc)
-        executeMonitorResponse = executeMonitor(updateMonitorResponse!!.monitor, monitorId, false)
-        Assert.assertTrue(client().admin().cluster().state(ClusterStateRequest()).get().state.routingTable.hasIndex(customQueryIndex))
+        if (updateMonitorResponse != null) {
+            executeMonitorResponse = executeMonitor(updateMonitorResponse.monitor, monitorId, false)
+        }
         val findings = searchFindings(monitorId, customFindingsIndex)
         assertEquals("Findings saved for test monitor", 1, findings.size)
         assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("2"))
@@ -770,5 +866,286 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         Assert.assertTrue(getAlertsByWrongAlertIds != null)
         Assert.assertEquals(getAlertsByWrongAlertIds.alerts.size, 0)
+    }
+
+    fun `test queryIndex rollover and delete monitor success`() {
+
+        val testSourceIndex = "test_source_index"
+        createIndex(testSourceIndex, Settings.EMPTY)
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+        // This doc should create close to 1000 (limit) fields in index mapping. It's easier to add mappings like this then via api
+        val docPayload: StringBuilder = StringBuilder(100000)
+        docPayload.append("{")
+        for (i in 1..330) {
+            docPayload.append(""" "id$i.somefield.somefield$i":$i,""")
+        }
+        docPayload.append("\"test_field\" : \"us-west-2\" }")
+        indexDoc(testSourceIndex, "1", docPayload.toString())
+        // Create monitor #1
+        var monitorResponse = createMonitor(monitor)
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+        // Execute monitor #1
+        var executeMonitorResponse = executeMonitor(monitor, monitorResponse.id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        // Create monitor #2
+        var monitorResponse2 = createMonitor(monitor)
+        assertFalse(monitorResponse2?.id.isNullOrEmpty())
+        monitor = monitorResponse2!!.monitor
+        // Insert doc #2. This one should trigger creation of alerts during monitor exec
+        val testDoc = """{
+            "test_field" : "us-west-2"
+        }"""
+        indexDoc(testSourceIndex, "2", testDoc)
+        // Execute monitor #2
+        var executeMonitorResponse2 = executeMonitor(monitor, monitorResponse2.id, false)
+        Assert.assertEquals(executeMonitorResponse2!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse2.monitorRunResult.triggerResults.size, 1)
+
+        refreshIndex(AlertIndices.ALERT_INDEX)
+        var alerts = searchAlerts(monitorResponse2.id)
+        Assert.assertTrue(alerts != null)
+        Assert.assertTrue(alerts.size == 1)
+
+        // Both monitors used same queryIndex alias. Since source index has close to limit amount of fields in mappings,
+        // we expect that creation of second monitor would trigger rollover of queryIndex
+        var getIndexResponse: GetIndexResponse =
+            client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+        assertEquals(2, getIndexResponse.indices.size)
+        assertEquals(DOC_LEVEL_QUERIES_INDEX + "-000001", getIndexResponse.indices[0])
+        assertEquals(DOC_LEVEL_QUERIES_INDEX + "-000002", getIndexResponse.indices[1])
+        // Now we'll verify that execution of both monitors still works
+        indexDoc(testSourceIndex, "3", testDoc)
+        // Exec Monitor #1
+        executeMonitorResponse = executeMonitor(monitor, monitorResponse.id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        refreshIndex(AlertIndices.ALERT_INDEX)
+        alerts = searchAlerts(monitorResponse.id)
+        Assert.assertTrue(alerts != null)
+        Assert.assertTrue(alerts.size == 2)
+        // Exec Monitor #2
+        executeMonitorResponse = executeMonitor(monitor, monitorResponse2.id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        refreshIndex(AlertIndices.ALERT_INDEX)
+        alerts = searchAlerts(monitorResponse2.id)
+        Assert.assertTrue(alerts != null)
+        Assert.assertTrue(alerts.size == 2)
+        // Delete monitor #1
+        client().execute(
+            AlertingActions.DELETE_MONITOR_ACTION_TYPE, DeleteMonitorRequest(monitorResponse.id, WriteRequest.RefreshPolicy.IMMEDIATE)
+        ).get()
+        // Expect first concrete queryIndex to be deleted since that one was only used by this monitor
+        getIndexResponse =
+            client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+        assertEquals(1, getIndexResponse.indices.size)
+        assertEquals(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "-000002", getIndexResponse.indices[0])
+        // Delete monitor #2
+        client().execute(
+            AlertingActions.DELETE_MONITOR_ACTION_TYPE, DeleteMonitorRequest(monitorResponse2.id, WriteRequest.RefreshPolicy.IMMEDIATE)
+        ).get()
+        // Expect second concrete queryIndex to be deleted since that one was only used by this monitor
+        getIndexResponse =
+            client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+        assertEquals(0, getIndexResponse.indices.size)
+    }
+
+    fun `test queryIndex rollover failure source_index field count over limit`() {
+
+        val testSourceIndex = "test_source_index"
+        createIndex(testSourceIndex, Settings.EMPTY)
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+        // This doc should create 999 fields in mapping, only 1 field less then limit
+        val docPayload: StringBuilder = StringBuilder(100000)
+        docPayload.append("{")
+        for (i in 1..998) {
+            docPayload.append(""" "id$i":$i,""")
+        }
+        docPayload.append("\"test_field\" : \"us-west-2\" }")
+        indexDoc(testSourceIndex, "1", docPayload.toString())
+        // Create monitor and expect failure.
+        // queryIndex has 3 fields in mappings initially so 999 + 3 > 1000(default limit)
+        try {
+            createMonitor(monitor)
+        } catch (e: Exception) {
+            assertTrue(e.message?.contains("can't process index [$testSourceIndex] due to field mapping limit") ?: false)
+        }
+    }
+
+    fun `test queryIndex not rolling over multiple monitors`() {
+        val testSourceIndex = "test_source_index"
+        createIndex(testSourceIndex, Settings.EMPTY)
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+        // Create doc with 11 fields
+        val docPayload: StringBuilder = StringBuilder(1000)
+        docPayload.append("{")
+        for (i in 1..10) {
+            docPayload.append(""" "id$i":$i,""")
+        }
+        docPayload.append("\"test_field\" : \"us-west-2\" }")
+        indexDoc(testSourceIndex, "1", docPayload.toString())
+        // Create monitor #1
+        var monitorResponse = createMonitor(monitor)
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+        // Execute monitor #1
+        var executeMonitorResponse = executeMonitor(monitor, monitorResponse.id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        // Create monitor #2
+        var monitorResponse2 = createMonitor(monitor)
+        assertFalse(monitorResponse2?.id.isNullOrEmpty())
+        monitor = monitorResponse2!!.monitor
+        // Insert doc #2. This one should trigger creation of alerts during monitor exec
+        val testDoc = """{
+            "test_field" : "us-west-2"
+        }"""
+        indexDoc(testSourceIndex, "2", testDoc)
+        // Execute monitor #2
+        var executeMonitorResponse2 = executeMonitor(monitor, monitorResponse2.id, false)
+        Assert.assertEquals(executeMonitorResponse2!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse2.monitorRunResult.triggerResults.size, 1)
+
+        refreshIndex(AlertIndices.ALERT_INDEX)
+        var alerts = searchAlerts(monitorResponse2.id)
+        Assert.assertTrue(alerts != null)
+        Assert.assertTrue(alerts.size == 1)
+
+        // Both monitors used same queryIndex. Since source index has well below limit amount of fields in mappings,
+        // we expect only 1 backing queryIndex
+        val getIndexResponse: GetIndexResponse =
+            client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+        assertEquals(1, getIndexResponse.indices.size)
+        // Now we'll verify that execution of both monitors work
+        indexDoc(testSourceIndex, "3", testDoc)
+        // Exec Monitor #1
+        executeMonitorResponse = executeMonitor(monitor, monitorResponse.id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        refreshIndex(AlertIndices.ALERT_INDEX)
+        alerts = searchAlerts(monitorResponse.id)
+        Assert.assertTrue(alerts != null)
+        Assert.assertTrue(alerts.size == 2)
+        // Exec Monitor #2
+        executeMonitorResponse = executeMonitor(monitor, monitorResponse2.id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        refreshIndex(AlertIndices.ALERT_INDEX)
+        alerts = searchAlerts(monitorResponse2.id)
+        Assert.assertTrue(alerts != null)
+        Assert.assertTrue(alerts.size == 2)
+    }
+
+    /**
+     * 1. Create monitor with input source_index with 900 fields in mappings - can fit 1 in queryIndex
+     * 2. Update monitor and change input source_index to a new one with 900 fields in mappings
+     * 3. Expect queryIndex rollover resulting in 2 backing indices
+     * 4. Delete monitor and expect that all backing indices are deleted
+     * */
+    fun `test updating monitor no execution queryIndex rolling over`() {
+        val testSourceIndex1 = "test_source_index1"
+        val testSourceIndex2 = "test_source_index2"
+        createIndex(testSourceIndex1, Settings.EMPTY)
+        createIndex(testSourceIndex2, Settings.EMPTY)
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex1), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+        // This doc should create close to 1000 (limit) fields in index mapping. It's easier to add mappings like this then via api
+        val docPayload: StringBuilder = StringBuilder(100000)
+        docPayload.append("{")
+        for (i in 1..899) {
+            docPayload.append(""" "id$i":$i,""")
+        }
+        docPayload.append("\"test_field\" : \"us-west-2\" }")
+        // Indexing docs here as an easier means to set index mappings
+        indexDoc(testSourceIndex1, "1", docPayload.toString())
+        indexDoc(testSourceIndex2, "1", docPayload.toString())
+        // Create monitor
+        var monitorResponse = createMonitor(monitor)
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+
+        // Update monitor and change input
+        val updatedMonitor = monitor.copy(
+            inputs = listOf(
+                DocLevelMonitorInput("description", listOf(testSourceIndex2), listOf(docQuery))
+            )
+        )
+        updateMonitor(updatedMonitor, updatedMonitor.id)
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+
+        // Expect queryIndex to rollover after setting new source_index with close to limit amount of fields in mappings
+        var getIndexResponse: GetIndexResponse =
+            client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+        assertEquals(2, getIndexResponse.indices.size)
+
+        deleteMonitor(updatedMonitor.id)
+        waitUntil {
+            getIndexResponse =
+                client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+            return@waitUntil getIndexResponse.indices.isEmpty()
+        }
+        assertEquals(0, getIndexResponse.indices.size)
+    }
+
+    fun `test queryIndex bwc when index was not an alias`() {
+        createIndex(DOC_LEVEL_QUERIES_INDEX, Settings.builder().put("index.hidden", true).build())
+        assertIndexExists(DOC_LEVEL_QUERIES_INDEX)
+
+        val testSourceIndex = "test_source_index"
+        createIndex(testSourceIndex, Settings.EMPTY)
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+        // This doc should create 999 fields in mapping, only 1 field less then limit
+        val docPayload = "{\"test_field\" : \"us-west-2\" }"
+        // Create monitor
+        try {
+            var monitorResponse = createMonitor(monitor)
+            indexDoc(testSourceIndex, "1", docPayload)
+            var executeMonitorResponse = executeMonitor(monitor, monitorResponse!!.id, false)
+            Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+            Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+            refreshIndex(AlertIndices.ALERT_INDEX)
+            val alerts = searchAlerts(monitorResponse.id)
+            Assert.assertTrue(alerts != null)
+            Assert.assertTrue(alerts.size == 1)
+            // check if DOC_LEVEL_QUERIES_INDEX alias exists
+            assertAliasExists(DOC_LEVEL_QUERIES_INDEX)
+        } catch (e: Exception) {
+            fail("Exception happend but it shouldn't!")
+        }
     }
 }
