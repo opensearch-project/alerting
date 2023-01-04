@@ -175,6 +175,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         )
         assertFalse(monitorResponse?.id.isNullOrEmpty())
         monitor = monitorResponse!!.monitor
+        indexDoc(index, "1", testDoc)
         val id = monitorResponse.id
         val executeMonitorResponse = executeMonitor(monitor, id, false)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
@@ -469,6 +470,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         val customAlertsIndex = "custom_alerts_index"
         val customQueryIndex = "custom_query_index"
+        Assert.assertFalse(client().admin().cluster().state(ClusterStateRequest()).get().state.routingTable.hasIndex(customQueryIndex))
         val customFindingsIndex = "custom_findings_index"
         val updateMonitorResponse = updateMonitor(
             monitor.copy(
