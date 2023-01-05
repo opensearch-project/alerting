@@ -19,8 +19,6 @@ import org.opensearch.action.admin.cluster.health.ClusterHealthAction
 import org.opensearch.action.admin.cluster.health.ClusterHealthRequest
 import org.opensearch.action.admin.cluster.health.ClusterHealthResponse
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
-import org.opensearch.action.admin.indices.get.GetIndexRequest
-import org.opensearch.action.admin.indices.get.GetIndexResponse
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.index.IndexRequest
@@ -31,9 +29,8 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.master.AcknowledgedResponse
-import org.opensearch.alerting.DocumentLevelMonitorRunner
+import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.core.ScheduledJobIndices
-import org.opensearch.alerting.model.AlertingConfigAccessor.Companion.getMonitorMetadata
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
@@ -463,8 +460,6 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         private suspend fun indexMonitor() {
-            var metadata = createMetadata()
-
             if (user != null) {
                 // Use the backend roles which is an intersection of the requested backend roles and the user's backend roles.
                 // Admins can pass in any backend role. Also if no backend role is passed in, all the user's backend roles are used.
@@ -495,22 +490,16 @@ class TransportIndexMonitorAction @Inject constructor(
                     )
                     return
                 }
-                metadata = metadata.copy(monitorId = indexResponse.id, id = "${indexResponse.id}-metadata")
-
-                // In case the metadata fails to be created, the monitor runner should have logic to recreate and index the metadata.
-                // This is currently being handled in DocumentLevelMonitor as its the only current monitor to use metadata currently.
-                // This should be enhanced by having a utility class to handle the logic of management and creation of the metadata.
-                // Issue to track this: https://github.com/opensearch-project/alerting/issues/445
-                val metadataIndexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
-                    .setRefreshPolicy(request.refreshPolicy)
-                    .source(metadata.toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-                    .id(metadata.id)
-                    .timeout(indexTimeout)
-                client.suspendUntil<Client, IndexResponse> { client.index(metadataIndexRequest, it) }
-
-                if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
-                    indexDocLevelMonitorQueries(request.monitor, indexResponse.id, request.refreshPolicy)
+                request.monitor = request.monitor.copy(id = indexResponse.id)
+                var (metadata, created) = MonitorMetadataService.getOrCreateMetadata(request.monitor)
+                if (created == false) {
+                    log.warn("Metadata doc id:${metadata.id} exists, but it shouldn't!")
                 }
+                if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                    indexDocLevelMonitorQueries(request.monitor, indexResponse.id, metadata, request.refreshPolicy)
+                }
+                // When inserting queries in queryIndex we could update sourceToQueryIndexMapping
+                MonitorMetadataService.upsertMetadata(metadata, updating = true)
 
                 actionListener.onResponse(
                     IndexMonitorResponse(
@@ -524,7 +513,12 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         @Suppress("UNCHECKED_CAST")
-        private suspend fun indexDocLevelMonitorQueries(monitor: Monitor, monitorId: String, refreshPolicy: RefreshPolicy) {
+        private suspend fun indexDocLevelMonitorQueries(
+            monitor: Monitor,
+            monitorId: String,
+            monitorMetadata: MonitorMetadata,
+            refreshPolicy: RefreshPolicy
+        ) {
             val queryIndex = monitor.dataSources.queryIndex
             if (!docLevelMonitorQueries.docLevelQueryIndexExists(monitor.dataSources)) {
                 docLevelMonitorQueries.initDocLevelQueryIndex(monitor.dataSources)
@@ -533,6 +527,7 @@ class TransportIndexMonitorAction @Inject constructor(
             docLevelMonitorQueries.indexDocLevelQueries(
                 monitor,
                 monitorId,
+                monitorMetadata,
                 refreshPolicy,
                 indexTimeout
             )
@@ -626,40 +621,20 @@ class TransportIndexMonitorAction @Inject constructor(
                     )
                     return
                 }
-
-                val metadata = getMonitorMetadata(client, xContentRegistry, "${request.monitor.id}-metadata")
-
-                if (metadata == null) {
-                    val newMetadata = createMetadata()
-                    val indexMetadataRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
-                        .setRefreshPolicy(request.refreshPolicy)
-                        .source(newMetadata.toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-                        .id(newMetadata.id)
-                        .timeout(indexTimeout)
-                    client.suspendUntil<Client, IndexResponse> { client.index(indexMetadataRequest, it) }
-                } else if (currentMonitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
-                    val monitorIndex = (request.monitor.inputs[0] as DocLevelMonitorInput).indices[0]
-                    val runContext = createFullRunContext(
-                        monitorIndex,
-                        metadata.lastRunContext as MutableMap<String, MutableMap<String, Any>>
-                    )
-                    val updatedMetadata = metadata.copy(lastRunContext = runContext)
-                    val indexMetadataRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
-                        .setRefreshPolicy(request.refreshPolicy)
-                        .source(updatedMetadata.toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-                        .id(metadata.id)
-                        .timeout(indexTimeout)
-                    client.suspendUntil<Client, IndexResponse> { client.index(indexMetadataRequest, it) }
-                }
-
-                if (currentMonitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                var updatedMetadata: MonitorMetadata
+                val (metadata, created) = MonitorMetadataService.getOrCreateMetadata(request.monitor)
+                // Recreate runContext if metadata exists
+                // Delete and insert all queries from/to queryIndex
+                if (created == false && currentMonitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                    updatedMetadata = MonitorMetadataService.recreateRunContext(metadata, currentMonitor)
                     client.suspendUntil<Client, BulkByScrollResponse> {
                         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
                             .source(currentMonitor.dataSources.queryIndex)
                             .filter(QueryBuilders.matchQuery("monitor_id", currentMonitor.id))
                             .execute(it)
                     }
-                    indexDocLevelMonitorQueries(request.monitor, currentMonitor.id, request.refreshPolicy)
+                    indexDocLevelMonitorQueries(request.monitor, currentMonitor.id, updatedMetadata, request.refreshPolicy)
+                    MonitorMetadataService.upsertMetadata(updatedMetadata, updating = true)
                 }
                 actionListener.onResponse(
                     IndexMonitorResponse(
@@ -670,34 +645,6 @@ class TransportIndexMonitorAction @Inject constructor(
             } catch (t: Exception) {
                 actionListener.onFailure(AlertingException.wrap(t))
             }
-        }
-
-        private suspend fun createFullRunContext(
-            index: String?,
-            existingRunContext: MutableMap<String,
-                MutableMap<String, Any>>? = null
-        ): MutableMap<String, MutableMap<String, Any>> {
-            if (index == null) return mutableMapOf()
-            val getIndexRequest = GetIndexRequest().indices(index)
-            val getIndexResponse: GetIndexResponse = client.suspendUntil {
-                client.admin().indices().getIndex(getIndexRequest, it)
-            }
-            val indices = getIndexResponse.indices()
-            val lastRunContext = existingRunContext?.toMutableMap() ?: mutableMapOf<String, MutableMap<String, Any>>()
-            indices.forEach { indexName ->
-                if (!lastRunContext.containsKey(indexName))
-                    lastRunContext[indexName] = DocumentLevelMonitorRunner.createRunContext(clusterService, client, indexName)
-            }
-            return lastRunContext
-        }
-
-        private suspend fun createMetadata(): MonitorMetadata {
-            val monitorIndex = if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR)
-                (request.monitor.inputs[0] as DocLevelMonitorInput).indices[0]
-            else null
-            val runContext = if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) createFullRunContext(monitorIndex)
-            else emptyMap()
-            return MonitorMetadata("${request.monitorId}-metadata", request.monitorId, emptyList(), runContext)
         }
 
         private fun checkShardsFailure(response: IndexResponse): String? {
