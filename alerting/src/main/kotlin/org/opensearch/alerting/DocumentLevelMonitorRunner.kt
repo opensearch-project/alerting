@@ -44,7 +44,6 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.action.PerAlertActionScope
 import org.opensearch.commons.alerting.util.string
 import org.opensearch.index.query.BoolQueryBuilder
-import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.percolator.PercolateQueryBuilderExt
 import org.opensearch.rest.RestStatus
@@ -54,6 +53,7 @@ import org.opensearch.search.sort.SortOrder
 import java.io.IOException
 import java.time.Instant
 import java.util.UUID
+import kotlin.collections.HashMap
 import kotlin.math.max
 
 object DocumentLevelMonitorRunner : MonitorRunner() {
@@ -87,10 +87,14 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             monitorResult = monitorResult.copy(error = AlertingException.wrap(e))
         }
 
-        var (monitorMetadata, _) = MonitorMetadataService.getOrCreateMetadata(
+        var (monitorMetadata, _) = MonitorMetadataService.getOrCreateMetadata(monitor, createWithRunContext = false)
+
+        monitorCtx.docLevelMonitorQueries!!.initDocLevelQueryIndex(monitor.dataSources)
+        monitorCtx.docLevelMonitorQueries!!.indexDocLevelQueries(
             monitor = monitor,
-            createWithRunContext = false,
-            skipIndex = isTempMonitor
+            monitorId = monitor.id,
+            monitorMetadata,
+            indexTimeout = monitorCtx.indexTimeout!!
         )
 
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
@@ -528,11 +532,11 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         monitorMetadata: MonitorMetadata,
         index: String
     ): SearchHits {
-        val boolQueryBuilder = BoolQueryBuilder().must(QueryBuilders.matchQuery("index", index).operator(Operator.AND))
+        val boolQueryBuilder = BoolQueryBuilder().filter(QueryBuilders.matchQuery("index", index))
 
         val percolateQueryBuilder = PercolateQueryBuilderExt("query", docs, XContentType.JSON)
         if (monitor.id.isNotEmpty()) {
-            boolQueryBuilder.must(QueryBuilders.matchQuery("monitor_id", monitor.id).operator(Operator.AND))
+            boolQueryBuilder.filter(QueryBuilders.matchQuery("monitor_id", monitor.id))
         }
         boolQueryBuilder.filter(percolateQueryBuilder)
 
