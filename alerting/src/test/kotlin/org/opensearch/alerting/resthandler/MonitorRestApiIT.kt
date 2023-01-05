@@ -60,6 +60,7 @@ import org.opensearch.test.rest.OpenSearchRestTestCase
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.TimeUnit
 
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
@@ -850,14 +851,26 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             updatedMonitor.toHttpEntity()
         )
         assertEquals("Update request not successful", RestStatus.OK, updateResponse.restStatus())
-
-        // Wait 5 seconds for event to be processed and alerts moved
-        Thread.sleep(5000)
-
+        // Wait until postIndex hook is executed due to monitor update
+        waitUntil({
+            val alerts = searchAlerts(monitor)
+            if (alerts.size == 1) {
+                return@waitUntil true
+            }
+            return@waitUntil false
+        }, 60, TimeUnit.SECONDS)
         val alerts = searchAlerts(monitor)
         // We have two alerts from above, 1 for each trigger, there should be only 1 left in active index
         assertEquals("One alert should be in active index", 1, alerts.size)
         assertEquals("Wrong alert in active index", alertKeep.toJsonString(), alerts.single().toJsonString())
+
+        waitUntil({
+            val alerts = searchAlerts(monitor, AlertIndices.ALERT_HISTORY_WRITE_INDEX)
+            if (alerts.size == 1) {
+                return@waitUntil true
+            }
+            return@waitUntil false
+        }, 60, TimeUnit.SECONDS)
 
         val historyAlerts = searchAlerts(monitor, AlertIndices.ALERT_HISTORY_WRITE_INDEX)
         // Only alertDelete should of been moved to history index

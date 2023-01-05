@@ -74,7 +74,6 @@ import javax.management.MBeanServerInvocationHandler
 import javax.management.ObjectName
 import javax.management.remote.JMXConnectorFactory
 import javax.management.remote.JMXServiceURL
-import kotlin.collections.HashMap
 
 abstract class AlertingRestTestCase : ODFERestTestCase() {
 
@@ -652,7 +651,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun refreshIndex(index: String): Response {
-        val response = client().makeRequest("POST", "/$index/_refresh")
+        val response = client().makeRequest("POST", "/$index/_refresh?expand_wildcards=all")
         assertEquals("Unable to refresh index", RestStatus.OK, response.restStatus())
         return response
     }
