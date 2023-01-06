@@ -6,6 +6,7 @@
 package org.opensearch.alerting.util
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.ExceptionsHelper
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.ResourceAlreadyExistsException
 import org.opensearch.action.admin.indices.alias.Alias
@@ -272,10 +273,12 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             }
             return Pair(updateMappingResponse, targetQueryIndex)
         } catch (e: Exception) {
+            val unwrappedException = ExceptionsHelper.unwrapCause(e) as Exception
+            log.debug("exception after rollover queryIndex index: $targetQueryIndex exception: ${unwrappedException.message}")
             // If we reached limit for total number of fields in mappings, do a rollover here
-            if (e.message?.contains("Limit of total fields") == true) {
-                targetQueryIndex = rolloverQueryIndex(monitor)
+            if (unwrappedException.message?.contains("Limit of total fields") == true) {
                 try {
+                    targetQueryIndex = rolloverQueryIndex(monitor)
                     // PUT mappings to newly created index
                     val updateMappingRequestRetry = PutMappingRequest(targetQueryIndex)
                     updateMappingRequestRetry.source(mapOf<String, Any>("properties" to updatedProperties))
@@ -286,7 +289,9 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     // If we reached limit for total number of fields in mappings after rollover
                     // it means that source index has more then (FIELD_LIMIT - 3) fields (every query index has 3 fields defined)
                     // TODO maybe split queries/mappings between multiple query indices?
-                    if (e.message?.contains("Limit of total fields") == true) {
+                    val unwrappedException = ExceptionsHelper.unwrapCause(e) as Exception
+                    log.debug("exception after rollover queryIndex index: $targetQueryIndex exception: ${unwrappedException.message}")
+                    if (unwrappedException.message?.contains("Limit of total fields") == true) {
                         val errorMessage =
                             "Monitor [${monitorMetadata.monitorId}] can't process index [$sourceIndex] due to field mapping limit"
                         log.error(errorMessage)
@@ -296,7 +301,9 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     }
                 }
             } else {
-                throw AlertingException.wrap(e)
+                log.debug("unknown exception during PUT mapping on queryIndex: $targetQueryIndex")
+                val unwrappedException = ExceptionsHelper.unwrapCause(e) as Exception
+                throw AlertingException.wrap(unwrappedException)
             }
         }
         // We did rollover, so try to apply mappings again on new targetQueryIndex
