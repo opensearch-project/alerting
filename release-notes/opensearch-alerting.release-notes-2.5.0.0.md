@@ -22,4 +22,4 @@ Compatible with OpenSearch 2.5.0
 * Fix percolator mapping error when having field name 'type'. ([#726](https://github.com/opensearch-project/alerting/pull/726))
 
 ### Documentation
-* Added 2.5 release notes. ([#]())
+* Added 2.5 release notes. ([#743](https://github.com/opensearch-project/alerting/pull/743))
