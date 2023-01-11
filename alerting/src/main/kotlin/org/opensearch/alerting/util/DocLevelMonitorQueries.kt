@@ -153,10 +153,10 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         flattenPaths: MutableList<String>
     ) {
         // If node contains "properties" property then it is internal(non-leaf) node
+        log.debug("Node in traverse: $node")
         if (node.containsKey(PROPERTIES)) {
             return traverseMappingsAndUpdate(node.get(PROPERTIES) as MutableMap<String, Any>, currentPath, processLeafFn, flattenPaths)
-        } else if (node.containsKey(TYPE) == false) {
-            // If there is no "type" property, this is either internal(non-leaf) node or leaf node
+        } else {
             // newNodes will hold list of updated leaf properties
             var newNodes = ArrayList<Triple<String, String, Any>>(node.size)
             node.entries.forEach {
