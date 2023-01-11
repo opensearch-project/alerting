@@ -7,15 +7,19 @@ package org.opensearch.alerting
 
 import org.junit.Assert
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
+import org.opensearch.action.search.SearchRequest
 import org.opensearch.alerting.action.GetAlertsAction
 import org.opensearch.alerting.action.GetAlertsRequest
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.model.DocLevelMonitorInput
 import org.opensearch.alerting.core.model.DocLevelQuery
+import org.opensearch.alerting.core.model.ScheduledJob.Companion.DOC_LEVEL_QUERIES_INDEX
 import org.opensearch.alerting.core.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.alerting.model.Table
 import org.opensearch.alerting.transport.AlertingSingleNodeTestCase
 import org.opensearch.common.settings.Settings
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.search.builder.SearchSourceBuilder
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit.MILLIS
@@ -60,6 +64,36 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 0)
+    }
+
+    fun `test delete monitor deletes all queries and metadata too`() {
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+        val monitorResponse = createMonitor(monitor)
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+        indexDoc(index, "1", testDoc)
+        val monitorId = monitorResponse.id
+        val executeMonitorResponse = executeMonitor(monitor, monitorId, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        searchAlerts(monitorId)
+        // Verify queries exist
+        var searchResponse = client().search(
+            SearchRequest(DOC_LEVEL_QUERIES_INDEX).source(SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
+        ).get()
+        assertNotEquals(0, searchResponse.hits.hits.size)
     }
 
     fun `test execute pre-existing monitor and update`() {
