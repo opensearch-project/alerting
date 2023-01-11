@@ -16,10 +16,12 @@ import org.opensearch.alerting.ADMIN
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ALERTING_DELETE_MONITOR_ACCESS
 import org.opensearch.alerting.ALERTING_EXECUTE_MONITOR_ACCESS
+import org.opensearch.alerting.ALERTING_EXPLAIN_MONITOR_ACCES
 import org.opensearch.alerting.ALERTING_FULL_ACCESS_ROLE
 import org.opensearch.alerting.ALERTING_GET_ALERTS_ACCESS
 import org.opensearch.alerting.ALERTING_GET_MONITOR_ACCESS
 import org.opensearch.alerting.ALERTING_INDEX_MONITOR_ACCESS
+import org.opensearch.alerting.ALERTING_NO_ACCESS_ROLE
 import org.opensearch.alerting.ALERTING_SEARCH_MONITOR_ONLY_ACCESS
 import org.opensearch.alerting.ALL_ACCESS_ROLE
 import org.opensearch.alerting.ALWAYS_RUN
@@ -34,6 +36,8 @@ import org.opensearch.alerting.assertUserNull
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomAlert
+import org.opensearch.alerting.randomDocumentLevelMonitor
+import org.opensearch.alerting.randomDocumentLevelTrigger
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.randomTemplateScript
@@ -45,6 +49,8 @@ import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
+import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.rest.SecureRestClientBuilder
@@ -272,6 +278,52 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
             )
             assertEquals("Get monitor failed", RestStatus.OK, getMonitorResponse?.restStatus())
+        } finally {
+            deleteRoleAndRoleMapping(TEST_HR_ROLE)
+        }
+    }
+
+    fun `test explain monitor with a user with explain monitor role`() {
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            listOf(TEST_HR_BACKEND_ROLE),
+            getClusterPermissionsFromCustomRole(ALERTING_EXPLAIN_MONITOR_ACCES)
+        )
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(TEST_HR_INDEX), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+
+        try {
+            val explainMonitorResponse = explainMonitor(userClient as RestClient, monitor.id, false)
+            assertEquals("Explain monitor failed", RestStatus.OK, explainMonitorResponse.restStatus())
+        } finally {
+            deleteRoleAndRoleMapping(TEST_HR_ROLE)
+        }
+    }
+
+    fun `test explain monitor with a user without explain monitor role`() {
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            listOf(TEST_HR_BACKEND_ROLE),
+            getClusterPermissionsFromCustomRole(ALERTING_NO_ACCESS_ROLE)
+        )
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(TEST_HR_INDEX), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+
+        try {
+            explainMonitor(userClient as RestClient, monitor.id, false)
+            fail("Security exception expected.")
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
         } finally {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
         }

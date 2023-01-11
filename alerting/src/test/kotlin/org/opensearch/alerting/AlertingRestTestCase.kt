@@ -696,6 +696,20 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return response
     }
 
+    protected fun explainMonitor(monitorId: String, doc_diff: Boolean = false): Response {
+        return explainMonitor(client(), monitorId, doc_diff)
+    }
+
+    protected fun explainMonitor(client: RestClient, monitorId: String, doc_diff: Boolean): Response {
+        val params: Map<String, String> = mutableMapOf()
+        return client.makeRequest("GET", "$ALERTING_BASE_URI/$monitorId/_explain?doc_diff=$doc_diff", params)
+    }
+
+    protected fun explainMonitor(client: RestClient, monitor: Monitor, doc_diff: Boolean = false): Response {
+        val params: Map<String, String> = mutableMapOf()
+        return client.makeRequest("GET", "$ALERTING_BASE_URI/_explain?doc_diff=$doc_diff", params, monitor.toHttpEntityWithUser())
+    }
+
     protected fun executeMonitor(monitorId: String, params: Map<String, String> = mutableMapOf()): Response {
         return executeMonitor(client(), monitorId, params)
     }
@@ -749,6 +763,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return indexDoc(client(), index, id, doc, refresh)
     }
 
+    protected fun updateDoc(index: String, id: String, doc: String, params: Map<String, String> = mutableMapOf()): Response {
+        return updateDoc(client(), index, id, doc, params)
+    }
+
     protected fun indexDocWithAdminClient(index: String, id: String, doc: String, refresh: Boolean = true): Response {
         return indexDoc(adminClient(), index, id, doc, refresh)
     }
@@ -759,6 +777,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val response = client.makeRequest("PUT", "$index/_doc/$id", params, requestBody)
         assertTrue(
             "Unable to index doc: '${doc.take(15)}...' to index: '$index'",
+            listOf(RestStatus.OK, RestStatus.CREATED).contains(response.restStatus())
+        )
+        return response
+    }
+
+    private fun updateDoc(client: RestClient, index: String, id: String, doc: String, params: Map<String, String>): Response {
+        val requestBody = StringEntity(doc, APPLICATION_JSON)
+        val response = client.makeRequest("POST", "$index/_update/$id", params, requestBody)
+        assertTrue(
+            "Unable to update doc: '${doc.take(15)}...' to index: '$index'",
             listOf(RestStatus.OK, RestStatus.CREATED).contains(response.restStatus())
         )
         return response
