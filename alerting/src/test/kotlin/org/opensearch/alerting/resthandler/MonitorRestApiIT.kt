@@ -404,23 +404,21 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
         assertNotNull(monitor.id)
 
-        var response = explainMonitor(monitor.id)
-        var output = entityAsMap(response)
+        var output = entityAsMap(explainMonitor(monitor.id))
 
-        assertEquals(monitor.id, output["_id"])
-        assertEquals(0, output["seq_no_diff"])
+        assertEquals("Documents behind miscount", monitor.id, output["_id"])
+        assertEquals("Documents behind miscount", 0, output["documents_behind"])
 
         indexDoc(testIndex, "1", testDoc)
         indexDoc(testIndex, "5", testDoc)
 
-        response = explainMonitor(monitor.id)
-        output = entityAsMap(response)
+        output = entityAsMap(explainMonitor(monitor.id))
 
-        assertEquals(monitor.id, output["_id"])
-        assertEquals(2, output["seq_no_diff"])
+        assertEquals("Documents behind miscount", monitor.id, output["_id"])
+        assertEquals("Documents behind miscount", 2, output["documents_behind"])
     }
 
-    fun `test monitor explain shard seq_no and doc_diff difference`() {
+    fun `test monitor explain shard seq_no and document difference`() {
         val testIndex = createTestIndex()
         val testDoc = """{
             "test_field" : "us-west-2"
@@ -442,15 +440,14 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         updateDoc(testIndex, "1", updateDoc)
         indexDoc(testIndex, "5", testDoc)
 
-        val response = explainMonitor(monitor.id, true)
-        val output = entityAsMap(response)
+        val responseNoDocDiff = entityAsMap(explainMonitor(monitor.id, false))
+        val responseDocDiff = entityAsMap(explainMonitor(monitor.id, true))
 
-        assertEquals(monitor.id, output["_id"])
-        assertEquals(3, output["seq_no_diff"])
-        assertEquals(2, output["doc_diff"])
+        assertEquals("Documents behind miscount", 3, responseNoDocDiff["documents_behind"])
+        assertEquals("Documents behind miscount", 2, responseDocDiff["documents_behind"])
     }
 
-    fun `test monitor explain seq_no diff and doc diff with wildcard index`() {
+    fun `test monitor explain seq_no and doc difference with wildcard index`() {
         val testIndex = createTestIndex("test1")
         val testIndex2 = createTestIndex("test2")
         val testDoc = """{
@@ -473,12 +470,11 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         updateDoc(testIndex, "1", updateDoc)
         indexDoc(testIndex2, "5", testDoc)
 
-        val response = explainMonitor(monitor.id, true)
-        val output = entityAsMap(response)
+        val responseNoDocDiff = entityAsMap(explainMonitor(monitor.id, false))
+        val responseDocDiff = entityAsMap(explainMonitor(monitor.id, true))
 
-        assertEquals(monitor.id, output["_id"])
-        assertEquals(3, output["seq_no_diff"])
-        assertEquals(2, output["doc_diff"])
+        assertEquals("Documents behind miscount", 3, responseNoDocDiff["documents_behind"])
+        assertEquals("Documents behind miscount", 2, responseDocDiff["documents_behind"])
     }
 
     @Throws(Exception::class)

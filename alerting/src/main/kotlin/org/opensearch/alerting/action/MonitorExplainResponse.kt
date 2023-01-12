@@ -16,41 +16,33 @@ import java.io.IOException
 
 class MonitorExplainResponse : ActionResponse, ToXContentObject {
     var monitorId: String
-    var seqNoDiff: Long
-    var docDiff: Long?
+    var documentsBehind: Long
 
     constructor(
         monitorId: String,
-        seqNoDiff: Long,
-        docDiff: Long?
+        documentsBehind: Long,
     ) : super() {
         this.monitorId = monitorId
-        this.seqNoDiff = seqNoDiff
-        this.docDiff = docDiff
+        this.documentsBehind = documentsBehind
     }
 
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
         sin.readString(), // id
-        sin.readLong(), // seqNo
-        sin.readOptionalLong() // docDiff
+        sin.readLong(), // documentsBehind
     )
 
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {
         out.writeString(monitorId)
-        out.writeLong(seqNoDiff)
-        out.writeOptionalLong(docDiff)
+        out.writeLong(documentsBehind)
     }
 
     @Throws(IOException::class)
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         builder.startObject()
             .field(_ID, monitorId)
-            .field("seq_no_diff", seqNoDiff)
-
-        if (docDiff != null)
-            builder.field("doc_diff", docDiff)
+            .field("documents_behind", documentsBehind)
 
         return builder.endObject()
     }

@@ -136,7 +136,6 @@ class TransportMonitorExplainAction @Inject constructor(
                     val lastRunContext = if (monitorMetadata.lastRunContext.isEmpty()) mutableMapOf()
                     else monitorMetadata.lastRunContext.toMutableMap() as MutableMap<String, MutableMap<String, Any>>
 
-                    var seqNoDiffAmount: Long = 0
                     var docDiffAmount: Long = 0
 
                     indices.forEach { indexName ->
@@ -155,9 +154,9 @@ class TransportMonitorExplainAction @Inject constructor(
                             val maxSeqNo: Long = indexUpdatedRunContext[shard].toString().toLong()
                             val prevSeqNo: Long = indexLastRunContext[shard].toString().toLong()
 
-                            seqNoDiffAmount += maxSeqNo - prevSeqNo
-
-                            if (docDiffRequested) {
+                            if (!docDiffRequested) {
+                                docDiffAmount += maxSeqNo - prevSeqNo
+                            } else {
                                 val boolQueryBuilder = BoolQueryBuilder()
                                 boolQueryBuilder.filter(QueryBuilders.rangeQuery("_seq_no").gt(prevSeqNo).lte(maxSeqNo))
 
@@ -179,8 +178,7 @@ class TransportMonitorExplainAction @Inject constructor(
                             }
                         }
                     }
-                    val docDiffResult: Long? = if (docDiffRequested) docDiffAmount else null
-                    actionListener.onResponse(MonitorExplainResponse(monitorId, seqNoDiffAmount, docDiffResult))
+                    actionListener.onResponse(MonitorExplainResponse(monitorId, docDiffAmount))
                 } else {
                     actionListener.onFailure(
                         AlertingException("Not allowed to explain this type of monitor!", RestStatus.FORBIDDEN, IllegalStateException())
