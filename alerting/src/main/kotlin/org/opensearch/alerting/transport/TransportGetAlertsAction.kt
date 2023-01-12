@@ -100,7 +100,7 @@ class TransportGetAlertsAction @Inject constructor(
             queryBuilder.filter(QueryBuilders.termQuery("state", getAlertsRequest.alertState))
 
         if (getAlertsRequest.alertIds.isNullOrEmpty() == false) {
-            queryBuilder.filter(QueryBuilders.termsQuery("id", getAlertsRequest.alertIds))
+            queryBuilder.filter(QueryBuilders.termsQuery("_id", getAlertsRequest.alertIds))
         }
 
         if (getAlertsRequest.monitorId != null) {
