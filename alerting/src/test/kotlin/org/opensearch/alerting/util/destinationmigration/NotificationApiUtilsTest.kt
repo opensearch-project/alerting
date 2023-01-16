@@ -31,9 +31,9 @@ class NotificationApiUtilsTest {
         val eNConfig = "emailNotificationConfig"
         val emailNotificationConfig = NotificationConfig(nMail, eNConfig, ConfigType.EMAIL, null)
         val nsns = "testValidateSNSNotificationConfig"
-        val snsNConfig  = "snsNotificationConfig"
+        val snsNConfig = "snsNotificationConfig"
         val snsNotificationConfig = NotificationConfig(nsns, snsNConfig, ConfigType.SNS, null)
-        val nslack ="testslackNotificationConfig"
+        val nslack = "testslackNotificationConfig"
         val slackNConfig = "slackNotificationConfig"
         val slackNotificationConfig = NotificationConfig(nslack, slackNConfig, ConfigType.SLACK, null)
         val others = "testValidateOtherNotificationConfig"
