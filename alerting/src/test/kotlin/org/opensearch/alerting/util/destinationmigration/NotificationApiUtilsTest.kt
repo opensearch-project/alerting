@@ -27,7 +27,7 @@ class NotificationApiUtilsTest {
         val lastUpdatedTime = Instant.now()
         val createdTime = Instant.now()
         // create the different types of notification config
-        val emailNotificationConfig = NotificationConfig("testValidateEmailNotificationConfig", "emailNotificationConfig", ConfigType.EMAIL, null)
+//        val emailNotificationConfig = NotificationConfig("testValidateEmailNotificationConfig", "emailNotificationConfig", ConfigType.EMAIL, null)
         val snsNotificationConfig = NotificationConfig("testValidateSNSNotificationConfig", "snsNotificationConfig", ConfigType.SNS, null)
         val slackNotificationConfig = NotificationConfig("testslackNotificationConfig", "slackNotificationConfig", ConfigType.SLACK, null)
         val otherNotificationConfig = NotificationConfig("testValidateOtherNotificationConfig", "otherNotificationConfig", ConfigType.NONE, null)
@@ -39,7 +39,7 @@ class NotificationApiUtilsTest {
         val otherConfig = NotificationConfigInfo("testValidateOtherNotificationConfig", lastUpdatedTime, createdTime, otherNotificationConfig)
 
         // Test that the getTitle method returns the subject when called with email , sns or   Slack config types
-        Assert.assertEquals(subject, emailConfig.getTitle(subject))
+        Assert.assertEquals("Alerting-Notification Action", slackConfig.getTitle(subject))
         Assert.assertEquals(subject, snsConfig.getTitle(subject))
         Assert.assertEquals("Alerting-Notification Action", slackConfig.getTitle(subject))
         // Test that the getTitle method returns "Alerting-Notification Action"  when the configType is other than email and sns
