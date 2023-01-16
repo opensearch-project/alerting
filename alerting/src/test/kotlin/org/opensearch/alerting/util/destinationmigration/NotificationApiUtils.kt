@@ -16,7 +16,7 @@ Tested issue 731 - Ensures correct subject line used in email/SNS notifications.
 and  "Tested issue 529 - Returns slack notifications to original formatting of $subject \n\n $message without hardcoded prefix
  */
 
-class NotificationApiUtilsTests {
+class NotificationApiUtils{
 
     fun `test getTitle`() {
         // create the subject that we're going to test with
