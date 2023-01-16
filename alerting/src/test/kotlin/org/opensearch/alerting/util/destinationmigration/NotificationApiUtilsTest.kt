@@ -27,15 +27,56 @@ class NotificationApiUtilsTest {
         val lastUpdatedTime = Instant.now()
         val createdTime = Instant.now()
         // create the different types of notification config
-        val emailNotificationConfig = NotificationConfig("testValidateEmailNotificationConfig", "emailNotificationConfig", ConfigType.EMAIL, null)
-        val snsNotificationConfig = NotificationConfig("testValidateSNSNotificationConfig", "snsNotificationConfig", ConfigType.SNS, null)
-        val slackNotificationConfig = NotificationConfig("testslackNotificationConfig", "slackNotificationConfig", ConfigType.SLACK, null)
-        val otherNotificationConfig = NotificationConfig("testValidateOtherNotificationConfig", "otherNotificationConfig", ConfigType.NONE, null)
-        // create the notification config infos using  the different types of notification config
-        val emailConfig = NotificationConfigInfo("testValidateEmailNotificationConfig", lastUpdatedTime, createdTime, emailNotificationConfig)
-        val snsConfig = NotificationConfigInfo("testValidateSNSNotificationConfig", lastUpdatedTime, createdTime, snsNotificationConfig)
-        val slackConfig = NotificationConfigInfo("testSlackConfig", lastUpdatedTime, createdTime, slackNotificationConfig)
-        val otherConfig = NotificationConfigInfo("testValidateOtherNotificationConfig", lastUpdatedTime, createdTime, otherNotificationConfig)
+        val emailNotificationConfig = NotificationConfig(
+                "testValidateEmailNotificationConfig",
+                "emailNotificationConfig",
+                ConfigType.EMAIL,
+                null
+        )
+        val snsNotificationConfig = NotificationConfig(
+                "testValidateSNSNotificationConfig",
+                "snsNotificationConfig",
+                ConfigType.SNS,
+                null
+        )
+        val slackNotificationConfig = NotificationConfig(
+                "testslackNotificationConfig",
+                "slackNotificationConfig",
+                ConfigType.SLACK,
+                null
+        )
+        val otherNotificationConfig = NotificationConfig(
+                "testValidateOtherNotificationConfig",
+                "otherNotificationConfig",
+                ConfigType.NONE,
+                null
+        )
+
+// create the notification config infos using  the different types of notification config
+        val emailConfig = NotificationConfigInfo(
+                "testValidateEmailNotificationConfig",
+                lastUpdatedTime,
+                createdTime,
+                emailNotificationConfig
+        )
+        val snsConfig = NotificationConfigInfo(
+                "testValidateSNSNotificationConfig",
+                lastUpdatedTime,
+                createdTime,
+                snsNotificationConfig
+        )
+        val slackConfig = NotificationConfigInfo(
+                "testSlackConfig",
+                lastUpdatedTime,
+                createdTime,
+                slackNotificationConfig
+        )
+        val otherConfig = NotificationConfigInfo(
+                "testValidateOtherNotificationConfig",
+                lastUpdatedTime,
+                createdTime,
+                otherNotificationConfig
+        )
 
         // Test that the getTitle method returns the subject when called with email , sns or   Slack config types
         Assert.assertEquals(subject, emailConfig.getTitle(subject))
