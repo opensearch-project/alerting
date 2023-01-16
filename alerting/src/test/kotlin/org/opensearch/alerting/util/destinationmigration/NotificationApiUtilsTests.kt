@@ -4,17 +4,22 @@
  */
 
 package org.opensearch.alerting.util.destinationmigration
+
 import org.junit.Assert
-import org.junit.Test
 import org.opensearch.commons.notifications.model.ConfigType
 import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
+import org.opensearch.test.OpenSearchTestCase
 import java.time.Instant
 
-class NotificationApiUtilsTests  {
+/*
+Tested issue 731 - Ensures correct subject line used in email/SNS notifications."
+and  "Tested issue 529 - Returns slack notifications to original formatting of $subject \n\n $message without hardcoded prefix
+ */
 
-    @Test
-    fun testGetTitle() {
+class NotificationApiUtilsTests : OpenSearchTestCase() {
+
+    fun `test getTitle`() {
         // create the subject that we're going to test with
         val subject = "Urgent: Server down on production"
         // create the lastUpdatedTime and createdTime
@@ -42,7 +47,7 @@ class NotificationApiUtilsTests  {
         val slackConfig = NotificationConfigInfo(testSlack, lastUpdatedTime, createdTime, slackNotificationConfig)
         val otherConfig = NotificationConfigInfo(others, lastUpdatedTime, createdTime, otherNotificationConfig)
 
-        // Test that the getTitle method returns the subject when called with email , sns or Slack config types
+        // Test that the getTitle method returns the subject when called with email , sns or   Slack config types
         Assert.assertEquals(subject, emailConfig.getTitle(subject))
         Assert.assertEquals(subject, snsConfig.getTitle(subject))
         Assert.assertEquals("Alerting-Notification Action", slackConfig.getTitle(subject))
