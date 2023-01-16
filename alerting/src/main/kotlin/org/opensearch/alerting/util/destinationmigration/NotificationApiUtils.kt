@@ -138,7 +138,8 @@ suspend fun NotificationConfigInfo.sendNotification(client: Client, title: Strin
 }
 
 /**
- * For most channel types, a placeholder Alerting title will be used but the email channel/SNS notification will
+ * For most channel types, a placeholder Alerting title will be used but the
+ * email channel/SNS notification will
  * use the subject, so it appears as the actual subject of the email/SNS notification.
  */
 fun NotificationConfigInfo.getTitle(subject: String?): String {
