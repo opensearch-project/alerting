@@ -27,18 +27,18 @@ class NotificationApiUtilsTest {
         val lastUpdatedTime = Instant.now()
         val createdTime = Instant.now()
         // create the different types of notification config
-        val nMail ="testValidateEmailNotificationConfig"
+        val nMail = "testValidateEmailNotificationConfig"
         val eNConfig = "emailNotificationConfig"
         val emailNotificationConfig = NotificationConfig(nMail, eNConfig, ConfigType.EMAIL, null)
-        val nsns="testValidateSNSNotificationConfig"
+        val nsns = "testValidateSNSNotificationConfig"
         val snsNConfig  = "snsNotificationConfig"
         val snsNotificationConfig = NotificationConfig(nsns, snsNConfig, ConfigType.SNS, null)
-        val nslack="testslackNotificationConfig"
+        val nslack ="testslackNotificationConfig"
         val slackNConfig = "slackNotificationConfig"
         val slackNotificationConfig = NotificationConfig(nslack, slackNConfig, ConfigType.SLACK, null)
-        val others ="testValidateOtherNotificationConfig"
+        val others = "testValidateOtherNotificationConfig"
         val otherConfigNotif = "otherNotificationConfig"
-        val testSlack="testSlackConfig"
+        val testSlack = "testSlackConfig"
 
         val otherNotificationConfig = NotificationConfig(others, otherConfigNotif, ConfigType.NONE, null)
         // create the notification config infos using  the different types of notification config
