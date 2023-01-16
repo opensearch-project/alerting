@@ -20,7 +20,7 @@ and  "Tested issue 529 - Returns slack notifications to original formatting of $
 class NotificationApiUtilsTest {
 
     @Test
-    fun `test getTitle`() {
+    fun `test  placeholder Alerting title`() {
         // create the subject that we're going to test with
         val subject = "Urgent: Server down on production"
         // create the lastUpdatedTime and createdTime
