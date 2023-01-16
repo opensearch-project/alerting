@@ -19,8 +19,8 @@ and  "Tested issue 529 - Returns slack notifications to original formatting of $
 class NotificationApiUtilsTests {
     fun testgetTitle() {
         val subject = "Urgent: Server down on production"
-        val lastUpdatedTime = Instant.now()
-        val createdTime = Instant.now()
+        val lastUpdatedTime : Instant = Instant.now()
+        val createdTime : Instant = Instant.now()
         // create the different types of notification config
         val nMail = "testValidateEmailNotificationConfig"
         val eNConfig = "emailNotificationConfig"
