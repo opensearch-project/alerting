@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.util.destinationmigration
 import org.junit.Assert
+import org.junit.Test
 import org.opensearch.commons.notifications.model.ConfigType
 import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
@@ -12,6 +13,7 @@ import java.time.Instant
 
 class NotificationApiUtilsTests {
 
+    @Test
     fun testGetTitle() {
         // create the subject that we're going to test with
         val subject = "Urgent: Server down on production"
