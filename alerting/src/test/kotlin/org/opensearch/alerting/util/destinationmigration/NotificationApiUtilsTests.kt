@@ -18,9 +18,8 @@ and  "Tested issue 529 - Returns slack notifications to original formatting of $
 
 class NotificationApiUtilsTests {
     fun testgetTitle() {
+
         val subject = "Urgent: Server down on production"
-        val createdTime = Instant.now()
-        // create the different types of notification config
         val nMail = "testValidateEmailNotificationConfig"
         val eNConfig = "emailNotificationConfig"
         val emailNotificationConfig = NotificationConfig(nMail, eNConfig, ConfigType.EMAIL, null)
@@ -36,11 +35,11 @@ class NotificationApiUtilsTests {
 
         val otherNotificationConfig = NotificationConfig(others, otherConfigNotif, ConfigType.NONE, null)
         // create the notification config infos using  the different types of notification config
-        val emailConfig = NotificationConfigInfo(nMail, Instant.now(), createdTime, emailNotificationConfig)
-        val snsConfig = NotificationConfigInfo(nsns, Instant.now(), createdTime, snsNotificationConfig)
+        val emailConfig = NotificationConfigInfo(nMail, Instant.now(), Instant.now(), emailNotificationConfig)
+        val snsConfig = NotificationConfigInfo(nsns, Instant.now(), Instant.now(), snsNotificationConfig)
 
-        val slackConfig = NotificationConfigInfo(testSlack, Instant.now(), createdTime, slackNotificationConfig)
-        val otherConfig = NotificationConfigInfo(others, Instant.now(), createdTime, otherNotificationConfig)
+        val slackConfig = NotificationConfigInfo(testSlack, Instant.now(), Instant.now(), slackNotificationConfig)
+        val otherConfig = NotificationConfigInfo(others, Instant.now(), Instant.now(), otherNotificationConfig)
 
         // Test that the getTitle method returns the subject when called with email , sns or   Slack config types
         Assert.assertEquals(subject, emailConfig.getTitle(subject))
