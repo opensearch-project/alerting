@@ -65,6 +65,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         dryrun: Boolean
     ): MonitorRunResult<DocumentLevelTriggerRunResult> {
         logger.debug("Document-level-monitor is running ...")
+        val isTempMonitor = dryrun || monitor.id == Monitor.NO_ID
         var monitorResult = MonitorRunResult<DocumentLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
 
         try {
@@ -84,7 +85,11 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             return monitorResult.copy(error = AlertingException.wrap(e))
         }
 
-        var (monitorMetadata, _) = MonitorMetadataService.getOrCreateMetadata(monitor, createWithRunContext = false)
+        var (monitorMetadata, _) = MonitorMetadataService.getOrCreateMetadata(
+            monitor = monitor,
+            createWithRunContext = false,
+            skipIndex = isTempMonitor
+        )
 
         monitorCtx.docLevelMonitorQueries!!.initDocLevelQueryIndex(monitor.dataSources)
         monitorCtx.docLevelMonitorQueries!!.indexDocLevelQueries(
@@ -98,7 +103,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         val index = docLevelMonitorInput.indices[0]
         val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
 
-        val isTempMonitor = dryrun || monitor.id == Monitor.NO_ID
         val lastRunContext = if (monitorMetadata.lastRunContext.isNullOrEmpty()) mutableMapOf()
         else monitorMetadata.lastRunContext.toMutableMap() as MutableMap<String, MutableMap<String, Any>>
 
