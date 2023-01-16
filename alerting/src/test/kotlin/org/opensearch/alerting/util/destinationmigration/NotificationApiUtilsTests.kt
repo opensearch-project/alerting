@@ -11,7 +11,7 @@ import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import java.time.Instant
 
-class NotificationApiUtilsTests : LuceneTestCase(){
+class NotificationApiUtilsTests : LuceneTestCase() {
 
     fun testGetTitle() {
         // create the subject that we're going to test with
