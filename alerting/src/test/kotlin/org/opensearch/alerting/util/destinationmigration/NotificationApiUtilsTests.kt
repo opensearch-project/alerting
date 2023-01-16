@@ -9,8 +9,8 @@ import org.junit.Assert
 import org.opensearch.commons.notifications.model.ConfigType
 import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
-import java.time.Instant
 import org.opensearch.test.OpenSearchTestCase
+import java.time.Instant
 
 /*
 Tested issue 731 - Ensures correct subject line used in email/SNS notifications."
