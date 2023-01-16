@@ -17,8 +17,7 @@ and  "Tested issue 529 - Returns slack notifications to original formatting of $
  */
 
 class NotificationApiUtilsTests {
-    fun  testgetTitle() {
-
+    fun testgetTitle() {
         val subject = "Urgent: Server down on production"
         val lastUpdatedTime = Instant.now()
         val createdTime = Instant.now()
@@ -55,6 +54,4 @@ class NotificationApiUtilsTests {
         // Test that the getTitle method returns "Alerting-Notification Action" when the subject is null
         Assert.assertEquals("Alerting-Notification Action", emailConfig.getTitle(null))
     }
-
-
 }
