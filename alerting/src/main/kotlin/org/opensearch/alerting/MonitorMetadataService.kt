@@ -123,7 +123,7 @@ object MonitorMetadataService :
             } else {
                 val newMetadata = createNewMetadata(monitor, createWithRunContext = createWithRunContext)
                 if (skipIndex) {
-                    newMetadata to false
+                    newMetadata to created
                 } else {
                     upsertMetadata(newMetadata, updating = false) to created
                 }
