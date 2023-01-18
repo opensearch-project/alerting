@@ -22,7 +22,7 @@ import java.lang.IllegalStateException
 data class Telegram(val chatId: String, val botToken: String) : ToXContent {
 
     init {
-        require(!Strings.isNullOrEmpty(chatId)) { "Chat ID is null or empty" }
+        require(!Strings.isNullOrEmpty(chatId)) { "Chat ID is null or  empty" }
         require(!Strings.isNullOrEmpty(botToken)) { "Bot token is null or empty" }
     }
 
