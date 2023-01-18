@@ -778,7 +778,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 chime = null,
                 slack = null,
                 customWebhook = null,
-                email = email
+                email = email,
+                telegram = null,
             )
         )
         val action = randomAction(destinationId = destination.id)
@@ -982,7 +983,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                     chime = null,
                     slack = null,
                     customWebhook = customWebhook,
-                    email = null
+                    email = null,
+                    telegram = null,
                 )
             )
             val action = randomAction(destinationId = destination.id)
