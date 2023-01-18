@@ -72,6 +72,7 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
             chime = chime,
             slack = null,
             customWebhook = null,
+            telegram = null,
             email = null
         )
         val createdDestination = createDestination(destination = destination)
@@ -90,6 +91,7 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
             chime = null,
             slack = slack,
             customWebhook = null,
+            telegram = null,
             email = null
         )
 
@@ -117,6 +119,7 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
             chime = null,
             slack = slack,
             customWebhook = null,
+            telegram = null,
             email = null
         )
 

@@ -32,7 +32,9 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             chime = chime,
             slack = null,
             customWebhook = null,
+            telegram = null,
             email = null
+
         )
         val createdDestination = createDestination(destination = destination)
         assertEquals("Incorrect destination name", createdDestination.name, "test")
@@ -50,6 +52,7 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             chime = null,
             slack = null,
             customWebhook = customWebhook,
+            telegram = null,
             email = null
         )
         val createdDestination = createDestination(destination = destination)
@@ -71,6 +74,7 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             chime = null,
             slack = null,
             customWebhook = customWebhook,
+            telegram = null,
             email = null
         )
         val createdDestination = createDestination(destination = destination)
@@ -95,7 +99,8 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             chime = null,
             slack = null,
             customWebhook = null,
-            email = email
+            email = email,
+            telegram = null,
         )
 
         val createdDestination = createDestination(destination = destination)
@@ -132,6 +137,7 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             chime = null,
             slack = slack,
             customWebhook = null,
+            telegram = null,
             email = null
         )
 
@@ -164,6 +170,7 @@ class DestinationRestApiIT : AlertingRestTestCase() {
             chime = null,
             slack = slack,
             customWebhook = null,
+            telegram = null,
             email = null
         )
 

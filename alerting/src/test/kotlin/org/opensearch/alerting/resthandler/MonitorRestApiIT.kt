@@ -1062,6 +1062,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             chime = chime,
             slack = null,
             customWebhook = null,
+            telegram = null,
             email = null
         )
         createDestination(destination)

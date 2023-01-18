@@ -381,7 +381,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             chime = null,
             slack = null,
             customWebhook = null,
-            email = null
+            email = null,
+            telegram = null,
         )
     }
 
@@ -395,7 +396,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             chime = null,
             slack = slack,
             customWebhook = null,
-            email = null
+            email = null,
+            telegram = null,
         )
     }
 
@@ -409,7 +411,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             chime = chime,
             slack = null,
             customWebhook = null,
-            email = null
+            email = null,
+            telegram = null
         )
     }
 
@@ -434,7 +437,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             chime = null,
             slack = null,
             customWebhook = customWebhook,
-            email = null
+            email = null,
+            telegram = null,
         )
     }
 
