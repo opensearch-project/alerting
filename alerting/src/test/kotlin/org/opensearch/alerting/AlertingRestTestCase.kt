@@ -5,12 +5,12 @@
 
 package org.opensearch.alerting
 
-import org.apache.http.HttpEntity
-import org.apache.http.HttpHeaders
-import org.apache.http.entity.ContentType
-import org.apache.http.entity.ContentType.APPLICATION_JSON
-import org.apache.http.entity.StringEntity
-import org.apache.http.message.BasicHeader
+import org.apache.hc.core5.http.ContentType
+import org.apache.hc.core5.http.ContentType.APPLICATION_JSON
+import org.apache.hc.core5.http.HttpEntity
+import org.apache.hc.core5.http.HttpHeaders
+import org.apache.hc.core5.http.io.entity.StringEntity
+import org.apache.hc.core5.http.message.BasicHeader
 import org.junit.AfterClass
 import org.junit.rules.DisableOnDebug
 import org.opensearch.action.search.SearchResponse
@@ -1093,7 +1093,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             "PUT", "_cluster/settings",
             emptyMap(),
             StringEntity(
-                XContentFactory.jsonBuilder().startObject().field("persistent")
+                jsonBuilder().startObject().field("persistent")
                     .startObject().field(AlertingSettings.FILTER_BY_BACKEND_ROLES.key, false).endObject()
                     .endObject().string(),
                 ContentType.APPLICATION_JSON

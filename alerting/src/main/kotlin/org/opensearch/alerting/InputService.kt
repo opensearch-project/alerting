@@ -16,6 +16,7 @@ import org.opensearch.alerting.util.AggregationQueryRewriter
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.executeTransportAction
 import org.opensearch.alerting.util.toMap
+import org.opensearch.alerting.util.use
 import org.opensearch.client.Client
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.NamedWriteableAwareStreamInput

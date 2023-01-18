@@ -8,7 +8,6 @@ package org.opensearch.alerting.core.action.node
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.FailedNodeException
 import org.opensearch.action.support.ActionFilters
-import org.opensearch.action.support.nodes.BaseNodeRequest
 import org.opensearch.action.support.nodes.TransportNodesAction
 import org.opensearch.alerting.core.JobSweeper
 import org.opensearch.alerting.core.JobSweeperMetrics
@@ -21,6 +20,7 @@ import org.opensearch.common.inject.Inject
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.threadpool.ThreadPool
+import org.opensearch.transport.TransportRequest
 import org.opensearch.transport.TransportService
 import java.io.IOException
 
@@ -116,7 +116,7 @@ class ScheduledJobsStatsTransportAction : TransportNodesAction<ScheduledJobsStat
         return ScheduledJobStats.ScheduleStatus.RED
     }
 
-    class ScheduledJobStatusRequest : BaseNodeRequest {
+    class ScheduledJobStatusRequest : TransportRequest {
 
         lateinit var request: ScheduledJobsStatsRequest
 

@@ -5,8 +5,8 @@
 
 package org.opensearch.alerting.resthandler
 
-import org.apache.http.entity.ContentType
-import org.apache.http.nio.entity.NStringEntity
+import org.apache.hc.core5.http.ContentType
+import org.apache.hc.core5.http.io.entity.StringEntity
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest
@@ -110,7 +110,7 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
             "GET",
             "$EMAIL_ACCOUNT_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search email account failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
@@ -127,7 +127,7 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
             "POST",
             "$EMAIL_ACCOUNT_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search email account failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
@@ -151,7 +151,7 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
             "GET",
             "$EMAIL_ACCOUNT_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search email account failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
@@ -170,7 +170,7 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
                 "GET",
                 "$EMAIL_ACCOUNT_BASE_URI/_search",
                 emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON)
+                StringEntity(search, ContentType.APPLICATION_JSON)
             )
             fail("Expected 403 Method FORBIDDEN response")
         } catch (e: ResponseException) {

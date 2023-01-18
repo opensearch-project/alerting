@@ -54,7 +54,7 @@ class IndexUtilsTests : OpenSearchTestCase() {
         val indexContent = "{\"testIndex\":{\"settings\":{\"index\":{\"creation_date\":\"1558407515699\"," +
             "\"number_of_shards\":\"1\",\"number_of_replicas\":\"1\",\"uuid\":\"t-VBBW6aR6KpJ3XP5iISOA\"," +
             "\"version\":{\"created\":\"6040399\"},\"provided_name\":\"data_test\"}},\"mapping_version\":123," +
-            "\"settings_version\":123,\"mappings\":{\"_doc\":{\"properties\":{\"name\":{\"type\":\"keyword\"}}}}}}"
+            "\"settings_version\":123,\"aliases_version\":1,\"mappings\":{\"_doc\":{\"properties\":{\"name\":{\"type\":\"keyword\"}}}}}}"
         val newMapping = "{\"_meta\":{\"schema_version\":10},\"properties\":{\"name\":{\"type\":\"keyword\"}}}"
         val index: IndexMetadata = IndexMetadata.fromXContent(parser(indexContent))
 
@@ -66,7 +66,7 @@ class IndexUtilsTests : OpenSearchTestCase() {
         val indexContent = "{\"testIndex\":{\"settings\":{\"index\":{\"creation_date\":\"1558407515699\"," +
             "\"number_of_shards\":\"1\",\"number_of_replicas\":\"1\",\"uuid\":\"t-VBBW6aR6KpJ3XP5iISOA\"," +
             "\"version\":{\"created\":\"6040399\"},\"provided_name\":\"data_test\"}},\"mapping_version\":123," +
-            "\"settings_version\":123,\"mappings\":{\"_doc\":{\"_meta\":{\"schema_version\":1},\"properties\":" +
+            "\"settings_version\":123,\"aliases_version\":1,\"mappings\":{\"_doc\":{\"_meta\":{\"schema_version\":1},\"properties\":" +
             "{\"name\":{\"type\":\"keyword\"}}}}}}"
         val newMapping = "{\"_meta\":{\"schema_version\":10},\"properties\":{\"name\":{\"type\":\"keyword\"}}}"
         val index: IndexMetadata = IndexMetadata.fromXContent(parser(indexContent))

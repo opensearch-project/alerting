@@ -6,8 +6,8 @@
 package org.opensearch.alerting
 
 import junit.framework.TestCase.assertNull
-import org.apache.http.Header
-import org.apache.http.HttpEntity
+import org.apache.hc.core5.http.Header
+import org.apache.hc.core5.http.HttpEntity
 import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult

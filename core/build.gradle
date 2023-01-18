@@ -4,6 +4,7 @@
  */
 
 apply plugin: 'java'
+apply plugin: 'opensearch.java-rest-test'
 apply plugin: 'org.jetbrains.kotlin.jvm'
 apply plugin: 'jacoco'
 

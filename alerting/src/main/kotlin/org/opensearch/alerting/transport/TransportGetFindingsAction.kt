@@ -26,6 +26,7 @@ import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_FINDING_INDEX_P
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.use
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.Strings

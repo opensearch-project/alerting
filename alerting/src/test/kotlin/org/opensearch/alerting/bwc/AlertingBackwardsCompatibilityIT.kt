@@ -5,8 +5,8 @@
 
 package org.opensearch.alerting.bwc
 
+import org.apache.hc.core5.http.ContentType.APPLICATION_JSON
 import org.apache.hc.core5.http.io.entity.StringEntity
-import org.apache.http.entity.ContentType.APPLICATION_JSON
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest

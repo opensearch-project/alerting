@@ -4,10 +4,10 @@
  */
 package org.opensearch.alerting.resthandler
 
-import org.apache.http.HttpHeaders
-import org.apache.http.entity.ContentType
-import org.apache.http.message.BasicHeader
-import org.apache.http.nio.entity.NStringEntity
+import org.apache.hc.core5.http.ContentType
+import org.apache.hc.core5.http.HttpHeaders
+import org.apache.hc.core5.http.io.entity.StringEntity
+import org.apache.hc.core5.http.message.BasicHeader
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.ANOMALY_DETECTOR_INDEX
@@ -448,7 +448,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val searchResponse = client().makeRequest(
             "GET", "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
@@ -464,7 +464,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val searchResponse = client().makeRequest(
             "POST", "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
@@ -487,7 +487,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             "GET",
             "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
@@ -504,7 +504,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             "GET",
             "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON),
+            StringEntity(search, ContentType.APPLICATION_JSON),
             header
         )
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
@@ -530,7 +530,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             "GET",
             "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
 
@@ -1072,7 +1072,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             "GET",
             "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
@@ -1097,7 +1097,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
                 "GET",
                 "$ALERTING_BASE_URI/_search",
                 params,
-                NStringEntity(search, ContentType.APPLICATION_JSON)
+                StringEntity(search, ContentType.APPLICATION_JSON)
             )
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())

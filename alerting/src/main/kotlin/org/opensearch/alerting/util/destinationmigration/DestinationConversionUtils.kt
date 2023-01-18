@@ -5,7 +5,7 @@
 
 package org.opensearch.alerting.util.destinationmigration
 
-import org.apache.http.client.utils.URIBuilder
+import org.apache.hc.core5.net.URIBuilder
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.Recipient

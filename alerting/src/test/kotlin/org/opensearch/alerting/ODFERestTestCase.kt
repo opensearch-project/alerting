@@ -81,7 +81,7 @@ abstract class ODFERestTestCase : OpenSearchRestTestCase() {
 
         val response = client().performRequest(Request("GET", "/_cat/indices?format=json&expand_wildcards=all"))
 
-        val xContentType = XContentType.fromMediaType(response.entity.contentType.value)
+        val xContentType = XContentType.fromMediaType(response.entity.contentType)
         xContentType.xContent().createParser(
             NamedXContentRegistry.EMPTY, DeprecationHandler.THROW_UNSUPPORTED_OPERATION,
             response.entity.content
@@ -132,7 +132,10 @@ abstract class ODFERestTestCase : OpenSearchRestTestCase() {
                     // create client with passed user
                     val userName = System.getProperty("user")
                     val password = System.getProperty("password")
-                    SecureRestClientBuilder(hosts, isHttps(), userName, password).setSocketTimeout(60000).build()
+                    SecureRestClientBuilder(hosts, isHttps(), userName, password)
+                        .setSocketTimeout(60000)
+                        .setConnectionRequestTimeout(180000)
+                        .build()
                 }
             }
         } else {

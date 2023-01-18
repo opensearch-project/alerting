@@ -83,9 +83,9 @@ import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.env.Environment
 import org.opensearch.env.NodeEnvironment
 import org.opensearch.index.IndexModule
+import org.opensearch.painless.spi.Allowlist
+import org.opensearch.painless.spi.AllowlistLoader
 import org.opensearch.painless.spi.PainlessExtension
-import org.opensearch.painless.spi.Whitelist
-import org.opensearch.painless.spi.WhitelistLoader
 import org.opensearch.percolator.PercolatorPluginExt
 import org.opensearch.plugins.ActionPlugin
 import org.opensearch.plugins.ReloadablePlugin
@@ -108,8 +108,8 @@ import java.util.function.Supplier
  */
 internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, ReloadablePlugin, SearchPlugin, PercolatorPluginExt() {
 
-    override fun getContextWhitelists(): Map<ScriptContext<*>, List<Whitelist>> {
-        val whitelist = WhitelistLoader.loadFromResourceFiles(javaClass, "org.opensearch.alerting.txt")
+    override fun getContextAllowlists(): Map<ScriptContext<*>, List<Allowlist>> {
+        val whitelist = AllowlistLoader.loadFromResourceFiles(javaClass, "org.opensearch.alerting.txt")
         return mapOf(TriggerScript.CONTEXT to listOf(whitelist))
     }
 

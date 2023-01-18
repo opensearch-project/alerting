@@ -5,8 +5,8 @@
 
 package org.opensearch.alerting.resthandler
 
-import org.apache.http.HttpHeaders
-import org.apache.http.message.BasicHeader
+import org.apache.hc.core5.http.HttpHeaders
+import org.apache.hc.core5.http.message.BasicHeader
 import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
