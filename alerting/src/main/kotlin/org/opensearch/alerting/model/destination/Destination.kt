@@ -47,7 +47,7 @@ data class Destination(
     val slack: Slack?,
     val customWebhook: CustomWebhook?,
     val email: Email?,
-    val telegram : Telegram?
+    val telegram: Telegram?
 ) : ToXContent {
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
@@ -122,7 +122,7 @@ data class Destination(
         const val SLACK = "slack"
         const val CUSTOMWEBHOOK = "custom_webhook"
         const val EMAIL = "email"
-        const val TELEGRAM ="telegram"
+        const val TELEGRAM = "telegram"
 
         // This constant is used for test actions created part of integ tests
         const val TEST_ACTION = "test"
@@ -147,7 +147,7 @@ data class Destination(
             var chime: Chime? = null
             var customWebhook: CustomWebhook? = null
             var email: Email? = null
-            var telegram : Telegram? = null
+            var telegram: Telegram? = null
             var lastUpdateTime: Instant? = null
             var schemaVersion = NO_SCHEMA_VERSION
 
@@ -179,7 +179,7 @@ data class Destination(
                     EMAIL -> {
                         email = Email.parse(xcp)
                     }
-                    TELEGRAM ->{
+                    TELEGRAM -> {
                         telegram = Telegram.parse(xcp)
                     }
                     TEST_ACTION -> {
@@ -276,12 +276,8 @@ data class Destination(
             }
             DestinationType.TELEGRAM -> {
                 val messageContent = chime?.constructMessageContent(compiledSubject, compiledMessage)
-                destinationMessage = LegacyChimeMessage.Builder(name)
-                        .withUrl(chime?.url)
-                        .withMessage(messageContent)
-                        .build()
+                destinationMessage = LegacyChimeMessage.Builder(name).withUrl(chime?.url).withMessage(messageContent).build()
             }
-
             DestinationType.EMAIL -> {
                 val emailAccount = destinationCtx.emailAccount
                 destinationMessage = LegacyEmailMessage.Builder(name)

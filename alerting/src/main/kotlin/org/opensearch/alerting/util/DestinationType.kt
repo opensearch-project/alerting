@@ -13,7 +13,6 @@ enum class DestinationType(val value: String) {
     TELEGRAM("Telegram"),
     TEST_ACTION("test_action");
 
-
     override fun toString(): String {
         return value
     }

@@ -22,10 +22,7 @@ data class Telegram(val chatId: String, val botToken: String) : ToXContent {
     }
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        return builder.startObject(TYPE)
-                .field(CHAT_ID, chatId)
-                .field(BOT_TOKEN, botToken)
-                .endObject()
+        return builder.startObject(TYPE).field(CHAT_ID, chatId).field(BOT_TOKEN, botToken).endObject()
     }
 
     @Throws(IOException::class)
