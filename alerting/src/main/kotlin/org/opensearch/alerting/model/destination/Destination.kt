@@ -276,10 +276,7 @@ data class Destination(
             }
             DestinationType.TELEGRAM -> {
                 val messageContent = slack?.constructMessageContent(compiledSubject, compiledMessage)
-                destinationMessage = LegacySlackMessage.Builder(name)
-                        .withUrl(slack?.url)
-                        .withMessage(messageContent)
-                        .build()
+                destinationMessage = LegacySlackMessage.Builder(name).withUrl(slack?.url).withMessage(messageContent).build()
             }
             DestinationType.EMAIL -> {
                 val emailAccount = destinationCtx.emailAccount
