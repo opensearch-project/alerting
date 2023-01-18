@@ -46,7 +46,7 @@ class GetDestinationsResponseTests : OpenSearchTestCase() {
             slack,
             null,
             null,
-             null,
+            null,
         )
 
         val req = GetDestinationsResponse(RestStatus.OK, 1, listOf(destination))
