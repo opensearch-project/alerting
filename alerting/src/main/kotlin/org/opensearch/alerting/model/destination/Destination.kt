@@ -46,7 +46,8 @@ data class Destination(
     val chime: Chime?,
     val slack: Slack?,
     val customWebhook: CustomWebhook?,
-    val email: Email?
+    val email: Email?,
+    val telegram : Telegram?
 ) : ToXContent {
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
@@ -99,6 +100,8 @@ data class Destination(
         customWebhook?.writeTo(out)
         out.writeBoolean(email != null)
         email?.writeTo(out)
+        out.writeBoolean(telegram != null)
+        telegram?.writeTo(out)
     }
 
     companion object {
@@ -119,6 +122,7 @@ data class Destination(
         const val SLACK = "slack"
         const val CUSTOMWEBHOOK = "custom_webhook"
         const val EMAIL = "email"
+        const val TELEGRAM ="telegram"
 
         // This constant is used for test actions created part of integ tests
         const val TEST_ACTION = "test"
@@ -143,6 +147,7 @@ data class Destination(
             var chime: Chime? = null
             var customWebhook: CustomWebhook? = null
             var email: Email? = null
+            var telegram : Telegram? = null
             var lastUpdateTime: Instant? = null
             var schemaVersion = NO_SCHEMA_VERSION
 
@@ -174,6 +179,9 @@ data class Destination(
                     EMAIL -> {
                         email = Email.parse(xcp)
                     }
+                    TELEGRAM ->{
+                        telegram = Telegram.parse(xcp)
+                    }
                     TEST_ACTION -> {
                         // This condition is for integ tests to avoid parsing
                     }
@@ -198,7 +206,8 @@ data class Destination(
                 chime,
                 slack,
                 customWebhook,
-                email
+                email,
+                telegram,
             )
         }
 
@@ -231,7 +240,8 @@ data class Destination(
                 chime = Chime.readFrom(sin),
                 slack = Slack.readFrom(sin),
                 customWebhook = CustomWebhook.readFrom(sin),
-                email = Email.readFrom(sin)
+                email = Email.readFrom(sin),
+                telegram = Telegram.readFrom(sin),
             )
         }
     }
@@ -264,6 +274,14 @@ data class Destination(
                     .withHeaderParams(customWebhook?.headerParams)
                     .withMessage(compiledMessage).build()
             }
+            DestinationType.TELEGRAM -> {
+                val messageContent = chime?.constructMessageContent(compiledSubject, compiledMessage)
+                destinationMessage = LegacyChimeMessage.Builder(name)
+                        .withUrl(chime?.url)
+                        .withMessage(messageContent)
+                        .build()
+            }
+
             DestinationType.EMAIL -> {
                 val emailAccount = destinationCtx.emailAccount
                 destinationMessage = LegacyEmailMessage.Builder(name)
@@ -288,6 +306,7 @@ data class Destination(
             DestinationType.SLACK -> content = slack?.convertToMap()?.get(type.value)
             DestinationType.CUSTOM_WEBHOOK -> content = customWebhook?.convertToMap()?.get(type.value)
             DestinationType.EMAIL -> content = email?.convertToMap()?.get(type.value)
+            DestinationType.TELEGRAM -> content = telegram?.convertToMap()?.get(type.value)
             DestinationType.TEST_ACTION -> content = "dummy"
         }
         if (content == null) {
