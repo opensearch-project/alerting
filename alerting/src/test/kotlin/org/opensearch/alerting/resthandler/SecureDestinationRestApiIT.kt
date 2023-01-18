@@ -49,7 +49,10 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
 
         if (userClient == null) {
             createUser(user, user, arrayOf())
-            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user).setSocketTimeout(60000).build()
+            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user)
+                .setSocketTimeout(60000)
+                .setConnectionRequestTimeout(180000)
+                .build()
         }
     }
 

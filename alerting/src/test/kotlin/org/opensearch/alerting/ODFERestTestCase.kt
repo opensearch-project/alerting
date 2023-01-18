@@ -126,7 +126,10 @@ abstract class ODFERestTestCase : OpenSearchRestTestCase() {
                     // create adminDN (super-admin) client
                     val uri = javaClass.classLoader.getResource("sample.pem").toURI()
                     val configPath = PathUtils.get(uri).parent.toAbsolutePath()
-                    SecureRestClientBuilder(settings, configPath).setSocketTimeout(60000).build()
+                    SecureRestClientBuilder(settings, configPath)
+                        .setSocketTimeout(60000)
+                        .setConnectionRequestTimeout(180000)
+                        .build()
                 }
                 false -> {
                     // create client with passed user
