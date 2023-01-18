@@ -223,7 +223,7 @@ class DestinationTests : OpenSearchTestCase() {
                 null
             ),
             null,
-             telegram = null,
+            telegram = null,
         )
         val out = BytesStreamOutput()
         customWebhookDest.writeTo(out)
