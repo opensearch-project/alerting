@@ -60,7 +60,7 @@ class DestinationMigrationUtilServiceIT : AlertingRestTestCase() {
                 slack = null,
                 customWebhook = null,
                 email = email
-            )
+            )//destinationType
             val slackDestination = getSlackDestination().copy(id = UUID.randomUUID().toString())
             val chimeDestination = getChimeDestination().copy(id = UUID.randomUUID().toString())
             val customWebhookDestination = getCustomWebhookDestination().copy(id = UUID.randomUUID().toString())
