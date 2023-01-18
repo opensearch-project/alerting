@@ -5,7 +5,7 @@
 
 package org.opensearch.alerting
 
-import org.apache.http.HttpHost
+import org.apache.hc.core5.http.HttpHost
 import org.junit.After
 import org.opensearch.client.Request
 import org.opensearch.client.RequestOptions
