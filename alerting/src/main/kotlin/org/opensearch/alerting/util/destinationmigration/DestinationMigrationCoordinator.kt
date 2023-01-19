@@ -36,8 +36,7 @@ class DestinationMigrationCoordinator(
 
     private var scheduledMigration: Scheduler.Cancellable? = null
 
-    @Volatile
-    private var runningLock = false
+    @Volatile private var runningLock = false
 
     init {
         clusterService.addListener(this)
@@ -46,6 +45,7 @@ class DestinationMigrationCoordinator(
 
     override fun clusterChanged(event: ClusterChangedEvent) {
         logger.info("Detected cluster change event for destination migration")
+
         if (DestinationMigrationUtilService.finishFlag) {
             logger.info("Reset destination migration process.")
             scheduledMigration?.cancel()
@@ -92,7 +92,6 @@ class DestinationMigrationCoordinator(
                         logger.info("Cancel background destination migration process.")
                         scheduledMigration?.cancel()
                     }
-
                     logger.info("Performing migration of destination data.")
                     DestinationMigrationUtilService.migrateDestinations(client as NodeClient)
                 } catch (e: Exception) {
@@ -100,7 +99,6 @@ class DestinationMigrationCoordinator(
                 }
             }
         }
-
         scheduledMigration = threadPool.scheduleWithFixedDelay(scheduledJob, TimeValue.timeValueMinutes(1), ThreadPool.Names.MANAGEMENT)
     }
 }

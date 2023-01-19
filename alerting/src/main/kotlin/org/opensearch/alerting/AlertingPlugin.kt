@@ -69,6 +69,7 @@ import org.opensearch.alerting.transport.TransportIndexMonitorAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
+import org.opensearch.alerting.util.ClusterMetricsCoordinator
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
 import org.opensearch.client.Client
@@ -110,6 +111,7 @@ import java.util.function.Supplier
  * It also adds [Monitor.XCONTENT_REGISTRY], [SearchInput.XCONTENT_REGISTRY], [QueryLevelTrigger.XCONTENT_REGISTRY],
  * [BucketLevelTrigger.XCONTENT_REGISTRY], [ClusterMetricsInput.XCONTENT_REGISTRY] to the [NamedXContentRegistry] so that we are able to deserialize the custom named objects.
  */
+
 internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, ReloadablePlugin, SearchPlugin, PercolatorPluginExt() {
 
     override fun getContextWhitelists(): Map<ScriptContext<*>, List<Whitelist>> {
@@ -141,6 +143,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     lateinit var alertIndices: AlertIndices
     lateinit var clusterService: ClusterService
     lateinit var destinationMigrationCoordinator: DestinationMigrationCoordinator
+    lateinit var clusterMetricsCoordinator: ClusterMetricsCoordinator
 
     override fun getRestHandlers(
         settings: Settings,
@@ -212,10 +215,12 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         nodeEnvironment: NodeEnvironment,
         namedWriteableRegistry: NamedWriteableRegistry,
         indexNameExpressionResolver: IndexNameExpressionResolver,
-        repositoriesServiceSupplier: Supplier<RepositoriesService>
+        repositoriesServiceSupplier: Supplier<RepositoriesService>,
+
     ): Collection<Any> {
         // Need to figure out how to use the OpenSearch DI classes rather than handwiring things here.
         val settings = environment.settings()
+
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
         runner = MonitorRunnerService
             .registerClusterService(clusterService)
@@ -236,9 +241,18 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         scheduler = JobScheduler(threadPool, runner)
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
         destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool, scheduledJobIndices)
+        clusterMetricsCoordinator = ClusterMetricsCoordinator(settings, client, clusterService, threadPool)
         this.threadPool = threadPool
         this.clusterService = clusterService
-        return listOf(sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator)
+        return listOf(
+            sweeper,
+            scheduler,
+            runner,
+            scheduledJobIndices,
+            docLevelMonitorQueries,
+            destinationMigrationCoordinator,
+            clusterMetricsCoordinator
+        )
     }
 
     override fun getSettings(): List<Setting<*>> {
@@ -300,7 +314,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.FINDING_HISTORY_MAX_DOCS,
             AlertingSettings.FINDING_HISTORY_INDEX_MAX_AGE,
             AlertingSettings.FINDING_HISTORY_ROLLOVER_PERIOD,
-            AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD
+            AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD,
+            AlertingSettings.METRICS_STORE_TIME,
+            AlertingSettings.METRICS_EXECUTION_FREQUENCY
         )
     }
 

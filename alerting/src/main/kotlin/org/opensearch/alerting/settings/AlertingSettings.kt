@@ -13,13 +13,32 @@ import java.util.concurrent.TimeUnit
 /**
  * settings specific to [AlertingPlugin]. These settings include things like history index max age, request timeout, etc...
  */
+private val log = org.apache.logging.log4j.LogManager.getLogger(AlertingSettings::class.java)
+
 class AlertingSettings {
 
     companion object {
-
         const val MONITOR_MAX_INPUTS = 1
         const val MONITOR_MAX_TRIGGERS = 10
         const val DEFAULT_MAX_ACTIONABLE_ALERT_COUNT = 50L
+
+        val MINIMUM_EXECUTION_FREQUENCY = TimeValue(1, TimeUnit.SECONDS)
+        val MINIMUM_STORAGE_TIME = TimeValue(1, TimeUnit.MINUTES)
+
+        val METRICS_EXECUTION_FREQUENCY_DEFAULT_VALUE = TimeValue(15, TimeUnit.MINUTES)
+        val METRICS_STORE_TIME_DEFAULT_VALUE = TimeValue(7, TimeUnit.DAYS)
+
+        val METRICS_EXECUTION_FREQUENCY_DEFAULT = Setting.positiveTimeSetting(
+            "plugins.alerting.cluster_metrics.execution_frequency",
+            METRICS_EXECUTION_FREQUENCY_DEFAULT_VALUE,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val METRICS_STORE_TIME_DEFAULT = Setting.positiveTimeSetting(
+            "plugins.alerting.cluster_metrics.metrics_history_max_age",
+            METRICS_STORE_TIME_DEFAULT_VALUE,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(
             "plugins.alerting.monitor.max_monitors",
@@ -156,5 +175,70 @@ class AlertingSettings {
             -1L,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+
+        val METRICS_STORE_TIME = Setting.timeSetting(
+            METRICS_STORE_TIME_DEFAULT.key,
+            METRICS_STORE_TIME_DEFAULT,
+            StorageValidator(),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val METRICS_EXECUTION_FREQUENCY = Setting.timeSetting(
+            METRICS_EXECUTION_FREQUENCY_DEFAULT.key,
+            METRICS_EXECUTION_FREQUENCY_DEFAULT,
+            ExecutionValidator(),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+        internal class ExecutionValidator : Setting.Validator<TimeValue> {
+            override fun validate(value: TimeValue) {}
+
+            override fun validate(value: TimeValue, settings: Map<Setting<*>, Any>) {
+                val storageTime = settings[METRICS_STORE_TIME] as TimeValue
+                log.info("THIS IS STORAGETIME $storageTime")
+                validateSettings(value, storageTime)
+            }
+
+            override fun settings(): MutableIterator<Setting<*>> {
+                val settings = mutableListOf<Setting<*>>(
+                    METRICS_EXECUTION_FREQUENCY,
+                    METRICS_STORE_TIME
+                )
+                return settings.iterator()
+            }
+        }
+
+        internal class StorageValidator : Setting.Validator<TimeValue> {
+            override fun validate(value: TimeValue) {}
+
+            override fun validate(value: TimeValue, settings: Map<Setting<*>, Any>) {
+                val executionTime = settings[METRICS_EXECUTION_FREQUENCY] as TimeValue
+                log.info("THIS IS EXECUTIONTIME AS MILLIS ${executionTime.millis()}")
+                log.info("THIS IS EXECUTIONTIME $executionTime")
+                validateSettings(executionTime, value)
+            }
+
+            override fun settings(): MutableIterator<Setting<*>> {
+                val settings = mutableListOf<Setting<*>>(
+                    METRICS_EXECUTION_FREQUENCY,
+                    METRICS_STORE_TIME
+                )
+                return settings.iterator()
+            }
+        }
+        private fun validateSettings(executionFrequency: TimeValue, storageTime: TimeValue) {
+            if (executionFrequency > storageTime) {
+                throw IllegalArgumentException(
+                    "The execution frequency should be less than the storage time."
+                )
+            } else if (executionFrequency < MINIMUM_EXECUTION_FREQUENCY) {
+                throw IllegalArgumentException(
+                    "The execution frequency can not be less than $MINIMUM_EXECUTION_FREQUENCY"
+                )
+            } else if (storageTime < MINIMUM_STORAGE_TIME) {
+                throw IllegalArgumentException(
+                    "The storage time can not be less than $MINIMUM_STORAGE_TIME."
+                )
+            }
+        }
     }
 }

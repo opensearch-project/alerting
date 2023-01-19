@@ -1,0 +1,119 @@
+{
+  "_meta": {
+    "schema_version": 1
+  },
+  "properties": {
+    "cluster_status": {
+      "properties": {
+        "timestamp": {
+          "type": "date"
+        },
+        "value" : {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        }
+      }
+    },
+    "cpu_usage": {
+      "properties": {
+        "timestamp": {
+          "type": "date"
+        },
+        "value" : {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        }
+      }
+    },
+    "jvm_pressure": {
+      "properties": {
+        "timestamp": {
+          "type": "date"
+        },
+        "value" : {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        }
+      }
+    },
+    "unassigned_shards": {
+      "properties": {
+        "timestamp": {
+          "type": "date"
+        },
+        "value" : {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        }
+      }
+    },
+    "number_of_pending_tasks": {
+      "properties": {
+        "timestamp": {
+          "type": "date"
+        },
+        "value" : {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        }
+      }
+    },
+    "active_shards": {
+      "properties": {
+        "timestamp": {
+          "type": "date"
+        },
+        "value" : {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        }
+      }
+    },
+    "relocating_shards": {
+      "properties": {
+        "timestamp": {
+          "type": "date"
+        },
+        "value" : {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        }
+      }
+    }
+  }
+}
