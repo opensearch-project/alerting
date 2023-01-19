@@ -128,6 +128,21 @@ You can also run the integration tests against a multi-node cluster by running `
 You can also debug a multi-node cluster, by using a combination of above multi-node and debug steps.
 But, you must set up debugger configurations to listen on each port starting from `5005` and increasing by 1 for each node.
 
+### Running with custom Opensearch distribution
+
+If you're trying to execute run/integTest on ARM MacOS, or current opensearch-min distro artifact is not available for any reason, you can use your own distro jar. 
+Pass `-PcustomDistributionUrl=/path/to/distro` to run/integTest to execute them with local opensearch distro.
+
+1. Build Opensearch min distribution:
+   1. Clone [Opensearch repo](https://github.com/opensearch-project/OpenSearch)
+   2. Execute ./gradlew assemble (you will need docker installed)
+   3. Built distros are in distribution/archives/<os-arch>/distributions/
+2. `./gradlew run -PcustomDistributionUrl=/path/to/distro`
+
+Example running on ARM MacOS with local artifact:
+
+`./gradlew integTest -PnumNodes=3 -PcustomDistributionUrl=/Users/macos-user/OpenSearch/distribution/archives/darwin-arm64-tar/build/distributions/opensearch-min-2.5.0-SNAPSHOT-darwin-arm64.tar.gz`
+
 ### Backport
 
 - [Link to backport documentation](https://github.com/opensearch-project/opensearch-plugins/blob/main/BACKPORT.md)
