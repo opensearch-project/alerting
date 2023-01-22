@@ -35,6 +35,7 @@ class TriggerService(val scriptService: ScriptService) {
     private val logger = LogManager.getLogger(TriggerService::class.java)
     private val ALWAYS_RUN = Script("return true")
     private val NEVER_RUN = Script("return false")
+    private val previouslyTriggered = mutableSetOf<String>()
 
     fun isQueryLevelTriggerActionable(ctx: QueryLevelTriggerExecutionContext, result: QueryLevelTriggerRunResult): Boolean {
         // Suppress actions if the current alert is acknowledged and there are no errors.
@@ -43,14 +44,17 @@ class TriggerService(val scriptService: ScriptService) {
     }
 
     fun runQueryLevelTrigger(
-        monitor: Monitor,
-        trigger: QueryLevelTrigger,
-        ctx: QueryLevelTriggerExecutionContext
+            monitor: Monitor,
+            trigger: QueryLevelTrigger,
+            ctx: QueryLevelTriggerExecutionContext
     ): QueryLevelTriggerRunResult {
+        if (previouslyTriggered.contains(trigger.name)) {
+            return QueryLevelTriggerRunResult(trigger.name, false, null)
+        }
         return try {
             val triggered = scriptService.compile(trigger.condition, TriggerScript.CONTEXT)
-                .newInstance(trigger.condition.params)
-                .execute(ctx)
+                    .newInstance(trigger.condition.params)
+                    .execute(ctx)
             QueryLevelTriggerRunResult(trigger.name, triggered, null)
         } catch (e: Exception) {
             logger.info("Error running script for monitor ${monitor.id}, trigger: ${trigger.id}", e)
@@ -61,9 +65,9 @@ class TriggerService(val scriptService: ScriptService) {
 
     // TODO: improve performance and support match all and match any
     fun runDocLevelTrigger(
-        monitor: Monitor,
-        trigger: DocumentLevelTrigger,
-        queryToDocIds: Map<DocLevelQuery, Set<String>>
+            monitor: Monitor,
+            trigger: DocumentLevelTrigger,
+            queryToDocIds: Map<DocLevelQuery, Set<String>>
     ): DocumentLevelTriggerRunResult {
         return try {
             var triggeredDocs = mutableListOf<String>()
@@ -74,7 +78,7 @@ class TriggerService(val scriptService: ScriptService) {
                 }
             } else if (!trigger.condition.idOrCode.equals(NEVER_RUN.idOrCode)) {
                 triggeredDocs = TriggerExpressionParser(trigger.condition.idOrCode).parse()
-                    .evaluate(queryToDocIds).toMutableList()
+                        .evaluate(queryToDocIds).toMutableList()
             }
 
             DocumentLevelTriggerRunResult(trigger.name, triggeredDocs, null)
@@ -87,17 +91,17 @@ class TriggerService(val scriptService: ScriptService) {
 
     @Suppress("UNCHECKED_CAST")
     fun runBucketLevelTrigger(
-        monitor: Monitor,
-        trigger: BucketLevelTrigger,
-        ctx: BucketLevelTriggerExecutionContext
+            monitor: Monitor,
+            trigger: BucketLevelTrigger,
+            ctx: BucketLevelTriggerExecutionContext
     ): BucketLevelTriggerRunResult {
         return try {
             val bucketIndices =
-                ((ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)[trigger.id] as HashMap<*, *>)[BUCKET_INDICES] as List<*>
+                    ((ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)[trigger.id] as HashMap<*, *>)[BUCKET_INDICES] as List<*>
             val parentBucketPath = (
-                (ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
-                    .get(trigger.id) as HashMap<*, *>
-                )[PARENT_BUCKET_PATH] as String
+                    (ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
+                            .get(trigger.id) as HashMap<*, *>
+                    )[PARENT_BUCKET_PATH] as String
             val aggregationPath = AggregationPath.parse(parentBucketPath)
             // TODO test this part by passing sub-aggregation path
             var parentAgg = (ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
