@@ -43,12 +43,17 @@ class TriggerService(val scriptService: ScriptService) {
         return result.triggered && !suppress
     }
 
-    fun runQueryLevelTrigger(monitor: Monitor, trigger: QueryLevelTrigger, ctx: QueryLevelTriggerExecutionContext): QueryLevelTriggerRunResult {
+    fun runQueryLevelTrigger(
+        monitor: Monitor,
+        trigger: QueryLevelTrigger,
+        ctx: QueryLevelTriggerExecutionContext
+    ): QueryLevelTriggerRunResult {
         if (previouslyTriggered.contains(trigger.name)) {
             return QueryLevelTriggerRunResult(trigger.name, false, null)
         }
         return try {
-            val triggered = scriptService.compile(trigger.condition, TriggerScript.CONTEXT).newInstance(trigger.condition.params).execute(ctx)
+            val triggered = scriptService.compile(trigger.condition, TriggerScript.CONTEXT)
+                .newInstance(trigger.condition.params).execute(ctx)
             QueryLevelTriggerRunResult(trigger.name, triggered, null)
         } catch (e: Exception) {
             logger.info("Error running script for monitor ${monitor.id}, trigger: ${trigger.id}", e)
@@ -58,7 +63,11 @@ class TriggerService(val scriptService: ScriptService) {
     }
 
     // TODO: improve performance and support match all and match any
-    fun runDocLevelTrigger(monitor: Monitor, trigger: DocumentLevelTrigger, queryToDocIds: Map<DocLevelQuery, Set<String>>): DocumentLevelTriggerRunResult {
+    fun runDocLevelTrigger(
+        monitor: Monitor,
+        trigger: DocumentLevelTrigger,
+        queryToDocIds: Map<DocLevelQuery, Set<String>>
+    ): DocumentLevelTriggerRunResult {
         return try {
             var triggeredDocs = mutableListOf<String>()
 
@@ -78,7 +87,11 @@ class TriggerService(val scriptService: ScriptService) {
     }
 
     @Suppress("UNCHECKED_CAST")
-    fun runBucketLevelTrigger(monitor: Monitor, trigger: BucketLevelTrigger, ctx: BucketLevelTriggerExecutionContext): BucketLevelTriggerRunResult {
+    fun runBucketLevelTrigger(
+        monitor: Monitor,
+        trigger: BucketLevelTrigger,
+        ctx: BucketLevelTriggerExecutionContext
+    ): BucketLevelTriggerRunResult {
         return try {
             val bucketIndices = ((ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)[trigger.id] as HashMap<*, *>)[BUCKET_INDICES] as List<*>
             val parentBucketPath = ((ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>).get(trigger.id) as HashMap<*, *>)[PARENT_BUCKET_PATH] as String
