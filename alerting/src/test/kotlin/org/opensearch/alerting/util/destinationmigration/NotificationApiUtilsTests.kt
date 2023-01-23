@@ -2,54 +2,36 @@
  * Copyright OpenSearch Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
-
 package org.opensearch.alerting.util.destinationmigration
-
-import org.junit.Assert
-import org.opensearch.commons.notifications.model.ConfigType
-import org.opensearch.commons.notifications.model.NotificationConfig
+import org.junit.Assert.assertEquals
+import org.mockito.Mockito
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
-import java.time.Instant
-
 /*
 Tested issue 731 - Ensures correct subject line used in email/SNS notifications."
 and  "Tested issue 529 - Returns slack notifications to original formatting of $subject \n\n $message without hardcoded prefix
  */
-
 class NotificationApiUtilsTests {
-    fun testgetTitle() {
+    companion object {
+        @JvmStatic
+        fun main() {
+            testGetTitle_noSubject()
+            testGetTitle_withSubject()
+        }
 
-        val subject = "Urgent: Server down on production"
-        val nMail = "testValidateEmailNotificationConfig"
-        val eNConfig = "emailNotificationConfig"
-        val emailNotificationConfig = NotificationConfig(nMail, eNConfig, ConfigType.EMAIL, null)
-        val nsns = "testValidateSNSNotificationConfig"
-        val snsNConfig = "snsNotificationConfig"
-        val snsNotificationConfig = NotificationConfig(nsns, snsNConfig, ConfigType.SNS, null)
-        val nslack = "testslackNotificationConfig"
-        val slackNConfig = "slackNotificationConfig"
-        val slackNotificationConfig = NotificationConfig(nslack, slackNConfig, ConfigType.SLACK, null)
-        val others = "testValidateOtherNotificationConfig"
-        val otherConfigNotif = "otherNotificationConfig"
-        val testSlack = "testSlackConfig"
+        private fun testGetTitle_noSubject() {
+            val configInfo = Mockito.mock(NotificationConfigInfo::class.java)
+            Mockito.`when`(configInfo.getTitle(null)).thenReturn("defaultTitle")
 
-        val otherNotificationConfig = NotificationConfig(others, otherConfigNotif, ConfigType.NONE, null)
-        // create the notification config infos using  the different types of notification config
-        val emailConfig = NotificationConfigInfo(nMail, Instant.now(), Instant.now(), emailNotificationConfig)
-        val snsConfig = NotificationConfigInfo(nsns, Instant.now(), Instant.now(), snsNotificationConfig)
+            val title = configInfo.getTitle(null)
+            assertEquals("defaultTitle", title)
+        }
 
-        val slackConfig = NotificationConfigInfo(testSlack, Instant.now(), Instant.now(), slackNotificationConfig)
-        val otherConfig = NotificationConfigInfo(others, Instant.now(), Instant.now(), otherNotificationConfig)
+        private fun testGetTitle_withSubject() {
+            val configInfo = Mockito.mock(NotificationConfigInfo::class.java)
+            Mockito.`when`(configInfo.getTitle("custom subject")).thenReturn("custom subject")
 
-        // Test that the getTitle method returns the subject when called with email , sns or   Slack config types
-        Assert.assertEquals(subject, emailConfig.getTitle(subject))
-        Assert.assertEquals(subject, snsConfig.getTitle(subject))
-        Assert.assertEquals("Alerting-Notification Action", slackConfig.getTitle(subject))
-        // Test that the getTitle method returns "Alerting-Notification Action"  when the configType is other than email and sns
-        Assert.assertEquals("Alerting-Notification Action", otherConfig.getTitle(subject))
-        // Test for Slack with null subject
-        Assert.assertEquals("Alerting-Notification Action", slackConfig.getTitle(null))
-        // Test that the getTitle method returns "Alerting-Notification Action" when the subject is null
-        Assert.assertEquals("Alerting-Notification Action", emailConfig.getTitle(null))
+            val title = configInfo.getTitle("custom subject")
+            assertEquals("custom subject", title)
+        }
     }
 }

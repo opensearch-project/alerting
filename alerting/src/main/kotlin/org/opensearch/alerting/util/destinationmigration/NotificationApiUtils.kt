@@ -19,8 +19,18 @@ import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.destination.message.LegacyBaseMessage
 import org.opensearch.commons.notifications.NotificationsPluginInterface
-import org.opensearch.commons.notifications.action.*
-import org.opensearch.commons.notifications.model.*
+import org.opensearch.commons.notifications.action.CreateNotificationConfigRequest
+import org.opensearch.commons.notifications.action.CreateNotificationConfigResponse
+import org.opensearch.commons.notifications.action.GetNotificationConfigRequest
+import org.opensearch.commons.notifications.action.GetNotificationConfigResponse
+import org.opensearch.commons.notifications.action.LegacyPublishNotificationRequest
+import org.opensearch.commons.notifications.action.LegacyPublishNotificationResponse
+import org.opensearch.commons.notifications.action.SendNotificationResponse
+import org.opensearch.commons.notifications.model.ChannelMessage
+import org.opensearch.commons.notifications.model.ConfigType
+import org.opensearch.commons.notifications.model.EventSource
+import org.opensearch.commons.notifications.model.NotificationConfigInfo
+import org.opensearch.commons.notifications.model.SeverityType
 import org.opensearch.rest.RestStatus
 
 class NotificationApiUtils {
