@@ -6,11 +6,12 @@ package org.opensearch.alerting.util.destinationmigration
 import org.junit.Assert.assertEquals
 import org.mockito.Mockito
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
+import org.opensearch.test.OpenSearchTestCase
 /*
 Tested issue 731 - Ensures correct subject line used in email/SNS notifications."
 and  "Tested issue 529 - Returns slack notifications to original formatting of $subject \n\n $message without hardcoded prefix
  */
-class NotificationApiUtilsTests {
+class NotificationApiUtilsTests : OpenSearchTestCase() {
     companion object {
         @JvmStatic
         fun main() {
