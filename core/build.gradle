@@ -17,7 +17,6 @@ dependencies {
     implementation 'com.google.googlejavaformat:google-java-format:1.10.0'
     api files("/Users/snistala/Documents/opensearch/common-utils/build/libs/common-utils-3.0.0.0-SNAPSHOT.jar")
     implementation 'commons-validator:commons-validator:1.7'
-
     testImplementation "org.opensearch.test:framework:${opensearch_version}"
     testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlin_version}"
     testImplementation "org.jetbrains.kotlin:kotlin-test-junit:${kotlin_version}"
