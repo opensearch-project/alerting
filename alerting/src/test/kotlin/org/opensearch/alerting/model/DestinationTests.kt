@@ -307,4 +307,18 @@ class DestinationTests : OpenSearchTestCase() {
         val parsedDest = Destination.parse(parser(userString))
         assertNull(parsedDest.user)
     }
+    fun `test slack message formatting without subject`() {
+        val slack = Slack("http://abc.com")
+        val message = "test message"
+        val formattedMessage = slack.constructMessageContent(null, message)
+        assertEquals("Slack message should be formatted without subject", message, formattedMessage)
+    }
+    fun `test slack message formatting with subject`() {
+        val slack = Slack("http://abc.com")
+        val subject = "test subject"
+        val message = "test message"
+        val expectedMessage = "$subject \n\n $message"
+        val formattedMessage = slack.constructMessageContent(subject, message)
+        assertEquals("Slack message should be formatted with subject", expectedMessage, formattedMessage)
+    }
 }
