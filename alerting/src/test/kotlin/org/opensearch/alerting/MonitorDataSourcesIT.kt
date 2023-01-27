@@ -203,7 +203,6 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             val finding = Finding.parse(xcp)
             findings1.add(finding)
         }
-        logger.error("sashank: response: {}", finalQueryResponse)
         val indexToRelatedDocIdsMap = mutableMapOf<String, MutableList<String>>()
         for (finding in findings1) {
             val ids = indexToRelatedDocIdsMap.getOrDefault(index, mutableListOf())

@@ -2,7 +2,6 @@ package org.opensearch.alerting.workflow
 
 import org.opensearch.alerting.MonitorRunnerExecutionContext
 import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.Workflow
 import java.time.Instant
 

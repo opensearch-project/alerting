@@ -39,8 +39,11 @@ import org.opensearch.commons.alerting.model.ActionExecutionResult
 import org.opensearch.commons.alerting.model.AggregationResultBucket
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.ChainedFindings
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
+import org.opensearch.commons.alerting.model.CompositeInput
 import org.opensearch.commons.alerting.model.DataSources
+import org.opensearch.commons.alerting.model.Delegate
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
@@ -51,7 +54,10 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.Schedule
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.model.Sequence
 import org.opensearch.commons.alerting.model.Trigger
+import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.commons.alerting.model.Workflow.WorkflowType
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.commons.alerting.model.action.ActionExecutionScope
@@ -84,7 +90,7 @@ fun randomQueryLevelMonitor(
     triggers: List<Trigger> = (1..randomInt(10)).map { randomQueryLevelTrigger() },
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
-    withMetadata: Boolean = false
+    withMetadata: Boolean = false,
 ): Monitor {
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
@@ -102,7 +108,7 @@ fun randomQueryLevelMonitorWithoutUser(
     triggers: List<Trigger> = (1..randomInt(10)).map { randomQueryLevelTrigger() },
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
-    withMetadata: Boolean = false
+    withMetadata: Boolean = false,
 ): Monitor {
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
@@ -126,7 +132,7 @@ fun randomBucketLevelMonitor(
     triggers: List<Trigger> = (1..randomInt(10)).map { randomBucketLevelTrigger() },
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
-    withMetadata: Boolean = false
+    withMetadata: Boolean = false,
 ): Monitor {
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.BUCKET_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
@@ -151,7 +157,7 @@ fun randomBucketLevelMonitor(
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     withMetadata: Boolean = false,
-    dataSources: DataSources
+    dataSources: DataSources,
 ): Monitor {
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.BUCKET_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
@@ -170,7 +176,7 @@ fun randomClusterMetricsMonitor(
     triggers: List<Trigger> = (1..randomInt(10)).map { randomQueryLevelTrigger() },
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
-    withMetadata: Boolean = false
+    withMetadata: Boolean = false,
 ): Monitor {
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.CLUSTER_METRICS_MONITOR, enabled = enabled, inputs = inputs,
@@ -188,7 +194,7 @@ fun randomDocumentLevelMonitor(
     triggers: List<Trigger> = (1..randomInt(10)).map { randomQueryLevelTrigger() },
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
-    withMetadata: Boolean = false
+    withMetadata: Boolean = false,
 ): Monitor {
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.DOC_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
@@ -208,12 +214,62 @@ fun randomDocumentLevelMonitor(
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     withMetadata: Boolean = false,
     dataSources: DataSources,
-    owner: String? = null
+    owner: String? = null,
 ): Monitor {
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.DOC_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
         uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf(), dataSources = dataSources, owner = owner
+    )
+}
+
+fun randomWorkflowMonitor(
+    monitorIds: List<String>,
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    user: User? = randomUser(),
+    schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
+    enabled: Boolean = randomBoolean(),
+    enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
+    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS)
+): Workflow {
+    val delegates = mutableListOf<Delegate>()
+    if (!monitorIds.isNullOrEmpty()) {
+        delegates.add(Delegate(1, monitorIds[0]))
+        for (i in 1 until monitorIds.size) {
+            delegates.add(Delegate(i + 1, monitorIds [i], ChainedFindings(monitorIds[i - 1])))
+        }
+    }
+
+    return Workflow(
+        name = name,
+        enabled = enabled,
+        schedule = schedule,
+        lastUpdateTime = lastUpdateTime,
+        enabledTime = enabledTime,
+        workflowType = WorkflowType.COMPOSITE,
+        user = user,
+        inputs = listOf(CompositeInput(Sequence(delegates)))
+    )
+}
+
+fun randomWorkflowMonitorWithDelegates(
+    delegates: List<Delegate>,
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    user: User? = randomUser(),
+    schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
+    enabled: Boolean = randomBoolean(),
+    enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
+    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+): Workflow {
+    return Workflow(
+        name = name,
+        enabled = enabled,
+        schedule = schedule,
+        lastUpdateTime = lastUpdateTime,
+        enabledTime = enabledTime,
+        workflowType = WorkflowType.COMPOSITE,
+        user = user,
+        inputs = listOf(CompositeInput(Sequence(delegates)))
     )
 }
 
@@ -223,7 +279,7 @@ fun randomQueryLevelTrigger(
     severity: String = "1",
     condition: Script = randomScript(),
     actions: List<Action> = mutableListOf(),
-    destinationId: String = ""
+    destinationId: String = "",
 ): QueryLevelTrigger {
     return QueryLevelTrigger(
         id = id,
@@ -240,7 +296,7 @@ fun randomBucketLevelTrigger(
     severity: String = "1",
     bucketSelector: BucketSelectorExtAggregationBuilder = randomBucketSelectorExtAggregationBuilder(name = id),
     actions: List<Action> = mutableListOf(),
-    destinationId: String = ""
+    destinationId: String = "",
 ): BucketLevelTrigger {
     return BucketLevelTrigger(
         id = id,
@@ -260,7 +316,7 @@ fun randomDocumentLevelTrigger(
     severity: String = "1",
     condition: Script = randomScript(),
     actions: List<Action> = mutableListOf(),
-    destinationId: String = ""
+    destinationId: String = "",
 ): DocumentLevelTrigger {
     return DocumentLevelTrigger(
         id = id,
@@ -278,14 +334,14 @@ fun randomBucketSelectorExtAggregationBuilder(
     bucketsPathsMap: MutableMap<String, String> = mutableMapOf("avg" to "10"),
     script: Script = randomBucketSelectorScript(params = bucketsPathsMap),
     parentBucketPath: String = "testPath",
-    filter: BucketSelectorExtFilter = BucketSelectorExtFilter(IncludeExclude("foo*", "bar*"))
+    filter: BucketSelectorExtFilter = BucketSelectorExtFilter(IncludeExclude("foo*", "bar*")),
 ): BucketSelectorExtAggregationBuilder {
     return BucketSelectorExtAggregationBuilder(name, bucketsPathsMap, script, parentBucketPath, filter)
 }
 
 fun randomBucketSelectorScript(
     idOrCode: String = "params.avg >= 0",
-    params: Map<String, String> = mutableMapOf("avg" to "10")
+    params: Map<String, String> = mutableMapOf("avg" to "10"),
 ): Script {
     return Script(Script.DEFAULT_SCRIPT_TYPE, Script.DEFAULT_SCRIPT_LANG, idOrCode, emptyMap<String, String>(), params)
 }
@@ -298,7 +354,7 @@ fun randomEmailAccount(
     port: Int = randomIntBetween(1, 100),
     method: EmailAccount.MethodType = randomEmailAccountMethod(),
     username: SecureString? = null,
-    password: SecureString? = null
+    password: SecureString? = null,
 ): EmailAccount {
     return EmailAccount(
         name = name,
@@ -316,7 +372,7 @@ fun randomEmailGroup(
     name: String = salt + OpenSearchRestTestCase.randomAlphaOfLength(10),
     emails: List<EmailEntry> = (1..randomInt(10)).map {
         EmailEntry(email = salt + OpenSearchRestTestCase.randomAlphaOfLength(5) + "@email.com")
-    }
+    },
 ): EmailGroup {
     return EmailGroup(name = name, emails = emails)
 }
@@ -342,7 +398,7 @@ val TERM_DLS_QUERY = """{\"term\": { \"accessible\": true}}"""
 
 fun randomTemplateScript(
     source: String,
-    params: Map<String, String> = emptyMap()
+    params: Map<String, String> = emptyMap(),
 ): Script = Script(ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG, source, params)
 
 fun randomAction(
@@ -350,7 +406,7 @@ fun randomAction(
     template: Script = randomTemplateScript("Hello World"),
     destinationId: String = "",
     throttleEnabled: Boolean = false,
-    throttle: Throttle = randomThrottle()
+    throttle: Throttle = randomThrottle(),
 ) = Action(name, destinationId, template, template, throttleEnabled, throttle, actionExecutionPolicy = null)
 
 fun randomActionWithPolicy(
@@ -359,7 +415,7 @@ fun randomActionWithPolicy(
     destinationId: String = "",
     throttleEnabled: Boolean = false,
     throttle: Throttle = randomThrottle(),
-    actionExecutionPolicy: ActionExecutionPolicy? = randomActionExecutionPolicy()
+    actionExecutionPolicy: ActionExecutionPolicy? = randomActionExecutionPolicy(),
 ): Action {
     return if (actionExecutionPolicy?.actionExecutionScope is PerExecutionActionScope) {
         // Return null for throttle when using PerExecutionActionScope since throttling is currently not supported for it
@@ -371,11 +427,11 @@ fun randomActionWithPolicy(
 
 fun randomThrottle(
     value: Int = randomIntBetween(60, 120),
-    unit: ChronoUnit = ChronoUnit.MINUTES
+    unit: ChronoUnit = ChronoUnit.MINUTES,
 ) = Throttle(value, unit)
 
 fun randomActionExecutionPolicy(
-    actionExecutionScope: ActionExecutionScope = randomActionExecutionScope()
+    actionExecutionScope: ActionExecutionScope = randomActionExecutionScope(),
 ) = ActionExecutionPolicy(actionExecutionScope)
 
 fun randomActionExecutionScope(): ActionExecutionScope {
@@ -400,7 +456,7 @@ fun randomDocLevelQuery(
     id: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     query: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     name: String = "${randomInt(5)}",
-    tags: List<String> = mutableListOf(0..randomInt(10)).map { OpenSearchRestTestCase.randomAlphaOfLength(10) }
+    tags: List<String> = mutableListOf(0..randomInt(10)).map { OpenSearchRestTestCase.randomAlphaOfLength(10) },
 ): DocLevelQuery {
     return DocLevelQuery(id = id, query = query, name = name, tags = tags)
 }
@@ -408,7 +464,7 @@ fun randomDocLevelQuery(
 fun randomDocLevelMonitorInput(
     description: String = OpenSearchRestTestCase.randomAlphaOfLength(randomInt(10)),
     indices: List<String> = listOf(1..randomInt(10)).map { OpenSearchRestTestCase.randomAlphaOfLength(10) },
-    queries: List<DocLevelQuery> = listOf(1..randomInt(10)).map { randomDocLevelQuery() }
+    queries: List<DocLevelQuery> = listOf(1..randomInt(10)).map { randomDocLevelQuery() },
 ): DocLevelMonitorInput {
     return DocLevelMonitorInput(description = description, indices = indices, queries = queries)
 }
@@ -420,7 +476,7 @@ fun randomFinding(
     monitorName: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     index: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     docLevelQueries: List<DocLevelQuery> = listOf(randomDocLevelQuery()),
-    timestamp: Instant = Instant.now()
+    timestamp: Instant = Instant.now(),
 ): Finding {
     return Finding(
         id = id,
@@ -456,7 +512,7 @@ fun randomEmailAccountMethod(): EmailAccount.MethodType {
 fun randomActionExecutionResult(
     actionId: String = UUIDs.base64UUID(),
     lastExecutionTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
-    throttledCount: Int = randomInt()
+    throttledCount: Int = randomInt(),
 ) = ActionExecutionResult(actionId, lastExecutionTime, throttledCount)
 
 fun randomQueryLevelMonitorRunResult(): MonitorRunResult<QueryLevelTriggerRunResult> {
@@ -518,7 +574,7 @@ fun randomQueryLevelTriggerRunResult(): QueryLevelTriggerRunResult {
 fun randomClusterMetricsInput(
     path: String = ClusterMetricsInput.ClusterMetricType.CLUSTER_HEALTH.defaultPath,
     pathParams: String = "",
-    url: String = ""
+    url: String = "",
 ): ClusterMetricsInput {
     return ClusterMetricsInput(path, pathParams, url)
 }
@@ -617,7 +673,7 @@ fun RestClient.makeRequest(
     endpoint: String,
     params: Map<String, String> = emptyMap(),
     entity: HttpEntity? = null,
-    vararg headers: Header
+    vararg headers: Header,
 ): Response {
     val request = Request(method, endpoint)
     // TODO: remove PERMISSIVE option after moving system index access to REST API call
@@ -642,7 +698,7 @@ fun RestClient.makeRequest(
     method: String,
     endpoint: String,
     entity: HttpEntity? = null,
-    vararg headers: Header
+    vararg headers: Header,
 ): Response {
     val request = Request(method, endpoint)
     val options = RequestOptions.DEFAULT.toBuilder()
@@ -685,4 +741,8 @@ fun assertUserNull(map: Map<String, Any?>) {
 
 fun assertUserNull(monitor: Monitor) {
     assertNull("User is not null", monitor.user)
+}
+
+fun assertUserNull(workflow: Workflow) {
+    assertNull("User is not null", workflow.user)
 }

@@ -51,6 +51,7 @@ import org.opensearch.alerting.transport.TransportGetEmailAccountAction
 import org.opensearch.alerting.transport.TransportGetEmailGroupAction
 import org.opensearch.alerting.transport.TransportGetFindingsSearchAction
 import org.opensearch.alerting.transport.TransportGetMonitorAction
+import org.opensearch.alerting.transport.TransportIndexCompositeWorkflowAction
 import org.opensearch.alerting.transport.TransportIndexMonitorAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
@@ -80,6 +81,7 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.env.Environment
 import org.opensearch.env.NodeEnvironment
 import org.opensearch.index.IndexModule
@@ -180,8 +182,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(SearchEmailGroupAction.INSTANCE, TransportSearchEmailGroupAction::class.java),
             ActionPlugin.ActionHandler(GetDestinationsAction.INSTANCE, TransportGetDestinationsAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.GET_ALERTS_ACTION_TYPE, TransportGetAlertsAction::class.java),
-            ActionPlugin.ActionHandler(AlertingActions.GET_FINDINGS_ACTION_TYPE, TransportGetFindingsSearchAction::class.java)
-
+            ActionPlugin.ActionHandler(AlertingActions.GET_FINDINGS_ACTION_TYPE, TransportGetFindingsSearchAction::class.java),
+            ActionPlugin.ActionHandler(AlertingActions.INDEX_WORKFLOW_ACTION_TYPE, TransportIndexCompositeWorkflowAction::class.java)
         )
     }
 
@@ -193,7 +195,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             QueryLevelTrigger.XCONTENT_REGISTRY,
             BucketLevelTrigger.XCONTENT_REGISTRY,
             ClusterMetricsInput.XCONTENT_REGISTRY,
-            DocumentLevelTrigger.XCONTENT_REGISTRY
+            DocumentLevelTrigger.XCONTENT_REGISTRY,
+            Workflow.XCONTENT_REGISTRY
         )
     }
 

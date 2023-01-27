@@ -180,7 +180,6 @@ object WorkflowRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompo
     }
 
     override fun postDelete(jobId: String) {
-
     }
 
     override fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant) {
@@ -195,7 +194,6 @@ object WorkflowRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompo
     suspend fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant, dryrun: Boolean): MonitorRunResult<*> {
         val workflow = job as Workflow
         return CompositeWorkflowRunner.runWorkflow(workflow, monitorCtx, periodStart, periodEnd, dryrun)
-
     }
 
     // TODO: See if we can move below methods (or few of these) to a common utils
