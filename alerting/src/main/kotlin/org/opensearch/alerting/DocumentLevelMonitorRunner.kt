@@ -74,25 +74,17 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         } catch (e: Exception) {
             val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
             logger.error("Error setting up alerts and findings indices for monitor: $id", e)
-            return monitorResult.copy(error = AlertingException.wrap(e))
+            monitorResult = monitorResult.copy(error = AlertingException.wrap(e))
         }
 
         try {
             validate(monitor)
         } catch (e: Exception) {
             logger.error("Failed to start Document-level-monitor. Error: ${e.message}")
-            return monitorResult.copy(error = AlertingException.wrap(e))
+            monitorResult = monitorResult.copy(error = AlertingException.wrap(e))
         }
 
         var (monitorMetadata, _) = MonitorMetadataService.getOrCreateMetadata(monitor, createWithRunContext = false)
-
-        monitorCtx.docLevelMonitorQueries!!.initDocLevelQueryIndex(monitor.dataSources)
-        monitorCtx.docLevelMonitorQueries!!.indexDocLevelQueries(
-            monitor = monitor,
-            monitorId = monitor.id,
-            monitorMetadata,
-            indexTimeout = monitorCtx.indexTimeout!!
-        )
 
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
         val index = docLevelMonitorInput.indices[0]
@@ -109,6 +101,14 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         val docsToQueries = mutableMapOf<String, MutableList<String>>()
 
         try {
+            monitorCtx.docLevelMonitorQueries!!.initDocLevelQueryIndex(monitor.dataSources)
+            monitorCtx.docLevelMonitorQueries!!.indexDocLevelQueries(
+                monitor = monitor,
+                monitorId = monitor.id,
+                monitorMetadata,
+                indexTimeout = monitorCtx.indexTimeout!!
+            )
+
             val getIndexRequest = GetIndexRequest().indices(index)
             val getIndexResponse: GetIndexResponse = monitorCtx.client!!.suspendUntil {
                 monitorCtx.client!!.admin().indices().getIndex(getIndexRequest, it)
@@ -174,13 +174,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     }
                 }
             }
+            monitorResult = monitorResult.copy(inputResults = InputRunResults(listOf(inputRunResults)))
         } catch (e: Exception) {
             logger.error("Failed to start Document-level-monitor $index. Error: ${e.message}", e)
             val alertingException = AlertingException.wrap(e)
-            return monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
+            monitorResult = monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
         }
-
-        monitorResult = monitorResult.copy(inputResults = InputRunResults(listOf(inputRunResults)))
 
         /*
          populate the map queryToDocIds with pairs of <DocLevelQuery object from queries in monitor metadata &
@@ -259,6 +258,16 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             val alert = monitorCtx.alertService!!.composeDocLevelAlert(
                 listOf(it.first),
                 listOf(it.second),
+                triggerCtx,
+                monitorResult.alertError() ?: triggerResult.alertError()
+            )
+            alerts.add(alert)
+        }
+
+        if (findingDocPairs.isEmpty() && monitorResult.error != null) {
+            val alert = monitorCtx.alertService!!.composeDocLevelAlert(
+                listOf(),
+                listOf(),
                 triggerCtx,
                 monitorResult.alertError() ?: triggerResult.alertError()
             )
