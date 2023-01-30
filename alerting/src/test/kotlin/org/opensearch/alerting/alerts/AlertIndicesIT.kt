@@ -5,8 +5,8 @@
 
 package org.opensearch.alerting.alerts
 
-import org.apache.http.entity.ContentType.APPLICATION_JSON
-import org.apache.http.entity.StringEntity
+import org.apache.hc.core5.http.ContentType.APPLICATION_JSON
+import org.apache.hc.core5.http.io.entity.StringEntity
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.AlertingRestTestCase

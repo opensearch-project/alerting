@@ -65,9 +65,11 @@ configurations.all {
         force "com.fasterxml.jackson.core:jackson-core:${versions.jackson}"
         force "com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:${versions.jackson}"
         force "commons-logging:commons-logging:${versions.commonslogging}"
-        force "org.apache.httpcomponents:httpcore:${versions.httpcore}"
+        force "org.apache.httpcomponents.core5:httpcore5:5.1.4"
         // force the version until OpenSearch upgrade to an invulnerable one, https://www.whitesourcesoftware.com/vulnerability-database/WS-2019-0379
         force "commons-codec:commons-codec:1.13"
+
+        force "org.slf4j:slf4j-api:${versions.slf4j}" //Needed for http5
         
         // This is required because kotlin-coroutines-core 1.1.1 still requires kotlin stdlib 1.3.20 and we're using a higher kotlin version
         force "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
@@ -87,6 +89,8 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
     implementation "org.jetbrains.kotlin:kotlin-stdlib-common:${kotlin_version}"
     implementation "org.jetbrains:annotations:13.0"
+
+    implementation "org.apache.httpcomponents.core5:httpcore5:5.1.4"
 
     api project(":alerting-core")
     implementation "com.github.seancfoley:ipaddress:5.3.3"
@@ -128,8 +132,8 @@ String notificationsFilePath = "src/test/resources/notifications"
 String notificationsCoreFilePath = "src/test/resources/notifications-core"
 String notificationsPlugin = "opensearch-notifications-" + plugin_no_snapshot + ".zip"
 String notificationsCorePlugin = "opensearch-notifications-core-" + plugin_no_snapshot + ".zip"
-String notificationsRemoteFile = "https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/" + opensearch_no_snapshot + "/latest/linux/x64/tar/builds/opensearch/plugins/" + notificationsPlugin
-String notificationsCoreRemoteFile = "https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/" + opensearch_no_snapshot + "/latest/linux/x64/tar/builds/opensearch/plugins/" + notificationsCorePlugin
+String notificationsRemoteFile = "https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/" + opensearch_no_snapshot + "/6809/linux/x64/tar/builds/opensearch/plugins/" + notificationsPlugin
+String notificationsCoreRemoteFile = "https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/" + opensearch_no_snapshot + "/6809/linux/x64/tar/builds/opensearch/plugins/" + notificationsCorePlugin
 testClusters.integTest {
     testDistribution = "ARCHIVE"
     // Cluster shrink exception thrown if we try to set numberOfNodes to 1, so only apply if > 1
@@ -249,17 +253,18 @@ task integTestRemote(type: RestIntegTestTask) {
 }
 integTestRemote.enabled = System.getProperty("tests.rest.cluster") != null
 
-String bwcVersion = "1.1.0.0"
+String bwcVersion = "2.5.0.0"
 String baseName = "alertingBwcCluster"
 String bwcFilePath = "src/test/resources/bwc"
 String bwcOpenSearchPlugin = "opensearch-alerting-" + bwcVersion + ".zip"
-String bwcRemoteFile = 'https://ci.opensearch.org/ci/dbc/bundle-build/1.1.0/20210930/linux/x64/builds/opensearch/plugins/' + bwcOpenSearchPlugin
+String bwcRemoteFile = 'https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/2.5.0/latest/linux' +
+        '/x64/tar/builds/opensearch/plugins/' + bwcOpenSearchPlugin
 
 2.times {i ->
     testClusters {
         "${baseName}$i" {
             testDistribution = "ARCHIVE"
-            versions = ["1.1.0", "2.4.0-SNAPSHOT"]
+            versions = ["2.5.0-SNAPSHOT", "3.0.0-SNAPSHOT"]
             numberOfNodes = 3
             plugin(provider(new Callable<RegularFile>(){
                 @Override

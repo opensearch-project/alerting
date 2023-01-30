@@ -5,10 +5,10 @@
 
 package org.opensearch.alerting.resthandler
 
-import org.apache.http.HttpHeaders
-import org.apache.http.entity.ContentType
-import org.apache.http.message.BasicHeader
-import org.apache.http.nio.entity.NStringEntity
+import org.apache.hc.core5.http.ContentType
+import org.apache.hc.core5.http.HttpHeaders
+import org.apache.hc.core5.http.io.entity.StringEntity
+import org.apache.hc.core5.http.message.BasicHeader
 import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
@@ -74,7 +74,10 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         if (userClient == null) {
             createUser(user, user, arrayOf())
-            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user).setSocketTimeout(60000).build()
+            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user)
+                .setSocketTimeout(60000)
+                .setConnectionRequestTimeout(180000)
+                .build()
         }
     }
 
@@ -179,7 +182,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         val searchResponse = client().makeRequest(
             "GET", "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
 
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
@@ -382,7 +385,9 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
         )
         val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
-            .setSocketTimeout(60000).build()
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
 
         val getMonitorResponse = getUserClient?.makeRequest(
             "GET",
@@ -575,7 +580,9 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
         )
         val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
-            .setSocketTimeout(60000).build()
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
 
         val getMonitorResponse = getUserClient?.makeRequest(
             "GET",
@@ -711,7 +718,9 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
         )
         val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
-            .setSocketTimeout(60000).build()
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
 
         val getMonitorResponse = getUserClient?.makeRequest(
             "GET",
@@ -764,7 +773,9 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         )
 
         val updateUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), updateUser, updateUser)
-            .setSocketTimeout(60000).build()
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
         val updatedMonitor = updateMonitorWithClient(updateUserClient, createdMonitor, listOf("role5"))
 
         // old user should no longer have access
@@ -815,7 +826,9 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
         )
         val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
-            .setSocketTimeout(60000).build()
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
 
         val getMonitorResponse = getUserClient?.makeRequest(
             "GET",
@@ -879,7 +892,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             "POST",
             "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search monitor failed", RestStatus.OK, adminSearchResponse.restStatus())
 
@@ -913,7 +926,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             "POST",
             "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search monitor failed", RestStatus.OK, adminSearchResponse.restStatus())
 
@@ -940,7 +953,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             "POST",
             "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search monitor failed", RestStatus.OK, adminSearchResponse.restStatus())
         assertEquals("Monitor not found during search", 1, getDocs(adminSearchResponse))
@@ -950,7 +963,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             userClient?.makeRequest(
                 "POST", "$ALERTING_BASE_URI/_search",
                 emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON)
+                StringEntity(search, ContentType.APPLICATION_JSON)
             )
             fail("Expected 403 FORBIDDEN response")
         } catch (e: AssertionError) {
@@ -964,7 +977,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 "POST",
                 "$ALERTING_BASE_URI/_search",
                 emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON)
+                StringEntity(search, ContentType.APPLICATION_JSON)
             )
             assertEquals("Search monitor failed", RestStatus.OK, userOneSearchResponse?.restStatus())
             assertEquals("Monitor not found during search", 1, getDocs(userOneSearchResponse))
@@ -986,7 +999,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             "POST",
             "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search monitor failed", RestStatus.OK, adminSearchResponse.restStatus())
         assertEquals("Monitor not found during search", 1, getDocs(adminSearchResponse))
@@ -996,7 +1009,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             userClient?.makeRequest(
                 "POST", "$ALERTING_BASE_URI/_search",
                 emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON)
+                StringEntity(search, ContentType.APPLICATION_JSON)
             )
             fail("Expected 403 FORBIDDEN response")
         } catch (e: AssertionError) {
@@ -1010,7 +1023,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 "POST",
                 "$ALERTING_BASE_URI/_search",
                 emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON)
+                StringEntity(search, ContentType.APPLICATION_JSON)
             )
             assertEquals("Search monitor failed", RestStatus.OK, userOneSearchResponse?.restStatus())
             assertEquals("Monitor not found during search", 0, getDocs(userOneSearchResponse))
@@ -1297,7 +1310,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 "POST",
                 "$ALERTING_BASE_URI/_search",
                 emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON)
+                StringEntity(search, ContentType.APPLICATION_JSON)
             )
             assertEquals("Search monitor failed", RestStatus.OK, adminSearchResponse.restStatus())
             assertEquals("Monitor not found during search", 1, getDocs(adminSearchResponse))
@@ -1308,7 +1321,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 "GET",
                 "$ALERTING_BASE_URI/$id",
                 emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON)
+                StringEntity(search, ContentType.APPLICATION_JSON)
             )
             assertEquals("Get monitor failed", RestStatus.OK, adminGetResponse.restStatus())
 
@@ -1317,7 +1330,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 "DELETE",
                 "$ALERTING_BASE_URI/$id",
                 emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON)
+                StringEntity(search, ContentType.APPLICATION_JSON)
             )
             assertEquals("Delete monitor failed", RestStatus.OK, adminDeleteResponse.restStatus())
         } finally {

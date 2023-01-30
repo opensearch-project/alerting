@@ -12,6 +12,7 @@ import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.opensearchapi.retryForNotification
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.util.use
 import org.opensearch.client.Client
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.Strings
