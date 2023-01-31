@@ -6,23 +6,7 @@
 package org.opensearch.alerting
 
 import org.junit.Assert
-import org.opensearch.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
-import org.opensearch.alerting.alerts.AlertError
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.core.model.IntervalSchedule
-import org.opensearch.alerting.core.model.SearchInput
-import org.opensearch.alerting.model.ActionExecutionResult
-import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.Alert.State.ACKNOWLEDGED
-import org.opensearch.alerting.model.Alert.State.ACTIVE
-import org.opensearch.alerting.model.Alert.State.COMPLETED
-import org.opensearch.alerting.model.Alert.State.ERROR
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.action.ActionExecutionPolicy
-import org.opensearch.alerting.model.action.AlertCategory
-import org.opensearch.alerting.model.action.PerAlertActionScope
-import org.opensearch.alerting.model.action.PerExecutionActionScope
-import org.opensearch.alerting.model.action.Throttle
 import org.opensearch.alerting.model.destination.CustomWebhook
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.email.Email
@@ -32,12 +16,31 @@ import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.ResponseException
 import org.opensearch.client.WarningFailureException
 import org.opensearch.common.settings.Settings
+import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
+import org.opensearch.commons.alerting.alerts.AlertError
+import org.opensearch.commons.alerting.model.ActionExecutionResult
+import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.Alert.State
+import org.opensearch.commons.alerting.model.Alert.State.ACKNOWLEDGED
+import org.opensearch.commons.alerting.model.Alert.State.ACTIVE
+import org.opensearch.commons.alerting.model.Alert.State.COMPLETED
+import org.opensearch.commons.alerting.model.Alert.State.ERROR
+import org.opensearch.commons.alerting.model.DataSources
+import org.opensearch.commons.alerting.model.IntervalSchedule
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
+import org.opensearch.commons.alerting.model.action.AlertCategory
+import org.opensearch.commons.alerting.model.action.PerAlertActionScope
+import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
+import org.opensearch.commons.alerting.model.action.Throttle
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
 import org.opensearch.search.aggregations.bucket.composite.TermsValuesSourceBuilder
+import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.net.URLEncoder
 import java.time.Instant
@@ -665,7 +668,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         val monitor = createMonitor(
             randomQueryLevelMonitor(
                 triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = actions)),
-                schedule = IntervalSchedule(interval = 1, unit = ChronoUnit.MINUTES)
+                schedule = IntervalSchedule(interval = 1, unit = MINUTES)
             )
         )
         val monitorRunResultNotThrottled = entityAsMap(executeMonitor(monitor.id))
@@ -1320,6 +1323,209 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         )
     }
 
+    fun `test bucket-level monitor with findings enabled on term agg`() {
+        val testIndex = createTestIndex()
+        insertSampleTimeSerializedData(
+            testIndex,
+            listOf(
+                "test_value_1",
+                "test_value_2"
+            )
+        )
+
+        val query = QueryBuilders.rangeQuery("test_strict_date_time")
+            .gt("{{period_end}}||-10d")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
+        val termAgg = TermsAggregationBuilder("test_field").field("test_field")
+        val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(termAgg))
+        val triggerScript = """
+            params.docCount > 0
+        """.trimIndent()
+
+        // For the Actions ensure that there is at least one and any PER_ALERT actions contain ACTIVE, DEDUPED and COMPLETED in its policy
+        // so that the assertions done later in this test don't fail.
+        // The config is being mutated this way to still maintain the randomness in configuration (like including other ActionExecutionScope).
+        val actions = randomActionsForBucketLevelTrigger(min = 1).map {
+            if (it.actionExecutionPolicy?.actionExecutionScope is PerAlertActionScope) {
+                it.copy(
+                    actionExecutionPolicy = ActionExecutionPolicy(
+                        PerAlertActionScope(setOf(AlertCategory.NEW, AlertCategory.DEDUPED, AlertCategory.COMPLETED))
+                    )
+                )
+            } else {
+                it
+            }
+        }
+        var trigger = randomBucketLevelTrigger(actions = actions)
+        trigger = trigger.copy(
+            bucketSelector = BucketSelectorExtAggregationBuilder(
+                name = trigger.id,
+                bucketsPathsMap = mapOf("docCount" to "_count"),
+                script = Script(triggerScript),
+                parentBucketPath = "test_field",
+                filter = null
+            )
+        )
+        val monitor = createMonitor(
+            randomBucketLevelMonitor(
+                inputs = listOf(input),
+                enabled = false,
+                triggers = listOf(trigger),
+                dataSources = DataSources(findingsEnabled = true)
+            )
+        )
+        executeMonitor(monitor.id)
+
+        // Check created Alerts
+        var currentAlerts = searchAlerts(monitor)
+        assertEquals("Alerts not saved", 2, currentAlerts.size)
+        currentAlerts.forEach { alert ->
+            Assert.assertEquals("expected findings for alert", alert.findingIds.size, 1)
+        }
+        val findings = searchFindings(monitor)
+        assertEquals("Findings saved for test monitor", 1, findings.size)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("2"))
+    }
+
+    fun `test bucket-level monitor with findings enabled on composite agg`() {
+        val testIndex = createTestIndex()
+        insertSampleTimeSerializedData(
+            testIndex,
+            listOf(
+                "test_value_1",
+                "test_value_2"
+            )
+        )
+
+        val query = QueryBuilders.rangeQuery("test_strict_date_time")
+            .gt("{{period_end}}||-10d")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
+        val compositeSources = listOf(
+            TermsValuesSourceBuilder("test_field").field("test_field")
+        )
+        val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
+        val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
+        val triggerScript = """
+            params.docCount > 0
+        """.trimIndent()
+
+        // For the Actions ensure that there is at least one and any PER_ALERT actions contain ACTIVE, DEDUPED and COMPLETED in its policy
+        // so that the assertions done later in this test don't fail.
+        // The config is being mutated this way to still maintain the randomness in configuration (like including other ActionExecutionScope).
+        val actions = randomActionsForBucketLevelTrigger(min = 1).map {
+            if (it.actionExecutionPolicy?.actionExecutionScope is PerAlertActionScope) {
+                it.copy(
+                    actionExecutionPolicy = ActionExecutionPolicy(
+                        PerAlertActionScope(setOf(AlertCategory.NEW, AlertCategory.DEDUPED, AlertCategory.COMPLETED))
+                    )
+                )
+            } else {
+                it
+            }
+        }
+        var trigger = randomBucketLevelTrigger(actions = actions)
+        trigger = trigger.copy(
+            bucketSelector = BucketSelectorExtAggregationBuilder(
+                name = trigger.id,
+                bucketsPathsMap = mapOf("docCount" to "_count"),
+                script = Script(triggerScript),
+                parentBucketPath = "composite_agg",
+                filter = null
+            )
+        )
+        val monitor = createMonitor(
+            randomBucketLevelMonitor(
+                inputs = listOf(input),
+                enabled = false,
+                triggers = listOf(trigger),
+                dataSources = DataSources(findingsEnabled = true)
+            )
+        )
+        executeMonitor(monitor.id)
+
+        // Check created Alerts
+        var currentAlerts = searchAlerts(monitor)
+        assertEquals("Alerts not saved", 2, currentAlerts.size)
+        currentAlerts.forEach { alert ->
+            Assert.assertEquals("expected findings for alert", alert.findingIds.size, 1)
+        }
+        val findings = searchFindings(monitor)
+        assertEquals("Findings saved for test monitor", 1, findings.size)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("2"))
+    }
+
+    fun `test bucket-level monitor with findings enabled for multiple group by fields`() {
+        val testIndex = createTestIndex()
+        insertSampleTimeSerializedData(
+            testIndex,
+            listOf(
+                "test_value_1",
+                "test_value_2"
+            )
+        )
+
+        val query = QueryBuilders.rangeQuery("test_strict_date_time")
+            .gt("{{period_end}}||-10d")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
+        val compositeSources = listOf(
+            TermsValuesSourceBuilder("test_field").field("test_field"),
+            TermsValuesSourceBuilder("number").field("number")
+        )
+        val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
+        val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
+        val triggerScript = """
+            params.docCount > 0
+        """.trimIndent()
+
+        // For the Actions ensure that there is at least one and any PER_ALERT actions contain ACTIVE, DEDUPED and COMPLETED in its policy
+        // so that the assertions done later in this test don't fail.
+        // The config is being mutated this way to still maintain the randomness in configuration (like including other ActionExecutionScope).
+        val actions = randomActionsForBucketLevelTrigger(min = 1).map {
+            if (it.actionExecutionPolicy?.actionExecutionScope is PerAlertActionScope) {
+                it.copy(
+                    actionExecutionPolicy = ActionExecutionPolicy(
+                        PerAlertActionScope(setOf(AlertCategory.NEW, AlertCategory.DEDUPED, AlertCategory.COMPLETED))
+                    )
+                )
+            } else {
+                it
+            }
+        }
+        var trigger = randomBucketLevelTrigger(actions = actions)
+        trigger = trigger.copy(
+            bucketSelector = BucketSelectorExtAggregationBuilder(
+                name = trigger.id,
+                bucketsPathsMap = mapOf("docCount" to "_count"),
+                script = Script(triggerScript),
+                parentBucketPath = "composite_agg",
+                filter = null
+            )
+        )
+        val monitor = createMonitor(
+            randomBucketLevelMonitor(
+                inputs = listOf(input),
+                enabled = false,
+                triggers = listOf(trigger),
+                dataSources = DataSources(findingsEnabled = true)
+            )
+        )
+        executeMonitor(monitor.id)
+
+        // Check created Alerts
+        var currentAlerts = searchAlerts(monitor)
+        assertEquals("Alerts not saved", 2, currentAlerts.size)
+        currentAlerts.forEach { alert ->
+            Assert.assertEquals("expected findings for alert", alert.findingIds.size, 0)
+        }
+        val findings = searchFindings(monitor)
+        assertEquals("Findings saved for test monitor", 0, findings.size)
+    }
+
     @Suppress("UNCHECKED_CAST")
     fun `test bucket-level monitor with one good action and one bad action`() {
         val testIndex = createTestIndex()
@@ -1738,7 +1944,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     private fun verifyAlert(
         alert: Alert,
         monitor: Monitor,
-        expectedState: Alert.State = ACTIVE,
+        expectedState: State = ACTIVE,
         expectNotification: Boolean = true
     ) {
         assertNotNull(alert.id)

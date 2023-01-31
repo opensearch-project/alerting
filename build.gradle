@@ -7,10 +7,10 @@ buildscript {
     apply from: 'build-tools/repositories.gradle'
 
     ext {
-        opensearch_version = System.getProperty("opensearch.version", "2.0.1-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "3.0.0-SNAPSHOT")
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
-        // 2.0.1-SNAPSHOT -> 2.0.1.0-SNAPSHOT
+        // 3.0.0-SNAPSHOT -> 3.0.0.0-SNAPSHOT
         version_tokens = opensearch_version.tokenize('-')
         opensearch_build = version_tokens[0] + '.0'
         plugin_no_snapshot = opensearch_build
@@ -88,8 +88,29 @@ allprojects {
         compileKotlin.kotlinOptions.jvmTarget = compileTestKotlin.kotlinOptions.jvmTarget = JavaVersion.VERSION_11
         compileKotlin.dependsOn ktlint
     }
+    tasks.withType(AbstractArchiveTask).configureEach {
+        preserveFileTimestamps = false
+        reproducibleFileOrder = true
+    }
 }
 
 evaluationDependsOnChildren()
 
 check.dependsOn subprojects*.check
+
+// updateVersion: Task to auto increment to the next development iteration
+task updateVersion {
+    onlyIf { System.getProperty('newVersion') }
+    doLast {
+        ext.newVersion = System.getProperty('newVersion')
+        println "Setting version to ${newVersion}."
+        // String tokenization to support -SNAPSHOT
+        ant.replaceregexp(match: opensearch_version.tokenize('-')[0], replace: newVersion.tokenize('-')[0], flags:'g', byline:true) {
+            fileset(dir: projectDir) {
+                // Include the required files that needs to be updated with new Version
+                include(name: "alerting/build.gradle")
+            }
+        }
+        ant.replaceregexp(file:'build.gradle', match: '"opensearch.version", "\\d.*"', replace: '"opensearch.version", "' + newVersion.tokenize('-')[0] + '-SNAPSHOT"', flags:'g', byline:true)
+    }
+}

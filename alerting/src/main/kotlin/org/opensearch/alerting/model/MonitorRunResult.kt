@@ -7,13 +7,14 @@ package org.opensearch.alerting.model
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchException
-import org.opensearch.alerting.alerts.AlertError
-import org.opensearch.alerting.opensearchapi.optionalTimeField
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.io.stream.Writeable
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.commons.alerting.alerts.AlertError
+import org.opensearch.commons.alerting.model.Trigger
+import org.opensearch.commons.alerting.util.optionalTimeField
 import org.opensearch.script.ScriptException
 import java.io.IOException
 import java.time.Instant

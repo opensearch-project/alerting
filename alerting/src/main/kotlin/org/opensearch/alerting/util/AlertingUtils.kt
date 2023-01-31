@@ -6,25 +6,16 @@
 package org.opensearch.alerting.util
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.action.index.IndexRequest
-import org.opensearch.action.index.IndexResponse
-import org.opensearch.action.support.WriteRequest
-import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.MonitorMetadata
-import org.opensearch.alerting.model.action.Action
-import org.opensearch.alerting.model.action.ActionExecutionPolicy
-import org.opensearch.alerting.model.action.ActionExecutionScope
 import org.opensearch.alerting.model.destination.Destination
-import org.opensearch.alerting.opensearchapi.suspendUntil
-import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
-import org.opensearch.client.Client
-import org.opensearch.common.settings.Settings
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentFactory
+import org.opensearch.common.util.concurrent.ThreadContext
+import org.opensearch.commons.alerting.model.AggregationResultBucket
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.action.Action
+import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
+import org.opensearch.commons.alerting.model.action.ActionExecutionScope
+import org.opensearch.commons.alerting.util.isBucketLevelMonitor
 
 private val logger = LogManager.getLogger("AlertingUtils")
 
@@ -50,8 +41,6 @@ fun isValidEmail(email: String): Boolean {
 fun Destination.isAllowed(allowList: List<String>): Boolean = allowList.contains(this.type.value)
 
 fun Destination.isTestAction(): Boolean = this.type == DestinationType.TEST_ACTION
-
-fun Monitor.isBucketLevelMonitor(): Boolean = this.monitorType == Monitor.MonitorType.BUCKET_LEVEL_MONITOR
 
 fun Monitor.isDocLevelMonitor(): Boolean = this.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR
 
@@ -124,12 +113,39 @@ fun defaultToPerExecutionAction(
     return false
 }
 
-suspend fun updateMonitorMetadata(client: Client, settings: Settings, monitorMetadata: MonitorMetadata): IndexResponse {
-    val indexRequest = IndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
-        .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-        .source(monitorMetadata.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-        .id(monitorMetadata.id)
-        .timeout(AlertingSettings.INDEX_TIMEOUT.get(settings))
+/**
+ * Executes the given [block] function on this resource and then closes it down correctly whether an exception
+ * is thrown or not.
+ *
+ * In case if the resource is being closed due to an exception occurred in [block], and the closing also fails with an exception,
+ * the latter is added to the [suppressed][java.lang.Throwable.addSuppressed] exceptions of the former.
+ *
+ * @param block a function to process this [AutoCloseable] resource.
+ * @return the result of [block] function invoked on this resource.
+ */
+inline fun <T : ThreadContext.StoredContext, R> T.use(block: (T) -> R): R {
+    var exception: Throwable? = null
+    try {
+        return block(this)
+    } catch (e: Throwable) {
+        exception = e
+        throw e
+    } finally {
+        closeFinally(exception)
+    }
+}
 
-    return client.suspendUntil { client.index(indexRequest, it) }
+/**
+ * Closes this [AutoCloseable], suppressing possible exception or error thrown by [AutoCloseable.close] function when
+ * it's being closed due to some other [cause] exception occurred.
+ *
+ * The suppressed exception is added to the list of suppressed exceptions of [cause] exception.
+ */
+fun ThreadContext.StoredContext.closeFinally(cause: Throwable?) = when (cause) {
+    null -> close()
+    else -> try {
+        close()
+    } catch (closeException: Throwable) {
+        cause.addSuppressed(closeException)
+    }
 }

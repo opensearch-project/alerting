@@ -7,8 +7,8 @@ package org.opensearch.alerting.core.schedule
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.core.JobRunner
-import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.common.unit.TimeValue
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.threadpool.Scheduler
 import org.opensearch.threadpool.ThreadPool
 import java.time.Duration

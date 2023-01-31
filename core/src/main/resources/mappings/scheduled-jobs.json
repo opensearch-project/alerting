@@ -1,6 +1,6 @@
 {
   "_meta" : {
-    "schema_version": 5
+    "schema_version": 6
   },
   "properties": {
     "monitor": {
@@ -10,6 +10,15 @@
           "type": "integer"
         },
         "name": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "owner": {
           "type": "text",
           "fields": {
             "keyword": {
@@ -113,6 +122,46 @@
                 "query": {
                   "type": "object",
                   "enabled": false
+                }
+              }
+            }
+          }
+        },
+        "data_sources": {
+          "properties": {
+            "alerts_index": {
+              "type": "text",
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "ignore_above": 256
+                }
+              }
+            },
+            "findings_index": {
+              "type": "text",
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "ignore_above": 256
+                }
+              }
+            },
+            "query_index": {
+              "type": "text",
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "ignore_above": 256
+                }
+              }
+            },
+            "query_index_mapping": {
+              "type": "text",
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "ignore_above": 256
                 }
               }
             }
@@ -461,6 +510,10 @@
           }
         },
         "last_run_context": {
+          "type": "object",
+          "enabled": false
+        },
+        "source_to_query_index_mapping": {
           "type": "object",
           "enabled": false
         }

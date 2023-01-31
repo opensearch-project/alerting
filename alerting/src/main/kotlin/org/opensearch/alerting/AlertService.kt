@@ -15,17 +15,10 @@ import org.opensearch.action.delete.DeleteRequest
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.alerting.alerts.AlertError
+import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.model.ActionExecutionResult
 import org.opensearch.alerting.model.ActionRunResult
-import org.opensearch.alerting.model.AggregationResultBucket
-import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.BucketLevelTrigger
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
-import org.opensearch.alerting.model.Trigger
-import org.opensearch.alerting.model.action.AlertCategory
 import org.opensearch.alerting.opensearchapi.firstFailureOrNull
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -42,6 +35,15 @@ import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.alerts.AlertError
+import org.opensearch.commons.alerting.model.ActionExecutionResult
+import org.opensearch.commons.alerting.model.AggregationResultBucket
+import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.DataSources
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.Trigger
+import org.opensearch.commons.alerting.model.action.AlertCategory
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.builder.SearchSourceBuilder
@@ -63,7 +65,7 @@ class AlertService(
 
     suspend fun loadCurrentAlertsForQueryLevelMonitor(monitor: Monitor): Map<Trigger, Alert?> {
         val searchAlertsResponse: SearchResponse = searchAlerts(
-            monitorId = monitor.id,
+            monitor = monitor,
             size = monitor.triggers.size * 2 // We expect there to be only a single in-progress alert so fetch 2 to check
         )
 
@@ -82,7 +84,7 @@ class AlertService(
 
     suspend fun loadCurrentAlertsForBucketLevelMonitor(monitor: Monitor): Map<Trigger, MutableMap<String, Alert>> {
         val searchAlertsResponse: SearchResponse = searchAlerts(
-            monitorId = monitor.id,
+            monitor = monitor,
             // TODO: This should be limited based on a circuit breaker that limits Alerts
             size = MAX_BUCKET_LEVEL_MONITOR_ALERT_SEARCH_COUNT
         )
@@ -235,7 +237,8 @@ class AlertService(
         monitor: Monitor,
         trigger: BucketLevelTrigger,
         currentAlerts: MutableMap<String, Alert>,
-        aggResultBuckets: List<AggregationResultBucket>
+        aggResultBuckets: List<AggregationResultBucket>,
+        findings: List<String>
     ): Map<AlertCategory, List<Alert>> {
         val dedupedAlerts = mutableListOf<Alert>()
         val newAlerts = mutableListOf<Alert>()
@@ -253,9 +256,10 @@ class AlertService(
                 // New Alert
                 val newAlert = Alert(
                     monitor = monitor, trigger = trigger, startTime = currentTime,
-                    lastNotificationTime = null, state = Alert.State.ACTIVE, errorMessage = null,
+                    lastNotificationTime = currentTime, state = Alert.State.ACTIVE, errorMessage = null,
                     errorHistory = mutableListOf(), actionExecutionResults = mutableListOf(),
-                    schemaVersion = IndexUtils.alertIndexSchemaVersion, aggregationResultBucket = aggAlertBucket
+                    schemaVersion = IndexUtils.alertIndexSchemaVersion, aggregationResultBucket = aggAlertBucket,
+                    findingIds = findings
                 )
                 newAlerts.add(newAlert)
             }
@@ -277,7 +281,15 @@ class AlertService(
         } ?: listOf()
     }
 
-    suspend fun saveAlerts(alerts: List<Alert>, retryPolicy: BackoffPolicy, allowUpdatingAcknowledgedAlert: Boolean = false) {
+    suspend fun saveAlerts(
+        dataSources: DataSources,
+        alerts: List<Alert>,
+        retryPolicy: BackoffPolicy,
+        allowUpdatingAcknowledgedAlert: Boolean = false
+    ) {
+        val alertsIndex = dataSources.alertsIndex
+        val alertsHistoryIndex = dataSources.alertsHistoryIndex
+
         var requestsToRetry = alerts.flatMap { alert ->
             // We don't want to set the version when saving alerts because the MonitorRunner has first priority when writing alerts.
             // In the rare event that a user acknowledges an alert between when it's read and when it's written
@@ -286,7 +298,7 @@ class AlertService(
             when (alert.state) {
                 Alert.State.ACTIVE, Alert.State.ERROR -> {
                     listOf<DocWriteRequest<*>>(
-                        IndexRequest(AlertIndices.ALERT_INDEX)
+                        IndexRequest(alertsIndex)
                             .routing(alert.monitorId)
                             .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                             .id(if (alert.id != Alert.NO_ID) alert.id else null)
@@ -297,7 +309,7 @@ class AlertService(
                     // and updated by the MonitorRunner
                     if (allowUpdatingAcknowledgedAlert) {
                         listOf<DocWriteRequest<*>>(
-                            IndexRequest(AlertIndices.ALERT_INDEX)
+                            IndexRequest(alertsIndex)
                                 .routing(alert.monitorId)
                                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                                 .id(if (alert.id != Alert.NO_ID) alert.id else null)
@@ -311,11 +323,11 @@ class AlertService(
                 }
                 Alert.State.COMPLETED -> {
                     listOfNotNull<DocWriteRequest<*>>(
-                        DeleteRequest(AlertIndices.ALERT_INDEX, alert.id)
+                        DeleteRequest(alertsIndex, alert.id)
                             .routing(alert.monitorId),
                         // Only add completed alert to history index if history is enabled
                         if (alertIndices.isAlertHistoryEnabled()) {
-                            IndexRequest(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
+                            IndexRequest(alertsHistoryIndex)
                                 .routing(alert.monitorId)
                                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                                 .id(alert.id)
@@ -344,12 +356,12 @@ class AlertService(
     /**
      * This is a separate method created specifically for saving new Alerts during the Bucket-Level Monitor run.
      * Alerts are saved in two batches during the execution of an Bucket-Level Monitor, once before the Actions are executed
-     * and once afterwards. This method saves Alerts to the [AlertIndices.ALERT_INDEX] but returns the same Alerts with their document IDs.
+     * and once afterwards. This method saves Alerts to the monitor's alertIndex but returns the same Alerts with their document IDs.
      *
      * The Alerts are required with their indexed ID so that when the new Alerts are updated after the Action execution,
      * the ID is available for the index request so that the existing Alert can be updated, instead of creating a duplicate Alert document.
      */
-    suspend fun saveNewAlerts(alerts: List<Alert>, retryPolicy: BackoffPolicy): List<Alert> {
+    suspend fun saveNewAlerts(dataSources: DataSources, alerts: List<Alert>, retryPolicy: BackoffPolicy): List<Alert> {
         val savedAlerts = mutableListOf<Alert>()
         var alertsBeingIndexed = alerts
         var requestsToRetry: MutableList<IndexRequest> = alerts.map { alert ->
@@ -359,7 +371,7 @@ class AlertService(
             if (alert.id != Alert.NO_ID) {
                 throw IllegalStateException("Unexpected attempt to save new alert [$alert] with an existing alert ID [${alert.id}]")
             }
-            IndexRequest(AlertIndices.ALERT_INDEX)
+            IndexRequest(dataSources.alertsIndex)
                 .routing(alert.monitorId)
                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
         }.toMutableList()
@@ -372,7 +384,7 @@ class AlertService(
         // If the index request is to be retried, the Alert is saved separately as well so that its relative ordering is maintained in
         // relation to index request in the retried bulk request for when it eventually succeeds.
         retryPolicy.retry(logger, listOf(RestStatus.TOO_MANY_REQUESTS)) {
-            val bulkRequest = BulkRequest().add(requestsToRetry)
+            val bulkRequest = BulkRequest().add(requestsToRetry).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
             val bulkResponse: BulkResponse = client.suspendUntil { client.bulk(bulkRequest, it) }
             // TODO: This is only used to retrieve the retryCause, could instead fetch it from the bulkResponse iteration below
             val failedResponses = (bulkResponse.items ?: arrayOf()).filter { it.isFailed }
@@ -413,12 +425,15 @@ class AlertService(
     }
 
     /**
-     * Searches for Alerts in the [AlertIndices.ALERT_INDEX].
+     * Searches for Alerts in the monitor's alertIndex.
      *
      * @param monitorId The Monitor to get Alerts for
      * @param size The number of search hits (Alerts) to return
      */
-    private suspend fun searchAlerts(monitorId: String, size: Int): SearchResponse {
+    private suspend fun searchAlerts(monitor: Monitor, size: Int): SearchResponse {
+        val monitorId = monitor.id
+        val alertIndex = monitor.dataSources.alertsIndex
+
         val queryBuilder = QueryBuilders.boolQuery()
             .filter(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, monitorId))
 
@@ -426,7 +441,7 @@ class AlertService(
             .size(size)
             .query(queryBuilder)
 
-        val searchRequest = SearchRequest(AlertIndices.ALERT_INDEX)
+        val searchRequest = SearchRequest(alertIndex)
             .routing(monitorId)
             .source(searchSourceBuilder)
         val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }

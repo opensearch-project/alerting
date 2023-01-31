@@ -14,11 +14,11 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetDestinationsRequest
 import org.opensearch.alerting.action.GetDestinationsResponse
-import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.use
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.Strings
@@ -30,6 +30,7 @@ import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders

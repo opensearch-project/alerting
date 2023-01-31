@@ -6,24 +6,50 @@
 package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.action.bulk.BulkRequest
+import org.opensearch.action.bulk.BulkResponse
+import org.opensearch.action.index.IndexRequest
+import org.opensearch.action.search.SearchRequest
+import org.opensearch.action.search.SearchResponse
+import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.model.ActionRunResult
-import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.BucketLevelTrigger
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.InputRunResults
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.model.action.AlertCategory
-import org.opensearch.alerting.model.action.PerAlertActionScope
-import org.opensearch.alerting.model.action.PerExecutionActionScope
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
+import org.opensearch.alerting.opensearchapi.retry
+import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.alerting.util.getCombinedTriggerRunResult
+import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.ToXContent
+import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.Finding
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.model.action.AlertCategory
+import org.opensearch.commons.alerting.model.action.PerAlertActionScope
+import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
+import org.opensearch.commons.alerting.util.string
+import org.opensearch.index.query.BoolQueryBuilder
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.rest.RestStatus
+import org.opensearch.script.Script
+import org.opensearch.script.ScriptType
+import org.opensearch.script.TemplateScript
+import org.opensearch.search.aggregations.AggregatorFactories
+import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
+import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
+import org.opensearch.search.builder.SearchSourceBuilder
 import java.time.Instant
+import java.util.UUID
 
 object BucketLevelMonitorRunner : MonitorRunner() {
     private val logger = LogManager.getLogger(javaClass)
@@ -44,8 +70,11 @@ object BucketLevelMonitorRunner : MonitorRunner() {
 
         var monitorResult = MonitorRunResult<BucketLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
         val currentAlerts = try {
-            monitorCtx.alertIndices!!.createOrUpdateAlertIndex()
-            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex()
+            monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor.dataSources)
+            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(monitor.dataSources)
+            if (monitor.dataSources.findingsEnabled == true) {
+                monitorCtx.alertIndices!!.createOrUpdateInitialFindingHistoryIndex(monitor.dataSources)
+            }
             monitorCtx.alertService!!.loadCurrentAlertsForBucketLevelMonitor(monitor)
         } catch (e: Exception) {
             // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
@@ -116,11 +145,24 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                  * existing Alerts in a way the user can easily view them since they will have all been moved to the history index.
                  */
                 if (triggerResults[trigger.id]?.error != null) continue
-
+                val findings =
+                    if (monitor.triggers.size == 1 && monitor.dataSources.findingsEnabled == true) {
+                        logger.debug("Creating bucket level findings")
+                        createFindings(
+                            triggerResult,
+                            monitor,
+                            monitorCtx,
+                            periodStart,
+                            periodEnd,
+                            !dryrun && monitor.id != Monitor.NO_ID
+                        )
+                    } else {
+                        emptyList()
+                    }
                 // TODO: Should triggerResult's aggregationResultBucket be a list? If not, getCategorizedAlertsForBucketLevelMonitor can
                 //  be refactored to use a map instead
                 val categorizedAlerts = monitorCtx.alertService!!.getCategorizedAlertsForBucketLevelMonitor(
-                    monitor, trigger, currentAlertsForTrigger, triggerResult.aggregationResultBuckets.values.toList()
+                    monitor, trigger, currentAlertsForTrigger, triggerResult.aggregationResultBuckets.values.toList(), findings
                 ).toMutableMap()
                 val dedupedAlerts = categorizedAlerts.getOrDefault(AlertCategory.DEDUPED, emptyList())
                 var newAlerts = categorizedAlerts.getOrDefault(AlertCategory.NEW, emptyList())
@@ -135,8 +177,10 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                  * will still execute with the Alert information in the ctx but the Alerts may not be visible.
                  */
                 if (!dryrun && monitor.id != Monitor.NO_ID) {
-                    monitorCtx.alertService!!.saveAlerts(dedupedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = true)
-                    newAlerts = monitorCtx.alertService!!.saveNewAlerts(newAlerts, monitorCtx.retryPolicy!!)
+                    monitorCtx.alertService!!.saveAlerts(
+                        monitor.dataSources, dedupedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = true
+                    )
+                    newAlerts = monitorCtx.alertService!!.saveNewAlerts(monitor.dataSources, newAlerts, monitorCtx.retryPolicy!!)
                 }
 
                 // Store deduped and new Alerts to accumulate across pages
@@ -269,9 +313,12 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             // Update Alerts with action execution results (if it's not a test Monitor).
             // ACKNOWLEDGED Alerts should not be saved here since actions are not executed for them.
             if (!dryrun && monitor.id != Monitor.NO_ID) {
-                monitorCtx.alertService!!.saveAlerts(updatedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = false)
+                monitorCtx.alertService!!.saveAlerts(
+                    monitor.dataSources, updatedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = false
+                )
                 // Save any COMPLETED Alerts that were not covered in updatedAlerts
                 monitorCtx.alertService!!.saveAlerts(
+                    monitor.dataSources,
                     completedAlertsToUpdate.toList(),
                     monitorCtx.retryPolicy!!,
                     allowUpdatingAcknowledgedAlert = false
@@ -280,6 +327,135 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         }
 
         return monitorResult.copy(inputResults = firstPageOfInputResults, triggerResults = triggerResults)
+    }
+
+    private suspend fun createFindings(
+        triggerResult: BucketLevelTriggerRunResult,
+        monitor: Monitor,
+        monitorCtx: MonitorRunnerExecutionContext,
+        periodStart: Instant,
+        periodEnd: Instant,
+        shouldCreateFinding: Boolean
+    ): List<String> {
+        monitor.inputs.forEach { input ->
+            if (input is SearchInput) {
+                val bucketValues: Set<String> = triggerResult.aggregationResultBuckets.keys
+                val query = input.query
+                var fieldName = ""
+
+                for (aggFactory in (query.aggregations() as AggregatorFactories.Builder).aggregatorFactories) {
+                    when (aggFactory) {
+                        is CompositeAggregationBuilder -> {
+                            var grouByFields = 0 // if number of fields used to group by > 1 we won't calculate findings
+                            val sources = aggFactory.sources()
+                            for (source in sources) {
+                                if (grouByFields > 0) {
+                                    logger.error("grouByFields > 0. not generating findings for bucket level monitor ${monitor.id}")
+                                    return listOf()
+                                }
+                                grouByFields++
+                                fieldName = source.field()
+                            }
+                        }
+                        is TermsAggregationBuilder -> {
+                            fieldName = aggFactory.field()
+                        }
+                        else -> {
+                            logger.error(
+                                "Bucket level monitor findings supported only for composite and term aggs. Found [{${aggFactory.type}}]"
+                            )
+                            return listOf()
+                        }
+                    }
+                }
+                if (fieldName != "") {
+                    val searchParams = mapOf(
+                        "period_start" to periodStart.toEpochMilli(),
+                        "period_end" to periodEnd.toEpochMilli()
+                    )
+                    val searchSource = monitorCtx.scriptService!!.compile(
+                        Script(
+                            ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
+                            query.toString(), searchParams
+                        ),
+                        TemplateScript.CONTEXT
+                    )
+                        .newInstance(searchParams)
+                        .execute()
+                    val sr = SearchRequest(*input.indices.toTypedArray())
+                    XContentType.JSON.xContent().createParser(monitorCtx.xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource)
+                        .use {
+                            val source = SearchSourceBuilder.fromXContent(it)
+                            val queryBuilder = if (input.query.query() == null) BoolQueryBuilder()
+                            else QueryBuilders.boolQuery().must(source.query())
+                            queryBuilder.filter(QueryBuilders.termsQuery(fieldName, bucketValues))
+                            sr.source().query(queryBuilder)
+                        }
+                    val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(sr, it) }
+                    return createFindingPerIndex(searchResponse, monitor, monitorCtx, shouldCreateFinding)
+                } else {
+                    logger.error("Couldn't resolve groupBy field. Not generating bucket level monitor findings for monitor %${monitor.id}")
+                }
+            }
+        }
+        return listOf()
+    }
+
+    private suspend fun createFindingPerIndex(
+        searchResponse: SearchResponse,
+        monitor: Monitor,
+        monitorCtx: MonitorRunnerExecutionContext,
+        shouldCreateFinding: Boolean
+    ): List<String> {
+        val docIdsByIndexName: MutableMap<String, MutableList<String>> = mutableMapOf()
+        for (hit in searchResponse.hits.hits) {
+            val ids = docIdsByIndexName.getOrDefault(hit.index, mutableListOf())
+            ids.add(hit.id)
+            docIdsByIndexName[hit.index] = ids
+        }
+        val findings = mutableListOf<String>()
+        var requestsToRetry: MutableList<IndexRequest> = mutableListOf()
+        docIdsByIndexName.entries.forEach { it ->
+            run {
+                val finding = Finding(
+                    id = UUID.randomUUID().toString(),
+                    relatedDocIds = it.value,
+                    monitorId = monitor.id,
+                    monitorName = monitor.name,
+                    index = it.key,
+                    timestamp = Instant.now(),
+                    docLevelQueries = listOf()
+                )
+
+                val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
+                logger.debug("Bucket level monitor ${monitor.id} Findings: $findingStr")
+                if (shouldCreateFinding) {
+                    logger.debug("Saving bucket level monitor findings for monitor ${monitor.id}")
+                    val indexRequest = IndexRequest(monitor.dataSources.findingsIndex)
+                        .source(findingStr, XContentType.JSON)
+                        .id(finding.id)
+                        .routing(finding.id)
+                    requestsToRetry.add(indexRequest)
+                }
+                findings.add(finding.id)
+            }
+        }
+        if (requestsToRetry.isEmpty()) return listOf()
+        monitorCtx.retryPolicy!!.retry(logger, listOf(RestStatus.TOO_MANY_REQUESTS)) {
+            val bulkRequest = BulkRequest().add(requestsToRetry).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+            val bulkResponse: BulkResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.bulk(bulkRequest, it) }
+            requestsToRetry = mutableListOf()
+            val findingsBeingRetried = mutableListOf<Alert>()
+            bulkResponse.items.forEach { item ->
+                if (item.isFailed) {
+                    if (item.status() == RestStatus.TOO_MANY_REQUESTS) {
+                        requestsToRetry.add(bulkRequest.requests()[item.itemId] as IndexRequest)
+                        findingsBeingRetried.add(findingsBeingRetried[item.itemId])
+                    }
+                }
+            }
+        }
+        return findings
     }
 
     private fun getActionContextForAlertCategory(

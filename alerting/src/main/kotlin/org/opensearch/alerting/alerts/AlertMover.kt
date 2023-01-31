@@ -13,8 +13,6 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_HISTORY_WRITE_INDEX
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
-import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.client.Client
 import org.opensearch.common.bytes.BytesReference
@@ -25,6 +23,8 @@ import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.index.VersionType
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
@@ -37,11 +37,14 @@ import org.opensearch.search.builder.SearchSourceBuilder
  * 1. Find active alerts:
  *      a. matching monitorId if no monitor is provided (postDelete)
  *      b. matching monitorId and no triggerIds if monitor is provided (postIndex)
- * 2. Move alerts over to [ALERT_HISTORY_WRITE_INDEX] as DELETED
- * 3. Delete alerts from [ALERT_INDEX]
+ * 2. Move alerts over to DataSources.alertsHistoryIndex as DELETED
+ * 3. Delete alerts from monitor's DataSources.alertsIndex
  * 4. Schedule a retry if there were any failures
  */
-suspend fun moveAlerts(client: Client, monitorId: String, monitor: Monitor? = null) {
+suspend fun moveAlerts(client: Client, monitorId: String, monitor: Monitor?) {
+    var alertIndex = monitor?.dataSources?.alertsIndex ?: ALERT_INDEX
+    var alertHistoryIndex = monitor?.dataSources?.alertsHistoryIndex ?: ALERT_HISTORY_WRITE_INDEX
+
     val boolQuery = QueryBuilders.boolQuery()
         .filter(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, monitorId))
 
@@ -53,7 +56,7 @@ suspend fun moveAlerts(client: Client, monitorId: String, monitor: Monitor? = nu
         .query(boolQuery)
         .version(true)
 
-    val activeAlertsRequest = SearchRequest(AlertIndices.ALERT_INDEX)
+    val activeAlertsRequest = SearchRequest(alertIndex)
         .routing(monitorId)
         .source(activeAlertsQuery)
     val response: SearchResponse = client.suspendUntil { search(activeAlertsRequest, it) }
@@ -61,7 +64,7 @@ suspend fun moveAlerts(client: Client, monitorId: String, monitor: Monitor? = nu
     // If no alerts are found, simply return
     if (response.hits.totalHits?.value == 0L) return
     val indexRequests = response.hits.map { hit ->
-        IndexRequest(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
+        IndexRequest(alertHistoryIndex)
             .routing(monitorId)
             .source(
                 Alert.parse(alertContentParser(hit.sourceRef), hit.id, hit.version)
@@ -76,7 +79,7 @@ suspend fun moveAlerts(client: Client, monitorId: String, monitor: Monitor? = nu
     val copyResponse: BulkResponse = client.suspendUntil { bulk(copyRequest, it) }
 
     val deleteRequests = copyResponse.items.filterNot { it.isFailed }.map {
-        DeleteRequest(AlertIndices.ALERT_INDEX, it.id)
+        DeleteRequest(alertIndex, it.id)
             .routing(monitorId)
             .version(it.version)
             .versionType(VersionType.EXTERNAL_GTE)

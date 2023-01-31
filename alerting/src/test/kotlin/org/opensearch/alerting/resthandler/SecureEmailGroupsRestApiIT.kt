@@ -5,10 +5,10 @@
 
 package org.opensearch.alerting.resthandler
 
-import org.apache.http.HttpHeaders
-import org.apache.http.entity.ContentType
-import org.apache.http.entity.StringEntity
-import org.apache.http.message.BasicHeader
+import org.apache.hc.core5.http.ContentType
+import org.apache.hc.core5.http.HttpHeaders
+import org.apache.hc.core5.http.io.entity.StringEntity
+import org.apache.hc.core5.http.message.BasicHeader
 import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
@@ -60,7 +60,10 @@ class SecureEmailGroupsRestApiIT : AlertingRestTestCase() {
 
         if (userClient == null) {
             createUser(user, user, arrayOf())
-            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user).setSocketTimeout(60000).build()
+            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user)
+                .setSocketTimeout(60000)
+                .setConnectionRequestTimeout(180000)
+                .build()
         }
     }
 
@@ -78,7 +81,7 @@ class SecureEmailGroupsRestApiIT : AlertingRestTestCase() {
             user,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
-            TEST_HR_BACKEND_ROLE,
+            listOf(TEST_HR_BACKEND_ROLE),
             getClusterPermissionsFromCustomRole(ALERTING_GET_EMAIL_GROUP_ACCESS)
         )
 
@@ -105,7 +108,7 @@ class SecureEmailGroupsRestApiIT : AlertingRestTestCase() {
             user,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
-            TEST_HR_BACKEND_ROLE,
+            listOf(TEST_HR_BACKEND_ROLE),
             getClusterPermissionsFromCustomRole(ALERTING_SEARCH_EMAIL_GROUP_ACCESS)
         )
 

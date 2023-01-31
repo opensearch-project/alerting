@@ -5,15 +5,12 @@
 
 package org.opensearch.alerting.alerts
 
-import org.apache.http.entity.ContentType.APPLICATION_JSON
-import org.apache.http.entity.StringEntity
+import org.apache.hc.core5.http.ContentType.APPLICATION_JSON
+import org.apache.hc.core5.http.io.entity.StringEntity
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.NEVER_RUN
-import org.opensearch.alerting.core.model.DocLevelMonitorInput
-import org.opensearch.alerting.core.model.DocLevelQuery
-import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.randomDocumentLevelMonitor
 import org.opensearch.alerting.randomDocumentLevelTrigger
@@ -22,6 +19,9 @@ import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent.jsonXContent
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
+import org.opensearch.commons.alerting.model.DocLevelQuery
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.rest.RestStatus
 
 class AlertIndicesIT : AlertingRestTestCase() {
@@ -62,7 +62,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         executeMonitor(createRandomMonitor())
         assertIndexExists(AlertIndices.ALERT_INDEX)
         assertIndexExists(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
-        verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 5)
+        verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 6)
         verifyIndexSchemaVersion(AlertIndices.ALERT_INDEX, 4)
         verifyIndexSchemaVersion(AlertIndices.ALERT_HISTORY_WRITE_INDEX, 4)
     }
@@ -86,7 +86,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
         executeMonitor(trueMonitor.id)
         assertIndexExists(AlertIndices.FINDING_HISTORY_WRITE_INDEX)
-        verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 5)
+        verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 6)
         verifyIndexSchemaVersion(AlertIndices.FINDING_HISTORY_WRITE_INDEX, 1)
     }
 

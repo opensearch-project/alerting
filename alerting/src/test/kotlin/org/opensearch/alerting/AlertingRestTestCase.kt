@@ -5,39 +5,26 @@
 
 package org.opensearch.alerting
 
-import org.apache.http.HttpEntity
-import org.apache.http.HttpHeaders
-import org.apache.http.entity.ContentType
-import org.apache.http.entity.ContentType.APPLICATION_JSON
-import org.apache.http.entity.StringEntity
-import org.apache.http.message.BasicHeader
+import org.apache.hc.core5.http.ContentType
+import org.apache.hc.core5.http.ContentType.APPLICATION_JSON
+import org.apache.hc.core5.http.HttpEntity
+import org.apache.hc.core5.http.HttpHeaders
+import org.apache.hc.core5.http.io.entity.StringEntity
+import org.apache.hc.core5.http.message.BasicHeader
 import org.junit.AfterClass
 import org.junit.rules.DisableOnDebug
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
-import org.opensearch.alerting.action.GetFindingsResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRITE_INDEX
-import org.opensearch.alerting.core.model.DocLevelMonitorInput
-import org.opensearch.alerting.core.model.DocLevelQuery
-import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
-import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.BucketLevelTrigger
-import org.opensearch.alerting.model.DocumentLevelTrigger
-import org.opensearch.alerting.model.Finding
-import org.opensearch.alerting.model.FindingWithDocs
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.CustomWebhook
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.Slack
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
-import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.DestinationType
@@ -60,6 +47,19 @@ import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.common.xcontent.json.JsonXContent.jsonXContent
+import org.opensearch.commons.alerting.action.GetFindingsResponse
+import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
+import org.opensearch.commons.alerting.model.DocLevelQuery
+import org.opensearch.commons.alerting.model.DocumentLevelTrigger
+import org.opensearch.commons.alerting.model.Finding
+import org.opensearch.commons.alerting.model.FindingWithDocs
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.QueryLevelTrigger
+import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.util.string
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.SearchModule
 import java.net.URLEncoder
@@ -74,8 +74,10 @@ import javax.management.MBeanServerInvocationHandler
 import javax.management.ObjectName
 import javax.management.remote.JMXConnectorFactory
 import javax.management.remote.JMXServiceURL
-import kotlin.collections.HashMap
 
+/**
+ * Superclass for tests that interact with an external test cluster using OpenSearch's RestClient
+ */
 abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected val isDebuggingTest = DisableOnDebug(null).isDebugging
@@ -103,10 +105,26 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return entityAsMap(this)
     }
 
-    protected fun createMonitorWithClient(client: RestClient, monitor: Monitor, refresh: Boolean = true): Monitor {
+    private fun createMonitorEntityWithBackendRoles(monitor: Monitor, rbacRoles: List<String>?): HttpEntity {
+        if (rbacRoles == null) {
+            return monitor.toHttpEntity()
+        }
+        val temp = monitor.toJsonString()
+        val toReplace = temp.lastIndexOf("}")
+        val rbacString = rbacRoles.joinToString { "\"$it\"" }
+        val jsonString = temp.substring(0, toReplace) + ", \"rbac_roles\": [$rbacString] }"
+        return StringEntity(jsonString, APPLICATION_JSON)
+    }
+
+    protected fun createMonitorWithClient(
+        client: RestClient,
+        monitor: Monitor,
+        rbacRoles: List<String>? = null,
+        refresh: Boolean = true
+    ): Monitor {
         val response = client.makeRequest(
             "POST", "$ALERTING_BASE_URI?refresh=$refresh", emptyMap(),
-            monitor.toHttpEntity()
+            createMonitorEntityWithBackendRoles(monitor, rbacRoles)
         )
         assertEquals("Unable to create a new monitor", RestStatus.CREATED, response.restStatus())
 
@@ -120,7 +138,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun createMonitor(monitor: Monitor, refresh: Boolean = true): Monitor {
-        return createMonitorWithClient(client(), monitor, refresh)
+        return createMonitorWithClient(client(), monitor, emptyList(), refresh)
     }
 
     protected fun deleteMonitor(monitor: Monitor, refresh: Boolean = true): Response {
@@ -496,6 +514,21 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return getMonitor(monitorId = monitor.id)
     }
 
+    protected fun updateMonitorWithClient(
+        client: RestClient,
+        monitor: Monitor,
+        rbacRoles: List<String> = emptyList(),
+        refresh: Boolean = true
+    ): Monitor {
+        val response = client.makeRequest(
+            "PUT", "${monitor.relativeUrl()}?refresh=$refresh",
+            emptyMap(), createMonitorEntityWithBackendRoles(monitor, rbacRoles)
+        )
+        assertEquals("Unable to update a monitor", RestStatus.OK, response.restStatus())
+        assertUserNull(response.asMap()["monitor"] as Map<String, Any>)
+        return getMonitor(monitorId = monitor.id)
+    }
+
     protected fun getMonitor(monitorId: String, header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")): Monitor {
         val response = client().makeRequest("GET", "$ALERTING_BASE_URI/$monitorId", null, header)
         assertEquals("Unable to get monitor $monitorId", RestStatus.OK, response.restStatus())
@@ -652,7 +685,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun refreshIndex(index: String): Response {
-        val response = client().makeRequest("POST", "/$index/_refresh")
+        val response = client().makeRequest("POST", "/$index/_refresh?expand_wildcards=all")
         assertEquals("Unable to refresh index", RestStatus.OK, response.restStatus())
         return response
     }
@@ -745,7 +778,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             """
                 "properties" : {
                   "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
-                  "test_field" : { "type" : "keyword" }
+                  "test_field" : { "type" : "keyword" },
+                  "number" : { "type" : "keyword" }
                 }
             """.trimIndent()
         )
@@ -832,7 +866,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             val testDoc = """
                 {
                   "test_strict_date_time": "$testTime",
-                  "test_field": "$value"
+                  "test_field": "$value",
+                   "number": "$i"
                 }
             """.trimIndent()
             // Indexing documents with deterministic doc id to allow for easy selected deletion during testing
@@ -1058,7 +1093,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             "PUT", "_cluster/settings",
             emptyMap(),
             StringEntity(
-                XContentFactory.jsonBuilder().startObject().field("persistent")
+                jsonBuilder().startObject().field("persistent")
                     .startObject().field(AlertingSettings.FILTER_BY_BACKEND_ROLES.key, false).endObject()
                     .endObject().string(),
                 ContentType.APPLICATION_JSON
@@ -1082,6 +1117,18 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             "\"backend_roles\": [$broles],\n" +
             "\"attributes\": {\n" +
             "}} "
+        request.setJsonEntity(entity)
+        client().performRequest(request)
+    }
+
+    fun patchUserBackendRoles(name: String, backendRoles: Array<String>) {
+        val request = Request("PATCH", "/_plugins/_security/api/internalusers/$name")
+        val broles = backendRoles.joinToString { "\"$it\"" }
+        var entity = " [{\n" +
+            "\"op\": \"replace\",\n" +
+            "\"path\": \"/backend_roles\",\n" +
+            "\"value\": [$broles]\n" +
+            "}]"
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
@@ -1172,6 +1219,22 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client().performRequest(request)
     }
 
+    fun updateRoleMapping(role: String, users: List<String>, addUser: Boolean) {
+        val request = Request("PATCH", "/_plugins/_security/api/rolesmapping/$role")
+        val usersStr = users.joinToString { it -> "\"$it\"" }
+
+        val op = if (addUser) "add" else "remove"
+
+        val entity = "[{\n" +
+            "  \"op\" : \"$op\",\n" +
+            "  \"path\" : \"/users\",\n" +
+            "  \"value\" : [$usersStr]\n" +
+            "}]"
+
+        request.setJsonEntity(entity)
+        client().performRequest(request)
+    }
+
     fun deleteUser(name: String) {
         client().makeRequest("DELETE", "/_plugins/_security/api/internalusers/$name")
     }
@@ -1200,13 +1263,29 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         user: String,
         index: String,
         role: String,
-        backendRole: String,
+        backendRoles: List<String>,
         clusterPermissions: String?
     ) {
-        createUser(user, user, arrayOf(backendRole))
+        createUser(user, user, backendRoles.toTypedArray())
         createTestIndex(index)
         createCustomIndexRole(role, index, clusterPermissions)
         createUserRolesMapping(role, arrayOf(user))
+    }
+
+    fun createUserWithRoles(
+        user: String,
+        roles: List<String>,
+        backendRoles: List<String>,
+        isExistingRole: Boolean
+    ) {
+        createUser(user, user, backendRoles.toTypedArray())
+        for (role in roles) {
+            if (isExistingRole) {
+                updateRoleMapping(role, listOf(user), true)
+            } else {
+                createUserRolesMapping(role, arrayOf(user))
+            }
+        }
     }
 
     fun createUserWithDocLevelSecurityTestData(

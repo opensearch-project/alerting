@@ -9,11 +9,6 @@ import org.junit.Before
 import org.mockito.Mockito
 import org.opensearch.Version
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.model.AggregationResultBucket
-import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.BucketLevelTrigger
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.action.AlertCategory
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.Client
@@ -23,6 +18,11 @@ import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.commons.alerting.model.AggregationResultBucket
+import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.action.AlertCategory
 import org.opensearch.test.ClusterServiceUtils
 import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.threadpool.ThreadPool
@@ -83,7 +83,9 @@ class AlertServiceTests : OpenSearchTestCase() {
             )
         )
 
-        val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(monitor, trigger, currentAlerts, aggResultBuckets)
+        val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(
+            monitor, trigger, currentAlerts, aggResultBuckets, emptyList()
+        )
         // Completed Alerts are what remains in currentAlerts after categorization
         val completedAlerts = currentAlerts.values.toList()
         assertEquals(listOf<Alert>(), categorizedAlerts[AlertCategory.DEDUPED])
@@ -115,7 +117,9 @@ class AlertServiceTests : OpenSearchTestCase() {
             )
         )
 
-        val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(monitor, trigger, currentAlerts, aggResultBuckets)
+        val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(
+            monitor, trigger, currentAlerts, aggResultBuckets, emptyList()
+        )
         // Completed Alerts are what remains in currentAlerts after categorization
         val completedAlerts = currentAlerts.values.toList()
         assertAlertsExistForBucketKeys(
@@ -142,7 +146,9 @@ class AlertServiceTests : OpenSearchTestCase() {
         )
         val aggResultBuckets = listOf<AggregationResultBucket>()
 
-        val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(monitor, trigger, currentAlerts, aggResultBuckets)
+        val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(
+            monitor, trigger, currentAlerts, aggResultBuckets, emptyList()
+        )
         // Completed Alerts are what remains in currentAlerts after categorization
         val completedAlerts = currentAlerts.values.toList()
         assertEquals(listOf<Alert>(), categorizedAlerts[AlertCategory.DEDUPED])
@@ -174,7 +180,9 @@ class AlertServiceTests : OpenSearchTestCase() {
             )
         )
 
-        val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(monitor, trigger, currentAlerts, aggResultBuckets)
+        val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(
+            monitor, trigger, currentAlerts, aggResultBuckets, emptyList()
+        )
         // Completed Alerts are what remains in currentAlerts after categorization
         val completedAlerts = currentAlerts.values.toList()
         assertAlertsExistForBucketKeys(listOf(listOf("b")), categorizedAlerts[AlertCategory.DEDUPED] ?: error("Deduped alerts not found"))
@@ -198,7 +206,9 @@ class AlertServiceTests : OpenSearchTestCase() {
             )
         )
 
-        val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(monitor, trigger, currentAlerts, aggResultBuckets)
+        val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(
+            monitor, trigger, currentAlerts, aggResultBuckets, emptyList()
+        )
         // Completed Alerts are what remains in currentAlerts after categorization
         val completedAlerts = currentAlerts.values.toList()
         assertAlertsExistForBucketKeys(listOf(listOf("a")), categorizedAlerts[AlertCategory.DEDUPED] ?: error("Deduped alerts not found"))

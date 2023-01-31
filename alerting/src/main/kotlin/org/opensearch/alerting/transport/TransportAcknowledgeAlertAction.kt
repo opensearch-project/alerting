@@ -9,7 +9,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
+import org.opensearch.ResourceNotFoundException
 import org.opensearch.action.ActionListener
+import org.opensearch.action.ActionRequest
 import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.delete.DeleteRequest
@@ -19,15 +21,13 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.update.UpdateRequest
-import org.opensearch.alerting.action.AcknowledgeAlertAction
-import org.opensearch.alerting.action.AcknowledgeAlertRequest
-import org.opensearch.alerting.action.AcknowledgeAlertResponse
-import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.opensearchapi.optionalTimeField
+import org.opensearch.alerting.action.GetMonitorAction
+import org.opensearch.alerting.action.GetMonitorRequest
+import org.opensearch.alerting.action.GetMonitorResponse
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.use
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -39,11 +39,21 @@ import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
+import org.opensearch.commons.alerting.action.AcknowledgeAlertResponse
+import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.util.optionalTimeField
+import org.opensearch.commons.utils.recreateObject
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import java.time.Instant
+import java.util.*
 
 private val log = LogManager.getLogger(TransportAcknowledgeAlertAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
@@ -54,21 +64,53 @@ class TransportAcknowledgeAlertAction @Inject constructor(
     clusterService: ClusterService,
     actionFilters: ActionFilters,
     val settings: Settings,
-    val xContentRegistry: NamedXContentRegistry
-) : HandledTransportAction<AcknowledgeAlertRequest, AcknowledgeAlertResponse>(
-    AcknowledgeAlertAction.NAME, transportService, actionFilters, ::AcknowledgeAlertRequest
+    val xContentRegistry: NamedXContentRegistry,
+    val transportGetMonitorAction: TransportGetMonitorAction
+) : HandledTransportAction<ActionRequest, AcknowledgeAlertResponse>(
+    AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_NAME, transportService, actionFilters, ::AcknowledgeAlertRequest
 ) {
 
-    @Volatile private var isAlertHistoryEnabled = AlertingSettings.ALERT_HISTORY_ENABLED.get(settings)
+    @Volatile
+    private var isAlertHistoryEnabled = AlertingSettings.ALERT_HISTORY_ENABLED.get(settings)
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERT_HISTORY_ENABLED) { isAlertHistoryEnabled = it }
     }
 
-    override fun doExecute(task: Task, request: AcknowledgeAlertRequest, actionListener: ActionListener<AcknowledgeAlertResponse>) {
+    override fun doExecute(
+        task: Task,
+        acknowledgeAlertRequest: ActionRequest,
+        actionListener: ActionListener<AcknowledgeAlertResponse>
+    ) {
+        val request = acknowledgeAlertRequest as? AcknowledgeAlertRequest
+            ?: recreateObject(acknowledgeAlertRequest) { AcknowledgeAlertRequest(it) }
         client.threadPool().threadContext.stashContext().use {
             scope.launch {
-                AcknowledgeHandler(client, actionListener, request).start()
+                val getMonitorResponse: GetMonitorResponse =
+                    transportGetMonitorAction.client.suspendUntil {
+                        val getMonitorRequest = GetMonitorRequest(
+                            monitorId = request.monitorId,
+                            -3L,
+                            RestRequest.Method.GET,
+                            FetchSourceContext.FETCH_SOURCE
+                        )
+                        execute(GetMonitorAction.INSTANCE, getMonitorRequest, it)
+                    }
+                if (getMonitorResponse.monitor == null) {
+                    actionListener.onFailure(
+                        AlertingException.wrap(
+                            ResourceNotFoundException(
+                                String.format(
+                                    Locale.ROOT,
+                                    "No monitor found with id [%s]",
+                                    request.monitorId
+                                )
+                            )
+                        )
+                    )
+                } else {
+                    AcknowledgeHandler(client, actionListener, request).start(getMonitorResponse.monitor!!)
+                }
             }
         }
     }
@@ -80,14 +122,14 @@ class TransportAcknowledgeAlertAction @Inject constructor(
     ) {
         val alerts = mutableMapOf<String, Alert>()
 
-        suspend fun start() = findActiveAlerts()
+        suspend fun start(monitor: Monitor) = findActiveAlerts(monitor)
 
-        private suspend fun findActiveAlerts() {
+        private suspend fun findActiveAlerts(monitor: Monitor) {
             val queryBuilder = QueryBuilders.boolQuery()
                 .filter(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, request.monitorId))
                 .filter(QueryBuilders.termsQuery("_id", request.alertIds))
             val searchRequest = SearchRequest()
-                .indices(AlertIndices.ALERT_INDEX)
+                .indices(monitor.dataSources.alertsIndex)
                 .routing(request.monitorId)
                 .source(
                     SearchSourceBuilder()
@@ -98,13 +140,14 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                 )
             try {
                 val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
-                onSearchResponse(searchResponse)
+                onSearchResponse(searchResponse, monitor)
             } catch (t: Exception) {
                 actionListener.onFailure(AlertingException.wrap(t))
             }
         }
 
-        private suspend fun onSearchResponse(response: SearchResponse) {
+        private suspend fun onSearchResponse(response: SearchResponse, monitor: Monitor) {
+            val alertsHistoryIndex = monitor.dataSources.alertsHistoryIndex
             val updateRequests = mutableListOf<UpdateRequest>()
             val copyRequests = mutableListOf<IndexRequest>()
             response.hits.forEach { hit ->
@@ -117,8 +160,11 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                 alerts[alert.id] = alert
 
                 if (alert.state == Alert.State.ACTIVE) {
-                    if (alert.findingIds.isEmpty() || !isAlertHistoryEnabled) {
-                        val updateRequest = UpdateRequest(AlertIndices.ALERT_INDEX, alert.id)
+                    if (
+                        alert.findingIds.isEmpty() ||
+                        !isAlertHistoryEnabled
+                    ) {
+                        val updateRequest = UpdateRequest(monitor.dataSources.alertsIndex, alert.id)
                             .routing(request.monitorId)
                             .setIfSeqNo(hit.seqNo)
                             .setIfPrimaryTerm(hit.primaryTerm)
@@ -130,7 +176,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                             )
                         updateRequests.add(updateRequest)
                     } else {
-                        val copyRequest = IndexRequest(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
+                        val copyRequest = IndexRequest(alertsHistoryIndex)
                             .routing(request.monitorId)
                             .id(alert.id)
                             .source(
@@ -153,14 +199,14 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                         client.bulk(BulkRequest().add(copyRequests).setRefreshPolicy(request.refreshPolicy), it)
                     }
                 else null
-                onBulkResponse(updateResponse, copyResponse)
+                onBulkResponse(updateResponse, copyResponse, monitor)
             } catch (t: Exception) {
                 log.error("ack error: ${t.message}")
                 actionListener.onFailure(AlertingException.wrap(t))
             }
         }
 
-        private suspend fun onBulkResponse(updateResponse: BulkResponse?, copyResponse: BulkResponse?) {
+        private suspend fun onBulkResponse(updateResponse: BulkResponse?, copyResponse: BulkResponse?, monitor: Monitor) {
             val deleteRequests = mutableListOf<DeleteRequest>()
             val missing = request.alertIds.toMutableSet()
             val acknowledged = mutableListOf<Alert>()
@@ -189,7 +235,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                     log.info("got a failureResponse: ${item.failureMessage}")
                     failed.add(alerts[item.id]!!)
                 } else {
-                    val deleteRequest = DeleteRequest(AlertIndices.ALERT_INDEX, item.id)
+                    val deleteRequest = DeleteRequest(monitor.dataSources.alertsIndex, item.id)
                         .routing(request.monitorId)
                     deleteRequests.add(deleteRequest)
                 }

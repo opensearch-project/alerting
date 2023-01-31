@@ -5,8 +5,8 @@
 
 package org.opensearch.alerting.resthandler
 
-import org.apache.http.HttpHeaders
-import org.apache.http.message.BasicHeader
+import org.apache.hc.core5.http.HttpHeaders
+import org.apache.hc.core5.http.message.BasicHeader
 import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
@@ -49,7 +49,10 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
 
         if (userClient == null) {
             createUser(user, user, arrayOf())
-            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user).setSocketTimeout(60000).build()
+            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user)
+                .setSocketTimeout(60000)
+                .setConnectionRequestTimeout(180000)
+                .build()
         }
     }
 
@@ -139,7 +142,7 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
             user,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
-            TEST_HR_BACKEND_ROLE,
+            listOf(TEST_HR_BACKEND_ROLE),
             getClusterPermissionsFromCustomRole(ALERTING_GET_DESTINATION_ACCESS)
         )
 

@@ -7,13 +7,7 @@ package org.opensearch.alerting.resthandler
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.alerting.action.IndexMonitorAction
-import org.opensearch.alerting.action.IndexMonitorRequest
-import org.opensearch.alerting.action.IndexMonitorResponse
-import org.opensearch.alerting.model.BucketLevelTrigger
-import org.opensearch.alerting.model.DocumentLevelTrigger
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.QueryLevelTrigger
+import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.util.IF_PRIMARY_TERM
 import org.opensearch.alerting.util.IF_SEQ_NO
 import org.opensearch.alerting.util.REFRESH
@@ -21,6 +15,14 @@ import org.opensearch.client.node.NodeClient
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentParser.Token
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
+import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.IndexMonitorRequest
+import org.opensearch.commons.alerting.action.IndexMonitorResponse
+import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.DocumentLevelTrigger
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.QueryLevelTrigger
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
@@ -82,6 +84,9 @@ class RestIndexMonitorAction : BaseRestHandler() {
         val xcp = request.contentParser()
         ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
         val monitor = Monitor.parse(xcp, id).copy(lastUpdateTime = Instant.now())
+        val rbacRoles = request.contentParser().map()["rbac_roles"] as List<String>?
+
+        validateDataSources(monitor)
         val monitorType = monitor.monitorType
         val triggers = monitor.triggers
         when (monitorType) {
@@ -114,10 +119,22 @@ class RestIndexMonitorAction : BaseRestHandler() {
         } else {
             WriteRequest.RefreshPolicy.IMMEDIATE
         }
-        val indexMonitorRequest = IndexMonitorRequest(id, seqNo, primaryTerm, refreshPolicy, request.method(), monitor)
+        val indexMonitorRequest = IndexMonitorRequest(id, seqNo, primaryTerm, refreshPolicy, request.method(), monitor, rbacRoles)
 
         return RestChannelConsumer { channel ->
-            client.execute(IndexMonitorAction.INSTANCE, indexMonitorRequest, indexMonitorResponse(channel, request.method()))
+            client.execute(AlertingActions.INDEX_MONITOR_ACTION_TYPE, indexMonitorRequest, indexMonitorResponse(channel, request.method()))
+        }
+    }
+
+    private fun validateDataSources(monitor: Monitor) { // Data Sources will currently be supported only at transport layer.
+        if (monitor.dataSources != null) {
+            if (
+                monitor.dataSources.queryIndex != ScheduledJob.DOC_LEVEL_QUERIES_INDEX ||
+                monitor.dataSources.findingsIndex != AlertIndices.FINDING_HISTORY_WRITE_INDEX ||
+                monitor.dataSources.alertsIndex != AlertIndices.ALERT_INDEX
+            ) {
+                throw IllegalArgumentException("Custom Data Sources are not allowed.")
+            }
         }
     }
 

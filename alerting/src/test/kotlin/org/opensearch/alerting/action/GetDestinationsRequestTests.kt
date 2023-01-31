@@ -5,9 +5,9 @@
 
 package org.opensearch.alerting.action
 
-import org.opensearch.alerting.model.Table
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.commons.alerting.model.Table
 import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.test.OpenSearchTestCase
 

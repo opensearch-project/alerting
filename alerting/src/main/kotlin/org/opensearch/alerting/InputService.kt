@@ -8,10 +8,7 @@ package org.opensearch.alerting
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.alerting.core.model.ClusterMetricsInput
-import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.model.InputRunResults
-import org.opensearch.alerting.model.Monitor
 import org.opensearch.alerting.model.TriggerAfterKey
 import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -19,6 +16,7 @@ import org.opensearch.alerting.util.AggregationQueryRewriter
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.executeTransportAction
 import org.opensearch.alerting.util.toMap
+import org.opensearch.alerting.util.use
 import org.opensearch.client.Client
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.NamedWriteableAwareStreamInput
@@ -26,6 +24,9 @@ import org.opensearch.common.io.stream.NamedWriteableRegistry
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.ClusterMetricsInput
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
 import org.opensearch.script.ScriptType

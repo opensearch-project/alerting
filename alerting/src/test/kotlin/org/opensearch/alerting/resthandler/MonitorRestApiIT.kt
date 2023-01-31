@@ -4,10 +4,10 @@
  */
 package org.opensearch.alerting.resthandler
 
-import org.apache.http.HttpHeaders
-import org.apache.http.entity.ContentType
-import org.apache.http.message.BasicHeader
-import org.apache.http.nio.entity.NStringEntity
+import org.apache.hc.core5.http.ContentType
+import org.apache.hc.core5.http.HttpHeaders
+import org.apache.hc.core5.http.io.entity.StringEntity
+import org.apache.hc.core5.http.message.BasicHeader
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.ANOMALY_DETECTOR_INDEX
@@ -15,17 +15,8 @@ import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.LEGACY_OPENDISTRO_ALERTING_BASE_URI
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.anomalyDetectorIndexMapping
-import org.opensearch.alerting.core.model.CronSchedule
-import org.opensearch.alerting.core.model.DocLevelMonitorInput
-import org.opensearch.alerting.core.model.DocLevelQuery
-import org.opensearch.alerting.core.model.ScheduledJob
-import org.opensearch.alerting.core.model.SearchInput
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.makeRequest
-import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.DocumentLevelTrigger
-import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.QueryLevelTrigger
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.randomADMonitor
@@ -33,6 +24,7 @@ import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomAlert
 import org.opensearch.alerting.randomAnomalyDetector
 import org.opensearch.alerting.randomAnomalyDetectorWithUser
+import org.opensearch.alerting.randomBucketLevelMonitor
 import org.opensearch.alerting.randomBucketLevelTrigger
 import org.opensearch.alerting.randomDocumentLevelMonitor
 import org.opensearch.alerting.randomDocumentLevelTrigger
@@ -50,6 +42,15 @@ import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.CronSchedule
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
+import org.opensearch.commons.alerting.model.DocLevelQuery
+import org.opensearch.commons.alerting.model.DocumentLevelTrigger
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.QueryLevelTrigger
+import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
@@ -60,6 +61,7 @@ import org.opensearch.test.rest.OpenSearchRestTestCase
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.TimeUnit
 
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
@@ -95,6 +97,21 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     @Throws(Exception::class)
     fun `test creating a monitor`() {
         val monitor = randomQueryLevelMonitor()
+
+        val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+
+        assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
+        val responseBody = createResponse.asMap()
+        val createdId = responseBody["_id"] as String
+        val createdVersion = responseBody["_version"] as Int
+        assertNotEquals("response is missing Id", Monitor.NO_ID, createdId)
+        assertTrue("incorrect version", createdVersion > 0)
+        assertEquals("Incorrect Location header", "$ALERTING_BASE_URI/$createdId", createResponse.getHeader("Location"))
+    }
+
+    @Throws(Exception::class)
+    fun `test creating a bucket monitor`() {
+        val monitor = randomBucketLevelMonitor()
 
         val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
 
@@ -431,7 +448,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val searchResponse = client().makeRequest(
             "GET", "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
@@ -447,7 +464,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val searchResponse = client().makeRequest(
             "POST", "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
@@ -470,7 +487,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             "GET",
             "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
@@ -487,7 +504,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             "GET",
             "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON),
+            StringEntity(search, ContentType.APPLICATION_JSON),
             header
         )
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
@@ -513,7 +530,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             "GET",
             "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
 
@@ -850,14 +867,26 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             updatedMonitor.toHttpEntity()
         )
         assertEquals("Update request not successful", RestStatus.OK, updateResponse.restStatus())
-
-        // Wait 5 seconds for event to be processed and alerts moved
-        Thread.sleep(5000)
-
+        // Wait until postIndex hook is executed due to monitor update
+        waitUntil({
+            val alerts = searchAlerts(monitor)
+            if (alerts.size == 1) {
+                return@waitUntil true
+            }
+            return@waitUntil false
+        }, 60, TimeUnit.SECONDS)
         val alerts = searchAlerts(monitor)
         // We have two alerts from above, 1 for each trigger, there should be only 1 left in active index
         assertEquals("One alert should be in active index", 1, alerts.size)
         assertEquals("Wrong alert in active index", alertKeep.toJsonString(), alerts.single().toJsonString())
+
+        waitUntil({
+            val alerts = searchAlerts(monitor, AlertIndices.ALERT_HISTORY_WRITE_INDEX)
+            if (alerts.size == 1) {
+                return@waitUntil true
+            }
+            return@waitUntil false
+        }, 60, TimeUnit.SECONDS)
 
         val historyAlerts = searchAlerts(monitor, AlertIndices.ALERT_HISTORY_WRITE_INDEX)
         // Only alertDelete should of been moved to history index
@@ -1043,7 +1072,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             "GET",
             "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
@@ -1068,7 +1097,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
                 "GET",
                 "$ALERTING_BASE_URI/_search",
                 params,
-                NStringEntity(search, ContentType.APPLICATION_JSON)
+                StringEntity(search, ContentType.APPLICATION_JSON)
             )
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())

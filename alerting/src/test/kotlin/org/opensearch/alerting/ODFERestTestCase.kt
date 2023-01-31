@@ -5,7 +5,7 @@
 
 package org.opensearch.alerting
 
-import org.apache.http.HttpHost
+import org.apache.hc.core5.http.HttpHost
 import org.junit.After
 import org.opensearch.client.Request
 import org.opensearch.client.RequestOptions
@@ -81,7 +81,7 @@ abstract class ODFERestTestCase : OpenSearchRestTestCase() {
 
         val response = client().performRequest(Request("GET", "/_cat/indices?format=json&expand_wildcards=all"))
 
-        val xContentType = XContentType.fromMediaTypeOrFormat(response.entity.contentType.value)
+        val xContentType = XContentType.fromMediaType(response.entity.contentType)
         xContentType.xContent().createParser(
             NamedXContentRegistry.EMPTY, DeprecationHandler.THROW_UNSUPPORTED_OPERATION,
             response.entity.content
@@ -126,13 +126,19 @@ abstract class ODFERestTestCase : OpenSearchRestTestCase() {
                     // create adminDN (super-admin) client
                     val uri = javaClass.classLoader.getResource("sample.pem").toURI()
                     val configPath = PathUtils.get(uri).parent.toAbsolutePath()
-                    SecureRestClientBuilder(settings, configPath).setSocketTimeout(60000).build()
+                    SecureRestClientBuilder(settings, configPath)
+                        .setSocketTimeout(60000)
+                        .setConnectionRequestTimeout(180000)
+                        .build()
                 }
                 false -> {
                     // create client with passed user
                     val userName = System.getProperty("user")
                     val password = System.getProperty("password")
-                    SecureRestClientBuilder(hosts, isHttps(), userName, password).setSocketTimeout(60000).build()
+                    SecureRestClientBuilder(hosts, isHttps(), userName, password)
+                        .setSocketTimeout(60000)
+                        .setConnectionRequestTimeout(180000)
+                        .build()
                 }
             }
         } else {
