@@ -380,6 +380,103 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Indexed and retrieved monitor differ", monitor, storedMonitor)
     }
 
+    fun `test non-explainable monitor`() {
+        val monitor = createRandomMonitor() // creates query-level monitor
+
+        try {
+            explainMonitor(monitor.id, false)
+            fail("Expected 403 Forbidden status")
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
+        }
+    }
+
+    fun `test monitor explain shard seq_no difference`() {
+        val testIndex = createTestIndex()
+        val testDoc = """{
+            "test_field" : "us-west-2"
+        }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+        assertNotNull(monitor.id)
+
+        var output = entityAsMap(explainMonitor(monitor.id))
+
+        assertEquals("Documents behind miscount", monitor.id, output["_id"])
+        assertEquals("Documents behind miscount", 0, output["documents_behind"])
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex, "5", testDoc)
+
+        output = entityAsMap(explainMonitor(monitor.id))
+
+        assertEquals("Documents behind miscount", monitor.id, output["_id"])
+        assertEquals("Documents behind miscount", 2, output["documents_behind"])
+    }
+
+    fun `test monitor explain shard seq_no and document difference`() {
+        val testIndex = createTestIndex()
+        val testDoc = """{
+            "test_field" : "us-west-2"
+        }"""
+        val updateDoc = """{
+            "doc": {
+                "test_field" : "us-west-3"
+            }
+        }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        updateDoc(testIndex, "1", updateDoc)
+        indexDoc(testIndex, "5", testDoc)
+
+        val responseNoDocDiff = entityAsMap(explainMonitor(monitor.id, false))
+        val responseDocDiff = entityAsMap(explainMonitor(monitor.id, true))
+
+        assertEquals("Documents behind miscount", 3, responseNoDocDiff["documents_behind"])
+        assertEquals("Documents behind miscount", 2, responseDocDiff["documents_behind"])
+    }
+
+    fun `test monitor explain seq_no and doc difference with wildcard index`() {
+        val testIndex = createTestIndex("test1")
+        val testIndex2 = createTestIndex("test2")
+        val testDoc = """{
+            "test_field" : "us-west-2"
+        }"""
+        val updateDoc = """{
+            "doc": {
+                "test_field" : "us-west-3"
+            }
+        }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf("test*"), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        updateDoc(testIndex, "1", updateDoc)
+        indexDoc(testIndex2, "5", testDoc)
+
+        val responseNoDocDiff = entityAsMap(explainMonitor(monitor.id, false))
+        val responseDocDiff = entityAsMap(explainMonitor(monitor.id, true))
+
+        assertEquals("Documents behind miscount", 3, responseNoDocDiff["documents_behind"])
+        assertEquals("Documents behind miscount", 2, responseDocDiff["documents_behind"])
+    }
+
     @Throws(Exception::class)
     fun `test getting a monitor that doesn't exist`() {
         try {

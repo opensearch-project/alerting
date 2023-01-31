@@ -21,6 +21,7 @@ val ALERTING_EXECUTE_MONITOR_ACCESS = "alerting_execute_monitor_access"
 val ALERTING_DELETE_MONITOR_ACCESS = "alerting_delete_monitor_access"
 val ALERTING_GET_DESTINATION_ACCESS = "alerting_get_destination_access"
 val ALERTING_GET_ALERTS_ACCESS = "alerting_get_alerts_access"
+val ALERTING_EXPLAIN_MONITOR_ACCES = "alerting_explain_monitor_access"
 
 val ROLE_TO_PERMISSION_MAPPING = mapOf(
     ALERTING_NO_ACCESS_ROLE to "",
@@ -34,5 +35,6 @@ val ROLE_TO_PERMISSION_MAPPING = mapOf(
     ALERTING_EXECUTE_MONITOR_ACCESS to "cluster:admin/opendistro/alerting/monitor/execute",
     ALERTING_DELETE_MONITOR_ACCESS to "cluster:admin/opendistro/alerting/monitor/delete",
     ALERTING_GET_DESTINATION_ACCESS to "cluster:admin/opendistro/alerting/destination/get",
-    ALERTING_GET_ALERTS_ACCESS to "cluster:admin/opendistro/alerting/alerts/get"
+    ALERTING_GET_ALERTS_ACCESS to "cluster:admin/opendistro/alerting/alerts/get",
+    ALERTING_EXPLAIN_MONITOR_ACCES to "cluster:admin/opendistro/alerting/monitor/explain"
 )
