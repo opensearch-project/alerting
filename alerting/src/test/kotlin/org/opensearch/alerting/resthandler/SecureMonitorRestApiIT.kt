@@ -27,8 +27,8 @@ import org.opensearch.alerting.ALL_ACCESS_ROLE
 import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.DRYRUN_MONITOR
-import org.opensearch.alerting.TERM_DLS_QUERY
 import org.opensearch.alerting.READALL_AND_MONITOR_ROLE
+import org.opensearch.alerting.TERM_DLS_QUERY
 import org.opensearch.alerting.TEST_HR_BACKEND_ROLE
 import org.opensearch.alerting.TEST_HR_INDEX
 import org.opensearch.alerting.TEST_HR_ROLE
@@ -158,7 +158,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
         createUserRolesMapping(ALERTING_READ_ONLY_ACCESS, arrayOf(user))
-
 
         try {
             val monitor = randomQueryLevelMonitor().copy(
@@ -1359,7 +1358,12 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUser(user, user, arrayOf(TEST_HR_BACKEND_ROLE))
         createTestIndex(TEST_HR_INDEX)
-        createIndexRoleWithDocLevelSecurity(TEST_HR_ROLE, TEST_HR_INDEX, TERM_DLS_QUERY, getClusterPermissionsFromCustomRole(ALERTING_INDEX_MONITOR_ACCESS))
+        createIndexRoleWithDocLevelSecurity(
+            TEST_HR_ROLE,
+            TEST_HR_INDEX,
+            TERM_DLS_QUERY,
+            getClusterPermissionsFromCustomRole(ALERTING_INDEX_MONITOR_ACCESS)
+        )
         createUserRolesMapping(TEST_HR_ROLE, arrayOf(user))
 
         // Add a doc that is accessible to the user
@@ -1409,7 +1413,12 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUser(user, user, arrayOf(TEST_HR_BACKEND_ROLE))
         createTestIndex(TEST_HR_INDEX)
-        createIndexRoleWithDocLevelSecurity(TEST_HR_ROLE, TEST_HR_INDEX, TERM_DLS_QUERY, getClusterPermissionsFromCustomRole(ALERTING_INDEX_MONITOR_ACCESS))
+        createIndexRoleWithDocLevelSecurity(
+            TEST_HR_ROLE,
+            TEST_HR_INDEX,
+            TERM_DLS_QUERY,
+            getClusterPermissionsFromCustomRole(ALERTING_INDEX_MONITOR_ACCESS)
+        )
         createUserRolesMapping(TEST_HR_ROLE, arrayOf(user))
 
         // Add a doc that is accessible to the user
