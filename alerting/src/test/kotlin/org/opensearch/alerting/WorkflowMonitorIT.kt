@@ -5,7 +5,11 @@
 
 package org.opensearch.alerting
 
+import org.opensearch.action.admin.indices.refresh.RefreshRequest
+import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.transport.WorkflowSingleNodeTestCase
+import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.DeleteWorkflowRequest
 import org.opensearch.commons.alerting.model.ChainedFindings
 import org.opensearch.commons.alerting.model.CompositeInput
 import org.opensearch.commons.alerting.model.DataSources
@@ -88,7 +92,7 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
         )
     }
 
-    fun `test update workflow success`() {
+    fun `test update workflow add monitor success`() {
         val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery1)
@@ -190,6 +194,183 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
         assertEquals(
             "Delegate3 Chained finding not correct", monitorResponse2.id, delegate3.chainedFindings!!.monitorId
         )
+    }
+
+    fun `test update workflow remove monitor success`() {
+        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(docQuery1)
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customFindingsIndex = "custom_findings_index"
+        val customFindingsIndexPattern = "custom_findings_index-1"
+        val customQueryIndex = "custom_alerts_index"
+        val monitor1 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(
+                queryIndex = customQueryIndex,
+                findingsIndex = customFindingsIndex,
+                findingsIndexPattern = customFindingsIndexPattern
+            )
+        )
+
+        val monitor2 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(
+                queryIndex = customQueryIndex,
+                findingsIndex = customFindingsIndex,
+                findingsIndexPattern = customFindingsIndexPattern
+            )
+        )
+
+        val monitorResponse1 = createMonitor(monitor1)!!
+        val monitorResponse2 = createMonitor(monitor2)!!
+
+        val workflow = randomWorkflowMonitor(
+            monitorIds = listOf(monitorResponse1.id, monitorResponse2.id)
+        )
+
+        val workflowResponse = upsertWorkflow(workflow)!!
+        assertNotNull("Workflow creation failed", workflowResponse)
+        assertNotNull(workflowResponse.workflow)
+        assertNotEquals("response is missing Id", Monitor.NO_ID, workflowResponse.id)
+        assertTrue("incorrect version", workflowResponse.version > 0)
+
+        var workflowById = searchWorkflow(workflowResponse.id)!!
+        assertNotNull(workflowById)
+
+        val updatedWorkflowResponse = upsertWorkflow(
+            randomWorkflowMonitor(
+                monitorIds = listOf(monitorResponse1.id)
+            ),
+            workflowResponse.id,
+            RestRequest.Method.PUT
+        )!!
+
+        assertNotNull("Workflow creation failed", updatedWorkflowResponse)
+        assertNotNull(updatedWorkflowResponse.workflow)
+        assertEquals("Workflow id changed", workflowResponse.id, updatedWorkflowResponse.id)
+        assertTrue("incorrect version", updatedWorkflowResponse.version > 0)
+
+        workflowById = searchWorkflow(updatedWorkflowResponse.id)!!
+
+        // Verify workflow
+        assertNotEquals("response is missing Id", Monitor.NO_ID, workflowById.id)
+        assertTrue("incorrect version", workflowById.version > 0)
+        assertEquals("Workflow name not correct", updatedWorkflowResponse.workflow.name, workflowById.name)
+        assertEquals("Workflow owner not correct", updatedWorkflowResponse.workflow.owner, workflowById.owner)
+        assertEquals("Workflow input not correct", updatedWorkflowResponse.workflow.inputs, workflowById.inputs)
+
+        // Delegate verification
+        val delegates = (workflowById.inputs as List<CompositeInput>)[0].sequence.delegates.sortedBy { it.order }
+        assertEquals("Delegates size not correct", 1, delegates.size)
+
+        val delegate1 = delegates[0]
+        assertNotNull(delegate1)
+        assertEquals("Delegate1 order not correct", 1, delegate1.order)
+        assertEquals("Delegate1 id not correct", monitorResponse1.id, delegate1.monitorId)
+    }
+
+    fun `test get workflow`() {
+        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(docQuery1)
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customFindingsIndex = "custom_findings_index"
+        val customFindingsIndexPattern = "custom_findings_index-1"
+        val customQueryIndex = "custom_alerts_index"
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(
+                queryIndex = customQueryIndex,
+                findingsIndex = customFindingsIndex,
+                findingsIndexPattern = customFindingsIndexPattern
+            )
+        )
+
+        val monitorResponse = createMonitor(monitor)!!
+
+        val workflowRequest = randomWorkflowMonitor(
+            monitorIds = listOf(monitorResponse.id)
+        )
+
+        val workflowResponse = upsertWorkflow(workflowRequest)!!
+        assertNotNull("Workflow creation failed", workflowResponse)
+        assertNotNull(workflowResponse.workflow)
+        assertNotEquals("response is missing Id", Monitor.NO_ID, workflowResponse.id)
+        assertTrue("incorrect version", workflowResponse.version > 0)
+
+        val getWorkflowResponse = getWorkflowById(id = workflowResponse.id)
+        assertNotNull(getWorkflowResponse)
+
+        val workflowById = getWorkflowResponse.workflow!!
+        // Verify workflow
+        assertNotEquals("response is missing Id", Monitor.NO_ID, getWorkflowResponse.id)
+        assertTrue("incorrect version", getWorkflowResponse.version > 0)
+        assertEquals("Workflow name not correct", workflowRequest.name, workflowById.name)
+        assertEquals("Workflow owner not correct", workflowRequest.owner, workflowById.owner)
+        assertEquals("Workflow input not correct", workflowRequest.inputs, workflowById.inputs)
+
+        // Delegate verification
+        val delegates = (workflowById.inputs as List<CompositeInput>)[0].sequence.delegates.sortedBy { it.order }
+        assertEquals("Delegates size not correct", 1, delegates.size)
+
+        val delegate = delegates[0]
+        assertNotNull(delegate)
+        assertEquals("Delegate order not correct", 1, delegate.order)
+        assertEquals("Delegate id not correct", monitorResponse.id, delegate.monitorId)
+    }
+
+    fun `test delete workflow`() {
+        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(docQuery1)
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customFindingsIndex = "custom_findings_index"
+        val customFindingsIndexPattern = "custom_findings_index-1"
+        val customQueryIndex = "custom_alerts_index"
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(
+                queryIndex = customQueryIndex,
+                findingsIndex = customFindingsIndex,
+                findingsIndexPattern = customFindingsIndexPattern
+            )
+        )
+
+        val monitorResponse = createMonitor(monitor)!!
+
+        val workflowRequest = randomWorkflowMonitor(
+            monitorIds = listOf(monitorResponse.id)
+        )
+        val workflowResponse = upsertWorkflow(workflowRequest)!!
+        val workflowId = workflowResponse.id
+        val getWorkflowResponse = getWorkflowById(id = workflowResponse.id)
+
+        assertNotNull(getWorkflowResponse)
+        assertEquals(workflowId, getWorkflowResponse.id)
+
+        client().execute(
+            AlertingActions.DELETE_WORKFLOW_ACTION_TYPE, DeleteWorkflowRequest(workflowId, WriteRequest.RefreshPolicy.IMMEDIATE)
+        ).get()
+        client().admin().indices().refresh(RefreshRequest(customQueryIndex)).get()
+        // Verify that the workflow is deleted
+        try {
+            getWorkflowById(workflowId)
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning IndexWorkflow Action error ",
+                    it.contains("Workflow not found.")
+                )
+            }
+        }
     }
 
     fun `test create workflow without delegate failure`() {

@@ -404,20 +404,37 @@
         "inputs": {
           "type": "nested",
           "properties": {
-            "search": {
+            "sequence": {
               "properties": {
-                "indices": {
-                  "type": "text",
-                  "fields": {
-                    "keyword": {
-                      "type": "keyword",
-                      "ignore_above": 256
+                "delegates": {
+                  "type": "nested",
+                  "properties": {
+                    "order": {
+                      "type": "integer"
+                    },
+                    "monitorId": {
+                      "type": "text",
+                      "fields": {
+                        "keyword": {
+                          "type": "keyword",
+                          "ignore_above": 256
+                        }
+                      }
+                    },
+                    "chainedFindings": {
+                      "properties": {
+                        "monitorId": {
+                          "type": "text",
+                          "fields": {
+                            "keyword": {
+                              "type": "keyword",
+                              "ignore_above": 256
+                            }
+                          }
+                        }
+                      }
                     }
                   }
-                },
-                "query": {
-                  "type": "object",
-                  "enabled": false
                 }
               }
             }

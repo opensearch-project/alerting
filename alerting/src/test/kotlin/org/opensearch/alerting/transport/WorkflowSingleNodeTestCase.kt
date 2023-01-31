@@ -9,6 +9,8 @@ import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.GetWorkflowRequest
+import org.opensearch.commons.alerting.action.GetWorkflowResponse
 import org.opensearch.commons.alerting.action.IndexWorkflowRequest
 import org.opensearch.commons.alerting.action.IndexWorkflowResponse
 import org.opensearch.commons.alerting.model.ScheduledJob
@@ -17,6 +19,8 @@ import org.opensearch.index.query.TermQueryBuilder
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.search.fetch.subphase.FetchSourceContext
+
 /**
  * A test that keep a singleton node started for all tests that can be used to get
  * references to Guice injectors in unit tests.
@@ -54,5 +58,13 @@ abstract class WorkflowSingleNodeTestCase : AlertingSingleNodeTestCase() {
         )
 
         return client().execute(AlertingActions.INDEX_WORKFLOW_ACTION_TYPE, request).actionGet()
+    }
+
+    protected fun getWorkflowById(
+        id: String,
+        version: Long = 1L,
+        fetchSourceContext: FetchSourceContext = FetchSourceContext.FETCH_SOURCE
+    ): GetWorkflowResponse {
+        return client().execute(AlertingActions.GET_WORKFLOW_ACTION_TYPE, GetWorkflowRequest(id, version, RestRequest.Method.GET, fetchSourceContext)).get()
     }
 }
