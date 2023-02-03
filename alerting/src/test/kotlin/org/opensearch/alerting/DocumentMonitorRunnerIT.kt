@@ -236,6 +236,8 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             }
         }
 
+        refreshAllIndices()
+
         val alerts = searchAlertsWithFilter(monitor)
         assertEquals("Alert saved for test monitor", 2, alerts.size)
 

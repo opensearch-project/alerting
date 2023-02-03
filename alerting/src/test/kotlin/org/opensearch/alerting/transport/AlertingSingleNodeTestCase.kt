@@ -6,10 +6,12 @@
 package org.opensearch.alerting.transport
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope
+import org.opensearch.action.admin.indices.get.GetIndexRequest
 import org.opensearch.action.admin.indices.get.GetIndexRequestBuilder
 import org.opensearch.action.admin.indices.get.GetIndexResponse
 import org.opensearch.action.admin.indices.refresh.RefreshAction
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
+import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.ExecuteMonitorAction
@@ -66,7 +68,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         return getIndexResponse.indices().toList()
     }
 
-    protected fun executeMonitor(monitor: Monitor, id: String, dryRun: Boolean = true): ExecuteMonitorResponse? {
+    protected fun executeMonitor(monitor: Monitor, id: String?, dryRun: Boolean = true): ExecuteMonitorResponse? {
         val request = ExecuteMonitorRequest(dryRun, TimeValue(Instant.now().toEpochMilli()), id, monitor)
         return client().execute(ExecuteMonitorAction.INSTANCE, request).get()
     }
@@ -87,6 +89,22 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     protected fun indexDoc(index: String, id: String, doc: String) {
         client().prepareIndex(index).setId(id)
             .setSource(doc, XContentType.JSON).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE).get()
+    }
+
+    protected fun assertIndexExists(index: String) {
+        val getIndexResponse =
+            client().admin().indices().getIndex(
+                GetIndexRequest().indices(index).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN)
+            ).get()
+        assertTrue(getIndexResponse.indices.size > 0)
+    }
+
+    protected fun assertIndexNotExists(index: String) {
+        val getIndexResponse =
+            client().admin().indices().getIndex(
+                GetIndexRequest().indices(index).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN)
+            ).get()
+        assertFalse(getIndexResponse.indices.size > 0)
     }
 
     protected fun createMonitor(monitor: Monitor): IndexMonitorResponse? {
