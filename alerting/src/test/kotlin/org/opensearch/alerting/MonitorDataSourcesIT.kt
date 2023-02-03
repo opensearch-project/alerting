@@ -19,6 +19,7 @@ import org.opensearch.alerting.action.SearchMonitorAction
 import org.opensearch.alerting.action.SearchMonitorRequest
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.ScheduledJobIndices
+import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.transport.AlertingSingleNodeTestCase
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.XContentType
@@ -339,6 +340,47 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals("Findings saved for test monitor", 1, findings.size)
         assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("2"))
         assertEquals("Didn't match all 4 queries", 1, findings[0].docLevelQueries.size)
+    }
+
+    fun `test execute monitor without create when no monitors exists`() {
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customQueryIndex = "custom_alerts_index"
+        val analyzer = "whitespace"
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(
+                queryIndex = customQueryIndex,
+                queryIndexMappingsByType = mapOf(Pair("text", mapOf(Pair("analyzer", analyzer)))),
+            )
+        )
+        var executeMonitorResponse = executeMonitor(monitor, null)
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        assertIndexNotExists(SCHEDULED_JOBS_INDEX)
+
+        val createMonitorResponse = createMonitor(monitor)
+
+        assertIndexExists(SCHEDULED_JOBS_INDEX)
+
+        indexDoc(index, "1", testDoc)
+
+        executeMonitorResponse = executeMonitor(monitor, createMonitorResponse?.id, dryRun = false)
+
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        Assert.assertEquals(
+            (executeMonitorResponse.monitorRunResult.triggerResults.iterator().next().value as DocumentLevelTriggerRunResult)
+                .triggeredDocs.size,
+            1
+        )
     }
 
     fun `test execute monitor with custom query index and custom field mappings`() {

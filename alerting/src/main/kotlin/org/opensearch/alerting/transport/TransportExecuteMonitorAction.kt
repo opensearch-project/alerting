@@ -131,7 +131,7 @@ class TransportExecuteMonitorAction @Inject constructor(
                                 docLevelMonitorQueries.initDocLevelQueryIndex(monitor.dataSources)
                                 log.info("Central Percolation index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX} created")
                             }
-                            val (metadata, _) = MonitorMetadataService.getOrCreateMetadata(monitor)
+                            val (metadata, _) = MonitorMetadataService.getOrCreateMetadata(monitor, skipIndex = true)
                             docLevelMonitorQueries.indexDocLevelQueries(
                                 monitor,
                                 monitor.id,
