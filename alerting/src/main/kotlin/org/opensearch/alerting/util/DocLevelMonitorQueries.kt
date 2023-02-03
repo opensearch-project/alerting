@@ -18,6 +18,9 @@ import org.opensearch.action.admin.indices.get.GetIndexResponse
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.admin.indices.rollover.RolloverRequest
 import org.opensearch.action.admin.indices.rollover.RolloverResponse
+import org.opensearch.action.admin.indices.settings.get.GetSettingsRequest
+import org.opensearch.action.admin.indices.settings.get.GetSettingsResponse
+import org.opensearch.action.admin.indices.settings.put.UpdateSettingsRequest
 import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.index.IndexRequest
@@ -29,11 +32,13 @@ import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
+import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.index.mapper.MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING
 import org.opensearch.rest.RestStatus
 
 private val log = LogManager.getLogger(DocLevelMonitorQueries::class.java)
@@ -45,9 +50,16 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         const val NESTED = "nested"
         const val TYPE = "type"
         const val INDEX_PATTERN_SUFFIX = "-000001"
+        const val QUERY_INDEX_BASE_FIELDS_COUNT = 8 // 3 fields we defined and 5 builtin additional metadata fields
         @JvmStatic
         fun docLevelQueriesMappings(): String {
             return DocLevelMonitorQueries::class.java.classLoader.getResource("mappings/doc-level-queries.json").readText()
+        }
+        fun docLevelQueriesSettings(): Settings {
+            return Settings.builder().loadFromSource(
+                DocLevelMonitorQueries::class.java.classLoader.getResource("settings/doc-level-queries.json").readText(),
+                XContentType.JSON
+            ).build()
         }
     }
 
@@ -70,10 +82,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             val indexRequest = CreateIndexRequest(indexPattern)
                 .mapping(docLevelQueriesMappings())
                 .alias(Alias(alias))
-                .settings(
-                    Settings.builder().put("index.hidden", true)
-                        .build()
-                )
+                .settings(docLevelQueriesSettings())
             return try {
                 val createIndexResponse: CreateIndexResponse = client.suspendUntil { client.admin().indices().create(indexRequest, it) }
                 createIndexResponse.isAcknowledged
@@ -321,6 +330,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         updateMappingRequest.source(mapOf<String, Any>("properties" to updatedProperties))
         var updateMappingResponse = AcknowledgedResponse(false)
         try {
+            // Adjust max field limit in mappings for query index, if needed.
+            checkAndAdjustMaxFieldLimit(sourceIndex, targetQueryIndex)
             updateMappingResponse = client.suspendUntil {
                 client.admin().indices().putMapping(updateMappingRequest, it)
             }
@@ -331,7 +342,10 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             // If we reached limit for total number of fields in mappings, do a rollover here
             if (unwrappedException.message?.contains("Limit of total fields") == true) {
                 try {
+                    // Do queryIndex rollover
                     targetQueryIndex = rolloverQueryIndex(monitor)
+                    // Adjust max field limit in mappings for new index.
+                    checkAndAdjustMaxFieldLimit(sourceIndex, targetQueryIndex)
                     // PUT mappings to newly created index
                     val updateMappingRequest = PutMappingRequest(targetQueryIndex)
                     updateMappingRequest.source(mapOf<String, Any>("properties" to updatedProperties))
@@ -371,14 +385,41 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         return Pair(updateMappingResponse, targetQueryIndex)
     }
 
-    private suspend fun rolloverQueryIndex(monitor: Monitor): String? {
+    /**
+     * Adjusts max field limit index setting for query index if source index has higher limit.
+     * This will prevent max field limit exception, when applying mappings to query index
+     */
+    private suspend fun checkAndAdjustMaxFieldLimit(sourceIndex: String, concreteQueryIndex: String) {
+        val getSettingsResponse: GetSettingsResponse = client.suspendUntil {
+            admin().indices().getSettings(GetSettingsRequest().indices(sourceIndex, concreteQueryIndex), it)
+        }
+        val sourceIndexLimit =
+            getSettingsResponse.getSetting(sourceIndex, INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.key)?.toLong() ?: 1000L
+        val queryIndexLimit =
+            getSettingsResponse.getSetting(concreteQueryIndex, INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.key)?.toLong() ?: 1000L
+        // Our query index initially has 3 fields we defined and 5 more builtin metadata fields in mappings so we have to account for that
+        if (sourceIndexLimit > (queryIndexLimit - QUERY_INDEX_BASE_FIELDS_COUNT)) {
+            val updateSettingsResponse: AcknowledgedResponse = client.suspendUntil {
+                admin().indices().updateSettings(
+                    UpdateSettingsRequest(concreteQueryIndex).settings(
+                        Settings.builder().put(
+                            INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.key, sourceIndexLimit + QUERY_INDEX_BASE_FIELDS_COUNT
+                        )
+                    ),
+                    it
+                )
+            }
+        }
+    }
+
+    private suspend fun rolloverQueryIndex(monitor: Monitor): String {
         val queryIndex = monitor.dataSources.queryIndex
         val queryIndexPattern = monitor.dataSources.queryIndex + INDEX_PATTERN_SUFFIX
 
         val request = RolloverRequest(queryIndex, null)
         request.createIndexRequest.index(queryIndexPattern)
             .mapping(docLevelQueriesMappings())
-            .settings(Settings.builder().put("index.hidden", true).build())
+            .settings(docLevelQueriesSettings())
         val response: RolloverResponse = client.suspendUntil {
             client.admin().indices().rolloverIndex(request, it)
         }
