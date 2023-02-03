@@ -1145,7 +1145,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val testSourceIndex1 = "test_source_index1"
         val testSourceIndex2 = "test_source_index2"
         createIndex(testSourceIndex1, Settings.builder().put("index.mapping.total_fields.limit", "10000").build())
-        createIndex(testSourceIndex2, Settings.builder().put("index.mapping.total_fields.limit", "30000").build())
+        createIndex(testSourceIndex2, Settings.builder().put("index.mapping.total_fields.limit", "10000").build())
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex1), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
