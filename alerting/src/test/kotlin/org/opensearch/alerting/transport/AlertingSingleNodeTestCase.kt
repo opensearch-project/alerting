@@ -6,6 +6,7 @@
 package org.opensearch.alerting.transport
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope
+import org.opensearch.action.admin.indices.alias.get.GetAliasesRequest
 import org.opensearch.action.admin.indices.get.GetIndexRequest
 import org.opensearch.action.admin.indices.get.GetIndexRequestBuilder
 import org.opensearch.action.admin.indices.get.GetIndexResponse
@@ -14,6 +15,8 @@ import org.opensearch.action.admin.indices.refresh.RefreshRequest
 import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.action.DeleteMonitorAction
+import org.opensearch.alerting.action.DeleteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorResponse
@@ -107,6 +110,18 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         assertFalse(getIndexResponse.indices.size > 0)
     }
 
+    protected fun assertAliasExists(alias: String) {
+        val aliasesResponse = client().admin().indices().getAliases(GetAliasesRequest()).get()
+        val foundAlias = aliasesResponse.aliases.values().forEach {
+            it.value.forEach {
+                if (it.alias == alias) {
+                    return
+                }
+            }
+        }
+        fail("alias doesn't exists, but it should")
+    }
+
     protected fun createMonitor(monitor: Monitor): IndexMonitorResponse? {
         val request = IndexMonitorRequest(
             monitorId = Monitor.NO_ID,
@@ -129,6 +144,13 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
             monitor = monitor
         )
         return client().execute(IndexMonitorAction.INSTANCE, request).actionGet()
+    }
+
+    protected fun deleteMonitor(monitorId: String): Boolean {
+        client().execute(
+            DeleteMonitorAction.INSTANCE, DeleteMonitorRequest(monitorId, WriteRequest.RefreshPolicy.IMMEDIATE)
+        ).get()
+        return true
     }
 
     protected fun searchAlerts(id: String, indices: String = AlertIndices.ALERT_INDEX, refresh: Boolean = true): List<Alert> {
