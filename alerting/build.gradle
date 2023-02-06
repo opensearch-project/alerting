@@ -257,7 +257,7 @@ String bwcRemoteFile = 'https://ci.opensearch.org/ci/dbc/bundle-build/1.1.0/2021
     testClusters {
         "${baseName}$i" {
             testDistribution = "ARCHIVE"
-            versions = ["1.1.0", "2.3.0-SNAPSHOT"]
+            versions = ["1.1.0", "2.3.1-SNAPSHOT"]
             numberOfNodes = 3
             plugin(provider(new Callable<RegularFile>(){
                 @Override
