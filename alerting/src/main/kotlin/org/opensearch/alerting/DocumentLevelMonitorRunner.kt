@@ -105,9 +105,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         val docsToQueries = mutableMapOf<String, MutableList<String>>()
 
         try {
-            if (docLevelMonitorInput.indices.isEmpty()) {
-                throw IllegalArgumentException("DocLevelMonitorInput has no indices")
-            }
             // Resolve all passed indices to concrete indices
             val indices = IndexUtils.resolveAllIndices(
                 docLevelMonitorInput.indices,
