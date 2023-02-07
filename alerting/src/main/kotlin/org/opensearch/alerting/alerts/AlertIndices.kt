@@ -6,6 +6,7 @@
 package org.opensearch.alerting.alerts
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.ExceptionsHelper
 import org.opensearch.ResourceAlreadyExistsException
 import org.opensearch.action.ActionListener
 import org.opensearch.action.admin.cluster.state.ClusterStateRequest
@@ -357,8 +358,12 @@ class AlertIndices(
         return try {
             val createIndexResponse: CreateIndexResponse = client.admin().indices().suspendUntil { create(request, it) }
             createIndexResponse.isAcknowledged
-        } catch (e: ResourceAlreadyExistsException) {
-            true
+        } catch (t: Exception) {
+            if (ExceptionsHelper.unwrapCause(t) is ResourceAlreadyExistsException) {
+                true
+            } else {
+                throw t
+            }
         }
     }
 

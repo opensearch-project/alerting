@@ -13,6 +13,7 @@ import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.client.Client
+import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
@@ -25,6 +26,7 @@ data class MonitorRunnerExecutionContext(
     var clusterService: ClusterService? = null,
     var client: Client? = null,
     var xContentRegistry: NamedXContentRegistry? = null,
+    var indexNameExpressionResolver: IndexNameExpressionResolver? = null,
     var scriptService: ScriptService? = null,
     var settings: Settings? = null,
     var threadPool: ThreadPool? = null,
