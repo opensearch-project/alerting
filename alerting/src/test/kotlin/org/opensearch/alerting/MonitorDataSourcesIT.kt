@@ -21,6 +21,7 @@ import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.transport.AlertingSingleNodeTestCase
+import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
@@ -35,6 +36,7 @@ import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.DOC_LEVEL_QUERIES_INDEX
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.model.Table
+import org.opensearch.index.mapper.MapperService
 import org.opensearch.index.query.MatchQueryBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
@@ -989,7 +991,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     fun `test queryIndex rollover and delete monitor success`() {
 
         val testSourceIndex = "test_source_index"
-        createIndex(testSourceIndex, Settings.EMPTY)
+        createIndex(testSourceIndex, Settings.builder().put("index.mapping.total_fields.limit", "10000").build())
 
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex), listOf(docQuery))
@@ -1001,7 +1003,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         // This doc should create close to 1000 (limit) fields in index mapping. It's easier to add mappings like this then via api
         val docPayload: StringBuilder = StringBuilder(100000)
         docPayload.append("{")
-        for (i in 1..330) {
+        for (i in 1..3300) {
             docPayload.append(""" "id$i.somefield.somefield$i":$i,""")
         }
         docPayload.append("\"test_field\" : \"us-west-2\" }")
@@ -1178,16 +1180,16 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     /**
-     * 1. Create monitor with input source_index with 900 fields in mappings - can fit 1 in queryIndex
-     * 2. Update monitor and change input source_index to a new one with 900 fields in mappings
+     * 1. Create monitor with input source_index with 9000 fields in mappings - can fit 1 in queryIndex
+     * 2. Update monitor and change input source_index to a new one with 9000 fields in mappings
      * 3. Expect queryIndex rollover resulting in 2 backing indices
      * 4. Delete monitor and expect that all backing indices are deleted
      * */
     fun `test updating monitor no execution queryIndex rolling over`() {
         val testSourceIndex1 = "test_source_index1"
         val testSourceIndex2 = "test_source_index2"
-        createIndex(testSourceIndex1, Settings.EMPTY)
-        createIndex(testSourceIndex2, Settings.EMPTY)
+        createIndex(testSourceIndex1, Settings.builder().put("index.mapping.total_fields.limit", "10000").build())
+        createIndex(testSourceIndex2, Settings.builder().put("index.mapping.total_fields.limit", "10000").build())
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex1), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
@@ -1195,10 +1197,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             inputs = listOf(docLevelInput),
             triggers = listOf(trigger)
         )
-        // This doc should create close to 1000 (limit) fields in index mapping. It's easier to add mappings like this then via api
+        // This doc should create close to 10000 (limit) fields in index mapping. It's easier to add mappings like this then via api
         val docPayload: StringBuilder = StringBuilder(100000)
         docPayload.append("{")
-        for (i in 1..899) {
+        for (i in 1..9000) {
             docPayload.append(""" "id$i":$i,""")
         }
         docPayload.append("\"test_field\" : \"us-west-2\" }")
@@ -1225,6 +1227,48 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals(2, getIndexResponse.indices.size)
 
         deleteMonitor(updatedMonitor.id)
+        waitUntil {
+            getIndexResponse =
+                client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+            return@waitUntil getIndexResponse.indices.isEmpty()
+        }
+        assertEquals(0, getIndexResponse.indices.size)
+    }
+
+    fun `test queryIndex gets increased max fields in mappings`() {
+        val testSourceIndex = "test_source_index"
+        createIndex(testSourceIndex, Settings.builder().put("index.mapping.total_fields.limit", "10000").build())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+        // This doc should create 12000 fields in index mapping. It's easier to add mappings like this then via api
+        val docPayload: StringBuilder = StringBuilder(100000)
+        docPayload.append("{")
+        for (i in 1..9998) {
+            docPayload.append(""" "id$i":$i,""")
+        }
+        docPayload.append("\"test_field\" : \"us-west-2\" }")
+        // Indexing docs here as an easier means to set index mappings
+        indexDoc(testSourceIndex, "1", docPayload.toString())
+        // Create monitor
+        var monitorResponse = createMonitor(monitor)
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+
+        // Expect queryIndex to rollover after setting new source_index with close to limit amount of fields in mappings
+        var getIndexResponse: GetIndexResponse =
+            client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+        assertEquals(1, getIndexResponse.indices.size)
+        val field_max_limit = getIndexResponse
+            .getSetting(DOC_LEVEL_QUERIES_INDEX + "-000001", MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.key).toInt()
+
+        assertEquals(10000 + DocLevelMonitorQueries.QUERY_INDEX_BASE_FIELDS_COUNT, field_max_limit)
+
+        deleteMonitor(monitorResponse.id)
         waitUntil {
             getIndexResponse =
                 client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
