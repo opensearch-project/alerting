@@ -54,7 +54,7 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.BitDocIdSet;
 import org.apache.lucene.util.BitSet;
 import org.apache.lucene.util.BytesRef;
-import org.opensearch.common.SetOnce;
+import org.apache.lucene.util.SetOnce;
 import org.opensearch.OpenSearchException;
 import org.opensearch.ResourceNotFoundException;
 import org.opensearch.Version;
