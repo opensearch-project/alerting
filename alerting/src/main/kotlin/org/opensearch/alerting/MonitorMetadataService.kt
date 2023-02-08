@@ -110,7 +110,11 @@ object MonitorMetadataService :
         }
     }
 
-    suspend fun getOrCreateMetadata(monitor: Monitor, createWithRunContext: Boolean = true): Pair<MonitorMetadata, Boolean> {
+    suspend fun getOrCreateMetadata(
+        monitor: Monitor,
+        createWithRunContext: Boolean = true,
+        skipIndex: Boolean = false
+    ): Pair<MonitorMetadata, Boolean> {
         try {
             val created = true
             val metadata = getMetadata(monitor)
@@ -118,7 +122,11 @@ object MonitorMetadataService :
                 metadata to !created
             } else {
                 val newMetadata = createNewMetadata(monitor, createWithRunContext = createWithRunContext)
-                upsertMetadata(newMetadata, updating = false) to created
+                if (skipIndex) {
+                    newMetadata to created
+                } else {
+                    upsertMetadata(newMetadata, updating = false) to created
+                }
             }
         } catch (e: Exception) {
             throw AlertingException.wrap(e)
