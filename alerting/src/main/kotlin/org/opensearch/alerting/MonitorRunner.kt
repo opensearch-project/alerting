@@ -23,7 +23,6 @@ import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
 import org.opensearch.alerting.util.destinationmigration.NotificationActionConfigs
 import org.opensearch.alerting.util.destinationmigration.NotificationApiUtils.Companion.getNotificationConfigInfo
-import org.opensearch.alerting.util.destinationmigration.createMessageContent
 import org.opensearch.alerting.util.destinationmigration.getTitle
 import org.opensearch.alerting.util.destinationmigration.publishLegacyNotification
 import org.opensearch.alerting.util.destinationmigration.sendNotification
@@ -110,7 +109,7 @@ abstract class MonitorRunner {
             ?.sendNotification(
                 monitorCtx.client!!,
                 config.channel.getTitle(subject),
-                config.channel.createMessageContent(subject, message)
+                message
             ) ?: actionResponseContent
 
         actionResponseContent = config.destination
