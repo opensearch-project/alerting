@@ -15,7 +15,6 @@ import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.util.use
 import org.opensearch.client.Client
 import org.opensearch.client.node.NodeClient
-import org.opensearch.common.Strings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.destination.message.LegacyBaseMessage
@@ -28,7 +27,6 @@ import org.opensearch.commons.notifications.action.LegacyPublishNotificationRequ
 import org.opensearch.commons.notifications.action.LegacyPublishNotificationResponse
 import org.opensearch.commons.notifications.action.SendNotificationResponse
 import org.opensearch.commons.notifications.model.ChannelMessage
-import org.opensearch.commons.notifications.model.ConfigType
 import org.opensearch.commons.notifications.model.EventSource
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import org.opensearch.commons.notifications.model.SeverityType
@@ -139,33 +137,11 @@ suspend fun NotificationConfigInfo.sendNotification(client: Client, title: Strin
 }
 
 /**
- * For most channel types, a placeholder Alerting title will be used but the email channel/SNS notification will
- * use the subject, so it appears as the actual subject of the email/SNS notification.
+ * A placeholder Alerting title will be used if no subject is passed in.
  */
 fun NotificationConfigInfo.getTitle(subject: String?): String {
     val defaultTitle = "Alerting-Notification Action"
-    if (this.notificationConfig.configType == ConfigType.EMAIL || this.notificationConfig.configType == ConfigType.SNS) {
-        return if (subject.isNullOrEmpty()) defaultTitle else subject
-    }
-
-    return defaultTitle
-}
-
-fun NotificationConfigInfo.createMessageContent(subject: String?, message: String): String {
-    // For Email Channels, the subject is not passed in the main message since it's used as the title
-    if (this.notificationConfig.configType == ConfigType.EMAIL) {
-        return constructMessageContent("", message)
-    }
-
-    return constructMessageContent(subject, message)
-}
-
-/**
- * Similar to Destinations, this is a generic utility method for constructing message content from
- * a subject and message body when sending through Notifications since the Action definition in Monitors can have both.
- */
-private fun constructMessageContent(subject: String?, message: String): String {
-    return if (Strings.isNullOrEmpty(subject)) message else "$subject \n\n $message"
+    return if (subject.isNullOrEmpty()) defaultTitle else subject
 }
 
 /**
