@@ -159,7 +159,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             monitorCtx,
                             periodStart,
                             periodEnd,
-                            !dryrun && monitor.id != Monitor.NO_ID
+                            !dryrun && monitor.id != Monitor.NO_ID,
+                            workflowExecutionContext
                         )
                     } else {
                         emptyList()

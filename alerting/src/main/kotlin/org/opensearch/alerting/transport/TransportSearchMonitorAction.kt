@@ -21,7 +21,6 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.Monitor
-import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.ExistsQueryBuilder
@@ -49,9 +48,6 @@ class TransportSearchMonitorAction @Inject constructor(
     }
 
     override fun doExecute(task: Task, searchMonitorRequest: SearchMonitorRequest, actionListener: ActionListener<SearchResponse>) {
-        if (searchMonitorRequest.searchRequest.indices().isEmpty())
-            searchMonitorRequest.searchRequest.indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
-
         val searchSourceBuilder = searchMonitorRequest.searchRequest.source()
         val queryBuilder = if (searchSourceBuilder.query() == null) BoolQueryBuilder()
         else QueryBuilders.boolQuery().must(searchSourceBuilder.query())
@@ -101,7 +97,7 @@ class TransportSearchMonitorAction @Inject constructor(
             var boolQueryBuilder: BoolQueryBuilder = if (searchRequest.source().query() == null) BoolQueryBuilder()
             else QueryBuilders.boolQuery().must(searchRequest.source().query())
             val bqb = BoolQueryBuilder()
-            bqb.must().add(BoolQueryBuilder().mustNot(ExistsQueryBuilder("monitor.owner")))
+            bqb.should().add(BoolQueryBuilder().mustNot(ExistsQueryBuilder("monitor.owner")))
             bqb.should().add(BoolQueryBuilder().must(MatchQueryBuilder("monitor.owner", "alerting")))
             boolQueryBuilder.filter(bqb)
             searchRequest.source().query(boolQueryBuilder)

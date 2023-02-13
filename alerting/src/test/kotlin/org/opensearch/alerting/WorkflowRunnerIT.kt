@@ -96,7 +96,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         // Doesn't match
         val testDoc3 = """{
             "message" : "This is an error from IAD region",
-            "source.ip.v6.v2" : 123456, 
+            "source.ip.v6.v2" : 16645, 
             "test_strict_date_time" : "$testTime",
             "test_field" : "us-east-1"
         }"""
