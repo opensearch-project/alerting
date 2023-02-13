@@ -16,6 +16,7 @@ import org.opensearch.alerting.AlertService
 import org.opensearch.alerting.InputService
 import org.opensearch.alerting.MonitorRunnerExecutionContext
 import org.opensearch.alerting.TriggerService
+import org.opensearch.alerting.WorkflowService
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.JobRunner
 import org.opensearch.alerting.model.MonitorRunResult
@@ -94,6 +95,11 @@ object WorkflowRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompo
 
     fun registerInputService(inputService: InputService): WorkflowRunnerService {
         monitorCtx.inputService = inputService
+        return this
+    }
+
+    fun registerWorkflowService(workflowService: WorkflowService): WorkflowRunnerService {
+        monitorCtx.workflowService = workflowService
         return this
     }
 
@@ -191,7 +197,7 @@ object WorkflowRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompo
         }
     }
 
-    suspend fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant, dryrun: Boolean): MonitorRunResult<*> {
+    suspend fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant, dryrun: Boolean): List<MonitorRunResult<*>> {
         val workflow = job as Workflow
         return CompositeWorkflowRunner.runWorkflow(workflow, monitorCtx, periodStart, periodEnd, dryrun)
     }

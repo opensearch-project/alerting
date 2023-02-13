@@ -33,6 +33,7 @@ data class MonitorRunnerExecutionContext(
     var triggerService: TriggerService? = null,
     var alertService: AlertService? = null,
     var docLevelMonitorQueries: DocLevelMonitorQueries? = null,
+    var workflowService: WorkflowService? = null,
 
     @Volatile var retryPolicy: BackoffPolicy? = null,
     @Volatile var moveAlertsRetryPolicy: BackoffPolicy? = null,

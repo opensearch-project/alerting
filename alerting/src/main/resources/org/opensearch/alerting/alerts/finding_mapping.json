@@ -51,6 +51,9 @@
     },
     "timestamp": {
       "type": "long"
+    },
+    "workflow_execution_id": {
+      "type": "keyword"
     }
   }
 }

@@ -1,3 +1,8 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package org.opensearch.alerting.workflow
 
 import org.opensearch.alerting.MonitorRunnerExecutionContext
@@ -12,5 +17,5 @@ abstract class WorkflowRunner {
         periodStart: Instant,
         periodEnd: Instant,
         dryRun: Boolean
-    ): MonitorRunResult<*>
+    ): List<MonitorRunResult<*>>
 }

@@ -16,6 +16,7 @@ import org.opensearch.alerting.util.AggregationQueryRewriter
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.executeTransportAction
 import org.opensearch.alerting.util.toMap
+import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.NamedWriteableAwareStreamInput
@@ -26,6 +27,10 @@ import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.index.query.BoolQueryBuilder
+import org.opensearch.index.query.MatchQueryBuilder
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.index.query.TermsQueryBuilder
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
 import org.opensearch.script.ScriptType
@@ -47,11 +52,15 @@ class InputService(
         monitor: Monitor,
         periodStart: Instant,
         periodEnd: Instant,
-        prevResult: InputRunResults? = null
+        prevResult: InputRunResults? = null,
+        workflowRunContext: WorkflowRunContext? = null
     ): InputRunResults {
         return try {
             val results = mutableListOf<Map<String, Any>>()
             val aggTriggerAfterKey: MutableMap<String, TriggerAfterKey> = mutableMapOf()
+
+            // If monitor execution is triggered from a workflow
+            val indexToDocIds = workflowRunContext?.indexToDocIds
 
             // TODO: If/when multiple input queries are supported for Bucket-Level Monitor execution, aggTriggerAfterKeys will
             //  need to be updated to account for it
@@ -78,7 +87,22 @@ class InputService(
 
                         val searchRequest = SearchRequest().indices(*input.indices.toTypedArray())
                         XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource).use {
-                            searchRequest.source(SearchSourceBuilder.fromXContent(it))
+                            if (indexToDocIds.isNullOrEmpty()) {
+                                searchRequest.source(SearchSourceBuilder.fromXContent(it))
+                            } else {
+                                val source = SearchSourceBuilder.fromXContent(it)
+                                val queryBuilder = QueryBuilders.boolQuery().must(source.query())
+                                indexToDocIds.forEach { entry ->
+                                    queryBuilder
+                                        .should()
+                                        .add(
+                                            BoolQueryBuilder()
+                                                .must(MatchQueryBuilder("_index", entry.key))
+                                                .must(TermsQueryBuilder("_id", entry.value))
+                                        )
+                                }
+                                searchRequest.source(SearchSourceBuilder().query(queryBuilder))
+                            }
                         }
                         val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
                         aggTriggerAfterKey += AggregationQueryRewriter.getAfterKeysFromSearchResponse(

@@ -8,6 +8,10 @@ package org.opensearch.alerting.transport
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.common.xcontent.XContentParser
+import org.opensearch.alerting.action.ExecuteWorkflowAction
+import org.opensearch.alerting.action.ExecuteWorkflowRequest
+import org.opensearch.alerting.action.ExecuteWorkflowResponse
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.DeleteWorkflowRequest
@@ -22,6 +26,7 @@ import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.fetch.subphase.FetchSourceContext
+import java.time.Instant
 
 /**
  * A test that keep a singleton node started for all tests that can be used to get
@@ -82,5 +87,10 @@ abstract class WorkflowSingleNodeTestCase : AlertingSingleNodeTestCase() {
             AlertingActions.DELETE_WORKFLOW_ACTION_TYPE,
             DeleteWorkflowRequest(workflowId, WriteRequest.RefreshPolicy.IMMEDIATE)
         ).get()
+    }
+
+    protected fun executeWorkflow(workflow: Workflow, id: String, dryRun: Boolean = true): ExecuteWorkflowResponse? {
+        val request = ExecuteWorkflowRequest(dryRun, TimeValue(Instant.now().toEpochMilli()), id, workflow)
+        return client().execute(ExecuteWorkflowAction.INSTANCE, request).get()
     }
 }
