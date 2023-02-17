@@ -305,7 +305,7 @@ class TriggerServiceTests : OpenSearchTestCase() {
                     ]
                 },
                 "${trigger.id}": {
-                    "parent_bucket_path": "status_code",
+                    "parent_bucket_path ": "status_code",
                     "bucket_indices": [0, 1]
                 }
             }

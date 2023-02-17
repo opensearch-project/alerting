@@ -56,7 +56,7 @@ class TriggerService(val scriptService: ScriptService) {
                 .newInstance(trigger.condition.params).execute(ctx)
             QueryLevelTriggerRunResult(trigger.name, triggered, null)
         } catch (e: Exception) {
-            logger.info("Error running   script for monitor ${monitor.id}, trigger: ${trigger.id}", e)
+            logger.info("Error running    script for monitor ${monitor.id}, trigger: ${trigger.id}", e)
             // if the script fails we need to send an alert so set triggered = true
             QueryLevelTriggerRunResult(trigger.name, true, e)
         }
