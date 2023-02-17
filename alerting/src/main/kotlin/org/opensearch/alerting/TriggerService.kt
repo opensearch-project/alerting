@@ -35,6 +35,7 @@ class TriggerService(val scriptService: ScriptService) {
     private val logger = LogManager.getLogger(TriggerService::class.java)
     private val ALWAYS_RUN = Script("return true")
     private val NEVER_RUN = Script("return false")
+    private val previouslyTriggered = mutableSetOf<String>()
 
     fun isQueryLevelTriggerActionable(ctx: QueryLevelTriggerExecutionContext, result: QueryLevelTriggerRunResult): Boolean {
         // Suppress actions if the current alert is acknowledged and there are no errors.
@@ -47,13 +48,15 @@ class TriggerService(val scriptService: ScriptService) {
         trigger: QueryLevelTrigger,
         ctx: QueryLevelTriggerExecutionContext
     ): QueryLevelTriggerRunResult {
+        if (previouslyTriggered.contains(trigger.name)) {
+            return QueryLevelTriggerRunResult(trigger.name, false, null)
+        }
         return try {
             val triggered = scriptService.compile(trigger.condition, TriggerScript.CONTEXT)
-                .newInstance(trigger.condition.params)
-                .execute(ctx)
+                .newInstance(trigger.condition.params).execute(ctx)
             QueryLevelTriggerRunResult(trigger.name, triggered, null)
         } catch (e: Exception) {
-            logger.info("Error running script for monitor ${monitor.id}, trigger: ${trigger.id}", e)
+            logger.info("Error running    script for monitor ${monitor.id}, trigger: ${trigger.id}", e)
             // if the script fails we need to send an alert so set triggered = true
             QueryLevelTriggerRunResult(trigger.name, true, e)
         }
@@ -73,10 +76,8 @@ class TriggerService(val scriptService: ScriptService) {
                     triggeredDocs.addAll(value)
                 }
             } else if (!trigger.condition.idOrCode.equals(NEVER_RUN.idOrCode)) {
-                triggeredDocs = TriggerExpressionParser(trigger.condition.idOrCode).parse()
-                    .evaluate(queryToDocIds).toMutableList()
+                triggeredDocs = TriggerExpressionParser(trigger.condition.idOrCode).parse().evaluate(queryToDocIds).toMutableList()
             }
-
             DocumentLevelTriggerRunResult(trigger.name, triggeredDocs, null)
         } catch (e: Exception) {
             logger.info("Error running script for monitor ${monitor.id}, trigger: ${trigger.id}", e)
@@ -92,11 +93,14 @@ class TriggerService(val scriptService: ScriptService) {
         ctx: BucketLevelTriggerExecutionContext
     ): BucketLevelTriggerRunResult {
         return try {
-            val bucketIndices =
-                ((ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)[trigger.id] as HashMap<*, *>)[BUCKET_INDICES] as List<*>
-            val parentBucketPath = (
+            val bucketIndices = (
                 (ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
-                    .get(trigger.id) as HashMap<*, *>
+                [trigger.id] as HashMap<*, *>
+                )[BUCKET_INDICES] as List<*>
+            val parentBucketPath = (
+                (
+                    ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>
+                    ).get(trigger.id) as HashMap<*, *>
                 )[PARENT_BUCKET_PATH] as String
             val aggregationPath = AggregationPath.parse(parentBucketPath)
             // TODO test this part by passing sub-aggregation path
