@@ -313,7 +313,9 @@ class TriggerServiceTests : OpenSearchTestCase() {
         """.trimIndent()
 
         // parse the input results
-        val parser = XContentType.JSON.xContent().createParser(NamedXContentRegistry.EMPTY, DeprecationHandler.THROW_UNSUPPORTED_OPERATION, inputResultsStr)
+        val parser = XContentType.JSON.xContent().createParser(
+            NamedXContentRegistry.EMPTY, DeprecationHandler.THROW_UNSUPPORTED_OPERATION, inputResultsStr
+        )
         val inputResults = parser.map()
 
         // create a monitor run result using the input results
