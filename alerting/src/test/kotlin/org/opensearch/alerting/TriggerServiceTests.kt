@@ -257,7 +257,7 @@ class TriggerServiceTests : OpenSearchTestCase() {
         val bucketLevelTriggerRunResult = triggerService.runBucketLevelTrigger(monitor, trigger, triggerCtx)
         assertNull(bucketLevelTriggerRunResult.error)
     }
-    fun `test run bucket level trigger with bucket key as map`() {
+    fun `test run bucket level trigger with bucket  key as map`() {
         // create a bucket selector aggregation that groups results by a nested field using a map as the key
         val bucketSelectorExtAggregationBuilder = randomBucketSelectorExtAggregationBuilder(
             bucketsPathsMap = mutableMapOf(
