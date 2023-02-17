@@ -328,7 +328,7 @@ class TriggerServiceTests : OpenSearchTestCase() {
         // run the bucket-level trigger using the trigger service
         val bucketLevelTriggerRunResult = triggerService.runBucketLevelTrigger(monitor, trigger, triggerCtx)
 
-        // verify that the bucket-level trigger run result has no error
+        // verify   that the bucket-level trigger run result has no error
 //        assertNull(bucketLevelTriggerRunResult.error)
     }
 }
