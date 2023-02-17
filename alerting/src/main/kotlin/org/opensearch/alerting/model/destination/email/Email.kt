@@ -24,7 +24,8 @@ import java.util.Locale
  */
 data class Email(
     val emailAccountID: String,
-    val recipients: List<Recipient>
+    val recipients: List<Recipient>,
+    val emailFormat: EmailFormat = EmailFormat.PLAIN_TEXT
 ) : Writeable, ToXContent {
 
     init {
@@ -35,6 +36,7 @@ data class Email(
         return builder.startObject(TYPE)
             .field(EMAIL_ACCOUNT_ID_FIELD, emailAccountID)
             .field(RECIPIENTS_FIELD, recipients.toTypedArray())
+            .field(EMAIL_FORMAT_FIELD, emailFormat.name.lowercase(Locale.ROOT))
             .endObject()
     }
 
@@ -42,18 +44,24 @@ data class Email(
     override fun writeTo(out: StreamOutput) {
         out.writeString(emailAccountID)
         out.writeCollection(recipients)
+        out.writeEnum(emailFormat)
     }
-
+    enum class EmailFormat {
+        PLAIN_TEXT,
+        HTML
+    }
     companion object {
         const val TYPE = "email"
         const val EMAIL_ACCOUNT_ID_FIELD = "email_account_id"
         const val RECIPIENTS_FIELD = "recipients"
+        const val EMAIL_FORMAT_FIELD = "email_format"
 
         @JvmStatic
         @Throws(IOException::class)
         fun parse(xcp: XContentParser): Email {
             lateinit var emailAccountID: String
             val recipients: MutableList<Recipient> = mutableListOf()
+            var emailFormat: EmailFormat = EmailFormat.PLAIN_TEXT
 
             ensureExpectedToken(Token.START_OBJECT, xcp.currentToken(), xcp)
             while (xcp.nextToken() != Token.END_OBJECT) {
@@ -68,6 +76,7 @@ data class Email(
                             recipients.add(Recipient.parse(xcp))
                         }
                     }
+
                     else -> {
                         throw IllegalStateException("Unexpected field: $fieldName, while parsing email destination")
                     }
@@ -76,7 +85,8 @@ data class Email(
 
             return Email(
                 requireNotNull(emailAccountID) { "Email account ID is null" },
-                recipients
+                recipients,
+                emailFormat
             )
         }
 
@@ -86,7 +96,8 @@ data class Email(
             return if (sin.readBoolean()) {
                 Email(
                     sin.readString(), // emailAccountID
-                    sin.readList(::Recipient) // recipients
+                    sin.readList(::Recipient), // recipients
+                    sin.readEnum(EmailFormat::class.java) // format
                 )
             } else null
         }
@@ -146,6 +157,7 @@ data class Recipient(
         const val TYPE_FIELD = "type"
         const val EMAIL_GROUP_ID_FIELD = "email_group_id"
         const val EMAIL_FIELD = "email"
+        const val FORMAT_FIELD = "format"
 
         @JvmStatic
         @Throws(IOException::class)
