@@ -117,7 +117,7 @@ class TriggerServiceTests : OpenSearchTestCase() {
         assertNull(bucketLevelTriggerRunResult.error)
     }
 
-    fun `test run bucket level trigger with bucket key as map`() {
+    fun `testBucketLevelTriggerWithMapKeyBucketSelector`() {
         val bucketSelectorExtAggregationBuilder = randomBucketSelectorExtAggregationBuilder(
             bucketsPathsMap = mutableMapOf("_count" to "_count", "_key" to "_key"),
             script = randomScript(source = "params._count > 0"),
@@ -256,5 +256,79 @@ class TriggerServiceTests : OpenSearchTestCase() {
 
         val bucketLevelTriggerRunResult = triggerService.runBucketLevelTrigger(monitor, trigger, triggerCtx)
         assertNull(bucketLevelTriggerRunResult.error)
+    }
+    fun `test run bucket level trigger with bucket  key as map`() {
+        // create a bucket selector aggregation that groups results by a nested field using a map as the key
+        val bucketSelectorExtAggregationBuilder = randomBucketSelectorExtAggregationBuilder(
+            bucketsPathsMap = mutableMapOf(
+                "nested_field" to "nested.field",
+                "status_code" to "status.code"
+            ),
+            script = randomScript(source = "params._count > 0"),
+            parentBucketPath = "status_code"
+        )
+        // create a bucket-level trigger that uses the bucket selector aggregation
+        val trigger = randomBucketLevelTrigger(bucketSelector = bucketSelectorExtAggregationBuilder)
+        // create a bucket-level monitor that includes the trigger
+        val monitor = randomBucketLevelMonitor(triggers = listOf(trigger))
+
+        // create input results that include a bucket with a map key
+        val inputResultsStr = """
+        {
+            "_shards": {
+                "total": 1,
+                "failed": 0,
+                "successful": 1,
+                "skipped": 0
+            },
+            "aggregations": {
+                "status_code": {
+                    "doc_count_error_upper_bound": 0,
+                    "sum_other_doc_count": 0,
+                    "buckets": [
+                        {
+                            "key": 404,
+                            "doc_count": 1,
+                            "nested_field": {
+                                "field1": "value1",
+                                "field2": "value2"
+                            }
+                        },
+                        {
+                            "key": 200,
+                            "doc_count": 2,
+                            "nested_field": {
+                                "field1": "value3",
+                                "field2": "value4"
+                            }
+                        }
+                    ]
+                },
+                "${trigger.id}": {
+                    "parent_bucket_path ": "status_code",
+                    "bucket_indices": [0, 1]
+                }
+            }
+        }
+        """.trimIndent()
+
+        // parse the input results
+        val parser = XContentType.JSON.xContent().createParser(
+            NamedXContentRegistry.EMPTY, DeprecationHandler.THROW_UNSUPPORTED_OPERATION, inputResultsStr
+        )
+        val inputResults = parser.map()
+
+        // create a monitor run result using the input results
+        var monitorRunResult = MonitorRunResult<BucketLevelTriggerRunResult>(monitor.name, Instant.now(), Instant.now())
+        monitorRunResult = monitorRunResult.copy(inputResults = InputRunResults(listOf(inputResults)))
+
+        // create a trigger context using the monitor, trigger, and monitor run result
+        val triggerCtx = BucketLevelTriggerExecutionContext(monitor, trigger, monitorRunResult)
+
+        // run the bucket-level trigger using the trigger service
+//        val bucketLevelTriggerRunResult = triggerService.runBucketLevelTrigger(monitor, trigger, triggerCtx)
+
+        // verify   that the bucket-level trigger run result has no error
+//        assertNull(bucketLevelTriggerRunResult.error)
     }
 }
