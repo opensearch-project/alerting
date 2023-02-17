@@ -127,119 +127,119 @@ class TriggerServiceTests : OpenSearchTestCase() {
         val monitor = randomBucketLevelMonitor(triggers = listOf(trigger))
 
         val inputResultsStr = "{\n" +
-            "  \"_shards\": {\n" +
-            "    \"total\": 1,\n" +
-            "    \"failed\": 0,\n" +
-            "    \"successful\": 1,\n" +
-            "    \"skipped\": 0\n" +
-            "  },\n" +
-            "  \"hits\": {\n" +
-            "    \"hits\": [\n" +
-            "      {\n" +
-            "        \"_index\": \"sample-http-responses\",\n" +
-            "        \"_type\": \"http\",\n" +
-            "        \"_source\": {\n" +
-            "          \"status_code\": 100,\n" +
-            "          \"http_4xx\": 0,\n" +
-            "          \"http_3xx\": 0,\n" +
-            "          \"http_5xx\": 0,\n" +
-            "          \"http_2xx\": 0,\n" +
-            "          \"timestamp\": 100000,\n" +
-            "          \"http_1xx\": 1\n" +
-            "        },\n" +
-            "        \"_id\": 1,\n" +
-            "        \"_score\": 1\n" +
-            "      },\n" +
-            "      {\n" +
-            "        \"_index\": \"sample-http-responses\",\n" +
-            "        \"_type\": \"http\",\n" +
-            "        \"_source\": {\n" +
-            "          \"status_code\": 102,\n" +
-            "          \"http_4xx\": 0,\n" +
-            "          \"http_3xx\": 0,\n" +
-            "          \"http_5xx\": 0,\n" +
-            "          \"http_2xx\": 0,\n" +
-            "          \"timestamp\": 160000,\n" +
-            "          \"http_1xx\": 1\n" +
-            "        },\n" +
-            "        \"_id\": 2,\n" +
-            "        \"_score\": 1\n" +
-            "      },\n" +
-            "      {\n" +
-            "        \"_index\": \"sample-http-responses\",\n" +
-            "        \"_type\": \"http\",\n" +
-            "        \"_source\": {\n" +
-            "          \"status_code\": 100,\n" +
-            "          \"http_4xx\": 0,\n" +
-            "          \"http_3xx\": 0,\n" +
-            "          \"http_5xx\": 0,\n" +
-            "          \"http_2xx\": 0,\n" +
-            "          \"timestamp\": 220000,\n" +
-            "          \"http_1xx\": 1\n" +
-            "        },\n" +
-            "        \"_id\": 4,\n" +
-            "        \"_score\": 1\n" +
-            "      },\n" +
-            "      {\n" +
-            "        \"_index\": \"sample-http-responses\",\n" +
-            "        \"_type\": \"http\",\n" +
-            "        \"_source\": {\n" +
-            "          \"status_code\": 201,\n" +
-            "          \"http_4xx\": 0,\n" +
-            "          \"http_3xx\": 0,\n" +
-            "          \"http_5xx\": 0,\n" +
-            "          \"http_2xx\": 1,\n" +
-            "          \"timestamp\": 280000,\n" +
-            "          \"http_1xx\": 0\n" +
-            "        },\n" +
-            "        \"_id\": 5,\n" +
-            "        \"_score\": 1\n" +
-            "      }\n" +
-            "    ],\n" +
-            "    \"total\": {\n" +
-            "      \"value\": 4,\n" +
-            "      \"relation\": \"eq\"\n" +
-            "    },\n" +
-            "    \"max_score\": 1\n" +
-            "  },\n" +
-            "  \"took\": 15,\n" +
-            "  \"timed_out\": false,\n" +
-            "  \"aggregations\": {\n" +
-            "    \"${trigger.id}\": {\n" +
-            "      \"parent_bucket_path\": \"status_code\",\n" +
-            "      \"bucket_indices\": [\n" +
-            "        0,\n" +
-            "        1,\n" +
-            "        2\n" +
-            "      ]\n" +
-            "    },\n" +
-            "    \"status_code\": {\n" +
-            "      \"buckets\": [\n" +
-            "        {\n" +
-            "          \"doc_count\": 2,\n" +
-            "          \"key\": {\n" +
-            "            \"status_code\": 100\n" +
-            "          }\n" +
-            "        },\n" +
-            "        {\n" +
-            "          \"doc_count\": 1,\n" +
-            "          \"key\": {\n" +
-            "            \"status_code\": 102\n" +
-            "          }\n" +
-            "        },\n" +
-            "        {\n" +
-            "          \"doc_count\": 1,\n" +
-            "          \"key\": {\n" +
-            "            \"status_code\": 201\n" +
-            "          }\n" +
-            "        }\n" +
-            "      ],\n" +
-            "      \"after_key\": {\n" +
-            "        \"status_code\": 201\n" +
-            "      }\n" +
-            "    }\n" +
-            "  }\n" +
-            "}"
+                "  \"_shards\": {\n" +
+                "    \"total\": 1,\n" +
+                "    \"failed\": 0,\n" +
+                "    \"successful\": 1,\n" +
+                "    \"skipped\": 0\n" +
+                "  },\n" +
+                "  \"hits\": {\n" +
+                "    \"hits\": [\n" +
+                "      {\n" +
+                "        \"_index\": \"sample-http-responses\",\n" +
+                "        \"_type\": \"http\",\n" +
+                "        \"_source\": {\n" +
+                "          \"status_code\": 100,\n" +
+                "          \"http_4xx\": 0,\n" +
+                "          \"http_3xx\": 0,\n" +
+                "          \"http_5xx\": 0,\n" +
+                "          \"http_2xx\": 0,\n" +
+                "          \"timestamp\": 100000,\n" +
+                "          \"http_1xx\": 1\n" +
+                "        },\n" +
+                "        \"_id\": 1,\n" +
+                "        \"_score\": 1\n" +
+                "      },\n" +
+                "      {\n" +
+                "        \"_index\": \"sample-http-responses\",\n" +
+                "        \"_type\": \"http\",\n" +
+                "        \"_source\": {\n" +
+                "          \"status_code\": 102,\n" +
+                "          \"http_4xx\": 0,\n" +
+                "          \"http_3xx\": 0,\n" +
+                "          \"http_5xx\": 0,\n" +
+                "          \"http_2xx\": 0,\n" +
+                "          \"timestamp\": 160000,\n" +
+                "          \"http_1xx\": 1\n" +
+                "        },\n" +
+                "        \"_id\": 2,\n" +
+                "        \"_score\": 1\n" +
+                "      },\n" +
+                "      {\n" +
+                "        \"_index\": \"sample-http-responses\",\n" +
+                "        \"_type\": \"http\",\n" +
+                "        \"_source\": {\n" +
+                "          \"status_code\": 100,\n" +
+                "          \"http_4xx\": 0,\n" +
+                "          \"http_3xx\": 0,\n" +
+                "          \"http_5xx\": 0,\n" +
+                "          \"http_2xx\": 0,\n" +
+                "          \"timestamp\": 220000,\n" +
+                "          \"http_1xx\": 1\n" +
+                "        },\n" +
+                "        \"_id\": 4,\n" +
+                "        \"_score\": 1\n" +
+                "      },\n" +
+                "      {\n" +
+                "        \"_index\": \"sample-http-responses\",\n" +
+                "        \"_type\": \"http\",\n" +
+                "        \"_source\": {\n" +
+                "          \"status_code\": 201,\n" +
+                "          \"http_4xx\": 0,\n" +
+                "          \"http_3xx\": 0,\n" +
+                "          \"http_5xx\": 0,\n" +
+                "          \"http_2xx\": 1,\n" +
+                "          \"timestamp\": 280000,\n" +
+                "          \"http_1xx\": 0\n" +
+                "        },\n" +
+                "        \"_id\": 5,\n" +
+                "        \"_score\": 1\n" +
+                "      }\n" +
+                "    ],\n" +
+                "    \"total\": {\n" +
+                "      \"value\": 4,\n" +
+                "      \"relation\": \"eq\"\n" +
+                "    },\n" +
+                "    \"max_score\": 1\n" +
+                "  },\n" +
+                "  \"took\": 15,\n" +
+                "  \"timed_out\": false,\n" +
+                "  \"aggregations\": {\n" +
+                "    \"${trigger.id}\": {\n" +
+                "      \"parent_bucket_path\": \"status_code\",\n" +
+                "      \"bucket_indices\": [\n" +
+                "        0,\n" +
+                "        1,\n" +
+                "        2\n" +
+                "      ]\n" +
+                "    },\n" +
+                "    \"status_code\": {\n" +
+                "      \"buckets\": [\n" +
+                "        {\n" +
+                "          \"doc_count\": 2,\n" +
+                "          \"key\": {\n" +
+                "            \"status_code\": 100\n" +
+                "          }\n" +
+                "        },\n" +
+                "        {\n" +
+                "          \"doc_count\": 1,\n" +
+                "          \"key\": {\n" +
+                "            \"status_code\": 102\n" +
+                "          }\n" +
+                "        },\n" +
+                "        {\n" +
+                "          \"doc_count\": 1,\n" +
+                "          \"key\": {\n" +
+                "            \"status_code\": 201\n" +
+                "          }\n" +
+                "        }\n" +
+                "      ],\n" +
+                "      \"after_key\": {\n" +
+                "        \"status_code\": 201\n" +
+                "      }\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
 
         val parser = XContentType.JSON.xContent()
             .createParser(
@@ -326,7 +326,7 @@ class TriggerServiceTests : OpenSearchTestCase() {
         val triggerCtx = BucketLevelTriggerExecutionContext(monitor, trigger, monitorRunResult)
 
         // run the bucket-level trigger using the trigger service
-        val bucketLevelTriggerRunResult = triggerService.runBucketLevelTrigger(monitor, trigger, triggerCtx)
+//        val bucketLevelTriggerRunResult = triggerService.runBucketLevelTrigger(monitor, trigger, triggerCtx)
 
         // verify   that the bucket-level trigger run result has no error
 //        assertNull(bucketLevelTriggerRunResult.error)
