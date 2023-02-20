@@ -37,6 +37,7 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDING_HISTO
 import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDING_HISTORY_RETENTION_PERIOD
 import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDING_HISTORY_ROLLOVER_PERIOD
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
+import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.client.Client
 import org.opensearch.cluster.ClusterChangedEvent
@@ -362,7 +363,7 @@ class AlertIndices(
             if (ExceptionsHelper.unwrapCause(t) is ResourceAlreadyExistsException) {
                 true
             } else {
-                throw t
+                throw AlertingException.wrap(t)
             }
         }
     }
