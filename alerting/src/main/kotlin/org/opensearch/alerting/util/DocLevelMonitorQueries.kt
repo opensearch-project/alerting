@@ -13,8 +13,6 @@ import org.opensearch.action.admin.indices.alias.Alias
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
 import org.opensearch.action.admin.indices.delete.DeleteIndexRequest
-import org.opensearch.action.admin.indices.get.GetIndexRequest
-import org.opensearch.action.admin.indices.get.GetIndexResponse
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.admin.indices.rollover.RolloverRequest
 import org.opensearch.action.admin.indices.rollover.RolloverResponse
@@ -26,6 +24,7 @@ import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.alerting.MonitorRunnerService.monitorCtx
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.client.Client
@@ -86,8 +85,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             return try {
                 val createIndexResponse: CreateIndexResponse = client.suspendUntil { client.admin().indices().create(indexRequest, it) }
                 createIndexResponse.isAcknowledged
-            } catch (t: ResourceAlreadyExistsException) {
-                if (t.message?.contains("already exists") == true) {
+            } catch (t: Exception) {
+                if (ExceptionsHelper.unwrapCause(t) is ResourceAlreadyExistsException) {
                     true
                 } else {
                     throw t
@@ -107,9 +106,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 admin().indices().delete(DeleteIndexRequest(dataSources.queryIndex), it)
             }
             if (!acknowledgedResponse.isAcknowledged) {
-                val errorMessage = "Deletion of old queryIndex [${dataSources.queryIndex}] index is not acknowledged!"
-                log.error(errorMessage)
-                throw AlertingException.wrap(OpenSearchStatusException(errorMessage, RestStatus.INTERNAL_SERVER_ERROR))
+                log.warn("Deletion of old queryIndex [${dataSources.queryIndex}] index is not acknowledged!")
             }
         }
         val alias = dataSources.queryIndex
@@ -125,8 +122,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             return try {
                 val createIndexResponse: CreateIndexResponse = client.suspendUntil { client.admin().indices().create(indexRequest, it) }
                 createIndexResponse.isAcknowledged
-            } catch (t: ResourceAlreadyExistsException) {
-                if (t.message?.contains("already exists") == true) {
+            } catch (t: Exception) {
+                if (ExceptionsHelper.unwrapCause(t) is ResourceAlreadyExistsException) {
                     true
                 } else {
                     throw t
@@ -206,16 +203,15 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         indexTimeout: TimeValue
     ) {
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
-        val index = docLevelMonitorInput.indices[0]
         val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
 
-        val clusterState = clusterService.state()
+        val indices = IndexUtils.resolveAllIndices(
+            docLevelMonitorInput.indices,
+            monitorCtx.clusterService!!,
+            monitorCtx.indexNameExpressionResolver!!
+        )
 
-        val getIndexRequest = GetIndexRequest().indices(index)
-        val getIndexResponse: GetIndexResponse = client.suspendUntil {
-            client.admin().indices().getIndex(getIndexRequest, it)
-        }
-        val indices = getIndexResponse.indices()
+        val clusterState = clusterService.state()
 
         // Run through each backing index and apply appropriate mappings to query index
         indices?.forEach { indexName ->
@@ -387,7 +383,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
 
     /**
      * Adjusts max field limit index setting for query index if source index has higher limit.
-     * This will prevent max field limit exception, when applying mappings to query index
+     * This will prevent max field limit exception, when source index has more fields then query index limit
      */
     private suspend fun checkAndAdjustMaxFieldLimit(sourceIndex: String, concreteQueryIndex: String) {
         val getSettingsResponse: GetSettingsResponse = client.suspendUntil {
