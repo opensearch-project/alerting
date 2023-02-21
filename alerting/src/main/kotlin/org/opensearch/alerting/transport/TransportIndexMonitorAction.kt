@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
+import org.opensearch.ExceptionsHelper
 import org.opensearch.OpenSearchException
 import org.opensearch.OpenSearchSecurityException
 import org.opensearch.OpenSearchStatusException
@@ -260,7 +261,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     }
                     override fun onFailure(t: Exception) {
                         // https://github.com/opensearch-project/alerting/issues/646
-                        if (t is ResourceAlreadyExistsException && t.message?.contains("already exists") == true) {
+                        if (ExceptionsHelper.unwrapCause(t) is ResourceAlreadyExistsException) {
                             scope.launch {
                                 // Wait for the yellow status
                                 val request = ClusterHealthRequest()

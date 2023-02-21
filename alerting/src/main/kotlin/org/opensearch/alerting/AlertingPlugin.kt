@@ -221,6 +221,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerClusterService(clusterService)
             .registerClient(client)
             .registerNamedXContentRegistry(xContentRegistry)
+            .registerindexNameExpressionResolver(indexNameExpressionResolver)
             .registerScriptService(scriptService)
             .registerSettings(settings)
             .registerThreadPool(threadPool)

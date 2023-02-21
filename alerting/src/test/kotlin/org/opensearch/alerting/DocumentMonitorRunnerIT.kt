@@ -379,8 +379,8 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 2, findings.size)
-        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
-        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("5"))
+        val foundFindings = findings.filter { it.relatedDocIds.contains("1") || it.relatedDocIds.contains("5") }
+        assertEquals("Didn't find findings for docs 1 and 5", 2, foundFindings.size)
     }
 
     fun `test execute monitor with new index added after first execution that generates alerts and findings`() {
@@ -409,14 +409,9 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         var findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 2, findings.size)
-        assertTrue(
-            "Findings saved for test monitor expected 1 instead of ${findings[0].relatedDocIds}",
-            findings[0].relatedDocIds.contains("1")
-        )
-        assertTrue(
-            "Findings saved for test monitor expected 51 instead of ${findings[1].relatedDocIds}",
-            findings[1].relatedDocIds.contains("5")
-        )
+
+        var foundFindings = findings.filter { it.relatedDocIds.contains("1") || it.relatedDocIds.contains("5") }
+        assertEquals("Findings saved for test monitor expected 1 and 5", 2, foundFindings.size)
 
         // clear previous findings and alerts
         deleteIndex(ALL_FINDING_INDEX_PATTERN)
@@ -444,18 +439,11 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 3, findings.size)
-        assertTrue(
-            "Findings saved for test monitor expected 14 instead of ${findings[0].relatedDocIds}",
-            findings[0].relatedDocIds.contains("14")
-        )
-        assertTrue(
-            "Findings saved for test monitor expected 51 instead of ${findings[1].relatedDocIds}",
-            findings[1].relatedDocIds.contains("51")
-        )
-        assertTrue(
-            "Findings saved for test monitor expected 10 instead of ${findings[2].relatedDocIds}",
-            findings[2].relatedDocIds.contains("10")
-        )
+
+        foundFindings = findings.filter {
+            it.relatedDocIds.contains("14") || it.relatedDocIds.contains("51") || it.relatedDocIds.contains("10")
+        }
+        assertEquals("Findings saved for test monitor expected 14, 51 and 10", 3, foundFindings.size)
     }
 
     fun `test document-level monitor when alias only has write index with 0 docs`() {

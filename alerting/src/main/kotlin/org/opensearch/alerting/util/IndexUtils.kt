@@ -7,16 +7,20 @@ package org.opensearch.alerting.util
 
 import org.opensearch.action.ActionListener
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
+import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.client.IndicesAdminClient
 import org.opensearch.cluster.ClusterState
 import org.opensearch.cluster.metadata.IndexMetadata
+import org.opensearch.cluster.metadata.IndexNameExpressionResolver
+import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.index.IndexNotFoundException
 
 class IndexUtils {
 
@@ -129,6 +133,27 @@ class IndexUtils {
                     actionListener.onResponse(AcknowledgedResponse(true))
                 }
             }
+        }
+
+        @JvmStatic
+        fun resolveAllIndices(indices: List<String>, clusterService: ClusterService, resolver: IndexNameExpressionResolver): List<String> {
+            val result = mutableListOf<String>()
+
+            indices.forEach { index ->
+                val concreteIndices = resolver.concreteIndexNames(
+                    clusterService.state(),
+                    IndicesOptions.lenientExpand(),
+                    true,
+                    index
+                )
+                result.addAll(concreteIndices)
+            }
+
+            if (result.size == 0) {
+                throw IndexNotFoundException(indices[0])
+            }
+
+            return result
         }
     }
 }
