@@ -52,6 +52,17 @@ publishing {
             }
         }
     }
+
+    repositories {
+        maven {
+            name = "Snapshots"
+            url = "https://aws.oss.sonatype.org/content/repositories/snapshots"
+            credentials {
+                username "$System.env.SONATYPE_USERNAME"
+                password "$System.env.SONATYPE_PASSWORD"
+            }
+        }
+    }
 }
 
 // Prefer elastic bundled versions for conflicts (primarily with AWS SDK).  We need to specify these manually because
