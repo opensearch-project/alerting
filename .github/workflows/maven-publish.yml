@@ -14,8 +14,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        jdk: [11, 17]
-        platform: ["ubuntu-latest", "windows-latest", "macos-latest"]
+        jdk: [17]
+        platform: ["ubuntu-latest"]
     if: github.repository == 'opensearch-project/alerting'
     runs-on: ${{ matrix.platform }}
 
