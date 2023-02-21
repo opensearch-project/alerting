@@ -8,6 +8,7 @@ package org.opensearch.alerting
 import org.junit.Assert
 import org.opensearch.action.admin.cluster.state.ClusterStateRequest
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
+import org.opensearch.action.admin.indices.delete.DeleteIndexRequest
 import org.opensearch.action.admin.indices.get.GetIndexRequest
 import org.opensearch.action.admin.indices.get.GetIndexResponse
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest
@@ -506,6 +507,178 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(indices.isNotEmpty())
     }
 
+    fun `test execute monitor with multiple indices in input success`() {
+
+        val testSourceIndex1 = "test_source_index1"
+        val testSourceIndex2 = "test_source_index2"
+
+        createIndex(testSourceIndex1, Settings.EMPTY)
+        createIndex(testSourceIndex2, Settings.EMPTY)
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex1, testSourceIndex2), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customFindingsIndex = "custom_findings_index"
+        val customFindingsIndexPattern = "<custom_findings_index-{now/d}-1>"
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(findingsIndex = customFindingsIndex, findingsIndexPattern = customFindingsIndexPattern)
+        )
+        val monitorResponse = createMonitor(monitor)
+        client().admin().indices().refresh(RefreshRequest("*"))
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+
+        indexDoc(testSourceIndex1, "1", testDoc)
+        indexDoc(testSourceIndex2, "1", testDoc)
+
+        val id = monitorResponse.id
+        var executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+
+        var findings = searchFindings(id, "custom_findings_index*", true)
+        assertEquals("Findings saved for test monitor", 2, findings.size)
+        var foundFindings = findings.filter { it.relatedDocIds.contains("1") }
+        assertEquals("Didn't find 2 findings", 2, foundFindings.size)
+
+        indexDoc(testSourceIndex1, "2", testDoc)
+        indexDoc(testSourceIndex2, "2", testDoc)
+        executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        searchAlerts(id)
+        findings = searchFindings(id, "custom_findings_index*", true)
+        assertEquals("Findings saved for test monitor", 4, findings.size)
+        foundFindings = findings.filter { it.relatedDocIds.contains("2") }
+        assertEquals("Didn't find 2 findings", 2, foundFindings.size)
+
+        val indices = getAllIndicesFromPattern("custom_findings_index*")
+        Assert.assertTrue(indices.isNotEmpty())
+    }
+
+    fun `test execute monitor with multiple indices in input first index gets deleted`() {
+        // Index #1 does not exist
+        val testSourceIndex1 = "test_source_index1"
+        val testSourceIndex2 = "test_source_index2"
+
+        createIndex(testSourceIndex1, Settings.EMPTY)
+        createIndex(testSourceIndex2, Settings.EMPTY)
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex1, testSourceIndex2), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customFindingsIndex = "custom_findings_index"
+        val customFindingsIndexPattern = "<custom_findings_index-{now/d}-1>"
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(findingsIndex = customFindingsIndex, findingsIndexPattern = customFindingsIndexPattern)
+        )
+        val monitorResponse = createMonitor(monitor)
+        client().admin().indices().refresh(RefreshRequest("*"))
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+
+        indexDoc(testSourceIndex2, "1", testDoc)
+
+        client().admin().indices().delete(DeleteIndexRequest(testSourceIndex1)).get()
+
+        val id = monitorResponse.id
+        var executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+
+        var findings = searchFindings(id, "custom_findings_index*", true)
+        assertEquals("Findings saved for test monitor", 1, findings.size)
+        var foundFindings = findings.filter { it.relatedDocIds.contains("1") }
+        assertEquals("Didn't find 2 findings", 1, foundFindings.size)
+
+        indexDoc(testSourceIndex2, "2", testDoc)
+        executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        searchAlerts(id)
+        findings = searchFindings(id, "custom_findings_index*", true)
+        assertEquals("Findings saved for test monitor", 2, findings.size)
+        foundFindings = findings.filter { it.relatedDocIds.contains("2") }
+        assertEquals("Didn't find 2 findings", 1, foundFindings.size)
+
+        val indices = getAllIndicesFromPattern("custom_findings_index*")
+        Assert.assertTrue(indices.isNotEmpty())
+    }
+
+    fun `test execute monitor with multiple indices in input second index gets deleted`() {
+        // Second index does not exist
+        val testSourceIndex1 = "test_source_index1"
+        val testSourceIndex2 = "test_source_index2"
+
+        createIndex(testSourceIndex1, Settings.EMPTY)
+        createIndex(testSourceIndex2, Settings.EMPTY)
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex1, testSourceIndex2), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customFindingsIndex = "custom_findings_index"
+        val customFindingsIndexPattern = "<custom_findings_index-{now/d}-1>"
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(findingsIndex = customFindingsIndex, findingsIndexPattern = customFindingsIndexPattern)
+        )
+        val monitorResponse = createMonitor(monitor)
+        client().admin().indices().refresh(RefreshRequest("*"))
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+
+        indexDoc(testSourceIndex1, "1", testDoc)
+
+        client().admin().indices().delete(DeleteIndexRequest(testSourceIndex2)).get()
+
+        val id = monitorResponse.id
+        var executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+
+        var findings = searchFindings(id, "custom_findings_index*", true)
+        assertEquals("Findings saved for test monitor", 1, findings.size)
+        var foundFindings = findings.filter { it.relatedDocIds.contains("1") }
+        assertEquals("Didn't find 2 findings", 1, foundFindings.size)
+
+        indexDoc(testSourceIndex1, "2", testDoc)
+
+        executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        searchAlerts(id)
+        findings = searchFindings(id, "custom_findings_index*", true)
+        assertEquals("Findings saved for test monitor", 2, findings.size)
+        foundFindings = findings.filter { it.relatedDocIds.contains("2") }
+        assertEquals("Didn't find 2 findings", 1, foundFindings.size)
+
+        val indices = getAllIndicesFromPattern("custom_findings_index*")
+        Assert.assertTrue(indices.isNotEmpty())
+    }
+
     fun `test execute pre-existing monitor and update`() {
         val request = CreateIndexRequest(SCHEDULED_JOBS_INDEX).mapping(ScheduledJobIndices.scheduledJobMappings())
             .settings(Settings.builder().put("index.hidden", true).build())
@@ -634,6 +807,47 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             client().execute(SearchMonitorAction.INSTANCE, SearchMonitorRequest(searchRequest))
                 .get()
         Assert.assertEquals(searchMonitorResponse.hits.hits.size, 1)
+    }
+
+    fun `test execute monitor with empty source index`() {
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customFindingsIndex = "custom_findings_index"
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(findingsIndex = customFindingsIndex)
+        )
+        val monitorResponse = createMonitor(monitor)
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+
+        val monitorId = monitorResponse.id
+        var executeMonitorResponse = executeMonitor(monitor, monitorId, false)
+
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+
+        refreshIndex(customFindingsIndex)
+
+        var findings = searchFindings(monitorId, customFindingsIndex)
+        assertEquals("Findings saved for test monitor", 0, findings.size)
+
+        indexDoc(index, "1", testDoc)
+
+        executeMonitor(monitor, monitorId, false)
+
+        refreshIndex(customFindingsIndex)
+
+        findings = searchFindings(monitorId, customFindingsIndex)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
     }
 
     fun `test execute GetFindingsAction with monitorId param`() {

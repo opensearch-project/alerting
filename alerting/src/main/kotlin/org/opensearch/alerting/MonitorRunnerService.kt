@@ -31,6 +31,7 @@ import org.opensearch.alerting.settings.DestinationSettings.Companion.loadDestin
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.isDocLevelMonitor
 import org.opensearch.client.Client
+import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.component.AbstractLifecycleComponent
 import org.opensearch.common.settings.Settings
@@ -68,6 +69,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
     fun registerNamedXContentRegistry(xContentRegistry: NamedXContentRegistry): MonitorRunnerService {
         this.monitorCtx.xContentRegistry = xContentRegistry
+        return this
+    }
+
+    fun registerindexNameExpressionResolver(indexNameExpressionResolver: IndexNameExpressionResolver): MonitorRunnerService {
+        this.monitorCtx.indexNameExpressionResolver = indexNameExpressionResolver
         return this
     }
 
