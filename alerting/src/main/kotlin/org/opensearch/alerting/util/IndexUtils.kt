@@ -155,5 +155,8 @@ class IndexUtils {
 
             return result
         }
+
+        @JvmStatic
+        fun sanitizeDotsInIndexName(index: String) = index.replace(".", "_dot_")
     }
 }

@@ -160,7 +160,9 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
     ) {
         // If node contains "properties" property then it is internal(non-leaf) node
         log.debug("Node in traverse: $node")
-        if (node.containsKey(PROPERTIES)) {
+        if (node.containsKey(PROPERTIES) &&
+            (node.get(PROPERTIES) as Map<String, Any>).containsKey(PROPERTIES) == false // Make sure that "properties" isn't interim node
+        ) { // Make sure that "properties" isn't interim node
             return traverseMappingsAndUpdate(node.get(PROPERTIES) as MutableMap<String, Any>, currentPath, processLeafFn, flattenPaths)
         } else {
             // newNodes will hold list of updated leaf properties
@@ -190,6 +192,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     node.remove(it.first)
                 }
                 // Put new properties of leaf
+                log.info("REWRITTNG ${it.first} to ${it.second} ${it.third}")
                 node.put(it.second, it.third)
             }
         }
@@ -236,9 +239,9 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                                 }
                             }
                             if (props.containsKey("path")) {
-                                newProps["path"] = "${props["path"]}_${indexName}_$monitorId"
+                                newProps["path"] = "${props["path"]}_${IndexUtils.sanitizeDotsInIndexName(indexName)}_$monitorId"
                             }
-                            return Triple(fieldName, "${fieldName}_${indexName}_$monitorId", newProps)
+                            return Triple(fieldName, "${fieldName}_${IndexUtils.sanitizeDotsInIndexName(indexName)}_$monitorId", newProps)
                         }
                     // Traverse and update index mappings here while extracting flatten field paths
                     val flattenPaths = mutableListOf<String>()
@@ -274,7 +277,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         queries.forEach {
             var query = it.query
             flattenPaths.forEach { fieldPath ->
-                query = query.replace("$fieldPath:", "${fieldPath}_${sourceIndex}_$monitorId:")
+                query = query.replace("$fieldPath:", "${fieldPath}_${IndexUtils.sanitizeDotsInIndexName(sourceIndex)}_$monitorId:")
             }
             val indexRequest = IndexRequest(concreteQueryIndex)
                 .id(it.id + "_${sourceIndex}_$monitorId")
@@ -295,7 +298,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             }
             bulkResponse.forEach { bulkItemResponse ->
                 if (bulkItemResponse.isFailed) {
-                    log.debug(bulkItemResponse.failureMessage)
+                    log.info(bulkItemResponse.failureMessage)
                 }
             }
         }
@@ -307,7 +310,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         sourceIndex: String,
         updatedProperties: MutableMap<String, Any>
     ): Pair<AcknowledgedResponse, String> {
-        var targetQueryIndex = monitorMetadata.sourceToQueryIndexMapping[sourceIndex + monitor.id]
+        var targetQueryIndex = monitorMetadata.getMappedQueryIndex(sourceIndex)
         if (targetQueryIndex == null) {
             // queryIndex is alias which will always have only 1 backing index which is writeIndex
             // This is due to a fact that that _rollover API would maintain only single index under alias
@@ -320,7 +323,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR)
                 )
             }
-            monitorMetadata.sourceToQueryIndexMapping[sourceIndex + monitor.id] = targetQueryIndex
+            monitorMetadata.addQueryIndexToMapping(sourceIndex, targetQueryIndex)
         }
         val updateMappingRequest = PutMappingRequest(targetQueryIndex)
         updateMappingRequest.source(mapOf<String, Any>("properties" to updatedProperties))
@@ -372,7 +375,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         // We did rollover, so try to apply mappings again on new targetQueryIndex
         if (targetQueryIndex.isNotEmpty()) {
             // add newly created index to monitor's metadata object so that we can fetch it later on, when either applying mappings or running queries
-            monitorMetadata.sourceToQueryIndexMapping[sourceIndex + monitor.id] = targetQueryIndex
+            monitorMetadata.addQueryIndexToMapping(sourceIndex, targetQueryIndex)
         } else {
             val failureMessage = "Failed to resolve targetQueryIndex!"
             log.error(failureMessage)
