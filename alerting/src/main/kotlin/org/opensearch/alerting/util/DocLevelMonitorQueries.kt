@@ -162,7 +162,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         log.debug("Node in traverse: $node")
         if (node.containsKey(PROPERTIES) &&
             (node.get(PROPERTIES) as Map<String, Any>).containsKey(PROPERTIES) == false // Make sure that "properties" isn't interim node
-        ) { // Make sure that "properties" isn't interim node
+        ) {
             return traverseMappingsAndUpdate(node.get(PROPERTIES) as MutableMap<String, Any>, currentPath, processLeafFn, flattenPaths)
         } else {
             // newNodes will hold list of updated leaf properties
@@ -192,7 +192,6 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     node.remove(it.first)
                 }
                 // Put new properties of leaf
-                log.info("REWRITTNG ${it.first} to ${it.second} ${it.third}")
                 node.put(it.second, it.third)
             }
         }
