@@ -297,7 +297,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             }
             bulkResponse.forEach { bulkItemResponse ->
                 if (bulkItemResponse.isFailed) {
-                    log.info(bulkItemResponse.failureMessage)
+                    log.debug(bulkItemResponse.failureMessage)
                 }
             }
         }
