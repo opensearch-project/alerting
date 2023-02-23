@@ -1329,7 +1329,10 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             testIndex,
             listOf(
                 "test_value_1",
-                "test_value_2"
+                "test_value_1", // adding duplicate to verify aggregation
+                "test_value_2",
+                "test_value_2",
+                "test_value_3"
             )
         )
 
@@ -1340,7 +1343,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         val termAgg = TermsAggregationBuilder("test_field").field("test_field")
         val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(termAgg))
         val triggerScript = """
-            params.docCount > 0
+            params.docCount > 1
         """.trimIndent()
 
         // For the Actions ensure that there is at least one and any PER_ALERT actions contain ACTIVE, DEDUPED and COMPLETED in its policy

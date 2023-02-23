@@ -237,6 +237,7 @@ fun randomWorkflowMonitor(
     if (!monitorIds.isNullOrEmpty()) {
         delegates.add(Delegate(1, monitorIds[0]))
         for (i in 1 until monitorIds.size) {
+            // Order of monitors in workflow will be the same like forwarded meaning that the first monitorId will be used as second monitor chained finding
             delegates.add(Delegate(i + 1, monitorIds [i], ChainedFindings(monitorIds[i - 1])))
         }
     }

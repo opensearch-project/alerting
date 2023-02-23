@@ -29,6 +29,7 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.MatchQueryBuilder
+import org.opensearch.index.query.QueryBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.query.TermsQueryBuilder
 import org.opensearch.script.Script
@@ -72,6 +73,13 @@ class InputService(
                             "period_start" to periodStart.toEpochMilli(),
                             "period_end" to periodEnd.toEpochMilli()
                         )
+
+                        // Rewrite query to consider the doc ids per given index
+                        if (chainedFindingExist(indexToDocIds)) {
+                            val updatedSourceQuery = updateInputQueryWithFindingDocIds(input.query.query(), indexToDocIds!!)
+                            input.query.query(updatedSourceQuery)
+                        }
+
                         // Deep copying query before passing it to rewriteQuery since otherwise, the monitor.input is modified directly
                         // which causes a strange bug where the rewritten query persists on the Monitor across executions
                         val rewrittenQuery = AggregationQueryRewriter.rewriteQuery(deepCopyQuery(input.query), prevResult, monitor.triggers)
@@ -87,22 +95,7 @@ class InputService(
 
                         val searchRequest = SearchRequest().indices(*input.indices.toTypedArray())
                         XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource).use {
-                            if (indexToDocIds.isNullOrEmpty()) {
-                                searchRequest.source(SearchSourceBuilder.fromXContent(it))
-                            } else {
-                                val source = SearchSourceBuilder.fromXContent(it)
-                                val queryBuilder = QueryBuilders.boolQuery().must(source.query())
-                                indexToDocIds.forEach { entry ->
-                                    queryBuilder
-                                        .should()
-                                        .add(
-                                            BoolQueryBuilder()
-                                                .must(MatchQueryBuilder("_index", entry.key))
-                                                .must(TermsQueryBuilder("_id", entry.value))
-                                        )
-                                }
-                                searchRequest.source(SearchSourceBuilder().query(queryBuilder))
-                            }
+                            searchRequest.source(SearchSourceBuilder.fromXContent(it))
                         }
                         val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
                         aggTriggerAfterKey += AggregationQueryRewriter.getAfterKeysFromSearchResponse(
@@ -128,6 +121,28 @@ class InputService(
             InputRunResults(emptyList(), e)
         }
     }
+
+    private fun updateInputQueryWithFindingDocIds(
+        query: QueryBuilder,
+        indexToDocIds: Map<String, List<String>>,
+    ): QueryBuilder {
+        val queryBuilder = QueryBuilders.boolQuery().must(query)
+        val shouldQuery = QueryBuilders.boolQuery()
+
+        indexToDocIds.forEach { entry ->
+            shouldQuery
+                .should()
+                .add(
+                    BoolQueryBuilder()
+                        .must(MatchQueryBuilder("_index", entry.key))
+                        .must(TermsQueryBuilder("_id", entry.value))
+                )
+        }
+        return queryBuilder.must(shouldQuery)
+    }
+
+    private fun chainedFindingExist(indexToDocIds: Map<String, List<String>>?) =
+        !indexToDocIds.isNullOrEmpty()
 
     private fun deepCopyQuery(query: SearchSourceBuilder): SearchSourceBuilder {
         val out = BytesStreamOutput()
