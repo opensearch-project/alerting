@@ -463,6 +463,12 @@ class TransportIndexCompositeWorkflowAction @Inject constructor(
     }
 
     suspend fun validateRequest(request: IndexWorkflowRequest) {
+        if (request.workflow.inputs.isEmpty())
+            throw AlertingException.wrap(IllegalArgumentException("Input list can not be empty."))
+
+        if (request.workflow.inputs[0] !is CompositeInput)
+            throw AlertingException.wrap(IllegalArgumentException("When creating a workflow input must be CompositeInput"))
+
         val compositeInput = request.workflow.inputs[0] as CompositeInput
         val monitorIds = compositeInput.sequence.delegates.stream().map { it.monitorId }.collect(Collectors.toList())
 

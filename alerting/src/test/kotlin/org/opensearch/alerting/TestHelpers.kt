@@ -224,6 +224,7 @@ fun randomDocumentLevelMonitor(
 }
 
 fun randomWorkflowMonitor(
+    id: String = Workflow.NO_ID,
     monitorIds: List<String>,
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     user: User? = randomUser(),
@@ -241,6 +242,7 @@ fun randomWorkflowMonitor(
     }
 
     return Workflow(
+        id = id,
         name = name,
         enabled = enabled,
         schedule = schedule,
@@ -253,6 +255,7 @@ fun randomWorkflowMonitor(
 }
 
 fun randomWorkflowMonitorWithDelegates(
+    id: String = Workflow.NO_ID,
     delegates: List<Delegate>,
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     user: User? = randomUser(),
@@ -262,6 +265,7 @@ fun randomWorkflowMonitorWithDelegates(
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
 ): Workflow {
     return Workflow(
+        id = id,
         name = name,
         enabled = enabled,
         schedule = schedule,

@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
 import org.opensearch.action.ActionRequest
@@ -18,6 +19,7 @@ import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
@@ -36,9 +38,12 @@ import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
+import org.opensearch.index.IndexNotFoundException
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
+
+private val log = LogManager.getLogger(TransportIndexMonitorAction::class.java)
 
 class TransportDeleteWorkflowAction @Inject constructor(
     transportService: TransportService,
@@ -64,7 +69,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
 
         val user = readUserFromThreadContext(client)
         val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, transformedRequest.workflowId)
-            .setRefreshPolicy(transformedRequest.refreshPolicy)
+            .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
 
         if (!validateUserBackendRoles(user, actionListener)) {
             return
@@ -111,7 +116,16 @@ class TransportDeleteWorkflowAction @Inject constructor(
                     )
                 }
             } catch (t: Exception) {
-                actionListener.onFailure(AlertingException.wrap(t))
+                if (t is IndexNotFoundException) {
+                    actionListener.onFailure(
+                        OpenSearchStatusException(
+                            "Workflow not found.",
+                            RestStatus.NOT_FOUND
+                        )
+                    )
+                } else {
+                    actionListener.onFailure(AlertingException.wrap(t))
+                }
             }
         }
 
@@ -122,7 +136,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
             if (getResponse.isExists == false) {
                 actionListener.onFailure(
                     AlertingException.wrap(
-                        OpenSearchStatusException("Workflow with $workflowId is not found", RestStatus.NOT_FOUND)
+                        OpenSearchStatusException("Workflow not found.", RestStatus.NOT_FOUND)
                     )
                 )
             }
@@ -134,6 +148,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
         }
 
         private suspend fun deleteWorkflow(workflow: Workflow): DeleteResponse {
+            log.debug("Deleting the workflow with id ${deleteRequest.id()}")
             return client.suspendUntil { delete(deleteRequest, it) }
         }
 

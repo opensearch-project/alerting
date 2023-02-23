@@ -26,6 +26,7 @@ import org.opensearch.commons.alerting.action.GetWorkflowRequest
 import org.opensearch.commons.alerting.action.GetWorkflowResponse
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.index.IndexNotFoundException
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -117,7 +118,16 @@ class TransportGetWorkflowAction @Inject constructor(
                     }
 
                     override fun onFailure(t: Exception) {
-                        actionListener.onFailure(AlertingException.wrap(t))
+                        if (t is IndexNotFoundException) {
+                            actionListener.onFailure(
+                                OpenSearchStatusException(
+                                    "Workflow not found",
+                                    RestStatus.NOT_FOUND
+                                )
+                            )
+                        } else {
+                            actionListener.onFailure(AlertingException.wrap(t))
+                        }
                     }
                 }
             )
