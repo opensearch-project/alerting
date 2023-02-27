@@ -404,31 +404,36 @@
         "inputs": {
           "type": "nested",
           "properties": {
-            "sequence": {
+            "composite_input": {
+              "type": "nested",
               "properties": {
-                "delegates": {
-                  "type": "nested",
+                "sequence": {
                   "properties": {
-                    "order": {
-                      "type": "integer"
-                    },
-                    "monitorId": {
-                      "type": "text",
-                      "fields": {
-                        "keyword": {
-                          "type": "keyword",
-                          "ignore_above": 256
-                        }
-                      }
-                    },
-                    "chainedFindings": {
+                    "delegates": {
+                      "type": "nested",
                       "properties": {
-                        "monitorId": {
+                        "order": {
+                          "type": "integer"
+                        },
+                        "monitor_id": {
                           "type": "text",
                           "fields": {
                             "keyword": {
                               "type": "keyword",
                               "ignore_above": 256
+                            }
+                          }
+                        },
+                        "chained_findings": {
+                          "properties": {
+                            "monitor_id": {
+                              "type": "text",
+                              "fields": {
+                                "keyword": {
+                                  "type": "keyword",
+                                  "ignore_above": 256
+                                }
+                              }
                             }
                           }
                         }

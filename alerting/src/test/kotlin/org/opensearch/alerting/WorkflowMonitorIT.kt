@@ -406,6 +406,8 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
         val workflowRequest = randomWorkflowMonitor(
             monitorIds = listOf(monitorResponse.id)
         )
+
+        (workflowRequest.inputs.get(0) as CompositeInput).sequence.delegates.get(0).monitorId
         val workflowResponse = upsertWorkflow(workflowRequest)!!
         val workflowId = workflowResponse.id
         val getWorkflowResponse = getWorkflowById(id = workflowResponse.id)
@@ -413,15 +415,14 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
         assertNotNull(getWorkflowResponse)
         assertEquals(workflowId, getWorkflowResponse.id)
 
-        deleteWorkflow(workflowId)
-        // Verify that the workflow is deleted
+        // Verify that the monitor can't be deleted because it's included in the workflow
         try {
-            getWorkflowById(workflowId)
+            deleteMonitor(monitorResponse.id)
         } catch (e: Exception) {
             e.message?.let {
                 assertTrue(
-                    "Exception not returning GetWorkflow Action error ",
-                    it.contains("Workflow not found.")
+                    "Exception not returning DeleteMonitor Action error ",
+                    it.contains("Not allowed to delete this monitor!")
                 )
             }
         }

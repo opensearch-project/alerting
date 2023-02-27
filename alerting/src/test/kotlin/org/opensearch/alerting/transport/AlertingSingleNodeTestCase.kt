@@ -23,6 +23,8 @@ import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.DeleteMonitorRequest
+import org.opensearch.commons.alerting.action.DeleteMonitorResponse
 import org.opensearch.commons.alerting.action.GetFindingsRequest
 import org.opensearch.commons.alerting.action.GetFindingsResponse
 import org.opensearch.commons.alerting.action.IndexMonitorRequest
@@ -176,6 +178,10 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     ) = client().execute(
         GetMonitorAction.INSTANCE,
         GetMonitorRequest(monitorId, version, RestRequest.Method.GET, fetchSourceContext)
+    ).get()
+
+    protected fun deleteMonitor(monitorId: String): DeleteMonitorResponse = client().execute(
+        AlertingActions.DELETE_MONITOR_ACTION_TYPE, DeleteMonitorRequest(monitorId, WriteRequest.RefreshPolicy.IMMEDIATE)
     ).get()
 
     override fun getPlugins(): List<Class<out Plugin>> {

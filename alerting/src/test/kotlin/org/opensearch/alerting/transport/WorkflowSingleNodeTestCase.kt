@@ -7,6 +7,7 @@ package org.opensearch.alerting.transport
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope
 import org.opensearch.action.support.WriteRequest
+import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.DeleteWorkflowRequest
@@ -44,7 +45,14 @@ abstract class WorkflowSingleNodeTestCase : AlertingSingleNodeTestCase() {
 
         return searchResponse.hits.hits.map { it ->
             val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
-            Workflow.parse(xcp, it.id, it.version)
+            lateinit var workflow: Workflow
+            while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
+                xcp.nextToken()
+                when (xcp.currentName()) {
+                    "workflow" -> workflow = Workflow.parse(xcp)
+                }
+            }
+            workflow.copy(id = it.id, version = it.version)
         }.first()
     }
 

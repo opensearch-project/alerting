@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
+import org.apache.lucene.search.join.ScoreMode
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
 import org.opensearch.action.ActionRequest
@@ -17,6 +18,8 @@ import org.opensearch.action.delete.DeleteRequest
 import org.opensearch.action.delete.DeleteResponse
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
+import org.opensearch.action.search.SearchRequest
+import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -35,6 +38,7 @@ import org.opensearch.commons.alerting.action.DeleteMonitorRequest
 import org.opensearch.commons.alerting.action.DeleteMonitorResponse
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.index.query.QueryBuilders
@@ -42,6 +46,7 @@ import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
 import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.rest.RestStatus
+import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import kotlin.coroutines.resume
@@ -95,9 +100,10 @@ class TransportDeleteMonitorAction @Inject constructor(
             try {
                 val monitor = getMonitor()
 
-                val canDelete = user == null ||
-                    !doFilterForUser(user) ||
-                    checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", monitorId)
+                val canDelete = monitorIsNotInWorkflows(monitor.id) && (
+                    user == null || !doFilterForUser(user) ||
+                        checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", monitorId)
+                    )
 
                 if (canDelete) {
                     val deleteResponse = deleteMonitor(monitor)
@@ -112,6 +118,34 @@ class TransportDeleteMonitorAction @Inject constructor(
             } catch (t: Exception) {
                 actionListener.onFailure(AlertingException.wrap(t))
             }
+        }
+
+        /**
+         * Checks if the monitor is part of the workflow
+         *
+         * @param monitorId - id of monitor that is checked if it is a workflow delegate
+         */
+        private suspend fun monitorIsNotInWorkflows(monitorId: String): Boolean {
+            val queryBuilder = QueryBuilders.nestedQuery(
+                Workflow.WORKFLOW_DELEGATE_PATH,
+                QueryBuilders.boolQuery().must(
+                    QueryBuilders.matchQuery(
+                        Workflow.WORKFLOW_MONITOR_PATH,
+                        monitorId
+                    )
+                ),
+                ScoreMode.None
+            )
+
+            val searchRequest = SearchRequest()
+                .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
+                .source(SearchSourceBuilder().query(queryBuilder).fetchSource(true))
+
+            val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
+            if (searchResponse.hits.totalHits?.value == 0L) {
+                return true
+            }
+            return false
         }
 
         private suspend fun getMonitor(): Monitor {
