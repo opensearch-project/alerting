@@ -33,43 +33,64 @@ import java.util.stream.Collectors
 
 private val log = LogManager.getLogger(WorkflowService::class.java)
 
+/**
+ * Contains util methods used in workflow execution
+ */
 class WorkflowService(
     val client: Client,
     val xContentRegistry: NamedXContentRegistry,
 ) {
+    /**
+     * Returns finding doc ids per index for the given workflow execution
+     * Used for pre-filtering the dataset in the case of creating a workflow with chained findings
+     *
+     * @param chainedMonitor Monitor that is previously executed
+     * @param workflowExecutionId Execution id of the current workflow
+     */
+    suspend fun getFindingDocIdsByExecutionId(chainedMonitor: Monitor, workflowExecutionId: String): Map<String, List<String>> {
+        try {
+            // Search findings index per monitor and workflow execution id
+            val bqb = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery(Finding.MONITOR_ID_FIELD, chainedMonitor.id))
+                .filter(QueryBuilders.termQuery(Finding.EXECUTION_ID_FIELD, workflowExecutionId))
+            val searchRequest = SearchRequest()
+                .source(
+                    SearchSourceBuilder()
+                        .query(bqb)
+                        .version(true)
+                        .seqNoAndPrimaryTerm(true)
+                )
+                .indices(chainedMonitor.dataSources.findingsIndex)
+            val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
 
-    suspend fun getFindingDocIdsPerMonitorExecution(chainedMonitor: Monitor, workflowExecutionId: String): Map<String, List<String>> {
-        // Search findings index per monitor and workflow execution id
-        val bqb = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery(Finding.MONITOR_ID_FIELD, chainedMonitor.id))
-            .filter(QueryBuilders.termQuery(Finding.WORKFLOW_EXECUTION_ID_FIELD, workflowExecutionId))
-        val searchRequest = SearchRequest()
-            .source(
-                SearchSourceBuilder()
-                    .query(bqb)
-                    .version(true)
-                    .seqNoAndPrimaryTerm(true)
-            )
-            .indices(chainedMonitor.dataSources.findingsIndex)
-        val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
-
-        // Get the findings docs
-        val findings = mutableListOf<Finding>()
-        for (hit in searchResponse.hits) {
-            val xcp = XContentFactory.xContent(XContentType.JSON)
-                .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
-            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-            val finding = Finding.parse(xcp)
-            findings.add(finding)
+            // Get the findings docs
+            val findings = mutableListOf<Finding>()
+            for (hit in searchResponse.hits) {
+                val xcp = XContentFactory.xContent(XContentType.JSON)
+                    .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
+                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                val finding = Finding.parse(xcp)
+                findings.add(finding)
+            }
+            // Based on the findings get the document ids
+            val indexToRelatedDocIdsMap = mutableMapOf<String, MutableList<String>>()
+            for (finding in findings) {
+                indexToRelatedDocIdsMap.getOrPut(finding.index) { mutableListOf() }.addAll(finding.relatedDocIds)
+            }
+            return indexToRelatedDocIdsMap
+        } catch (t: Exception) {
+            log.error("Error getting finding doc ids: ${t.message}")
+            throw AlertingException.wrap(t)
         }
-        // Based on the findings get the document ids
-        val indexToRelatedDocIdsMap = mutableMapOf<String, MutableList<String>>()
-        for (finding in findings) {
-            indexToRelatedDocIdsMap.getOrPut(finding.index) { mutableListOf() }.addAll(finding.relatedDocIds)
-        }
-        return indexToRelatedDocIdsMap
     }
 
-    suspend fun searchMonitors(monitors: List<String>, size: Int, owner: String?): List<Monitor> {
+    /**
+     * Returns the list of monitors for the given ids
+     * Used in workflow execution in order to figure out the monitor type
+     *
+     * @param monitors List of monitor ids
+     * @param size Expected number of monitors
+     */
+    suspend fun getMonitorsById(monitors: List<String>, size: Int): List<Monitor> {
         val bqb = QueryBuilders.boolQuery().filter(QueryBuilders.termsQuery("_id", monitors))
 
         val searchRequest = SearchRequest()
@@ -83,10 +104,10 @@ class WorkflowService(
             .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
 
         val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
-        return buildMonitors(searchResponse)
+        return parseMonitors(searchResponse)
     }
 
-    private fun buildMonitors(response: SearchResponse): List<Monitor> {
+    private fun parseMonitors(response: SearchResponse): List<Monitor> {
         if (response.isTimedOut) {
             log.error("Request for getting monitors timeout")
             throw OpenSearchException("Cannot determine that the ${ScheduledJob.SCHEDULED_JOBS_INDEX} index is healthy")
@@ -126,7 +147,7 @@ class WorkflowService(
         } else throw IllegalStateException("Delegate monitors don't exist $monitorId")
         // Search findings index per monitor and workflow execution id
         val bqb = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery(Finding.MONITOR_ID_FIELD, monitor.id))
-            .filter(QueryBuilders.termQuery(Finding.WORKFLOW_EXECUTION_ID_FIELD, workflowExecutionId))
+            .filter(QueryBuilders.termQuery(Finding.EXECUTION_ID_FIELD, workflowExecutionId))
         val searchRequest = SearchRequest()
             .source(
                 SearchSourceBuilder()

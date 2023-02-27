@@ -40,9 +40,7 @@ import org.opensearch.commons.alerting.model.action.PerAlertActionScope
 import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
 import org.opensearch.commons.alerting.util.string
 import org.opensearch.index.query.BoolQueryBuilder
-import org.opensearch.index.query.MatchQueryBuilder
 import org.opensearch.index.query.QueryBuilders
-import org.opensearch.index.query.TermsQueryBuilder
 import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptType
@@ -63,7 +61,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         periodStart: Instant,
         periodEnd: Instant,
         dryrun: Boolean,
-        workflowExecutionContext: WorkflowRunContext?
+        workflowRunContext: WorkflowRunContext?
     ): MonitorRunResult<BucketLevelTriggerRunResult> {
         val roles = MonitorRunnerService.getRolesForMonitor(monitor)
         logger.debug("Running monitor: ${monitor.name} with roles: $roles Thread: ${Thread.currentThread().name}")
@@ -123,7 +121,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     periodStart,
                     periodEnd,
                     monitorResult.inputResults,
-                    workflowExecutionContext
+                    workflowRunContext
                 )
                 if (firstIteration) {
                     firstPageOfInputResults = inputResults
@@ -160,7 +158,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             periodStart,
                             periodEnd,
                             !dryrun && monitor.id != Monitor.NO_ID,
-                            workflowExecutionContext
+                            workflowRunContext
                         )
                     } else {
                         emptyList()
@@ -396,18 +394,6 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             val queryBuilder = if (input.query.query() == null) BoolQueryBuilder()
                             else QueryBuilders.boolQuery().must(source.query())
                             queryBuilder.filter(QueryBuilders.termsQuery(fieldName, bucketValues))
-
-                            if (workflowRunContext != null && !workflowRunContext.indexToDocIds.isNullOrEmpty()) {
-                                workflowRunContext.indexToDocIds.forEach { entry ->
-                                    queryBuilder
-                                        .should()
-                                        .add(
-                                            BoolQueryBuilder()
-                                                .must(MatchQueryBuilder("_index", entry.key))
-                                                .must(TermsQueryBuilder("_id", entry.value))
-                                        )
-                                }
-                            }
                             sr.source().query(queryBuilder)
                         }
                     val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(sr, it) }
@@ -445,7 +431,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     index = it.key,
                     timestamp = Instant.now(),
                     docLevelQueries = listOf(),
-                    workflowExecutionId = workflowExecutionId
+                    executionId = workflowExecutionId
                 )
 
                 val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()

@@ -19,7 +19,7 @@ import org.opensearch.alerting.TriggerService
 import org.opensearch.alerting.WorkflowService
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.JobRunner
-import org.opensearch.alerting.model.MonitorRunResult
+import org.opensearch.alerting.model.WorkflowRunResult
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.script.TriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
@@ -197,7 +197,7 @@ object WorkflowRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompo
         }
     }
 
-    suspend fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant, dryrun: Boolean): List<MonitorRunResult<*>> {
+    suspend fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant, dryrun: Boolean): WorkflowRunResult {
         val workflow = job as Workflow
         return CompositeWorkflowRunner.runWorkflow(workflow, monitorCtx, periodStart, periodEnd, dryrun)
     }

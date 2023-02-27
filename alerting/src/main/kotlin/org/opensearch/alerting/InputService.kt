@@ -74,15 +74,16 @@ class InputService(
                             "period_end" to periodEnd.toEpochMilli()
                         )
 
-                        // Rewrite query to consider the doc ids per given index
-                        if (chainedFindingExist(indexToDocIds)) {
-                            val updatedSourceQuery = updateInputQueryWithFindingDocIds(input.query.query(), indexToDocIds!!)
-                            input.query.query(updatedSourceQuery)
-                        }
-
                         // Deep copying query before passing it to rewriteQuery since otherwise, the monitor.input is modified directly
                         // which causes a strange bug where the rewritten query persists on the Monitor across executions
                         val rewrittenQuery = AggregationQueryRewriter.rewriteQuery(deepCopyQuery(input.query), prevResult, monitor.triggers)
+
+                        // Rewrite query to consider the doc ids per given index
+                        if (chainedFindingExist(indexToDocIds)) {
+                            val updatedSourceQuery = updateInputQueryWithFindingDocIds(rewrittenQuery.query(), indexToDocIds!!)
+                            rewrittenQuery.query(updatedSourceQuery)
+                        }
+
                         val searchSource = scriptService.compile(
                             Script(
                                 ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
@@ -122,6 +123,13 @@ class InputService(
         }
     }
 
+    /**
+     * Extends the given query builder with query that filters the given indices with the given doc ids per index
+     * Used whenever we want to select the documents that were found in chained delegate execution of the current workflow run
+     *
+     * @param query Original bucket monitor query
+     * @param indexToDocIds Map of finding doc ids grouped by index
+     */
     private fun updateInputQueryWithFindingDocIds(
         query: QueryBuilder,
         indexToDocIds: Map<String, List<String>>,

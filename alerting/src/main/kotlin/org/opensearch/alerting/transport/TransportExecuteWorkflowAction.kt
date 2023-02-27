@@ -19,6 +19,7 @@ import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.alerting.action.ExecuteWorkflowResponse
+import org.opensearch.alerting.model.WorkflowRunResult
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.workflow.WorkflowRunnerService
 import org.opensearch.client.Client
@@ -54,17 +55,22 @@ class TransportExecuteWorkflowAction @Inject constructor(
 
         client.threadPool().threadContext.stashContext().use {
             val executeWorkflow = fun(workflow: Workflow) {
-                // Launch the coroutine with the clients threadContext. This is needed to preserve authentication information
-                // stored on the threadContext set by the security plugin when using the Alerting plugin with the Security plugin.
-                // runner.launch(ElasticThreadContextElement(client.threadPool().threadContext)) {
                 runner.launch {
+                    val startTime = Instant.now()
                     val (periodStart, periodEnd) =
                         workflow.schedule.getPeriodEndingAt(Instant.ofEpochMilli(execWorkflowRequest.requestEnd.millis))
                     try {
                         val workflowRunResult =
                             WorkflowRunnerService.runJob(workflow, periodStart, periodEnd, execWorkflowRequest.dryrun)
                         withContext(Dispatchers.IO) {
-                            actionListener.onResponse(ExecuteWorkflowResponse(workflowRunResult))
+                            actionListener.onResponse(
+                                ExecuteWorkflowResponse(
+                                    workflowRunResult.workflowRunResult,
+                                    startTime,
+                                    Instant.now(),
+                                    WorkflowRunResult.WorkflowExecutionStatus.SUCCESSFUL
+                                )
+                            )
                         }
                     } catch (e: Exception) {
                         log.error("Unexpected error running workflow", e)

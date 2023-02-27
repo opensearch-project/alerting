@@ -127,9 +127,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 }
             }
 
-            // If monitor execution is triggered from a workflow
-            val indexToRelatedDocIdsMap = workflowRunContext?.indexToDocIds
-
             indices.forEach { indexName ->
                 // Prepare lastRunContext for each index
                 val indexLastRunContext = lastRunContext.getOrPut(indexName) {
@@ -158,6 +155,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
                 // Prepare DocumentExecutionContext for each index
                 val docExecutionContext = DocumentExecutionContext(queries, indexLastRunContext, indexUpdatedRunContext)
+
+                // If monitor execution is triggered from a workflow
+                val indexToRelatedDocIdsMap = workflowRunContext?.indexToDocIds
 
                 val matchingDocs = getMatchingDocs(
                     monitor,
@@ -338,7 +338,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             index = docIndex[1],
             docLevelQueries = docLevelQueries,
             timestamp = Instant.now(),
-            workflowExecutionId = workflowExecutionId
+            executionId = workflowExecutionId
         )
 
         val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()

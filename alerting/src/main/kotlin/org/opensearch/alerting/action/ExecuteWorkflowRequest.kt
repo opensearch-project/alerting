@@ -7,12 +7,16 @@ package org.opensearch.alerting.action
 
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionRequestValidationException
+import org.opensearch.action.ValidateActions
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.Workflow
 import java.io.IOException
 
+/**
+ * A class containing workflow details.
+ */
 class ExecuteWorkflowRequest : ActionRequest {
     val dryrun: Boolean
     val requestEnd: TimeValue
@@ -23,7 +27,7 @@ class ExecuteWorkflowRequest : ActionRequest {
         dryrun: Boolean,
         requestEnd: TimeValue,
         workflowId: String?,
-        workflow: Workflow?
+        workflow: Workflow?,
     ) : super() {
         this.dryrun = dryrun
         this.requestEnd = requestEnd
@@ -42,7 +46,13 @@ class ExecuteWorkflowRequest : ActionRequest {
     )
 
     override fun validate(): ActionRequestValidationException? {
-        return null
+        var validationException: ActionRequestValidationException? = null
+        if (workflowId == null || workflow == null) {
+            validationException = ValidateActions.addValidationError(
+                "Both workflow and workflow id are missing", validationException
+            )
+        }
+        return validationException
     }
 
     @Throws(IOException::class)

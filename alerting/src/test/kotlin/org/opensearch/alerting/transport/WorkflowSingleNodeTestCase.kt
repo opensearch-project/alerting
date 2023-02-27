@@ -7,11 +7,11 @@ package org.opensearch.alerting.transport
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope
 import org.opensearch.action.support.WriteRequest
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.alerting.action.ExecuteWorkflowResponse
 import org.opensearch.common.unit.TimeValue
+import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.DeleteWorkflowRequest
@@ -36,7 +36,11 @@ import java.time.Instant
 @ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 abstract class WorkflowSingleNodeTestCase : AlertingSingleNodeTestCase() {
 
-    protected fun searchWorkflow(id: String, indices: String = ScheduledJob.SCHEDULED_JOBS_INDEX, refresh: Boolean = true): Workflow? {
+    protected fun searchWorkflow(
+        id: String,
+        indices: String = ScheduledJob.SCHEDULED_JOBS_INDEX,
+        refresh: Boolean = true,
+    ): Workflow? {
         try {
             if (refresh) refreshIndex(indices)
         } catch (e: Exception) {
@@ -61,7 +65,11 @@ abstract class WorkflowSingleNodeTestCase : AlertingSingleNodeTestCase() {
         }.first()
     }
 
-    protected fun upsertWorkflow(workflow: Workflow, id: String = Workflow.NO_ID, method: RestRequest.Method = RestRequest.Method.POST): IndexWorkflowResponse? {
+    protected fun upsertWorkflow(
+        workflow: Workflow,
+        id: String = Workflow.NO_ID,
+        method: RestRequest.Method = RestRequest.Method.POST,
+    ): IndexWorkflowResponse? {
         val request = IndexWorkflowRequest(
             workflowId = id,
             seqNo = SequenceNumbers.UNASSIGNED_SEQ_NO,
@@ -77,9 +85,12 @@ abstract class WorkflowSingleNodeTestCase : AlertingSingleNodeTestCase() {
     protected fun getWorkflowById(
         id: String,
         version: Long = 1L,
-        fetchSourceContext: FetchSourceContext = FetchSourceContext.FETCH_SOURCE
+        fetchSourceContext: FetchSourceContext = FetchSourceContext.FETCH_SOURCE,
     ): GetWorkflowResponse {
-        return client().execute(AlertingActions.GET_WORKFLOW_ACTION_TYPE, GetWorkflowRequest(id, version, RestRequest.Method.GET, fetchSourceContext)).get()
+        return client().execute(
+            AlertingActions.GET_WORKFLOW_ACTION_TYPE,
+            GetWorkflowRequest(id, version, RestRequest.Method.GET, fetchSourceContext)
+        ).get()
     }
 
     protected fun deleteWorkflow(workflowId: String) {

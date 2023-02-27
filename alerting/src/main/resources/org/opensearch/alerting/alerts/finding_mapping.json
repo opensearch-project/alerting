@@ -52,7 +52,7 @@
     "timestamp": {
       "type": "long"
     },
-    "workflow_execution_id": {
+    "execution_id": {
       "type": "keyword"
     }
   }
