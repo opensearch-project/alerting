@@ -91,20 +91,25 @@ class WorkflowService(
      * @param size Expected number of monitors
      */
     suspend fun getMonitorsById(monitors: List<String>, size: Int): List<Monitor> {
-        val bqb = QueryBuilders.boolQuery().filter(QueryBuilders.termsQuery("_id", monitors))
+        try {
+            val bqb = QueryBuilders.boolQuery().filter(QueryBuilders.termsQuery("_id", monitors))
 
-        val searchRequest = SearchRequest()
-            .source(
-                SearchSourceBuilder()
-                    .query(bqb)
-                    .version(true)
-                    .seqNoAndPrimaryTerm(true)
-                    .size(size)
-            )
-            .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
+            val searchRequest = SearchRequest()
+                .source(
+                    SearchSourceBuilder()
+                        .query(bqb)
+                        .version(true)
+                        .seqNoAndPrimaryTerm(true)
+                        .size(size)
+                )
+                .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
 
-        val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
-        return parseMonitors(searchResponse)
+            val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
+            return parseMonitors(searchResponse)
+        } catch (e: Exception) {
+            log.error("Error getting monitors: ${e.message}")
+            throw AlertingException.wrap(e)
+        }
     }
 
     private fun parseMonitors(response: SearchResponse): List<Monitor> {

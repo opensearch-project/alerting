@@ -6,6 +6,7 @@
 package org.opensearch.alerting.transport
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope
+import org.opensearch.action.admin.indices.delete.DeleteIndexRequest
 import org.opensearch.action.admin.indices.get.GetIndexRequestBuilder
 import org.opensearch.action.admin.indices.get.GetIndexResponse
 import org.opensearch.action.admin.indices.refresh.RefreshAction
@@ -232,6 +233,11 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     protected fun deleteMonitor(monitorId: String): DeleteMonitorResponse = client().execute(
         AlertingActions.DELETE_MONITOR_ACTION_TYPE, DeleteMonitorRequest(monitorId, WriteRequest.RefreshPolicy.IMMEDIATE)
     ).get()
+
+    protected fun deleteIndex(index: String) {
+        val response = client().admin().indices().delete(DeleteIndexRequest(index)).get()
+        assertTrue("Unable to delete index", response.isAcknowledged())
+    }
 
     override fun getPlugins(): List<Class<out Plugin>> {
         return listOf(AlertingPlugin::class.java, ReindexPlugin::class.java, MustachePlugin::class.java, PainlessPlugin::class.java)

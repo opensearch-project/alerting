@@ -19,7 +19,6 @@ import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.alerting.action.ExecuteWorkflowResponse
-import org.opensearch.alerting.model.WorkflowRunResult
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.workflow.WorkflowRunnerService
 import org.opensearch.client.Client
@@ -56,7 +55,6 @@ class TransportExecuteWorkflowAction @Inject constructor(
         client.threadPool().threadContext.stashContext().use {
             val executeWorkflow = fun(workflow: Workflow) {
                 runner.launch {
-                    val startTime = Instant.now()
                     val (periodStart, periodEnd) =
                         workflow.schedule.getPeriodEndingAt(Instant.ofEpochMilli(execWorkflowRequest.requestEnd.millis))
                     try {
@@ -65,10 +63,7 @@ class TransportExecuteWorkflowAction @Inject constructor(
                         withContext(Dispatchers.IO) {
                             actionListener.onResponse(
                                 ExecuteWorkflowResponse(
-                                    workflowRunResult.workflowRunResult,
-                                    startTime,
-                                    Instant.now(),
-                                    WorkflowRunResult.WorkflowExecutionStatus.SUCCESSFUL
+                                    workflowRunResult
                                 )
                             )
                         }

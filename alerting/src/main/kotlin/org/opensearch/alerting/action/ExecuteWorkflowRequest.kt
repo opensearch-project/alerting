@@ -47,7 +47,7 @@ class ExecuteWorkflowRequest : ActionRequest {
 
     override fun validate(): ActionRequestValidationException? {
         var validationException: ActionRequestValidationException? = null
-        if (workflowId == null || workflow == null) {
+        if (workflowId == null && workflow == null) {
             validationException = ValidateActions.addValidationError(
                 "Both workflow and workflow id are missing", validationException
             )

@@ -100,7 +100,7 @@ abstract class WorkflowSingleNodeTestCase : AlertingSingleNodeTestCase() {
         ).get()
     }
 
-    protected fun executeWorkflow(workflow: Workflow, id: String, dryRun: Boolean = true): ExecuteWorkflowResponse? {
+    protected fun executeWorkflow(workflow: Workflow? = null, id: String? = null, dryRun: Boolean = true): ExecuteWorkflowResponse? {
         val request = ExecuteWorkflowRequest(dryRun, TimeValue(Instant.now().toEpochMilli()), id, workflow)
         return client().execute(ExecuteWorkflowAction.INSTANCE, request).get()
     }

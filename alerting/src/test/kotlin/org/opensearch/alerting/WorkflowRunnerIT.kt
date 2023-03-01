@@ -9,6 +9,7 @@ import org.junit.Assert
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.transport.WorkflowSingleNodeTestCase
+import org.opensearch.alerting.util.AlertingException
 import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.GetAlertsRequest
@@ -20,13 +21,16 @@ import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.Table
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
 import org.opensearch.search.aggregations.bucket.composite.TermsValuesSourceBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
+import java.lang.Exception
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.ExecutionException
 
 class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
 
@@ -105,7 +109,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
 
         val workflowId = workflowResponse.id
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
-        val monitorsRunResults = executeWorkflowResponse.workflowRunResult
+        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.workflowRunResult
         assertEquals(2, monitorsRunResults.size)
 
         assertEquals(monitor1.name, monitorsRunResults[0].monitorName)
@@ -209,7 +213,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
         assertNotNull(executeWorkflowResponse)
 
-        for (monitorRunResults in executeWorkflowResponse.workflowRunResult) {
+        for (monitorRunResults in executeWorkflowResponse.workflowRunResult.workflowRunResult) {
             if (bucketLevelMonitorResponse.monitor.name == monitorRunResults.monitorName) {
                 val searchResult = monitorRunResults.inputResults.results.first()
                 @Suppress("UNCHECKED_CAST")
@@ -347,7 +351,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
         assertNotNull(executeWorkflowResponse)
 
-        for (monitorRunResults in executeWorkflowResponse.workflowRunResult) {
+        for (monitorRunResults in executeWorkflowResponse.workflowRunResult.workflowRunResult) {
             when (monitorRunResults.monitorName) {
                 // Verify first doc level monitor execution, alerts and findings
                 docLevelMonitorResponse.monitor.name -> {
@@ -401,6 +405,71 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
                 }
             }
         }
+    }
+
+    fun `test execute workflow inout error`() {
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+
+        val monitorResponse = createMonitor(monitor)!!
+        var workflow = randomWorkflowMonitor(
+            monitorIds = listOf(monitorResponse.id)
+        )
+        val workflowResponse = upsertWorkflow(workflow)!!
+        val workflowById = searchWorkflow(workflowResponse.id)!!
+        assertNotNull(workflowById)
+
+        deleteIndex(index)
+
+        val response = executeWorkflow(workflowById, workflowById.id, false)!!
+
+        assertNotNull(response.workflowRunResult.error)
+        assertTrue(response.workflowRunResult.error is AlertingException)
+        assertEquals(RestStatus.NOT_FOUND, (response.workflowRunResult.error as AlertingException).status)
+        assertEquals("Configured indices are not found: [$index]", (response.workflowRunResult.error as AlertingException).message)
+    }
+
+    fun `test execute workflow wrong workflow id`() {
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+
+        val monitorResponse = createMonitor(monitor)!!
+
+        val workflowRequest = randomWorkflowMonitor(
+            monitorIds = listOf(monitorResponse.id)
+        )
+        val workflowResponse = upsertWorkflow(workflowRequest)!!
+        val workflowId = workflowResponse.id
+        val getWorkflowResponse = getWorkflowById(id = workflowResponse.id)
+
+        assertNotNull(getWorkflowResponse)
+        assertEquals(workflowId, getWorkflowResponse.id)
+
+        var exception: Exception? = null
+        val badWorkflowId = getWorkflowResponse.id + "bad"
+        try {
+            executeWorkflow(id = badWorkflowId)
+        } catch (ex: Exception) {
+            exception = ex
+        }
+        assertTrue(exception is ExecutionException)
+        assertTrue(exception!!.cause is AlertingException)
+        assertEquals(RestStatus.NOT_FOUND, (exception.cause as AlertingException).status)
+        assertEquals("Can't find workflow with id: $badWorkflowId", exception.cause!!.message)
     }
 
     private fun assertFindings(
