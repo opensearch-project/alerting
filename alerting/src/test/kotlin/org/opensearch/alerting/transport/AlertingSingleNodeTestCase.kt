@@ -88,7 +88,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
             val testDoc = """
                 {
                   "test_strict_date_time": "$testTime",
-                  "test_field": "$value",
+                  "test_field_1": "$value",
                   "number": "$i"
                 }
             """.trimIndent()
@@ -112,7 +112,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
             .field("type", "date")
             .field("format", "strict_date_time")
             .endObject()
-            .startObject("test_field")
+            .startObject("test_field_1")
             .field("type", "keyword")
             .endObject()
             .endObject()

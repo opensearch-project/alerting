@@ -54,6 +54,8 @@ fun Destination.isTestAction(): Boolean = this.type == DestinationType.TEST_ACTI
 
 fun Monitor.isDocLevelMonitor(): Boolean = this.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR
 
+fun Monitor.isQueryLevelMonitor(): Boolean = this.monitorType == Monitor.MonitorType.QUERY_LEVEL_MONITOR
+
 /**
  * Since buckets can have multi-value keys, this converts the bucket key values to a string that can be used
  * as the key for a HashMap to easily retrieve [AggregationResultBucket] based on the bucket key values.

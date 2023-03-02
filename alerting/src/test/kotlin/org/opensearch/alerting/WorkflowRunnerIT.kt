@@ -35,7 +35,7 @@ import java.util.concurrent.ExecutionException
 class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
 
     fun `test execute workflow with custom alerts and finding index with doc level delegates`() {
-        val docQuery1 = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customAlertsIndex1 = "custom_alerts_index"
@@ -83,7 +83,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
             "message" : "This is an error from IAD region",
             "source.ip.v6.v2" : 16644, 
             "test_strict_date_time" : "$testTime",
-            "test_field" : "us-west-2"
+            "test_field_1" : "us-west-2"
         }"""
         indexDoc(index, "1", testDoc1)
 
@@ -93,7 +93,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
             "message" : "This is an error from IAD region",
             "source.ip.v6.v2" : 16645, 
             "test_strict_date_time" : "$testTime",
-            "test_field" : "us-west-2"
+            "test_field_1" : "us-west-2"
         }"""
         indexDoc(index, "2", testDoc2)
 
@@ -103,7 +103,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
             "message" : "This is an error from IAD region",
             "source.ip.v6.v2" : 16645, 
             "test_strict_date_time" : "$testTime",
-            "test_field" : "us-east-1"
+            "test_field_1" : "us-east-1"
         }"""
         indexDoc(index, "3", testDoc3)
 
@@ -131,7 +131,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
             .lte("{{period_end}}")
             .format("epoch_millis")
         val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field").field("test_field")
+            TermsValuesSourceBuilder("test_field_1").field("test_field_1")
         )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(index), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
@@ -168,9 +168,9 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
             )
         )!!
 
-        val docQuery1 = DocLevelQuery(query = "test_field:\"test_value_2\"", name = "1")
-        val docQuery2 = DocLevelQuery(query = "test_field:\"test_value_1\"", name = "2")
-        val docQuery3 = DocLevelQuery(query = "test_field:\"test_value_3\"", name = "3")
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"test_value_2\"", name = "1")
+        val docQuery2 = DocLevelQuery(query = "test_field_1:\"test_value_1\"", name = "2")
+        val docQuery3 = DocLevelQuery(query = "test_field_1:\"test_value_3\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1, docQuery2, docQuery3))
         val docTrigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val docCustomAlertsIndex = "custom_alerts_index"
@@ -239,8 +239,8 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
     }
 
     fun `test execute workflow with custom alerts and finding index with bucket level and doc level delegates when doc level delegate is used in chained finding`() {
-        val docQuery1 = DocLevelQuery(query = "test_field:\"test_value_2\"", name = "1")
-        val docQuery2 = DocLevelQuery(query = "test_field:\"test_value_3\"", name = "2")
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"test_value_2\"", name = "1")
+        val docQuery2 = DocLevelQuery(query = "test_field_1:\"test_value_3\"", name = "2")
 
         var docLevelMonitor = randomDocumentLevelMonitor(
             inputs = listOf(DocLevelMonitorInput("description", listOf(index), listOf(docQuery1, docQuery2))),
@@ -259,7 +259,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
             .lte("{{period_end}}")
             .format("epoch_millis")
         val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field").field("test_field")
+            TermsValuesSourceBuilder("test_field_1").field("test_field_1")
         )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(index), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
@@ -294,7 +294,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         )!!
 
         var docLevelMonitor1 = randomDocumentLevelMonitor(
-            // Match the documents with test_field: test_value_3
+            // Match the documents with test_field_1: test_value_3
             inputs = listOf(DocLevelMonitorInput("description", listOf(index), listOf(docQuery2))),
             triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN)),
             dataSources = DataSources(

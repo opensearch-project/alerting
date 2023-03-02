@@ -14,6 +14,7 @@ import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.WorkflowRunResult
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.isDocLevelMonitor
+import org.opensearch.alerting.util.isQueryLevelMonitor
 import org.opensearch.commons.alerting.model.CompositeInput
 import org.opensearch.commons.alerting.model.Delegate
 import org.opensearch.commons.alerting.model.Monitor
@@ -49,10 +50,14 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 var indexToDocIds = mapOf<String, List<String>>()
                 var delegateMonitor: Monitor
                 delegateMonitor = monitorsById[delegate.monitorId]
-                    ?: throw IllegalStateException("Delegate monitor not found ${delegate.monitorId} for the workflow $workflow.id")
+                    ?: throw AlertingException.wrap(
+                        IllegalStateException("Delegate monitor not found ${delegate.monitorId} for the workflow $workflow.id")
+                    )
                 if (delegate.chainedFindings != null) {
                     val chainedMonitor = monitorsById[delegate.chainedFindings!!.monitorId]
-                        ?: throw IllegalStateException("Chained finding monitor not found ${delegate.monitorId} for the workflow $workflow.id")
+                        ?: throw AlertingException.wrap(
+                            IllegalStateException("Chained finding monitor not found ${delegate.monitorId} for the workflow $workflow.id")
+                        )
                     indexToDocIds = monitorCtx.workflowService!!.getFindingDocIdsByExecutionId(chainedMonitor, workflowExecutionId)
                 }
 
@@ -76,7 +81,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                         dryRun,
                         workflowRunContext
                     )
-                } else {
+                } else if (delegateMonitor.isQueryLevelMonitor()) {
                     QueryLevelMonitorRunner.runMonitor(
                         delegateMonitor,
                         monitorCtx,
@@ -84,6 +89,10 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                         periodEnd,
                         dryRun,
                         workflowRunContext
+                    )
+                } else {
+                    throw AlertingException.wrap(
+                        IllegalStateException("Unsupported monitor type")
                     )
                 }
                 resultList.add(runResult)

@@ -61,7 +61,7 @@ class InputService(
             val aggTriggerAfterKey: MutableMap<String, TriggerAfterKey> = mutableMapOf()
 
             // If monitor execution is triggered from a workflow
-            val indexToDocIds = workflowRunContext?.indexToDocIds
+            val indexToDocIds = workflowRunContext?.matchingDocIdsPerIndex
 
             // TODO: If/when multiple input queries are supported for Bucket-Level Monitor execution, aggTriggerAfterKeys will
             //  need to be updated to account for it

@@ -157,7 +157,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 val docExecutionContext = DocumentExecutionContext(queries, indexLastRunContext, indexUpdatedRunContext)
 
                 // If monitor execution is triggered from a workflow
-                val indexToRelatedDocIdsMap = workflowRunContext?.indexToDocIds
+                val indexToRelatedDocIdsMap = workflowRunContext?.matchingDocIdsPerIndex
 
                 val matchingDocs = getMatchingDocs(
                     monitor,

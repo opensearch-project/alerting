@@ -8,5 +8,5 @@ package org.opensearch.alerting.workflow
 data class WorkflowRunContext(
     val chainedMonitorId: String?,
     val workflowExecutionId: String,
-    val indexToDocIds: Map<String, List<String>>
+    val matchingDocIdsPerIndex: Map<String, List<String>>
 )
