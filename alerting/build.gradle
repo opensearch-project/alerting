@@ -151,13 +151,6 @@ integTest.getClusters().forEach{c -> c.plugin(project.getObjects().fileProperty(
 
 def _numNodes = findProperty('numNodes') as Integer ?: 1
 
-//String notificationsFilePath = "src/test/resources/notifications"
-//String notificationsCoreFilePath = "src/test/resources/notifications-core"
-//String notificationsPlugin = "opensearch-notifications-" + plugin_no_snapshot + ".zip"
-//String notificationsCorePlugin = "opensearch-notifications-core-" + plugin_no_snapshot + ".zip"
-//String notificationsRemoteFile = "https://aws.oss.sonatype.org/content/repositories/snapshots/org/opensearch/plugin/notifications/3.0.0.0-SNAPSHOT/notifications-3.0.0.0-20230224.051037-28.zip"
-//String notificationsCoreRemoteFile = "https://aws.oss.sonatype.org/content/repositories/snapshots/org/opensearch/plugin/opensearch-notifications-core/3.0.0.0-SNAPSHOT/opensearch-notifications-core-3.0.0.0-20230224.051037-28.zip"
-//String notificationsCorePath = "https://aws.oss.sonatype.org/content/repositories/snapshots/org/opensearch/plugin/opensearch-notifications-core/3.0.0.0-SNAPSHOT/opensearch-notifications-core-"
 testClusters.integTest {
     testDistribution = "ARCHIVE"
     // Cluster shrink exception thrown if we try to set numberOfNodes to 1, so only apply if > 1
