@@ -927,10 +927,15 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         enableScheduledJob()
         val monitorId = createMonitor(randomQueryLevelMonitor(enabled = true), refresh = true).id
 
+        if (isMultiNode) Thread.sleep(2000)
         var alertingStats = getAlertingStats()
         assertAlertingStatsSweeperEnabled(alertingStats, true)
         assertEquals("Scheduled job index does not exist", true, alertingStats["scheduled_job_index_exists"])
-        assertEquals("Scheduled job index is not yellow", "yellow", alertingStats["scheduled_job_index_status"])
+        if (isMultiNode) {
+            assertEquals("Scheduled job index is not green", "green", alertingStats["scheduled_job_index_status"])
+        } else {
+            assertEquals("Scheduled job index is not yellow", "yellow", alertingStats["scheduled_job_index_status"])
+        }
         assertEquals("Nodes are not on schedule", numberOfNodes, alertingStats["nodes_on_schedule"])
 
         val _nodes = alertingStats["_nodes"] as Map<String, Int>
@@ -981,10 +986,15 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         enableScheduledJob()
         createRandomMonitor(refresh = true)
 
+        if (isMultiNode) Thread.sleep(2000)
         val responseMap = getAlertingStats()
         assertAlertingStatsSweeperEnabled(responseMap, true)
         assertEquals("Scheduled job index does not exist", true, responseMap["scheduled_job_index_exists"])
-        assertEquals("Scheduled job index is not yellow", "yellow", responseMap["scheduled_job_index_status"])
+        if (isMultiNode) {
+            assertEquals("Scheduled job index is not green", "green", responseMap["scheduled_job_index_status"])
+        } else {
+            assertEquals("Scheduled job index is not yellow", "yellow", responseMap["scheduled_job_index_status"])
+        }
         assertEquals("Nodes are not on schedule", numberOfNodes, responseMap["nodes_on_schedule"])
 
         val _nodes = responseMap["_nodes"] as Map<String, Int>
@@ -1009,10 +1019,15 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         enableScheduledJob()
         createRandomMonitor(refresh = true)
 
+        if (isMultiNode) Thread.sleep(2000)
         val responseMap = getAlertingStats("/jobs_info")
         assertAlertingStatsSweeperEnabled(responseMap, true)
         assertEquals("Scheduled job index does not exist", true, responseMap["scheduled_job_index_exists"])
-        assertEquals("Scheduled job index is not yellow", "yellow", responseMap["scheduled_job_index_status"])
+        if (isMultiNode) {
+            assertEquals("Scheduled job index is not green", "green", responseMap["scheduled_job_index_status"])
+        } else {
+            assertEquals("Scheduled job index is not yellow", "yellow", responseMap["scheduled_job_index_status"])
+        }
         assertEquals("Nodes not on schedule", numberOfNodes, responseMap["nodes_on_schedule"])
 
         val _nodes = responseMap["_nodes"] as Map<String, Int>
