@@ -16,6 +16,7 @@ apply plugin: 'jacoco'
 
 def usingRemoteCluster = System.properties.containsKey('tests.rest.cluster') || System.properties.containsKey('tests.cluster')
 def usingMultiNode = project.properties.containsKey('numNodes')
+String bwcVersion = "2.6.0.0"
 
 ext {
     projectSubstitutions = [:]
@@ -92,7 +93,18 @@ configurations.testImplementation {
     exclude module: "securemock"
 }
 
+configurations {
+    zipArchive
+}
+
 dependencies {
+    // Needed for integ tests
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-notifications-core', version: "${opensearch_build}"
+    zipArchive group: 'org.opensearch.plugin', name:'notifications', version: "${opensearch_build}"
+
+    // Needed for BWC tests
+    zipArchive group: 'org.opensearch.plugin', name:'alerting', version: "${bwcVersion}"
+
     compileOnly "org.opensearch.plugin:opensearch-scripting-painless-spi:${versions.opensearch}"
     api "org.opensearch.plugin:percolator-client:${opensearch_version}"
 
@@ -139,12 +151,6 @@ integTest.getClusters().forEach{c -> c.plugin(project.getObjects().fileProperty(
 
 def _numNodes = findProperty('numNodes') as Integer ?: 1
 
-String notificationsFilePath = "src/test/resources/notifications"
-String notificationsCoreFilePath = "src/test/resources/notifications-core"
-String notificationsPlugin = "opensearch-notifications-" + plugin_no_snapshot + ".zip"
-String notificationsCorePlugin = "opensearch-notifications-core-" + plugin_no_snapshot + ".zip"
-String notificationsRemoteFile = "https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/" + opensearch_no_snapshot + "/6809/linux/x64/tar/builds/opensearch/plugins/" + notificationsPlugin
-String notificationsCoreRemoteFile = "https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/" + opensearch_no_snapshot + "/6809/linux/x64/tar/builds/opensearch/plugins/" + notificationsCorePlugin
 testClusters.integTest {
     testDistribution = "ARCHIVE"
     // Cluster shrink exception thrown if we try to set numberOfNodes to 1, so only apply if > 1
@@ -164,17 +170,9 @@ testClusters.integTest {
         new RegularFile() {
             @Override
             File getAsFile() {
-                File dir = new File(rootDir.path + "/alerting/" + notificationsCoreFilePath)
-
-                if (!dir.exists()) {
-                    dir.mkdirs()
-                }
-
-                File f = new File(dir, notificationsCorePlugin)
-                if (!f.exists()) {
-                    new URL(notificationsCoreRemoteFile).withInputStream{ ins -> f.withOutputStream{ it << ins }}
-                }
-                fileTree(notificationsCoreFilePath).getSingleFile()
+                return configurations.zipArchive.asFileTree.matching {
+                    include '**/opensearch-notifications-core*'
+                }.singleFile
             }
         }
     }))
@@ -183,17 +181,9 @@ testClusters.integTest {
         new RegularFile() {
             @Override
             File getAsFile() {
-                File dir = new File(rootDir.path + "/alerting/" + notificationsFilePath)
-
-                if (!dir.exists()) {
-                    dir.mkdirs()
-                }
-
-                File f = new File(dir, notificationsPlugin)
-                if (!f.exists()) {
-                    new URL(notificationsRemoteFile).withInputStream{ ins -> f.withOutputStream{ it << ins }}
-                }
-                fileTree(notificationsFilePath).getSingleFile()
+                return configurations.zipArchive.asFileTree.matching {
+                    include '**/notifications*'
+                }.singleFile
             }
         }
     }))
@@ -264,18 +254,12 @@ task integTestRemote(type: RestIntegTestTask) {
 }
 integTestRemote.enabled = System.getProperty("tests.rest.cluster") != null
 
-String bwcVersion = "2.5.0.0"
 String baseName = "alertingBwcCluster"
-String bwcFilePath = "src/test/resources/bwc"
-String bwcOpenSearchPlugin = "opensearch-alerting-" + bwcVersion + ".zip"
-String bwcRemoteFile = 'https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/2.5.0/latest/linux' +
-        '/x64/tar/builds/opensearch/plugins/' + bwcOpenSearchPlugin
-
 2.times {i ->
     testClusters {
         "${baseName}$i" {
             testDistribution = "ARCHIVE"
-            versions = ["2.5.0-SNAPSHOT", "3.0.0-SNAPSHOT"]
+            versions = ["2.6.0-SNAPSHOT", "3.0.0-SNAPSHOT"]
             numberOfNodes = 3
             plugin(provider(new Callable<RegularFile>(){
                 @Override
@@ -283,16 +267,9 @@ String bwcRemoteFile = 'https://ci.opensearch.org/ci/dbc/distribution-build-open
                     return new RegularFile() {
                         @Override
                         File getAsFile() {
-                            File dir = new File(rootDir.path + "/alerting/" + bwcFilePath + "/alerting/" + bwcVersion)
-
-                            if (!dir.exists()) {
-                                dir.mkdirs()
-                            }
-                            File f = new File(dir, bwcOpenSearchPlugin)
-                            if (!f.exists()) {
-                                new URL(bwcRemoteFile).withInputStream{ ins -> f.withOutputStream{ it << ins }}
-                            }
-                            return fileTree(bwcFilePath + "/alerting/" + bwcVersion).getSingleFile()
+                            return configurations.zipArchive.asFileTree.matching {
+                                include '**/alerting*'
+                            }.singleFile
                         }
                     }
                 }
@@ -315,17 +292,9 @@ task prepareBwcTests {
                     new RegularFile() {
                         @Override
                         File getAsFile() {
-                            File dir = new File(rootDir.path + "/alerting/" + notificationsCoreFilePath)
-
-                            if (!dir.exists()) {
-                                dir.mkdirs()
-                            }
-
-                            File f = new File(dir, notificationsCorePlugin)
-                            if (!f.exists()) {
-                                new URL(notificationsCoreRemoteFile).withInputStream{ ins -> f.withOutputStream{ it << ins }}
-                            }
-                            fileTree(notificationsCoreFilePath).getSingleFile()
+                            return configurations.zipArchive.asFileTree.matching {
+                                include '**/opensearch-notifications-core*'
+                            }.singleFile
                         }
                     }
                 }),
@@ -333,17 +302,9 @@ task prepareBwcTests {
                     new RegularFile() {
                         @Override
                         File getAsFile() {
-                            File dir = new File(rootDir.path + "/alerting/" + notificationsFilePath)
-
-                            if (!dir.exists()) {
-                                dir.mkdirs()
-                            }
-
-                            File f = new File(dir, notificationsPlugin)
-                            if (!f.exists()) {
-                                new URL(notificationsRemoteFile).withInputStream{ ins -> f.withOutputStream{ it << ins }}
-                            }
-                            fileTree(notificationsFilePath).getSingleFile()
+                            return configurations.zipArchive.asFileTree.matching {
+                                include '**/notifications*'
+                            }.singleFile
                         }
                     }
                 })

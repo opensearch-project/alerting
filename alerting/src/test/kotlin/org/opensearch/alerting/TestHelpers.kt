@@ -27,11 +27,7 @@ import org.opensearch.common.UUIDs
 import org.opensearch.common.settings.SecureString
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentFactory
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtFilter
@@ -61,6 +57,10 @@ import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
 import org.opensearch.commons.alerting.model.action.Throttle
 import org.opensearch.commons.alerting.util.string
 import org.opensearch.commons.authuser.User
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.ToXContent
+import org.opensearch.core.xcontent.XContentBuilder
+import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptType

@@ -53,8 +53,6 @@ import org.opensearch.common.io.stream.NamedWriteableRegistry
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
@@ -69,6 +67,8 @@ import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JO
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction

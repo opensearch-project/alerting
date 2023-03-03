@@ -19,12 +19,12 @@ import org.opensearch.client.OpenSearchClient
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.util.concurrent.ThreadContext
 import org.opensearch.common.util.concurrent.ThreadContext.StoredContext
-import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.InjectSecurity
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.notifications.NotificationsPluginInterface
+import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus

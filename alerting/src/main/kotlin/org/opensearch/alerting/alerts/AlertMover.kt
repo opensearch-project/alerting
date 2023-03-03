@@ -17,14 +17,14 @@ import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.client.Client
 import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.VersionType
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus

@@ -14,11 +14,11 @@ import org.opensearch.alerting.randomBucketSelectorExtAggregationBuilder
 import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.cluster.ClusterModule
 import org.opensearch.common.CheckedFunction
-import org.opensearch.common.ParseField
-import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.model.Trigger
+import org.opensearch.core.ParseField
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.search.aggregations.Aggregation
 import org.opensearch.search.aggregations.AggregationBuilder
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder

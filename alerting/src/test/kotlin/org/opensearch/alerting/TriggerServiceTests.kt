@@ -11,9 +11,9 @@ import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
-import org.opensearch.common.xcontent.DeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.core.xcontent.DeprecationHandler
+import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.script.ScriptService
 import org.opensearch.test.OpenSearchTestCase
 import java.time.Instant

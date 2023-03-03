@@ -46,7 +46,6 @@ import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
 import org.opensearch.client.RestClient
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
@@ -54,6 +53,7 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.rest.SecureRestClientBuilder
+import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
