@@ -535,7 +535,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         }
         boolQueryBuilder.filter(percolateQueryBuilder)
 
-        val queryIndex = monitorMetadata.sourceToQueryIndexMapping[index + monitor.id]
+        val queryIndex = monitorMetadata.getMappedQueryIndex(index)
         if (queryIndex == null) {
             val message = "Failed to resolve concrete queryIndex from sourceIndex during monitor execution!" +
                 " sourceIndex:$index queryIndex:${monitor.dataSources.queryIndex}"
@@ -565,7 +565,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
             var xContentBuilder = XContentFactory.jsonBuilder().startObject()
             sourceMap.forEach { (k, v) ->
-                xContentBuilder = xContentBuilder.field("${k}_${index}_$monitorId", v)
+                xContentBuilder = xContentBuilder.field("${k}_${IndexUtils.sanitizeDotsInIndexName(index)}_$monitorId", v)
             }
             xContentBuilder = xContentBuilder.endObject()
 

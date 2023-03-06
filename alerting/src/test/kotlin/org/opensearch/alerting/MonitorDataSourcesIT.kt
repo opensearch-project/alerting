@@ -210,6 +210,9 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute monitor with custom query index old`() {
+        val index = ".ds-my_index"
+        createIndex(index, Settings.EMPTY)
+
         val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
         val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4")
         val docQuery3 = DocLevelQuery(query = "source.ip.v4.v0:120", name = "5")
@@ -217,8 +220,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docQuery5 = DocLevelQuery(query = "message:\"This is an error from IAD region\"", name = "7")
         val docQuery6 = DocLevelQuery(query = "type.subtype:\"some subtype\"", name = "8")
         val docQuery7 = DocLevelQuery(query = "supertype.type:\"some type\"", name = "9")
+        val docQuery8 = DocLevelQuery(query = "test_field.properties.some_other_field:\"us-west-2\"", name = "10")
+        val docQuery9 = DocLevelQuery(query = "alias_of_properties_interim_field:\"1234\"", name = "10")
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(docQuery1, docQuery2, docQuery3, docQuery4, docQuery5, docQuery6, docQuery7)
+            "description",
+            listOf(index),
+            listOf(docQuery1, docQuery2, docQuery3, docQuery4, docQuery5, docQuery6, docQuery7, docQuery8, docQuery9)
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
@@ -243,13 +250,17 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             "source.ip.v4.v0" : 120,
             "test_bad_char" : "\u0000", 
             "test_strict_date_time" : "$testTime",
-            "test_field.some_other_field" : "us-west-2",
+            "test_field.properties.some_other_field" : "us-west-2",
+            "test_field.properties.aaa.bbb" : "1234",
             "type.subtype" : "some subtype",
             "supertype.type" : "some type"
         }"""
         indexDoc(index, "1", testDoc)
         client().admin().indices().putMapping(
-            PutMappingRequest(index).source("alias.some.fff", "type=alias,path=test_field.some_other_field")
+            PutMappingRequest(index).source("alias.some.fff", "type=alias,path=test_field.properties.some_other_field")
+        )
+        client().admin().indices().putMapping(
+            PutMappingRequest(index).source("alias_of_properties_interim_field", "type=alias,path=test_field.properties.aaa.bbb")
         )
         assertFalse(monitorResponse?.id.isNullOrEmpty())
         monitor = monitorResponse!!.monitor
@@ -268,7 +279,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val findings = searchFindings(id, customFindingsIndex)
         assertEquals("Findings saved for test monitor", 1, findings.size)
         assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
-        assertEquals("Didn't match all 7 queries", 7, findings[0].docLevelQueries.size)
+        assertEquals("Didn't match all 7 queries", 9, findings[0].docLevelQueries.size)
     }
 
     fun `test execute monitor with custom query index and nested mappings`() {

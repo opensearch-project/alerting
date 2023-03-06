@@ -6,6 +6,7 @@
 package org.opensearch.alerting.model
 
 import org.opensearch.alerting.model.destination.Destination.Companion.NO_ID
+import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.io.stream.Writeable
@@ -62,6 +63,16 @@ data class MonitorMetadata(
         }
         if (params.paramAsBoolean("with_type", false)) builder.endObject()
         return builder.endObject()
+    }
+
+    fun addQueryIndexToMapping(sourceIndex: String, queryIndex: String) {
+        val index = IndexUtils.sanitizeDotsInIndexName(sourceIndex)
+        sourceToQueryIndexMapping["$index$monitorId"] = queryIndex
+    }
+
+    fun getMappedQueryIndex(index: String): String? {
+        val index = IndexUtils.sanitizeDotsInIndexName(index)
+        return sourceToQueryIndexMapping["$index$monitorId"]
     }
 
     companion object {
