@@ -253,6 +253,14 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         }
     }
 
+    internal fun getUserStrForMonitor(monitor: Monitor): String {
+        return if (monitor.user != null) {
+            monitor.user!!.name + "|" + monitor.user!!.backendRoles.joinToString()
+        } else {
+            return ""
+        }
+    }
+
     // TODO: Can this be updated to just use 'Instant.now()'?
     //  'threadPool.absoluteTimeInMillis()' is referring to a cached value of System.currentTimeMillis() that by default updates every 200ms
     internal fun currentTime() = Instant.ofEpochMilli(monitorCtx.threadPool!!.absoluteTimeInMillis())

@@ -63,6 +63,7 @@ abstract class MonitorRunner {
             }
             if (!dryrun) {
                 val roles = MonitorRunnerService.getRolesForMonitor(monitor)
+                val userStr = MonitorRunnerService.getUserStrForMonitor(monitor)
                 withClosableContext(
                     InjectorContextElement(monitor.id, monitorCtx.settings!!, monitorCtx.threadPool!!.threadContext, roles)
                 ) {
@@ -70,7 +71,8 @@ abstract class MonitorRunner {
                         action,
                         monitorCtx,
                         actionOutput[Action.SUBJECT],
-                        actionOutput[Action.MESSAGE]!!
+                        actionOutput[Action.MESSAGE]!!,
+                        userStr
                     )
                 }
             }
@@ -84,9 +86,10 @@ abstract class MonitorRunner {
         action: Action,
         monitorCtx: MonitorRunnerExecutionContext,
         subject: String?,
-        message: String
+        message: String,
+        userStr: String
     ): String {
-        val config = getConfigForNotificationAction(action, monitorCtx)
+        val config = getConfigForNotificationAction(action, monitorCtx, userStr)
         if (config.destination == null && config.channel == null) {
             throw IllegalStateException("Unable to find a Notification Channel or Destination config with id [${action.destinationId}]")
         }
@@ -127,14 +130,15 @@ abstract class MonitorRunner {
      */
     private suspend fun getConfigForNotificationAction(
         action: Action,
-        monitorCtx: MonitorRunnerExecutionContext
+        monitorCtx: MonitorRunnerExecutionContext,
+        userStr: String?
     ): NotificationActionConfigs {
         var destination: Destination? = null
         var notificationPermissionException: Exception? = null
 
         var channel: NotificationConfigInfo? = null
         try {
-            channel = getNotificationConfigInfo(monitorCtx.client as NodeClient, action.destinationId)
+            channel = getNotificationConfigInfo(monitorCtx.client as NodeClient, action.destinationId, userStr)
         } catch (e: OpenSearchSecurityException) {
             notificationPermissionException = e
         }

@@ -44,9 +44,10 @@ class NotificationApiUtils {
         /**
          * Gets a NotificationConfigInfo object by ID if it exists.
          */
-        suspend fun getNotificationConfigInfo(client: NodeClient, id: String): NotificationConfigInfo? {
+        suspend fun getNotificationConfigInfo(client: NodeClient, id: String, userStr: String?): NotificationConfigInfo? {
             return try {
-                val res: GetNotificationConfigResponse = getNotificationConfig(client, GetNotificationConfigRequest(setOf(id)))
+                logger.info("alerting notifications userstr backendroles: {}", userStr)
+                val res: GetNotificationConfigResponse = getNotificationConfig(client, GetNotificationConfigRequest(setOf(id)), userStr)
                 res.searchResult.objectList.firstOrNull()
             } catch (e: OpenSearchSecurityException) {
                 throw e
@@ -60,14 +61,20 @@ class NotificationApiUtils {
 
         private suspend fun getNotificationConfig(
             client: NodeClient,
-            getNotificationConfigRequest: GetNotificationConfigRequest
+            getNotificationConfigRequest: GetNotificationConfigRequest,
+            userStr: String?
         ): GetNotificationConfigResponse {
-            val getNotificationConfigResponse: GetNotificationConfigResponse = NotificationsPluginInterface.suspendUntil {
-                this.getNotificationConfig(
-                    client,
-                    getNotificationConfigRequest,
-                    it
-                )
+            lateinit var getNotificationConfigResponse: GetNotificationConfigResponse
+            logger.info("alerting notifications user backendroles from monitor: {}", userStr)
+            client.threadPool().threadContext.stashContext().use {
+                client.threadPool().threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
+                getNotificationConfigResponse = NotificationsPluginInterface.suspendUntil {
+                    this.getNotificationConfig(
+                        client,
+                        getNotificationConfigRequest,
+                        it
+                    )
+                }
             }
             return getNotificationConfigResponse
         }
