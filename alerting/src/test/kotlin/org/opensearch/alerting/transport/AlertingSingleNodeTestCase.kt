@@ -21,6 +21,7 @@ import org.opensearch.alerting.action.ExecuteMonitorResponse
 import org.opensearch.alerting.action.GetMonitorAction
 import org.opensearch.alerting.action.GetMonitorRequest
 import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.settings.AlertingSettings.Companion.QUERY_INDEX_CLEANUP_PERIOD
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentType

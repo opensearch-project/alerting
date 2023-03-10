@@ -153,5 +153,11 @@ class AlertingSettings {
             -1L,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+
+        val QUERY_INDEX_CLEANUP_PERIOD = Setting.positiveTimeSetting(
+            "plugins.alerting.query_index_cleanup_period",
+            TimeValue(60, TimeUnit.MINUTES),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
     }
 }

@@ -13,6 +13,7 @@ import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.client.IndicesAdminClient
 import org.opensearch.cluster.ClusterState
+import org.opensearch.cluster.metadata.IndexAbstraction
 import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.service.ClusterService
@@ -154,6 +155,21 @@ class IndexUtils {
             }
 
             return result
+        }
+
+        @JvmStatic
+        fun getWriteIndexNameForAlias(clusterService: ClusterService, alias: String): String? {
+            return clusterService.state().metadata().indicesLookup?.get(alias)?.writeIndex?.index?.name
+        }
+
+        @JvmStatic
+        fun isIndexWriteIndex(clusterService: ClusterService, index: String): Boolean {
+            clusterService.state().metadata().indicesLookup.values.forEach {
+                if (it.type == IndexAbstraction.Type.ALIAS && it.writeIndex?.index?.name == index) {
+                    return true
+                }
+            }
+            return false
         }
     }
 }

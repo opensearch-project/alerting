@@ -56,6 +56,7 @@ import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
 import org.opensearch.alerting.util.DocLevelMonitorQueries
+import org.opensearch.alerting.util.QueryIndexManagement
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
 import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
@@ -128,6 +129,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         @JvmField val ALERTING_JOB_TYPES = listOf("monitor")
     }
 
+    lateinit var queryIndexManagement: QueryIndexManagement
     lateinit var runner: MonitorRunnerService
     lateinit var scheduler: JobScheduler
     lateinit var sweeper: JobSweeper
@@ -212,6 +214,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     ): Collection<Any> {
         // Need to figure out how to use the OpenSearch DI classes rather than handwiring things here.
         val settings = environment.settings()
+        queryIndexManagement = QueryIndexManagement(settings, client, threadPool, clusterService)
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
         runner = MonitorRunnerService
             .registerClusterService(clusterService)
@@ -277,6 +280,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.MAX_ACTION_THROTTLE_VALUE,
             AlertingSettings.FILTER_BY_BACKEND_ROLES,
             AlertingSettings.MAX_ACTIONABLE_ALERT_COUNT,
+            AlertingSettings.QUERY_INDEX_CLEANUP_PERIOD,
             LegacyOpenDistroAlertingSettings.INPUT_TIMEOUT,
             LegacyOpenDistroAlertingSettings.INDEX_TIMEOUT,
             LegacyOpenDistroAlertingSettings.BULK_TIMEOUT,
