@@ -27,6 +27,7 @@ import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.MonitorRunnerService.monitorCtx
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.util.IndexUtils.Companion.getWriteIndexNameForAlias
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
@@ -309,7 +310,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             // queryIndex is alias which will always have only 1 backing index which is writeIndex
             // This is due to a fact that that _rollover API would maintain only single index under alias
             // if you don't add is_write_index setting when creating index initially
-            targetQueryIndex = getWriteIndexNameForAlias(monitor.dataSources.queryIndex)
+            targetQueryIndex = getWriteIndexNameForAlias(this.clusterService, monitor.dataSources.queryIndex)
             if (targetQueryIndex == null) {
                 val message = "Failed to get write index for queryIndex alias:${monitor.dataSources.queryIndex}"
                 log.error(message)
@@ -424,9 +425,5 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             )
         }
         return response.newIndex
-    }
-
-    private fun getWriteIndexNameForAlias(alias: String): String? {
-        return this.clusterService.state().metadata().indicesLookup?.get(alias)?.writeIndex?.index?.name
     }
 }

@@ -13,6 +13,7 @@ import org.apache.hc.core5.http.io.entity.StringEntity
 import org.apache.hc.core5.http.message.BasicHeader
 import org.junit.AfterClass
 import org.junit.rules.DisableOnDebug
+import org.opensearch.action.admin.cluster.settings.ClusterUpdateSettingsRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
@@ -32,6 +33,7 @@ import org.opensearch.client.Request
 import org.opensearch.client.Response
 import org.opensearch.client.RestClient
 import org.opensearch.client.WarningFailureException
+import org.opensearch.common.Strings
 import org.opensearch.common.UUIDs
 import org.opensearch.common.io.PathUtils
 import org.opensearch.common.settings.Settings
@@ -62,6 +64,7 @@ import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.SearchModule
+import java.io.IOException
 import java.net.URLEncoder
 import java.nio.file.Files
 import java.time.Instant
@@ -151,6 +154,25 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return response
     }
 
+    protected fun getIndexAPI(index: String): Map<String, Any>? {
+        val response = client().makeRequest(
+            "GET", "/$index", emptyMap(),
+            null
+        )
+        assertEquals("Unable to delete a monitor", RestStatus.OK, response.restStatus())
+
+        return entityAsMap(response)
+    }
+
+    protected fun rolloverAPI(aliasOrDataStream: String, settings: Settings): Boolean {
+        val response = client().makeRequest(
+            "POST", "/$aliasOrDataStream/_rollover", emptyMap(),
+            null
+        )
+        assertEquals("Unable to delete a monitor", RestStatus.OK, response.restStatus())
+        return entityAsMap(response)["rolled_over"] as Boolean
+    }
+
     /**
      * Destinations are now deprecated in favor of the Notification plugin's configs.
      * This method should only be used for checking legacy behavior/Notification migration scenarios.
@@ -231,6 +253,13 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         }
 
         return emailAccount.copy(id = id, version = version)
+    }
+
+    @Throws(IOException::class)
+    protected open fun updateClusterSettings(settings: Settings) {
+        val request = Request("PUT", "/_cluster/settings")
+        request.setJsonEntity(Strings.toString(XContentType.JSON, ClusterUpdateSettingsRequest().transientSettings(settings)))
+        client().performRequest(request)
     }
 
     /**
