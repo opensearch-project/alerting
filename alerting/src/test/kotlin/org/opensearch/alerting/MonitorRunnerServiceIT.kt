@@ -1916,6 +1916,9 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
         indices = getIndexAPI(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")
         assertEquals(1, indices!!.size)
+
+        // revert queryIndex cleanup job period
+        updateClusterSettings(Settings.builder().put(QUERY_INDEX_CLEANUP_PERIOD.key, "30m").build())
     }
 
     fun `test queryIndex cleanup job single alias as input`() {
@@ -2022,6 +2025,9 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
         indices = getIndexAPI(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")
         assertEquals(1, indices!!.size)
+
+        // revert queryIndex cleanup job period
+        updateClusterSettings(Settings.builder().put(QUERY_INDEX_CLEANUP_PERIOD.key, "30m").build())
     }
 
     private fun prepareTestAnomalyResult(detectorId: String, user: User) {
