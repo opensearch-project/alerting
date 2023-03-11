@@ -30,6 +30,7 @@ import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -109,7 +110,7 @@ class TransportDeleteMonitorAction @Inject constructor(
                     checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", monitorId)
 
                 if (canDelete) {
-                    val deleteResponse = deleteAllResourcesForMonitor(client, monitor, deleteRequest, monitorId)
+                    val deleteResponse = deleteAllResourcesForMonitor(client, clusterService, monitor, deleteRequest)
                     actionListener.onResponse(DeleteMonitorResponse(deleteResponse.id, deleteResponse.version))
                 } else {
                     actionListener.onFailure(
@@ -145,13 +146,13 @@ class TransportDeleteMonitorAction @Inject constructor(
         @JvmStatic
         suspend fun deleteAllResourcesForMonitor(
             client: Client,
+            clusterService: ClusterService,
             monitor: Monitor,
             deleteRequest: DeleteRequest,
-            monitorId: String,
         ): DeleteResponse {
             val deleteResponse = deleteMonitorDocument(client, deleteRequest)
             deleteMetadata(client, monitor)
-            deleteDocLevelMonitorQueriesAndIndices(client, monitor, monitorId)
+            deleteDocLevelMonitorQueriesAndIndices(client, clusterService, monitor)
             return deleteResponse
         }
 
@@ -174,63 +175,69 @@ class TransportDeleteMonitorAction @Inject constructor(
 
         suspend fun deleteDocLevelMonitorQueriesAndIndices(
             client: Client,
-            monitor: Monitor,
-            monitorId: String,
+            clusterService: ClusterService,
+            monitor: Monitor
         ) {
             try {
-                val metadata = MonitorMetadataService.getMetadata(monitor)
-                metadata?.sourceToQueryIndexMapping?.forEach { (_, queryIndex) ->
+                val queryIndexAlias =
+                    if (monitor.dataSources.queryIndex.isNullOrEmpty()) ScheduledJob.DOC_LEVEL_QUERIES_INDEX
+                    else monitor.dataSources.queryIndex
+                val queryIndexWriteIndex = IndexUtils.getWriteIndexNameForAlias(clusterService, queryIndexAlias)
 
-                    val indicesExistsResponse: IndicesExistsResponse =
-                        client.suspendUntil {
-                            client.admin().indices().exists(IndicesExistsRequest(queryIndex), it)
+                val metadata = MonitorMetadataService.getMetadata(monitor)
+                metadata?.sourceToQueryIndexMapping
+                    ?.map { it.value }
+                    ?.filter { it != queryIndexWriteIndex } // Skip deleting queryIndexWriteIndex to avoid potential race conditions with existing monitors
+                    ?.forEach { queryIndex ->
+
+                        val indicesExistsResponse: IndicesExistsResponse =
+                            client.suspendUntil {
+                                client.admin().indices().exists(IndicesExistsRequest(queryIndex), it)
+                            }
+                        if (indicesExistsResponse.isExists == false) {
+                            return
                         }
-                    if (indicesExistsResponse.isExists == false) {
-                        return
-                    }
-                    // Check if there's any queries from other monitors in this queryIndex,
-                    // to avoid unnecessary doc deletion, if we could just delete index completely
-                    val searchResponse: SearchResponse = client.suspendUntil {
-                        search(
-                            SearchRequest(queryIndex).source(
-                                SearchSourceBuilder()
-                                    .size(0)
-                                    .query(
-                                        QueryBuilders.boolQuery().mustNot(
-                                            QueryBuilders.matchQuery("monitor_id", monitorId)
+                        // Check if there's any queries from other monitors in this queryIndex,
+                        // to avoid unnecessary doc deletion, if we could just delete index completely
+                        val searchResponse: SearchResponse = client.suspendUntil {
+                            search(
+                                SearchRequest(queryIndex).source(
+                                    SearchSourceBuilder()
+                                        .size(0)
+                                        .query(
+                                            QueryBuilders.boolQuery().mustNot(
+                                                QueryBuilders.matchQuery("monitor_id", monitor.id)
+                                            )
                                         )
-                                    )
-                            ).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN),
-                            it
-                        )
-                    }
-                    if (searchResponse.hits.totalHits.value == 0L) {
-                        val ack: AcknowledgedResponse = client.suspendUntil {
-                            client.admin().indices().delete(
-                                DeleteIndexRequest(queryIndex).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN), it
+                                ).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN),
+                                it
                             )
                         }
-                        if (ack.isAcknowledged == false) {
-                            log.error("Deletion of concrete queryIndex:$queryIndex is not ack'd!")
-                        }
-                    } else {
-                        // Delete all queries added by this monitor
-                        val response: BulkByScrollResponse = suspendCoroutine { cont ->
-                            DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-                                .source(queryIndex)
-                                .filter(QueryBuilders.matchQuery("monitor_id", monitorId))
-                                .refresh(true)
-                                .execute(
-                                    object : ActionListener<BulkByScrollResponse> {
-                                        override fun onResponse(response: BulkByScrollResponse) = cont.resume(response)
-                                        override fun onFailure(t: Exception) {
-                                            cont.resumeWithException(t)
-                                        }
-                                    }
+                        if (searchResponse.hits.totalHits.value == 0L) {
+                            val ack: AcknowledgedResponse = client.suspendUntil {
+                                client.admin().indices().delete(
+                                    DeleteIndexRequest(queryIndex).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN), it
                                 )
+                            }
+                            if (ack.isAcknowledged == false) {
+                                log.error("Deletion of concrete queryIndex:$queryIndex is not ack'd!")
+                            }
+                        } else {
+                            // Delete all queries added by this monitor
+                            val response: BulkByScrollResponse = suspendCoroutine { cont ->
+                                DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+                                    .source(queryIndex)
+                                    .filter(QueryBuilders.matchQuery("monitor_id", monitor.id))
+                                    .refresh(true)
+                                    .execute(
+                                        object : ActionListener<BulkByScrollResponse> {
+                                            override fun onResponse(response: BulkByScrollResponse) = cont.resume(response)
+                                            override fun onFailure(t: Exception) = cont.resumeWithException(t)
+                                        }
+                                    )
+                            }
                         }
                     }
-                }
             } catch (e: Exception) {
                 // we only log the error and don't fail the request because if monitor document has been deleted successfully,
                 // we cannot retry based on this failure

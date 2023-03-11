@@ -1921,7 +1921,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         updateClusterSettings(Settings.builder().put(QUERY_INDEX_CLEANUP_PERIOD.key, "30m").build())
     }
 
-    fun `test queryIndex cleanup job single alias as input`() {
+    fun `test queryIndex cleanup job single alias as input one source index per query index`() {
 
         val alias = "my_alias"
         val testSourceIndex1 = "test_source_index-000001"
@@ -1984,33 +1984,90 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals(8, indices!!.size)
 
         deleteIndex(testSourceIndex1)
-        // After deleting 1 sourceIndex, expect 2 query indices deleted
-        waitUntil(
-            {
-                var indices = getIndexAPI(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")
-                return@waitUntil indices!!.size == 6
-            },
-            60,
-            TimeUnit.SECONDS
-        )
-
-        indices = getIndexAPI(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")
-        assertEquals(6, indices!!.size)
-
         deleteIndex(testSourceIndex2)
-        // After deleting 2 source indices, expect 4 query indices
+        deleteIndex(testSourceIndex3)
+        deleteIndex(testSourceIndex4)
+        // After deleting all source indices, expect that only query index writeIndex is preserved
         waitUntil(
             {
                 var indices = getIndexAPI(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")
-                return@waitUntil indices!!.size == 4
+                return@waitUntil indices!!.size == 1
             },
             60,
             TimeUnit.SECONDS
         )
 
         indices = getIndexAPI(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")
+        assertEquals(1, indices!!.size)
+
+        // revert queryIndex cleanup job period
+        updateClusterSettings(Settings.builder().put(QUERY_INDEX_CLEANUP_PERIOD.key, "30m").build())
+    }
+
+    fun `test queryIndex cleanup job single alias as input two source index per query index`() {
+
+        val alias = "my_alias"
+        val testSourceIndex1 = "test_source_index-000001"
+        val testSourceIndex2 = "test_source_index-000002"
+        val testSourceIndex3 = "test_source_index-000003"
+        val testSourceIndex4 = "test_source_index-000004"
+        createIndex(
+            testSourceIndex1,
+            Settings.builder().put("index.mapping.total_fields.limit", "10000").build(),
+            null,
+            "\"$alias\": { \"is_write_index\":false }"
+        )
+        createIndex(
+            testSourceIndex2,
+            Settings.builder().put("index.mapping.total_fields.limit", "10000").build(),
+            null,
+            "\"$alias\": { \"is_write_index\":false }"
+        )
+        createIndex(
+            testSourceIndex3,
+            Settings.builder().put("index.mapping.total_fields.limit", "10000").build(),
+            null,
+            "\"$alias\": { \"is_write_index\":false }"
+        )
+        createIndex(
+            testSourceIndex4,
+            Settings.builder().put("index.mapping.total_fields.limit", "10000").build(),
+            null,
+            "\"$alias\": { \"is_write_index\":true }"
+        )
+        // This doc should create close to 10000 (limit) fields in index mapping. It's easier to add mappings like this then via api
+        val docPayload: StringBuilder = StringBuilder(100000)
+        docPayload.append("{")
+        for (i in 1..4900) {
+            docPayload.append(""" "id$i":$i,""")
+        }
+        docPayload.append("\"test_field\" : \"us-west-2\" }")
+        indexDoc(testSourceIndex1, "1", docPayload.toString())
+        indexDoc(testSourceIndex2, "1", docPayload.toString())
+        indexDoc(testSourceIndex3, "1", docPayload.toString())
+        indexDoc(testSourceIndex4, "1", docPayload.toString())
+
+        // Reduce queryIndex cleanup job period
+        updateClusterSettings(Settings.builder().put(QUERY_INDEX_CLEANUP_PERIOD.key, "1s").build())
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(alias), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+
+        // Create monitor #1
+        createMonitor(monitor)
+        // Create monitor #2
+        createMonitor(monitor)
+
+        var indices = getIndexAPI(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")
         assertEquals(4, indices!!.size)
 
+        deleteIndex(testSourceIndex1)
+        deleteIndex(testSourceIndex2)
         deleteIndex(testSourceIndex3)
         deleteIndex(testSourceIndex4)
         // After deleting all source indices, expect that only query index writeIndex is preserved
