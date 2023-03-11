@@ -31,6 +31,8 @@ import org.opensearch.index.IndexNotFoundException
 import org.opensearch.threadpool.Scheduler
 import org.opensearch.threadpool.ThreadPool
 
+private val log = LogManager.getLogger(QueryIndexManagement::class.java)
+
 class QueryIndexManagement(
     settings: Settings,
     private val client: Client,
@@ -98,6 +100,7 @@ class QueryIndexManagement(
             if (runLock.tryLock() == false) {
                 return@launch
             }
+            log.debug("QueryIndex cleanup sweep started")
             try {
                 val allMonitorMetadataDocs = MonitorMetadataService.getAllMetadataDocs()
                 // Populate queryIndex --> source indices map
@@ -120,6 +123,7 @@ class QueryIndexManagement(
                 runLock.unlock()
                 sweepJob = threadPool
                     .scheduleWithFixedDelay({ runQueryIndexSweep() }, runPeriod, executorName())
+                log.debug("QueryIndex cleanup sweep ended")
             }
         }
     }
@@ -155,13 +159,21 @@ class QueryIndexManagement(
             val indexExistsResponse: IndicesExistsResponse =
                 client.admin().indices().suspendUntil { exists(IndicesExistsRequest(*sourceIndices.toTypedArray()), it) }
             if (indexExistsResponse.isExists == false) {
+                var error = false
                 try {
+                    log.info("Deleting query index: [$concreteQueryIndex]")
                     val ack: AcknowledgedResponse =
                         client.admin().indices().suspendUntil { delete(DeleteIndexRequest(concreteQueryIndex), it) }
                 } catch (e: IndexNotFoundException) {
                     /** Continue if index does not exists **/
+                } catch (e: Exception) {
+                    log.error("Error deleting query index: [$concreteQueryIndex]", e)
+                    error = true
                 }
-                deletedQueryIndices.add(concreteQueryIndex)
+                if (!error) {
+                    deletedQueryIndices.add(concreteQueryIndex)
+                    log.info("Deleted query index: [$concreteQueryIndex]")
+                }
             }
         }
         return deletedQueryIndices
