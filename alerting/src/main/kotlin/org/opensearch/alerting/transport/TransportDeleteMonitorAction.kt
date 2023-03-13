@@ -173,6 +173,11 @@ class TransportDeleteMonitorAction @Inject constructor(
             }
         }
 
+        /**
+         * Deletes all queries of this monitor from queryIndex and potentially deletes queryIndex itself in following conditions:
+         * 1. queryIndex is not writeIndex (avoiding race conditions with other APIs here)
+         * 2. queryIndex does not contain queries from other monitors, but only from this one.
+         * */
         suspend fun deleteDocLevelMonitorQueriesAndIndices(
             client: Client,
             clusterService: ClusterService,
