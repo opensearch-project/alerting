@@ -246,4 +246,9 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     override fun resetNodeAfterTest(): Boolean {
         return false
     }
+
+    override fun nodeSettings(): Settings {
+        return super.nodeSettings()
+    }
+
 }

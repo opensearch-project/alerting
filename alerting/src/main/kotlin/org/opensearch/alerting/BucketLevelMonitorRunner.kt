@@ -397,7 +397,9 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             sr.source().query(queryBuilder)
                         }
                     val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(sr, it) }
-                    return createFindingPerIndex(searchResponse, monitor, monitorCtx, shouldCreateFinding, workflowRunContext?.workflowExecutionId)
+                    return createFindingPerIndex(
+                        searchResponse, monitor, monitorCtx, shouldCreateFinding, workflowRunContext?.workflowExecutionId
+                    )
                 } else {
                     logger.error("Couldn't resolve groupBy field. Not generating bucket level monitor findings for monitor %${monitor.id}")
                 }

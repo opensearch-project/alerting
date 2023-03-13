@@ -21,7 +21,9 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.action.support.WriteRequest
 import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
@@ -45,23 +47,35 @@ import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.IndexMonitorRequest
+import org.opensearch.commons.alerting.action.IndexMonitorResponse
 import org.opensearch.commons.alerting.action.IndexWorkflowRequest
 import org.opensearch.commons.alerting.action.IndexWorkflowResponse
 import org.opensearch.commons.alerting.model.CompositeInput
 import org.opensearch.commons.alerting.model.Delegate
+import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
+import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.model.Sequence
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestStatus
+import org.opensearch.script.Script
+import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.stream.Collectors
+import kotlin.math.max
 
 private val log = LogManager.getLogger(TransportIndexCompositeWorkflowAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
@@ -323,7 +337,16 @@ class TransportIndexCompositeWorkflowAction @Inject constructor(
                 )
                 log.debug("Created monitor's backend roles: $rbacRoles")
             }
-
+            val compositeInput = request.workflow.inputs[0] as CompositeInput
+            val monitorIds = compositeInput.sequence.delegates.stream().map { it.monitorId }.collect(Collectors.toList())
+            val chainedAlertsMonitor = buildChainedAlertsMonitor("custom_alerts_index", monitorIds)
+            val delegates = compositeInput.sequence.delegates as MutableList<Delegate>
+            val maxOrder = compositeInput.sequence.delegates.maxOf { it -> it.order }
+            delegates.add(Delegate(maxOrder+1, chainedAlertsMonitor!!.id))
+            request.workflow = request.workflow.copy(
+                schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion,
+                inputs = listOf(CompositeInput(Sequence(delegates)))
+            )
             val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
                 .setRefreshPolicy(request.refreshPolicy)
                 .source(request.workflow.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
@@ -421,7 +444,17 @@ class TransportIndexCompositeWorkflowAction @Inject constructor(
                 log.debug("Update monitor backend roles to: ${request.workflow.user?.backendRoles}")
             }
 
-            request.workflow = request.workflow.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
+            val compositeInput = request.workflow.inputs[0] as CompositeInput
+            val monitorIds = compositeInput.sequence.delegates.stream().map { it.monitorId }.collect(Collectors.toList())
+            val chainedAlertsMonitor = buildChainedAlertsMonitor("abc", monitorIds)
+            val delegates = compositeInput.sequence.delegates as MutableList<Delegate>
+            val maxOrder = compositeInput.sequence.delegates.maxOf { it -> it.order }
+            delegates.add(Delegate(maxOrder+1, chainedAlertsMonitor!!.id))
+            request.workflow = request.workflow.copy(
+                schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion,
+                inputs = listOf(CompositeInput(Sequence(delegates)))
+            )
+
             val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
                 .setRefreshPolicy(request.refreshPolicy)
                 .source(request.workflow.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
@@ -481,6 +514,53 @@ class TransportIndexCompositeWorkflowAction @Inject constructor(
         val delegateMonitors = getDelegateMonitors(monitorIds)
         validateDelegateMonitorsExist(monitorIds, delegateMonitors)
         // todo: validate that user has roles to reference delegate monitors
+        //val chainedAlertMonitor: Monitor = buildChainedAlertsMonitor(delegateMonitors)//fixme
+    }
+
+    private suspend fun buildChainedAlertsMonitor(alertIndex: String, monitorIds: MutableList<String>): Monitor? {
+        try {
+            val monitorIdsCSV = monitorIds.joinToString { it -> "\"$it\"" }
+            val termAgg = TermsAggregationBuilder("monitor_id").field("monitor_id")
+            val triggerScript = """
+            ArrayList monitorIds = new ArrayList();for (bucket in ctx.results[0].aggregations.terms_agg.buckets) 
+            {
+                monitorIds.add(bucket.key);
+            }
+            return monitorIds.containsAll($monitorIdsCSV);
+        """.trimIndent()
+            val input = SearchInput(indices = listOf(alertIndex), query = SearchSourceBuilder().size(0).aggregation(termAgg))
+            val chainedAlertMonitor = Monitor(
+                name = "chained_alert_monitor",
+                monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR,
+                enabled = false,
+                inputs = listOf(input),
+                schedule = IntervalSchedule(1, ChronoUnit.MINUTES),
+                triggers = listOf(
+                    QueryLevelTrigger(
+                        id = "test",
+                        name = "chainedAlertTrigger",
+                        severity = "1",
+                        condition = Script(triggerScript),
+                        actions = emptyList()
+                    )
+                ), enabledTime = null, lastUpdateTime = Instant.now(), user = null,
+                uiMetadata = mapOf()
+            )
+            val indexMonitorRequest = IndexMonitorRequest(
+                monitorId = Monitor.NO_ID,
+                seqNo = SequenceNumbers.UNASSIGNED_SEQ_NO,
+                primaryTerm = SequenceNumbers.UNASSIGNED_PRIMARY_TERM,
+                WriteRequest.RefreshPolicy.IMMEDIATE,
+                RestRequest.Method.POST,
+                chainedAlertMonitor,
+            )
+            val response: IndexMonitorResponse =
+                client.suspendUntil { client.execute(AlertingActions.INDEX_MONITOR_ACTION_TYPE, indexMonitorRequest, it) }
+            return response.monitor
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return null
+        }
     }
 
     private fun validateChainedFindings(delegates: List<Delegate>) {
@@ -534,7 +614,7 @@ class TransportIndexCompositeWorkflowAction @Inject constructor(
 
     private suspend fun getDelegateMonitors(
         monitorIds: MutableList<String>
-    ): List<Monitor> {
+    ): MutableList<Monitor> {
         val query = QueryBuilders.boolQuery().filter(QueryBuilders.termsQuery("_id", monitorIds))
         val searchSource = SearchSourceBuilder().query(query)
         val searchRequest = SearchRequest(ScheduledJob.SCHEDULED_JOBS_INDEX).source(searchSource)
