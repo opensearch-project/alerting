@@ -2087,6 +2087,56 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         updateClusterSettings(Settings.builder().put(QUERY_INDEX_CLEANUP_PERIOD.key, "30m").build())
     }
 
+    fun `test queryIndex cleanup job post-rollover delete`() {
+
+        val testSourceIndex1 = "test_source_index1"
+        val testSourceIndex2 = "test_source_index2"
+        createIndex(testSourceIndex1, Settings.builder().put("index.mapping.total_fields.limit", "10000").build())
+        createIndex(testSourceIndex2, Settings.builder().put("index.mapping.total_fields.limit", "10000").build())
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex1), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+        // This doc should create close to 10000 (limit) fields in index mapping. It's easier to add mappings like this then via api
+        val docPayload: StringBuilder = StringBuilder(100000)
+        docPayload.append("{")
+        for (i in 1..3300) {
+            docPayload.append(""" "id$i.somefield.somefield$i":$i,""")
+        }
+        docPayload.append("\"test_field\" : \"us-west-2\" }")
+        indexDoc(testSourceIndex1, "1", docPayload.toString())
+        indexDoc(testSourceIndex2, "2", docPayload.toString())
+
+        // Create monitor #1
+        val m1 = createMonitor(monitor)
+        // Check that we have only 1 index
+        var indices = getIndexAPI(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")
+        assertEquals(1, indices!!.size)
+        assertTrue(indices.contains(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "-000001"))
+
+        // Delete monitor #1
+        deleteMonitor(monitor.copy(id = m1.id))
+
+        // After monitor deletion we will be left with 1 queryIndex since we forbid deleting writeIndex
+        indices = getIndexAPI(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")
+        assertEquals(1, indices!!.size)
+        assertTrue(indices.contains(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "-000001"))
+
+        // Create monitor #2
+        // Since we have mappings left from sourceIndex used by monitor #1, we will expect rollover and deletion of old queryIndex
+        // because it isn't used by any monitors anymore and there isn't a chance that it will be used in future
+        createMonitor(monitor)
+
+        // Assert we have 1 queryIndex created by rollover and old one is deleted
+        indices = getIndexAPI(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")
+        assertEquals(1, indices!!.size)
+        assertTrue(indices.contains(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "-000002"))
+    }
+
     private fun prepareTestAnomalyResult(detectorId: String, user: User) {
         val adResultIndex = ".opendistro-anomaly-results-history-2020.10.17"
         try {

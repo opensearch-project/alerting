@@ -15,9 +15,10 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.action.admin.indices.delete.DeleteIndexRequest
 import org.opensearch.action.admin.indices.exists.indices.IndicesExistsRequest
 import org.opensearch.action.admin.indices.exists.indices.IndicesExistsResponse
+import org.opensearch.action.admin.indices.stats.IndicesStatsRequest
+import org.opensearch.action.admin.indices.stats.IndicesStatsResponse
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.MonitorMetadataService
-import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
@@ -25,6 +26,7 @@ import org.opensearch.alerting.util.IndexUtils.Companion.isIndexWriteIndex
 import org.opensearch.client.Client
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
+import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.index.IndexNotFoundException
@@ -33,15 +35,32 @@ import org.opensearch.threadpool.ThreadPool
 
 private val log = LogManager.getLogger(QueryIndexManagement::class.java)
 
-class QueryIndexManagement(
+class QueryIndexManagement private constructor(
     settings: Settings,
     private val client: Client,
     private val threadPool: ThreadPool,
-    private val clusterService: ClusterService
+    private val clusterService: ClusterService,
+    private val indexNameExpressionResolver: IndexNameExpressionResolver
 ) : ClusterStateListener,
     CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("QueryIndexManagement")) {
 
     @Volatile private var runPeriod = AlertingSettings.QUERY_INDEX_CLEANUP_PERIOD.get(settings)
+
+    companion object {
+        private var instance: QueryIndexManagement? = null
+
+        fun initInstance(
+            settings: Settings,
+            client: Client,
+            threadPool: ThreadPool,
+            clusterService: ClusterService,
+            indexNameExpressionResolver: IndexNameExpressionResolver
+        ) {
+            instance = QueryIndexManagement(settings, client, threadPool, clusterService, indexNameExpressionResolver)
+        }
+
+        fun getInstance() = instance!!
+    }
 
     init {
         clusterService.addListener(this)
@@ -63,7 +82,7 @@ class QueryIndexManagement(
         try {
             runQueryIndexSweep()
         } catch (e: Exception) {
-            logger.error(
+            log.error(
                 "Error cleaning up query indices",
                 e
             )
@@ -95,7 +114,7 @@ class QueryIndexManagement(
         }
     }
 
-    private fun runQueryIndexSweep() {
+    fun runQueryIndexSweep() {
         launch {
             if (runLock.tryLock() == false) {
                 return@launch
@@ -115,7 +134,7 @@ class QueryIndexManagement(
                 // Refresh sourceToQueryIndexMapping field in all MonitorMetadatas, now that we deleted some query indices
                 refreshMonitorMetadataDocs(allMonitorMetadataDocs, deletedQueryIndices)
             } catch (e: Exception) {
-                logger.error(
+                log.error(
                     "Error cleaning up query indices",
                     e
                 )
@@ -128,7 +147,7 @@ class QueryIndexManagement(
         }
     }
 
-    private fun getQueryIndexToSourceIndicesMapping(allMonitorMetadataDocs: List<MonitorMetadata>): Map<String, Set<String>> {
+    fun getQueryIndexToSourceIndicesMapping(allMonitorMetadataDocs: List<MonitorMetadata>): Map<String, Set<String>> {
         val queryIndexToSourceIndicesMapping = mutableMapOf<String, MutableSet<String>>()
         allMonitorMetadataDocs.forEach { metadata ->
             metadata.sourceToQueryIndexMapping.forEach {
@@ -150,7 +169,7 @@ class QueryIndexManagement(
         return queryIndexToSourceIndicesMapping
     }
 
-    private suspend fun deleteUnusedQueryIndices(queryIndexToSourceIndicesMapping: Map<String, Set<String>>): MutableSet<String> {
+    suspend fun deleteUnusedQueryIndices(queryIndexToSourceIndicesMapping: Map<String, Set<String>>): MutableSet<String> {
         val deletedQueryIndices = mutableSetOf<String>()
         queryIndexToSourceIndicesMapping.forEach {
             val concreteQueryIndex = it.key
@@ -179,7 +198,42 @@ class QueryIndexManagement(
         return deletedQueryIndices
     }
 
-    private suspend fun refreshMonitorMetadataDocs(allMonitorMetadataDocs: List<MonitorMetadata>, deletedQueryIndices: Set<String>) {
+    suspend fun deleteUnusedQueryIndices(queryIndexAlias: String): MutableSet<String> {
+        val deletedQueryIndices = mutableSetOf<String>()
+        val queryIndexPattern = "$queryIndexAlias*"
+        var writeIndex = IndexUtils.getWriteIndexNameForAlias(clusterService, queryIndexAlias)
+        // We don't want to delete writeIndex so filter it out first
+        var concreteIndices = IndexUtils.resolveAllIndices(listOf(queryIndexPattern), clusterService, indexNameExpressionResolver)
+        concreteIndices = concreteIndices.filter { it != writeIndex }
+
+        val indicesStatsResponse: IndicesStatsResponse = client.admin().indices().suspendUntil {
+            stats(IndicesStatsRequest().indices(*concreteIndices.toTypedArray()).docs(true), it)
+        }
+        indicesStatsResponse.indices.forEach {
+            val concreteQueryIndex = it.key
+            val stats = it.value
+            if (stats.total.docs.count == 0L) {
+                var error = false
+                try {
+                    log.info("Deleting query index: [$concreteQueryIndex]")
+                    val ack: AcknowledgedResponse =
+                        client.admin().indices().suspendUntil { delete(DeleteIndexRequest(concreteQueryIndex), it) }
+                } catch (e: IndexNotFoundException) {
+                    /** Continue if index does not exists **/
+                } catch (e: Exception) {
+                    log.error("Error deleting query index: [$concreteQueryIndex]", e)
+                    error = true
+                }
+                if (!error) {
+                    deletedQueryIndices.add(concreteQueryIndex)
+                    log.info("Deleted query index: [$concreteQueryIndex]")
+                }
+            }
+        }
+        return deletedQueryIndices
+    }
+
+    suspend fun refreshMonitorMetadataDocs(allMonitorMetadataDocs: List<MonitorMetadata>, deletedQueryIndices: Set<String>) {
         for (monitorMetadata in allMonitorMetadataDocs) {
             var sourceToQueryIndexMapping = monitorMetadata.sourceToQueryIndexMapping
             if (sourceToQueryIndexMapping == null) {
@@ -193,9 +247,5 @@ class QueryIndexManagement(
                 MonitorMetadataService.upsertMetadata(monitorMetadata, true)
             }
         }
-    }
-
-    companion object {
-        private val logger = LogManager.getLogger(AlertIndices::class.java)
     }
 }
