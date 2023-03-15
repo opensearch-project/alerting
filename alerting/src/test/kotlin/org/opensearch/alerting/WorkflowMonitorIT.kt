@@ -6,7 +6,7 @@
 package org.opensearch.alerting
 
 import org.opensearch.alerting.transport.WorkflowSingleNodeTestCase
-import org.opensearch.commons.alerting.model.ChainedFindings
+import org.opensearch.commons.alerting.model.ChainedMonitorFindings
 import org.opensearch.commons.alerting.model.CompositeInput
 import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.Delegate
@@ -85,7 +85,7 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
         assertEquals("Delegate2 order not correct", 2, delegate2.order)
         assertEquals("Delegate2 id not correct", monitorResponse2.id, delegate2.monitorId)
         assertEquals(
-            "Delegate2 Chained finding not correct", monitorResponse1.id, delegate2.chainedFindings!!.monitorId
+            "Delegate2 Chained finding not correct", monitorResponse1.id, delegate2.chainedMonitorFindings!!.monitorId
         )
     }
 
@@ -182,7 +182,7 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
         assertEquals("Delegate2 order not correct", 2, delegate2.order)
         assertEquals("Delegate2 id not correct", monitorResponse2.id, delegate2.monitorId)
         assertEquals(
-            "Delegate2 Chained finding not correct", monitorResponse1.id, delegate2.chainedFindings!!.monitorId
+            "Delegate2 Chained finding not correct", monitorResponse1.id, delegate2.chainedMonitorFindings!!.monitorId
         )
 
         val delegate3 = delegates[2]
@@ -190,7 +190,7 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
         assertEquals("Delegate3 order not correct", 3, delegate3.order)
         assertEquals("Delegate3 id not correct", monitorResponse3.id, delegate3.monitorId)
         assertEquals(
-            "Delegate3 Chained finding not correct", monitorResponse2.id, delegate3.chainedFindings!!.monitorId
+            "Delegate3 Chained finding not correct", monitorResponse2.id, delegate3.chainedMonitorFindings!!.monitorId
         )
     }
 
@@ -276,7 +276,7 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
         assertEquals("Delegate2 order not correct", 2, delegate2.order)
         assertEquals("Delegate2 id not correct", monitorResponse1.id, delegate2.monitorId)
         assertEquals(
-            "Delegate2 Chained finding not correct", monitorResponse2.id, delegate2.chainedFindings!!.monitorId
+            "Delegate2 Chained finding not correct", monitorResponse2.id, delegate2.chainedMonitorFindings!!.monitorId
         )
     }
 
@@ -630,8 +630,8 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
     fun `test create workflow chained findings monitor not in sequence failure`() {
         val delegates = listOf(
             Delegate(1, "monitor-1"),
-            Delegate(2, "monitor-2", ChainedFindings("monitor-1")),
-            Delegate(3, "monitor-3", ChainedFindings("monitor-x"))
+            Delegate(2, "monitor-2", ChainedMonitorFindings("monitor-1")),
+            Delegate(3, "monitor-3", ChainedMonitorFindings("monitor-x"))
         )
         val workflow = randomWorkflowWithDelegates(
             delegates = delegates
@@ -719,8 +719,8 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
 
         val delegates = listOf(
             Delegate(1, "monitor-1"),
-            Delegate(2, "monitor-2", ChainedFindings("monitor-1")),
-            Delegate(3, "monitor-3", ChainedFindings("monitor-x"))
+            Delegate(2, "monitor-2", ChainedMonitorFindings("monitor-1")),
+            Delegate(3, "monitor-3", ChainedMonitorFindings("monitor-x"))
         )
         workflow = randomWorkflowWithDelegates(
             id = workflowResponse.id,
@@ -742,8 +742,8 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
     fun `test create workflow chained findings order not correct failure`() {
         val delegates = listOf(
             Delegate(1, "monitor-1"),
-            Delegate(3, "monitor-2", ChainedFindings("monitor-1")),
-            Delegate(2, "monitor-3", ChainedFindings("monitor-2"))
+            Delegate(3, "monitor-2", ChainedMonitorFindings("monitor-1")),
+            Delegate(2, "monitor-3", ChainedMonitorFindings("monitor-2"))
         )
         val workflow = randomWorkflowWithDelegates(
             delegates = delegates
@@ -781,8 +781,8 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
 
         val delegates = listOf(
             Delegate(1, "monitor-1"),
-            Delegate(3, "monitor-2", ChainedFindings("monitor-1")),
-            Delegate(2, "monitor-3", ChainedFindings("monitor-2"))
+            Delegate(3, "monitor-2", ChainedMonitorFindings("monitor-1")),
+            Delegate(2, "monitor-3", ChainedMonitorFindings("monitor-2"))
         )
         workflow = randomWorkflowWithDelegates(
             delegates = delegates

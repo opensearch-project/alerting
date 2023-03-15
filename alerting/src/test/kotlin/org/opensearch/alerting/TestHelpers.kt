@@ -39,7 +39,7 @@ import org.opensearch.commons.alerting.model.ActionExecutionResult
 import org.opensearch.commons.alerting.model.AggregationResultBucket
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
-import org.opensearch.commons.alerting.model.ChainedFindings
+import org.opensearch.commons.alerting.model.ChainedMonitorFindings
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
 import org.opensearch.commons.alerting.model.CompositeInput
 import org.opensearch.commons.alerting.model.DataSources
@@ -239,7 +239,7 @@ fun randomWorkflow(
         delegates.add(Delegate(1, monitorIds[0]))
         for (i in 1 until monitorIds.size) {
             // Order of monitors in workflow will be the same like forwarded meaning that the first monitorId will be used as second monitor chained finding
-            delegates.add(Delegate(i + 1, monitorIds [i], ChainedFindings(monitorIds[i - 1])))
+            delegates.add(Delegate(i + 1, monitorIds [i], ChainedMonitorFindings(monitorIds[i - 1])))
         }
     }
 

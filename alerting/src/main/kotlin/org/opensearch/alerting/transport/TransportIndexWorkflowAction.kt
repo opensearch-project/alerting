@@ -463,27 +463,27 @@ class TransportIndexWorkflowAction @Inject constructor(
 
         validateDuplicateDelegateMonitorReferenceExists(monitorIds)
         validateSequenceOrdering(compositeInput.sequence.delegates)
-        validateChainedFindings(compositeInput.sequence.delegates)
+        validateChainedMonitorFindings(compositeInput.sequence.delegates)
         val delegateMonitors = getDelegateMonitors(monitorIds)
         validateDelegateMonitorsExist(monitorIds, delegateMonitors)
-        validateChainedFindingsMonitors(compositeInput.sequence.delegates, delegateMonitors)
+        validateChainedMonitorFindingsMonitors(compositeInput.sequence.delegates, delegateMonitors)
     }
 
-    private fun validateChainedFindings(delegates: List<Delegate>) {
+    private fun validateChainedMonitorFindings(delegates: List<Delegate>) {
         val monitorIdOrderMap: Map<String, Int> = delegates.associate { it.monitorId to it.order }
         delegates.forEach {
-            if (it.chainedFindings != null) {
-                if (monitorIdOrderMap.containsKey(it.chainedFindings!!.monitorId) == false) {
+            if (it.chainedMonitorFindings != null) {
+                if (monitorIdOrderMap.containsKey(it.chainedMonitorFindings!!.monitorId) == false) {
                     throw AlertingException.wrap(
                         IllegalArgumentException(
-                            "Chained Findings Monitor ${it.chainedFindings!!.monitorId} doesn't exist in sequence"
+                            "Chained Findings Monitor ${it.chainedMonitorFindings!!.monitorId} doesn't exist in sequence"
                         )
                     )
                 }
-                if (it.order <= monitorIdOrderMap[it.chainedFindings!!.monitorId]!!) {
+                if (it.order <= monitorIdOrderMap[it.chainedMonitorFindings!!.monitorId]!!) {
                     throw AlertingException.wrap(
                         IllegalArgumentException(
-                            "Chained Findings Monitor ${it.chainedFindings!!.monitorId} should be executed before monitor ${it.monitorId}"
+                            "Chained Findings Monitor ${it.chainedMonitorFindings!!.monitorId} should be executed before monitor ${it.monitorId}"
                         )
                     )
                 }
@@ -491,11 +491,11 @@ class TransportIndexWorkflowAction @Inject constructor(
         }
     }
 
-    private fun validateChainedFindingsMonitors(delegates: List<Delegate>, monitorDelegates: List<Monitor>) {
+    private fun validateChainedMonitorFindingsMonitors(delegates: List<Delegate>, monitorDelegates: List<Monitor>) {
         val monitorsById = monitorDelegates.associateBy { it.id }
         delegates.forEach {
-            if (it.chainedFindings != null) {
-                val chainedFindingMonitor = monitorsById[it.chainedFindings!!.monitorId] ?: throw AlertingException.wrap(
+            if (it.chainedMonitorFindings != null) {
+                val chainedFindingMonitor = monitorsById[it.chainedMonitorFindings!!.monitorId] ?: throw AlertingException.wrap(
                     IllegalArgumentException("Chained finding monitor doesn't exist")
                 )
 
