@@ -338,6 +338,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 try {
                     // Do queryIndex rollover
                     targetQueryIndex = rolloverQueryIndex(monitor)
+                    // Delete old queryIndex if it isn't used
+                    QueryIndexManagement.getInstance().deleteUnusedQueryIndices(monitor.dataSources.queryIndex)
                     // Adjust max field limit in mappings for new index.
                     checkAndAdjustMaxFieldLimit(sourceIndex, targetQueryIndex)
                     // PUT mappings to newly created index
@@ -349,7 +351,6 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 } catch (e: Exception) {
                     // If we reached limit for total number of fields in mappings after rollover
                     // it means that source index has more then (FIELD_LIMIT - 3) fields (every query index has 3 fields defined)
-                    // TODO maybe split queries/mappings between multiple query indices?
                     val unwrappedException = ExceptionsHelper.unwrapCause(e) as Exception
                     log.debug("exception after rollover queryIndex index: $targetQueryIndex exception: ${unwrappedException.message}")
                     if (unwrappedException.message?.contains("Limit of total fields") == true) {

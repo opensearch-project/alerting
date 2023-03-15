@@ -129,7 +129,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         @JvmField val ALERTING_JOB_TYPES = listOf("monitor")
     }
 
-    lateinit var queryIndexManagement: QueryIndexManagement
     lateinit var runner: MonitorRunnerService
     lateinit var scheduler: JobScheduler
     lateinit var sweeper: JobSweeper
@@ -214,7 +213,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     ): Collection<Any> {
         // Need to figure out how to use the OpenSearch DI classes rather than handwiring things here.
         val settings = environment.settings()
-        queryIndexManagement = QueryIndexManagement(settings, client, threadPool, clusterService)
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
         runner = MonitorRunnerService
             .registerClusterService(clusterService)
@@ -245,6 +243,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             xContentRegistry,
             settings
         )
+
+        QueryIndexManagement.initInstance(settings, client, threadPool, clusterService, indexNameExpressionResolver)
 
         return listOf(sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator)
     }
