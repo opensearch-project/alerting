@@ -452,6 +452,9 @@ class TransportIndexWorkflowAction @Inject constructor(
         if (request.workflow.inputs.isEmpty())
             throw AlertingException.wrap(IllegalArgumentException("Input list can not be empty."))
 
+        if (request.workflow.inputs.size > 1)
+            throw AlertingException.wrap(IllegalArgumentException("Input list can contain only one element."))
+
         if (request.workflow.inputs[0] !is CompositeInput)
             throw AlertingException.wrap(IllegalArgumentException("When creating a workflow input must be CompositeInput"))
 

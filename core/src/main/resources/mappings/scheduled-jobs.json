@@ -1,6 +1,6 @@
 {
   "_meta" : {
-    "schema_version": 6
+    "schema_version": 7
   },
   "properties": {
     "monitor": {
@@ -433,46 +433,6 @@
             }
           }
         },
-        "data_sources": {
-          "properties": {
-            "alerts_index": {
-              "type": "text",
-              "fields": {
-                "keyword": {
-                  "type": "keyword",
-                  "ignore_above": 256
-                }
-              }
-            },
-            "findings_index": {
-              "type": "text",
-              "fields": {
-                "keyword": {
-                  "type": "keyword",
-                  "ignore_above": 256
-                }
-              }
-            },
-            "query_index": {
-              "type": "text",
-              "fields": {
-                "keyword": {
-                  "type": "keyword",
-                  "ignore_above": 256
-                }
-              }
-            },
-            "query_index_mapping": {
-              "type": "text",
-              "fields": {
-                "keyword": {
-                  "type": "keyword",
-                  "ignore_above": 256
-                }
-              }
-            }
-          }
-        },
         "group_by_fields": {
           "type": "text",
           "fields": {
@@ -481,127 +441,6 @@
               "ignore_above": 256
             }
           }
-        },
-        "triggers": {
-          "type": "nested",
-          "properties": {
-            "name": {
-              "type": "text",
-              "fields": {
-                "keyword": {
-                  "type": "keyword",
-                  "ignore_above": 256
-                }
-              }
-            },
-            "min_time_between_executions": {
-              "type": "integer"
-            },
-            "condition": {
-              "type": "object",
-              "enabled": false
-            },
-            "actions": {
-              "type": "nested",
-              "properties": {
-                "name": {
-                  "type": "text",
-                  "fields": {
-                    "keyword": {
-                      "type": "keyword",
-                      "ignore_above": 256
-                    }
-                  }
-                },
-                "destination_id": {
-                  "type": "keyword"
-                },
-                "subject_template": {
-                  "type": "object",
-                  "enabled": false
-                },
-                "message_template": {
-                  "type": "object",
-                  "enabled": false
-                },
-                "throttle_enabled": {
-                  "type": "boolean"
-                },
-                "throttle": {
-                  "properties": {
-                    "value": {
-                      "type": "integer"
-                    },
-                    "unit": {
-                      "type": "keyword"
-                    }
-                  }
-                }
-              }
-            },
-            "query_level_trigger": {
-              "properties": {
-                "name": {
-                  "type": "text",
-                  "fields": {
-                    "keyword": {
-                      "type": "keyword",
-                      "ignore_above": 256
-                    }
-                  }
-                },
-                "min_time_between_executions": {
-                  "type": "integer"
-                },
-                "condition": {
-                  "type": "object",
-                  "enabled": false
-                },
-                "actions": {
-                  "type": "nested",
-                  "properties": {
-                    "name": {
-                      "type": "text",
-                      "fields": {
-                        "keyword": {
-                          "type": "keyword",
-                          "ignore_above": 256
-                        }
-                      }
-                    },
-                    "destination_id": {
-                      "type": "keyword"
-                    },
-                    "subject_template": {
-                      "type": "object",
-                      "enabled": false
-                    },
-                    "message_template": {
-                      "type": "object",
-                      "enabled": false
-                    },
-                    "throttle_enabled": {
-                      "type": "boolean"
-                    },
-                    "throttle": {
-                      "properties": {
-                        "value": {
-                          "type": "integer"
-                        },
-                        "unit": {
-                          "type": "keyword"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "ui_metadata": {
-          "type": "object",
-          "enabled": false
         }
       }
     },
