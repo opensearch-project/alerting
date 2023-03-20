@@ -127,7 +127,7 @@ class TransportIndexWorkflowAction @Inject constructor(
             transformedRequest.rbacRoles != null
         ) {
             if (transformedRequest.rbacRoles?.stream()?.anyMatch { !user.backendRoles.contains(it) } == true) {
-                log.debug(
+                log.error(
                     "User specified backend roles, ${transformedRequest.rbacRoles}, " +
                         "that they don' have access to. User backend roles: ${user.backendRoles}"
                 )
@@ -140,7 +140,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                 )
                 return
             } else if (transformedRequest.rbacRoles?.isEmpty() == true) {
-                log.debug(
+                log.error(
                     "Non-admin user are not allowed to specify an empty set of backend roles. " +
                         "Please don't pass in the parameter or pass in at least one backend role."
                 )
@@ -170,6 +170,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                 try {
                     validateRequest(request)
                 } catch (e: Exception) {
+                    log.error("Failed to create workflow", e)
                     if (e is IndexNotFoundException) {
                         actionListener.onFailure(
                             OpenSearchStatusException(
@@ -184,7 +185,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                 }
 
                 if (user == null) {
-                    // Security is disabled, add empty user to Monitor. user is null for older versions.
+                    // Security is disabled, add empty user to Workflow. user is null for older versions.
                     request.workflow = request.workflow
                         .copy(user = User("", listOf(), listOf(), listOf()))
                     start()
@@ -215,14 +216,16 @@ class TransportIndexWorkflowAction @Inject constructor(
                                     execute(ClusterHealthAction.INSTANCE, request, it)
                                 }
                                 if (response.isTimedOut) {
+                                    log.error("Workflow creation timeout", t)
                                     actionListener.onFailure(
                                         OpenSearchException("Cannot determine that the $SCHEDULED_JOBS_INDEX index is healthy")
                                     )
                                 }
-                                // Retry mapping of monitor
+                                // Retry mapping of workflow
                                 onCreateMappingsResponse(true)
                             }
                         } else {
+                            log.error("Failed to create workflow", t)
                             actionListener.onFailure(AlertingException.wrap(t))
                         }
                     }
@@ -237,6 +240,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                         }
 
                         override fun onFailure(t: Exception) {
+                            log.error("Failed to create workflow", t)
                             actionListener.onFailure(AlertingException.wrap(t))
                         }
                     }
@@ -269,7 +273,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                 prepareWorkflowIndexing()
                 IndexUtils.scheduledJobIndexUpdated()
             } else {
-                log.info("Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged.")
+                log.error("Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged.")
                 actionListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException(
@@ -282,15 +286,15 @@ class TransportIndexWorkflowAction @Inject constructor(
 
         private fun onUpdateMappingsResponse(response: AcknowledgedResponse) {
             if (response.isAcknowledged) {
-                log.info("Updated  ${ScheduledJob.SCHEDULED_JOBS_INDEX} with mappings.")
+                log.info("Updated  $SCHEDULED_JOBS_INDEX with mappings.")
                 IndexUtils.scheduledJobIndexUpdated()
                 prepareWorkflowIndexing()
             } else {
-                log.info("Update ${ScheduledJob.SCHEDULED_JOBS_INDEX} mappings call not acknowledged.")
+                log.error("Update $SCHEDULED_JOBS_INDEX mappings call not acknowledged.")
                 actionListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException(
-                            "Updated ${ScheduledJob.SCHEDULED_JOBS_INDEX} mappings call not acknowledged.",
+                            "Updated $SCHEDULED_JOBS_INDEX mappings call not acknowledged.",
                             RestStatus.INTERNAL_SERVER_ERROR
                         )
                     )
@@ -334,6 +338,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                     )
                 )
             } catch (t: Exception) {
+                log.error("Failed to index workflow", t)
                 actionListener.onFailure(AlertingException.wrap(t))
             }
         }
@@ -542,7 +547,7 @@ class TransportIndexWorkflowAction @Inject constructor(
     ): List<Monitor> {
         val query = QueryBuilders.boolQuery().filter(QueryBuilders.termsQuery("_id", monitorIds))
         val searchSource = SearchSourceBuilder().query(query)
-        val searchRequest = SearchRequest(ScheduledJob.SCHEDULED_JOBS_INDEX).source(searchSource)
+        val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
         val response: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
         var monitors = mutableListOf<Monitor>()
         if (response.isTimedOut) {
