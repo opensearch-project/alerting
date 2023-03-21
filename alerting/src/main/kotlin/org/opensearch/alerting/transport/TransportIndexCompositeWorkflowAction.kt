@@ -52,6 +52,7 @@ import org.opensearch.commons.alerting.action.IndexMonitorResponse
 import org.opensearch.commons.alerting.action.IndexWorkflowRequest
 import org.opensearch.commons.alerting.action.IndexWorkflowResponse
 import org.opensearch.commons.alerting.model.CompositeInput
+import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.Delegate
 import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
@@ -324,37 +325,37 @@ class TransportIndexCompositeWorkflowAction @Inject constructor(
         }
 
         private suspend fun indexWorkflow() {
-
-            if (user != null) {
-                // Use the backend roles which is an intersection of the requested backend roles and the user's backend roles.
-                // Admins can pass in any backend role. Also if no backend role is passed in, all the user's backend roles are used.
-                val rbacRoles = if (request.rbacRoles == null) user.backendRoles.toSet()
-                else if (!isAdmin(user)) request.rbacRoles?.intersect(user.backendRoles)?.toSet()
-                else request.rbacRoles
-
-                request.workflow = request.workflow.copy(
-                    user = User(user.name, rbacRoles.orEmpty().toList(), user.roles, user.customAttNames)
-                )
-                log.debug("Created monitor's backend roles: $rbacRoles")
-            }
-            val compositeInput = request.workflow.inputs[0] as CompositeInput
-            val monitorIds = compositeInput.sequence.delegates.stream().map { it.monitorId }.collect(Collectors.toList())
-            val chainedAlertsMonitor = buildChainedAlertsMonitor("custom_alerts_index", monitorIds)
-            val delegates = compositeInput.sequence.delegates as MutableList<Delegate>
-            val maxOrder = compositeInput.sequence.delegates.maxOf { it -> it.order }
-            delegates.add(Delegate(maxOrder+1, chainedAlertsMonitor!!.id))
-            request.workflow = request.workflow.copy(
-                schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion,
-                inputs = listOf(CompositeInput(Sequence(delegates)))
-            )
-            val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
-                .setRefreshPolicy(request.refreshPolicy)
-                .source(request.workflow.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-                .setIfSeqNo(request.seqNo)
-                .setIfPrimaryTerm(request.primaryTerm)
-                .timeout(indexTimeout)
-
             try {
+                if (user != null) {
+                    // Use the backend roles which is an intersection of the requested backend roles and the user's backend roles.
+                    // Admins can pass in any backend role. Also if no backend role is passed in, all the user's backend roles are used.
+                    val rbacRoles = if (request.rbacRoles == null) user.backendRoles.toSet()
+                    else if (!isAdmin(user)) request.rbacRoles?.intersect(user.backendRoles)?.toSet()
+                    else request.rbacRoles
+
+                    request.workflow = request.workflow.copy(
+                        user = User(user.name, rbacRoles.orEmpty().toList(), user.roles, user.customAttNames)
+                    )
+                    log.debug("Created monitor's backend roles: $rbacRoles")
+                }
+                val compositeInput = request.workflow.inputs[0] as CompositeInput
+                val monitorIds = compositeInput.sequence.delegates.stream().map { it.monitorId }.collect(Collectors.toList())
+                val chainedAlertsMonitor = buildChainedAlertsMonitor("custom_alerts_index", monitorIds)
+                val delegates = compositeInput.sequence.delegates as MutableList<Delegate>
+                val maxOrder = compositeInput.sequence.delegates.maxOf { it -> it.order }
+                delegates.add(Delegate(maxOrder + 1, chainedAlertsMonitor!!.id))
+                request.workflow = request.workflow.copy(
+                    schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion,
+                    inputs = listOf(CompositeInput(Sequence(delegates)))
+                )
+                val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
+                    .setRefreshPolicy(request.refreshPolicy)
+                    .source(request.workflow.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+                    .setIfSeqNo(request.seqNo)
+                    .setIfPrimaryTerm(request.primaryTerm)
+                    .timeout(indexTimeout)
+
+
                 val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
                 val failureReasons = checkShardsFailure(indexResponse)
                 if (failureReasons != null) {
@@ -522,7 +523,8 @@ class TransportIndexCompositeWorkflowAction @Inject constructor(
             val monitorIdsCSV = monitorIds.joinToString { it -> "\"$it\"" }
             val termAgg = TermsAggregationBuilder("monitor_id").field("monitor_id")
             val triggerScript = """
-            ArrayList monitorIds = new ArrayList();for (bucket in ctx.results[0].aggregations.terms_agg.buckets) 
+            ArrayList monitorIds = new ArrayList();
+            for (bucket in MonitorRunResult.results[0].aggregations.monitor_id.buckets) 
             {
                 monitorIds.add(bucket.key);
             }
@@ -544,7 +546,11 @@ class TransportIndexCompositeWorkflowAction @Inject constructor(
                         actions = emptyList()
                     )
                 ), enabledTime = null, lastUpdateTime = Instant.now(), user = null,
-                uiMetadata = mapOf()
+                uiMetadata = mapOf(),
+                dataSources = DataSources(
+                    alertsIndex = alertIndex,
+
+                )
             )
             val indexMonitorRequest = IndexMonitorRequest(
                 monitorId = Monitor.NO_ID,
@@ -556,7 +562,8 @@ class TransportIndexCompositeWorkflowAction @Inject constructor(
             )
             val response: IndexMonitorResponse =
                 client.suspendUntil { client.execute(AlertingActions.INDEX_MONITOR_ACTION_TYPE, indexMonitorRequest, it) }
-            return response.monitor
+
+            return response.monitor.copy(id = response.id)
         } catch (e: Exception) {
             e.printStackTrace()
             return null

@@ -163,7 +163,8 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         if (!isADMonitor(transformedRequest.monitor)) {
-            checkIndicesAndExecute(client, actionListener, transformedRequest, user)
+//            checkIndicesAndExecute(client, actionListener, transformedRequest, user)
+            IndexMonitorHandler(client, actionListener, transformedRequest, user).resolveUserAndStart()
         } else {
             // check if user has access to any anomaly detector for AD monitor
             checkAnomalyDetectorAndExecute(client, actionListener, transformedRequest, user)

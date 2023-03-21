@@ -337,7 +337,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(mapping?.source()?.string()?.contains("\"analyzer\":\"$analyzer\"") == true)
     }
 
-    fun `test delete monitor deletes all queries and metadata too`() {
+    fun `test delete metadata`() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)

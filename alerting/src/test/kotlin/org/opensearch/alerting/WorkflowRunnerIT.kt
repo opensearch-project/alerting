@@ -15,6 +15,7 @@ import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.GetAlertsRequest
 import org.opensearch.commons.alerting.action.IndexMonitorResponse
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
+import org.opensearch.commons.alerting.model.CompositeInput
 import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
@@ -200,7 +201,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         val workflowId = workflowResponse.id
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
         val monitorsRunResults = executeWorkflowResponse.workflowRunResult.workflowRunResult
-        assertEquals(2, monitorsRunResults.size)
+        assertEquals(3, monitorsRunResults.size)
 
         assertEquals(monitor1.name, monitorsRunResults[0].monitorName)
         assertEquals(1, monitorsRunResults[0].triggerResults.size)
@@ -213,6 +214,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
 
         assertAlerts(monitorResponse2, customAlertsIndex1, 1)
         assertFindings(monitorResponse2.id, customFindingsIndex1, 1, 1, listOf("2"))
+        assertAlerts((workflowResponse.workflow.inputs.get(0) as CompositeInput).sequence.delegates.get(0).monitorId, customAlertsIndex1, 1)
     }
 
     fun `test execute workflow with custom alerts and finding index with bucket level doc level delegates when bucket level delegate is used in chained finding`() {
@@ -584,6 +586,37 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         alertSize: Int
     ) {
         val monitorId = monitorResponse.id
+        val alerts = searchAlerts(monitorId, customAlertsIndex)
+        assertEquals("Alert saved for test monitor", alertSize, alerts.size)
+        val table = Table("asc", "id", null, alertSize, 0, "")
+        var getAlertsResponse = client()
+            .execute(
+                AlertingActions.GET_ALERTS_ACTION_TYPE,
+                GetAlertsRequest(table, "ALL", "ALL", null, customAlertsIndex)
+            )
+            .get()
+        assertTrue(getAlertsResponse != null)
+        assertTrue(getAlertsResponse.alerts.size == alertSize)
+        getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, null))
+            .get()
+        assertTrue(getAlertsResponse != null)
+        assertTrue(getAlertsResponse.alerts.size == alertSize)
+
+        val alertIds = getAlertsResponse.alerts.map { it.id }
+        val acknowledgeAlertResponse = client().execute(
+            AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_TYPE,
+            AcknowledgeAlertRequest(monitorId, alertIds, WriteRequest.RefreshPolicy.IMMEDIATE)
+        ).get()
+
+        assertEquals(alertSize, acknowledgeAlertResponse.acknowledged.size)
+    }
+
+    private fun assertAlerts(
+        monitorId: String,
+        customAlertsIndex: String,
+        alertSize: Int
+    ) {
         val alerts = searchAlerts(monitorId, customAlertsIndex)
         assertEquals("Alert saved for test monitor", alertSize, alerts.size)
         val table = Table("asc", "id", null, alertSize, 0, "")

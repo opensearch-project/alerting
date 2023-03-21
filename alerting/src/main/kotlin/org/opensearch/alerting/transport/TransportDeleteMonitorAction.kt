@@ -36,6 +36,7 @@ import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.DeleteMonitorRequest
 import org.opensearch.commons.alerting.action.DeleteMonitorResponse
+import org.opensearch.commons.alerting.action.DeleteWorkflowResponse
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.Workflow
@@ -173,6 +174,11 @@ class TransportDeleteMonitorAction @Inject constructor(
         private suspend fun deleteMetadata(monitor: Monitor) {
             val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, "${monitor.id}-metadata")
             val deleteResponse: DeleteResponse = client.suspendUntil { delete(deleteRequest, it) }
+            if(deleteResponse.result.name.equals("DELETED")) {
+                log.info("Deleted ${monitor.id}-metadata")
+            } else {
+                log.error("Failed to delete ${monitor.id}-metadata")
+            }
         }
 
         private suspend fun deleteDocLevelMonitorQueries(monitor: Monitor) {
