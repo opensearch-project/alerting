@@ -473,10 +473,11 @@ class TransportIndexCompositeWorkflowAction @Inject constructor(
                     )
                     return
                 }
+
                 actionListener.onResponse(
                     IndexWorkflowResponse(
                         indexResponse.id, indexResponse.version, indexResponse.seqNo,
-                        indexResponse.primaryTerm, request.workflow
+                        indexResponse.primaryTerm, request.workflow.copy(id=indexResponse.id)
                     )
                 )
             } catch (t: Exception) {
@@ -524,7 +525,7 @@ class TransportIndexCompositeWorkflowAction @Inject constructor(
             val termAgg = TermsAggregationBuilder("monitor_id").field("monitor_id")
             val triggerScript = """
             ArrayList monitorIds = new ArrayList();
-            for (bucket in MonitorRunResult.results[0].aggregations.monitor_id.buckets) 
+            for (bucket in ctx.results[0].aggregations.monitor_id.buckets) 
             {
                 monitorIds.add(bucket.key);
             }

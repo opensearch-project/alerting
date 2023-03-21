@@ -223,7 +223,7 @@ fun randomDocumentLevelMonitor(
     )
 }
 
-fun randomWorkflowMonitor(
+fun randomWorkflow(
     id: String = Workflow.NO_ID,
     monitorIds: List<String>,
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
@@ -255,7 +255,7 @@ fun randomWorkflowMonitor(
     )
 }
 
-fun randomWorkflowMonitorWithDelegates(
+fun randomWorkflowWithDelegates(
     id: String = Workflow.NO_ID,
     delegates: List<Delegate>,
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
@@ -386,6 +386,7 @@ fun randomScript(source: String = "return " + OpenSearchRestTestCase.randomBoole
 
 val ADMIN = "admin"
 val ALERTING_BASE_URI = "/_plugins/_alerting/monitors"
+val WORKFLOW_ALERTING_BASE_URI = "/_plugins/_alerting/workflows"
 val DESTINATION_BASE_URI = "/_plugins/_alerting/destinations"
 val LEGACY_OPENDISTRO_ALERTING_BASE_URI = "/_opendistro/_alerting/monitors"
 val LEGACY_OPENDISTRO_DESTINATION_BASE_URI = "/_opendistro/_alerting/destinations"

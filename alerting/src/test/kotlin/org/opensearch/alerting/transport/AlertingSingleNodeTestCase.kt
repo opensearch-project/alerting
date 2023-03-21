@@ -40,6 +40,7 @@ import org.opensearch.index.IndexService
 import org.opensearch.index.query.TermQueryBuilder
 import org.opensearch.index.reindex.ReindexPlugin
 import org.opensearch.index.seqno.SequenceNumbers
+import org.opensearch.node.Node
 import org.opensearch.painless.PainlessPlugin
 import org.opensearch.plugins.Plugin
 import org.opensearch.rest.RestRequest
@@ -66,6 +67,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         super.setUp()
         createTestIndex()
     }
+
 
     protected fun getAllIndicesFromPattern(pattern: String): List<String> {
         val getIndexResponse = (
