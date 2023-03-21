@@ -334,7 +334,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                 actionListener.onResponse(
                     IndexWorkflowResponse(
                         indexResponse.id, indexResponse.version, indexResponse.seqNo,
-                        indexResponse.primaryTerm, request.workflow
+                        indexResponse.primaryTerm, request.workflow.copy(id = indexResponse.id)
                     )
                 )
             } catch (t: Exception) {
@@ -433,7 +433,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                 actionListener.onResponse(
                     IndexWorkflowResponse(
                         indexResponse.id, indexResponse.version, indexResponse.seqNo,
-                        indexResponse.primaryTerm, request.workflow
+                        indexResponse.primaryTerm, request.workflow.copy(id = currentWorkflow.id)
                     )
                 )
             } catch (t: Exception) {
