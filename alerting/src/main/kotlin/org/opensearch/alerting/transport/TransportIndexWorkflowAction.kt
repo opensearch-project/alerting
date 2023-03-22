@@ -24,6 +24,7 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.core.ScheduledJobIndices
+import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
@@ -50,9 +51,11 @@ import org.opensearch.commons.alerting.action.IndexWorkflowRequest
 import org.opensearch.commons.alerting.action.IndexWorkflowResponse
 import org.opensearch.commons.alerting.model.CompositeInput
 import org.opensearch.commons.alerting.model.Delegate
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
+import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
@@ -134,7 +137,8 @@ class TransportIndexWorkflowAction @Inject constructor(
                 actionListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException(
-                            "User specified backend roles that they don't have access to. Contact administrator", RestStatus.FORBIDDEN
+                            "User specified backend roles that they don't have access to. Contact administrator",
+                            RestStatus.FORBIDDEN
                         )
                     )
                 )
@@ -147,16 +151,70 @@ class TransportIndexWorkflowAction @Inject constructor(
                 actionListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException(
-                            "Non-admin user are not allowed to specify an empty set of backend roles.", RestStatus.FORBIDDEN
+                            "Non-admin user are not allowed to specify an empty set of backend roles.",
+                            RestStatus.FORBIDDEN
                         )
                     )
                 )
                 return
             }
         }
-        client.threadPool().threadContext.stashContext().use {
-            IndexWorkflowHandler(client, actionListener, transformedRequest, user).resolveUserAndStart()
+        scope.launch {
+            try {
+                validateRequest(client, transformedRequest, user)
+
+                // If the validation was successful - continue with the execution
+                client.threadPool().threadContext.stashContext().use {
+                    IndexWorkflowHandler(client, actionListener, transformedRequest, user).resolveUserAndStart()
+                }
+            } catch (e: Exception) {
+                log.error("Failed to create workflow", e)
+                if (e is IndexNotFoundException) {
+                    actionListener.onFailure(
+                        OpenSearchStatusException(
+                            "Monitors not found",
+                            RestStatus.NOT_FOUND
+                        )
+                    )
+                } else {
+                    actionListener.onFailure(e)
+                }
+            }
         }
+    }
+
+    /**
+     * Validates the request in several steps
+     * Checks if the user has appropriate backend roles and if he can access the given monitors and it's indices
+     */
+    private suspend fun validateRequest(client: Client, request: IndexWorkflowRequest, user: User?) {
+        if (request.workflow.inputs.isEmpty())
+            throw AlertingException.wrap(IllegalArgumentException("Input list can not be empty."))
+
+        if (request.workflow.inputs.size > 1)
+            throw AlertingException.wrap(IllegalArgumentException("Input list can contain only one element."))
+
+        if (request.workflow.inputs[0] !is CompositeInput)
+            throw AlertingException.wrap(IllegalArgumentException("When creating a workflow input must be CompositeInput"))
+
+        val compositeInput = request.workflow.inputs[0] as CompositeInput
+        val monitorIds = compositeInput.sequence.delegates.stream().map { it.monitorId }.collect(Collectors.toList())
+
+        if (monitorIds.isNullOrEmpty())
+            throw AlertingException.wrap(IllegalArgumentException("Delegates list can not be empty."))
+
+        validateDuplicateDelegateMonitorReferenceExists(monitorIds)
+        validateSequenceOrdering(compositeInput.sequence.delegates)
+        validateChainedMonitorFindings(compositeInput.sequence.delegates)
+
+        val monitors = getDelegateMonitors(user, monitorIds)
+
+        validateDelegateMonitorsExist(monitorIds, monitors)
+        validateChainedMonitorFindingsMonitors(compositeInput.sequence.delegates, monitors)
+
+        val indices = getMonitorIndices(monitors)
+
+        validateIndicesAccess(indices, client)
     }
 
     inner class IndexWorkflowHandler(
@@ -167,23 +225,6 @@ class TransportIndexWorkflowAction @Inject constructor(
     ) {
         fun resolveUserAndStart() {
             scope.launch {
-                try {
-                    validateRequest(request)
-                } catch (e: Exception) {
-                    log.error("Failed to create workflow", e)
-                    if (e is IndexNotFoundException) {
-                        actionListener.onFailure(
-                            OpenSearchStatusException(
-                                "Monitors not found",
-                                RestStatus.NOT_FOUND
-                            )
-                        )
-                    } else {
-                        actionListener.onFailure(e)
-                    }
-                    return@launch
-                }
-
                 if (user == null) {
                     // Security is disabled, add empty user to Workflow. user is null for older versions.
                     request.workflow = request.workflow
@@ -453,30 +494,6 @@ class TransportIndexWorkflowAction @Inject constructor(
         }
     }
 
-    suspend fun validateRequest(request: IndexWorkflowRequest) {
-        if (request.workflow.inputs.isEmpty())
-            throw AlertingException.wrap(IllegalArgumentException("Input list can not be empty."))
-
-        if (request.workflow.inputs.size > 1)
-            throw AlertingException.wrap(IllegalArgumentException("Input list can contain only one element."))
-
-        if (request.workflow.inputs[0] !is CompositeInput)
-            throw AlertingException.wrap(IllegalArgumentException("When creating a workflow input must be CompositeInput"))
-
-        val compositeInput = request.workflow.inputs[0] as CompositeInput
-        val monitorIds = compositeInput.sequence.delegates.stream().map { it.monitorId }.collect(Collectors.toList())
-
-        if (monitorIds.isNullOrEmpty())
-            throw AlertingException.wrap(IllegalArgumentException("Delegates list can not be empty."))
-
-        validateDuplicateDelegateMonitorReferenceExists(monitorIds)
-        validateSequenceOrdering(compositeInput.sequence.delegates)
-        validateChainedMonitorFindings(compositeInput.sequence.delegates)
-        val delegateMonitors = getDelegateMonitors(monitorIds)
-        validateDelegateMonitorsExist(monitorIds, delegateMonitors)
-        validateChainedMonitorFindingsMonitors(compositeInput.sequence.delegates, delegateMonitors)
-    }
-
     private fun validateChainedMonitorFindings(delegates: List<Delegate>) {
         val monitorIdOrderMap: Map<String, Int> = delegates.associate { it.monitorId to it.order }
         delegates.forEach {
@@ -542,26 +559,81 @@ class TransportIndexWorkflowAction @Inject constructor(
         }
     }
 
+    /**
+     * Returns monitors for the given ids if user has an access
+     */
     private suspend fun getDelegateMonitors(
+        user: User?,
         monitorIds: MutableList<String>
     ): List<Monitor> {
         val query = QueryBuilders.boolQuery().filter(QueryBuilders.termsQuery("_id", monitorIds))
         val searchSource = SearchSourceBuilder().query(query)
-        val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
-        val response: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
-        var monitors = mutableListOf<Monitor>()
-        if (response.isTimedOut) {
-            return monitors
+        val monitorSearchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
+        // TODO - Add secure tests once the Rest Action is created
+        if (user != null && filterByEnabled) {
+            addFilter(user, monitorSearchRequest.source(), "monitor.user.backend_roles.keyword")
         }
-        for (hit in response.hits) {
+
+        val searchMonitorResponse: SearchResponse = client.suspendUntil { client.search(monitorSearchRequest, it) }
+
+        if (searchMonitorResponse.status() != RestStatus.OK) {
+            throw AlertingException.wrap(
+                OpenSearchStatusException(
+                    "User doesn't have read permissions for one or more configured monitors ${monitorIds.joinToString()}",
+                    RestStatus.FORBIDDEN
+                )
+            )
+        }
+        if (searchMonitorResponse.isTimedOut) {
+            throw OpenSearchException("Cannot determine that the $SCHEDULED_JOBS_INDEX index is healthy")
+        }
+        val monitors = mutableListOf<Monitor>()
+        for (hit in searchMonitorResponse.hits) {
             XContentType.JSON.xContent().createParser(
                 xContentRegistry,
                 LoggingDeprecationHandler.INSTANCE, hit.sourceAsString
             ).use { hitsParser ->
-                val monitor = ScheduledJob.parse(hitsParser, hit.id, hit.version)
-                monitors.add(monitor as Monitor)
+                val monitor = ScheduledJob.parse(hitsParser, hit.id, hit.version) as Monitor
+                monitors.add(monitor)
             }
         }
         return monitors
+    }
+
+    /**
+     * Extract indices from monitors
+     */
+    private fun getMonitorIndices(monitors: List<Monitor>): MutableList<String> {
+        val indices = mutableListOf<String>()
+
+        val searchInputs =
+            monitors.flatMap { monitor -> monitor.inputs.filter { it.name() == SearchInput.SEARCH_FIELD || it.name() == DocLevelMonitorInput.DOC_LEVEL_INPUT_FIELD } }
+        searchInputs.forEach {
+            val inputIndices = if (it.name() == SearchInput.SEARCH_FIELD) (it as SearchInput).indices
+            else (it as DocLevelMonitorInput).indices
+            indices.addAll(inputIndices)
+        }
+        return indices
+    }
+
+    /**
+     * Checks if the user can access the monitor indices
+     */
+    private suspend fun validateIndicesAccess(
+        indices: MutableList<String>,
+        client: Client,
+    ) {
+        val indicesSearchRequest = SearchRequest().indices(*indices.toTypedArray())
+            .source(SearchSourceBuilder.searchSource().size(1).query(QueryBuilders.matchAllQuery()))
+
+        val indicesSearchResponse: SearchResponse = client.suspendUntil { client.search(indicesSearchRequest, it) }
+        if (indicesSearchResponse.status() != RestStatus.OK) {
+            throw AlertingException.wrap(
+                OpenSearchStatusException(
+                    "User doesn't have read permissions for one or more configured index ${indices.joinToString()}",
+                    RestStatus.FORBIDDEN
+                )
+            )
+        }
     }
 }
