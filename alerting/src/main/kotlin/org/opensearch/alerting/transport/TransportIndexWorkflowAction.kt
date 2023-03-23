@@ -450,7 +450,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                     request.workflow = request.workflow
                         .copy(user = User(user.name, currentWorkflow.user!!.backendRoles, user.roles, user.customAttNames))
                 }
-                log.debug("Update monitor backend roles to: ${request.workflow.user?.backendRoles}")
+                log.debug("Update workflow backend roles to: ${request.workflow.user?.backendRoles}")
             }
 
             request.workflow = request.workflow.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)

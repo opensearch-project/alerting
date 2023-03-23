@@ -418,7 +418,7 @@
                         "monitor_id": {
                           "type": "keyword"
                         },
-                        "chained_findings": {
+                        "chained_monitor_findings": {
                           "properties": {
                             "monitor_id": {
                               "type": "keyword"
