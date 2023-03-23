@@ -7,6 +7,7 @@ package org.opensearch.alerting.transport
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope
 import org.opensearch.action.admin.indices.alias.get.GetAliasesRequest
+import org.opensearch.action.admin.indices.delete.DeleteIndexRequest
 import org.opensearch.action.admin.indices.get.GetIndexRequest
 import org.opensearch.action.admin.indices.get.GetIndexRequestBuilder
 import org.opensearch.action.admin.indices.get.GetIndexResponse
@@ -23,6 +24,8 @@ import org.opensearch.alerting.action.GetMonitorRequest
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
+import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.action.AlertingActions
@@ -35,16 +38,22 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.Table
+import org.opensearch.index.IndexService
 import org.opensearch.index.query.TermQueryBuilder
 import org.opensearch.index.reindex.ReindexModulePlugin
 import org.opensearch.index.seqno.SequenceNumbers
-import org.opensearch.join.ParentJoinModulePlugin
+import org.opensearch.join.ParentJoinPlugin
+import org.opensearch.painless.PainlessPlugin
 import org.opensearch.plugins.Plugin
 import org.opensearch.rest.RestRequest
+import org.opensearch.script.mustache.MustachePlugin
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.test.OpenSearchSingleNodeTestCase
 import java.time.Instant
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 /**
@@ -75,17 +84,58 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         return client().execute(ExecuteMonitorAction.INSTANCE, request).get()
     }
 
-    /** A test index that can be used across tests. Feel free to add new fields but don't remove any. */
-    protected fun createTestIndex() {
-        createIndex(
-            index, Settings.EMPTY,
-            """
-                "properties" : {
-                  "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
-                  "test_field" : { "type" : "keyword" }
+    protected fun insertSampleTimeSerializedData(index: String, data: List<String>) {
+        data.forEachIndexed { i, value ->
+            val twoMinsAgo = ZonedDateTime.now().minus(2, ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MILLIS)
+            val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(twoMinsAgo)
+            val testDoc = """
+                {
+                  "test_strict_date_time": "$testTime",
+                  "test_field_1": "$value",
+                  "number": "$i"
                 }
             """.trimIndent()
+            // Indexing documents with deterministic doc id to allow for easy selected deletion during testing
+            indexDoc(index, (i + 1).toString(), testDoc)
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun Map<String, Any>.stringMap(key: String): Map<String, Any>? {
+        val map = this as Map<String, Map<String, Any>>
+        return map[key]
+    }
+
+    /** A test index that can be used across tests. Feel free to add new fields but don't remove any. */
+    protected fun createTestIndex() {
+        val mapping = XContentFactory.jsonBuilder()
+        mapping.startObject()
+            .startObject("properties")
+            .startObject("test_strict_date_time")
+            .field("type", "date")
+            .field("format", "strict_date_time")
+            .endObject()
+            .startObject("test_field_1")
+            .field("type", "keyword")
+            .endObject()
+            .endObject()
+            .endObject()
+
+        createIndex(
+            index, Settings.EMPTY, mapping
         )
+    }
+
+    private fun createIndex(
+        index: String?,
+        settings: Settings?,
+        mappings: XContentBuilder?,
+    ): IndexService? {
+        val createIndexRequestBuilder = client().admin().indices().prepareCreate(index).setSettings(settings)
+        if (mappings != null) {
+            createIndexRequestBuilder.setMapping(mappings)
+        }
+        return this.createIndex(index, createIndexRequestBuilder)
     }
 
     protected fun indexDoc(index: String, id: String, doc: String) {
@@ -230,7 +280,18 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     ).get()
 
     override fun getPlugins(): List<Class<out Plugin>> {
-        return listOf(AlertingPlugin::class.java, ReindexModulePlugin::class.java, ParentJoinModulePlugin::class.java)
+        return listOf(
+            AlertingPlugin::class.java,
+            ReindexPlugin::class.java,
+            MustachePlugin::class.java,
+            PainlessPlugin::class.java,
+            ParentJoinPlugin::class.java
+        )
+    }
+
+    protected fun deleteIndex(index: String) {
+        val response = client().admin().indices().delete(DeleteIndexRequest(index)).get()
+        assertTrue("Unable to delete index", response.isAcknowledged())
     }
 
     override fun resetNodeAfterTest(): Boolean {
