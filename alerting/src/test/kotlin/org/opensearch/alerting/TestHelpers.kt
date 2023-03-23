@@ -39,8 +39,11 @@ import org.opensearch.commons.alerting.model.ActionExecutionResult
 import org.opensearch.commons.alerting.model.AggregationResultBucket
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.ChainedMonitorFindings
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
+import org.opensearch.commons.alerting.model.CompositeInput
 import org.opensearch.commons.alerting.model.DataSources
+import org.opensearch.commons.alerting.model.Delegate
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
@@ -51,7 +54,10 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.Schedule
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.model.Sequence
 import org.opensearch.commons.alerting.model.Trigger
+import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.commons.alerting.model.Workflow.WorkflowType
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.commons.alerting.model.action.ActionExecutionScope
@@ -215,6 +221,61 @@ fun randomDocumentLevelMonitor(
         name = name, monitorType = Monitor.MonitorType.DOC_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
         uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf(), dataSources = dataSources, owner = owner
+    )
+}
+
+fun randomWorkflow(
+    id: String = Workflow.NO_ID,
+    monitorIds: List<String>,
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    user: User? = randomUser(),
+    schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
+    enabled: Boolean = randomBoolean(),
+    enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
+    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS)
+): Workflow {
+    val delegates = mutableListOf<Delegate>()
+    if (!monitorIds.isNullOrEmpty()) {
+        delegates.add(Delegate(1, monitorIds[0]))
+        for (i in 1 until monitorIds.size) {
+            // Order of monitors in workflow will be the same like forwarded meaning that the first monitorId will be used as second monitor chained finding
+            delegates.add(Delegate(i + 1, monitorIds [i], ChainedMonitorFindings(monitorIds[i - 1])))
+        }
+    }
+
+    return Workflow(
+        id = id,
+        name = name,
+        enabled = enabled,
+        schedule = schedule,
+        lastUpdateTime = lastUpdateTime,
+        enabledTime = enabledTime,
+        workflowType = WorkflowType.COMPOSITE,
+        user = user,
+        inputs = listOf(CompositeInput(Sequence(delegates)))
+    )
+}
+
+fun randomWorkflowWithDelegates(
+    id: String = Workflow.NO_ID,
+    delegates: List<Delegate>,
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    user: User? = randomUser(),
+    schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
+    enabled: Boolean = randomBoolean(),
+    enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
+    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+): Workflow {
+    return Workflow(
+        id = id,
+        name = name,
+        enabled = enabled,
+        schedule = schedule,
+        lastUpdateTime = lastUpdateTime,
+        enabledTime = enabledTime,
+        workflowType = WorkflowType.COMPOSITE,
+        user = user,
+        inputs = listOf(CompositeInput(Sequence(delegates)))
     )
 }
 
@@ -686,4 +747,8 @@ fun assertUserNull(map: Map<String, Any?>) {
 
 fun assertUserNull(monitor: Monitor) {
     assertNull("User is not null", monitor.user)
+}
+
+fun assertUserNull(workflow: Workflow) {
+    assertNull("User is not null", workflow.user)
 }
