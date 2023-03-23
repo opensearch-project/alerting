@@ -9,6 +9,9 @@ import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.DeleteWorkflowRequest
+import org.opensearch.commons.alerting.action.GetWorkflowRequest
+import org.opensearch.commons.alerting.action.GetWorkflowResponse
 import org.opensearch.commons.alerting.action.IndexWorkflowRequest
 import org.opensearch.commons.alerting.action.IndexWorkflowResponse
 import org.opensearch.commons.alerting.model.ScheduledJob
@@ -71,5 +74,18 @@ abstract class WorkflowSingleNodeTestCase : AlertingSingleNodeTestCase() {
         )
 
         return client().execute(AlertingActions.INDEX_WORKFLOW_ACTION_TYPE, request).actionGet()
+    }
+    protected fun getWorkflowById(id: String): GetWorkflowResponse {
+        return client().execute(
+            AlertingActions.GET_WORKFLOW_ACTION_TYPE,
+            GetWorkflowRequest(id, RestRequest.Method.GET)
+        ).get()
+    }
+
+    protected fun deleteWorkflow(workflowId: String, deleteDelegateMonitors: Boolean? = null) {
+        client().execute(
+            AlertingActions.DELETE_WORKFLOW_ACTION_TYPE,
+            DeleteWorkflowRequest(workflowId, deleteDelegateMonitors)
+        ).get()
     }
 }
