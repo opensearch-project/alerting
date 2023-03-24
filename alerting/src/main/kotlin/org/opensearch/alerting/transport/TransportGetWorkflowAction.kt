@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.transport
 
+import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
 import org.opensearch.action.get.GetRequest
@@ -43,6 +44,8 @@ class TransportGetWorkflowAction @Inject constructor(
 ),
     SecureTransportAction {
 
+    private val log = LogManager.getLogger(javaClass)
+
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
@@ -64,6 +67,7 @@ class TransportGetWorkflowAction @Inject constructor(
                 object : ActionListener<GetResponse> {
                     override fun onResponse(response: GetResponse) {
                         if (!response.isExists) {
+                            log.error("Workflow with ${getWorkflowRequest.workflowId} not found")
                             actionListener.onFailure(
                                 AlertingException.wrap(
                                     OpenSearchStatusException(
@@ -110,6 +114,8 @@ class TransportGetWorkflowAction @Inject constructor(
                     }
 
                     override fun onFailure(t: Exception) {
+                        log.error("Getting the workflow failed", t)
+
                         if (t is IndexNotFoundException) {
                             actionListener.onFailure(
                                 OpenSearchStatusException(

@@ -109,12 +109,14 @@ class TransportDeleteMonitorAction @Inject constructor(
             try {
                 val monitor = getMonitor()
 
-                val canDelete = monitorIsNotInWorkflows(monitor.id) && (
-                    user == null || !doFilterForUser(user) ||
-                        checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", monitorId)
-                    )
+                val canDelete = user == null || !doFilterForUser(user) ||
+                    checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", monitorId)
 
-                if (canDelete) {
+                if (monitorIsWorkflowDelegate(monitor.id)) {
+                    actionListener.onFailure(
+                        AlertingException("Monitor can't be deleted because it is a part of workflow(s)", RestStatus.FORBIDDEN, IllegalStateException())
+                    )
+                } else if (canDelete) {
                     val deleteResponse = deleteMonitor(monitor)
                     deleteDocLevelMonitorQueriesAndIndices(monitor)
                     deleteMetadata(monitor)
@@ -134,7 +136,7 @@ class TransportDeleteMonitorAction @Inject constructor(
          *
          * @param monitorId id of monitor that is checked if it is a workflow delegate
          */
-        private suspend fun monitorIsNotInWorkflows(monitorId: String): Boolean {
+        private suspend fun monitorIsWorkflowDelegate(monitorId: String): Boolean {
             val queryBuilder = QueryBuilders.nestedQuery(
                 Workflow.WORKFLOW_DELEGATE_PATH,
                 QueryBuilders.boolQuery().must(
@@ -145,16 +147,25 @@ class TransportDeleteMonitorAction @Inject constructor(
                 ),
                 ScoreMode.None
             )
+            try {
+                val searchRequest = SearchRequest()
+                    .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
+                    .source(SearchSourceBuilder().query(queryBuilder))
 
-            val searchRequest = SearchRequest()
-                .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
-                .source(SearchSourceBuilder().query(queryBuilder).fetchSource(true))
+                client.threadPool().threadContext.stashContext().use {
+                    val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
+                    if (searchResponse.hits.totalHits?.value == 0L) {
+                        return false
+                    }
 
-            val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
-            if (searchResponse.hits.totalHits?.value == 0L) {
-                return true
+                    val workflowIds = searchResponse.hits.hits.map { it.id }.joinToString()
+                    log.info("Monitor $monitorId can't be deleted since it belongs to $workflowIds")
+                    return true
+                }
+            } catch (ex: Exception) {
+                log.error("Error getting the monitor workflows", ex)
+                throw AlertingException.wrap(ex)
             }
-            return false
         }
 
         private suspend fun getMonitor(): Monitor {

@@ -23,6 +23,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
+import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
@@ -54,8 +55,6 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 
-private val log = LogManager.getLogger(TransportIndexMonitorAction::class.java)
-
 /**
  * Transport class that deletes the workflow.
  * If the deleteDelegateMonitor flag is set to true, deletes the workflow delegates that are not part of another workflow
@@ -71,6 +70,8 @@ class TransportDeleteWorkflowAction @Inject constructor(
     AlertingActions.DELETE_WORKFLOW_ACTION_NAME, transportService, actionFilters, ::DeleteWorkflowRequest
 ),
     SecureTransportAction {
+
+    private val log = LogManager.getLogger(javaClass)
 
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
@@ -126,10 +127,11 @@ class TransportDeleteWorkflowAction @Inject constructor(
 
                 if (canDelete) {
                     val deleteResponse = deleteWorkflow(workflow)
-                    deleteMetadata(workflow)
+                    // TODO - uncomment once the metadata are introduced
+                    // deleteMetadata(workflow)
                     if (deleteDelegateMonitors == true) {
                         val delegateMonitorIds = (workflow.inputs[0] as CompositeInput).getMonitorIds()
-                        val monitorIdsToBeDeleted = getDeletableDelegates(workflowId, delegateMonitorIds)
+                        val monitorIdsToBeDeleted = getDeletableDelegates(workflowId, delegateMonitorIds, user)
 
                         // Delete the monitor ids
                         if (monitorIdsToBeDeleted.isNotEmpty()) {
@@ -177,7 +179,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
          * @param workflowIdToBeDeleted Id of the workflow that should be deleted
          * @param monitorIds List of delegate monitor ids (underlying monitor ids)
          */
-        private suspend fun getDeletableDelegates(workflowIdToBeDeleted: String, monitorIds: List<String>): List<String> {
+        private suspend fun getDeletableDelegates(workflowIdToBeDeleted: String, monitorIds: List<String>, user: User?): List<String> {
             // Retrieve monitors belonging to another workflows
             val queryBuilder = QueryBuilders.boolQuery().mustNot(QueryBuilders.termQuery("_id", workflowIdToBeDeleted)).filter(
                 QueryBuilders.nestedQuery(
@@ -194,7 +196,12 @@ class TransportDeleteWorkflowAction @Inject constructor(
 
             val searchRequest = SearchRequest()
                 .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
-                .source(SearchSourceBuilder().query(queryBuilder).fetchSource(true))
+                .source(SearchSourceBuilder().query(queryBuilder))
+
+            // Check  if user can access the monitors (since the monitors could get modified later and the user might not have the backend roles to access the monitors)
+            if (user != null && filterByEnabled) {
+                addFilter(user, searchRequest.source(), "monitor.user.backend_roles.keyword")
+            }
 
             val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
 
@@ -239,7 +246,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
             log.debug("Deleting the workflow with id ${deleteRequest.id()}")
             return client.suspendUntil { delete(deleteRequest, it) }
         }
-
+        // TODO - use once the workflow metadata concept is introduced
         private suspend fun deleteMetadata(workflow: Workflow) {
             val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, "${workflow.id}-metadata")
             val deleteResponse: DeleteResponse = client.suspendUntil { delete(deleteRequest, it) }

@@ -606,7 +606,7 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning DeleteMonitor Action error ",
-                    it.contains("Not allowed to delete this monitor!")
+                    it.contains("Monitor can't be deleted because it is a part of workflow(s)")
                 )
             }
         }
