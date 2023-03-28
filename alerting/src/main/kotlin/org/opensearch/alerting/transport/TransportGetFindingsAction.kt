@@ -32,9 +32,7 @@ import org.opensearch.common.Strings
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentFactory
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AlertingActions
@@ -44,6 +42,8 @@ import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.FindingDocument
 import org.opensearch.commons.alerting.model.FindingWithDocs
 import org.opensearch.commons.utils.recreateObject
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestRequest
@@ -65,7 +65,10 @@ class TransportGetFindingsSearchAction @Inject constructor(
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<ActionRequest, GetFindingsResponse> (
-    AlertingActions.GET_FINDINGS_ACTION_NAME, transportService, actionFilters, ::GetFindingsRequest
+    AlertingActions.GET_FINDINGS_ACTION_NAME,
+    transportService,
+    actionFilters,
+    ::GetFindingsRequest
 ),
     SecureTransportAction {
 
@@ -101,8 +104,9 @@ class TransportGetFindingsSearchAction @Inject constructor(
 
         val queryBuilder = QueryBuilders.boolQuery()
 
-        if (!getFindingsRequest.findingId.isNullOrBlank())
+        if (!getFindingsRequest.findingId.isNullOrBlank()) {
             queryBuilder.filter(QueryBuilders.termQuery("_id", getFindingsRequest.findingId))
+        }
 
         if (getFindingsRequest.monitorId != null) {
             queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getFindingsRequest.monitorId))

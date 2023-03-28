@@ -37,12 +37,8 @@ import org.opensearch.common.io.PathUtils
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent
@@ -60,6 +56,10 @@ import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.util.string
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.ToXContent
+import org.opensearch.core.xcontent.XContentBuilder
+import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.SearchModule
 import java.net.URLEncoder
@@ -123,13 +123,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         refresh: Boolean = true
     ): Monitor {
         val response = client.makeRequest(
-            "POST", "$ALERTING_BASE_URI?refresh=$refresh", emptyMap(),
+            "POST",
+            "$ALERTING_BASE_URI?refresh=$refresh",
+            emptyMap(),
             createMonitorEntityWithBackendRoles(monitor, rbacRoles)
         )
         assertEquals("Unable to create a new monitor", RestStatus.CREATED, response.restStatus())
 
         val monitorJson = jsonXContent.createParser(
-            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            NamedXContentRegistry.EMPTY,
+            LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
         assertUserNull(monitorJson as HashMap<String, Any>)
@@ -143,7 +146,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun deleteMonitor(monitor: Monitor, refresh: Boolean = true): Response {
         val response = client().makeRequest(
-            "DELETE", "$ALERTING_BASE_URI/${monitor.id}?refresh=$refresh", emptyMap(),
+            "DELETE",
+            "$ALERTING_BASE_URI/${monitor.id}?refresh=$refresh",
+            emptyMap(),
             monitor.toHttpEntity()
         )
         assertEquals("Unable to delete a monitor", RestStatus.OK, response.restStatus())
@@ -166,7 +171,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             refresh
         )
         val destinationJson = jsonXContent.createParser(
-            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            NamedXContentRegistry.EMPTY,
+            LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
 
@@ -198,7 +204,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         )
         assertEquals("Unable to update a destination", RestStatus.OK, response.restStatus())
         val destinationJson = jsonXContent.createParser(
-            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            NamedXContentRegistry.EMPTY,
+            LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
         assertUserNull(destinationJson as HashMap<String, Any>)
@@ -248,7 +255,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             refresh
         )
         val emailAccountJson = jsonXContent.createParser(
-            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            NamedXContentRegistry.EMPTY,
+            LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
         return emailAccount.copy(id = emailAccountJson["_id"] as String)
@@ -308,7 +316,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             refresh
         )
         val emailGroupJson = jsonXContent.createParser(
-            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            NamedXContentRegistry.EMPTY,
+            LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
         return emailGroup.copy(id = emailGroupJson["_id"] as String)
@@ -334,7 +343,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         )
         assertEquals("Unable to update a destination", RestStatus.OK, response.restStatus())
         val destinationJson = jsonXContent.createParser(
-            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            NamedXContentRegistry.EMPTY,
+            LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
         assertUserNull(destinationJson as HashMap<String, Any>)
@@ -352,7 +362,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         dataMap: Map<String, Any> = emptyMap(),
         header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
     ): List<Map<String, Any>> {
-
         var baseEndpoint = "$DESTINATION_BASE_URI?"
         for (entry in dataMap.entries) {
             baseEndpoint += "${entry.key}=${entry.value}&"
@@ -366,7 +375,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         )
         assertEquals("Unable to update a destination", RestStatus.OK, response.restStatus())
         val destinationJson = jsonXContent.createParser(
-            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            NamedXContentRegistry.EMPTY,
+            LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
         return destinationJson["destinations"] as List<Map<String, Any>>
@@ -471,13 +481,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun createAlert(alert: Alert): Alert {
         val response = adminClient().makeRequest(
-            "POST", "/${AlertIndices.ALERT_INDEX}/_doc?refresh=true&routing=${alert.monitorId}",
-            emptyMap(), alert.toHttpEntityWithUser()
+            "POST",
+            "/${AlertIndices.ALERT_INDEX}/_doc?refresh=true&routing=${alert.monitorId}",
+            emptyMap(),
+            alert.toHttpEntityWithUser()
         )
         assertEquals("Unable to create a new alert", RestStatus.CREATED, response.restStatus())
 
         val alertJson = jsonXContent.createParser(
-            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            NamedXContentRegistry.EMPTY,
+            LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
 
@@ -506,8 +519,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     @Suppress("UNCHECKED_CAST")
     protected fun updateMonitor(monitor: Monitor, refresh: Boolean = false): Monitor {
         val response = client().makeRequest(
-            "PUT", "${monitor.relativeUrl()}?refresh=$refresh",
-            emptyMap(), monitor.toHttpEntity()
+            "PUT",
+            "${monitor.relativeUrl()}?refresh=$refresh",
+            emptyMap(),
+            monitor.toHttpEntity()
         )
         assertEquals("Unable to update a monitor", RestStatus.OK, response.restStatus())
         assertUserNull(response.asMap()["monitor"] as Map<String, Any>)
@@ -521,8 +536,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         refresh: Boolean = true
     ): Monitor {
         val response = client.makeRequest(
-            "PUT", "${monitor.relativeUrl()}?refresh=$refresh",
-            emptyMap(), createMonitorEntityWithBackendRoles(monitor, rbacRoles)
+            "PUT",
+            "${monitor.relativeUrl()}?refresh=$refresh",
+            emptyMap(),
+            createMonitorEntityWithBackendRoles(monitor, rbacRoles)
         )
         assertEquals("Unable to update a monitor", RestStatus.OK, response.restStatus())
         assertUserNull(response.asMap()["monitor"] as Map<String, Any>)
@@ -655,8 +672,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             .let { StringEntity(it, APPLICATION_JSON) }
 
         val response = client().makeRequest(
-            "POST", "${monitor.relativeUrl()}/_acknowledge/alerts?refresh=true",
-            emptyMap(), request
+            "POST",
+            "${monitor.relativeUrl()}/_acknowledge/alerts?refresh=true",
+            emptyMap(),
+            request
         )
         assertEquals("Acknowledge call failed.", RestStatus.OK, response.restStatus())
         return response
@@ -712,7 +731,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client.makeRequest("POST", "$ALERTING_BASE_URI/_execute", params, monitor.toHttpEntityWithUser())
 
     protected fun searchFindings(params: Map<String, String> = mutableMapOf()): GetFindingsResponse {
-
         var baseEndpoint = "${AlertingPlugin.FINDING_BASE_URI}/_search?"
         for (entry in params.entries) {
             baseEndpoint += "${entry.key}=${entry.value}&"
@@ -774,7 +792,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     /** A test index that can be used across tests. Feel free to add new fields but don't remove any. */
     protected fun createTestIndex(index: String = randomAlphaOfLength(10).lowercase(Locale.ROOT)): String {
         createIndex(
-            index, Settings.EMPTY,
+            index,
+            Settings.EMPTY,
             """
                 "properties" : {
                   "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
@@ -794,7 +813,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun createTestConfigIndex(index: String = "." + randomAlphaOfLength(10).lowercase(Locale.ROOT)): String {
         try {
             createIndex(
-                index, Settings.builder().build(),
+                index,
+                Settings.builder().build(),
                 """
                     "properties" : {
                       "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" }
@@ -1048,7 +1068,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     fun enableScheduledJob(): Response {
         val updateResponse = client().makeRequest(
-            "PUT", "_cluster/settings",
+            "PUT",
+            "_cluster/settings",
             emptyMap(),
             StringEntity(
                 XContentFactory.jsonBuilder().startObject().field("persistent")
@@ -1062,7 +1083,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     fun disableScheduledJob(): Response {
         val updateResponse = client().makeRequest(
-            "PUT", "_cluster/settings",
+            "PUT",
+            "_cluster/settings",
             emptyMap(),
             StringEntity(
                 XContentFactory.jsonBuilder().startObject().field("persistent")
@@ -1076,7 +1098,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     fun enableFilterBy() {
         val updateResponse = client().makeRequest(
-            "PUT", "_cluster/settings",
+            "PUT",
+            "_cluster/settings",
             emptyMap(),
             StringEntity(
                 XContentFactory.jsonBuilder().startObject().field("persistent")
@@ -1090,7 +1113,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     fun disableFilterBy() {
         val updateResponse = client().makeRequest(
-            "PUT", "_cluster/settings",
+            "PUT",
+            "_cluster/settings",
             emptyMap(),
             StringEntity(
                 XContentFactory.jsonBuilder().startObject().field("persistent")

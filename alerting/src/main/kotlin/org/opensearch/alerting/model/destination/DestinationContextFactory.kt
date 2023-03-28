@@ -13,7 +13,7 @@ import org.opensearch.alerting.settings.DestinationSettings.Companion.SecureDest
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.client.Client
 import org.opensearch.common.settings.SecureString
-import org.opensearch.common.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.NamedXContentRegistry
 
 /**
  * This class is responsible for generating [DestinationContext].

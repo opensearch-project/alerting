@@ -8,11 +8,11 @@ package org.opensearch.alerting.util
 import org.opensearch.alerting.ANOMALY_RESULT_INDEX
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.common.io.stream.StreamOutput
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.commons.alerting.model.Input
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
+import org.opensearch.core.xcontent.ToXContent
+import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase
@@ -32,7 +32,6 @@ class AnomalyDetectionUtilsTests : OpenSearchTestCase() {
     }
 
     fun `test not ad monitor if monitor have no inputs`() {
-
         val monitor = randomQueryLevelMonitor(
             inputs = listOf()
         )
@@ -103,7 +102,9 @@ class AnomalyDetectionUtilsTests : OpenSearchTestCase() {
         val searchSourceBuilder = SearchSourceBuilder()
         addUserBackendRolesFilter(
             User(
-                randomAlphaOfLength(5), null, listOf(randomAlphaOfLength(5)),
+                randomAlphaOfLength(5),
+                null,
+                listOf(randomAlphaOfLength(5)),
                 listOf(randomAlphaOfLength(5))
             ),
             searchSourceBuilder
@@ -121,7 +122,9 @@ class AnomalyDetectionUtilsTests : OpenSearchTestCase() {
         val searchSourceBuilder = SearchSourceBuilder()
         addUserBackendRolesFilter(
             User(
-                randomAlphaOfLength(5), listOf(), listOf(randomAlphaOfLength(5)),
+                randomAlphaOfLength(5),
+                listOf(),
+                listOf(randomAlphaOfLength(5)),
                 listOf(randomAlphaOfLength(5))
             ),
             searchSourceBuilder
@@ -141,7 +144,9 @@ class AnomalyDetectionUtilsTests : OpenSearchTestCase() {
         val backendRole2 = randomAlphaOfLength(5)
         addUserBackendRolesFilter(
             User(
-                randomAlphaOfLength(5), listOf(backendRole1, backendRole2), listOf(randomAlphaOfLength(5)),
+                randomAlphaOfLength(5),
+                listOf(backendRole1, backendRole2),
+                listOf(randomAlphaOfLength(5)),
                 listOf(randomAlphaOfLength(5))
             ),
             searchSourceBuilder

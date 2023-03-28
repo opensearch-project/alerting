@@ -147,9 +147,13 @@ fun NotificationConfigInfo.getTitle(subject: String?): String {
  * All valid response statuses.
  */
 private val VALID_RESPONSE_STATUS = setOf(
-    RestStatus.OK.status, RestStatus.CREATED.status, RestStatus.ACCEPTED.status,
-    RestStatus.NON_AUTHORITATIVE_INFORMATION.status, RestStatus.NO_CONTENT.status,
-    RestStatus.RESET_CONTENT.status, RestStatus.PARTIAL_CONTENT.status,
+    RestStatus.OK.status,
+    RestStatus.CREATED.status,
+    RestStatus.ACCEPTED.status,
+    RestStatus.NON_AUTHORITATIVE_INFORMATION.status,
+    RestStatus.NO_CONTENT.status,
+    RestStatus.RESET_CONTENT.status,
+    RestStatus.PARTIAL_CONTENT.status,
     RestStatus.MULTI_STATUS.status
 )
 

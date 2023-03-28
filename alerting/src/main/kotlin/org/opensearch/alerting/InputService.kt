@@ -21,11 +21,11 @@ import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.NamedWriteableAwareStreamInput
 import org.opensearch.common.io.stream.NamedWriteableRegistry
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
 import org.opensearch.script.ScriptType
@@ -68,8 +68,10 @@ class InputService(
                         val rewrittenQuery = AggregationQueryRewriter.rewriteQuery(deepCopyQuery(input.query), prevResult, monitor.triggers)
                         val searchSource = scriptService.compile(
                             Script(
-                                ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
-                                rewrittenQuery.toString(), searchParams
+                                ScriptType.INLINE,
+                                Script.DEFAULT_TEMPLATE_LANG,
+                                rewrittenQuery.toString(),
+                                searchParams
                             ),
                             TemplateScript.CONTEXT
                         )
@@ -131,8 +133,10 @@ class InputService(
             val searchParams = mapOf("period_start" to periodStart.toEpochMilli(), "period_end" to periodEnd.toEpochMilli())
             val searchSource = scriptService.compile(
                 Script(
-                    ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
-                    input.query.toString(), searchParams
+                    ScriptType.INLINE,
+                    Script.DEFAULT_TEMPLATE_LANG,
+                    input.query.toString(),
+                    searchParams
                 ),
                 TemplateScript.CONTEXT
             )

@@ -103,11 +103,13 @@ class DestinationRestApiIT : AlertingRestTestCase() {
         assertEquals("Incorrect destination name", createdDestination.name, "test")
         assertEquals("Incorrect destination type", createdDestination.type, DestinationType.EMAIL)
         assertEquals(
-            "Incorrect email destination recipient type", createdDestination.email?.recipients?.get(0)?.type,
+            "Incorrect email destination recipient type",
+            createdDestination.email?.recipients?.get(0)?.type,
             Recipient.RecipientType.EMAIL
         )
         assertEquals(
-            "Incorrect email destination recipient email", createdDestination.email?.recipients?.get(0)?.email,
+            "Incorrect email destination recipient email",
+            createdDestination.email?.recipients?.get(0)?.email,
             "test@email.com"
         )
     }

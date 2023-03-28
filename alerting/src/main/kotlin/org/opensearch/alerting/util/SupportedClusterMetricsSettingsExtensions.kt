@@ -117,7 +117,8 @@ fun redactFieldsFromResponse(
                 when (val mappedValue = mappedActionResponse[key]) {
                     is Map<*, *> -> output[key] = XContentMapValues.filter(
                         mappedActionResponse[key] as MutableMap<String, *>?,
-                        value.toTypedArray(), arrayOf()
+                        value.toTypedArray(),
+                        arrayOf()
                     )
                     else -> output[key] = mappedValue ?: hashMapOf<String, Any>()
                 }

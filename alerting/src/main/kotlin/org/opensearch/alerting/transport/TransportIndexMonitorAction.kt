@@ -52,8 +52,6 @@ import org.opensearch.common.io.stream.NamedWriteableRegistry
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
@@ -68,6 +66,8 @@ import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JO
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
@@ -92,17 +92,25 @@ class TransportIndexMonitorAction @Inject constructor(
     val clusterService: ClusterService,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry,
-    val namedWriteableRegistry: NamedWriteableRegistry,
+    val namedWriteableRegistry: NamedWriteableRegistry
 ) : HandledTransportAction<ActionRequest, IndexMonitorResponse>(
-    AlertingActions.INDEX_MONITOR_ACTION_NAME, transportService, actionFilters, ::IndexMonitorRequest
+    AlertingActions.INDEX_MONITOR_ACTION_NAME,
+    transportService,
+    actionFilters,
+    ::IndexMonitorRequest
 ),
     SecureTransportAction {
 
     @Volatile private var maxMonitors = ALERTING_MAX_MONITORS.get(settings)
+
     @Volatile private var requestTimeout = REQUEST_TIMEOUT.get(settings)
+
     @Volatile private var indexTimeout = INDEX_TIMEOUT.get(settings)
+
     @Volatile private var maxActionThrottle = MAX_ACTION_THROTTLE_VALUE.get(settings)
+
     @Volatile private var allowList = ALLOW_LIST.get(settings)
+
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
@@ -139,7 +147,8 @@ class TransportIndexMonitorAction @Inject constructor(
                 actionListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException(
-                            "User specified backend roles that they don't have access to. Contact administrator", RestStatus.FORBIDDEN
+                            "User specified backend roles that they don't have access to. Contact administrator",
+                            RestStatus.FORBIDDEN
                         )
                     )
                 )
@@ -152,7 +161,8 @@ class TransportIndexMonitorAction @Inject constructor(
                 actionListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException(
-                            "Non-admin user are not allowed to specify an empty set of backend roles.", RestStatus.FORBIDDEN
+                            "Non-admin user are not allowed to specify an empty set of backend roles.",
+                            RestStatus.FORBIDDEN
                         )
                     )
                 )
@@ -329,7 +339,9 @@ class TransportIndexMonitorAction @Inject constructor(
             } else if (!IndexUtils.scheduledJobIndexUpdated) {
                 IndexUtils.updateIndexMapping(
                     SCHEDULED_JOBS_INDEX,
-                    ScheduledJobIndices.scheduledJobMappings(), clusterService.state(), client.admin().indices(),
+                    ScheduledJobIndices.scheduledJobMappings(),
+                    clusterService.state(),
+                    client.admin().indices(),
                     object : ActionListener<AcknowledgedResponse> {
                         override fun onResponse(response: AcknowledgedResponse) {
                             onUpdateMappingsResponse(response)
@@ -350,7 +362,6 @@ class TransportIndexMonitorAction @Inject constructor(
          * and compare this to the [maxMonitorCount]. Requests that breach this threshold will be rejected.
          */
         private fun prepareMonitorIndexing() {
-
             // Below check needs to be async operations and needs to be refactored issue#269
             // checkForDisallowedDestinations(allowList)
 
@@ -435,7 +446,8 @@ class TransportIndexMonitorAction @Inject constructor(
                 actionListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException(
-                            "Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged", RestStatus.INTERNAL_SERVER_ERROR
+                            "Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged",
+                            RestStatus.INTERNAL_SERVER_ERROR
                         )
                     )
                 )
@@ -504,8 +516,11 @@ class TransportIndexMonitorAction @Inject constructor(
 
                 actionListener.onResponse(
                     IndexMonitorResponse(
-                        indexResponse.id, indexResponse.version, indexResponse.seqNo,
-                        indexResponse.primaryTerm, request.monitor
+                        indexResponse.id,
+                        indexResponse.version,
+                        indexResponse.seqNo,
+                        indexResponse.primaryTerm,
+                        request.monitor
                     )
                 )
             } catch (t: Exception) {
@@ -548,8 +563,10 @@ class TransportIndexMonitorAction @Inject constructor(
                     return
                 }
                 val xcp = XContentHelper.createParser(
-                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                    getResponse.sourceAsBytesRef, XContentType.JSON
+                    xContentRegistry,
+                    LoggingDeprecationHandler.INSTANCE,
+                    getResponse.sourceAsBytesRef,
+                    XContentType.JSON
                 )
                 val monitor = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
                 onGetResponse(monitor)
@@ -565,8 +582,9 @@ class TransportIndexMonitorAction @Inject constructor(
 
             // If both are enabled, use the current existing monitor enabled time, otherwise the next execution will be
             // incorrect.
-            if (request.monitor.enabled && currentMonitor.enabled)
+            if (request.monitor.enabled && currentMonitor.enabled) {
                 request.monitor = request.monitor.copy(enabledTime = currentMonitor.enabledTime)
+            }
 
             /**
              * On update monitor check which backend roles to associate to the monitor.
@@ -639,8 +657,11 @@ class TransportIndexMonitorAction @Inject constructor(
                 }
                 actionListener.onResponse(
                     IndexMonitorResponse(
-                        indexResponse.id, indexResponse.version, indexResponse.seqNo,
-                        indexResponse.primaryTerm, request.monitor
+                        indexResponse.id,
+                        indexResponse.version,
+                        indexResponse.seqNo,
+                        indexResponse.primaryTerm,
+                        request.monitor
                     )
                 )
             } catch (t: Exception) {

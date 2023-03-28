@@ -39,8 +39,6 @@ import org.opensearch.client.ResponseException
 import org.opensearch.client.WarningFailureException
 import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.unit.TimeValue
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.CronSchedule
@@ -51,6 +49,8 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.core.xcontent.ToXContent
+import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
@@ -313,8 +313,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             SearchSourceBuilder().query(QueryBuilders.termQuery("foo", "bar"))
         )
         val updateResponse = client().makeRequest(
-            "PUT", monitor.relativeUrl(),
-            emptyMap(), monitor.copy(inputs = listOf(updatedSearch)).toHttpEntity()
+            "PUT",
+            monitor.relativeUrl(),
+            emptyMap(),
+            monitor.copy(inputs = listOf(updatedSearch)).toHttpEntity()
         )
 
         assertEquals("Update monitor failed", RestStatus.OK, updateResponse.restStatus())
@@ -339,8 +341,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             )
         )
         val updateResponse = client().makeRequest(
-            "PUT", monitor.relativeUrl(),
-            emptyMap(), monitor.copy(triggers = updatedTriggers).toHttpEntity()
+            "PUT",
+            monitor.relativeUrl(),
+            emptyMap(),
+            monitor.copy(triggers = updatedTriggers).toHttpEntity()
         )
 
         assertEquals("Update monitor failed", RestStatus.OK, updateResponse.restStatus())
@@ -358,8 +362,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
         val updatedSchedule = CronSchedule(expression = "0 9 * * *", timezone = ZoneId.of("UTC"))
         val updateResponse = client().makeRequest(
-            "PUT", monitor.relativeUrl(),
-            emptyMap(), monitor.copy(schedule = updatedSchedule).toHttpEntity()
+            "PUT",
+            monitor.relativeUrl(),
+            emptyMap(),
+            monitor.copy(schedule = updatedSchedule).toHttpEntity()
         )
 
         assertEquals("Update monitor failed", RestStatus.OK, updateResponse.restStatus())
@@ -430,7 +436,8 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val getMonitor = getMonitor(monitorId = monitor.id)
         assertEquals(
             "UI Metadata returned but request did not come from OpenSearch Dashboards.",
-            getMonitor.uiMetadata, mapOf<String, Any>()
+            getMonitor.uiMetadata,
+            mapOf<String, Any>()
         )
     }
 
@@ -446,7 +453,8 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
         val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", monitor.id)).toString()
         val searchResponse = client().makeRequest(
-            "GET", "$ALERTING_BASE_URI/_search",
+            "GET",
+            "$ALERTING_BASE_URI/_search",
             emptyMap(),
             NStringEntity(search, ContentType.APPLICATION_JSON)
         )
@@ -462,7 +470,8 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
         val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", monitor.id)).toString()
         val searchResponse = client().makeRequest(
-            "POST", "$ALERTING_BASE_URI/_search",
+            "POST",
+            "$ALERTING_BASE_URI/_search",
             emptyMap(),
             NStringEntity(search, ContentType.APPLICATION_JSON)
         )
@@ -832,7 +841,9 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         refreshIndex("*")
         val updatedMonitor = monitor.copy(triggers = emptyList())
         val updateResponse = client().makeRequest(
-            "PUT", "$ALERTING_BASE_URI/${monitor.id}", emptyMap(),
+            "PUT",
+            "$ALERTING_BASE_URI/${monitor.id}",
+            emptyMap(),
             updatedMonitor.toHttpEntity()
         )
         assertEquals("Update request not successful", RestStatus.OK, updateResponse.restStatus())
@@ -863,7 +874,9 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         refreshIndex("*")
         val updatedMonitor = monitor.copy(triggers = listOf(triggerToKeep))
         val updateResponse = client().makeRequest(
-            "PUT", "$ALERTING_BASE_URI/${monitor.id}", emptyMap(),
+            "PUT",
+            "$ALERTING_BASE_URI/${monitor.id}",
+            emptyMap(),
             updatedMonitor.toHttpEntity()
         )
         assertEquals("Update request not successful", RestStatus.OK, updateResponse.restStatus())
@@ -902,8 +915,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val monitor = createRandomMonitor(refresh = true)
         try {
             client().makeRequest(
-                "PUT", "${monitor.relativeUrl()}?refresh=true&if_seq_no=1234&if_primary_term=1234",
-                emptyMap(), monitor.toHttpEntity()
+                "PUT",
+                "${monitor.relativeUrl()}?refresh=true&if_seq_no=1234&if_primary_term=1234",
+                emptyMap(),
+                monitor.toHttpEntity()
             )
             fail("expected 409 ResponseException")
         } catch (e: ResponseException) {
@@ -1046,7 +1061,6 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
     @Throws(Exception::class)
     fun `test search monitors only`() {
-
         // 1. create monitor
         val monitor = randomQueryLevelMonitor()
         val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
@@ -1159,8 +1173,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             )
         )
         val updateResponse = client().makeRequest(
-            "PUT", monitor.relativeUrl(),
-            emptyMap(), monitor.copy(triggers = updatedTriggers).toHttpEntity()
+            "PUT",
+            monitor.relativeUrl(),
+            emptyMap(),
+            monitor.copy(triggers = updatedTriggers).toHttpEntity()
         )
 
         assertEquals("Update monitor failed", RestStatus.OK, updateResponse.restStatus())

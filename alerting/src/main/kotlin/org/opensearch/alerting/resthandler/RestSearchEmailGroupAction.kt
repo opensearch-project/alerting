@@ -14,10 +14,10 @@ import org.opensearch.alerting.util.context
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
+import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BytesRestResponse
@@ -93,7 +93,8 @@ class RestSearchEmailGroupAction : BaseRestHandler() {
                 for (hit in response.hits) {
                     XContentType.JSON.xContent().createParser(
                         channel.request().xContentRegistry,
-                        LoggingDeprecationHandler.INSTANCE, hit.sourceAsString
+                        LoggingDeprecationHandler.INSTANCE,
+                        hit.sourceAsString
                     ).use { hitsParser ->
                         val emailGroup = EmailGroup.parseWithType(hitsParser, hit.id, hit.version)
                         val xcb = emailGroup.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS)

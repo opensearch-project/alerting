@@ -30,13 +30,13 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.authuser.User
+import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -55,12 +55,14 @@ class TransportExecuteMonitorAction @Inject constructor(
     private val docLevelMonitorQueries: DocLevelMonitorQueries,
     private val settings: Settings
 ) : HandledTransportAction<ExecuteMonitorRequest, ExecuteMonitorResponse> (
-    ExecuteMonitorAction.NAME, transportService, actionFilters, ::ExecuteMonitorRequest
+    ExecuteMonitorAction.NAME,
+    transportService,
+    actionFilters,
+    ::ExecuteMonitorRequest
 ) {
     @Volatile private var indexTimeout = AlertingSettings.INDEX_TIMEOUT.get(settings)
 
     override fun doExecute(task: Task, execMonitorRequest: ExecuteMonitorRequest, actionListener: ActionListener<ExecuteMonitorResponse>) {
-
         val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
         log.debug("User and roles string from thread context: $userStr")
         val user: User? = User.parse(userStr)
@@ -103,8 +105,10 @@ class TransportExecuteMonitorAction @Inject constructor(
                             }
                             if (!response.isSourceEmpty) {
                                 XContentHelper.createParser(
-                                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                                    response.sourceAsBytesRef, XContentType.JSON
+                                    xContentRegistry,
+                                    LoggingDeprecationHandler.INSTANCE,
+                                    response.sourceAsBytesRef,
+                                    XContentType.JSON
                                 ).use { xcp ->
                                     val monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
                                     executeMonitor(monitor)

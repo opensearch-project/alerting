@@ -28,8 +28,13 @@ data class QueryLevelTriggerExecutionContext(
         monitorRunResult: MonitorRunResult<QueryLevelTriggerRunResult>,
         alert: Alert? = null
     ) : this(
-        monitor, trigger, monitorRunResult.inputResults.results, monitorRunResult.periodStart, monitorRunResult.periodEnd,
-        alert, monitorRunResult.scriptContextError(trigger)
+        monitor,
+        trigger,
+        monitorRunResult.inputResults.results,
+        monitorRunResult.periodStart,
+        monitorRunResult.periodEnd,
+        alert,
+        monitorRunResult.scriptContextError(trigger)
     )
 
     /**

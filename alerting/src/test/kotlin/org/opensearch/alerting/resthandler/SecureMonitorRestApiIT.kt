@@ -46,7 +46,6 @@ import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
 import org.opensearch.client.RestClient
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
@@ -54,6 +53,7 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.rest.SecureRestClientBuilder
+import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
@@ -69,7 +69,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     companion object {
 
         @BeforeClass
-        @JvmStatic fun setup() {
+        @JvmStatic
+        fun setup() {
             // things to execute once and keep around for the class
             org.junit.Assume.assumeTrue(System.getProperty("security", "false")!!.toBoolean())
         }
@@ -80,7 +81,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     @Before
     fun create() {
-
         if (userClient == null) {
             createUser(user, user, arrayOf())
             userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user).setSocketTimeout(60000).build()
@@ -89,14 +89,12 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     @After
     fun cleanup() {
-
         userClient?.close()
         deleteUser(user)
     }
 
     // Create Monitor related security tests
     fun `test create monitor with an user with alerting role`() {
-
         createUserWithTestDataAndCustomRole(
             user,
             TEST_HR_INDEX,
@@ -109,7 +107,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             val monitor = randomQueryLevelMonitor().copy(
                 inputs = listOf(
                     SearchInput(
-                        indices = listOf(TEST_HR_INDEX), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                        indices = listOf(TEST_HR_INDEX),
+                        query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
                     )
                 )
             )
@@ -126,7 +125,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     TODO: https://github.com/opensearch-project/alerting/issues/300
     */
     fun `test create monitor with an user without alerting role`() {
-
         createUserWithTestDataAndCustomRole(
             user,
             TEST_HR_INDEX,
@@ -138,7 +136,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             val monitor = randomQueryLevelMonitor().copy(
                 inputs = listOf(
                     SearchInput(
-                        indices = listOf(TEST_HR_INDEX), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                        indices = listOf(TEST_HR_INDEX),
+                        query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
                     )
                 )
             )
@@ -152,7 +151,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test create monitor with an user with read-only role`() {
-
         createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
         createUserRolesMapping(ALERTING_READ_ONLY_ACCESS, arrayOf(user))
 
@@ -160,7 +158,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             val monitor = randomQueryLevelMonitor().copy(
                 inputs = listOf(
                     SearchInput(
-                        indices = listOf(TEST_HR_INDEX), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                        indices = listOf(TEST_HR_INDEX),
+                        query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
                     )
                 )
             )
@@ -175,7 +174,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test query monitors with an user with only search monitor cluster permission`() {
-
         createUserWithTestDataAndCustomRole(
             user,
             TEST_HR_INDEX,
@@ -187,7 +185,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", monitor.id)).toString()
         val searchResponse = client().makeRequest(
-            "GET", "$ALERTING_BASE_URI/_search",
+            "GET",
+            "$ALERTING_BASE_URI/_search",
             emptyMap(),
             NStringEntity(search, ContentType.APPLICATION_JSON)
         )
@@ -204,7 +203,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     TODO: https://github.com/opensearch-project/alerting/issues/300
     */
     fun `test query monitors with an user without search monitor cluster permission`() {
-
         createUserWithTestDataAndCustomRole(
             user,
             TEST_HR_INDEX,
@@ -216,7 +214,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             val monitor = randomQueryLevelMonitor().copy(
                 inputs = listOf(
                     SearchInput(
-                        indices = listOf(TEST_HR_INDEX), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                        indices = listOf(TEST_HR_INDEX),
+                        query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
                     )
                 )
             )
@@ -230,7 +229,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test create monitor with an user without index read role`() {
-
         createUserWithTestDataAndCustomRole(
             user,
             TEST_HR_INDEX,
@@ -242,7 +240,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             val monitor = randomQueryLevelMonitor().copy(
                 inputs = listOf(
                     SearchInput(
-                        indices = listOf(TEST_NON_HR_INDEX), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                        indices = listOf(TEST_NON_HR_INDEX),
+                        query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
                     )
                 )
             )
@@ -959,7 +958,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         // search as userOne without alerting roles - must return 403 Forbidden
         try {
             userClient?.makeRequest(
-                "POST", "$ALERTING_BASE_URI/_search",
+                "POST",
+                "$ALERTING_BASE_URI/_search",
                 emptyMap(),
                 NStringEntity(search, ContentType.APPLICATION_JSON)
             )
@@ -990,7 +990,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test query monitors with enable filter by`() {
-
         enableFilterBy()
 
         // creates monitor as "admin" user.
@@ -1010,7 +1009,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         // search as userOne without alerting roles - must return 403 Forbidden
         try {
             userClient?.makeRequest(
-                "POST", "$ALERTING_BASE_URI/_search",
+                "POST",
+                "$ALERTING_BASE_URI/_search",
                 emptyMap(),
                 NStringEntity(search, ContentType.APPLICATION_JSON)
             )
@@ -1073,7 +1073,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         val monitor = createRandomMonitor(true)
 
         try {
-
             userClient?.makeRequest(
                 "POST",
                 "$ALERTING_BASE_URI/${monitor.id}/_execute",
@@ -1143,7 +1142,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test query all alerts in all states with disabled filter by`() {
-
         disableFilterBy()
         putAlertMappings()
         val monitor = createRandomMonitor(refresh = true)
@@ -1179,7 +1177,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test query all alerts in all states with filter by`() {
-
         enableFilterBy()
         putAlertMappings()
         val adminUser = User(ADMIN, listOf(ADMIN), listOf(ALL_ACCESS_ROLE), listOf())
@@ -1215,7 +1212,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test get alerts with an user with get alerts role`() {
-
         putAlertMappings()
         val ackAlertsUser = User(ADMIN, listOf(ADMIN), listOf(ALERTING_GET_ALERTS_ACCESS), listOf())
         var monitor = createRandomMonitor(refresh = true).copy(user = ackAlertsUser)
@@ -1251,7 +1247,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     // Execute Monitor related security tests
 
     fun `test execute monitor with elevate permissions`() {
-
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
         val inputs = listOf(
             SearchInput(
@@ -1281,7 +1276,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test admin all access with enable filter by`() {
-
         enableFilterBy()
         createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
         createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
@@ -1290,7 +1284,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             val monitor = randomQueryLevelMonitor().copy(
                 inputs = listOf(
                     SearchInput(
-                        indices = listOf(TEST_HR_INDEX), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                        indices = listOf(TEST_HR_INDEX),
+                        query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
                     )
                 )
             )
@@ -1298,7 +1293,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             val createResponse = userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
             assertEquals("Create monitor failed", RestStatus.CREATED, createResponse?.restStatus())
             val monitorJson = JsonXContent.jsonXContent.createParser(
-                NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+                NamedXContentRegistry.EMPTY,
+                LoggingDeprecationHandler.INSTANCE,
                 createResponse?.entity?.content
             ).map()
 
@@ -1342,7 +1338,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     TODO: https://github.com/opensearch-project/alerting/issues/300
      */
     fun `test execute query-level monitor with user having partial index permissions`() {
-
         createUser(user, user, arrayOf(TEST_HR_BACKEND_ROLE))
         createTestIndex(TEST_HR_INDEX)
         createIndexRoleWithDocLevelSecurity(
@@ -1355,7 +1350,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         // Add a doc that is accessible to the user
         indexDoc(
-            TEST_HR_INDEX, "1",
+            TEST_HR_INDEX,
+            "1",
             """
             {
               "test_field": "a",
@@ -1366,7 +1362,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         // Add a second doc that is not accessible to the user
         indexDoc(
-            TEST_HR_INDEX, "2",
+            TEST_HR_INDEX,
+            "2",
             """
             {
               "test_field": "b",
@@ -1397,7 +1394,6 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test execute bucket-level monitor with user having partial index permissions`() {
-
         createUser(user, user, arrayOf(TEST_HR_BACKEND_ROLE))
         createTestIndex(TEST_HR_INDEX)
         createIndexRoleWithDocLevelSecurity(
@@ -1410,7 +1406,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         // Add a doc that is accessible to the user
         indexDoc(
-            TEST_HR_INDEX, "1",
+            TEST_HR_INDEX,
+            "1",
             """
             {
               "test_field": "a",
@@ -1421,7 +1418,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         // Add a second doc that is not accessible to the user
         indexDoc(
-            TEST_HR_INDEX, "2",
+            TEST_HR_INDEX,
+            "2",
             """
             {
               "test_field": "b",

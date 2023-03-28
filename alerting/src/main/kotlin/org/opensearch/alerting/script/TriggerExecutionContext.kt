@@ -20,8 +20,11 @@ abstract class TriggerExecutionContext(
 
     constructor(monitor: Monitor, trigger: Trigger, monitorRunResult: MonitorRunResult<*>) :
         this(
-            monitor, monitorRunResult.inputResults.results, monitorRunResult.periodStart,
-            monitorRunResult.periodEnd, monitorRunResult.scriptContextError(trigger)
+            monitor,
+            monitorRunResult.inputResults.results,
+            monitorRunResult.periodStart,
+            monitorRunResult.periodEnd,
+            monitorRunResult.scriptContextError(trigger)
         )
 
     /**

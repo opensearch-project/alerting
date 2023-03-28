@@ -81,7 +81,8 @@ interface SecureTransportAction {
                 actionListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException(
-                            "Filter by user backend roles is enabled with security disabled.", RestStatus.FORBIDDEN
+                            "Filter by user backend roles is enabled with security disabled.",
+                            RestStatus.FORBIDDEN
                         )
                     )
                 )
@@ -113,7 +114,6 @@ interface SecureTransportAction {
         resourceType: String,
         resourceId: String
     ): Boolean {
-
         if (!doFilterForUser(requesterUser)) return true
 
         val resourceBackendRoles = resourceUser?.backendRoles

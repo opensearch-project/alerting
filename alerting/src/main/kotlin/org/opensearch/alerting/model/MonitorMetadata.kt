@@ -9,12 +9,12 @@ import org.opensearch.alerting.model.destination.Destination.Companion.NO_ID
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.io.stream.Writeable
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentBuilder
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.util.instant
+import org.opensearch.core.xcontent.ToXContent
+import org.opensearch.core.xcontent.XContentBuilder
+import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.seqno.SequenceNumbers
 import java.io.IOException
 import java.time.Instant
@@ -71,7 +71,8 @@ data class MonitorMetadata(
         const val LAST_RUN_CONTEXT_FIELD = "last_run_context"
         const val SOURCE_TO_QUERY_INDEX_MAP_FIELD = "source_to_query_index_mapping"
 
-        @JvmStatic @JvmOverloads
+        @JvmStatic
+        @JvmOverloads
         @Throws(IOException::class)
         fun parse(
             xcp: XContentParser,
@@ -136,7 +137,7 @@ data class ActionExecutionTime(
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
         sin.readString(), // actionId
-        sin.readInstant(), // executionTime
+        sin.readInstant() // executionTime
     )
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {

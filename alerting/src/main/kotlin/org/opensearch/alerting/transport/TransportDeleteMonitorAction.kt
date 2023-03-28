@@ -35,7 +35,6 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AlertingActions
@@ -45,6 +44,7 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
+import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
@@ -67,7 +67,10 @@ class TransportDeleteMonitorAction @Inject constructor(
     settings: Settings,
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<ActionRequest, DeleteMonitorResponse>(
-    AlertingActions.DELETE_MONITOR_ACTION_NAME, transportService, actionFilters, ::DeleteMonitorRequest
+    AlertingActions.DELETE_MONITOR_ACTION_NAME,
+    transportService,
+    actionFilters,
+    ::DeleteMonitorRequest
 ),
     SecureTransportAction {
 
@@ -135,8 +138,10 @@ class TransportDeleteMonitorAction @Inject constructor(
                 )
             }
             val xcp = XContentHelper.createParser(
-                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                getResponse.sourceAsBytesRef, XContentType.JSON
+                xContentRegistry,
+                LoggingDeprecationHandler.INSTANCE,
+                getResponse.sourceAsBytesRef,
+                XContentType.JSON
             )
             return ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
         }
@@ -181,7 +186,8 @@ class TransportDeleteMonitorAction @Inject constructor(
                 if (searchResponse.hits.totalHits.value == 0L) {
                     val ack: AcknowledgedResponse = client.suspendUntil {
                         client.admin().indices().delete(
-                            DeleteIndexRequest(queryIndex).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN), it
+                            DeleteIndexRequest(queryIndex).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN),
+                            it
                         )
                     }
                     if (ack.isAcknowledged == false) {
