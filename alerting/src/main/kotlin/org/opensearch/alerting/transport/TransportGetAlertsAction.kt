@@ -29,9 +29,7 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentHelper
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AlertingActions
@@ -40,6 +38,8 @@ import org.opensearch.commons.alerting.action.GetAlertsResponse
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestRequest
@@ -63,7 +63,10 @@ class TransportGetAlertsAction @Inject constructor(
     val xContentRegistry: NamedXContentRegistry,
     val transportGetMonitorAction: TransportGetMonitorAction
 ) : HandledTransportAction<ActionRequest, GetAlertsResponse>(
-    AlertingActions.GET_ALERTS_ACTION_NAME, transportService, actionFilters, ::GetAlertsRequest
+    AlertingActions.GET_ALERTS_ACTION_NAME,
+    transportService,
+    actionFilters,
+    ::GetAlertsRequest
 ),
     SecureTransportAction {
 
@@ -93,11 +96,13 @@ class TransportGetAlertsAction @Inject constructor(
 
         val queryBuilder = QueryBuilders.boolQuery()
 
-        if (getAlertsRequest.severityLevel != "ALL")
+        if (getAlertsRequest.severityLevel != "ALL") {
             queryBuilder.filter(QueryBuilders.termQuery("severity", getAlertsRequest.severityLevel))
+        }
 
-        if (getAlertsRequest.alertState != "ALL")
+        if (getAlertsRequest.alertState != "ALL") {
             queryBuilder.filter(QueryBuilders.termQuery("state", getAlertsRequest.alertState))
+        }
 
         if (getAlertsRequest.alertIds.isNullOrEmpty() == false) {
             queryBuilder.filter(QueryBuilders.termsQuery("_id", getAlertsRequest.alertIds))
@@ -152,7 +157,7 @@ class TransportGetAlertsAction @Inject constructor(
         var alertIndex = AlertIndices.ALL_ALERT_INDEX_PATTERN
         if (getAlertsRequest.alertIndex.isNullOrEmpty() == false) {
             alertIndex = getAlertsRequest.alertIndex!!
-        } else if (getAlertsRequest.monitorId.isNullOrEmpty() == false)
+        } else if (getAlertsRequest.monitorId.isNullOrEmpty() == false) {
             withContext(Dispatchers.IO) {
                 val getMonitorRequest = GetMonitorRequest(
                     getAlertsRequest.monitorId!!,
@@ -168,6 +173,7 @@ class TransportGetAlertsAction @Inject constructor(
                     alertIndex = getMonitorResponse.monitor!!.dataSources.alertsIndex
                 }
             }
+        }
         return alertIndex
     }
 
@@ -208,8 +214,10 @@ class TransportGetAlertsAction @Inject constructor(
                     val totalAlertCount = response.hits.totalHits?.value?.toInt()
                     val alerts = response.hits.map { hit ->
                         val xcp = XContentHelper.createParser(
-                            xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                            hit.sourceRef, XContentType.JSON
+                            xContentRegistry,
+                            LoggingDeprecationHandler.INSTANCE,
+                            hit.sourceRef,
+                            XContentType.JSON
                         )
                         XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
                         val alert = Alert.parse(xcp, hit.id, hit.version)

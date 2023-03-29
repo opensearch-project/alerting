@@ -17,12 +17,12 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.commons.alerting.model.AggregationResultBucket
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.action.AlertCategory
+import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.test.ClusterServiceUtils
 import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.threadpool.ThreadPool
@@ -84,7 +84,11 @@ class AlertServiceTests : OpenSearchTestCase() {
         )
 
         val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(
-            monitor, trigger, currentAlerts, aggResultBuckets, emptyList()
+            monitor,
+            trigger,
+            currentAlerts,
+            aggResultBuckets,
+            emptyList()
         )
         // Completed Alerts are what remains in currentAlerts after categorization
         val completedAlerts = currentAlerts.values.toList()
@@ -104,7 +108,8 @@ class AlertServiceTests : OpenSearchTestCase() {
         val monitor = randomBucketLevelMonitor(triggers = listOf(trigger))
 
         val currentAlerts = createCurrentAlertsFromBucketKeys(
-            monitor, trigger,
+            monitor,
+            trigger,
             listOf(
                 listOf("a"),
                 listOf("b")
@@ -118,7 +123,11 @@ class AlertServiceTests : OpenSearchTestCase() {
         )
 
         val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(
-            monitor, trigger, currentAlerts, aggResultBuckets, emptyList()
+            monitor,
+            trigger,
+            currentAlerts,
+            aggResultBuckets,
+            emptyList()
         )
         // Completed Alerts are what remains in currentAlerts after categorization
         val completedAlerts = currentAlerts.values.toList()
@@ -138,7 +147,8 @@ class AlertServiceTests : OpenSearchTestCase() {
         val monitor = randomBucketLevelMonitor(triggers = listOf(trigger))
 
         val currentAlerts = createCurrentAlertsFromBucketKeys(
-            monitor, trigger,
+            monitor,
+            trigger,
             listOf(
                 listOf("a"),
                 listOf("b")
@@ -147,7 +157,11 @@ class AlertServiceTests : OpenSearchTestCase() {
         val aggResultBuckets = listOf<AggregationResultBucket>()
 
         val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(
-            monitor, trigger, currentAlerts, aggResultBuckets, emptyList()
+            monitor,
+            trigger,
+            currentAlerts,
+            aggResultBuckets,
+            emptyList()
         )
         // Completed Alerts are what remains in currentAlerts after categorization
         val completedAlerts = currentAlerts.values.toList()
@@ -167,7 +181,8 @@ class AlertServiceTests : OpenSearchTestCase() {
         val monitor = randomBucketLevelMonitor(triggers = listOf(trigger))
 
         val currentAlerts = createCurrentAlertsFromBucketKeys(
-            monitor, trigger,
+            monitor,
+            trigger,
             listOf(
                 listOf("a"),
                 listOf("b")
@@ -181,7 +196,11 @@ class AlertServiceTests : OpenSearchTestCase() {
         )
 
         val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(
-            monitor, trigger, currentAlerts, aggResultBuckets, emptyList()
+            monitor,
+            trigger,
+            currentAlerts,
+            aggResultBuckets,
+            emptyList()
         )
         // Completed Alerts are what remains in currentAlerts after categorization
         val completedAlerts = currentAlerts.values.toList()
@@ -195,19 +214,24 @@ class AlertServiceTests : OpenSearchTestCase() {
         val monitor = randomBucketLevelMonitor(triggers = listOf(trigger))
 
         val currentAlerts = createCurrentAlertsFromBucketKeys(
-            monitor, trigger,
+            monitor,
+            trigger,
             listOf(
                 listOf("a")
             )
         )
         val aggResultBuckets = createAggregationResultBucketsFromBucketKeys(
             listOf(
-                listOf("a"),
+                listOf("a")
             )
         )
 
         val categorizedAlerts = alertService.getCategorizedAlertsForBucketLevelMonitor(
-            monitor, trigger, currentAlerts, aggResultBuckets, emptyList()
+            monitor,
+            trigger,
+            currentAlerts,
+            aggResultBuckets,
+            emptyList()
         )
         // Completed Alerts are what remains in currentAlerts after categorization
         val completedAlerts = currentAlerts.values.toList()
@@ -224,8 +248,12 @@ class AlertServiceTests : OpenSearchTestCase() {
         return bucketKeysList.map { bucketKeys ->
             val aggResultBucket = AggregationResultBucket("parent_bucket_path", bucketKeys, mapOf())
             val alert = Alert(
-                monitor, trigger, Instant.now().truncatedTo(ChronoUnit.MILLIS), null,
-                actionExecutionResults = listOf(randomActionExecutionResult()), aggregationResultBucket = aggResultBucket
+                monitor,
+                trigger,
+                Instant.now().truncatedTo(ChronoUnit.MILLIS),
+                null,
+                actionExecutionResults = listOf(randomActionExecutionResult()),
+                aggregationResultBucket = aggResultBucket
             )
             aggResultBucket.getBucketKeysHash() to alert
         }.toMap().toMutableMap()

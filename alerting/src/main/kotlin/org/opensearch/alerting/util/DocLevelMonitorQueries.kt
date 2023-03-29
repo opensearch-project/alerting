@@ -290,7 +290,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         if (indexRequests.isNotEmpty()) {
             val bulkResponse: BulkResponse = client.suspendUntil {
                 client.bulk(
-                    BulkRequest().setRefreshPolicy(refreshPolicy).timeout(indexTimeout).add(indexRequests), it
+                    BulkRequest().setRefreshPolicy(refreshPolicy).timeout(indexTimeout).add(indexRequests),
+                    it
                 )
             }
             bulkResponse.forEach { bulkItemResponse ->
@@ -399,7 +400,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 admin().indices().updateSettings(
                     UpdateSettingsRequest(concreteQueryIndex).settings(
                         Settings.builder().put(
-                            INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.key, sourceIndexLimit + QUERY_INDEX_BASE_FIELDS_COUNT
+                            INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.key,
+                            sourceIndexLimit + QUERY_INDEX_BASE_FIELDS_COUNT
                         )
                     ),
                     it

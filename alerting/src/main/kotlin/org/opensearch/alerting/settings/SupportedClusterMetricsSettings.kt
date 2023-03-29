@@ -59,9 +59,10 @@ class SupportedClusterMetricsSettings : org.opensearch.commons.alerting.settings
             val supportedJsonPayloads = SupportedClusterMetricsSettings::class.java.getResource(RESOURCE_FILE)
 
             @Suppress("UNCHECKED_CAST")
-            if (supportedJsonPayloads != null)
+            if (supportedJsonPayloads != null) {
                 supportedApiList = XContentHelper.convertToMap(JsonXContent.jsonXContent, supportedJsonPayloads.readText(), false)
                     as HashMap<String, Map<String, ArrayList<String>>>
+            }
         }
 
         /**
@@ -133,8 +134,9 @@ class SupportedClusterMetricsSettings : org.opensearch.commons.alerting.settings
          * @throws IllegalArgumentException when supportedApiList does not contain the provided path.
          */
         fun validateApiTyped(clusterMetricsInput: ClusterMetricsInput) {
-            if (!supportedApiList.keys.contains(clusterMetricsInput.clusterMetricType.defaultPath))
+            if (!supportedApiList.keys.contains(clusterMetricsInput.clusterMetricType.defaultPath)) {
                 throw IllegalArgumentException("API path not in supportedApiList.")
+            }
         }
     }
 

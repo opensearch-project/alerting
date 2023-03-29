@@ -9,14 +9,15 @@ import org.opensearch.action.ActionResponse
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.ToXContentObject
-import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.core.xcontent.ToXContent
+import org.opensearch.core.xcontent.ToXContentObject
+import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.rest.RestStatus
 import java.io.IOException
 
 class GetDestinationsResponse : ActionResponse, ToXContentObject {
     var status: RestStatus
+
     // totalDestinations is not the same as the size of destinations because there can be 30 destinations from the request, but
     // the request only asked for 5 destinations, so totalDestinations will be 30, but alerts will only contain 5 destinations
     var totalDestinations: Int?

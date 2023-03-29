@@ -17,10 +17,10 @@ import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.util.IndexUtils
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.IndexNotFoundException
 
 class IndexUtils {
@@ -70,7 +70,8 @@ class IndexUtils {
         fun getSchemaVersion(mapping: String): Int {
             val xcp = XContentType.JSON.xContent().createParser(
                 NamedXContentRegistry.EMPTY,
-                LoggingDeprecationHandler.INSTANCE, mapping
+                LoggingDeprecationHandler.INSTANCE,
+                mapping
             )
 
             while (!xcp.isClosed) {

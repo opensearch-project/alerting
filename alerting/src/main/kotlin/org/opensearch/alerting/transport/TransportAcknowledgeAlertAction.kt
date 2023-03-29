@@ -32,10 +32,8 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
@@ -45,6 +43,8 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.util.optionalTimeField
 import org.opensearch.commons.utils.recreateObject
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
@@ -66,7 +66,10 @@ class TransportAcknowledgeAlertAction @Inject constructor(
     val xContentRegistry: NamedXContentRegistry,
     val transportGetMonitorAction: TransportGetMonitorAction
 ) : HandledTransportAction<ActionRequest, AcknowledgeAlertResponse>(
-    AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_NAME, transportService, actionFilters, ::AcknowledgeAlertRequest
+    AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_NAME,
+    transportService,
+    actionFilters,
+    ::AcknowledgeAlertRequest
 ) {
 
     @Volatile
@@ -151,8 +154,10 @@ class TransportAcknowledgeAlertAction @Inject constructor(
             val copyRequests = mutableListOf<IndexRequest>()
             response.hits.forEach { hit ->
                 val xcp = XContentHelper.createParser(
-                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                    hit.sourceRef, XContentType.JSON
+                    xContentRegistry,
+                    LoggingDeprecationHandler.INSTANCE,
+                    hit.sourceRef,
+                    XContentType.JSON
                 )
                 XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
                 val alert = Alert.parse(xcp, hit.id, hit.version)
@@ -188,16 +193,16 @@ class TransportAcknowledgeAlertAction @Inject constructor(
             }
 
             try {
-                val updateResponse: BulkResponse? = if (updateRequests.isNotEmpty())
+                val updateResponse: BulkResponse? = if (updateRequests.isNotEmpty()) {
                     client.suspendUntil {
                         client.bulk(BulkRequest().add(updateRequests).setRefreshPolicy(request.refreshPolicy), it)
                     }
-                else null
-                val copyResponse: BulkResponse? = if (copyRequests.isNotEmpty())
+                } else null
+                val copyResponse: BulkResponse? = if (copyRequests.isNotEmpty()) {
                     client.suspendUntil {
                         client.bulk(BulkRequest().add(copyRequests).setRefreshPolicy(request.refreshPolicy), it)
                     }
-                else null
+                } else null
                 onBulkResponse(updateResponse, copyResponse, monitor)
             } catch (t: Exception) {
                 log.error("ack error: ${t.message}")

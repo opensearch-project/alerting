@@ -33,16 +33,16 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.ToXContent
+import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.RestStatus
 import org.opensearch.transport.RemoteTransportException
@@ -141,8 +141,10 @@ object MonitorMetadataService :
             val getResponse: GetResponse = client.suspendUntil { get(getRequest, it) }
             return if (getResponse.isExists) {
                 val xcp = XContentHelper.createParser(
-                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                    getResponse.sourceAsBytesRef, XContentType.JSON
+                    xContentRegistry,
+                    LoggingDeprecationHandler.INSTANCE,
+                    getResponse.sourceAsBytesRef,
+                    XContentType.JSON
                 )
                 XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
                 MonitorMetadata.parse(xcp)
@@ -160,12 +162,12 @@ object MonitorMetadataService :
 
     suspend fun recreateRunContext(metadata: MonitorMetadata, monitor: Monitor): MonitorMetadata {
         try {
-            val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR)
+            val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
                 (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
-            else null
-            val runContext = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR)
+            } else null
+            val runContext = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
                 createFullRunContext(monitorIndex, metadata.lastRunContext as MutableMap<String, MutableMap<String, Any>>)
-            else null
+            } else null
             if (runContext != null) {
                 return metadata.copy(
                     lastRunContext = runContext
@@ -179,13 +181,13 @@ object MonitorMetadataService :
     }
 
     private suspend fun createNewMetadata(monitor: Monitor, createWithRunContext: Boolean): MonitorMetadata {
-        val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR)
+        val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
             (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
-        else null
+        } else null
         val runContext =
-            if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR && createWithRunContext)
+            if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR && createWithRunContext) {
                 createFullRunContext(monitorIndex)
-            else emptyMap()
+            } else emptyMap()
         return MonitorMetadata(
             id = "${monitor.id}-metadata",
             seqNo = SequenceNumbers.UNASSIGNED_SEQ_NO,

@@ -26,8 +26,6 @@ import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.alerting.util.getCombinedTriggerRunResult
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
@@ -38,6 +36,8 @@ import org.opensearch.commons.alerting.model.action.AlertCategory
 import org.opensearch.commons.alerting.model.action.PerAlertActionScope
 import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
 import org.opensearch.commons.alerting.util.string
+import org.opensearch.core.xcontent.ToXContent
+import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
@@ -162,7 +162,11 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 // TODO: Should triggerResult's aggregationResultBucket be a list? If not, getCategorizedAlertsForBucketLevelMonitor can
                 //  be refactored to use a map instead
                 val categorizedAlerts = monitorCtx.alertService!!.getCategorizedAlertsForBucketLevelMonitor(
-                    monitor, trigger, currentAlertsForTrigger, triggerResult.aggregationResultBuckets.values.toList(), findings
+                    monitor,
+                    trigger,
+                    currentAlertsForTrigger,
+                    triggerResult.aggregationResultBuckets.values.toList(),
+                    findings
                 ).toMutableMap()
                 val dedupedAlerts = categorizedAlerts.getOrDefault(AlertCategory.DEDUPED, emptyList())
                 var newAlerts = categorizedAlerts.getOrDefault(AlertCategory.NEW, emptyList())
@@ -178,7 +182,10 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                  */
                 if (!dryrun && monitor.id != Monitor.NO_ID) {
                     monitorCtx.alertService!!.saveAlerts(
-                        monitor.dataSources, dedupedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = true
+                        monitor.dataSources,
+                        dedupedAlerts,
+                        monitorCtx.retryPolicy!!,
+                        allowUpdatingAcknowledgedAlert = true
                     )
                     newAlerts = monitorCtx.alertService!!.saveNewAlerts(monitor.dataSources, newAlerts, monitorCtx.retryPolicy!!)
                 }
@@ -200,9 +207,10 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         // However, this operation will only be done if there was no trigger error, since otherwise the nextAlerts were not collected
         // in favor of just using the currentAlerts as-is.
         currentAlerts.forEach { (trigger, keysToAlertsMap) ->
-            if (triggerResults[trigger.id]?.error == null)
+            if (triggerResults[trigger.id]?.error == null) {
                 nextAlerts[trigger.id]?.get(AlertCategory.COMPLETED)
                     ?.addAll(monitorCtx.alertService!!.convertToCompletedAlerts(keysToAlertsMap))
+            }
         }
 
         for (trigger in monitor.triggers) {
@@ -241,7 +249,10 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                         val alertsToExecuteActionsFor = nextAlerts[trigger.id]?.get(alertCategory) ?: mutableListOf()
                         for (alert in alertsToExecuteActionsFor) {
                             val actionCtx = getActionContextForAlertCategory(
-                                alertCategory, alert, triggerCtx, monitorOrTriggerError
+                                alertCategory,
+                                alert,
+                                triggerCtx,
+                                monitorOrTriggerError
                             )
                             // AggregationResultBucket should not be null here
                             val alertBucketKeysHash = alert.aggregationResultBucket!!.getBucketKeysHash()
@@ -267,8 +278,9 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 } else if (actionExecutionScope is PerExecutionActionScope || shouldDefaultToPerExecution) {
                     // If all categories of Alerts are empty, there is nothing to message on and we can skip the Action.
                     // If the error is not null, this is disregarded and the Action is executed anyway so the user can be notified.
-                    if (monitorOrTriggerError == null && dedupedAlerts.isEmpty() && newAlerts.isEmpty() && completedAlerts.isEmpty())
+                    if (monitorOrTriggerError == null && dedupedAlerts.isEmpty() && newAlerts.isEmpty() && completedAlerts.isEmpty()) {
                         continue
+                    }
 
                     val actionCtx = triggerCtx.copy(
                         dedupedAlerts = dedupedAlerts,
@@ -314,7 +326,10 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             // ACKNOWLEDGED Alerts should not be saved here since actions are not executed for them.
             if (!dryrun && monitor.id != Monitor.NO_ID) {
                 monitorCtx.alertService!!.saveAlerts(
-                    monitor.dataSources, updatedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = false
+                    monitor.dataSources,
+                    updatedAlerts,
+                    monitorCtx.retryPolicy!!,
+                    allowUpdatingAcknowledgedAlert = false
                 )
                 // Save any COMPLETED Alerts that were not covered in updatedAlerts
                 monitorCtx.alertService!!.saveAlerts(
@@ -375,8 +390,10 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     )
                     val searchSource = monitorCtx.scriptService!!.compile(
                         Script(
-                            ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
-                            query.toString(), searchParams
+                            ScriptType.INLINE,
+                            Script.DEFAULT_TEMPLATE_LANG,
+                            query.toString(),
+                            searchParams
                         ),
                         TemplateScript.CONTEXT
                     )

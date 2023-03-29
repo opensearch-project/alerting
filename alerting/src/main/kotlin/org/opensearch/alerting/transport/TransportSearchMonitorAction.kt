@@ -38,7 +38,10 @@ class TransportSearchMonitorAction @Inject constructor(
     clusterService: ClusterService,
     actionFilters: ActionFilters
 ) : HandledTransportAction<SearchMonitorRequest, SearchResponse>(
-    SearchMonitorAction.NAME, transportService, actionFilters, ::SearchMonitorRequest
+    SearchMonitorAction.NAME,
+    transportService,
+    actionFilters,
+    ::SearchMonitorRequest
 ),
     SecureTransportAction {
     @Volatile

@@ -29,10 +29,8 @@ import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.Client
 import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.alerts.AlertError
@@ -44,6 +42,8 @@ import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.commons.alerting.model.action.AlertCategory
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.builder.SearchSourceBuilder
@@ -146,8 +146,11 @@ class AlertService(
         val updatedHistory = currentAlert?.errorHistory.update(alertError)
         return if (alertError == null && !result.triggered) {
             currentAlert?.copy(
-                state = Alert.State.COMPLETED, endTime = currentTime, errorMessage = null,
-                errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
+                state = Alert.State.COMPLETED,
+                endTime = currentTime,
+                errorMessage = null,
+                errorHistory = updatedHistory,
+                actionExecutionResults = updatedActionExecutionResults,
                 schemaVersion = IndexUtils.alertIndexSchemaVersion
             )
         } else if (alertError == null && currentAlert?.isAcknowledged() == true) {
@@ -155,8 +158,11 @@ class AlertService(
         } else if (currentAlert != null) {
             val alertState = if (alertError == null) Alert.State.ACTIVE else Alert.State.ERROR
             currentAlert.copy(
-                state = alertState, lastNotificationTime = currentTime, errorMessage = alertError?.message,
-                errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
+                state = alertState,
+                lastNotificationTime = currentTime,
+                errorMessage = alertError?.message,
+                errorHistory = updatedHistory,
+                actionExecutionResults = updatedActionExecutionResults,
                 schemaVersion = IndexUtils.alertIndexSchemaVersion
             )
         } else {
@@ -275,7 +281,9 @@ class AlertService(
         val currentTime = Instant.now()
         return currentAlerts?.map {
             it.value.copy(
-                state = Alert.State.COMPLETED, endTime = currentTime, errorMessage = null,
+                state = Alert.State.COMPLETED,
+                endTime = currentTime,
+                errorMessage = null,
                 schemaVersion = IndexUtils.alertIndexSchemaVersion
             )
         } ?: listOf()
@@ -417,8 +425,10 @@ class AlertService(
 
     private fun contentParser(bytesReference: BytesReference): XContentParser {
         val xcp = XContentHelper.createParser(
-            xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-            bytesReference, XContentType.JSON
+            xContentRegistry,
+            LoggingDeprecationHandler.INSTANCE,
+            bytesReference,
+            XContentType.JSON
         )
         XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
         return xcp

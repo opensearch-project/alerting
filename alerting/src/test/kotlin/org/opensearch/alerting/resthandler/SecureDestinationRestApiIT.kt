@@ -35,7 +35,8 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
     companion object {
 
         @BeforeClass
-        @JvmStatic fun setup() {
+        @JvmStatic
+        fun setup() {
             // things to execute once and keep around for the class
             org.junit.Assume.assumeTrue(System.getProperty("security", "false")!!.toBoolean())
         }
@@ -46,7 +47,6 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
 
     @Before
     fun create() {
-
         if (userClient == null) {
             createUser(user, user, arrayOf())
             userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user).setSocketTimeout(60000).build()
@@ -55,7 +55,6 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
 
     @After
     fun cleanup() {
-
         userClient?.close()
         deleteUser(user)
     }

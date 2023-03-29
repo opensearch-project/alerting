@@ -22,11 +22,11 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -41,7 +41,10 @@ class TransportGetMonitorAction @Inject constructor(
     val clusterService: ClusterService,
     settings: Settings
 ) : HandledTransportAction<GetMonitorRequest, GetMonitorResponse> (
-    GetMonitorAction.NAME, transportService, actionFilters, ::GetMonitorRequest
+    GetMonitorAction.NAME,
+    transportService,
+    actionFilters,
+    ::GetMonitorRequest
 ),
     SecureTransportAction {
 
@@ -83,8 +86,10 @@ class TransportGetMonitorAction @Inject constructor(
                         var monitor: Monitor? = null
                         if (!response.isSourceEmpty) {
                             XContentHelper.createParser(
-                                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                                response.sourceAsBytesRef, XContentType.JSON
+                                xContentRegistry,
+                                LoggingDeprecationHandler.INSTANCE,
+                                response.sourceAsBytesRef,
+                                XContentType.JSON
                             ).use { xcp ->
                                 monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
 

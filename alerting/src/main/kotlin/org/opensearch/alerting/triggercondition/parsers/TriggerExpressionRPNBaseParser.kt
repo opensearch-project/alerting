@@ -41,8 +41,9 @@ abstract class TriggerExpressionRPNBaseParser(
                                 outputExpTokens.add(topExpToken)
                                 topExpToken = expTokenStack.popExpTokenOrNull<TriggerExpressionOperator>()
                             }
-                            if (topExpToken != TriggerExpressionOperator.PAR_LEFT)
+                            if (topExpToken != TriggerExpressionOperator.PAR_LEFT) {
                                 throw java.lang.IllegalArgumentException("No matching left parenthesis.")
+                            }
                         }
                         else -> {
                             var op2 = expTokenStack.peekExpTokenOrNull<TriggerExpressionOperator>()
@@ -64,8 +65,9 @@ abstract class TriggerExpressionRPNBaseParser(
 
         while (!expTokenStack.isEmpty()) {
             expTokenStack.peekExpTokenOrNull<TriggerExpressionOperator>()?.let {
-                if (it == TriggerExpressionOperator.PAR_LEFT)
+                if (it == TriggerExpressionOperator.PAR_LEFT) {
                     throw java.lang.IllegalArgumentException("No matching right parenthesis.")
+                }
             }
             val top = expTokenStack.pop()
             outputExpTokens.add(top)
@@ -78,10 +80,10 @@ abstract class TriggerExpressionRPNBaseParser(
      * Looks up and maps the expression token that matches the string version of that expression unit
      */
     private fun assignToken(tokenString: String): ExpressionToken {
-
         // Check "query" string in trigger expression such as in 'query[name="abc"]'
-        if (tokenString.startsWith(TriggerExpressionConstant.ConstantType.QUERY.ident))
+        if (tokenString.startsWith(TriggerExpressionConstant.ConstantType.QUERY.ident)) {
             return TriggerExpressionToken(tokenString)
+        }
 
         // Check operators in trigger expression such as in [&&, ||, !]
         for (op in TriggerExpressionOperator.values()) {
