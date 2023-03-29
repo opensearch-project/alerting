@@ -119,7 +119,7 @@ dependencies {
     implementation "com.github.seancfoley:ipaddress:5.3.3"
 
     testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlin_version}"
-    testImplementation "org.mockito:mockito-core:5.1.0"
+    testImplementation "org.mockito:mockito-core:${versions.mockito}"
     testImplementation "org.opensearch.plugin:reindex-client:${opensearch_version}"
 }
 
