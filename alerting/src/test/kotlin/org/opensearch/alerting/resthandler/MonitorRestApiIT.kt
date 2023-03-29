@@ -841,7 +841,9 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         refreshIndex("*")
         val updatedMonitor = monitor.copy(triggers = emptyList())
         val updateResponse = client().makeRequest(
-            "PUT", "$ALERTING_BASE_URI/${monitor.id}", emptyMap(),
+            "PUT",
+            "$ALERTING_BASE_URI/${monitor.id}",
+            emptyMap(),
             updatedMonitor.toHttpEntity()
         )
         assertEquals("Update request not successful", RestStatus.OK, updateResponse.restStatus())
