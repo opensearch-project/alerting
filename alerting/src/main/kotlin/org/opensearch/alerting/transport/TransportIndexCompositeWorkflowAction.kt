@@ -340,7 +340,7 @@ class TransportIndexCompositeWorkflowAction @Inject constructor(
                 }
                 val compositeInput = request.workflow.inputs[0] as CompositeInput
                 val monitorIds = compositeInput.sequence.delegates.stream().map { it.monitorId }.collect(Collectors.toList())
-                val chainedAlertsMonitor = buildChainedAlertsMonitor("custom_alerts_index", monitorIds)
+                val chainedAlertsMonitor = buildChainedAlertsMonitor(".opendistro-alerting-alerts", monitorIds)
                 val delegates = compositeInput.sequence.delegates as MutableList<Delegate>
                 val maxOrder = compositeInput.sequence.delegates.maxOf { it -> it.order }
                 delegates.add(Delegate(maxOrder + 1, chainedAlertsMonitor!!.id))
@@ -521,7 +521,7 @@ class TransportIndexCompositeWorkflowAction @Inject constructor(
 
     private suspend fun buildChainedAlertsMonitor(alertIndex: String, monitorIds: MutableList<String>): Monitor? {
         try {
-            val monitorIdsCSV = monitorIds.joinToString { it -> "\"$it\"" }
+            val monitorIdsCSV = monitorIds.joinToString { it -> "'$it'" }
             val termAgg = TermsAggregationBuilder("monitor_id").field("monitor_id")
             val triggerScript = """
             ArrayList monitorIds = new ArrayList();

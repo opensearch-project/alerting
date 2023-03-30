@@ -561,6 +561,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
             var xContentBuilder = XContentFactory.jsonBuilder().startObject()
             sourceMap.forEach { (k, v) ->
+                if( v is )
                 xContentBuilder = xContentBuilder.field("${k}_${index}_$monitorId", v)
             }
             xContentBuilder = xContentBuilder.endObject()

@@ -7,12 +7,15 @@ package org.opensearch.alerting.resthandler
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.action.ExecuteMonitorAction
+import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
+import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.RestHandler
@@ -27,7 +30,12 @@ class RestExecuteWorkflowAction : BaseRestHandler() {
     override fun getName(): String = "execute_workflow_action"
 
     override fun routes(): List<RestHandler.Route> {
-        return listOf()
+        return mutableListOf(
+            RestHandler.Route(
+                RestRequest.Method.POST,
+                "${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowID}/_execute",
+            )
+        )
     }
 
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
@@ -39,15 +47,9 @@ class RestExecuteWorkflowAction : BaseRestHandler() {
 
             if (request.hasParam("workflowID")) {
                 val workflowId = request.param("workflowID")
-                val execWorkflowRequest = ExecuteWorkflowRequest(dryrun, requestEnd, workflowId, null)
-                client.execute(ExecuteWorkflowAction.INSTANCE, execWorkflowRequest, RestToXContentListener(channel))
-            } else {
-                val xcp = request.contentParser()
-                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                val workflow = Workflow.parse(xcp, Workflow.NO_ID, Workflow.NO_VERSION)
-                val execWorkflowRequest = ExecuteWorkflowRequest(dryrun, requestEnd, null, workflow)
-                client.execute(ExecuteWorkflowAction.INSTANCE, execWorkflowRequest, RestToXContentListener(channel))
-            }
+                val execMonitorRequest = ExecuteWorkflowRequest(dryrun, requestEnd, workflowId, null)
+                client.execute(ExecuteWorkflowAction.INSTANCE, execMonitorRequest, RestToXContentListener(channel))
+            } else throw java.lang.IllegalArgumentException("worfklowID is mandatory")
         }
     }
 

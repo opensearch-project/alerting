@@ -2,6 +2,7 @@
   "_meta": {
     "schema_version": 1
   },
+  "dynamic": "strict",
   "properties": {
     "query": {
       "type": "percolator_ext"

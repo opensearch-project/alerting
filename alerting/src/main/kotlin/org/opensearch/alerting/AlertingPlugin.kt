@@ -27,6 +27,7 @@ import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSetting
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.resthandler.RestAcknowledgeAlertAction
 import org.opensearch.alerting.resthandler.RestDeleteMonitorAction
+import org.opensearch.alerting.resthandler.RestDeleteWorkflowAction
 import org.opensearch.alerting.resthandler.RestExecuteMonitorAction
 import org.opensearch.alerting.resthandler.RestExecuteWorkflowAction
 import org.opensearch.alerting.resthandler.RestGetAlertsAction
@@ -35,7 +36,9 @@ import org.opensearch.alerting.resthandler.RestGetEmailAccountAction
 import org.opensearch.alerting.resthandler.RestGetEmailGroupAction
 import org.opensearch.alerting.resthandler.RestGetFindingsAction
 import org.opensearch.alerting.resthandler.RestGetMonitorAction
+import org.opensearch.alerting.resthandler.RestGetWorkflowAction
 import org.opensearch.alerting.resthandler.RestIndexMonitorAction
+import org.opensearch.alerting.resthandler.RestIndexWorkflowAction
 import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
 import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
 import org.opensearch.alerting.resthandler.RestSearchMonitorAction
@@ -56,8 +59,8 @@ import org.opensearch.alerting.transport.TransportGetEmailGroupAction
 import org.opensearch.alerting.transport.TransportGetFindingsSearchAction
 import org.opensearch.alerting.transport.TransportGetMonitorAction
 import org.opensearch.alerting.transport.TransportGetWorkflowAction
-import org.opensearch.alerting.transport.TransportIndexCompositeWorkflowAction
 import org.opensearch.alerting.transport.TransportIndexMonitorAction
+import org.opensearch.alerting.transport.TransportIndexCompositeWorkflowAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
@@ -162,6 +165,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestGetMonitorAction(),
             RestDeleteMonitorAction(),
             RestIndexMonitorAction(),
+            RestIndexWorkflowAction(),
             RestSearchMonitorAction(settings, clusterService),
             RestExecuteMonitorAction(),
             RestExecuteWorkflowAction(),
@@ -173,7 +177,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestGetEmailGroupAction(),
             RestGetDestinationsAction(),
             RestGetAlertsAction(),
-            RestGetFindingsAction()
+            RestGetFindingsAction(),
+            RestGetWorkflowAction(),
+            RestDeleteWorkflowAction()
         )
     }
 
@@ -265,7 +271,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool, scheduledJobIndices)
         this.threadPool = threadPool
         this.clusterService = clusterService
-        getContextWhitelists()
         return listOf(sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator)
     }
 
