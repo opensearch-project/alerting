@@ -137,18 +137,23 @@ class AlertIndices(
     }
 
     @Volatile private var alertHistoryEnabled = AlertingSettings.ALERT_HISTORY_ENABLED.get(settings)
+
     @Volatile private var findingHistoryEnabled = AlertingSettings.FINDING_HISTORY_ENABLED.get(settings)
 
     @Volatile private var alertHistoryMaxDocs = AlertingSettings.ALERT_HISTORY_MAX_DOCS.get(settings)
+
     @Volatile private var findingHistoryMaxDocs = AlertingSettings.FINDING_HISTORY_MAX_DOCS.get(settings)
 
     @Volatile private var alertHistoryMaxAge = AlertingSettings.ALERT_HISTORY_INDEX_MAX_AGE.get(settings)
+
     @Volatile private var findingHistoryMaxAge = AlertingSettings.FINDING_HISTORY_INDEX_MAX_AGE.get(settings)
 
     @Volatile private var alertHistoryRolloverPeriod = AlertingSettings.ALERT_HISTORY_ROLLOVER_PERIOD.get(settings)
+
     @Volatile private var findingHistoryRolloverPeriod = AlertingSettings.FINDING_HISTORY_ROLLOVER_PERIOD.get(settings)
 
     @Volatile private var alertHistoryRetentionPeriod = AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD.get(settings)
+
     @Volatile private var findingHistoryRetentionPeriod = AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD.get(settings)
 
     @Volatile private var requestTimeout = AlertingSettings.REQUEST_TIMEOUT.get(settings)
@@ -299,11 +304,12 @@ class AlertIndices(
     suspend fun createOrUpdateInitialAlertHistoryIndex() {
         if (!alertHistoryIndexInitialized) {
             alertHistoryIndexInitialized = createIndex(ALERT_HISTORY_INDEX_PATTERN, alertMapping(), ALERT_HISTORY_WRITE_INDEX)
-            if (alertHistoryIndexInitialized)
+            if (alertHistoryIndexInitialized) {
                 IndexUtils.lastUpdatedAlertHistoryIndex = IndexUtils.getIndexNameWithAlias(
                     clusterService.state(),
                     ALERT_HISTORY_WRITE_INDEX
                 )
+            }
         } else {
             updateIndexMapping(ALERT_HISTORY_WRITE_INDEX, alertMapping(), true)
         }
@@ -448,17 +454,25 @@ class AlertIndices(
 
     private fun rolloverAlertHistoryIndex() {
         rolloverIndex(
-            alertHistoryIndexInitialized, ALERT_HISTORY_WRITE_INDEX,
-            ALERT_HISTORY_INDEX_PATTERN, alertMapping(),
-            alertHistoryMaxDocs, alertHistoryMaxAge, ALERT_HISTORY_WRITE_INDEX
+            alertHistoryIndexInitialized,
+            ALERT_HISTORY_WRITE_INDEX,
+            ALERT_HISTORY_INDEX_PATTERN,
+            alertMapping(),
+            alertHistoryMaxDocs,
+            alertHistoryMaxAge,
+            ALERT_HISTORY_WRITE_INDEX
         )
     }
 
     private fun rolloverFindingHistoryIndex() {
         rolloverIndex(
-            findingHistoryIndexInitialized, FINDING_HISTORY_WRITE_INDEX,
-            FINDING_HISTORY_INDEX_PATTERN, findingMapping(),
-            findingHistoryMaxDocs, findingHistoryMaxAge, FINDING_HISTORY_WRITE_INDEX
+            findingHistoryIndexInitialized,
+            FINDING_HISTORY_WRITE_INDEX,
+            FINDING_HISTORY_INDEX_PATTERN,
+            findingMapping(),
+            findingHistoryMaxDocs,
+            findingHistoryMaxAge,
+            FINDING_HISTORY_WRITE_INDEX
         )
     }
 

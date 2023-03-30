@@ -14,11 +14,11 @@ import org.opensearch.alerting.randomBucketSelectorExtAggregationBuilder
 import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.cluster.ClusterModule
 import org.opensearch.common.CheckedFunction
-import org.opensearch.common.ParseField
-import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.model.Trigger
+import org.opensearch.core.ParseField
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.search.aggregations.Aggregation
 import org.opensearch.search.aggregations.AggregationBuilder
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
@@ -296,30 +296,36 @@ class AggregationQueryRewriterTests : OpenSearchTestCase() {
         val entries = ClusterModule.getNamedXWriteables()
         entries.add(
             NamedXContentRegistry.Entry(
-                Aggregation::class.java, ParseField(CompositeAggregationBuilder.NAME),
+                Aggregation::class.java,
+                ParseField(CompositeAggregationBuilder.NAME),
                 CheckedFunction<XContentParser, ParsedComposite, IOException> { parser: XContentParser? ->
                     ParsedComposite.fromXContent(
-                        parser, "testPath"
+                        parser,
+                        "testPath"
                     )
                 }
             )
         )
         entries.add(
             NamedXContentRegistry.Entry(
-                Aggregation::class.java, ParseField(CompositeAggregationBuilder.NAME + "2"),
+                Aggregation::class.java,
+                ParseField(CompositeAggregationBuilder.NAME + "2"),
                 CheckedFunction<XContentParser, ParsedComposite, IOException> { parser: XContentParser? ->
                     ParsedComposite.fromXContent(
-                        parser, "smallerResults"
+                        parser,
+                        "smallerResults"
                     )
                 }
             )
         )
         entries.add(
             NamedXContentRegistry.Entry(
-                Aggregation::class.java, ParseField(CompositeAggregationBuilder.NAME + "3"),
+                Aggregation::class.java,
+                ParseField(CompositeAggregationBuilder.NAME + "3"),
                 CheckedFunction<XContentParser, ParsedComposite, IOException> { parser: XContentParser? ->
                     ParsedComposite.fromXContent(
-                        parser, "largerResults"
+                        parser,
+                        "largerResults"
                     )
                 }
             )

@@ -30,7 +30,10 @@ class TransportSearchEmailGroupAction @Inject constructor(
     val clusterService: ClusterService,
     settings: Settings
 ) : HandledTransportAction<SearchRequest, SearchResponse>(
-    SearchEmailGroupAction.NAME, transportService, actionFilters, ::SearchRequest
+    SearchEmailGroupAction.NAME,
+    transportService,
+    actionFilters,
+    ::SearchRequest
 ) {
 
     @Volatile private var allowList = ALLOW_LIST.get(settings)
@@ -40,7 +43,6 @@ class TransportSearchEmailGroupAction @Inject constructor(
     }
 
     override fun doExecute(task: Task, searchRequest: SearchRequest, actionListener: ActionListener<SearchResponse>) {
-
         if (!allowList.contains(DestinationType.EMAIL.value)) {
             actionListener.onFailure(
                 AlertingException.wrap(

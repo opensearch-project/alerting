@@ -24,10 +24,10 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
+import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -42,7 +42,10 @@ class TransportGetEmailGroupAction @Inject constructor(
     settings: Settings,
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<GetEmailGroupRequest, GetEmailGroupResponse>(
-    GetEmailGroupAction.NAME, transportService, actionFilters, ::GetEmailGroupRequest
+    GetEmailGroupAction.NAME,
+    transportService,
+    actionFilters,
+    ::GetEmailGroupRequest
 ) {
 
     @Volatile private var allowList = ALLOW_LIST.get(settings)
@@ -56,7 +59,6 @@ class TransportGetEmailGroupAction @Inject constructor(
         getEmailGroupRequest: GetEmailGroupRequest,
         actionListener: ActionListener<GetEmailGroupResponse>
     ) {
-
         if (!allowList.contains(DestinationType.EMAIL.value)) {
             actionListener.onFailure(
                 AlertingException.wrap(
@@ -89,8 +91,10 @@ class TransportGetEmailGroupAction @Inject constructor(
                         var emailGroup: EmailGroup? = null
                         if (!response.isSourceEmpty) {
                             XContentHelper.createParser(
-                                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                                response.sourceAsBytesRef, XContentType.JSON
+                                xContentRegistry,
+                                LoggingDeprecationHandler.INSTANCE,
+                                response.sourceAsBytesRef,
+                                XContentType.JSON
                             ).use { xcp ->
                                 emailGroup = EmailGroup.parseWithType(xcp, response.id, response.version)
                             }
@@ -98,8 +102,12 @@ class TransportGetEmailGroupAction @Inject constructor(
 
                         actionListener.onResponse(
                             GetEmailGroupResponse(
-                                response.id, response.version, response.seqNo, response.primaryTerm,
-                                RestStatus.OK, emailGroup
+                                response.id,
+                                response.version,
+                                response.seqNo,
+                                response.primaryTerm,
+                                RestStatus.OK,
+                                emailGroup
                             )
                         )
                     }

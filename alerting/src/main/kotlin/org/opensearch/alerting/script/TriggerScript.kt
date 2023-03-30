@@ -17,7 +17,8 @@ abstract class TriggerScript(_scriptParams: Map<String, Any>) {
      * painless script context we surface it to the painless script as just `params` using a custom getter name.
      */
     val scriptParams: Map<String, Any> = _scriptParams
-        @JvmName("getParams") get
+        @JvmName("getParams")
+        get
 
     companion object {
         /**

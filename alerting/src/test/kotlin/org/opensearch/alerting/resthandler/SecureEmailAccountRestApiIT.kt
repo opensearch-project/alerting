@@ -46,7 +46,8 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
     companion object {
 
         @BeforeClass
-        @JvmStatic fun setup() {
+        @JvmStatic
+        fun setup() {
             // things to execute once and keep around for the class
             org.junit.Assume.assumeTrue(System.getProperty("security", "false")!!.toBoolean())
         }
@@ -57,7 +58,6 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
 
     @Before
     fun create() {
-
         if (userClient == null) {
             createUser(user, user, arrayOf())
             userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user).setSocketTimeout(60000).build()
@@ -66,7 +66,6 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
 
     @After
     fun cleanup() {
-
         userClient?.close()
         deleteUser(user)
     }
@@ -102,7 +101,6 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test search email accounts with an user with search email account role`() {
-
         createUserWithTestDataAndCustomRole(
             user,
             TEST_HR_INDEX,

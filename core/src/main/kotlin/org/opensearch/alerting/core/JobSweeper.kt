@@ -32,12 +32,12 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.util.concurrent.OpenSearchExecutors
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentHelper
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.engine.Engine
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.QueryBuilders
@@ -89,11 +89,17 @@ class JobSweeper(
     @Volatile private var lastFullSweepTimeNano = System.nanoTime()
 
     @Volatile private var requestTimeout = REQUEST_TIMEOUT.get(settings)
+
     @Volatile private var sweepPeriod = SWEEP_PERIOD.get(settings)
+
     @Volatile private var sweeperEnabled = SWEEPER_ENABLED.get(settings)
+
     @Volatile private var sweepPageSize = SWEEP_PAGE_SIZE.get(settings)
+
     @Volatile private var sweepBackoffMillis = SWEEP_BACKOFF_MILLIS.get(settings)
+
     @Volatile private var sweepBackoffRetryCount = SWEEP_BACKOFF_RETRY_COUNT.get(settings)
+
     @Volatile private var sweepSearchBackoff = BackoffPolicy.exponentialBackoff(sweepBackoffMillis, sweepBackoffRetryCount)
 
     init {
@@ -225,7 +231,6 @@ class JobSweeper(
     }
 
     private fun initBackgroundSweep() {
-
         // if sweeping disabled, background sweep should not be triggered
         if (!isSweepingEnabled()) return
 
@@ -338,8 +343,10 @@ class JobSweeper(
             for (hit in response.hits) {
                 if (shardNodes.isOwningNode(hit.id)) {
                     val xcp = XContentHelper.createParser(
-                        xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                        hit.sourceRef, XContentType.JSON
+                        xContentRegistry,
+                        LoggingDeprecationHandler.INSTANCE,
+                        hit.sourceRef,
+                        XContentType.JSON
                     )
                     parseAndSweepJob(xcp, shardId, hit.id, hit.version, hit.sourceRef)
                 }

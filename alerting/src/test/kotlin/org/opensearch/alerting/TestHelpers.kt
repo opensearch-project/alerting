@@ -27,11 +27,7 @@ import org.opensearch.common.UUIDs
 import org.opensearch.common.settings.SecureString
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentFactory
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtFilter
@@ -67,6 +63,10 @@ import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
 import org.opensearch.commons.alerting.model.action.Throttle
 import org.opensearch.commons.alerting.util.string
 import org.opensearch.commons.authuser.User
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.ToXContent
+import org.opensearch.core.xcontent.XContentBuilder
+import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptType
@@ -329,9 +329,9 @@ fun randomDocumentLevelTrigger(
         name = name,
         severity = severity,
         condition = condition,
-        actions = if (actions.isEmpty() && destinationId.isNotBlank())
+        actions = if (actions.isEmpty() && destinationId.isNotBlank()) {
             (0..randomInt(10)).map { randomAction(destinationId = destinationId) }
-        else actions
+        } else actions
     )
 }
 
@@ -397,6 +397,7 @@ val TEST_HR_INDEX = "hr_data"
 val TEST_NON_HR_INDEX = "not_hr_data"
 val TEST_HR_ROLE = "hr_role"
 val TEST_HR_BACKEND_ROLE = "HR"
+
 // Using a triple-quote string for the query so escaped quotes are kept as-is
 // in the request made using triple-quote strings (i.e. createIndexRoleWithDocLevelSecurity).
 // Removing the escape slash in the request causes the security API role request to fail with parsing exception.
@@ -453,7 +454,10 @@ fun randomAlert(monitor: Monitor = randomQueryLevelMonitor()): Alert {
     val trigger = randomQueryLevelTrigger()
     val actionExecutionResults = mutableListOf(randomActionExecutionResult(), randomActionExecutionResult())
     return Alert(
-        monitor, trigger, Instant.now().truncatedTo(ChronoUnit.MILLIS), null,
+        monitor,
+        trigger,
+        Instant.now().truncatedTo(ChronoUnit.MILLIS),
+        null,
         actionExecutionResults = actionExecutionResults
     )
 }
@@ -499,7 +503,10 @@ fun randomAlertWithAggregationResultBucket(monitor: Monitor = randomBucketLevelM
     val trigger = randomBucketLevelTrigger()
     val actionExecutionResults = mutableListOf(randomActionExecutionResult(), randomActionExecutionResult())
     return Alert(
-        monitor, trigger, Instant.now().truncatedTo(ChronoUnit.MILLIS), null,
+        monitor,
+        trigger,
+        Instant.now().truncatedTo(ChronoUnit.MILLIS),
+        null,
         actionExecutionResults = actionExecutionResults,
         aggregationResultBucket = AggregationResultBucket(
             "parent_bucket_path_1",
@@ -606,7 +613,8 @@ fun randomBucketLevelTriggerRunResult(): BucketLevelTriggerRunResult {
     actionResultsMap[aggBucket2.getBucketKeysHash()] = map
 
     return BucketLevelTriggerRunResult(
-        "trigger-name", null,
+        "trigger-name",
+        null,
         mapOf(
             aggBucket1.getBucketKeysHash() to aggBucket1,
             aggBucket2.getBucketKeysHash() to aggBucket2
@@ -632,8 +640,12 @@ fun randomActionRunResult(): ActionRunResult {
     map.plus(Pair("key1", "val1"))
     map.plus(Pair("key2", "val2"))
     return ActionRunResult(
-        "1234", "test-action", map,
-        false, Instant.now(), null
+        "1234",
+        "test-action",
+        map,
+        false,
+        Instant.now(),
+        null
     )
 }
 

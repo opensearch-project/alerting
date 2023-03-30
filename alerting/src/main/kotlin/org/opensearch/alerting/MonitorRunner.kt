@@ -54,9 +54,9 @@ abstract class MonitorRunner {
                 return ActionRunResult(action.id, action.name, mapOf(), true, null, null)
             }
             val actionOutput = mutableMapOf<String, String>()
-            actionOutput[Action.SUBJECT] = if (action.subjectTemplate != null)
+            actionOutput[Action.SUBJECT] = if (action.subjectTemplate != null) {
                 MonitorRunnerService.compileTemplate(action.subjectTemplate!!, ctx)
-            else ""
+            } else ""
             actionOutput[Action.MESSAGE] = MonitorRunnerService.compileTemplate(action.messageTemplate, ctx)
             if (Strings.isNullOrEmpty(actionOutput[Action.MESSAGE])) {
                 throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
@@ -166,14 +166,16 @@ abstract class MonitorRunner {
                 // Catching the exception thrown when the Destination was not found so the NotificationActionConfigs object can be returned
                 null
             } catch (e: OpenSearchSecurityException) {
-                if (notificationPermissionException != null)
+                if (notificationPermissionException != null) {
                     throw notificationPermissionException
-                else
+                } else {
                     throw e
+                }
             }
 
-            if (destination == null && notificationPermissionException != null)
+            if (destination == null && notificationPermissionException != null) {
                 throw notificationPermissionException
+            }
         }
 
         return NotificationActionConfigs(destination, channel)

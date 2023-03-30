@@ -96,9 +96,9 @@ class DestinationConversionUtils {
                     val recipients = mutableListOf<EmailRecipient>()
                     val emailGroupIds = mutableListOf<String>()
                     alertEmail.recipients.forEach {
-                        if (it.type == Recipient.RecipientType.EMAIL_GROUP)
+                        if (it.type == Recipient.RecipientType.EMAIL_GROUP) {
                             it.emailGroupID?.let { emailGroup -> emailGroupIds.add(emailGroup) }
-                        else it.email?.let { emailRecipient -> recipients.add(EmailRecipient(emailRecipient)) }
+                        } else it.email?.let { emailRecipient -> recipients.add(EmailRecipient(emailRecipient)) }
                     }
 
                     val email = Email(alertEmail.emailAccountID, recipients, emailGroupIds)

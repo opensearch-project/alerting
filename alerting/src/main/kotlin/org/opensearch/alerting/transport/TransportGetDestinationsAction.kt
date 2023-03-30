@@ -24,13 +24,13 @@ import org.opensearch.common.Strings
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentFactory
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.authuser.User
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
@@ -52,7 +52,10 @@ class TransportGetDestinationsAction @Inject constructor(
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<GetDestinationsRequest, GetDestinationsResponse> (
-    GetDestinationsAction.NAME, transportService, actionFilters, ::GetDestinationsRequest
+    GetDestinationsAction.NAME,
+    transportService,
+    actionFilters,
+    ::GetDestinationsRequest
 ),
     SecureTransportAction {
 
@@ -87,11 +90,13 @@ class TransportGetDestinationsAction @Inject constructor(
         val queryBuilder = QueryBuilders.boolQuery()
             .must(QueryBuilders.existsQuery("destination"))
 
-        if (!getDestinationsRequest.destinationId.isNullOrBlank())
+        if (!getDestinationsRequest.destinationId.isNullOrBlank()) {
             queryBuilder.filter(QueryBuilders.termQuery("_id", getDestinationsRequest.destinationId))
+        }
 
-        if (getDestinationsRequest.destinationType != "ALL")
+        if (getDestinationsRequest.destinationType != "ALL") {
             queryBuilder.filter(QueryBuilders.termQuery("destination.type", getDestinationsRequest.destinationType))
+        }
 
         if (!tableProp.searchString.isNullOrBlank()) {
             queryBuilder

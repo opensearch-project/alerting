@@ -22,6 +22,7 @@ import org.opensearch.rest.action.RestToXContentListener
 import java.io.IOException
 
 private val log: Logger = LogManager.getLogger(RestDeleteMonitorAction::class.java)
+
 /**
  * This class consists of the REST handler to delete monitors.
  * When a monitor is deleted, all alerts are moved to the [Alert.State.DELETED] state and moved to the alert history index.

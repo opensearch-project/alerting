@@ -12,9 +12,6 @@ import org.opensearch.alerting.util.DestinationType
 import org.opensearch.alerting.util.destinationmigration.DestinationConversionUtils.Companion.convertAlertingToNotificationMethodType
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentBuilder
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
 import org.opensearch.commons.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
 import org.opensearch.commons.alerting.util.instant
@@ -26,6 +23,9 @@ import org.opensearch.commons.destination.message.LegacyChimeMessage
 import org.opensearch.commons.destination.message.LegacyCustomWebhookMessage
 import org.opensearch.commons.destination.message.LegacyEmailMessage
 import org.opensearch.commons.destination.message.LegacySlackMessage
+import org.opensearch.core.xcontent.ToXContent
+import org.opensearch.core.xcontent.XContentBuilder
+import org.opensearch.core.xcontent.XContentParser
 import java.io.IOException
 import java.time.Instant
 import java.util.Locale
@@ -135,7 +135,6 @@ data class Destination(
             seqNo: Int = NO_SEQ_NO,
             primaryTerm: Int = NO_PRIMARY_TERM
         ): Destination {
-
             lateinit var name: String
             var user: User? = null
             lateinit var type: String
@@ -241,7 +240,6 @@ data class Destination(
         compiledMessage: String,
         destinationCtx: DestinationContext
     ): LegacyBaseMessage {
-
         val destinationMessage: LegacyBaseMessage
         when (type) {
             DestinationType.CHIME -> {

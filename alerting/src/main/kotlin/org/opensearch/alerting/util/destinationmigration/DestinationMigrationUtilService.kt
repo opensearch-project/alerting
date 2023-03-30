@@ -23,9 +23,7 @@ import org.opensearch.alerting.util.destinationmigration.NotificationApiUtils.Co
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.Strings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentFactory
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.ConfigConstants
@@ -33,6 +31,8 @@ import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.notifications.action.CreateNotificationConfigRequest
 import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.builder.SearchSourceBuilder
@@ -204,7 +204,7 @@ class DestinationMigrationUtilService {
                             else -> logger.info("Unrecognized config name [$configName] to migrate")
                         }
 
-                        if (notificationConfig != null)
+                        if (notificationConfig != null) {
                             notificationConfigInfoList.add(
                                 Pair(
                                     NotificationConfigInfo(
@@ -216,6 +216,7 @@ class DestinationMigrationUtilService {
                                     userStr
                                 )
                             )
+                        }
                     }
                 }
 

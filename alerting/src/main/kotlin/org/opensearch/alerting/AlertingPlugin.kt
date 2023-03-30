@@ -69,8 +69,6 @@ import org.opensearch.common.settings.IndexScopedSettings
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.settings.SettingsFilter
-import org.opensearch.common.xcontent.NamedXContentRegistry
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
@@ -81,6 +79,8 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.env.Environment
 import org.opensearch.env.NodeEnvironment
@@ -117,17 +117,29 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
 
     companion object {
         @JvmField val OPEN_SEARCH_DASHBOARDS_USER_AGENT = "OpenSearch-Dashboards"
+
         @JvmField val UI_METADATA_EXCLUDE = arrayOf("monitor.${Monitor.UI_METADATA_FIELD}")
+
         @JvmField val MONITOR_BASE_URI = "/_plugins/_alerting/monitors"
+
         @JvmField val WORKFLOW_BASE_URI = "/_plugins/_alerting/workflows"
+
         @JvmField val DESTINATION_BASE_URI = "/_plugins/_alerting/destinations"
+
         @JvmField val LEGACY_OPENDISTRO_MONITOR_BASE_URI = "/_opendistro/_alerting/monitors"
+
         @JvmField val LEGACY_OPENDISTRO_DESTINATION_BASE_URI = "/_opendistro/_alerting/destinations"
+
         @JvmField val EMAIL_ACCOUNT_BASE_URI = "$DESTINATION_BASE_URI/email_accounts"
+
         @JvmField val EMAIL_GROUP_BASE_URI = "$DESTINATION_BASE_URI/email_groups"
+
         @JvmField val LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI = "$LEGACY_OPENDISTRO_DESTINATION_BASE_URI/email_accounts"
+
         @JvmField val LEGACY_OPENDISTRO_EMAIL_GROUP_BASE_URI = "$LEGACY_OPENDISTRO_DESTINATION_BASE_URI/email_groups"
+
         @JvmField val FINDING_BASE_URI = "/_plugins/_alerting/findings"
+
         @JvmField val ALERTING_JOB_TYPES = listOf("monitor")
     }
 
