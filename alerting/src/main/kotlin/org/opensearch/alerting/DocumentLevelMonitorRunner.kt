@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting
 
+import kotlin.math.max
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.index.IndexRequest
@@ -52,7 +53,6 @@ import org.opensearch.search.sort.SortOrder
 import java.io.IOException
 import java.time.Instant
 import java.util.UUID
-import kotlin.math.max
 
 object DocumentLevelMonitorRunner : MonitorRunner() {
     private val logger = LogManager.getLogger(javaClass)
@@ -564,14 +564,30 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             val sourceMap = hit.sourceAsMap
 
             var xContentBuilder = XContentFactory.jsonBuilder().startObject()
-            sourceMap.forEach { (k, v) ->
-                xContentBuilder = xContentBuilder.field("${k}_${index}_$monitorId", v)
-            }
+
+            transformDocumentFieldNames(sourceMap, xContentBuilder, "${index}_$monitorId")
+
             xContentBuilder = xContentBuilder.endObject()
 
             val sourceRef = BytesReference.bytes(xContentBuilder)
 
             Pair(hit.id, sourceRef)
+        }
+    }
+
+    private fun transformDocumentFieldNames(
+        sourceAsMap: Map<String, Any>,
+        xContentBuilder: XContentBuilder,
+        fieldNameSuffix: String,
+        currentPath: String = ""
+    ) {
+        sourceAsMap.forEach { (k, v) ->
+            val path = if (currentPath == "") k else "$currentPath.$k"
+            if (v is Map<*, *>) {
+                transformDocumentFieldNames(v as Map<String, Any>, xContentBuilder, fieldNameSuffix, path)
+            } else {
+                xContentBuilder.field("${path}_$fieldNameSuffix", v)
+            }
         }
     }
 }
