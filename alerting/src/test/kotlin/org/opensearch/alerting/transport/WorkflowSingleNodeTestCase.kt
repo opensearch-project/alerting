@@ -7,13 +7,13 @@ package org.opensearch.alerting.transport
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope
 import org.opensearch.action.support.WriteRequest
-import org.opensearch.common.xcontent.XContentParser
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.IndexWorkflowRequest
 import org.opensearch.commons.alerting.action.IndexWorkflowResponse
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.query.TermQueryBuilder
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.RestRequest

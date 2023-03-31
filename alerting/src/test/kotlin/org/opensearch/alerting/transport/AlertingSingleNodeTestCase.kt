@@ -24,7 +24,6 @@ import org.opensearch.alerting.action.GetMonitorRequest
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
-import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent
@@ -38,6 +37,7 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.Table
+import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.index.IndexService
 import org.opensearch.index.query.TermQueryBuilder
 import org.opensearch.index.reindex.ReindexPlugin
