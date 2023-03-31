@@ -5,7 +5,6 @@
 
 package org.opensearch.alerting
 
-import kotlin.math.max
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.index.IndexRequest
@@ -53,6 +52,7 @@ import org.opensearch.search.sort.SortOrder
 import java.io.IOException
 import java.time.Instant
 import java.util.UUID
+import kotlin.math.max
 
 object DocumentLevelMonitorRunner : MonitorRunner() {
     private val logger = LogManager.getLogger(javaClass)
