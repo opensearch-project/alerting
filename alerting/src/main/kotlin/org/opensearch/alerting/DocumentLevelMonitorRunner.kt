@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting
 
+import kotlin.math.max
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.index.IndexRequest
@@ -52,7 +53,6 @@ import org.opensearch.search.sort.SortOrder
 import java.io.IOException
 import java.time.Instant
 import java.util.UUID
-import kotlin.math.max
 
 object DocumentLevelMonitorRunner : MonitorRunner() {
     private val logger = LogManager.getLogger(javaClass)
@@ -563,11 +563,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         return hits.map { hit ->
             val sourceMap = hit.sourceAsMap
 
-            var xContentBuilder = XContentFactory.jsonBuilder().startObject()
+            transformDocumentFieldNames(sourceMap, "${index}_$monitorId")
 
-            transformDocumentFieldNames(sourceMap, xContentBuilder, "${index}_$monitorId")
-
-            xContentBuilder = xContentBuilder.endObject()
+            var xContentBuilder = XContentFactory.jsonBuilder().map(sourceMap)
 
             val sourceRef = BytesReference.bytes(xContentBuilder)
 
@@ -575,19 +573,27 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         }
     }
 
+    /**
+     * Traverses document fields in leaves recursively and appends [fieldNameSuffix] to field names.
+     *
+     * @param jsonAsMap               Input JSON (as Map)
+     * @param fieldNameSuffix         Field suffix which is appended to existing field name
+     */
     private fun transformDocumentFieldNames(
-        sourceAsMap: Map<String, Any>,
-        xContentBuilder: XContentBuilder,
-        fieldNameSuffix: String,
-        currentPath: String = ""
+        jsonAsMap: MutableMap<String, Any>,
+        fieldNameSuffix: String
     ) {
-        sourceAsMap.forEach { (k, v) ->
-            val path = if (currentPath == "") k else "$currentPath.$k"
-            if (v is Map<*, *>) {
-                transformDocumentFieldNames(v as Map<String, Any>, xContentBuilder, fieldNameSuffix, path)
-            } else {
-                xContentBuilder.field("${path}_$fieldNameSuffix", v)
+        val tempMap = mutableMapOf<String, Any>()
+        val it: MutableIterator<Map.Entry<String, Any>> = jsonAsMap.entries.iterator()
+        while (it.hasNext()) {
+            val entry = it.next()
+            if (entry.value is Map<*, *>) {
+                transformDocumentFieldNames(entry.value as MutableMap<String, Any>, fieldNameSuffix)
+            } else if (entry.key.endsWith(fieldNameSuffix) == false) {
+                tempMap["${entry.key}_$fieldNameSuffix"] = entry.value
+                it.remove()
             }
         }
+        jsonAsMap.putAll(tempMap)
     }
 }
