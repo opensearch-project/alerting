@@ -5,9 +5,8 @@
 
 package org.opensearch.alerting.transport
 
-import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.apache.lucene.search.join.ScoreMode
@@ -55,6 +54,7 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 
+private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 /**
  * Transport class that deletes the workflow.
  * If the deleteDelegateMonitor flag is set to true, deletes the workflow delegates that are not part of another workflow
@@ -91,7 +91,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
             return
         }
 
-        GlobalScope.launch(Dispatchers.IO + CoroutineName("DeleteWorkflowAction")) {
+        scope.launch {
             DeleteWorkflowHandler(
                 client,
                 actionListener,
