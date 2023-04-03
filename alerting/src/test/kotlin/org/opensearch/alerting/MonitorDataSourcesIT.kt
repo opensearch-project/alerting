@@ -14,6 +14,7 @@ import org.opensearch.action.admin.indices.get.GetIndexResponse
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
+import org.opensearch.action.fieldcaps.FieldCapabilitiesRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.action.SearchMonitorAction
@@ -209,7 +210,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals("Didn't match all 8 queries", 8, findings[0].docLevelQueries.size)
     }
 
-    fun `test execute monitor with nested json doc as source`() {
+    fun `test execute monitor with non-flattened json doc as source`() {
         val docQuery1 = DocLevelQuery(query = "source.device.port:12345 OR source.device.hwd.id:12345", name = "3")
 
         val docLevelInput = DocLevelMonitorInput(
@@ -236,11 +237,19 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 "source.device.hwd.id": { "type": "long" }
             }
         }"""
+
         client().admin().indices().putMapping(PutMappingRequest(index).source(mappings, XContentType.JSON)).get()
+        val getFieldCapabilitiesResp = client().fieldCaps(FieldCapabilitiesRequest().indices(index).fields("*")).get()
+        assertTrue(getFieldCapabilitiesResp.getField("source").containsKey("object"))
+        assertTrue(getFieldCapabilitiesResp.getField("source.device").containsKey("object"))
+        assertTrue(getFieldCapabilitiesResp.getField("source.device.hwd").containsKey("object"))
         // testing both, nested and flatten documents
         val testDocuments = mutableListOf<String>()
         testDocuments += """{
             "source" : { "device": {"port" : 12345 } }
+        }"""
+        testDocuments += """{
+            "source.device.port" : "12345"
         }"""
         testDocuments += """{
             "source.device.port" : 12345
@@ -252,6 +261,9 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             "source.device.hwd.id" : 12345
         }"""
         // Checking if these pointless but valid documents cause any issues
+        testDocuments += """{
+            "source" : {}
+        }"""
         testDocuments += """{
             "source.device" : null
         }"""
@@ -285,7 +297,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         val findings = searchFindings(id, customFindingsIndex)
-        assertEquals("Findings saved for test monitor", 4, findings.size)
+        assertEquals("Findings saved for test monitor", 5, findings.size)
         assertEquals("Didn't match query", 1, findings[0].docLevelQueries.size)
     }
 

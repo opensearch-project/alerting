@@ -6,6 +6,7 @@
 package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.ExceptionsHelper
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
@@ -186,8 +187,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             }
             monitorResult = monitorResult.copy(inputResults = InputRunResults(listOf(inputRunResults)))
         } catch (e: Exception) {
-            logger.error("Failed to start Document-level-monitor ${monitor.name}. Error: ${e.message}", e)
-            val alertingException = AlertingException.wrap(e)
+            logger.error("Failed to start Document-level-monitor ${monitor.name}", e)
+            val alertingException = AlertingException(
+                ExceptionsHelper.unwrapCause(e).cause?.message.toString(),
+                RestStatus.INTERNAL_SERVER_ERROR,
+                e
+            )
             monitorResult = monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
         }
 
@@ -390,25 +395,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         }
     }
 
-    suspend fun createRunContext(
-        clusterService: ClusterService,
-        client: Client,
-        index: String,
-        createdRecently: Boolean = false
-    ): HashMap<String, Any> {
-        val lastRunContext = HashMap<String, Any>()
-        lastRunContext["index"] = index
-        val count = getShardsCount(clusterService, index)
-        lastRunContext["shards_count"] = count
-
-        for (i: Int in 0 until count) {
-            val shard = i.toString()
-            val maxSeqNo: Long = if (createdRecently) -1L else getMaxSeqNo(client, index, shard)
-            lastRunContext[shard] = maxSeqNo
-        }
-        return lastRunContext
-    }
-
     // Checks if the index was created from the last execution run or when the monitor was last updated to ensure that
     // new index is monitored from the beginning of that index
     private fun createdRecently(
@@ -563,11 +549,13 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         return hits.map { hit ->
             val sourceMap = hit.sourceAsMap
 
-            transformDocumentFieldNames(sourceMap, "${index}_$monitorId")
+            transformDocumentFieldNames(sourceMap, "_${index}_$monitorId")
 
             var xContentBuilder = XContentFactory.jsonBuilder().map(sourceMap)
 
             val sourceRef = BytesReference.bytes(xContentBuilder)
+
+            logger.trace("Document [${hit.id}] payload after transform: ", sourceRef.utf8ToString())
 
             Pair(hit.id, sourceRef)
         }
@@ -590,7 +578,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             if (entry.value is Map<*, *>) {
                 transformDocumentFieldNames(entry.value as MutableMap<String, Any>, fieldNameSuffix)
             } else if (entry.key.endsWith(fieldNameSuffix) == false) {
-                tempMap["${entry.key}_$fieldNameSuffix"] = entry.value
+                tempMap["${entry.key}$fieldNameSuffix"] = entry.value
                 it.remove()
             }
         }
