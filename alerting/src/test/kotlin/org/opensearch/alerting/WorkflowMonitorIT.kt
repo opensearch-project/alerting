@@ -559,15 +559,13 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
         assertNotNull(getWorkflowResponse2)
         assertEquals(workflowId2, getWorkflowResponse2.id)
 
-        deleteWorkflow(workflowId, true)
-        // Verify that the workflow is deleted
         try {
-            getWorkflowById(workflowId)
+            deleteWorkflow(workflowId, true)
         } catch (e: Exception) {
             e.message?.let {
                 assertTrue(
                     "Exception not returning GetWorkflow Action error ",
-                    it.contains("Workflow not found.")
+                    it.contains("[Not allowed to delete ${monitorResponse.id} monitors")
                 )
             }
         }

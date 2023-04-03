@@ -126,17 +126,30 @@ class TransportDeleteWorkflowAction @Inject constructor(
                     )
 
                 if (canDelete) {
-                    val deleteResponse = deleteWorkflow(workflow)
-                    // TODO - uncomment once the metadata are introduced
-                    // deleteMetadata(workflow)
+                    val delegateMonitorIds = (workflow.inputs[0] as CompositeInput).getMonitorIds()
+
+                    // User can only delete the delegate monitors only in the case if all monitors can be deleted
+                    // Partial monitor deletion is not available
                     if (deleteDelegateMonitors == true) {
-                        val delegateMonitorIds = (workflow.inputs[0] as CompositeInput).getMonitorIds()
                         val monitorIdsToBeDeleted = getDeletableDelegates(workflowId, delegateMonitorIds, user)
 
-                        // Delete the monitor ids
-                        if (monitorIdsToBeDeleted.isNotEmpty()) {
-                            deleteMonitors(monitorIdsToBeDeleted, RefreshPolicy.IMMEDIATE)
+                        if (
+                            delegateMonitorIds.size != monitorIdsToBeDeleted.size || delegateMonitorIds.toSet() != monitorIdsToBeDeleted.toSet()
+                        ) {
+                            actionListener.onFailure(
+                                AlertingException(
+                                    "Not allowed to delete ${delegateMonitorIds.joinToString()} monitors",
+                                    RestStatus.FORBIDDEN,
+                                    IllegalStateException()
+                                )
+                            )
+                            return
                         }
+                    }
+
+                    val deleteResponse = deleteWorkflow(workflow)
+                    if (deleteDelegateMonitors == true) {
+                        deleteMonitors(delegateMonitorIds, RefreshPolicy.IMMEDIATE)
                     }
                     actionListener.onResponse(DeleteWorkflowResponse(deleteResponse.id, deleteResponse.version))
                 } else {
@@ -198,7 +211,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
                 .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
                 .source(SearchSourceBuilder().query(queryBuilder))
 
-            // Check  if user can access the monitors (since the monitors could get modified later and the user might not have the backend roles to access the monitors)
+            // Check if user can access the monitors(since the monitors could get modified later and the user might not have the backend roles to access the monitors)
             if (user != null && filterByEnabled) {
                 addFilter(user, searchRequest.source(), "monitor.user.backend_roles.keyword")
             }
