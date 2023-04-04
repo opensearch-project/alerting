@@ -235,6 +235,14 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             "properties": {
                 "source.device.port": { "type": "long" },
                 "source.device.hwd.id": { "type": "long" },
+                "nested_field": {
+                  "type": "nested",
+                  "properties": {
+                    "test1": {
+                      "type": "keyword"
+                    }
+                  }
+                },
                 "my_join_field": { 
                   "type": "join",
                   "relations": {
@@ -252,7 +260,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         // testing both, nested and flatten documents
         val testDocuments = mutableListOf<String>()
         testDocuments += """{
-            "source" : { "device": {"port" : 12345 } }
+            "source" : { "device": {"port" : 12345 } },
+            "nested_field": { "test1": "some text" }
         }"""
         testDocuments += """{
             "source.device.port" : "12345"
