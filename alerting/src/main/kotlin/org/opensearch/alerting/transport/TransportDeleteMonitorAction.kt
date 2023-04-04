@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
+import org.apache.lucene.search.join.ScoreMode
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
 import org.opensearch.action.ActionRequest
@@ -42,6 +43,7 @@ import org.opensearch.commons.alerting.action.DeleteMonitorRequest
 import org.opensearch.commons.alerting.action.DeleteMonitorResponse
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -106,9 +108,12 @@ class TransportDeleteMonitorAction @Inject constructor(
         suspend fun resolveUserAndStart() {
             try {
                 val monitor = getMonitor()
-
-                val canDelete = user == null ||
-                    !doFilterForUser(user) ||
+                if (monitorIsWorkflowDelegate(monitor.id)) {
+                    actionListener.onFailure(
+                        AlertingException("Monitor can't be deleted because it is a part of workflow(s)", RestStatus.FORBIDDEN, IllegalStateException())
+                    )
+                }
+                val canDelete = user == null || !doFilterForUser(user) ||
                     checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", monitorId)
 
                 if (canDelete) {
@@ -122,6 +127,43 @@ class TransportDeleteMonitorAction @Inject constructor(
             } catch (t: Exception) {
                 log.error("Failed to delete monitor ${deleteRequest.id()}", t)
                 actionListener.onFailure(AlertingException.wrap(t))
+            }
+        }
+
+        /**
+         * Checks if the monitor is part of the workflow
+         *
+         * @param monitorId id of monitor that is checked if it is a workflow delegate
+         */
+        private suspend fun monitorIsWorkflowDelegate(monitorId: String): Boolean {
+            val queryBuilder = QueryBuilders.nestedQuery(
+                Workflow.WORKFLOW_DELEGATE_PATH,
+                QueryBuilders.boolQuery().must(
+                    QueryBuilders.matchQuery(
+                        Workflow.WORKFLOW_MONITOR_PATH,
+                        monitorId
+                    )
+                ),
+                ScoreMode.None
+            )
+            try {
+                val searchRequest = SearchRequest()
+                    .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
+                    .source(SearchSourceBuilder().query(queryBuilder))
+
+                client.threadPool().threadContext.stashContext().use {
+                    val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
+                    if (searchResponse.hits.totalHits?.value == 0L) {
+                        return false
+                    }
+
+                    val workflowIds = searchResponse.hits.hits.map { it.id }.joinToString()
+                    log.info("Monitor $monitorId can't be deleted since it belongs to $workflowIds")
+                    return true
+                }
+            } catch (ex: Exception) {
+                log.error("Error getting the monitor workflows", ex)
+                throw AlertingException.wrap(ex)
             }
         }
 
