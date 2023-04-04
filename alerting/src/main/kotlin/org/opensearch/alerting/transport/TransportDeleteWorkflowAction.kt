@@ -132,13 +132,13 @@ class TransportDeleteWorkflowAction @Inject constructor(
                     // Partial monitor deletion is not available
                     if (deleteDelegateMonitors == true) {
                         val monitorIdsToBeDeleted = getDeletableDelegates(workflowId, delegateMonitorIds, user)
+                        val monitorsDiff = delegateMonitorIds.toMutableList()
+                        monitorsDiff.removeAll(monitorIdsToBeDeleted)
 
-                        if (
-                            delegateMonitorIds.size != monitorIdsToBeDeleted.size || delegateMonitorIds.toSet() != monitorIdsToBeDeleted.toSet()
-                        ) {
+                        if (monitorsDiff.isNotEmpty()) {
                             actionListener.onFailure(
                                 AlertingException(
-                                    "Not allowed to delete ${delegateMonitorIds.joinToString()} monitors",
+                                    "Not allowed to delete ${monitorsDiff.joinToString()} monitors",
                                     RestStatus.FORBIDDEN,
                                     IllegalStateException()
                                 )
