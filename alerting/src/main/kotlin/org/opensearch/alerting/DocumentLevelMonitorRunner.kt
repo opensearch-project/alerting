@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting
 
+import kotlin.math.max
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
 import org.opensearch.OpenSearchStatusException
@@ -53,7 +54,6 @@ import org.opensearch.search.sort.SortOrder
 import java.io.IOException
 import java.time.Instant
 import java.util.UUID
-import kotlin.math.max
 
 object DocumentLevelMonitorRunner : MonitorRunner() {
     private val logger = LogManager.getLogger(javaClass)
@@ -563,6 +563,13 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
     /**
      * Traverses document fields in leaves recursively and appends [fieldNameSuffix] to field names.
+     *
+     * Example for index name is my_log_index and Monitor ID is TReewWdsf2gdJFV:
+     * {                         {
+     *   "a": {                     "a": {
+     *     "b": 1234      ---->       "b_my_log_index_TReewWdsf2gdJFV": 1234
+     *   }                          }
+     * }
      *
      * @param jsonAsMap               Input JSON (as Map)
      * @param fieldNameSuffix         Field suffix which is appended to existing field name

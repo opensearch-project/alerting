@@ -234,7 +234,13 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val mappings = """{
             "properties": {
                 "source.device.port": { "type": "long" },
-                "source.device.hwd.id": { "type": "long" }
+                "source.device.hwd.id": { "type": "long" },
+                "my_join_field": { 
+                  "type": "join",
+                  "relations": {
+                     "question": "answer" 
+                  }
+               }
             }
         }"""
 
@@ -259,6 +265,11 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         }"""
         testDocuments += """{
             "source.device.hwd.id" : 12345
+        }"""
+        // Document with join field
+        testDocuments += """{
+            "source" : { "device" : { "hwd": { "id" : 12345 } } },
+            "my_join_field": { "name": "question" }
         }"""
         // Checking if these pointless but valid documents cause any issues
         testDocuments += """{
@@ -297,7 +308,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         val findings = searchFindings(id, customFindingsIndex)
-        assertEquals("Findings saved for test monitor", 5, findings.size)
+        assertEquals("Findings saved for test monitor", 6, findings.size)
         assertEquals("Didn't match query", 1, findings[0].docLevelQueries.size)
     }
 
