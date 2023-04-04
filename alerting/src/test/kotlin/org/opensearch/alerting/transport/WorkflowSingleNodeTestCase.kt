@@ -7,6 +7,11 @@ package org.opensearch.alerting.transport
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope
 import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.action.ExecuteWorkflowAction
+import org.opensearch.alerting.action.ExecuteWorkflowRequest
+import org.opensearch.alerting.action.ExecuteWorkflowResponse
+import org.opensearch.alerting.model.WorkflowMetadata
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.DeleteWorkflowRequest
@@ -21,6 +26,7 @@ import org.opensearch.index.query.TermQueryBuilder
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
+import java.time.Instant
 
 /**
  * A test that keep a singleton node started for all tests that can be used to get
@@ -59,6 +65,35 @@ abstract class WorkflowSingleNodeTestCase : AlertingSingleNodeTestCase() {
         }.first()
     }
 
+    protected fun searchWorkflowMetadata(
+        id: String,
+        indices: String = ScheduledJob.SCHEDULED_JOBS_INDEX,
+        refresh: Boolean = true,
+    ): WorkflowMetadata? {
+        try {
+            if (refresh) refreshIndex(indices)
+        } catch (e: Exception) {
+            logger.warn("Could not refresh index $indices because: ${e.message}")
+            return null
+        }
+        val ssb = SearchSourceBuilder()
+        ssb.version(true)
+        ssb.query(TermQueryBuilder("workflow_metadata.workflow_id", id))
+        val searchResponse = client().prepareSearch(indices).setRouting(id).setSource(ssb).get()
+
+        return searchResponse.hits.hits.map { it ->
+            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
+            lateinit var workflowMetadata: WorkflowMetadata
+            while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
+                xcp.nextToken()
+                when (xcp.currentName()) {
+                    "workflow_metadata" -> workflowMetadata = WorkflowMetadata.parse(xcp)
+                }
+            }
+            workflowMetadata.copy(id = it.id)
+        }.first()
+    }
+
     protected fun upsertWorkflow(
         workflow: Workflow,
         id: String = Workflow.NO_ID,
@@ -87,5 +122,10 @@ abstract class WorkflowSingleNodeTestCase : AlertingSingleNodeTestCase() {
             AlertingActions.DELETE_WORKFLOW_ACTION_TYPE,
             DeleteWorkflowRequest(workflowId, deleteDelegateMonitors)
         ).get()
+    }
+
+    protected fun executeWorkflow(workflow: Workflow? = null, id: String? = null, dryRun: Boolean = true): ExecuteWorkflowResponse? {
+        val request = ExecuteWorkflowRequest(dryRun, TimeValue(Instant.now().toEpochMilli()), id, workflow)
+        return client().execute(ExecuteWorkflowAction.INSTANCE, request).get()
     }
 }

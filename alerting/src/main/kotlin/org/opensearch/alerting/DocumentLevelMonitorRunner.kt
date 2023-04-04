@@ -24,6 +24,7 @@ import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
+import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.routing.ShardRouting
@@ -62,7 +63,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         monitorCtx: MonitorRunnerExecutionContext,
         periodStart: Instant,
         periodEnd: Instant,
-        dryrun: Boolean
+        dryrun: Boolean,
+        workflowRunContext: WorkflowRunContext?
     ): MonitorRunResult<DocumentLevelTriggerRunResult> {
         logger.debug("Document-level-monitor is running ...")
         val isTempMonitor = dryrun || monitor.id == Monitor.NO_ID
@@ -88,7 +90,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         var (monitorMetadata, _) = MonitorMetadataService.getOrCreateMetadata(
             monitor = monitor,
             createWithRunContext = false,
-            skipIndex = isTempMonitor
+            skipIndex = isTempMonitor,
+            workflowRunContext?.workflowId
         )
 
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
@@ -161,7 +164,16 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 // Prepare DocumentExecutionContext for each index
                 val docExecutionContext = DocumentExecutionContext(queries, indexLastRunContext, indexUpdatedRunContext)
 
-                val matchingDocs = getMatchingDocs(monitor, monitorCtx, docExecutionContext, indexName)
+                // If monitor execution is triggered from a workflow
+                val indexToRelatedDocIdsMap = workflowRunContext?.matchingDocIdsPerIndex
+
+                val matchingDocs = getMatchingDocs(
+                    monitor,
+                    monitorCtx,
+                    docExecutionContext,
+                    indexName,
+                    indexToRelatedDocIdsMap?.get(indexName)
+                )
 
                 if (matchingDocs.isNotEmpty()) {
                     val matchedQueriesForDocs = getMatchedQueries(
@@ -214,7 +226,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 idQueryMap,
                 docsToQueries,
                 queryToDocIds,
-                dryrun
+                dryrun,
+                workflowRunContext?.executionId
             )
         }
 
@@ -238,7 +251,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         idQueryMap: Map<String, DocLevelQuery>,
         docsToQueries: Map<String, List<String>>,
         queryToDocIds: Map<DocLevelQuery, Set<String>>,
-        dryrun: Boolean
+        dryrun: Boolean,
+        workflowExecutionId: String? = null
     ): DocumentLevelTriggerRunResult {
         val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger)
         val triggerResult = monitorCtx.triggerService!!.runDocLevelTrigger(monitor, trigger, queryToDocIds)
@@ -249,7 +263,14 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         // TODO: Implement throttling for findings
         docsToQueries.forEach {
             val triggeredQueries = it.value.map { queryId -> idQueryMap[queryId]!! }
-            val findingId = createFindings(monitor, monitorCtx, triggeredQueries, it.key, !dryrun && monitor.id != Monitor.NO_ID)
+            val findingId = createFindings(
+                monitor,
+                monitorCtx,
+                triggeredQueries,
+                it.key,
+                !dryrun && monitor.id != Monitor.NO_ID,
+                workflowExecutionId
+            )
             findings.add(findingId)
 
             if (triggerResult.triggeredDocs.contains(it.key)) {
@@ -329,7 +350,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         monitorCtx: MonitorRunnerExecutionContext,
         docLevelQueries: List<DocLevelQuery>,
         matchingDocId: String,
-        shouldCreateFinding: Boolean
+        shouldCreateFinding: Boolean,
+        workflowExecutionId: String? = null,
     ): String {
         // Before the "|" is the doc id and after the "|" is the index
         val docIndex = matchingDocId.split("|")
@@ -341,7 +363,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             monitorName = monitor.name,
             index = docIndex[1],
             docLevelQueries = docLevelQueries,
-            timestamp = Instant.now()
+            timestamp = Instant.now(),
+            executionId = workflowExecutionId
         )
 
         val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
@@ -458,7 +481,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         monitor: Monitor,
         monitorCtx: MonitorRunnerExecutionContext,
         docExecutionCtx: DocumentExecutionContext,
-        index: String
+        index: String,
+        docIds: List<String>? = null
     ): List<Pair<String, BytesReference>> {
         val count: Int = docExecutionCtx.updatedLastRunContext["shards_count"] as Int
         val matchingDocs = mutableListOf<Pair<String, BytesReference>>()
@@ -474,7 +498,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     shard,
                     prevSeqNo,
                     maxSeqNo,
-                    null
+                    null,
+                    docIds
                 )
 
                 if (hits.hits.isNotEmpty()) {
@@ -493,7 +518,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         shard: String,
         prevSeqNo: Long?,
         maxSeqNo: Long,
-        query: String?
+        query: String?,
+        docIds: List<String>? = null
     ): SearchHits {
         if (prevSeqNo?.equals(maxSeqNo) == true && maxSeqNo != 0L) {
             return SearchHits.empty()
@@ -503,6 +529,10 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         if (query != null) {
             boolQueryBuilder.must(QueryBuilders.queryStringQuery(query))
+        }
+
+        if (!docIds.isNullOrEmpty()) {
+            boolQueryBuilder.filter(QueryBuilders.termsQuery("_id", docIds))
         }
 
         val request: SearchRequest = SearchRequest()

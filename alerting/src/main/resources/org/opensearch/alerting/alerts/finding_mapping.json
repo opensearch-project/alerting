@@ -51,6 +51,9 @@
     },
     "timestamp": {
       "type": "long"
+    },
+    "execution_id": {
+      "type": "keyword"
     }
   }
 }

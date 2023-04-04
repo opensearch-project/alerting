@@ -16,6 +16,7 @@ import org.opensearch.alerting.util.AggregationQueryRewriter
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.executeTransportAction
 import org.opensearch.alerting.util.toMap
+import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.NamedWriteableAwareStreamInput
@@ -26,6 +27,11 @@ import org.opensearch.commons.alerting.model.ClusterMetricsInput
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.index.query.BoolQueryBuilder
+import org.opensearch.index.query.MatchQueryBuilder
+import org.opensearch.index.query.QueryBuilder
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.index.query.TermsQueryBuilder
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
 import org.opensearch.script.ScriptType
@@ -47,11 +53,15 @@ class InputService(
         monitor: Monitor,
         periodStart: Instant,
         periodEnd: Instant,
-        prevResult: InputRunResults? = null
+        prevResult: InputRunResults? = null,
+        workflowRunContext: WorkflowRunContext? = null
     ): InputRunResults {
         return try {
             val results = mutableListOf<Map<String, Any>>()
             val aggTriggerAfterKey: MutableMap<String, TriggerAfterKey> = mutableMapOf()
+
+            // If monitor execution is triggered from a workflow
+            val matchingDocIdsPerIndex = workflowRunContext?.matchingDocIdsPerIndex
 
             // TODO: If/when multiple input queries are supported for Bucket-Level Monitor execution, aggTriggerAfterKeys will
             //  need to be updated to account for it
@@ -63,9 +73,17 @@ class InputService(
                             "period_start" to periodStart.toEpochMilli(),
                             "period_end" to periodEnd.toEpochMilli()
                         )
+
                         // Deep copying query before passing it to rewriteQuery since otherwise, the monitor.input is modified directly
                         // which causes a strange bug where the rewritten query persists on the Monitor across executions
                         val rewrittenQuery = AggregationQueryRewriter.rewriteQuery(deepCopyQuery(input.query), prevResult, monitor.triggers)
+
+                        // Rewrite query to consider the doc ids per given index
+                        if (chainedFindingExist(matchingDocIdsPerIndex) && rewrittenQuery.query() != null) {
+                            val updatedSourceQuery = updateInputQueryWithFindingDocIds(rewrittenQuery.query(), matchingDocIdsPerIndex!!)
+                            rewrittenQuery.query(updatedSourceQuery)
+                        }
+
                         val searchSource = scriptService.compile(
                             Script(
                                 ScriptType.INLINE,
@@ -106,6 +124,35 @@ class InputService(
             InputRunResults(emptyList(), e)
         }
     }
+
+    /**
+     * Extends the given query builder with query that filters the given indices with the given doc ids per index
+     * Used whenever we want to select the documents that were found in chained delegate execution of the current workflow run
+     *
+     * @param query Original bucket monitor query
+     * @param indexToDocIds Map of finding doc ids grouped by index
+     */
+    private fun updateInputQueryWithFindingDocIds(
+        query: QueryBuilder,
+        indexToDocIds: Map<String, List<String>>,
+    ): QueryBuilder {
+        val queryBuilder = QueryBuilders.boolQuery().must(query)
+        val shouldQuery = QueryBuilders.boolQuery()
+
+        indexToDocIds.forEach { entry ->
+            shouldQuery
+                .should()
+                .add(
+                    BoolQueryBuilder()
+                        .must(MatchQueryBuilder("_index", entry.key))
+                        .must(TermsQueryBuilder("_id", entry.value))
+                )
+        }
+        return queryBuilder.must(shouldQuery)
+    }
+
+    private fun chainedFindingExist(indexToDocIds: Map<String, List<String>>?) =
+        !indexToDocIds.isNullOrEmpty()
 
     private fun deepCopyQuery(query: SearchSourceBuilder): SearchSourceBuilder {
         val out = BytesStreamOutput()

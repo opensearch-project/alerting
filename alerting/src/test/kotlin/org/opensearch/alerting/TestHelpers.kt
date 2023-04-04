@@ -397,7 +397,6 @@ val TEST_HR_INDEX = "hr_data"
 val TEST_NON_HR_INDEX = "not_hr_data"
 val TEST_HR_ROLE = "hr_role"
 val TEST_HR_BACKEND_ROLE = "HR"
-
 // Using a triple-quote string for the query so escaped quotes are kept as-is
 // in the request made using triple-quote strings (i.e. createIndexRoleWithDocLevelSecurity).
 // Removing the escape slash in the request causes the security API role request to fail with parsing exception.

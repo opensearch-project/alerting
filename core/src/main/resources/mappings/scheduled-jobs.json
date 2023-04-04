@@ -663,6 +663,29 @@
           "enabled": false
         }
       }
+    },
+    "workflow_metadata" : {
+      "properties": {
+        "workflow_id": {
+          "type": "keyword"
+        },
+        "monitor_ids": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "latest_run_time": {
+          "type": "date",
+          "format": "strict_date_time||epoch_millis"
+        },
+        "latest_execution_id": {
+          "type": "keyword"
+        }
+      }
     }
   }
 }
