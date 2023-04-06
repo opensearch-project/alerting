@@ -36,8 +36,9 @@ import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.Table
 import org.opensearch.index.query.TermQueryBuilder
-import org.opensearch.index.reindex.ReindexPlugin
+import org.opensearch.index.reindex.ReindexModulePlugin
 import org.opensearch.index.seqno.SequenceNumbers
+import org.opensearch.join.ParentJoinModulePlugin
 import org.opensearch.plugins.Plugin
 import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
@@ -229,7 +230,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     ).get()
 
     override fun getPlugins(): List<Class<out Plugin>> {
-        return listOf(AlertingPlugin::class.java, ReindexPlugin::class.java)
+        return listOf(AlertingPlugin::class.java, ReindexModulePlugin::class.java, ParentJoinModulePlugin::class.java)
     }
 
     override fun resetNodeAfterTest(): Boolean {

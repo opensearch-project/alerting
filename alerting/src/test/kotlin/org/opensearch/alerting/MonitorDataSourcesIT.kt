@@ -13,6 +13,7 @@ import org.opensearch.action.admin.indices.get.GetIndexResponse
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
+import org.opensearch.action.fieldcaps.FieldCapabilitiesRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.action.SearchMonitorAction
@@ -206,6 +207,117 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals("Findings saved for test monitor", 1, findings.size)
         assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
         assertEquals("Didn't match all 8 queries", 8, findings[0].docLevelQueries.size)
+    }
+
+    fun `test execute monitor with non-flattened json doc as source`() {
+        val docQuery1 = DocLevelQuery(query = "source.device.port:12345 OR source.device.hwd.id:12345", name = "3")
+
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(docQuery1)
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customFindingsIndex = "custom_findings_index"
+        val customFindingsIndexPattern = "custom_findings_index-1"
+        val customQueryIndex = "custom_alerts_index"
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(
+                queryIndex = customQueryIndex,
+                findingsIndex = customFindingsIndex,
+                findingsIndexPattern = customFindingsIndexPattern
+            )
+        )
+        val monitorResponse = createMonitor(monitor)
+
+        val mappings = """{
+            "properties": {
+                "source.device.port": { "type": "long" },
+                "source.device.hwd.id": { "type": "long" },
+                "nested_field": {
+                  "type": "nested",
+                  "properties": {
+                    "test1": {
+                      "type": "keyword"
+                    }
+                  }
+                },
+                "my_join_field": { 
+                  "type": "join",
+                  "relations": {
+                     "question": "answer" 
+                  }
+               }
+            }
+        }"""
+
+        client().admin().indices().putMapping(PutMappingRequest(index).source(mappings, XContentType.JSON)).get()
+        val getFieldCapabilitiesResp = client().fieldCaps(FieldCapabilitiesRequest().indices(index).fields("*")).get()
+        assertTrue(getFieldCapabilitiesResp.getField("source").containsKey("object"))
+        assertTrue(getFieldCapabilitiesResp.getField("source.device").containsKey("object"))
+        assertTrue(getFieldCapabilitiesResp.getField("source.device.hwd").containsKey("object"))
+        // testing both, nested and flatten documents
+        val testDocuments = mutableListOf<String>()
+        testDocuments += """{
+            "source" : { "device": {"port" : 12345 } },
+            "nested_field": { "test1": "some text" }
+        }"""
+        testDocuments += """{
+            "source.device.port" : "12345"
+        }"""
+        testDocuments += """{
+            "source.device.port" : 12345
+        }"""
+        testDocuments += """{
+            "source" : { "device": {"hwd": { "id": 12345 } } }
+        }"""
+        testDocuments += """{
+            "source.device.hwd.id" : 12345
+        }"""
+        // Document with join field
+        testDocuments += """{
+            "source" : { "device" : { "hwd": { "id" : 12345 } } },
+            "my_join_field": { "name": "question" }
+        }"""
+        // Checking if these pointless but valid documents cause any issues
+        testDocuments += """{
+            "source" : {}
+        }"""
+        testDocuments += """{
+            "source.device" : null
+        }"""
+        testDocuments += """{
+            "source.device" : {}
+        }"""
+        testDocuments += """{
+            "source.device.hwd" : {}
+        }"""
+        testDocuments += """{
+            "source.device.hwd.id" : null
+        }"""
+        testDocuments += """{
+            "some.multi.val.field" : [12345, 10, 11]
+        }"""
+        // Insert all documents
+        for (i in testDocuments.indices) {
+            indexDoc(index, "$i", testDocuments[i])
+        }
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+        val id = monitorResponse.id
+        val executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        searchAlerts(id)
+        val table = Table("asc", "id", null, 1, 0, "")
+        var getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        val findings = searchFindings(id, customFindingsIndex)
+        assertEquals("Findings saved for test monitor", 6, findings.size)
+        assertEquals("Didn't match query", 1, findings[0].docLevelQueries.size)
     }
 
     fun `test execute monitor with custom query index old`() {
