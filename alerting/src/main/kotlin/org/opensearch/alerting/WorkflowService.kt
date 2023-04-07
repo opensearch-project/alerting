@@ -71,7 +71,7 @@ class WorkflowService(
             }
             return indexToRelatedDocIdsMap
         } catch (t: Exception) {
-            log.error("Error getting finding doc ids: ${t.message}")
+            log.error("Error getting finding doc ids: ${t.message}", t)
             throw AlertingException.wrap(t)
         }
     }
@@ -100,7 +100,7 @@ class WorkflowService(
             val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
             return parseMonitors(searchResponse)
         } catch (e: Exception) {
-            log.error("Error getting monitors: ${e.message}")
+            log.error("Error getting monitors: ${e.message}", e)
             throw AlertingException.wrap(e)
         }
     }
@@ -122,7 +122,7 @@ class WorkflowService(
                 }
             }
         } catch (e: Exception) {
-            log.error("Error parsing monitors: ${e.message}")
+            log.error("Error parsing monitors: ${e.message}", e)
             throw AlertingException.wrap(e)
         }
         return monitors

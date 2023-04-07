@@ -25,7 +25,6 @@ import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.model.MonitorMetadata
-import org.opensearch.alerting.model.WorkflowMetadata
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
@@ -38,18 +37,15 @@ import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.alerting.model.CompositeInput
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
-import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.RestStatus
 import org.opensearch.transport.RemoteTransportException
-import java.time.Instant
 
 private val log = LogManager.getLogger(MonitorMetadataService::class.java)
 
@@ -114,38 +110,6 @@ object MonitorMetadataService :
         }
     }
 
-    @Suppress("ComplexMethod", "ReturnCount")
-    suspend fun upsertWorkflowMetadata(metadata: WorkflowMetadata, updating: Boolean): WorkflowMetadata {
-        try {
-            val indexRequest = IndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
-                .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-                .source(metadata.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-                .id(metadata.id)
-                .routing(metadata.workflowId)
-                .timeout(indexTimeout)
-
-            if (updating) {
-                indexRequest.id(metadata.id)
-            } else {
-                indexRequest.opType(DocWriteRequest.OpType.CREATE)
-            }
-            val response: IndexResponse = client.suspendUntil { index(indexRequest, it) }
-            when (response.result) {
-                DocWriteResponse.Result.DELETED, DocWriteResponse.Result.NOOP, DocWriteResponse.Result.NOT_FOUND, null -> {
-                    val failureReason = "The upsert metadata call failed with a ${response.result?.lowercase} result"
-                    log.error(failureReason)
-                    throw AlertingException(failureReason, RestStatus.INTERNAL_SERVER_ERROR, IllegalStateException(failureReason))
-                }
-                DocWriteResponse.Result.CREATED, DocWriteResponse.Result.UPDATED -> {
-                    log.debug("Successfully upserted WorkflowMetadata:${metadata.id} ")
-                }
-            }
-            return metadata
-        } catch (e: Exception) {
-            throw AlertingException.wrap(e)
-        }
-    }
-
     /**
      * Document monitors are keeping the context of the last run.
      * Since one monitor can be part of multiple workflows we need to be sure that execution of the current workflow
@@ -168,29 +132,6 @@ object MonitorMetadataService :
                     newMetadata to created
                 } else {
                     upsertMetadata(newMetadata, updating = false) to created
-                }
-            }
-        } catch (e: Exception) {
-            throw AlertingException.wrap(e)
-        }
-    }
-
-    suspend fun getOrCreateWorkflowMetadata(
-        workflow: Workflow,
-        skipIndex: Boolean = false,
-        executionId: String
-    ): Pair<WorkflowMetadata, Boolean> {
-        try {
-            val created = true
-            val metadata = getWorkflowMetadata(workflow)
-            return if (metadata != null) {
-                metadata to !created
-            } else {
-                val newMetadata = createNewWorkflowMetadata(workflow, executionId)
-                if (skipIndex) {
-                    newMetadata to created
-                } else {
-                    upsertWorkflowMetadata(newMetadata, updating = false) to created
                 }
             }
         } catch (e: Exception) {
@@ -225,33 +166,6 @@ object MonitorMetadataService :
         }
     }
 
-    private suspend fun getWorkflowMetadata(workflow: Workflow): WorkflowMetadata? {
-        try {
-            val metadataId = WorkflowMetadata.getId(workflow.id)
-            val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, metadataId).routing(workflow.id)
-
-            val getResponse: GetResponse = client.suspendUntil { get(getRequest, it) }
-            return if (getResponse.isExists) {
-                val xcp = XContentHelper.createParser(
-                    xContentRegistry,
-                    LoggingDeprecationHandler.INSTANCE,
-                    getResponse.sourceAsBytesRef,
-                    XContentType.JSON
-                )
-                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                WorkflowMetadata.parse(xcp)
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            if (e.message?.contains("no such index") == true) {
-                return null
-            } else {
-                throw AlertingException.wrap(e)
-            }
-        }
-    }
-
     suspend fun recreateRunContext(metadata: MonitorMetadata, monitor: Monitor): MonitorMetadata {
         try {
             val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
@@ -260,12 +174,12 @@ object MonitorMetadataService :
             val runContext = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
                 createFullRunContext(monitorIndex, metadata.lastRunContext as MutableMap<String, MutableMap<String, Any>>)
             } else null
-            if (runContext != null) {
-                return metadata.copy(
+            return if (runContext != null) {
+                metadata.copy(
                     lastRunContext = runContext
                 )
             } else {
-                return metadata
+                metadata
             }
         } catch (e: Exception) {
             throw AlertingException.wrap(e)
@@ -288,16 +202,6 @@ object MonitorMetadataService :
             lastActionExecutionTimes = emptyList(),
             lastRunContext = runContext,
             sourceToQueryIndexMapping = mutableMapOf()
-        )
-    }
-
-    private fun createNewWorkflowMetadata(workflow: Workflow, executionId: String): WorkflowMetadata {
-        return WorkflowMetadata(
-            id = WorkflowMetadata.getId(workflow.id),
-            workflowId = workflow.id,
-            monitorIds = (workflow.inputs[0] as CompositeInput).getMonitorIds(),
-            latestRunTime = Instant.now(),
-            latestExecutionId = executionId
         )
     }
 

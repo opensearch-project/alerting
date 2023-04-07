@@ -130,16 +130,16 @@ class InputService(
      * Used whenever we want to select the documents that were found in chained delegate execution of the current workflow run
      *
      * @param query Original bucket monitor query
-     * @param indexToDocIds Map of finding doc ids grouped by index
+     * @param matchingDocIdsPerIndex Map of finding doc ids grouped by index
      */
     private fun updateInputQueryWithFindingDocIds(
         query: QueryBuilder,
-        indexToDocIds: Map<String, List<String>>,
+        matchingDocIdsPerIndex: Map<String, List<String>>,
     ): QueryBuilder {
         val queryBuilder = QueryBuilders.boolQuery().must(query)
         val shouldQuery = QueryBuilders.boolQuery()
 
-        indexToDocIds.forEach { entry ->
+        matchingDocIdsPerIndex.forEach { entry ->
             shouldQuery
                 .should()
                 .add(

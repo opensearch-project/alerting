@@ -125,6 +125,80 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         assertFindings(monitorResponse2.id, customFindingsIndex2, 1, 1, listOf("2"))
     }
 
+    fun `test execute workflows with shared monitor delegates`() {
+        val docQuery = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customAlertsIndex = "custom_alerts_index"
+        val customFindingsIndex = "custom_findings_index"
+        val customFindingsIndexPattern = "custom_findings_index-1"
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(
+                alertsIndex = customAlertsIndex,
+                findingsIndex = customFindingsIndex,
+                findingsIndexPattern = customFindingsIndexPattern
+            )
+        )
+        val monitorResponse = createMonitor(monitor)!!
+
+        var workflow = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id)
+        )
+        val workflowResponse = upsertWorkflow(workflow)!!
+        val workflowById = searchWorkflow(workflowResponse.id)
+        assertNotNull(workflowById)
+
+        var workflow1 = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id)
+        )
+        val workflowResponse1 = upsertWorkflow(workflow1)!!
+        val workflowById1 = searchWorkflow(workflowResponse1.id)
+        assertNotNull(workflowById1)
+
+        var testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS))
+        // Matches monitor1
+        val testDoc1 = """{
+            "message" : "This is an error from IAD region",
+            "source.ip.v6.v2" : 16644, 
+            "test_strict_date_time" : "$testTime",
+            "test_field_1" : "us-west-2"
+        }"""
+        indexDoc(index, "1", testDoc1)
+
+        testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS))
+        val testDoc2 = """{
+            "message" : "This is an error from IAD region",
+            "source.ip.v6.v2" : 16645, 
+            "test_strict_date_time" : "$testTime",
+            "test_field_1" : "us-west-2"
+        }"""
+        indexDoc(index, "2", testDoc2)
+
+        val workflowId = workflowResponse.id
+        val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
+        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.workflowRunResult
+        assertEquals(1, monitorsRunResults.size)
+
+        assertEquals(monitor.name, monitorsRunResults[0].monitorName)
+        assertEquals(1, monitorsRunResults[0].triggerResults.size)
+
+        assertAlerts(monitorResponse.id, customAlertsIndex, 2)
+        assertFindings(monitorResponse.id, customFindingsIndex, 2, 2, listOf("1", "2"))
+
+        val workflowId1 = workflowResponse1.id
+        val executeWorkflowResponse1 = executeWorkflow(workflowById1, workflowId1, false)!!
+        val monitorsRunResults1 = executeWorkflowResponse1.workflowRunResult.workflowRunResult
+        assertEquals(1, monitorsRunResults1.size)
+
+        assertEquals(monitor.name, monitorsRunResults1[0].monitorName)
+        assertEquals(1, monitorsRunResults1[0].triggerResults.size)
+
+        assertAlerts(monitorResponse.id, customAlertsIndex, 2)
+        assertFindings(monitorResponse.id, customFindingsIndex, 4, 4, listOf("1", "2", "1", "2"))
+    }
+
     fun `test execute workflow verify workflow metadata`() {
         val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))

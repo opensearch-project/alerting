@@ -86,7 +86,7 @@ data class WorkflowMetadata(
                 }
             }
             return WorkflowMetadata(
-                "$workflowId-metadata",
+                id = "$workflowId-metadata",
                 workflowId = workflowId,
                 monitorIds = monitorIds,
                 latestRunTime = latestRunTime,

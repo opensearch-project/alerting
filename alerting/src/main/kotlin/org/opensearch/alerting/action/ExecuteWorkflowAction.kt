@@ -10,6 +10,6 @@ import org.opensearch.action.ActionType
 class ExecuteWorkflowAction private constructor() : ActionType<ExecuteWorkflowResponse>(NAME, ::ExecuteWorkflowResponse) {
     companion object {
         val INSTANCE = ExecuteWorkflowAction()
-        const val NAME = "cluster:admin/opendistro/alerting/workflow/execute"
+        const val NAME = "cluster:admin/opensearch/alerting/workflow/execute"
     }
 }

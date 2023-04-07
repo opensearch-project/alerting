@@ -284,6 +284,13 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             settings
         )
 
+        WorkflowMetadataService.initialize(
+            client,
+            clusterService,
+            xContentRegistry,
+            settings
+        )
+
         return listOf(sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator)
     }
 

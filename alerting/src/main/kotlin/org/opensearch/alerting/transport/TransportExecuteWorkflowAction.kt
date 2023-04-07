@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.transport
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -37,13 +38,14 @@ import org.opensearch.transport.TransportService
 import java.time.Instant
 
 private val log = LogManager.getLogger(TransportExecuteWorkflowAction::class.java)
+private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
 class TransportExecuteWorkflowAction @Inject constructor(
     transportService: TransportService,
     private val client: Client,
     private val runner: MonitorRunnerService,
     actionFilters: ActionFilters,
-    val xContentRegistry: NamedXContentRegistry,
+    val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<ExecuteWorkflowRequest, ExecuteWorkflowResponse>(
     ExecuteWorkflowAction.NAME, transportService, actionFilters, ::ExecuteWorkflowRequest
 ) {
@@ -83,6 +85,7 @@ class TransportExecuteWorkflowAction @Inject constructor(
                     object : ActionListener<GetResponse> {
                         override fun onResponse(response: GetResponse) {
                             if (!response.isExists) {
+                                log.error("Can't find workflow with id: ${response.id}")
                                 actionListener.onFailure(
                                     AlertingException.wrap(
                                         OpenSearchStatusException(
@@ -105,6 +108,7 @@ class TransportExecuteWorkflowAction @Inject constructor(
                         }
 
                         override fun onFailure(t: Exception) {
+                            log.error("Error getting workflow ${execWorkflowRequest.workflowId}", t)
                             actionListener.onFailure(AlertingException.wrap(t))
                         }
                     }
@@ -114,6 +118,7 @@ class TransportExecuteWorkflowAction @Inject constructor(
                     true -> execWorkflowRequest.workflow as Workflow
                     false -> (execWorkflowRequest.workflow as Workflow).copy(user = user)
                 }
+
                 executeWorkflow(workflow)
             }
         }

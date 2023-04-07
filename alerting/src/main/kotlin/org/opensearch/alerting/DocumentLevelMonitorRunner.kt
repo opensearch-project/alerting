@@ -130,6 +130,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 }
             }
 
+            // Map of document ids per index when monitor is workflow delegate and has chained findings
+            val matchingDocIdsPerIndex = workflowRunContext?.matchingDocIdsPerIndex
+
             indices.forEach { indexName ->
                 // Prepare lastRunContext for each index
                 val indexLastRunContext = lastRunContext.getOrPut(indexName) {
@@ -164,15 +167,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 // Prepare DocumentExecutionContext for each index
                 val docExecutionContext = DocumentExecutionContext(queries, indexLastRunContext, indexUpdatedRunContext)
 
-                // If monitor execution is triggered from a workflow
-                val indexToRelatedDocIdsMap = workflowRunContext?.matchingDocIdsPerIndex
-
                 val matchingDocs = getMatchingDocs(
                     monitor,
                     monitorCtx,
                     docExecutionContext,
                     indexName,
-                    indexToRelatedDocIdsMap?.get(indexName)
+                    matchingDocIdsPerIndex?.get(indexName)
                 )
 
                 if (matchingDocs.isNotEmpty()) {

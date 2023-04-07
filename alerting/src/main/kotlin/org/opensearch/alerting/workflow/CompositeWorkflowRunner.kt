@@ -8,9 +8,9 @@ package org.opensearch.alerting.workflow
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.BucketLevelMonitorRunner
 import org.opensearch.alerting.DocumentLevelMonitorRunner
-import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.MonitorRunnerExecutionContext
 import org.opensearch.alerting.QueryLevelMonitorRunner
+import org.opensearch.alerting.WorkflowMetadataService
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.WorkflowRunResult
 import org.opensearch.alerting.util.AlertingException
@@ -23,6 +23,7 @@ import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
 import java.time.Instant
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 
 object CompositeWorkflowRunner : WorkflowRunner() {
@@ -37,9 +38,17 @@ object CompositeWorkflowRunner : WorkflowRunner() {
     ): WorkflowRunResult {
         val workflowExecutionStartTime = Instant.now()
 
-        val executionId = workflow.id.plus(LocalDateTime.now()).plus(UUID.randomUUID().toString())
+        val isTempWorkflow = dryRun || workflow.id == Workflow.NO_ID
+
+        val executionId = generateExecutionId(isTempWorkflow, workflow)
+
+        val (workflowMetadata, _) = WorkflowMetadataService.getOrCreateWorkflowMetadata(
+            workflow = workflow,
+            skipIndex = isTempWorkflow,
+            executionId = executionId
+        )
+
         var workflowResult = WorkflowRunResult(mutableListOf(), workflowExecutionStartTime, null, executionId)
-        val isTempMonitor = dryRun || workflow.id == Workflow.NO_ID
 
         logger.debug("Workflow ${workflow.id} in $executionId execution is running")
         val delegates = (workflow.inputs[0] as CompositeInput).sequence.delegates.sortedBy { it.order }
@@ -48,17 +57,11 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         try {
             monitors = monitorCtx.workflowService!!.getMonitorsById(delegates.map { it.monitorId }, delegates.size)
         } catch (e: Exception) {
-            logger.error("Failed to execute workflow. Error: ${e.message}")
+            logger.error("Failed getting workflow delegates. Error: ${e.message}", e)
             return workflowResult.copy(error = AlertingException.wrap(e))
         }
         // Validate the monitors size
         validateMonitorSize(delegates, monitors, workflow)
-
-        val (workflowMetadata, _) = MonitorMetadataService.getOrCreateWorkflowMetadata(
-            workflow = workflow,
-            skipIndex = isTempMonitor,
-            executionId = executionId
-        )
 
         val monitorsById = monitors.associateBy { it.id }
         val resultList = mutableListOf<MonitorRunResult<*>>()
@@ -80,12 +83,12 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 try {
                     indexToDocIds = monitorCtx.workflowService!!.getFindingDocIdsByExecutionId(chainedMonitor, executionId)
                 } catch (e: Exception) {
-                    logger.error("Failed to execute workflow. Error: ${e.message}")
+                    logger.error("Failed to execute workflow. Error: ${e.message}", e)
                     return workflowResult.copy(error = AlertingException.wrap(e))
                 }
             }
 
-            val workflowRunContext = WorkflowRunContext(workflow.id, delegate.chainedMonitorFindings?.monitorId, executionId, indexToDocIds)
+            val workflowRunContext = WorkflowRunContext(workflowMetadata.id, delegate.chainedMonitorFindings?.monitorId, executionId, indexToDocIds)
 
             var delegateRunResult: MonitorRunResult<*>?
             try {
@@ -122,7 +125,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                     )
                 }
             } catch (ex: Exception) {
-                logger.error("Error executing workflow delegate. Error: ${ex.message}")
+                logger.error("Error executing workflow delegate. Error: ${ex.message}", ex)
                 lastErrorDelegateRun = AlertingException.wrap(ex)
                 continue
             }
@@ -130,14 +133,22 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         }
         logger.debug("Workflow ${workflow.id} in $executionId finished")
         // Update metadata only if the workflow is not temp
-        if (!isTempMonitor) {
-            MonitorMetadataService.upsertWorkflowMetadata(
+        if (!isTempWorkflow) {
+            WorkflowMetadataService.upsertWorkflowMetadata(
                 workflowMetadata.copy(latestRunTime = workflowExecutionStartTime, latestExecutionId = executionId),
                 true
             )
         }
 
         return workflowResult.copy(workflowRunResult = resultList, executionEndTime = Instant.now(), error = lastErrorDelegateRun)
+    }
+
+    private fun generateExecutionId(
+        isTempWorkflow: Boolean,
+        workflow: Workflow,
+    ): String {
+        val randomPart = "${LocalDateTime.now(ZoneOffset.UTC)}${UUID.randomUUID()}"
+        return if (isTempWorkflow) randomPart else workflow.id.plus(randomPart)
     }
 
     private fun validateMonitorSize(
@@ -147,6 +158,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
     ) {
         if (delegates.size != monitors.size) {
             val diffMonitorIds = delegates.map { it.monitorId }.minus(monitors.map { it.id }.toSet()).joinToString()
+            logger.error("Delegate monitors don't exist $diffMonitorIds for the workflow $workflow.id")
             throw AlertingException.wrap(
                 IllegalStateException("Delegate monitors don't exist $diffMonitorIds for the workflow $workflow.id")
             )

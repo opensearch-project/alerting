@@ -1000,6 +1000,46 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
         }
     }
 
+    fun `test create workflow delegate and chained finding monitor different indices failure`() {
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+
+        val docMonitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+        val docMonitorResponse = createMonitor(docMonitor)!!
+
+        val index1 = "$index-1"
+        createTestIndex(index1)
+
+        val docLevelInput1 = DocLevelMonitorInput(
+            "description", listOf(index1), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
+        )
+
+        val docMonitor1 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput1),
+            triggers = listOf(trigger)
+        )
+        val docMonitorResponse1 = createMonitor(docMonitor1)!!
+
+        val workflow = randomWorkflow(
+            monitorIds = listOf(docMonitorResponse1.id, docMonitorResponse.id)
+        )
+        try {
+            upsertWorkflow(workflow)
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning IndexWorkflow Action error ",
+                    it.contains("Delegate monitor and it's chained finding monitor must query the same indices")
+                )
+            }
+        }
+    }
+
     fun `test create workflow when monitor index not initialized failure`() {
         val delegates = listOf(
             Delegate(1, "monitor-1")

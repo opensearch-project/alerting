@@ -125,6 +125,25 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         )
     }
 
+    protected fun createTestIndex(index: String) {
+        val mapping = XContentFactory.jsonBuilder()
+        mapping.startObject()
+            .startObject("properties")
+            .startObject("test_strict_date_time")
+            .field("type", "date")
+            .field("format", "strict_date_time")
+            .endObject()
+            .startObject("test_field_1")
+            .field("type", "keyword")
+            .endObject()
+            .endObject()
+            .endObject()
+
+        createIndex(
+            index, Settings.EMPTY, mapping
+        )
+    }
+
     private fun createIndex(
         index: String?,
         settings: Settings?,
