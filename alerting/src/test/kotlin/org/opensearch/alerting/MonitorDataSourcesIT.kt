@@ -339,7 +339,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val findings = searchFindings(id, customFindingsIndex)
         assertEquals("Findings saved for test monitor", 1, findings.size)
         assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
-        assertEquals("Didn't match all 8 queries", 9, findings[0].docLevelQueries.size)
+        assertEquals("Didn't match all 9 queries", 9, findings[0].docLevelQueries.size)
     }
 
     fun `test execute monitor with non-flattened json doc as source`() {
