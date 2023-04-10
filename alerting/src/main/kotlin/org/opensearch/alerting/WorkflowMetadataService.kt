@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import org.apache.logging.log4j.LogManager
+import org.opensearch.OpenSearchException
 import org.opensearch.action.DocWriteRequest
 import org.opensearch.action.DocWriteResponse
 import org.opensearch.action.get.GetRequest
@@ -95,6 +96,12 @@ object WorkflowMetadataService :
             }
             return metadata
         } catch (e: Exception) {
+            // If the update is set to false and id is set conflict exception will be thrown
+            if (e is OpenSearchException && e.status() == RestStatus.CONFLICT && !updating) {
+                log.debug("Metadata already exist. Instead of creating new, updating existing metadata will be performed")
+                return upsertWorkflowMetadata(metadata, true)
+            }
+            log.error("Error saving metadata", e)
             throw AlertingException.wrap(e)
         }
     }
