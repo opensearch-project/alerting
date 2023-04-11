@@ -12,9 +12,8 @@ import org.opensearch.alerting.action.GetDestinationsResponse
 import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.destination.Destination
-import org.opensearch.alerting.opensearchapi.InjectorContextElement
+import org.opensearch.alerting.opensearchapi.setUserInfoInThreadContext
 import org.opensearch.alerting.opensearchapi.suspendUntil
-import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
 import org.opensearch.alerting.util.destinationmigration.NotificationActionConfigs
@@ -62,10 +61,11 @@ abstract class MonitorRunner {
                 throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
             }
             if (!dryrun) {
-                val roles = MonitorRunnerService.getRolesForMonitor(monitor)
-                withClosableContext(
-                    InjectorContextElement(monitor.id, monitorCtx.settings!!, monitorCtx.threadPool!!.threadContext, roles)
-                ) {
+                val client = monitorCtx.client
+                client!!.threadPool().threadContext.stashContext().use {
+                    if (monitor.user != null) {
+                        monitor.user!!.setUserInfoInThreadContext(client.threadPool().threadContext)
+                    }
                     actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
                         action,
                         monitorCtx,

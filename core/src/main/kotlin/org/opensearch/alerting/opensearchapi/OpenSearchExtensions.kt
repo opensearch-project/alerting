@@ -21,6 +21,7 @@ import org.opensearch.common.util.concurrent.ThreadContext
 import org.opensearch.common.util.concurrent.ThreadContext.StoredContext
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.InjectSecurity
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.notifications.NotificationsPluginInterface
@@ -32,6 +33,7 @@ import org.opensearch.rest.RestStatus.BAD_GATEWAY
 import org.opensearch.rest.RestStatus.GATEWAY_TIMEOUT
 import org.opensearch.rest.RestStatus.SERVICE_UNAVAILABLE
 import org.opensearch.search.builder.SearchSourceBuilder
+import java.util.StringJoiner
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -217,5 +219,15 @@ suspend fun <T> withClosableContext(
         return withContext(context) { block() }
     } finally {
         context.rolesInjectorHelper.close()
+    }
+}
+
+fun User.setUserInfoInThreadContext(threadContext: ThreadContext) {
+    if (threadContext.getTransient<Any>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT) == null) {
+        val joiner = StringJoiner("|")
+        joiner.add(name)
+        joiner.add(java.lang.String.join(",", backendRoles))
+        joiner.add(java.lang.String.join(",", roles))
+        threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, joiner.toString())
     }
 }
