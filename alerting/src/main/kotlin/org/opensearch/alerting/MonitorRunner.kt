@@ -12,8 +12,9 @@ import org.opensearch.alerting.action.GetDestinationsResponse
 import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.destination.Destination
-import org.opensearch.alerting.opensearchapi.setUserInfoInThreadContext
+import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
 import org.opensearch.alerting.util.destinationmigration.NotificationActionConfigs
@@ -64,15 +65,22 @@ abstract class MonitorRunner {
             if (!dryrun) {
                 val client = monitorCtx.client
                 client!!.threadPool().threadContext.stashContext().use {
-                    if (monitor.user != null) {
-                        monitor.user!!.setUserInfoInThreadContext(client.threadPool().threadContext)
+                    withClosableContext(
+                        InjectorContextElement(
+                            monitor.id,
+                            monitorCtx.settings!!,
+                            monitorCtx.threadPool!!.threadContext,
+                            monitor.user?.roles,
+                            monitor.user
+                        )
+                    ) {
+                        actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
+                            action,
+                            monitorCtx,
+                            actionOutput[Action.SUBJECT],
+                            actionOutput[Action.MESSAGE]!!
+                        )
                     }
-                    actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
-                        action,
-                        monitorCtx,
-                        actionOutput[Action.SUBJECT],
-                        actionOutput[Action.MESSAGE]!!
-                    )
                 }
             }
             ActionRunResult(action.id, action.name, actionOutput, false, MonitorRunnerService.currentTime(), null)
