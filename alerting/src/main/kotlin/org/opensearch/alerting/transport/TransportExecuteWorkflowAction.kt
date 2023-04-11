@@ -5,7 +5,6 @@
 
 package org.opensearch.alerting.transport
 
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -38,7 +37,6 @@ import org.opensearch.transport.TransportService
 import java.time.Instant
 
 private val log = LogManager.getLogger(TransportExecuteWorkflowAction::class.java)
-private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
 class TransportExecuteWorkflowAction @Inject constructor(
     transportService: TransportService,
