@@ -119,15 +119,15 @@ object MonitorMetadataService :
         monitor: Monitor,
         createWithRunContext: Boolean = true,
         skipIndex: Boolean = false,
-        workflowId: String? = null
+        workflowMetadataId: String? = null
     ): Pair<MonitorMetadata, Boolean> {
         try {
             val created = true
-            val metadata = getMetadata(monitor, workflowId)
+            val metadata = getMetadata(monitor, workflowMetadataId)
             return if (metadata != null) {
                 metadata to !created
             } else {
-                val newMetadata = createNewMetadata(monitor, createWithRunContext = createWithRunContext, workflowId)
+                val newMetadata = createNewMetadata(monitor, createWithRunContext = createWithRunContext, workflowMetadataId)
                 if (skipIndex) {
                     newMetadata to created
                 } else {
@@ -139,9 +139,9 @@ object MonitorMetadataService :
         }
     }
 
-    suspend fun getMetadata(monitor: Monitor, workflowId: String? = null): MonitorMetadata? {
+    suspend fun getMetadata(monitor: Monitor, workflowMetadataId: String? = null): MonitorMetadata? {
         try {
-            val metadataId = MonitorMetadata.getId(monitor, workflowId)
+            val metadataId = MonitorMetadata.getId(monitor, workflowMetadataId)
             val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, metadataId).routing(monitor.id)
 
             val getResponse: GetResponse = client.suspendUntil { get(getRequest, it) }
@@ -186,7 +186,7 @@ object MonitorMetadataService :
         }
     }
 
-    private suspend fun createNewMetadata(monitor: Monitor, createWithRunContext: Boolean, workflowId: String? = null): MonitorMetadata {
+    private suspend fun createNewMetadata(monitor: Monitor, createWithRunContext: Boolean, workflowMetadataId: String? = null): MonitorMetadata {
         val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
             (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
         } else null
@@ -195,7 +195,7 @@ object MonitorMetadataService :
                 createFullRunContext(monitorIndex)
             } else emptyMap()
         return MonitorMetadata(
-            id = MonitorMetadata.getId(monitor, workflowId),
+            id = MonitorMetadata.getId(monitor, workflowMetadataId),
             seqNo = SequenceNumbers.UNASSIGNED_SEQ_NO,
             primaryTerm = SequenceNumbers.UNASSIGNED_PRIMARY_TERM,
             monitorId = monitor.id,

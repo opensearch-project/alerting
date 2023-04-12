@@ -18,6 +18,7 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Collections
+import java.util.UUID
 
 class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
 
@@ -729,6 +730,26 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
                     it.contains("Delegates list can not be empty.")
+                )
+            }
+        }
+    }
+
+    fun `test create workflow with 26 delegates failure`() {
+        val monitorsIds = mutableListOf<String>()
+        for (i in 0..25) {
+            monitorsIds.add(UUID.randomUUID().toString())
+        }
+        val workflow = randomWorkflow(
+            monitorIds = monitorsIds
+        )
+        try {
+            upsertWorkflow(workflow)
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning IndexWorkflow Action error ",
+                    it.contains("Delegates list can not be larger then 25.")
                 )
             }
         }

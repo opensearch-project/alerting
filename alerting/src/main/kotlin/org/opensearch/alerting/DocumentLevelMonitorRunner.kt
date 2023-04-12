@@ -91,7 +91,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             monitor = monitor,
             createWithRunContext = false,
             skipIndex = isTempMonitor,
-            workflowRunContext?.workflowId
+            workflowRunContext?.workflowMetadataId
         )
 
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput

@@ -88,7 +88,13 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 }
             }
 
-            val workflowRunContext = WorkflowRunContext(workflowMetadata.id, delegate.chainedMonitorFindings?.monitorId, executionId, indexToDocIds)
+            val workflowRunContext = WorkflowRunContext(
+                workflowId = workflowMetadata.workflowId,
+                workflowMetadataId = workflowMetadata.id,
+                chainedMonitorId = delegate.chainedMonitorFindings?.monitorId,
+                executionId = executionId,
+                matchingDocIdsPerIndex = indexToDocIds
+            )
 
             var delegateRunResult: MonitorRunResult<*>?
             try {
