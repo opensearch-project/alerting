@@ -6,10 +6,8 @@
 package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.action.ActionListener
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionResponse
-import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetEmailAccountAction
@@ -59,7 +57,6 @@ import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
 import org.opensearch.alerting.util.DocLevelMonitorQueries
-import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
 import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
@@ -248,21 +245,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             xContentRegistry,
             settings
         )
-
-        // Updating the scheduled job index at node startup if the config index exists
-        if (scheduledJobIndices.scheduledJobIndexExists() && !IndexUtils.scheduledJobIndexUpdated) {
-            IndexUtils.updateIndexMapping(
-                ScheduledJob.SCHEDULED_JOBS_INDEX,
-                ScheduledJobIndices.scheduledJobMappings(), this.clusterService.state(), client.admin().indices(),
-                object : ActionListener<AcknowledgedResponse> {
-                    override fun onResponse(response: AcknowledgedResponse) {
-                    }
-                    override fun onFailure(t: Exception) {
-                        logger.error("Failed to update config index schema", t)
-                    }
-                }
-            )
-        }
 
         return listOf(sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator)
     }
