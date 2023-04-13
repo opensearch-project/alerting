@@ -228,23 +228,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     }
 
     suspend fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant, dryrun: Boolean): MonitorRunResult<*> {
-
-        // Updating the scheduled job index at the start of monitor execution runs for when there is an upgrade the the schema mapping
-        // has not been updated.
-        if (!IndexUtils.scheduledJobIndexUpdated && monitorCtx.clusterService != null && monitorCtx.client != null) {
-            IndexUtils.updateIndexMapping(
-                ScheduledJob.SCHEDULED_JOBS_INDEX,
-                ScheduledJobIndices.scheduledJobMappings(), monitorCtx.clusterService!!.state(), monitorCtx.client!!.admin().indices(),
-                object : ActionListener<AcknowledgedResponse> {
-                    override fun onResponse(response: AcknowledgedResponse) {
-                    }
-                    override fun onFailure(t: Exception) {
-                        logger.error("Failed to update config index schema", AlertingException.wrap(t))
-                    }
-                }
-            )
-        }
-
         val monitor = job as Monitor
         val runResult = if (monitor.isBucketLevelMonitor()) {
             BucketLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
