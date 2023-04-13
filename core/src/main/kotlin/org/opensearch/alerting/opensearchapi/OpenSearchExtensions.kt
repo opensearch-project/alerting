@@ -5,10 +5,6 @@
 
 package org.opensearch.alerting.opensearchapi
 
-import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCoroutine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ThreadContextElement
 import kotlinx.coroutines.delay
@@ -35,6 +31,10 @@ import org.opensearch.rest.RestStatus.BAD_GATEWAY
 import org.opensearch.rest.RestStatus.GATEWAY_TIMEOUT
 import org.opensearch.rest.RestStatus.SERVICE_UNAVAILABLE
 import org.opensearch.search.builder.SearchSourceBuilder
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
 
 /** Convert an object to maps and lists representation */
 fun ToXContent.convertToMap(): Map<String, Any> {
