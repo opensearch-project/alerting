@@ -28,6 +28,8 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.alerting.action.SearchMonitorAction
+import org.opensearch.alerting.action.SearchMonitorRequest
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -586,13 +588,16 @@ class TransportIndexWorkflowAction @Inject constructor(
         val monitorIds = compositeInput.sequence.delegates.stream().map { it.monitorId }.collect(Collectors.toList())
         val query = QueryBuilders.boolQuery().filter(QueryBuilders.termsQuery("_id", monitorIds))
         val searchSource = SearchSourceBuilder().query(query)
-        val monitorSearchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
-        // TODO - Add secure tests once the Rest Action is created
+        val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
+
         if (user != null && filterByEnabled) {
-            addFilter(user, monitorSearchRequest.source(), "monitor.user.backend_roles.keyword")
+            addFilter(user, searchRequest.source(), "monitor.user.backend_roles.keyword")
         }
 
-        client.search(
+        val monitorSearchRequest = SearchMonitorRequest(searchRequest)
+
+        client.execute(
+            SearchMonitorAction.INSTANCE,
             monitorSearchRequest,
             object : ActionListener<SearchResponse> {
                 override fun onResponse(response: SearchResponse) {
@@ -636,7 +641,9 @@ class TransportIndexWorkflowAction @Inject constructor(
 
                 override fun onFailure(e: Exception) {
                     log.error("Error accessing the workflow monitors", e)
-                    if (e is IndexNotFoundException) {
+                    val unwrappedCause = ExceptionsHelper.unwrapCause(e) as Exception
+
+                    if (unwrappedCause.message?.contains("Configured indices are not found") == true) {
                         actionListener.onFailure(
                             OpenSearchStatusException(
                                 "Monitors not found",
