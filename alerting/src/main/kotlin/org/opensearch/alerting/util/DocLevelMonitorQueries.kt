@@ -117,38 +117,34 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
     ) {
         // If node contains "properties" property then it is internal(non-leaf) node
         log.debug("Node in traverse: $node")
-        if (node.containsKey(PROPERTIES)) {
-            return traverseMappingsAndUpdate(node.get(PROPERTIES) as MutableMap<String, Any>, currentPath, processLeafFn, flattenPaths)
-        } else {
-            // newNodes will hold list of updated leaf properties
-            var newNodes = ArrayList<Triple<String, String, Any>>(node.size)
-            node.entries.forEach {
-                // Compute full path relative to root
-                val fullPath = if (currentPath.isEmpty()) it.key
-                else "$currentPath.${it.key}"
-                val nodeProps = it.value as MutableMap<String, Any>
-                // If it has type property and type is not "nested" then this is a leaf
-                if (nodeProps.containsKey(TYPE) && nodeProps[TYPE] != NESTED) {
-                    // At this point we know full path of node, so we add it to output array
-                    flattenPaths.add(fullPath)
-                    // Calls processLeafFn and gets old node name, new node name and new properties of node.
-                    // This is all information we need to update this node
-                    val (oldName, newName, props) = processLeafFn(it.key, it.value as MutableMap<String, Any>)
-                    newNodes.add(Triple(oldName, newName, props))
-                } else {
-                    // Internal(non-leaf) node - visit children
-                    traverseMappingsAndUpdate(nodeProps[PROPERTIES] as MutableMap<String, Any>, fullPath, processLeafFn, flattenPaths)
-                }
+        // newNodes will hold list of updated leaf properties
+        var newNodes = ArrayList<Triple<String, String, Any>>(node.size)
+        node.entries.forEach {
+            // Compute full path relative to root
+            val fullPath = if (currentPath.isEmpty()) it.key
+            else "$currentPath.${it.key}"
+            val nodeProps = it.value as MutableMap<String, Any>
+            // If it has type property and type is not "nested" then this is a leaf
+            if (nodeProps.containsKey(TYPE) && nodeProps[TYPE] != NESTED) {
+                // At this point we know full path of node, so we add it to output array
+                flattenPaths.add(fullPath)
+                // Calls processLeafFn and gets old node name, new node name and new properties of node.
+                // This is all information we need to update this node
+                val (oldName, newName, props) = processLeafFn(it.key, it.value as MutableMap<String, Any>)
+                newNodes.add(Triple(oldName, newName, props))
+            } else {
+                // Internal(non-leaf) node - visit children
+                traverseMappingsAndUpdate(nodeProps[PROPERTIES] as MutableMap<String, Any>, fullPath, processLeafFn, flattenPaths)
             }
-            // Here we can update all processed leaves in tree
-            newNodes.forEach {
-                // If we renamed leaf, we have to remove it first
-                if (it.first != it.second) {
-                    node.remove(it.first)
-                }
-                // Put new properties of leaf
-                node.put(it.second, it.third)
+        }
+        // Here we can update all processed leaves in tree
+        newNodes.forEach {
+            // If we renamed leaf, we have to remove it first
+            if (it.first != it.second) {
+                node.remove(it.first)
             }
+            // Put new properties of leaf
+            node.put(it.second, it.third)
         }
     }
 

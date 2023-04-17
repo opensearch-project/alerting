@@ -82,6 +82,126 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(getAlertsResponse.alerts.size == 0)
     }
 
+    fun `test mappings parsing`() {
+
+        val index1 = "index_123"
+        val index2 = "index_456"
+        val index3 = "index_789"
+        val index4 = "index_012"
+        val q1 = DocLevelQuery(query = "properties:\"abcd\"", name = "1")
+        val q2 = DocLevelQuery(query = "type.properties:\"abcd\"", name = "2")
+        val q3 = DocLevelQuery(query = "type.something.properties:\"abcd\"", name = "3")
+        val q4 = DocLevelQuery(query = "type.something.properties.lastone:\"abcd\"", name = "4")
+
+        createIndex(index1, Settings.EMPTY)
+        createIndex(index2, Settings.EMPTY)
+        createIndex(index3, Settings.EMPTY)
+        createIndex(index4, Settings.EMPTY)
+
+        val m1 = """{
+                "properties": {
+                  "properties": {
+                    "type": "keyword"
+                  }
+                }
+        }
+        """.trimIndent()
+        client().admin().indices().putMapping(PutMappingRequest(index1).source(m1, XContentType.JSON)).get()
+
+        val m2 = """{
+                "properties": {
+                  "type": {
+                    "properties": {
+                      "properties": { "type": "keyword" }
+                    }
+                  }
+                }
+        }
+        """.trimIndent()
+        client().admin().indices().putMapping(PutMappingRequest(index2).source(m2, XContentType.JSON)).get()
+
+        val m3 = """{
+                "properties": {
+                  "type": {
+                    "properties": {
+                      "something": {
+                        "properties" : {
+                          "properties": { "type": "keyword" }
+                        }
+                      }
+                    }
+                  }
+                }
+        }
+        """.trimIndent()
+        client().admin().indices().putMapping(PutMappingRequest(index3).source(m3, XContentType.JSON)).get()
+
+        val m4 = """{
+                "properties": {
+                  "type": {
+                    "properties": {
+                      "something": {
+                        "properties" : {
+                          "properties": { 
+                            "properties": {
+                              "lastone": { "type": "keyword" }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+        }
+        """.trimIndent()
+        client().admin().indices().putMapping(PutMappingRequest(index4).source(m4, XContentType.JSON)).get()
+
+        val docLevelInput = DocLevelMonitorInput(
+            "description",
+            listOf(index1, index2, index3, index4),
+            listOf(q1, q2, q3, q4)
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+        val monitorResponse = createMonitor(monitor)
+
+        val testDoc1 = """{
+            "properties": "abcd"
+        }"""
+        indexDoc(index1, "1", testDoc1)
+        val testDoc2 = """{
+            "type.properties": "abcd"
+        }"""
+        indexDoc(index2, "1", testDoc2)
+        val testDoc3 = """{
+            "type.something.properties": "abcd"
+        }"""
+        indexDoc(index3, "1", testDoc3)
+        val testDoc4 = """{
+            "type.something.properties.lastone": "abcd"
+        }"""
+        indexDoc(index4, "1", testDoc4)
+
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+        val id = monitorResponse.id
+        val executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        searchAlerts(id)
+        val table = Table("asc", "id", null, 1, 0, "")
+        var getAlertsResponse = client()
+            .execute(GetAlertsAction.INSTANCE, GetAlertsRequest(table, "ALL", "ALL", null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        val findings = searchFindings(id, ALL_FINDING_INDEX_PATTERN)
+        assertEquals("Findings saved for test monitor", 4, findings.size)
+    }
+
     fun `test execute monitor with non-flattened json doc as source`() {
         val docQuery1 = DocLevelQuery(query = "source.device.port:12345 OR source.device.hwd.id:12345", name = "3")
 
