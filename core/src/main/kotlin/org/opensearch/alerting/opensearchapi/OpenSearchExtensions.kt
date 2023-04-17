@@ -18,7 +18,6 @@ import org.opensearch.action.search.ShardSearchFailure
 import org.opensearch.client.OpenSearchClient
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.util.concurrent.ThreadContext
-import org.opensearch.common.util.concurrent.ThreadContext.StoredContext
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.InjectSecurity
@@ -171,28 +170,13 @@ suspend fun <T> NotificationsPluginInterface.suspendUntil(block: NotificationsPl
         })
     }
 
-/**
- * Store a [ThreadContext] and restore a [ThreadContext] when the coroutine resumes on a different thread.
- *
- * @param threadContext - a [ThreadContext] instance
- */
-class ElasticThreadContextElement(private val threadContext: ThreadContext) : ThreadContextElement<Unit> {
-
-    companion object Key : CoroutineContext.Key<ElasticThreadContextElement>
-    private var context: StoredContext = threadContext.newStoredContext(true)
-
-    override val key: CoroutineContext.Key<*>
-        get() = Key
-
-    override fun restoreThreadContext(context: CoroutineContext, oldState: Unit) {
-        this.context = threadContext.stashContext()
-    }
-
-    override fun updateThreadContext(context: CoroutineContext) = this.context.close()
-}
-
-class InjectorContextElement(id: String, settings: Settings, threadContext: ThreadContext, private val roles: List<String>?) :
-    ThreadContextElement<Unit> {
+class InjectorContextElement(
+    id: String,
+    settings: Settings,
+    threadContext: ThreadContext,
+    private val roles: List<String>?,
+    private val user: User? = null
+) : ThreadContextElement<Unit> {
 
     companion object Key : CoroutineContext.Key<InjectorContextElement>
     override val key: CoroutineContext.Key<*>
@@ -202,6 +186,8 @@ class InjectorContextElement(id: String, settings: Settings, threadContext: Thre
 
     override fun updateThreadContext(context: CoroutineContext) {
         rolesInjectorHelper.injectRoles(roles)
+        // This is from where plugins extract backend roles. It should be passed when calling APIs of other plugins
+        rolesInjectorHelper.injectUserInfo(user)
     }
 
     override fun restoreThreadContext(context: CoroutineContext, oldState: Unit) {

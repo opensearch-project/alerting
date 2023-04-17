@@ -24,6 +24,7 @@ import org.opensearch.alerting.util.destinationmigration.publishLegacyNotificati
 import org.opensearch.alerting.util.destinationmigration.sendNotification
 import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isTestAction
+import org.opensearch.alerting.util.use
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.Strings
 import org.opensearch.commons.alerting.model.Monitor
@@ -62,16 +63,24 @@ abstract class MonitorRunner {
                 throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
             }
             if (!dryrun) {
-                val roles = MonitorRunnerService.getRolesForMonitor(monitor)
-                withClosableContext(
-                    InjectorContextElement(monitor.id, monitorCtx.settings!!, monitorCtx.threadPool!!.threadContext, roles)
-                ) {
-                    actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
-                        action,
-                        monitorCtx,
-                        actionOutput[Action.SUBJECT],
-                        actionOutput[Action.MESSAGE]!!
-                    )
+                val client = monitorCtx.client
+                client!!.threadPool().threadContext.stashContext().use {
+                    withClosableContext(
+                        InjectorContextElement(
+                            monitor.id,
+                            monitorCtx.settings!!,
+                            monitorCtx.threadPool!!.threadContext,
+                            monitor.user?.roles,
+                            monitor.user
+                        )
+                    ) {
+                        actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
+                            action,
+                            monitorCtx,
+                            actionOutput[Action.SUBJECT],
+                            actionOutput[Action.MESSAGE]!!
+                        )
+                    }
                 }
             }
             ActionRunResult(action.id, action.name, actionOutput, false, MonitorRunnerService.currentTime(), null)
