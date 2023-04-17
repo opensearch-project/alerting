@@ -28,11 +28,11 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.master.AcknowledgedResponse
-import org.opensearch.alerting.action.SearchMonitorAction
-import org.opensearch.alerting.action.SearchMonitorRequest
 import org.opensearch.alerting.core.ScheduledJobIndices
+import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
@@ -74,6 +74,7 @@ import org.opensearch.rest.RestStatus
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
+import java.util.UUID
 import java.util.stream.Collectors
 
 private val log = LogManager.getLogger(TransportIndexWorkflowAction::class.java)
@@ -166,32 +167,40 @@ class TransportIndexWorkflowAction @Inject constructor(
             }
         }
 
-        validateMonitors(
-            transformedRequest,
-            user,
-            client,
-            object : ActionListener<AcknowledgedResponse> {
-                override fun onResponse(response: AcknowledgedResponse) {
-                    client.threadPool().threadContext.stashContext().use {
-                        IndexWorkflowHandler(client, actionListener, transformedRequest, user).resolveUserAndStart()
-                    }
-                }
+        scope.launch {
+            try {
+                validateMonitorAccess(
+                    transformedRequest,
+                    user,
+                    client,
+                    object : ActionListener<AcknowledgedResponse> {
+                        override fun onResponse(response: AcknowledgedResponse) {
+                            // Stash the context and start the workflow creation
+                            client.threadPool().threadContext.stashContext().use {
+                                IndexWorkflowHandler(client, actionListener, transformedRequest, user).resolveUserAndStart()
+                            }
+                        }
 
-                override fun onFailure(e: Exception) {
-                    log.error("Failed to create workflow", e)
-                    if (e is IndexNotFoundException) {
-                        actionListener.onFailure(
-                            OpenSearchStatusException(
-                                "Monitors not found",
-                                RestStatus.NOT_FOUND
-                            )
-                        )
-                    } else {
-                        actionListener.onFailure(e)
+                        override fun onFailure(e: Exception) {
+                            log.error("Error indexing workflow", e)
+                            actionListener.onFailure(e)
+                        }
                     }
+                )
+            } catch (e: Exception) {
+                log.error("Failed to create workflow", e)
+                if (e is IndexNotFoundException) {
+                    actionListener.onFailure(
+                        OpenSearchStatusException(
+                            "Monitors not found",
+                            RestStatus.NOT_FOUND
+                        )
+                    )
+                } else {
+                    actionListener.onFailure(e)
                 }
             }
-        )
+        }
     }
 
     inner class IndexWorkflowHandler(
@@ -578,7 +587,12 @@ class TransportIndexWorkflowAction @Inject constructor(
         }
     }
 
-    private fun validateMonitors(
+    /**
+     * Validates monitor and indices access
+     * 1. Validates the monitor access (if the filterByEnabled is set to true - adds backend role filter) as admin
+     * 2. Unstashes the context and checks if the user can access the monitor indices
+     */
+    private suspend fun validateMonitorAccess(
         request: IndexWorkflowRequest,
         user: User?,
         client: Client,
@@ -590,82 +604,70 @@ class TransportIndexWorkflowAction @Inject constructor(
         val searchSource = SearchSourceBuilder().query(query)
         val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
 
-        if (user != null && filterByEnabled) {
+        if (user != null && !isAdmin(user) && filterByEnabled) {
             addFilter(user, searchRequest.source(), "monitor.user.backend_roles.keyword")
         }
 
-        val monitorSearchRequest = SearchMonitorRequest(searchRequest)
+        val searchMonitorResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
 
-        client.execute(
-            SearchMonitorAction.INSTANCE,
-            monitorSearchRequest,
-            object : ActionListener<SearchResponse> {
-                override fun onResponse(response: SearchResponse) {
-                    if (response.isTimedOut) {
-                        throw OpenSearchException("Cannot determine that the $SCHEDULED_JOBS_INDEX index is healthy")
-                    }
-                    val monitors = mutableListOf<Monitor>()
-                    for (hit in response.hits) {
-                        XContentType.JSON.xContent().createParser(
-                            xContentRegistry,
-                            LoggingDeprecationHandler.INSTANCE, hit.sourceAsString
-                        ).use { hitsParser ->
-                            val monitor = ScheduledJob.parse(hitsParser, hit.id, hit.version) as Monitor
-                            monitors.add(monitor)
-                        }
-                    }
-                    if (monitors.isEmpty()) {
-                        actionListener.onFailure(
-                            AlertingException.wrap(
-                                OpenSearchStatusException(
-                                    "User doesn't have read permissions for one or more configured monitors ${monitorIds.joinToString()}",
-                                    RestStatus.FORBIDDEN
-                                )
-                            )
-                        )
-                        return
-                    }
-
-                    val compositeInput = request.workflow.inputs[0] as CompositeInput
-                    // Validate delegates and it's chained findings
-                    try {
-                        validateDelegateMonitorsExist(monitorIds, monitors)
-                        validateChainedMonitorFindingsMonitors(compositeInput.sequence.delegates, monitors)
-                    } catch (e: Exception) {
-                        actionListener.onFailure(e)
-                        return
-                    }
-                    val indices = getMonitorIndices(monitors)
-                    validateIndicesAccess(indices, client, actionListener)
-                }
-
-                override fun onFailure(e: Exception) {
-                    log.error("Error accessing the workflow monitors", e)
-                    val unwrappedCause = ExceptionsHelper.unwrapCause(e) as Exception
-
-                    if (unwrappedCause.message?.contains("Configured indices are not found") == true) {
-                        actionListener.onFailure(
-                            OpenSearchStatusException(
-                                "Monitors not found",
-                                RestStatus.NOT_FOUND
-                            )
-                        )
-                    } else {
-                        actionListener.onFailure(e)
-                    }
-                }
+        if (searchMonitorResponse.isTimedOut) {
+            throw OpenSearchException("Cannot determine that the $SCHEDULED_JOBS_INDEX index is healthy")
+        }
+        val monitors = mutableListOf<Monitor>()
+        for (hit in searchMonitorResponse.hits) {
+            XContentType.JSON.xContent().createParser(
+                xContentRegistry,
+                LoggingDeprecationHandler.INSTANCE, hit.sourceAsString
+            ).use { hitsParser ->
+                val monitor = ScheduledJob.parse(hitsParser, hit.id, hit.version) as Monitor
+                monitors.add(monitor)
             }
-        )
-    }
+        }
+        if (monitors.isEmpty()) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "User doesn't have read permissions for one or more configured monitors ${monitorIds.joinToString()}",
+                        RestStatus.FORBIDDEN
+                    )
+                )
+            )
+            return
+        }
+        // Validate delegates and it's chained findings
+        try {
+            validateDelegateMonitorsExist(monitorIds, monitors)
+            validateChainedMonitorFindingsMonitors(compositeInput.sequence.delegates, monitors)
+        } catch (e: Exception) {
+            actionListener.onFailure(e)
+            return
+        }
+        val indices = getMonitorIndices(monitors)
 
-    private fun validateIndicesAccess(
-        indices: MutableList<String>,
-        client: Client,
-        actionListener: ActionListener<AcknowledgedResponse>,
-    ) {
         val indicesSearchRequest = SearchRequest().indices(*indices.toTypedArray())
             .source(SearchSourceBuilder.searchSource().size(1).query(QueryBuilders.matchAllQuery()))
 
+        if (user == null) {
+            checkIndicesAccess(client, indicesSearchRequest, indices, actionListener)
+        } else {
+            // Unstash the context and check if user with specified roles has indices access
+            withClosableContext(
+                InjectorContextElement(user.name.plus(UUID.randomUUID().toString()), settings, client.threadPool().threadContext, user.roles)
+            ) {
+                checkIndicesAccess(client, indicesSearchRequest, indices, actionListener)
+            }
+        }
+    }
+
+    /**
+     * Checks if the client can access the given indices
+     */
+    private fun checkIndicesAccess(
+        client: Client,
+        indicesSearchRequest: SearchRequest?,
+        indices: MutableList<String>,
+        actionListener: ActionListener<AcknowledgedResponse>,
+    ) {
         client.search(
             indicesSearchRequest,
             object : ActionListener<SearchResponse> {
