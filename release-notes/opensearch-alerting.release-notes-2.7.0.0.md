@@ -17,4 +17,4 @@ Compatible with OpenSearch 2.7.0
 * Use latest common-utils snapshot. ([#858](https://github.com/opensearch-project/alerting/pull/858))
 
 ### Documentation
-* Added 2.7 release notes. ([#]())
+* Added 2.7 release notes. ([#864](https://github.com/opensearch-project/alerting/pull/864))
