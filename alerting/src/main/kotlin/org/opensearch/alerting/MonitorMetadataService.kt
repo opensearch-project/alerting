@@ -53,6 +53,9 @@ import org.opensearch.transport.RemoteTransportException
 
 private val log = LogManager.getLogger(MonitorMetadataService::class.java)
 
+private const val MAX_SEARCH_SIZE = 10000
+private val SEARCH_TIMEOUT = TimeValue.timeValueMinutes(5)
+
 object MonitorMetadataService :
     CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("MonitorMetadataService")) {
 
@@ -256,8 +259,8 @@ object MonitorMetadataService :
     }
 
     suspend fun getAllMetadataDocs(): List<MonitorMetadata> {
-        val size = 10000
-        val searchTimeout = TimeValue.timeValueMinutes(5)
+        val size = MAX_SEARCH_SIZE
+        val searchTimeout = SEARCH_TIMEOUT
 
         val allMonitorMetadataDocs = mutableListOf<MonitorMetadata>()
         var fromIndex = 0

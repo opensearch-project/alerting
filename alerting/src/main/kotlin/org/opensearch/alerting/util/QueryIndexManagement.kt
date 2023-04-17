@@ -35,6 +35,12 @@ import org.opensearch.threadpool.ThreadPool
 
 private val log = LogManager.getLogger(QueryIndexManagement::class.java)
 
+/**
+ * Runs a cleanup job every AlertingSettings#QUERY_INDEX_CLEANUP_PERIOD. Job will go through all MonitorMetadata docs and try to find
+ * mapped query indices for which all source indices are deleted.
+ * It will skip deleting query index if that index is writeIndex. This is to avoid race-condition with monitor execution
+ * and PUT/POST /monitors APIs
+ * */
 class QueryIndexManagement private constructor(
     settings: Settings,
     private val client: Client,
