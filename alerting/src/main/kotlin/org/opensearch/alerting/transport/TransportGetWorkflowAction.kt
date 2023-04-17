@@ -85,7 +85,21 @@ class TransportGetWorkflowAction @Inject constructor(
                                 xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                                 response.sourceAsBytesRef, XContentType.JSON
                             ).use { xcp ->
-                                workflow = ScheduledJob.parse(xcp, response.id, response.version) as Workflow
+                                val compositeMonitor = ScheduledJob.parse(xcp, response.id, response.version)
+                                if (compositeMonitor is Workflow) {
+                                    workflow = compositeMonitor
+                                } else {
+                                    log.error("Wrong monitor type returned")
+                                    actionListener.onFailure(
+                                        AlertingException.wrap(
+                                            OpenSearchStatusException(
+                                                "Workflow not found.",
+                                                RestStatus.NOT_FOUND
+                                            )
+                                        )
+                                    )
+                                    return
+                                }
 
                                 // security is enabled and filterby is enabled
                                 if (!checkUserPermissionsWithResource(
