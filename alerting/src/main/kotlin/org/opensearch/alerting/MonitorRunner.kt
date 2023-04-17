@@ -62,16 +62,24 @@ abstract class MonitorRunner {
                 throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
             }
             if (!dryrun) {
-                val roles = MonitorRunnerService.getRolesForMonitor(monitor)
-                withClosableContext(
-                    InjectorContextElement(monitor.id, monitorCtx.settings!!, monitorCtx.threadPool!!.threadContext, roles)
-                ) {
-                    actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
-                        action,
-                        monitorCtx,
-                        actionOutput[Action.SUBJECT],
-                        actionOutput[Action.MESSAGE]!!
-                    )
+                val client = monitorCtx.client
+                client!!.threadPool().threadContext.stashContext().use {
+                    withClosableContext(
+                        InjectorContextElement(
+                            monitor.id,
+                            monitorCtx.settings!!,
+                            monitorCtx.threadPool!!.threadContext,
+                            monitor.user?.roles,
+                            monitor.user
+                        )
+                    ) {
+                        actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
+                            action,
+                            monitorCtx,
+                            actionOutput[Action.SUBJECT],
+                            actionOutput[Action.MESSAGE]!!
+                        )
+                    }
                 }
             }
             ActionRunResult(action.id, action.name, actionOutput, false, MonitorRunnerService.currentTime(), null)
