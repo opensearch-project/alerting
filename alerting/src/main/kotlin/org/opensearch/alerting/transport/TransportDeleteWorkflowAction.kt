@@ -22,8 +22,10 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
+import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
@@ -53,6 +55,7 @@ import org.opensearch.rest.RestStatus
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
+import java.util.UUID
 
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 /**
@@ -64,7 +67,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
     val client: Client,
     actionFilters: ActionFilters,
     val clusterService: ClusterService,
-    settings: Settings,
+    val settings: Settings,
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<ActionRequest, DeleteWorkflowResponse>(
     AlertingActions.DELETE_WORKFLOW_ACTION_NAME, transportService, actionFilters, ::DeleteWorkflowRequest
@@ -149,7 +152,22 @@ class TransportDeleteWorkflowAction @Inject constructor(
 
                     val deleteResponse = deleteWorkflow(workflow)
                     if (deleteDelegateMonitors == true) {
-                        deleteMonitors(delegateMonitorIds, RefreshPolicy.IMMEDIATE)
+                        if (user == null) {
+                            deleteMonitors(delegateMonitorIds, RefreshPolicy.IMMEDIATE)
+                        } else {
+                            // Un-stash the context
+                            withClosableContext(
+                                InjectorContextElement(
+                                    user.name.plus(UUID.randomUUID().toString()),
+                                    settings,
+                                    client.threadPool().threadContext,
+                                    user.roles,
+                                    user
+                                )
+                            ) {
+                                deleteMonitors(delegateMonitorIds, RefreshPolicy.IMMEDIATE)
+                            }
+                        }
                     }
                     actionListener.onResponse(DeleteWorkflowResponse(deleteResponse.id, deleteResponse.version))
                 } else {

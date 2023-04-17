@@ -652,7 +652,13 @@ class TransportIndexWorkflowAction @Inject constructor(
         } else {
             // Unstash the context and check if user with specified roles has indices access
             withClosableContext(
-                InjectorContextElement(user.name.plus(UUID.randomUUID().toString()), settings, client.threadPool().threadContext, user.roles)
+                InjectorContextElement(
+                    user.name.plus(UUID.randomUUID().toString()),
+                    settings,
+                    client.threadPool().threadContext,
+                    user.roles,
+                    user
+                )
             ) {
                 checkIndicesAccess(client, indicesSearchRequest, indices, actionListener)
             }
