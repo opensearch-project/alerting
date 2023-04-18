@@ -823,6 +823,29 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         )
     }
 
+    fun `test delete monitor moves alerts then try to search alert by monitorId to find alert in history index`() {
+        client().updateSettings(ScheduledJobSettings.SWEEPER_ENABLED.key, true)
+        putAlertMappings()
+        val monitor = createRandomMonitor(true)
+        val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
+        refreshIndex("*")
+        val deleteResponse = client().makeRequest("DELETE", "$ALERTING_BASE_URI/${monitor.id}")
+        assertEquals("Delete request not successful", RestStatus.OK, deleteResponse.restStatus())
+
+        // Wait 5 seconds for event to be processed and alerts moved
+        Thread.sleep(5000)
+
+        val alerts = searchAlerts(monitor)
+        assertEquals("Active alert was not deleted", 0, alerts.size)
+
+        // Find alert by id and make sure it checks the history of alerts as well
+        val inputMap = HashMap<String, Any>()
+        inputMap["monitorId"] = monitor.id
+        val responseMap = getAlerts(inputMap).asMap()
+
+        assertEquals(1, responseMap["totalAlerts"])
+    }
+
     fun `test delete trigger moves alerts`() {
         client().updateSettings(ScheduledJobSettings.SWEEPER_ENABLED.key, true)
         putAlertMappings()
