@@ -8,6 +8,7 @@ package org.opensearch.alerting
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
 import org.opensearch.OpenSearchStatusException
+import org.opensearch.action.ActionListener
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.search.SearchAction
@@ -26,12 +27,16 @@ import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.client.Client
+import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.AlertingPluginInterface
+import org.opensearch.commons.alerting.action.PublishFindingsRequest
+import org.opensearch.commons.alerting.action.SubscribeFindingsResponse
 import org.opensearch.commons.alerting.model.ActionExecutionResult
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
@@ -342,6 +347,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         val finding = Finding(
             id = UUID.randomUUID().toString(),
             relatedDocIds = listOf(docIndex[0]),
+            correlatedDocIds = listOf(docIndex[0]),
             monitorId = monitor.id,
             monitorName = monitor.name,
             index = docIndex[1],
@@ -363,7 +369,30 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 monitorCtx.client!!.index(indexRequest, it)
             }
         }
+
+        try {
+            publishFinding(monitor, monitorCtx, finding)
+        } catch (e: Exception) {
+            // suppress exception
+        }
         return finding.id
+    }
+
+    private fun publishFinding(
+        monitor: Monitor,
+        monitorCtx: MonitorRunnerExecutionContext,
+        finding: Finding
+    ) {
+        val publishFindingsRequest = PublishFindingsRequest(monitor.id, finding)
+        AlertingPluginInterface.publishFinding(
+            monitorCtx.client!! as NodeClient,
+            publishFindingsRequest,
+            object : ActionListener<SubscribeFindingsResponse> {
+                override fun onResponse(response: SubscribeFindingsResponse) {}
+
+                override fun onFailure(e: Exception) {}
+            }
+        )
     }
 
     private suspend fun updateLastRunContext(
