@@ -370,7 +370,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             "test_field.some_other_field" : "us-west-2",
             "f1.type.f2.f3" : "world",
             "f1.type.f4" : "hello",
-            "type" : "some type"
+            "type" : "some type",
+            "properties": 123
         }"""
         indexDoc(index, "1", testDoc)
         client().admin().indices().putMapping(
@@ -397,7 +398,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val findings = searchFindings(id, customFindingsIndex)
         assertEquals("Findings saved for test monitor", 1, findings.size)
         assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
-        assertEquals("Didn't match all 8 queries", 8, findings[0].docLevelQueries.size)
+        assertEquals("Didn't match all 9 queries", 9, findings[0].docLevelQueries.size)
     }
 
     fun `test execute monitor with non-flattened json doc as source`() {
