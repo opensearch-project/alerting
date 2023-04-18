@@ -7,6 +7,7 @@ Compatible with OpenSearch 2.7.0
 ### Refactoring
 * Revert enabled field in source_to_query_index_mapping. ([#812](https://github.com/opensearch-project/alerting/pull/812))
 * Fixed xContent dependencies due to OSCore changes. ([#839](https://github.com/opensearch-project/alerting/pull/839))
+* Update config index schema if needed at the start of each monitor execution. ([#849](https://github.com/opensearch-project/alerting/pull/849))
 
 ### Bug Fixes
 * Issue with percolate query transforming documents with object type fields. ([#844](https://github.com/opensearch-project/alerting/issues/844))
