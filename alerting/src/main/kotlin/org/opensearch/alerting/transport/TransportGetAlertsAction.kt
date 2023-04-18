@@ -168,7 +168,10 @@ class TransportGetAlertsAction @Inject constructor(
                     alertIndex = getMonitorResponse.monitor!!.dataSources.alertsIndex
                 }
             }
-        return alertIndex
+        return if (alertIndex == AlertIndices.ALERT_INDEX)
+            AlertIndices.ALL_ALERT_INDEX_PATTERN
+        else
+            alertIndex
     }
 
     fun getAlerts(
