@@ -210,17 +210,27 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         val idQueryMap: Map<String, DocLevelQuery> = queries.associateBy { it.id }
 
         val triggerResults = mutableMapOf<String, DocumentLevelTriggerRunResult>()
-        monitor.triggers.forEach {
-            triggerResults[it.id] = runForEachDocTrigger(
-                monitorCtx,
-                monitorResult,
-                it as DocumentLevelTrigger,
-                monitor,
-                idQueryMap,
-                docsToQueries,
-                queryToDocIds,
-                dryrun
-            )
+        // If there are no triggers defined, we still want to generate findings
+        if (monitor.triggers.isEmpty()) {
+            if (dryrun == false && monitor.id != Monitor.NO_ID) {
+                docsToQueries.forEach {
+                    val triggeredQueries = it.value.map { queryId -> idQueryMap[queryId]!! }
+                    createFindings(monitor, monitorCtx, triggeredQueries, it.key, true)
+                }
+            }
+        } else {
+            monitor.triggers.forEach {
+                triggerResults[it.id] = runForEachDocTrigger(
+                    monitorCtx,
+                    monitorResult,
+                    it as DocumentLevelTrigger,
+                    monitor,
+                    idQueryMap,
+                    docsToQueries,
+                    queryToDocIds,
+                    dryrun
+                )
+            }
         }
 
         // Don't update monitor if this is a test monitor
