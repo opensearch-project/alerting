@@ -51,6 +51,15 @@
     },
     "timestamp": {
       "type": "long"
+    },
+    "correlated_doc_ids": {
+      "type" : "text",
+      "analyzer": "whitespace",
+      "fields" : {
+        "keyword" : {
+          "type" : "keyword"
+        }
+      }
     }
   }
 }
