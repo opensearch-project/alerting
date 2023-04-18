@@ -174,7 +174,10 @@ class TransportGetAlertsAction @Inject constructor(
                 }
             }
         }
-        return alertIndex
+        return if (alertIndex == AlertIndices.ALERT_INDEX)
+            AlertIndices.ALL_ALERT_INDEX_PATTERN
+        else
+            alertIndex
     }
 
     fun getAlerts(
