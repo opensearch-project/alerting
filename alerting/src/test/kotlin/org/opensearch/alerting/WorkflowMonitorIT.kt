@@ -482,6 +482,46 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
         }
     }
 
+    fun `test delete workflow keeping delegate monitor`() {
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+
+        val monitorResponse = createMonitor(monitor)!!
+
+        val workflowRequest = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id)
+        )
+        val workflowResponse = upsertWorkflow(workflowRequest)!!
+        val workflowId = workflowResponse.id
+        val getWorkflowResponse = getWorkflowById(id = workflowResponse.id)
+
+        assertNotNull(getWorkflowResponse)
+        assertEquals(workflowId, getWorkflowResponse.id)
+
+        deleteWorkflow(workflowId, false)
+        // Verify that the workflow is deleted
+        try {
+            getWorkflowById(workflowId)
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning GetWorkflow Action error ",
+                    it.contains("Workflow not found.")
+                )
+            }
+        }
+        // Verify that the monitor is not deleted
+        val existingDelegate = getMonitorResponse(monitorResponse.id)
+        assertNotNull(existingDelegate)
+    }
+
     fun `test delete workflow delegate monitor deleted`() {
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
@@ -572,6 +612,19 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
         val monitorsRunResults = executeWorkflowResponse.workflowRunResult.workflowRunResult
         assertEquals(2, monitorsRunResults.size)
 
+        val workflowMetadata = searchWorkflowMetadata(workflowId)
+        assertNotNull(workflowMetadata)
+
+        val monitorMetadataId1 = "${monitorResponse.id}-${workflowMetadata!!.id}"
+        val monitorMetadata1 = searchMonitorMetadata(monitorMetadataId1)
+        assertNotNull(monitorMetadata1)
+
+        val monitorMetadataId2 = "${monitorResponse2.id}-${workflowMetadata!!.id}"
+        val monitorMetadata2 = searchMonitorMetadata(monitorMetadataId2)
+        assertNotNull(monitorMetadata2)
+
+        assertFalse(monitorMetadata1!!.id == monitorMetadata2!!.id)
+
         deleteWorkflow(workflowId, true)
         // Verify that the workflow is deleted
         try {
@@ -595,9 +648,31 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
                 )
             }
         }
+        // Verify that the monitors metadata are deleted
+        try {
+            searchMonitorMetadata(monitorMetadataId1)
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning GetMonitor Action error ",
+                    it.contains("List is empty")
+                )
+            }
+        }
+
+        try {
+            searchMonitorMetadata(monitorMetadataId2)
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning GetMonitor Action error ",
+                    it.contains("List is empty")
+                )
+            }
+        }
     }
 
-    fun `test delete workflow delegate monitor not deleted`() {
+    fun `test delete workflow delegate monitor part of another workflow not deleted`() {
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )

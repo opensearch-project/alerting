@@ -10,6 +10,7 @@ import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.alerting.action.ExecuteWorkflowResponse
+import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.WorkflowMetadata
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.json.JsonXContent
@@ -91,6 +92,35 @@ abstract class WorkflowSingleNodeTestCase : AlertingSingleNodeTestCase() {
                 }
             }
             workflowMetadata.copy(id = it.id)
+        }.first()
+    }
+
+    protected fun searchMonitorMetadata(
+        id: String,
+        indices: String = ScheduledJob.SCHEDULED_JOBS_INDEX,
+        refresh: Boolean = true,
+    ): MonitorMetadata? {
+        try {
+            if (refresh) refreshIndex(indices)
+        } catch (e: Exception) {
+            logger.warn("Could not refresh index $indices because: ${e.message}")
+            return null
+        }
+        val ssb = SearchSourceBuilder()
+        ssb.version(true)
+        ssb.query(TermQueryBuilder("_id", id))
+        val searchResponse = client().prepareSearch(indices).setRouting(id).setSource(ssb).get()
+
+        return searchResponse.hits.hits.map { it ->
+            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
+            lateinit var monitorMetadata: MonitorMetadata
+            while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
+                xcp.nextToken()
+                when (xcp.currentName()) {
+                    "metadata" -> monitorMetadata = MonitorMetadata.parse(xcp)
+                }
+            }
+            monitorMetadata.copy(id = it.id)
         }.first()
     }
 

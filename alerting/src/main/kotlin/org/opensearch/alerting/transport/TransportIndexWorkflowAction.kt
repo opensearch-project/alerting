@@ -604,7 +604,7 @@ class TransportIndexWorkflowAction @Inject constructor(
         val searchSource = SearchSourceBuilder().query(query)
         val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
 
-        if (user != null && filterByEnabled) {
+        if (user != null && !isAdmin(user) && filterByEnabled) {
             addFilter(user, searchRequest.source(), "monitor.user.backend_roles.keyword")
         }
 

@@ -125,7 +125,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         assertFindings(monitorResponse2.id, customFindingsIndex2, 1, 1, listOf("2"))
     }
 
-    fun `test execute workflows with shared monitor delegates`() {
+    fun `test execute workflows with shared monitor delegates verify metadata`() {
         val docQuery = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
@@ -186,7 +186,19 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
 
         assertAlerts(monitorResponse.id, customAlertsIndex, 2)
         assertFindings(monitorResponse.id, customFindingsIndex, 2, 2, listOf("1", "2"))
+        // Verify workflow and monitor delegate metadata
+        val workflowMetadata = searchWorkflowMetadata(id = workflowId)
+        assertNotNull("Workflow metadata not initialized", workflowMetadata)
+        assertEquals(
+            "Workflow metadata execution id not correct",
+            executeWorkflowResponse.workflowRunResult.executionId,
+            workflowMetadata!!.latestExecutionId
+        )
+        val monitorMetadataId = "${monitorResponse.id}-${workflowMetadata!!.id}"
+        val monitorMetadata = searchMonitorMetadata(monitorMetadataId)
+        assertNotNull(monitorMetadata)
 
+        // Execute second workflow
         val workflowId1 = workflowResponse1.id
         val executeWorkflowResponse1 = executeWorkflow(workflowById1, workflowId1, false)!!
         val monitorsRunResults1 = executeWorkflowResponse1.workflowRunResult.workflowRunResult
@@ -197,6 +209,20 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
 
         assertAlerts(monitorResponse.id, customAlertsIndex, 2)
         assertFindings(monitorResponse.id, customFindingsIndex, 4, 4, listOf("1", "2", "1", "2"))
+        // Verify workflow and monitor delegate metadata
+        val workflowMetadata1 = searchWorkflowMetadata(id = workflowId1)
+        assertNotNull("Workflow metadata not initialized", workflowMetadata1)
+        assertEquals(
+            "Workflow metadata execution id not correct",
+            executeWorkflowResponse1.workflowRunResult.executionId,
+            workflowMetadata1!!.latestExecutionId
+        )
+        val monitorMetadataId1 = "${monitorResponse.id}-${workflowMetadata1!!.id}"
+        val monitorMetadata1 = searchMonitorMetadata(monitorMetadataId1)
+        assertNotNull(monitorMetadata1)
+        // Verify that for two workflows two different doc level monitor metadata has been created
+        assertTrue(monitorMetadata!!.monitorId == monitorMetadata1!!.monitorId)
+        assertFalse(monitorMetadata!!.id == monitorMetadata1!!.id)
     }
 
     fun `test execute workflow verify workflow metadata`() {
@@ -248,6 +274,10 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
             executeWorkflowResponse.workflowRunResult.executionId,
             workflowMetadata!!.latestExecutionId
         )
+        val monitorMetadataId = "${monitorResponse.id}-${workflowMetadata!!.id}"
+        val monitorMetadata = searchMonitorMetadata(monitorMetadataId)
+        assertNotNull(monitorMetadata)
+
         // Second execution
         val executeWorkflowResponse1 = executeWorkflow(workflowById, workflowId, false)!!
         val monitorsRunResults1 = executeWorkflowResponse1.workflowRunResult.workflowRunResult
@@ -260,6 +290,10 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
             executeWorkflowResponse1.workflowRunResult.executionId,
             workflowMetadata1!!.latestExecutionId
         )
+        val monitorMetadataId1 = "${monitorResponse.id}-${workflowMetadata1!!.id}"
+        assertTrue(monitorMetadataId == monitorMetadataId1)
+        val monitorMetadata1 = searchMonitorMetadata(monitorMetadataId1)
+        assertNotNull(monitorMetadata1)
     }
 
     fun `test execute workflow dryrun verify workflow metadata not created`() {
