@@ -14,7 +14,11 @@ import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.rest.RestRequest
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Collections
+import java.util.UUID
 
 class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
 
@@ -526,6 +530,73 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
         }
     }
 
+    fun `test delete executed workflow with metadata deleted`() {
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
+        val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
+        val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor1 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput1),
+            triggers = listOf(trigger1)
+        )
+        val monitorResponse = createMonitor(monitor1)!!
+
+        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4")
+        val docLevelInput2 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery2))
+        val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor2 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput2),
+            triggers = listOf(trigger2),
+        )
+
+        val monitorResponse2 = createMonitor(monitor2)!!
+
+        var workflow = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id, monitorResponse2.id)
+        )
+        val workflowResponse = upsertWorkflow(workflow)!!
+        val workflowById = searchWorkflow(workflowResponse.id)
+        assertNotNull(workflowById)
+
+        var testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS))
+        // Matches monitor1
+        val testDoc1 = """{
+            "message" : "This is an error from IAD region",
+            "source.ip.v6.v2" : 16644, 
+            "test_strict_date_time" : "$testTime",
+            "test_field_1" : "us-west-2"
+        }"""
+        indexDoc(index, "1", testDoc1)
+
+        val workflowId = workflowResponse.id
+        val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
+        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.workflowRunResult
+        assertEquals(2, monitorsRunResults.size)
+
+        deleteWorkflow(workflowId, true)
+        // Verify that the workflow is deleted
+        try {
+            getWorkflowById(workflowId)
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning GetWorkflow Action error ",
+                    it.contains("Workflow not found.")
+                )
+            }
+        }
+        // Verify that the workflow metadata is deleted
+        try {
+            searchWorkflowMetadata(workflowId)
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning GetMonitor Action error ",
+                    it.contains("List is empty")
+                )
+            }
+        }
+    }
+
     fun `test delete workflow delegate monitor not deleted`() {
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
@@ -659,6 +730,26 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
                     it.contains("Delegates list can not be empty.")
+                )
+            }
+        }
+    }
+
+    fun `test create workflow with 26 delegates failure`() {
+        val monitorsIds = mutableListOf<String>()
+        for (i in 0..25) {
+            monitorsIds.add(UUID.randomUUID().toString())
+        }
+        val workflow = randomWorkflow(
+            monitorIds = monitorsIds
+        )
+        try {
+            upsertWorkflow(workflow)
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning IndexWorkflow Action error ",
+                    it.contains("Delegates list can not be larger then 25.")
                 )
             }
         }
@@ -925,6 +1016,46 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
                     it.contains("Query level monitor can't be part of chained findings")
+                )
+            }
+        }
+    }
+
+    fun `test create workflow delegate and chained finding monitor different indices failure`() {
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+
+        val docMonitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+        val docMonitorResponse = createMonitor(docMonitor)!!
+
+        val index1 = "$index-1"
+        createTestIndex(index1)
+
+        val docLevelInput1 = DocLevelMonitorInput(
+            "description", listOf(index1), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
+        )
+
+        val docMonitor1 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput1),
+            triggers = listOf(trigger)
+        )
+        val docMonitorResponse1 = createMonitor(docMonitor1)!!
+
+        val workflow = randomWorkflow(
+            monitorIds = listOf(docMonitorResponse1.id, docMonitorResponse.id)
+        )
+        try {
+            upsertWorkflow(workflow)
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning IndexWorkflow Action error ",
+                    it.contains("Delegate monitor and it's chained finding monitor must query the same indices")
                 )
             }
         }
