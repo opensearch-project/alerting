@@ -110,18 +110,24 @@ object MonitorMetadataService :
         }
     }
 
+    /**
+     * Document monitors are keeping the context of the last run.
+     * Since one monitor can be part of multiple workflows we need to be sure that execution of the current workflow
+     * doesn't interfere with the other workflows that are dependent on the given monitor
+     */
     suspend fun getOrCreateMetadata(
         monitor: Monitor,
         createWithRunContext: Boolean = true,
-        skipIndex: Boolean = false
+        skipIndex: Boolean = false,
+        workflowMetadataId: String? = null
     ): Pair<MonitorMetadata, Boolean> {
         try {
             val created = true
-            val metadata = getMetadata(monitor)
+            val metadata = getMetadata(monitor, workflowMetadataId)
             return if (metadata != null) {
                 metadata to !created
             } else {
-                val newMetadata = createNewMetadata(monitor, createWithRunContext = createWithRunContext)
+                val newMetadata = createNewMetadata(monitor, createWithRunContext = createWithRunContext, workflowMetadataId)
                 if (skipIndex) {
                     newMetadata to created
                 } else {
@@ -133,9 +139,9 @@ object MonitorMetadataService :
         }
     }
 
-    suspend fun getMetadata(monitor: Monitor): MonitorMetadata? {
+    suspend fun getMetadata(monitor: Monitor, workflowMetadataId: String? = null): MonitorMetadata? {
         try {
-            val metadataId = MonitorMetadata.getId(monitor)
+            val metadataId = MonitorMetadata.getId(monitor, workflowMetadataId)
             val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, metadataId).routing(monitor.id)
 
             val getResponse: GetResponse = client.suspendUntil { get(getRequest, it) }
@@ -165,21 +171,21 @@ object MonitorMetadataService :
             else null
             val runContext = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR)
                 createFullRunContext(monitorIndex, metadata.lastRunContext as MutableMap<String, MutableMap<String, Any>>)
-            else null
-            if (runContext != null) {
-                return metadata.copy(
+            } else null
+            return if (runContext != null) {
+                metadata.copy(
                     lastRunContext = runContext
                 )
             } else {
-                return metadata
+                metadata
             }
         } catch (e: Exception) {
             throw AlertingException.wrap(e)
         }
     }
 
-    private suspend fun createNewMetadata(monitor: Monitor, createWithRunContext: Boolean): MonitorMetadata {
-        val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR)
+    private suspend fun createNewMetadata(monitor: Monitor, createWithRunContext: Boolean, workflowMetadataId: String? = null): MonitorMetadata {
+        val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
             (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
         else null
         val runContext =
@@ -187,7 +193,7 @@ object MonitorMetadataService :
                 createFullRunContext(monitorIndex)
             else emptyMap()
         return MonitorMetadata(
-            id = "${monitor.id}-metadata",
+            id = MonitorMetadata.getId(monitor, workflowMetadataId),
             seqNo = SequenceNumbers.UNASSIGNED_SEQ_NO,
             primaryTerm = SequenceNumbers.UNASSIGNED_PRIMARY_TERM,
             monitorId = monitor.id,

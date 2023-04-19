@@ -8,6 +8,7 @@ package org.opensearch.alerting
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionResponse
 import org.opensearch.alerting.action.ExecuteMonitorAction
+import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetEmailAccountAction
 import org.opensearch.alerting.action.GetEmailGroupAction
@@ -27,6 +28,7 @@ import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.resthandler.RestAcknowledgeAlertAction
 import org.opensearch.alerting.resthandler.RestDeleteMonitorAction
 import org.opensearch.alerting.resthandler.RestExecuteMonitorAction
+import org.opensearch.alerting.resthandler.RestExecuteWorkflowAction
 import org.opensearch.alerting.resthandler.RestGetAlertsAction
 import org.opensearch.alerting.resthandler.RestGetDestinationsAction
 import org.opensearch.alerting.resthandler.RestGetEmailAccountAction
@@ -45,6 +47,7 @@ import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings
 import org.opensearch.alerting.transport.TransportAcknowledgeAlertAction
 import org.opensearch.alerting.transport.TransportDeleteMonitorAction
 import org.opensearch.alerting.transport.TransportExecuteMonitorAction
+import org.opensearch.alerting.transport.TransportExecuteWorkflowAction
 import org.opensearch.alerting.transport.TransportGetAlertsAction
 import org.opensearch.alerting.transport.TransportGetDestinationsAction
 import org.opensearch.alerting.transport.TransportGetEmailAccountAction
@@ -58,6 +61,7 @@ import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
+import org.opensearch.alerting.workflow.WorkflowRunnerService
 import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.node.DiscoveryNodes
@@ -132,6 +136,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     }
 
     lateinit var runner: MonitorRunnerService
+    lateinit var workflowRunner: WorkflowRunnerService
     lateinit var scheduler: JobScheduler
     lateinit var sweeper: JobSweeper
     lateinit var scheduledJobIndices: ScheduledJobIndices
@@ -156,6 +161,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestIndexMonitorAction(),
             RestSearchMonitorAction(settings, clusterService),
             RestExecuteMonitorAction(),
+            RestExecuteWorkflowAction(),
             RestAcknowledgeAlertAction(),
             RestScheduledJobStatsHandler("_alerting"),
             RestSearchEmailAccountAction(),
@@ -184,7 +190,10 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(GetDestinationsAction.INSTANCE, TransportGetDestinationsAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.GET_ALERTS_ACTION_TYPE, TransportGetAlertsAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.GET_FINDINGS_ACTION_TYPE, TransportGetFindingsSearchAction::class.java),
-            ActionPlugin.ActionHandler(AlertingActions.INDEX_WORKFLOW_ACTION_TYPE, TransportIndexWorkflowAction::class.java)
+            ActionPlugin.ActionHandler(AlertingActions.INDEX_WORKFLOW_ACTION_TYPE, TransportIndexWorkflowAction::class.java),
+            ActionPlugin.ActionHandler(AlertingActions.GET_WORKFLOW_ACTION_TYPE, TransportGetWorkflowAction::class.java),
+            ActionPlugin.ActionHandler(AlertingActions.DELETE_WORKFLOW_ACTION_TYPE, TransportDeleteWorkflowAction::class.java),
+            ActionPlugin.ActionHandler(ExecuteWorkflowAction.INSTANCE, TransportExecuteWorkflowAction::class.java)
         )
     }
 
@@ -232,6 +241,22 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerDocLevelMonitorQueries(DocLevelMonitorQueries(client, clusterService))
             .registerConsumers()
             .registerDestinationSettings()
+        workflowRunner = WorkflowRunnerService
+            .registerClusterService(clusterService)
+            .registerClient(client)
+            .registerNamedXContentRegistry(xContentRegistry)
+            .registerScriptService(scriptService)
+            .registerIndexNameExpressionResolver(indexNameExpressionResolver)
+            .registerSettings(settings)
+            .registerThreadPool(threadPool)
+            .registerAlertIndices(alertIndices)
+            .registerInputService(InputService(client, scriptService, namedWriteableRegistry, xContentRegistry))
+            .registerTriggerService(TriggerService(scriptService))
+            .registerAlertService(AlertService(client, xContentRegistry, alertIndices))
+            .registerDocLevelMonitorQueries(DocLevelMonitorQueries(client, clusterService))
+            .registerWorkflowService(WorkflowService(client, xContentRegistry))
+            .registerConsumers()
+            .registerDestinationSettings()
         scheduledJobIndices = ScheduledJobIndices(client.admin(), clusterService)
         docLevelMonitorQueries = DocLevelMonitorQueries(client, clusterService)
         scheduler = JobScheduler(threadPool, runner)
@@ -241,6 +266,13 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         this.clusterService = clusterService
 
         MonitorMetadataService.initialize(
+            client,
+            clusterService,
+            xContentRegistry,
+            settings
+        )
+
+        WorkflowMetadataService.initialize(
             client,
             clusterService,
             xContentRegistry,

@@ -14,7 +14,11 @@ import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.rest.RestRequest
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Collections
+import java.util.UUID
 
 class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
 
@@ -397,6 +401,324 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
         }
     }
 
+    fun `test get workflow`() {
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+        )
+
+        val monitorResponse = createMonitor(monitor)!!
+
+        val workflowRequest = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id)
+        )
+
+        val workflowResponse = upsertWorkflow(workflowRequest)!!
+        assertNotNull("Workflow creation failed", workflowResponse)
+        assertNotNull(workflowResponse.workflow)
+        assertNotEquals("response is missing Id", Monitor.NO_ID, workflowResponse.id)
+        assertTrue("incorrect version", workflowResponse.version > 0)
+
+        val getWorkflowResponse = getWorkflowById(id = workflowResponse.id)
+        assertNotNull(getWorkflowResponse)
+
+        val workflowById = getWorkflowResponse.workflow!!
+        // Verify workflow
+        assertNotEquals("response is missing Id", Monitor.NO_ID, getWorkflowResponse.id)
+        assertTrue("incorrect version", getWorkflowResponse.version > 0)
+        assertEquals("Workflow name not correct", workflowRequest.name, workflowById.name)
+        assertEquals("Workflow owner not correct", workflowRequest.owner, workflowById.owner)
+        assertEquals("Workflow input not correct", workflowRequest.inputs, workflowById.inputs)
+
+        // Delegate verification
+        @Suppress("UNCHECKED_CAST")
+        val delegates = (workflowById.inputs as List<CompositeInput>)[0].sequence.delegates.sortedBy { it.order }
+        assertEquals("Delegates size not correct", 1, delegates.size)
+
+        val delegate = delegates[0]
+        assertNotNull(delegate)
+        assertEquals("Delegate order not correct", 1, delegate.order)
+        assertEquals("Delegate id not correct", monitorResponse.id, delegate.monitorId)
+    }
+
+    fun `test get workflow for invalid id monitor index doesn't exist`() {
+        // Get workflow for non existing workflow id
+        try {
+            getWorkflowById(id = "-1")
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning GetWorkflow Action error ",
+                    it.contains("Workflow not found")
+                )
+            }
+        }
+    }
+
+    fun `test get workflow for invalid id monitor index exists`() {
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+        )
+        createMonitor(monitor)
+        // Get workflow for non existing workflow id
+        try {
+            getWorkflowById(id = "-1")
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning GetWorkflow Action error ",
+                    it.contains("Workflow not found")
+                )
+            }
+        }
+    }
+
+    fun `test delete workflow delegate monitor deleted`() {
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+
+        val monitorResponse = createMonitor(monitor)!!
+
+        val workflowRequest = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id)
+        )
+        val workflowResponse = upsertWorkflow(workflowRequest)!!
+        val workflowId = workflowResponse.id
+        val getWorkflowResponse = getWorkflowById(id = workflowResponse.id)
+
+        assertNotNull(getWorkflowResponse)
+        assertEquals(workflowId, getWorkflowResponse.id)
+
+        deleteWorkflow(workflowId, true)
+        // Verify that the workflow is deleted
+        try {
+            getWorkflowById(workflowId)
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning GetWorkflow Action error ",
+                    it.contains("Workflow not found.")
+                )
+            }
+        }
+        // Verify that the monitor is deleted
+        try {
+            getMonitorResponse(monitorResponse.id)
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning GetMonitor Action error ",
+                    it.contains("Monitor not found")
+                )
+            }
+        }
+    }
+
+    fun `test delete executed workflow with metadata deleted`() {
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
+        val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
+        val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor1 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput1),
+            triggers = listOf(trigger1)
+        )
+        val monitorResponse = createMonitor(monitor1)!!
+
+        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4")
+        val docLevelInput2 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery2))
+        val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor2 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput2),
+            triggers = listOf(trigger2),
+        )
+
+        val monitorResponse2 = createMonitor(monitor2)!!
+
+        var workflow = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id, monitorResponse2.id)
+        )
+        val workflowResponse = upsertWorkflow(workflow)!!
+        val workflowById = searchWorkflow(workflowResponse.id)
+        assertNotNull(workflowById)
+
+        var testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS))
+        // Matches monitor1
+        val testDoc1 = """{
+            "message" : "This is an error from IAD region",
+            "source.ip.v6.v2" : 16644, 
+            "test_strict_date_time" : "$testTime",
+            "test_field_1" : "us-west-2"
+        }"""
+        indexDoc(index, "1", testDoc1)
+
+        val workflowId = workflowResponse.id
+        val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
+        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.workflowRunResult
+        assertEquals(2, monitorsRunResults.size)
+
+        deleteWorkflow(workflowId, true)
+        // Verify that the workflow is deleted
+        try {
+            getWorkflowById(workflowId)
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning GetWorkflow Action error ",
+                    it.contains("Workflow not found.")
+                )
+            }
+        }
+        // Verify that the workflow metadata is deleted
+        try {
+            searchWorkflowMetadata(workflowId)
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning GetMonitor Action error ",
+                    it.contains("List is empty")
+                )
+            }
+        }
+    }
+
+    fun `test delete workflow delegate monitor not deleted`() {
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+
+        val monitorResponse = createMonitor(monitor)!!
+
+        val workflowRequest = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id)
+        )
+        val workflowResponse = upsertWorkflow(workflowRequest)!!
+        val workflowId = workflowResponse.id
+        val getWorkflowResponse = getWorkflowById(id = workflowResponse.id)
+
+        assertNotNull(getWorkflowResponse)
+        assertEquals(workflowId, getWorkflowResponse.id)
+
+        val workflowRequest2 = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id)
+        )
+        val workflowResponse2 = upsertWorkflow(workflowRequest2)!!
+        val workflowId2 = workflowResponse2.id
+        val getWorkflowResponse2 = getWorkflowById(id = workflowResponse2.id)
+
+        assertNotNull(getWorkflowResponse2)
+        assertEquals(workflowId2, getWorkflowResponse2.id)
+
+        try {
+            deleteWorkflow(workflowId, true)
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning GetWorkflow Action error ",
+                    it.contains("[Not allowed to delete ${monitorResponse.id} monitors")
+                )
+            }
+        }
+        val existingMonitor = getMonitorResponse(monitorResponse.id)
+        assertNotNull(existingMonitor)
+    }
+
+    fun `test trying to delete monitor that is part of workflow sequence`() {
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+
+        val monitorResponse = createMonitor(monitor)!!
+
+        val workflowRequest = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id)
+        )
+
+        val workflowResponse = upsertWorkflow(workflowRequest)!!
+        val workflowId = workflowResponse.id
+        val getWorkflowResponse = getWorkflowById(id = workflowResponse.id)
+
+        assertNotNull(getWorkflowResponse)
+        assertEquals(workflowId, getWorkflowResponse.id)
+
+        // Verify that the monitor can't be deleted because it's included in the workflow
+        try {
+            deleteMonitor(monitorResponse.id)
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning DeleteMonitor Action error ",
+                    it.contains("Monitor can't be deleted because it is a part of workflow(s)")
+                )
+            }
+        }
+    }
+
+    fun `test delete workflow for invalid id monitor index doesn't exists`() {
+        // Try deleting non-existing workflow
+        try {
+            deleteWorkflow("-1")
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning DeleteWorkflow Action error ",
+                    it.contains("Workflow not found.")
+                )
+            }
+        }
+    }
+
+    fun `test delete workflow for invalid id monitor index exists`() {
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+        )
+        createMonitor(monitor)
+        // Try deleting non-existing workflow
+        try {
+            deleteWorkflow("-1")
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning DeleteWorkflow Action error ",
+                    it.contains("Workflow not found.")
+                )
+            }
+        }
+    }
+
     fun `test create workflow without delegate failure`() {
         val workflow = randomWorkflow(
             monitorIds = Collections.emptyList()
@@ -408,6 +730,26 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
                     it.contains("Delegates list can not be empty.")
+                )
+            }
+        }
+    }
+
+    fun `test create workflow with 26 delegates failure`() {
+        val monitorsIds = mutableListOf<String>()
+        for (i in 0..25) {
+            monitorsIds.add(UUID.randomUUID().toString())
+        }
+        val workflow = randomWorkflow(
+            monitorIds = monitorsIds
+        )
+        try {
+            upsertWorkflow(workflow)
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning IndexWorkflow Action error ",
+                    it.contains("Delegates list can not be larger then 25.")
                 )
             }
         }
@@ -674,6 +1016,46 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
                     it.contains("Query level monitor can't be part of chained findings")
+                )
+            }
+        }
+    }
+
+    fun `test create workflow delegate and chained finding monitor different indices failure`() {
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+
+        val docMonitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+        val docMonitorResponse = createMonitor(docMonitor)!!
+
+        val index1 = "$index-1"
+        createTestIndex(index1)
+
+        val docLevelInput1 = DocLevelMonitorInput(
+            "description", listOf(index1), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
+        )
+
+        val docMonitor1 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput1),
+            triggers = listOf(trigger)
+        )
+        val docMonitorResponse1 = createMonitor(docMonitor1)!!
+
+        val workflow = randomWorkflow(
+            monitorIds = listOf(docMonitorResponse1.id, docMonitorResponse.id)
+        )
+        try {
+            upsertWorkflow(workflow)
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Exception not returning IndexWorkflow Action error ",
+                    it.contains("Delegate monitor and it's chained finding monitor must query the same indices")
                 )
             }
         }

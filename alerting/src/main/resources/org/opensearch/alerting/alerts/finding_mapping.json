@@ -60,6 +60,9 @@
           "type" : "keyword"
         }
       }
+    },
+    "execution_id": {
+      "type": "keyword"
     }
   }
 }
