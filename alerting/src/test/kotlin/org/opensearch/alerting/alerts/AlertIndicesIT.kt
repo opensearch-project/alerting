@@ -89,7 +89,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         executeMonitor(trueMonitor.id)
         assertIndexExists(AlertIndices.FINDING_HISTORY_WRITE_INDEX)
         verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 6)
-        verifyIndexSchemaVersion(AlertIndices.FINDING_HISTORY_WRITE_INDEX, 1)
+        verifyIndexSchemaVersion(AlertIndices.FINDING_HISTORY_WRITE_INDEX, 2)
     }
 
     fun `test alert index gets recreated automatically if deleted`() {
