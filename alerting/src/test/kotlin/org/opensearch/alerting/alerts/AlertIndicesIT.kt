@@ -75,7 +75,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
 
         putFindingMappings(
             AlertIndices.findingMapping().trimStart('{').trimEnd('}')
-                .replace("\"schema_version\": 1", "\"schema_version\": 0")
+                .replace("\"schema_version\": 2", "\"schema_version\": 0")
         )
         assertIndexExists(AlertIndices.FINDING_HISTORY_WRITE_INDEX)
         verifyIndexSchemaVersion(AlertIndices.FINDING_HISTORY_WRITE_INDEX, 0)
