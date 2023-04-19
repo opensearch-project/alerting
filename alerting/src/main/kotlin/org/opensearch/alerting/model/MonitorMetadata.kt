@@ -120,8 +120,9 @@ data class MonitorMetadata(
             return MonitorMetadata(sin)
         }
 
-        fun getId(monitor: Monitor): String {
-            return monitor.id + "-metadata"
+        fun getId(monitor: Monitor, workflowId: String? = null): String {
+            return if (workflowId.isNullOrEmpty()) "${monitor.id}-metadata"
+            else "${monitor.id}-$workflowId-metadata"
         }
     }
 }

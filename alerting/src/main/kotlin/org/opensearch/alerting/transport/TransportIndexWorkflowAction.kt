@@ -604,7 +604,7 @@ class TransportIndexWorkflowAction @Inject constructor(
         val searchSource = SearchSourceBuilder().query(query)
         val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
 
-        if (user != null && !isAdmin(user) && filterByEnabled) {
+        if (user != null && filterByEnabled) {
             addFilter(user, searchRequest.source(), "monitor.user.backend_roles.keyword")
         }
 
@@ -647,9 +647,7 @@ class TransportIndexWorkflowAction @Inject constructor(
         val indicesSearchRequest = SearchRequest().indices(*indices.toTypedArray())
             .source(SearchSourceBuilder.searchSource().size(1).query(QueryBuilders.matchAllQuery()))
 
-        if (user == null) {
-            checkIndicesAccess(client, indicesSearchRequest, indices, actionListener)
-        } else {
+        if (user != null && filterByEnabled) {
             // Unstash the context and check if user with specified roles has indices access
             withClosableContext(
                 InjectorContextElement(
@@ -662,6 +660,8 @@ class TransportIndexWorkflowAction @Inject constructor(
             ) {
                 checkIndicesAccess(client, indicesSearchRequest, indices, actionListener)
             }
+        } else {
+            checkIndicesAccess(client, indicesSearchRequest, indices, actionListener)
         }
     }
 

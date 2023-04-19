@@ -152,9 +152,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
 
                     val deleteResponse = deleteWorkflow(workflow)
                     if (deleteDelegateMonitors == true) {
-                        if (user == null) {
-                            deleteMonitors(delegateMonitorIds, RefreshPolicy.IMMEDIATE)
-                        } else {
+                        if (user != null && filterByEnabled) {
                             // Un-stash the context
                             withClosableContext(
                                 InjectorContextElement(
@@ -167,6 +165,8 @@ class TransportDeleteWorkflowAction @Inject constructor(
                             ) {
                                 deleteMonitors(delegateMonitorIds, RefreshPolicy.IMMEDIATE)
                             }
+                        } else {
+                            deleteMonitors(delegateMonitorIds, RefreshPolicy.IMMEDIATE)
                         }
                     }
                     actionListener.onResponse(DeleteWorkflowResponse(deleteResponse.id, deleteResponse.version))
