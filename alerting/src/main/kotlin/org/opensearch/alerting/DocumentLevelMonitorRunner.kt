@@ -274,7 +274,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 listOf(it.first),
                 listOf(it.second),
                 triggerCtx,
-                monitorResult.alertError() ?: triggerResult.alertError()
+                monitorResult.alertError() ?: triggerResult.alertError(),
+                workflowExecutionId
             )
             alerts.add(alert)
         }
@@ -561,7 +562,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
             var xContentBuilder = XContentFactory.jsonBuilder().startObject()
             sourceMap.forEach { (k, v) ->
-                if( v is )
                 xContentBuilder = xContentBuilder.field("${k}_${index}_$monitorId", v)
             }
             xContentBuilder = xContentBuilder.endObject()

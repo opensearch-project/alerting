@@ -6,11 +6,11 @@
 package org.opensearch.alerting.triggeraction
 
 import org.junit.Assert
-import org.opensearch.alerting.triggercondition.parsers.TriggerExpressionParser
+import org.opensearch.alerting.triggercondition.chained_alert_parsers.TriggerExpressionParser
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.test.OpenSearchTestCase
 
-class TriggerExpressionResolverTests : OpenSearchTestCase() {
+class CAResolverTests : OpenSearchTestCase() {
 
     fun `test trigger expression evaluation simple AND`() {
         val eqString = "(query[name=sigma-123] && query[name=sigma-456])"

@@ -76,7 +76,8 @@ object QueryLevelMonitorRunner : MonitorRunner() {
 
             val updatedAlert = monitorCtx.alertService!!.composeQueryLevelAlert(
                 triggerCtx, triggerResult,
-                monitorResult.alertError() ?: triggerResult.alertError()
+                monitorResult.alertError() ?: triggerResult.alertError(),
+                workflowRunContext?.workflowExecutionId
             )
             if (updatedAlert != null) updatedAlerts += updatedAlert
         }

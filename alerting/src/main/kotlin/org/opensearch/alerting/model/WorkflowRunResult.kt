@@ -10,6 +10,7 @@ import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.io.stream.Writeable
 import org.opensearch.common.xcontent.ToXContent
 import org.opensearch.common.xcontent.XContentBuilder
+import org.opensearch.commons.alerting.model.Alert
 import java.io.IOException
 import java.lang.Exception
 import java.time.Instant
@@ -19,7 +20,8 @@ data class WorkflowRunResult(
     val executionStartTime: Instant,
     val executionEndTime: Instant,
     val executionId: String,
-    val error: Exception? = null
+    val error: Exception? = null,
+    val chainedAlert: Alert? = null
 ) : Writeable, ToXContent {
 
     @Throws(IOException::class)
@@ -29,7 +31,8 @@ data class WorkflowRunResult(
         sin.readInstant(),
         sin.readInstant(),
         sin.readString(),
-        sin.readException()
+        sin.readException(),
+        Alert.readFrom(sin)
     )
 
     override fun writeTo(out: StreamOutput) {
@@ -38,16 +41,26 @@ data class WorkflowRunResult(
         out.writeInstant(executionEndTime)
         out.writeString(executionId)
         out.writeException(error)
+        chainedAlert?.writeTo(out)
     }
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        builder.startObject().startArray("workflow_run_result")
-        for (monitorResult in workflowRunResult) {
-            monitorResult.toXContent(builder, ToXContent.EMPTY_PARAMS)
+        try {
+            builder.startObject().startArray("workflow_run_result")
+            for (monitorResult in workflowRunResult) {
+                monitorResult.toXContent(builder, ToXContent.EMPTY_PARAMS)
+            }
+
+            builder.endArray().field("execution_start_time", executionStartTime)
+                .field("execution_end_time", executionEndTime)
+                .field("error", error?.message)
+            builder.startArray("chained_alert")
+            chainedAlert?.toXContent(builder, ToXContent.EMPTY_PARAMS)
+            builder.endArray()
+            builder.endObject()
+        } catch (e: Exception) {
+            println(e)
         }
-        builder.endArray().field("execution_start_time", executionStartTime)
-            .field("execution_end_time", executionEndTime)
-            .field("error", error?.message).endObject()
         return builder
     }
 }

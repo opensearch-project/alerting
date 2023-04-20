@@ -9,7 +9,7 @@ import org.junit.Assert
 import org.opensearch.alerting.triggercondition.parsers.TriggerExpressionParser
 import org.opensearch.test.OpenSearchTestCase
 
-class TriggerExpressionParserTests : OpenSearchTestCase() {
+class CAExpressionParserTests : OpenSearchTestCase() {
 
     fun `test trigger expression posix parsing simple AND`() {
         val eqString = "(query[name=sigma-123] && query[name=sigma-456])"

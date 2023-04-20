@@ -71,6 +71,9 @@
         }
       }
     },
+    "execution_id": {
+      "type": "keyword"
+    },
     "trigger_id": {
       "type": "keyword"
     },
@@ -100,6 +103,12 @@
       }
     },
     "state": {
+      "type": "keyword"
+    },
+    "workflow_execution_id": {
+      "type": "keyword"
+    },
+    "chained_alert_name": {
       "type": "keyword"
     },
     "start_time": {

@@ -338,16 +338,6 @@ class TransportIndexCompositeWorkflowAction @Inject constructor(
                     )
                     log.debug("Created monitor's backend roles: $rbacRoles")
                 }
-                val compositeInput = request.workflow.inputs[0] as CompositeInput
-                val monitorIds = compositeInput.sequence.delegates.stream().map { it.monitorId }.collect(Collectors.toList())
-                val chainedAlertsMonitor = buildChainedAlertsMonitor(".opendistro-alerting-alerts", monitorIds)
-                val delegates = compositeInput.sequence.delegates as MutableList<Delegate>
-                val maxOrder = compositeInput.sequence.delegates.maxOf { it -> it.order }
-                delegates.add(Delegate(maxOrder + 1, chainedAlertsMonitor!!.id))
-                request.workflow = request.workflow.copy(
-                    schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion,
-                    inputs = listOf(CompositeInput(Sequence(delegates)))
-                )
                 val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
                     .setRefreshPolicy(request.refreshPolicy)
                     .source(request.workflow.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))

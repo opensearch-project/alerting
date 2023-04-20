@@ -6,20 +6,36 @@
 package org.opensearch.alerting.workflow
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.action.index.IndexRequest
+import org.opensearch.action.index.IndexResponse
+import org.opensearch.action.search.SearchRequest
+import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.BucketLevelMonitorRunner
 import org.opensearch.alerting.DocumentLevelMonitorRunner
 import org.opensearch.alerting.MonitorRunnerExecutionContext
 import org.opensearch.alerting.QueryLevelMonitorRunner
+import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.chainedAlertCondition.parsers.CAExpressionParser
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.WorkflowRunResult
+import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.isDocLevelMonitor
 import org.opensearch.alerting.util.isQueryLevelMonitor
+import org.opensearch.client.Client
+import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.XContentFactory
+import org.opensearch.common.xcontent.XContentHelper
+import org.opensearch.common.xcontent.XContentParser
+import org.opensearch.common.xcontent.XContentParserUtils
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.CompositeInput
 import org.opensearch.commons.alerting.model.Delegate
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
+import org.opensearch.index.query.QueryBuilders
 import java.time.Instant
 import java.time.LocalDateTime
 import java.util.UUID
@@ -98,10 +114,68 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 resultList.add(runResult)
             }
             logger.debug("Workflow ${workflow.id} in $workflowExecutionId finished")
-            return workflowResult.copy(workflowRunResult = resultList)
+            val executeChainedAlerts = executeChainedAlerts(monitorCtx, workflow, workflowExecutionId, delegates)
+            return workflowResult.copy(workflowRunResult = resultList, chainedAlert = executeChainedAlerts)
         } catch (e: Exception) {
             logger.error("Failed to execute workflow. Error: ${e.message}")
             return workflowResult.copy(error = AlertingException.wrap(e))
+        }
+    }
+
+    private suspend fun executeChainedAlerts(
+        monitorCtx: MonitorRunnerExecutionContext,
+        workflow: Workflow,
+        workflowExecutionId: String,
+        delegates: List<Delegate>
+    ): Alert? {
+        val searchRequest = SearchRequest(AlertIndices.ALERT_INDEX)
+        val queryBuilder = QueryBuilders.boolQuery()
+
+        queryBuilder.filter(QueryBuilders.termQuery("workflow_execution_id", workflowExecutionId))
+
+        val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(searchRequest, it) }
+        val alerts = searchResponse.hits.map { hit ->
+            val xcp = XContentHelper.createParser(
+                monitorCtx.xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                hit.sourceRef, XContentType.JSON
+            )
+            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+            val alert = Alert.parse(xcp, hit.id, hit.version)
+            alert
+        }
+        val map = mutableMapOf<String, Boolean>()
+        for (alert in alerts) {
+            map.put(alert.monitorId!!, true);
+        }
+
+        if(CAExpressionParser("monitor[id=${delegates.get(0).monitorId}] && !monitor[id=${delegates.get(1).monitorId}]").parse()
+                .evaluate(map)) {
+            try {
+                val alert = Alert(
+                    Instant.now(),
+                    Instant.now(),
+                    Alert.State.ACTIVE,
+                    null, -1,
+                    "dunno", workflowExecutionId,
+                    "test chained alert")
+
+                val indexRequest = IndexRequest(AlertIndices.ALERT_INDEX)
+                    .routing(workflow.id)
+                    .id(UUID.randomUUID().toString())
+                    .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
+                val indexResponse = monitorCtx.client!!.suspendUntil<Client, IndexResponse> {
+                    monitorCtx.client!!.index(indexRequest, it)
+                }
+                return alert.copy(id=indexResponse.id)
+            } catch (e: Exception) {
+                println(e)
+                return null
+            }
+
+
+        } else {
+            println("ChainedAlertConditionNotSatisfied")
+            return null;
         }
     }
 

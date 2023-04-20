@@ -105,7 +105,8 @@ class AlertService(
     fun composeQueryLevelAlert(
         ctx: QueryLevelTriggerExecutionContext,
         result: QueryLevelTriggerRunResult,
-        alertError: AlertError?
+        alertError: AlertError?,
+        workflowExecutionId: String?
     ): Alert? {
         val currentTime = Instant.now()
         val currentAlert = ctx.alert
@@ -148,7 +149,8 @@ class AlertService(
             currentAlert?.copy(
                 state = Alert.State.COMPLETED, endTime = currentTime, errorMessage = null,
                 errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
-                schemaVersion = IndexUtils.alertIndexSchemaVersion
+                schemaVersion = IndexUtils.alertIndexSchemaVersion,
+                workflowExecutionId = workflowExecutionId
             )
         } else if (alertError == null && currentAlert?.isAcknowledged() == true) {
             null
@@ -157,7 +159,8 @@ class AlertService(
             currentAlert.copy(
                 state = alertState, lastNotificationTime = currentTime, errorMessage = alertError?.message,
                 errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
-                schemaVersion = IndexUtils.alertIndexSchemaVersion
+                schemaVersion = IndexUtils.alertIndexSchemaVersion,
+                workflowExecutionId = workflowExecutionId
             )
         } else {
             val alertState = if (alertError == null) Alert.State.ACTIVE else Alert.State.ERROR
@@ -165,7 +168,8 @@ class AlertService(
                 monitor = ctx.monitor, trigger = ctx.trigger, startTime = currentTime,
                 lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
                 errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
-                schemaVersion = IndexUtils.alertIndexSchemaVersion
+                schemaVersion = IndexUtils.alertIndexSchemaVersion,
+                workflowExecutionId = workflowExecutionId
             )
         }
     }
@@ -175,7 +179,8 @@ class AlertService(
         findings: List<String>,
         relatedDocIds: List<String>,
         ctx: DocumentLevelTriggerExecutionContext,
-        alertError: AlertError?
+        alertError: AlertError?,
+        workflowExecutionId: String?
     ): Alert {
         val currentTime = Instant.now()
 
@@ -183,7 +188,8 @@ class AlertService(
         return Alert(
             id = UUID.randomUUID().toString(), monitor = ctx.monitor, trigger = ctx.trigger, startTime = currentTime,
             lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
-            schemaVersion = IndexUtils.alertIndexSchemaVersion, findingIds = findings, relatedDocIds = relatedDocIds
+            schemaVersion = IndexUtils.alertIndexSchemaVersion, findingIds = findings, relatedDocIds = relatedDocIds,
+            workflowExecutionId = workflowExecutionId
         )
     }
 
