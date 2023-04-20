@@ -163,22 +163,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
                     val metadataIdsToDelete = mutableListOf(workflowMetadataId)
 
                     if (deleteDelegateMonitors == true) {
-                        if (user != null && filterByEnabled) {
-                            // Un-stash the context
-                            withClosableContext(
-                                InjectorContextElement(
-                                    user.name.plus(UUID.randomUUID().toString()),
-                                    settings,
-                                    client.threadPool().threadContext,
-                                    user.roles,
-                                    user
-                                )
-                            ) {
-                                deleteMonitors(delegateMonitorIds, RefreshPolicy.IMMEDIATE)
-                            }
-                        } else {
-                            deleteMonitors(delegateMonitorIds, RefreshPolicy.IMMEDIATE)
-                        }
+                        deleteMonitors(delegateMonitorIds, RefreshPolicy.IMMEDIATE)
                         // Delete monitors workflow metadata
                         // Monitor metadata will be in monitorId-workflowId-metadata format
                         metadataIdsToDelete.addAll(deletableMonitors.map { MonitorMetadata.getId(it, workflowMetadataId) })

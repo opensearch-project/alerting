@@ -157,6 +157,8 @@ object WorkflowMetadataService :
     }
 
     private fun createNewWorkflowMetadata(workflow: Workflow, executionId: String, isTempWorkflow: Boolean): WorkflowMetadata {
+        // In the case of temp workflow (ie. workflow is in dry-run) use timestampWithUUID-metadata format
+        // In the case of regular workflow execution, use the workflowId-metadata format
         val id = if (isTempWorkflow) "${LocalDateTime.now(ZoneOffset.UTC)}${UUID.randomUUID()}" else workflow.id
         return WorkflowMetadata(
             id = WorkflowMetadata.getId(id),
