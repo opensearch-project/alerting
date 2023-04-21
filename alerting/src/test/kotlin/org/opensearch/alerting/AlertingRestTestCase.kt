@@ -55,6 +55,7 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.util.string
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.ToXContent
@@ -70,6 +71,7 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.UUID
+import java.util.stream.Collectors
 import javax.management.MBeanServerInvocationHandler
 import javax.management.ObjectName
 import javax.management.remote.JMXConnectorFactory
@@ -152,6 +154,29 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             monitor.toHttpEntity()
         )
         assertEquals("Unable to delete a monitor", RestStatus.OK, response.restStatus())
+
+        return response
+    }
+
+    protected fun deleteWorkflow(workflow: Workflow, deleteDelegates: Boolean = false, refresh: Boolean = true): Response {
+        val response = client().makeRequest(
+            "DELETE",
+            "$WORKFLOW_ALERTING_BASE_URI/${workflow.id}?refresh=$refresh&deleteDelegateMonitors=$deleteDelegates",
+            emptyMap(),
+            workflow.toHttpEntity()
+        )
+        assertEquals("Unable to delete a workflow", RestStatus.OK, response.restStatus())
+        return response
+    }
+
+    protected fun deleteWorkflowWithClient(client: RestClient, workflow: Workflow, deleteDelegates: Boolean = false, refresh: Boolean = true): Response {
+        val response = client.makeRequest(
+            "DELETE",
+            "$WORKFLOW_ALERTING_BASE_URI/${workflow.id}?refresh=$refresh&deleteDelegateMonitors=$deleteDelegates",
+            emptyMap(),
+            workflow.toHttpEntity()
+        )
+        assertEquals("Unable to delete a workflow", RestStatus.OK, response.restStatus())
 
         return response
     }
@@ -529,6 +554,19 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return getMonitor(monitorId = monitor.id)
     }
 
+    @Suppress("UNCHECKED_CAST")
+    protected fun updateWorkflow(workflow: Workflow, refresh: Boolean = false): Workflow {
+        val response = client().makeRequest(
+            "PUT",
+            "${workflow.relativeUrl()}?refresh=$refresh",
+            emptyMap(),
+            workflow.toHttpEntity()
+        )
+        assertEquals("Unable to update a workflow", RestStatus.OK, response.restStatus())
+        assertUserNull(response.asMap()["workflow"] as Map<String, Any>)
+        return getWorkflow(workflowId = workflow.id)
+    }
+
     protected fun updateMonitorWithClient(
         client: RestClient,
         monitor: Monitor,
@@ -544,6 +582,23 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         assertEquals("Unable to update a monitor", RestStatus.OK, response.restStatus())
         assertUserNull(response.asMap()["monitor"] as Map<String, Any>)
         return getMonitor(monitorId = monitor.id)
+    }
+
+    protected fun updateWorkflowWithClient(
+        client: RestClient,
+        workflow: Workflow,
+        rbacRoles: List<String> = emptyList(),
+        refresh: Boolean = true
+    ): Workflow {
+        val response = client.makeRequest(
+            "PUT",
+            "${workflow.relativeUrl()}?refresh=$refresh",
+            emptyMap(),
+            createWorkflowEntityWithBackendRoles(workflow, rbacRoles)
+        )
+        assertEquals("Unable to update a workflow", RestStatus.OK, response.restStatus())
+        assertUserNull(response.asMap()["workflow"] as Map<String, Any>)
+        return getWorkflow(workflowId = workflow.id)
     }
 
     protected fun getMonitor(monitorId: String, header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")): Monitor {
@@ -719,8 +774,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return executeMonitor(client(), monitorId, params)
     }
 
+    protected fun executeWorkflow(workflowId: String, params: Map<String, String> = mutableMapOf()): Response {
+        return executeWorkflow(client(), workflowId, params)
+    }
+
     protected fun executeMonitor(client: RestClient, monitorId: String, params: Map<String, String> = mutableMapOf()): Response {
         return client.makeRequest("POST", "$ALERTING_BASE_URI/$monitorId/_execute", params)
+    }
+
+    protected fun executeWorkflow(client: RestClient, workflowId: String, params: Map<String, String> = mutableMapOf()): Response {
+        return client.makeRequest("POST", "$WORKFLOW_ALERTING_BASE_URI/$workflowId/_execute", params)
     }
 
     protected fun executeMonitor(monitor: Monitor, params: Map<String, String> = mapOf()): Response {
@@ -1206,11 +1269,72 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client().performRequest(request)
     }
 
+    private fun createCustomIndexRole(name: String, index: String, clusterPermissions: List<String?>) {
+        val request = Request("PUT", "/_plugins/_security/api/roles/$name")
+
+        val clusterPermissionsStr =
+            clusterPermissions.stream().map { p: String? -> "\"" + p + "\"" }.collect(
+                Collectors.joining(",")
+            )
+
+        var entity = "{\n" +
+            "\"cluster_permissions\": [\n" +
+            "$clusterPermissionsStr\n" +
+            "],\n" +
+            "\"index_permissions\": [\n" +
+            "{\n" +
+            "\"index_patterns\": [\n" +
+            "\"$index\"\n" +
+            "],\n" +
+            "\"dls\": \"\",\n" +
+            "\"fls\": [],\n" +
+            "\"masked_fields\": [],\n" +
+            "\"allowed_actions\": [\n" +
+            "\"crud\"\n" +
+            "]\n" +
+            "}\n" +
+            "],\n" +
+            "\"tenant_permissions\": []\n" +
+            "}"
+        request.setJsonEntity(entity)
+        client().performRequest(request)
+    }
+
     fun createIndexRoleWithDocLevelSecurity(name: String, index: String, dlsQuery: String, clusterPermissions: String? = "") {
         val request = Request("PUT", "/_plugins/_security/api/roles/$name")
         var entity = "{\n" +
             "\"cluster_permissions\": [\n" +
             "\"$clusterPermissions\"\n" +
+            "],\n" +
+            "\"index_permissions\": [\n" +
+            "{\n" +
+            "\"index_patterns\": [\n" +
+            "\"$index\"\n" +
+            "],\n" +
+            "\"dls\": \"$dlsQuery\",\n" +
+            "\"fls\": [],\n" +
+            "\"masked_fields\": [],\n" +
+            "\"allowed_actions\": [\n" +
+            "\"crud\"\n" +
+            "]\n" +
+            "}\n" +
+            "],\n" +
+            "\"tenant_permissions\": []\n" +
+            "}"
+        request.setJsonEntity(entity)
+        client().performRequest(request)
+    }
+
+    fun createIndexRoleWithDocLevelSecurity(name: String, index: String, dlsQuery: String, clusterPermissions: List<String>) {
+        val clusterPermissionsStr =
+            clusterPermissions.stream().map { p: String -> "\"" + getClusterPermissionsFromCustomRole(p) + "\"" }.collect(
+                Collectors.joining(",")
+            )
+
+        val request = Request("PUT", "/_plugins/_security/api/roles/$name")
+        var entity = "{\n" +
+            "\"cluster_permissions\": [\n" +
+            "$clusterPermissionsStr\n" +
             "],\n" +
             "\"index_permissions\": [\n" +
             "{\n" +
@@ -1289,6 +1413,19 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         role: String,
         backendRoles: List<String>,
         clusterPermissions: String?
+    ) {
+        createUser(user, user, backendRoles.toTypedArray())
+        createTestIndex(index)
+        createCustomIndexRole(role, index, clusterPermissions)
+        createUserRolesMapping(role, arrayOf(user))
+    }
+
+    fun createUserWithTestDataAndCustomRole(
+        user: String,
+        index: String,
+        role: String,
+        backendRoles: List<String>,
+        clusterPermissions: List<String?>
     ) {
         createUser(user, user, backendRoles.toTypedArray())
         createTestIndex(index)
@@ -1383,4 +1520,80 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             }
         }
     }
+
+    protected fun createRandomWorkflow(monitorIds: List<String>, refresh: Boolean = false): Workflow {
+        val workflow = randomWorkflow(monitorIds = monitorIds)
+        return createWorkflow(workflow, refresh)
+    }
+
+    private fun createWorkflowEntityWithBackendRoles(workflow: Workflow, rbacRoles: List<String>?): HttpEntity {
+        if (rbacRoles == null) {
+            return workflow.toHttpEntity()
+        }
+        val temp = workflow.toJsonString()
+        val toReplace = temp.lastIndexOf("}")
+        val rbacString = rbacRoles.joinToString { "\"$it\"" }
+        val jsonString = temp.substring(0, toReplace) + ", \"rbac_roles\": [$rbacString] }"
+        return StringEntity(jsonString, ContentType.APPLICATION_JSON)
+    }
+
+    protected fun createWorkflowWithClient(
+        client: RestClient,
+        workflow: Workflow,
+        rbacRoles: List<String>? = null,
+        refresh: Boolean = true
+    ): Workflow {
+        val response = client.makeRequest(
+            "POST", "$WORKFLOW_ALERTING_BASE_URI?refresh=$refresh", emptyMap(),
+            createWorkflowEntityWithBackendRoles(workflow, rbacRoles)
+        )
+        assertEquals("Unable to create a new monitor", RestStatus.CREATED, response.restStatus())
+
+        val workflowJson = JsonXContent.jsonXContent.createParser(
+            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            response.entity.content
+        ).map()
+        assertUserNull(workflowJson as HashMap<String, Any>)
+        return workflow.copy(id = workflowJson["_id"] as String)
+    }
+
+    protected fun createWorkflow(workflow: Workflow, refresh: Boolean = true): Workflow {
+        return createWorkflowWithClient(client(), workflow, emptyList(), refresh)
+    }
+
+    protected fun Workflow.toHttpEntity(): HttpEntity {
+        return StringEntity(toJsonString(), APPLICATION_JSON)
+    }
+
+    private fun Workflow.toJsonString(): String {
+        val builder = XContentFactory.jsonBuilder()
+        return shuffleXContent(toXContent(builder, ToXContent.EMPTY_PARAMS)).string()
+    }
+
+    protected fun getWorkflow(workflowId: String, header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")): Workflow {
+        val response = client().makeRequest("GET", "$WORKFLOW_ALERTING_BASE_URI/$workflowId", null, header)
+        assertEquals("Unable to get workflow $workflowId", RestStatus.OK, response.restStatus())
+
+        val parser = createParser(XContentType.JSON.xContent(), response.entity.content)
+        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser)
+
+        lateinit var id: String
+        var version: Long = 0
+        lateinit var workflow: Workflow
+
+        while (parser.nextToken() != XContentParser.Token.END_OBJECT) {
+            parser.nextToken()
+
+            when (parser.currentName()) {
+                "_id" -> id = parser.text()
+                "_version" -> version = parser.longValue()
+                "workflow" -> workflow = Workflow.parse(parser)
+            }
+        }
+
+        assertUserNull(workflow)
+        return workflow.copy(id = id, version = version)
+    }
+
+    protected fun Workflow.relativeUrl() = "$WORKFLOW_ALERTING_BASE_URI/$id"
 }
