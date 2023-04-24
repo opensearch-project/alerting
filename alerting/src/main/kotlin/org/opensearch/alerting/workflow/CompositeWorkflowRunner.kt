@@ -114,7 +114,10 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 resultList.add(runResult)
             }
             logger.debug("Workflow ${workflow.id} in $workflowExecutionId finished")
-            val executeChainedAlerts = executeChainedAlerts(monitorCtx, workflow, workflowExecutionId, delegates)
+
+            val executeChainedAlerts = if(workflow.chainedAlerts.isNotEmpty())
+                executeChainedAlerts(monitorCtx, workflow, workflowExecutionId, delegates)
+            else null
             return workflowResult.copy(workflowRunResult = resultList, chainedAlert = executeChainedAlerts)
         } catch (e: Exception) {
             logger.error("Failed to execute workflow. Error: ${e.message}")
@@ -147,8 +150,8 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         for (alert in alerts) {
             map.put(alert.monitorId!!, true);
         }
-
-        if(CAExpressionParser("monitor[id=${delegates.get(0).monitorId}] && !monitor[id=${delegates.get(1).monitorId}]").parse()
+        workflow.chainedAlerts.get(0).condition
+        if(CAExpressionParser(workflow.chainedAlerts.get(0).condition).parse()
                 .evaluate(map)) {
             try {
                 val alert = Alert(
