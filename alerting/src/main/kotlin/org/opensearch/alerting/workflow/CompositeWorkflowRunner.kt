@@ -6,6 +6,7 @@
 package org.opensearch.alerting.workflow
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.ExceptionsHelper
 import org.opensearch.alerting.BucketLevelMonitorRunner
 import org.opensearch.alerting.DocumentLevelMonitorRunner
 import org.opensearch.alerting.MonitorRunnerExecutionContext
@@ -83,8 +84,14 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 try {
                     indexToDocIds = monitorCtx.workflowService!!.getFindingDocIdsByExecutionId(chainedMonitor, executionId)
                 } catch (e: Exception) {
-                    logger.error("Failed to execute workflow. Error: ${e.message}", e)
-                    return workflowResult.copy(error = AlertingException.wrap(e))
+                    val unwrappedException = ExceptionsHelper.unwrapCause(e) as Exception
+                    // If it is not IndexNotFound exception return the result
+                    if (unwrappedException.message?.contains("Configured indices are not found") == false) {
+                        logger.error("Failed to execute workflow. Error: ${e.message}", e)
+                        return workflowResult.copy(error = AlertingException.wrap(e))
+                    }
+                    // Log that finding index is not found and proceed with the execution
+                    logger.error("Finding index ${chainedMonitor.dataSources.findingsIndex} doesn't exist")
                 }
             }
 
