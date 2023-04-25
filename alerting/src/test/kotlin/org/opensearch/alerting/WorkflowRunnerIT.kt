@@ -7,7 +7,6 @@ package org.opensearch.alerting
 
 import org.junit.Assert
 import org.opensearch.action.support.WriteRequest
-import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.transport.WorkflowSingleNodeTestCase
 import org.opensearch.alerting.util.AlertingException
