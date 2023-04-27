@@ -293,6 +293,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             settings
         )
 
+        DeleteMonitorService.initialize(client)
+
         return listOf(sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator)
     }
 

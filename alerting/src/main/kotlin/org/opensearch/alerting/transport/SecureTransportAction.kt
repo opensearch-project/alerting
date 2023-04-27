@@ -76,12 +76,17 @@ interface SecureTransportAction {
     }
 
     fun <T : Any> validateUserBackendRoles(user: User?, actionListener: ActionListener<T>): Boolean {
-        if (!filterByEnabled || user == null) {
-            return true
-        }
-
         if (filterByEnabled) {
-            if (isAdmin(user)) {
+            if (user == null) {
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "Filter by user backend roles is enabled with security disabled.", RestStatus.FORBIDDEN
+                        )
+                    )
+                )
+                return false
+            } else if (isAdmin(user)) {
                 return true
             } else if (user.backendRoles.isNullOrEmpty()) {
                 actionListener.onFailure(
