@@ -201,7 +201,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 RestStatus.INTERNAL_SERVER_ERROR,
                 e
             )
-            monitorResult = monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
+            return monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
         }
 
         /*
