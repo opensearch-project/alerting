@@ -321,7 +321,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             alerts.add(alert)
         }
 
-
         val shouldDefaultToPerExecution = defaultToPerExecutionAction(
             monitorCtx.maxActionableAlertCount,
             monitorId = monitor.id,
