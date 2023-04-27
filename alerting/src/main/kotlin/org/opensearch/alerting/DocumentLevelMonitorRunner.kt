@@ -20,6 +20,7 @@ import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.MonitorRunResult
+import org.opensearch.alerting.model.userErrorMessage
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.util.AlertingException
@@ -192,9 +193,11 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             }
             monitorResult = monitorResult.copy(inputResults = InputRunResults(listOf(inputRunResults)))
         } catch (e: Exception) {
-            logger.error("Failed to start Document-level-monitor ${monitor.name}", e)
+            val errorMessage = ExceptionsHelper.detailedMessage(e)
+            monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor, errorMessage)
+            logger.error("Failed running Document-level-monitor ${monitor.name}", e)
             val alertingException = AlertingException(
-                ExceptionsHelper.unwrapCause(e).cause?.message.toString(),
+                errorMessage,
                 RestStatus.INTERNAL_SERVER_ERROR,
                 e
             )
@@ -240,6 +243,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         // Don't update monitor if this is a test monitor
         if (!isTempMonitor) {
+            // If any error happened during trigger execution, upsert monitor error alert
+            val errorMessage = constructErrorMessageFromTriggerResults(triggerResults = triggerResults)
+            if (errorMessage.isNotEmpty()) {
+                monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor = monitor, errorMessage = errorMessage)
+            }
+
             MonitorMetadataService.upsertMetadata(
                 monitorMetadata.copy(lastRunContext = updatedLastRunContext),
                 true
@@ -248,6 +257,24 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         // TODO: Update the Document as part of the Trigger and return back the trigger action result
         return monitorResult.copy(triggerResults = triggerResults)
+    }
+
+    private fun constructErrorMessageFromTriggerResults(
+        triggerResults: MutableMap<String, DocumentLevelTriggerRunResult>? = null
+    ): String {
+        var errorMessage = ""
+        if (triggerResults != null) {
+            val triggersErrorBuilder = StringBuilder()
+            triggerResults.forEach {
+                if (it.value.error != null) {
+                    triggersErrorBuilder.append("[${it.key}]: [${it.value.error!!.userErrorMessage()}]").append(" | ")
+                }
+            }
+            if (triggersErrorBuilder.isNotEmpty()) {
+                errorMessage = "Trigger errors: $triggersErrorBuilder"
+            }
+        }
+        return errorMessage
     }
 
     private suspend fun runForEachDocTrigger(
@@ -294,15 +321,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             alerts.add(alert)
         }
 
-        if (findingDocPairs.isEmpty() && monitorResult.error != null) {
-            val alert = monitorCtx.alertService!!.composeDocLevelAlert(
-                listOf(),
-                listOf(),
-                triggerCtx,
-                monitorResult.alertError() ?: triggerResult.alertError()
-            )
-            alerts.add(alert)
-        }
 
         val shouldDefaultToPerExecution = defaultToPerExecutionAction(
             monitorCtx.maxActionableAlertCount,
@@ -575,8 +593,15 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         searchSourceBuilder.query(boolQueryBuilder)
         searchRequest.source(searchSourceBuilder)
 
-        val response: SearchResponse = monitorCtx.client!!.suspendUntil {
-            monitorCtx.client!!.execute(SearchAction.INSTANCE, searchRequest, it)
+        var response: SearchResponse
+        try {
+            response = monitorCtx.client!!.suspendUntil {
+                monitorCtx.client!!.execute(SearchAction.INSTANCE, searchRequest, it)
+            }
+        } catch (e: Exception) {
+            throw IllegalStateException(
+                "Failed to run percolate search for sourceIndex [$index] and queryIndex [$queryIndex] for ${docs.size} document(s)", e
+            )
         }
 
         if (response.status() !== RestStatus.OK) {
