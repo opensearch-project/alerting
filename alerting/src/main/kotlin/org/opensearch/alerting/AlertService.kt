@@ -325,12 +325,9 @@ class AlertService(
             }
             // Deserialize first/latest Alert
             val hit = searchResponse.hits.hits[0]
-            val xcp = XContentHelper.createParser(
-                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                hit.sourceRef, XContentType.JSON
-            )
-            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+            val xcp = contentParser(hit.sourceRef)
             val existingErrorAlert = Alert.parse(xcp, hit.id, hit.version)
+
             val currentTime = Instant.now()
             alert = if (alert.errorMessage != existingErrorAlert.errorMessage) {
                 var newErrorHistory = existingErrorAlert.errorHistory.update(
