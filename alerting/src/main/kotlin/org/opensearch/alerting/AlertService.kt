@@ -198,7 +198,7 @@ class AlertService(
     ): Alert {
         val currentTime = Instant.now()
         // TODO make Alert constructor without trigger param so that we don't have to create this dummy trigger
-        val trigger = DocumentLevelTrigger(id = "", name = "dummy-trigger", severity = "", listOf(), Script(""))
+        val trigger = DocumentLevelTrigger(id = "", name = "${monitor.id}ExecutionError", severity = "", listOf(), Script(""))
         return Alert(
             id = id, monitor = monitor, trigger = trigger, startTime = currentTime,
             lastNotificationTime = currentTime, state = Alert.State.ERROR, errorMessage = alertError?.message,

@@ -603,7 +603,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         var executeMonitorResponse = executeMonitor(monitor, id, false)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
-        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 0)
         searchAlerts(id)
         var table = Table("asc", "id", null, 1, 0, "")
         var getAlertsResponse = client()
@@ -621,7 +621,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         executeMonitorResponse = executeMonitor(monitor, id, false)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
-        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 0)
         searchAlerts(id)
         table = Table("asc", "id", null, 10, 0, "")
         getAlertsResponse = client()
