@@ -13,18 +13,6 @@ allprojects {
     }
 }
 
-/*task jacocoMerge(type: JacocoMerge) {
-    gradle.projectsEvaluated {
-        subprojects.each { 
-            jacocoMerge.dependsOn it.tasks.withType(JacocoReport)
-            jacocoMerge.executionData it.tasks.withType(JacocoReport).collect { it.executionData } 
-        }
-    }
-    doFirst {
-        executionData = files(executionData.findAll { it.exists() })
-    }
-}*/
-
 task jacocoReport(type: JacocoReport, group: 'verification') {
     description = 'Generates an aggregate report from all subprojects'
     gradle.projectsEvaluated {
@@ -32,10 +20,6 @@ task jacocoReport(type: JacocoReport, group: 'verification') {
             jacocoReport.dependsOn it.tasks.withType(JacocoReport)
             jacocoReport.executionData it.tasks.withType(JacocoReport).collect { it.executionData }
         }
-    }
-//    dependsOn jacocoMerge
-    doFirst {
-        executionData = files(executionData.findAll { it.exists() })
     }
 
     reports {
