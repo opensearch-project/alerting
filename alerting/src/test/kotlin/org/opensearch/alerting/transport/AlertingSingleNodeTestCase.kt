@@ -111,9 +111,9 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
 
     protected fun assertAliasNotExists(alias: String) {
         val aliasesResponse = client().admin().indices().getAliases(GetAliasesRequest()).get()
-        val foundAlias = aliasesResponse.aliases.values().forEach {
-            it.value.forEach {
-                if (it.alias == alias) {
+        val foundAlias = aliasesResponse.aliases.values.forEach {
+            it.forEach { it1 ->
+                if (it1.alias == alias) {
                     fail("alias exists, but it shouldn't")
                 }
             }
@@ -122,9 +122,9 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
 
     protected fun assertAliasExists(alias: String) {
         val aliasesResponse = client().admin().indices().getAliases(GetAliasesRequest()).get()
-        val foundAlias = aliasesResponse.aliases.values().forEach {
-            it.value.forEach {
-                if (it.alias == alias) {
+        val foundAlias = aliasesResponse.aliases.values.forEach {
+            it.forEach { it1 ->
+                if (it1.alias == alias) {
                     return
                 }
             }

@@ -39,7 +39,7 @@ buildscript {
 }
 
 plugins {
-    id 'nebula.ospackage' version "8.3.0" apply false
+    id 'com.netflix.nebula.ospackage' version "11.0.0"
     id "com.dorongold.task-tree" version "1.5"
 }
 
