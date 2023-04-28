@@ -13,26 +13,18 @@ allprojects {
     }
 }
 
-task jacocoMerge(type: JacocoMerge) {
-    gradle.projectsEvaluated {
-        subprojects.each { 
-            jacocoMerge.dependsOn it.tasks.withType(JacocoReport)
-            jacocoMerge.executionData it.tasks.withType(JacocoReport).collect { it.executionData } 
-        }
-    }
-    doFirst {
-        executionData = files(executionData.findAll { it.exists() })
-    }
-}
-
 task jacocoReport(type: JacocoReport, group: 'verification') {
     description = 'Generates an aggregate report from all subprojects'
-    dependsOn jacocoMerge
-    executionData jacocoMerge.destinationFile
+    gradle.projectsEvaluated {
+        subprojects.each {
+            jacocoReport.dependsOn it.tasks.withType(JacocoReport)
+            jacocoReport.executionData it.tasks.withType(JacocoReport).collect { it.executionData }
+        }
+    }
 
     reports {
-        html.enabled = true // human readable
-        xml.enabled = true
+        html.required = true // human readable
+        xml.required = true
     }
 
     gradle.projectsEvaluated {
