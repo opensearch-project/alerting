@@ -192,41 +192,21 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 }
             }
             monitorResult = monitorResult.copy(inputResults = InputRunResults(listOf(inputRunResults)))
-        } catch (e: Exception) {
-            val errorMessage = ExceptionsHelper.detailedMessage(e)
-            monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor, errorMessage)
-            logger.error("Failed running Document-level-monitor ${monitor.name}", e)
-            val alertingException = AlertingException(
-                errorMessage,
-                RestStatus.INTERNAL_SERVER_ERROR,
-                e
-            )
-            return monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
-        }
 
-        /*
-         populate the map queryToDocIds with pairs of <DocLevelQuery object from queries in monitor metadata &
-         list of matched docId from inputRunResults>
-         this fixes the issue of passing id, name, tags fields of DocLevelQuery object correctly to TriggerExpressionParser
-         */
-        queries.forEach {
-            if (inputRunResults.containsKey(it.id)) {
-                queryToDocIds[it] = inputRunResults[it.id]!!
-            }
-        }
-
-        val idQueryMap: Map<String, DocLevelQuery> = queries.associateBy { it.id }
-
-        val triggerResults = mutableMapOf<String, DocumentLevelTriggerRunResult>()
-        // If there are no triggers defined, we still want to generate findings
-        if (monitor.triggers.isEmpty()) {
-            if (dryrun == false && monitor.id != Monitor.NO_ID) {
-                docsToQueries.forEach {
-                    val triggeredQueries = it.value.map { queryId -> idQueryMap[queryId]!! }
-                    createFindings(monitor, monitorCtx, triggeredQueries, it.key, true)
+            /*
+             populate the map queryToDocIds with pairs of <DocLevelQuery object from queries in monitor metadata &
+             list of matched docId from inputRunResults>
+             this fixes the issue of passing id, name, tags fields of DocLevelQuery object correctly to TriggerExpressionParser
+             */
+            queries.forEach {
+                if (inputRunResults.containsKey(it.id)) {
+                    queryToDocIds[it] = inputRunResults[it.id]!!
                 }
             }
-        } else {
+
+            val idQueryMap: Map<String, DocLevelQuery> = queries.associateBy { it.id }
+
+            val triggerResults = mutableMapOf<String, DocumentLevelTriggerRunResult>()
             monitor.triggers.forEach {
                 triggerResults[it.id] = runForEachDocTrigger(
                     monitorCtx,
@@ -239,24 +219,34 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     dryrun
                 )
             }
-        }
 
-        // Don't update monitor if this is a test monitor
-        if (!isTempMonitor) {
-            // If any error happened during trigger execution, upsert monitor error alert
-            val errorMessage = constructErrorMessageFromTriggerResults(triggerResults = triggerResults)
-            if (errorMessage.isNotEmpty()) {
-                monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor = monitor, errorMessage = errorMessage)
+            // Don't update monitor if this is a test monitor
+            if (!isTempMonitor) {
+                // If any error happened during trigger execution, upsert monitor error alert
+                val errorMessage = constructErrorMessageFromTriggerResults(triggerResults = triggerResults)
+                if (errorMessage.isNotEmpty()) {
+                    monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor = monitor, errorMessage = errorMessage)
+                }
+
+                MonitorMetadataService.upsertMetadata(
+                    monitorMetadata.copy(lastRunContext = updatedLastRunContext),
+                    true
+                )
             }
 
-            MonitorMetadataService.upsertMetadata(
-                monitorMetadata.copy(lastRunContext = updatedLastRunContext),
-                true
+            // TODO: Update the Document as part of the Trigger and return back the trigger action result
+            return monitorResult.copy(triggerResults = triggerResults)
+        } catch (e: Exception) {
+            val errorMessage = ExceptionsHelper.detailedMessage(e)
+            monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor, errorMessage)
+            logger.error("Failed running Document-level-monitor ${monitor.name}", e)
+            val alertingException = AlertingException(
+                errorMessage,
+                RestStatus.INTERNAL_SERVER_ERROR,
+                e
             )
+            return monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
         }
-
-        // TODO: Update the Document as part of the Trigger and return back the trigger action result
-        return monitorResult.copy(triggerResults = triggerResults)
     }
 
     private fun constructErrorMessageFromTriggerResults(
