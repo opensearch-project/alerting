@@ -40,15 +40,14 @@ import org.opensearch.commons.alerting.model.AggregationResultBucket
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.DataSources
-import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.NoOpTrigger
 import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.commons.alerting.model.action.AlertCategory
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
-import org.opensearch.script.Script
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortOrder
 import java.time.Instant
@@ -197,12 +196,10 @@ class AlertService(
         alertError: AlertError
     ): Alert {
         val currentTime = Instant.now()
-        // TODO make Alert constructor without trigger param so that we don't have to create this dummy trigger
-        val trigger = DocumentLevelTrigger(id = "", name = "${monitor.id}ExecutionError", severity = "", listOf(), Script(""))
         return Alert(
-            id = id, monitor = monitor, trigger = trigger, startTime = currentTime,
+            id = id, monitor = monitor, trigger = NoOpTrigger(), startTime = currentTime,
             lastNotificationTime = currentTime, state = Alert.State.ERROR, errorMessage = alertError?.message,
-            schemaVersion = IndexUtils.alertIndexSchemaVersion, findingIds = listOf(), relatedDocIds = listOf()
+            schemaVersion = IndexUtils.alertIndexSchemaVersion
         )
     }
 

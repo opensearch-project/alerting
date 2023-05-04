@@ -283,6 +283,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 )
             indexRequests.add(indexRequest)
         }
+        log.debug("bulk inserting percolate [${queries.size}] queries")
         if (indexRequests.isNotEmpty()) {
             val bulkResponse: BulkResponse = client.suspendUntil {
                 client.bulk(
