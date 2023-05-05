@@ -13,6 +13,7 @@ import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.delete.DeleteRequest
 import org.opensearch.action.index.IndexRequest
+import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.WriteRequest
@@ -40,6 +41,7 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.NoOpTrigger
 import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.commons.alerting.model.action.AlertCategory
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -47,6 +49,7 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.search.sort.SortOrder
 import java.time.Instant
 import java.util.UUID
 
@@ -187,6 +190,19 @@ class AlertService(
         )
     }
 
+    fun composeMonitorErrorAlert(
+        id: String,
+        monitor: Monitor,
+        alertError: AlertError
+    ): Alert {
+        val currentTime = Instant.now()
+        return Alert(
+            id = id, monitor = monitor, trigger = NoOpTrigger(), startTime = currentTime,
+            lastNotificationTime = currentTime, state = Alert.State.ERROR, errorMessage = alertError?.message,
+            schemaVersion = IndexUtils.alertIndexSchemaVersion
+        )
+    }
+
     fun updateActionResultsForBucketLevelAlert(
         currentAlert: Alert,
         actionResults: Map<String, ActionRunResult>,
@@ -279,6 +295,60 @@ class AlertService(
                 schemaVersion = IndexUtils.alertIndexSchemaVersion
             )
         } ?: listOf()
+    }
+
+    suspend fun upsertMonitorErrorAlert(monitor: Monitor, errorMessage: String) {
+        val errorAlertIdPrefix = "error-alert"
+        val newErrorAlertId = "$errorAlertIdPrefix-${monitor.id}-${UUID.randomUUID()}"
+
+        val searchRequest = SearchRequest("${monitor.dataSources.alertsIndex}*")
+            .source(
+                SearchSourceBuilder()
+                    .sort(Alert.START_TIME_FIELD, SortOrder.DESC)
+                    .query(
+                        QueryBuilders.boolQuery()
+                            .must(QueryBuilders.queryStringQuery("${Alert.ALERT_ID_FIELD}:$errorAlertIdPrefix*"))
+                            .must(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, monitor.id))
+                            .must(QueryBuilders.termQuery(Alert.STATE_FIELD, Alert.State.ERROR))
+                    )
+            )
+        val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
+
+        var alert = composeMonitorErrorAlert(newErrorAlertId, monitor, AlertError(Instant.now(), errorMessage))
+
+        if (searchResponse.hits.totalHits.value > 0L) {
+            if (searchResponse.hits.totalHits.value > 1L) {
+                logger.warn("There are [${searchResponse.hits.totalHits.value}] error alerts for monitor [${monitor.id}]")
+            }
+            // Deserialize first/latest Alert
+            val hit = searchResponse.hits.hits[0]
+            val xcp = contentParser(hit.sourceRef)
+            val existingErrorAlert = Alert.parse(xcp, hit.id, hit.version)
+
+            val currentTime = Instant.now()
+            alert = if (alert.errorMessage != existingErrorAlert.errorMessage) {
+                var newErrorHistory = existingErrorAlert.errorHistory.update(
+                    AlertError(existingErrorAlert.startTime, existingErrorAlert.errorMessage!!)
+                )
+                alert.copy(
+                    id = existingErrorAlert.id,
+                    errorHistory = newErrorHistory,
+                    startTime = currentTime,
+                    lastNotificationTime = currentTime
+                )
+            } else {
+                existingErrorAlert.copy(startTime = Instant.now(), lastNotificationTime = currentTime)
+            }
+        }
+
+        val alertIndexRequest = IndexRequest(monitor.dataSources.alertsIndex)
+            .routing(alert.monitorId)
+            .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
+            .opType(DocWriteRequest.OpType.INDEX)
+            .id(alert.id)
+
+        val indexResponse: IndexResponse = client.suspendUntil { index(alertIndexRequest, it) }
+        logger.debug("Monitor error Alert successfully upserted. Op result: ${indexResponse.result}")
     }
 
     suspend fun saveAlerts(

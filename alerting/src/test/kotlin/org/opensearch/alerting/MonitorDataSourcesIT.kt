@@ -7,12 +7,14 @@ package org.opensearch.alerting
 
 import org.junit.Assert
 import org.opensearch.action.admin.cluster.state.ClusterStateRequest
+import org.opensearch.action.admin.indices.close.CloseIndexRequest
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
 import org.opensearch.action.admin.indices.delete.DeleteIndexRequest
 import org.opensearch.action.admin.indices.get.GetIndexRequest
 import org.opensearch.action.admin.indices.get.GetIndexResponse
 import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
+import org.opensearch.action.admin.indices.open.OpenIndexRequest
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
 import org.opensearch.action.fieldcaps.FieldCapabilitiesRequest
 import org.opensearch.action.search.SearchRequest
@@ -24,6 +26,7 @@ import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.transport.AlertingSingleNodeTestCase
 import org.opensearch.alerting.util.DocLevelMonitorQueries
+import org.opensearch.alerting.util.DocLevelMonitorQueries.Companion.INDEX_PATTERN_SUFFIX
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
@@ -41,6 +44,7 @@ import org.opensearch.commons.alerting.model.Table
 import org.opensearch.index.mapper.MapperService
 import org.opensearch.index.query.MatchQueryBuilder
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.script.Script
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase
 import java.time.ZonedDateTime
@@ -571,6 +575,109 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals("Findings saved for test monitor", 1, findings.size)
         assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
         assertEquals("Didn't match all 7 queries", 7, findings[0].docLevelQueries.size)
+    }
+
+    fun `test monitor error alert created and updated with new error`() {
+        val docQuery = DocLevelQuery(query = "source:12345", name = "1")
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(docQuery)
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+
+        val testDoc = """{
+            "message" : "This is an error from IAD region"
+        }"""
+
+        val monitorResponse = createMonitor(monitor)
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+
+        monitor = monitorResponse!!.monitor
+        val id = monitorResponse.id
+
+        // Close index to force error alert
+        client().admin().indices().close(CloseIndexRequest(index)).get()
+
+        var executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 0)
+        searchAlerts(id)
+        var table = Table("asc", "id", null, 1, 0, "")
+        var getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage == "IndexClosedException[closed]")
+        // Reopen index
+        client().admin().indices().open(OpenIndexRequest(index)).get()
+        // Close queryIndex
+        client().admin().indices().close(CloseIndexRequest(DOC_LEVEL_QUERIES_INDEX + INDEX_PATTERN_SUFFIX)).get()
+
+        indexDoc(index, "1", testDoc)
+
+        executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 0)
+        searchAlerts(id)
+        table = Table("asc", "id", null, 10, 0, "")
+        getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        Assert.assertTrue(getAlertsResponse.alerts[0].errorHistory[0].message == "IndexClosedException[closed]")
+        Assert.assertEquals(1, getAlertsResponse.alerts[0].errorHistory.size)
+        Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage!!.contains("Failed to run percolate search"))
+    }
+
+    fun `test monitor error alert created trigger run errored 2 times same error`() {
+        val docQuery = DocLevelQuery(query = "source:12345", name = "1")
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(docQuery)
+        )
+        val trigger = randomDocumentLevelTrigger(condition = Script("invalid script code"))
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+
+        val monitorResponse = createMonitor(monitor)
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+
+        monitor = monitorResponse!!.monitor
+        val id = monitorResponse.id
+
+        var executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        searchAlerts(id)
+        var table = Table("asc", "id", null, 1, 0, "")
+        var getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage!!.contains("Trigger errors"))
+
+        val oldAlertStartTime = getAlertsResponse.alerts[0].startTime
+
+        executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        searchAlerts(id)
+        table = Table("asc", "id", null, 10, 0, "")
+        getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        Assert.assertEquals(0, getAlertsResponse.alerts[0].errorHistory.size)
+        Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage!!.contains("Trigger errors"))
+        Assert.assertTrue(getAlertsResponse.alerts[0].startTime.isAfter(oldAlertStartTime))
     }
 
     fun `test execute monitor with custom query index and nested mappings`() {

@@ -351,6 +351,7 @@ class AlertIndices(
         }
         if (existsResponse.isExists) return true
 
+        logger.debug("index: [$index] schema mappings: [$schemaMapping]")
         val request = CreateIndexRequest(index)
             .mapping(schemaMapping)
             .settings(Settings.builder().put("index.hidden", true).build())
@@ -474,7 +475,7 @@ class AlertIndices(
             clusterStateRequest,
             object : ActionListener<ClusterStateResponse> {
                 override fun onResponse(clusterStateResponse: ClusterStateResponse) {
-                    if (!clusterStateResponse.state.metadata.indices.isEmpty()) {
+                    if (clusterStateResponse.state.metadata.indices.isNotEmpty()) {
                         val indicesToDelete = getIndicesToDelete(clusterStateResponse)
                         logger.info("Deleting old $tag indices viz $indicesToDelete")
                         deleteAllOldHistoryIndices(indicesToDelete)
