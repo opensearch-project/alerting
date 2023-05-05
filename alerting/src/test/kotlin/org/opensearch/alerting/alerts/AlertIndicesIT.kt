@@ -216,6 +216,9 @@ class AlertIndicesIT : AlertingRestTestCase() {
         // Check if alert is active and alert index is created
         val activeAlert = searchAlerts(monitor)
         assertEquals("1 alert should be active", 1, activeAlert.size)
+
+        waitUntil { return@waitUntil getAlertIndices().size == 2 }
+
         assertEquals("Did not find 2 alert indices", 2, getAlertIndices().size)
         // History index is created but is empty
         assertEquals(0, getAlertHistoryDocCount())
@@ -273,6 +276,9 @@ class AlertIndicesIT : AlertingRestTestCase() {
         // Check if alert is active and alert index is created
         val activeAlert = searchAlerts(monitor)
         assertEquals("1 alert should be active", 1, activeAlert.size)
+
+        waitUntil { return@waitUntil getAlertIndices().size == 2 }
+
         assertEquals("Did not find 2 alert indices", 2, getAlertIndices().size)
         // History index is created but is empty
         assertEquals(0, getAlertHistoryDocCount())

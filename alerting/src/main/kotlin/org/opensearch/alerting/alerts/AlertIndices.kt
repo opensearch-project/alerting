@@ -137,23 +137,18 @@ class AlertIndices(
     }
 
     @Volatile private var alertHistoryEnabled = AlertingSettings.ALERT_HISTORY_ENABLED.get(settings)
-
     @Volatile private var findingHistoryEnabled = AlertingSettings.FINDING_HISTORY_ENABLED.get(settings)
 
     @Volatile private var alertHistoryMaxDocs = AlertingSettings.ALERT_HISTORY_MAX_DOCS.get(settings)
-
     @Volatile private var findingHistoryMaxDocs = AlertingSettings.FINDING_HISTORY_MAX_DOCS.get(settings)
 
     @Volatile private var alertHistoryMaxAge = AlertingSettings.ALERT_HISTORY_INDEX_MAX_AGE.get(settings)
-
     @Volatile private var findingHistoryMaxAge = AlertingSettings.FINDING_HISTORY_INDEX_MAX_AGE.get(settings)
 
     @Volatile private var alertHistoryRolloverPeriod = AlertingSettings.ALERT_HISTORY_ROLLOVER_PERIOD.get(settings)
-
     @Volatile private var findingHistoryRolloverPeriod = AlertingSettings.FINDING_HISTORY_ROLLOVER_PERIOD.get(settings)
 
     @Volatile private var alertHistoryRetentionPeriod = AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD.get(settings)
-
     @Volatile private var findingHistoryRetentionPeriod = AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD.get(settings)
 
     @Volatile private var requestTimeout = AlertingSettings.REQUEST_TIMEOUT.get(settings)
@@ -454,25 +449,17 @@ class AlertIndices(
 
     private fun rolloverAlertHistoryIndex() {
         rolloverIndex(
-            alertHistoryIndexInitialized,
-            ALERT_HISTORY_WRITE_INDEX,
-            ALERT_HISTORY_INDEX_PATTERN,
-            alertMapping(),
-            alertHistoryMaxDocs,
-            alertHistoryMaxAge,
-            ALERT_HISTORY_WRITE_INDEX
+            alertHistoryIndexInitialized, ALERT_HISTORY_WRITE_INDEX,
+            ALERT_HISTORY_INDEX_PATTERN, alertMapping(),
+            alertHistoryMaxDocs, alertHistoryMaxAge, ALERT_HISTORY_WRITE_INDEX
         )
     }
 
     private fun rolloverFindingHistoryIndex() {
         rolloverIndex(
-            findingHistoryIndexInitialized,
-            FINDING_HISTORY_WRITE_INDEX,
-            FINDING_HISTORY_INDEX_PATTERN,
-            findingMapping(),
-            findingHistoryMaxDocs,
-            findingHistoryMaxAge,
-            FINDING_HISTORY_WRITE_INDEX
+            findingHistoryIndexInitialized, FINDING_HISTORY_WRITE_INDEX,
+            FINDING_HISTORY_INDEX_PATTERN, findingMapping(),
+            findingHistoryMaxDocs, findingHistoryMaxAge, FINDING_HISTORY_WRITE_INDEX
         )
     }
 
@@ -488,7 +475,7 @@ class AlertIndices(
             clusterStateRequest,
             object : ActionListener<ClusterStateResponse> {
                 override fun onResponse(clusterStateResponse: ClusterStateResponse) {
-                    if (!clusterStateResponse.state.metadata.indices.isEmpty) {
+                    if (clusterStateResponse.state.metadata.indices.isNotEmpty()) {
                         val indicesToDelete = getIndicesToDelete(clusterStateResponse)
                         logger.info("Deleting old $tag indices viz $indicesToDelete")
                         deleteAllOldHistoryIndices(indicesToDelete)
@@ -523,7 +510,7 @@ class AlertIndices(
     ): String? {
         val creationTime = indexMetadata.creationDate
         if ((Instant.now().toEpochMilli() - creationTime) > retentionPeriodMillis) {
-            val alias = indexMetadata.aliases.firstOrNull { writeIndex == it.value.alias }
+            val alias = indexMetadata.aliases.entries.firstOrNull { writeIndex == it.value.alias }
             if (alias != null) {
                 if (historyEnabled) {
                     // If the index has the write alias and history is enabled, don't delete the index
