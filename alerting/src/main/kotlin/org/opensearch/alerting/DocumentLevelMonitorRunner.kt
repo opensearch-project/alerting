@@ -49,6 +49,7 @@ import org.opensearch.commons.alerting.util.string
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.index.query.BoolQueryBuilder
+import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.percolator.PercolateQueryBuilderExt
 import org.opensearch.rest.RestStatus
@@ -553,11 +554,11 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         monitorMetadata: MonitorMetadata,
         index: String
     ): SearchHits {
-        val boolQueryBuilder = BoolQueryBuilder().filter(QueryBuilders.matchQuery("index", index))
+        val boolQueryBuilder = BoolQueryBuilder().must(QueryBuilders.matchQuery("index", index).operator(Operator.AND))
 
         val percolateQueryBuilder = PercolateQueryBuilderExt("query", docs, XContentType.JSON)
         if (monitor.id.isNotEmpty()) {
-            boolQueryBuilder.filter(QueryBuilders.matchQuery("monitor_id", monitor.id))
+            boolQueryBuilder.must(QueryBuilders.matchQuery("monitor_id", monitor.id).operator(Operator.AND))
         }
         boolQueryBuilder.filter(percolateQueryBuilder)
 
