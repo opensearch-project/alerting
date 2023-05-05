@@ -212,7 +212,7 @@ object MonitorMetadataService :
 
             indices.forEach { indexName ->
                 if (!lastRunContext.containsKey(indexName)) {
-                    lastRunContext[indexName] = createRunContextForIndex(index)
+                    lastRunContext[indexName] = createRunContextForIndex(indexName)
                 }
             }
         } catch (e: RemoteTransportException) {

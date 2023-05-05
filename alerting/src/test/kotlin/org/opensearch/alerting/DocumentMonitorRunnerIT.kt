@@ -20,6 +20,7 @@ import org.opensearch.script.Script
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit.MILLIS
+import java.util.Locale
 
 class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
@@ -342,9 +343,12 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("5"))
     }
 
-    fun `test execute monitor with wildcard index that generates alerts and findings`() {
-        val testIndex = createTestIndex("test1")
-        val testIndex2 = createTestIndex("test2")
+    fun `test execute monitor with wildcard index that generates alerts and findings for EQUALS query operator`() {
+        val testIndexPrefix = "test-index-${randomAlphaOfLength(10).lowercase(Locale.ROOT)}"
+        val testQueryName = "wildcard-test-query"
+        val testIndex = createTestIndex("${testIndexPrefix}1")
+        val testIndex2 = createTestIndex("${testIndexPrefix}2")
+
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
             "message" : "This is an error from IAD region",
@@ -352,10 +356,54 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             "test_field" : "us-west-2"
         }"""
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
-        val docLevelInput = DocLevelMonitorInput("description", listOf("test*"), listOf(docQuery))
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = testQueryName)
+        val docLevelInput = DocLevelMonitorInput("description", listOf("$testIndexPrefix*"), listOf(docQuery))
 
-        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val trigger = randomDocumentLevelTrigger(condition = Script("query[name=$testQueryName]"))
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex2, "5", testDoc)
+
+        val response = executeMonitor(monitor.id)
+
+        val output = entityAsMap(response)
+
+        assertEquals(monitor.name, output["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
+        assertEquals("Incorrect search result", 2, matchingDocsToQuery.size)
+        assertTrue("Incorrect search result", matchingDocsToQuery.containsAll(listOf("1|$testIndex", "5|$testIndex2")))
+
+        val alerts = searchAlertsWithFilter(monitor)
+        assertEquals("Alert saved for test monitor", 2, alerts.size)
+
+        val findings = searchFindings(monitor)
+        assertEquals("Findings saved for test monitor", 2, findings.size)
+        val foundFindings = findings.filter { it.relatedDocIds.contains("1") || it.relatedDocIds.contains("5") }
+        assertEquals("Didn't find findings for docs 1 and 5", 2, foundFindings.size)
+    }
+
+    fun `test execute monitor with wildcard index that generates alerts and findings for NOT EQUALS query operator`() {
+        val testIndexPrefix = "test-index-${randomAlphaOfLength(10).lowercase(Locale.ROOT)}"
+        val testQueryName = "wildcard-test-query"
+        val testIndex = createTestIndex("${testIndexPrefix}1")
+        val testIndex2 = createTestIndex("${testIndexPrefix}2")
+
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val docQuery = DocLevelQuery(query = "NOT (test_field:\"us-west-1\")", name = testQueryName)
+        val docLevelInput = DocLevelMonitorInput("description", listOf("$testIndexPrefix*"), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = Script("query[name=$testQueryName]"))
         val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
         assertNotNull(monitor.id)
 
