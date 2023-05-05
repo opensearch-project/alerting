@@ -22,6 +22,8 @@ import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.action.SearchMonitorAction
 import org.opensearch.alerting.action.SearchMonitorRequest
 import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_HISTORY_WRITE_INDEX
+import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.transport.AlertingSingleNodeTestCase
@@ -678,6 +680,65 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(0, getAlertsResponse.alerts[0].errorHistory.size)
         Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage!!.contains("Trigger errors"))
         Assert.assertTrue(getAlertsResponse.alerts[0].startTime.isAfter(oldAlertStartTime))
+    }
+
+    fun `test monitor error alert cleared after successful monitor run`() {
+        val docQuery = DocLevelQuery(query = "source:12345", name = "1")
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(docQuery)
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger)
+        )
+
+        val monitorResponse = createMonitor(monitor)
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+
+        monitor = monitorResponse!!.monitor
+        val id = monitorResponse.id
+
+        // Close index to force error alert
+        client().admin().indices().close(CloseIndexRequest(index)).get()
+
+        var executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 0)
+        searchAlerts(id)
+        var table = Table("asc", "id", null, 1, 0, "")
+        var getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage == "IndexClosedException[closed]")
+        Assert.assertNull(getAlertsResponse.alerts[0].endTime)
+
+        // Open index to have monitor run successfully
+        client().admin().indices().open(OpenIndexRequest(index)).get()
+        // Execute monitor again and expect successful run
+        executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        // Verify that alert is moved to history index
+        searchAlerts(id, ALERT_INDEX)
+        table = Table("asc", "id", null, 10, 0, "")
+        getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 0)
+
+        searchAlerts(id, ALERT_HISTORY_WRITE_INDEX)
+        table = Table("asc", "id", null, 10, 0, "")
+        getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage == "IndexClosedException[closed]")
+        Assert.assertNotNull(getAlertsResponse.alerts[0].endTime)
     }
 
     fun `test execute monitor with custom query index and nested mappings`() {

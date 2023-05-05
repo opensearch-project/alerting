@@ -236,6 +236,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 val errorMessage = constructErrorMessageFromTriggerResults(triggerResults = triggerResults)
                 if (errorMessage.isNotEmpty()) {
                     monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor = monitor, errorMessage = errorMessage)
+                } else {
+                    onSuccessfullMonitorRun(monitorCtx, monitor)
                 }
 
                 MonitorMetadataService.upsertMetadata(
@@ -256,6 +258,16 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 e
             )
             return monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
+        }
+    }
+
+    private suspend fun onSuccessfullMonitorRun(monitorCtx: MonitorRunnerExecutionContext, monitor: Monitor) {
+        monitorCtx.alertService!!.clearMonitorErrorAlert(monitor)
+        if (monitor.dataSources.alertsHistoryIndex != null) {
+            monitorCtx.alertService!!.moveClearedErrorAlertsToHistory(
+                monitor.dataSources.alertsIndex,
+                monitor.dataSources.alertsHistoryIndex!!
+            )
         }
     }
 
