@@ -20,6 +20,7 @@ import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.MonitorRunResult
+import org.opensearch.alerting.model.userErrorMessage
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.util.AlertingException
@@ -192,53 +193,88 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 }
             }
             monitorResult = monitorResult.copy(inputResults = InputRunResults(listOf(inputRunResults)))
+
+            /*
+             populate the map queryToDocIds with pairs of <DocLevelQuery object from queries in monitor metadata &
+             list of matched docId from inputRunResults>
+             this fixes the issue of passing id, name, tags fields of DocLevelQuery object correctly to TriggerExpressionParser
+             */
+            queries.forEach {
+                if (inputRunResults.containsKey(it.id)) {
+                    queryToDocIds[it] = inputRunResults[it.id]!!
+                }
+            }
+
+            val idQueryMap: Map<String, DocLevelQuery> = queries.associateBy { it.id }
+
+            val triggerResults = mutableMapOf<String, DocumentLevelTriggerRunResult>()
+            // If there are no triggers defined, we still want to generate findings
+            if (monitor.triggers.isEmpty()) {
+                if (dryrun == false && monitor.id != Monitor.NO_ID) {
+                    docsToQueries.forEach {
+                        val triggeredQueries = it.value.map { queryId -> idQueryMap[queryId]!! }
+                        createFindings(monitor, monitorCtx, triggeredQueries, it.key, true)
+                    }
+                }
+            } else {
+                monitor.triggers.forEach {
+                    triggerResults[it.id] = runForEachDocTrigger(
+                        monitorCtx,
+                        monitorResult,
+                        it as DocumentLevelTrigger,
+                        monitor,
+                        idQueryMap,
+                        docsToQueries,
+                        queryToDocIds,
+                        dryrun
+                    )
+                }
+            }
+            // Don't update monitor if this is a test monitor
+            if (!isTempMonitor) {
+                // If any error happened during trigger execution, upsert monitor error alert
+                val errorMessage = constructErrorMessageFromTriggerResults(triggerResults = triggerResults)
+                if (errorMessage.isNotEmpty()) {
+                    monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor = monitor, errorMessage = errorMessage)
+                }
+
+                MonitorMetadataService.upsertMetadata(
+                    monitorMetadata.copy(lastRunContext = updatedLastRunContext),
+                    true
+                )
+            }
+
+            // TODO: Update the Document as part of the Trigger and return back the trigger action result
+            return monitorResult.copy(triggerResults = triggerResults)
         } catch (e: Exception) {
-            logger.error("Failed to start Document-level-monitor ${monitor.name}", e)
+            val errorMessage = ExceptionsHelper.detailedMessage(e)
+            monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor, errorMessage)
+            logger.error("Failed running Document-level-monitor ${monitor.name}", e)
             val alertingException = AlertingException(
-                ExceptionsHelper.unwrapCause(e).cause?.message.toString(),
+                errorMessage,
                 RestStatus.INTERNAL_SERVER_ERROR,
                 e
             )
-            monitorResult = monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
+            return monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
         }
+    }
 
-        /*
-         populate the map queryToDocIds with pairs of <DocLevelQuery object from queries in monitor metadata &
-         list of matched docId from inputRunResults>
-         this fixes the issue of passing id, name, tags fields of DocLevelQuery object correctly to TriggerExpressionParser
-         */
-        queries.forEach {
-            if (inputRunResults.containsKey(it.id)) {
-                queryToDocIds[it] = inputRunResults[it.id]!!
+    private fun constructErrorMessageFromTriggerResults(
+        triggerResults: MutableMap<String, DocumentLevelTriggerRunResult>? = null
+    ): String {
+        var errorMessage = ""
+        if (triggerResults != null) {
+            val triggersErrorBuilder = StringBuilder()
+            triggerResults.forEach {
+                if (it.value.error != null) {
+                    triggersErrorBuilder.append("[${it.key}]: [${it.value.error!!.userErrorMessage()}]").append(" | ")
+                }
+            }
+            if (triggersErrorBuilder.isNotEmpty()) {
+                errorMessage = "Trigger errors: $triggersErrorBuilder"
             }
         }
-
-        val idQueryMap: Map<String, DocLevelQuery> = queries.associateBy { it.id }
-
-        val triggerResults = mutableMapOf<String, DocumentLevelTriggerRunResult>()
-        monitor.triggers.forEach {
-            triggerResults[it.id] = runForEachDocTrigger(
-                monitorCtx,
-                monitorResult,
-                it as DocumentLevelTrigger,
-                monitor,
-                idQueryMap,
-                docsToQueries,
-                queryToDocIds,
-                dryrun
-            )
-        }
-
-        // Don't update monitor if this is a test monitor
-        if (!isTempMonitor) {
-            MonitorMetadataService.upsertMetadata(
-                monitorMetadata.copy(lastRunContext = updatedLastRunContext),
-                true
-            )
-        }
-
-        // TODO: Update the Document as part of the Trigger and return back the trigger action result
-        return monitorResult.copy(triggerResults = triggerResults)
+        return errorMessage
     }
 
     private suspend fun runForEachDocTrigger(
@@ -279,16 +315,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             val alert = monitorCtx.alertService!!.composeDocLevelAlert(
                 listOf(it.first),
                 listOf(it.second),
-                triggerCtx,
-                monitorResult.alertError() ?: triggerResult.alertError()
-            )
-            alerts.add(alert)
-        }
-
-        if (findingDocPairs.isEmpty() && monitorResult.error != null) {
-            val alert = monitorCtx.alertService!!.composeDocLevelAlert(
-                listOf(),
-                listOf(),
                 triggerCtx,
                 monitorResult.alertError() ?: triggerResult.alertError()
             )
@@ -459,9 +485,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         if (response.status() !== RestStatus.OK) {
             throw IOException("Failed to get max seq no for shard: $shard")
         }
-        if (response.hits.hits.isEmpty()) {
+        if (response.hits.hits.isEmpty())
             return -1L
-        }
 
         return response.hits.hits[0].seqNo
     }
@@ -567,8 +592,15 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         searchSourceBuilder.query(boolQueryBuilder)
         searchRequest.source(searchSourceBuilder)
 
-        val response: SearchResponse = monitorCtx.client!!.suspendUntil {
-            monitorCtx.client!!.execute(SearchAction.INSTANCE, searchRequest, it)
+        var response: SearchResponse
+        try {
+            response = monitorCtx.client!!.suspendUntil {
+                monitorCtx.client!!.execute(SearchAction.INSTANCE, searchRequest, it)
+            }
+        } catch (e: Exception) {
+            throw IllegalStateException(
+                "Failed to run percolate search for sourceIndex [$index] and queryIndex [$queryIndex] for ${docs.size} document(s)", e
+            )
         }
 
         if (response.status() !== RestStatus.OK) {
