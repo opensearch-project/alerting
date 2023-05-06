@@ -665,7 +665,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage!!.contains("Trigger errors"))
 
-        val oldAlertStartTime = getAlertsResponse.alerts[0].startTime
+        val oldLastNotificationTime = getAlertsResponse.alerts[0].lastNotificationTime
 
         executeMonitorResponse = executeMonitor(monitor, id, false)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
@@ -679,7 +679,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         Assert.assertEquals(0, getAlertsResponse.alerts[0].errorHistory.size)
         Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage!!.contains("Trigger errors"))
-        Assert.assertTrue(getAlertsResponse.alerts[0].startTime.isAfter(oldAlertStartTime))
+        Assert.assertTrue(getAlertsResponse.alerts[0].lastNotificationTime!!.isAfter(oldLastNotificationTime))
     }
 
     fun `test monitor error alert cleared after successful monitor run`() {
