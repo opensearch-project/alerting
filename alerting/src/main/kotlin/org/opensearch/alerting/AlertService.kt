@@ -316,9 +316,8 @@ class AlertService(
                     .sort(Alert.START_TIME_FIELD, SortOrder.DESC)
                     .query(
                         QueryBuilders.boolQuery()
-                            .must(QueryBuilders.queryStringQuery("${Alert.ALERT_ID_FIELD}:$ERROR_ALERT_ID_PREFIX*"))
                             .must(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, monitor.id))
-                            .must(QueryBuilders.termQuery(Alert.STATE_FIELD, Alert.State.ERROR))
+                            .must(QueryBuilders.termQuery(Alert.STATE_FIELD, Alert.State.ERROR.name))
                     )
             )
         val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
@@ -354,6 +353,7 @@ class AlertService(
             .routing(alert.monitorId)
             .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
             .opType(DocWriteRequest.OpType.INDEX)
+            .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
             .id(alert.id)
 
         val indexResponse: IndexResponse = client.suspendUntil { index(alertIndexRequest, it) }
@@ -361,21 +361,26 @@ class AlertService(
     }
 
     suspend fun clearMonitorErrorAlert(monitor: Monitor) {
+        val currentTime = Instant.now()
         try {
-            val searchRequest = SearchRequest("${monitor.dataSources.alertsIndex}*")
+            val searchRequest = SearchRequest("${monitor.dataSources.alertsIndex}")
                 .source(
                     SearchSourceBuilder()
                         .sort(Alert.START_TIME_FIELD, SortOrder.DESC)
                         .query(
                             QueryBuilders.boolQuery()
-                                .must(QueryBuilders.queryStringQuery("${Alert.ALERT_ID_FIELD}:$ERROR_ALERT_ID_PREFIX*"))
                                 .must(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, monitor.id))
-                                .must(QueryBuilders.termQuery(Alert.STATE_FIELD, Alert.State.ERROR))
+                                .must(QueryBuilders.termQuery(Alert.STATE_FIELD, Alert.State.ERROR.name))
                         )
                 )
             val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
+            // If there's no error alert present, there's nothing to clear. We can stop here.
+            if (searchResponse.hits.totalHits.value == 0L) {
+                return
+            }
 
-            if (searchResponse.hits.totalHits.value > 0L) {
+            val indexRequests = mutableListOf<IndexRequest>()
+            searchResponse.hits.hits.forEach { hit ->
                 if (searchResponse.hits.totalHits.value > 1L) {
                     logger.warn("Found [${searchResponse.hits.totalHits.value}] error alerts for monitor [${monitor.id}] while clearing")
                 }
@@ -385,21 +390,30 @@ class AlertService(
                 val existingErrorAlert = Alert.parse(xcp, hit.id, hit.version)
 
                 val updatedAlert = existingErrorAlert.copy(
-                    endTime = Instant.now()
+                    endTime = currentTime
                 )
 
-                val indexRequest = IndexRequest(monitor.dataSources.alertsIndex)
+                indexRequests += IndexRequest(monitor.dataSources.alertsIndex)
                     .routing(monitor.id)
                     .id(updatedAlert.id)
                     .source(updatedAlert.toXContentWithUser(XContentFactory.jsonBuilder()))
                     .opType(DocWriteRequest.OpType.INDEX)
-                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+            }
 
-                val indexResponse: IndexResponse = client.suspendUntil { index(indexRequest, it) }
-                logger.debug("Error alert successfully cleared. End time set to: ${updatedAlert.endTime}")
+            val bulkResponse: BulkResponse = client.suspendUntil {
+                bulk(BulkRequest().add(indexRequests).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE), it)
+            }
+            if (bulkResponse.hasFailures()) {
+                bulkResponse.items.forEach { item ->
+                    if (item.isFailed) {
+                        logger.debug("Failed clearing error alert ${item.id} of monitor [${monitor.id}]")
+                    }
+                }
+            } else {
+                logger.debug("[${bulkResponse.items.size}] Error Alerts successfully cleared. End time set to: $currentTime")
             }
         } catch (e: Exception) {
-            logger.error("Error clearing monitor error alert for monitor [${monitor.id}]: ${ExceptionsHelper.detailedMessage(e)}")
+            logger.error("Error clearing monitor error alerts for monitor [${monitor.id}]: ${ExceptionsHelper.detailedMessage(e)}")
         }
     }
 
@@ -407,15 +421,15 @@ class AlertService(
      * Moves already cleared "error alerts" to history index.
      * Error Alert is cleared when endTime timestamp is set, on first successful run after failed run
      * */
-    suspend fun moveClearedErrorAlertsToHistory(alertIndex: String, alertHistoryIndex: String) {
+    suspend fun moveClearedErrorAlertsToHistory(monitorId: String, alertIndex: String, alertHistoryIndex: String) {
         try {
             val searchRequest = SearchRequest(alertIndex)
                 .source(
                     SearchSourceBuilder()
                         .query(
                             QueryBuilders.boolQuery()
-                                .must(QueryBuilders.queryStringQuery("${Alert.ALERT_ID_FIELD}:$ERROR_ALERT_ID_PREFIX*"))
-                                .must(QueryBuilders.termQuery(Alert.STATE_FIELD, Alert.State.ERROR))
+                                .must(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, monitorId))
+                                .must(QueryBuilders.termQuery(Alert.STATE_FIELD, Alert.State.ERROR.name))
                                 .must(QueryBuilders.existsQuery(Alert.END_TIME_FIELD))
                         )
                         .version(true) // Do we need this?
@@ -445,7 +459,9 @@ class AlertService(
                 )
             }
 
-            val bulkResponse: BulkResponse = client.suspendUntil { bulk(BulkRequest().add(copyRequests), it) }
+            val bulkResponse: BulkResponse = client.suspendUntil {
+                bulk(BulkRequest().add(copyRequests).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE), it)
+            }
             if (bulkResponse.hasFailures()) {
                 bulkResponse.items.forEach { item ->
                     if (item.isFailed) {

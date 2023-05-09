@@ -22,8 +22,6 @@ import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.action.SearchMonitorAction
 import org.opensearch.alerting.action.SearchMonitorRequest
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_HISTORY_WRITE_INDEX
-import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.transport.AlertingSingleNodeTestCase
@@ -683,6 +681,9 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test monitor error alert cleared after successful monitor run`() {
+        val customAlertIndex = "custom-alert-index"
+        val customAlertHistoryIndex = "custom-alert-history-index"
+        val customAlertHistoryIndexPattern = "<custom_alert_history_index-{now/d}-1>"
         val docQuery = DocLevelQuery(query = "source:12345", name = "1")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery)
@@ -690,7 +691,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor = randomDocumentLevelMonitor(
             inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
+            triggers = listOf(trigger),
+            dataSources = DataSources(
+                alertsIndex = customAlertIndex,
+                alertsHistoryIndex = customAlertHistoryIndex,
+                alertsHistoryIndexPattern = customAlertHistoryIndexPattern
+            )
         )
 
         val monitorResponse = createMonitor(monitor)
@@ -708,10 +714,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         searchAlerts(id)
         var table = Table("asc", "id", null, 1, 0, "")
         var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, customAlertIndex))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
-        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        Assert.assertEquals(1, getAlertsResponse.alerts.size)
         Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage == "IndexClosedException[closed]")
         Assert.assertNull(getAlertsResponse.alerts[0].endTime)
 
@@ -722,21 +728,19 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         // Verify that alert is moved to history index
-        searchAlerts(id, ALERT_INDEX)
         table = Table("asc", "id", null, 10, 0, "")
         getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, customAlertIndex))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
-        Assert.assertTrue(getAlertsResponse.alerts.size == 0)
+        Assert.assertEquals(0, getAlertsResponse.alerts.size)
 
-        searchAlerts(id, ALERT_HISTORY_WRITE_INDEX)
         table = Table("asc", "id", null, 10, 0, "")
         getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, customAlertHistoryIndex))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
-        Assert.assertTrue(getAlertsResponse.alerts.size == 1)
+        Assert.assertEquals(1, getAlertsResponse.alerts.size)
         Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage == "IndexClosedException[closed]")
         Assert.assertNotNull(getAlertsResponse.alerts[0].endTime)
     }

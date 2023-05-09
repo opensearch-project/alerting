@@ -237,7 +237,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 if (errorMessage.isNotEmpty()) {
                     monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor = monitor, errorMessage = errorMessage)
                 } else {
-                    onSuccessfullMonitorRun(monitorCtx, monitor)
+                    onSuccessfulMonitorRun(monitorCtx, monitor)
                 }
 
                 MonitorMetadataService.upsertMetadata(
@@ -261,10 +261,11 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         }
     }
 
-    private suspend fun onSuccessfullMonitorRun(monitorCtx: MonitorRunnerExecutionContext, monitor: Monitor) {
+    private suspend fun onSuccessfulMonitorRun(monitorCtx: MonitorRunnerExecutionContext, monitor: Monitor) {
         monitorCtx.alertService!!.clearMonitorErrorAlert(monitor)
         if (monitor.dataSources.alertsHistoryIndex != null) {
             monitorCtx.alertService!!.moveClearedErrorAlertsToHistory(
+                monitor.id,
                 monitor.dataSources.alertsIndex,
                 monitor.dataSources.alertsHistoryIndex!!
             )
