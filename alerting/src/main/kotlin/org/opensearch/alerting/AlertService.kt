@@ -27,9 +27,11 @@ import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.util.IndexUtils
+import org.opensearch.alerting.util.MAX_SEARCH_SIZE
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.Client
 import org.opensearch.common.bytes.BytesReference
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
@@ -57,6 +59,7 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortOrder
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -70,8 +73,9 @@ class AlertService(
 
     companion object {
         const val MAX_BUCKET_LEVEL_MONITOR_ALERT_SEARCH_COUNT = 500
-
         const val ERROR_ALERT_ID_PREFIX = "error-alert"
+
+        val ALERTS_SEARCH_TIMEOUT = TimeValue(5, TimeUnit.MINUTES)
     }
 
     private val logger = LogManager.getLogger(AlertService::class.java)
@@ -366,13 +370,16 @@ class AlertService(
             val searchRequest = SearchRequest("${monitor.dataSources.alertsIndex}")
                 .source(
                     SearchSourceBuilder()
+                        .size(MAX_SEARCH_SIZE)
                         .sort(Alert.START_TIME_FIELD, SortOrder.DESC)
                         .query(
                             QueryBuilders.boolQuery()
                                 .must(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, monitor.id))
                                 .must(QueryBuilders.termQuery(Alert.STATE_FIELD, Alert.State.ERROR.name))
                         )
+
                 )
+            searchRequest.cancelAfterTimeInterval = ALERTS_SEARCH_TIMEOUT
             val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
             // If there's no error alert present, there's nothing to clear. We can stop here.
             if (searchResponse.hits.totalHits.value == 0L) {
@@ -385,7 +392,6 @@ class AlertService(
                     logger.warn("Found [${searchResponse.hits.totalHits.value}] error alerts for monitor [${monitor.id}] while clearing")
                 }
                 // Deserialize first/latest Alert
-                val hit = searchResponse.hits.hits[0]
                 val xcp = contentParser(hit.sourceRef)
                 val existingErrorAlert = Alert.parse(xcp, hit.id, hit.version)
 
@@ -426,6 +432,7 @@ class AlertService(
             val searchRequest = SearchRequest(alertIndex)
                 .source(
                     SearchSourceBuilder()
+                        .size(MAX_SEARCH_SIZE)
                         .query(
                             QueryBuilders.boolQuery()
                                 .must(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, monitorId))
@@ -434,6 +441,7 @@ class AlertService(
                         )
                         .version(true) // Do we need this?
                 )
+            searchRequest.cancelAfterTimeInterval = ALERTS_SEARCH_TIMEOUT
             val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
 
             if (searchResponse.hits.totalHits.value == 0L) {
@@ -456,6 +464,7 @@ class AlertService(
                         .version(hit.version)
                         .versionType(VersionType.EXTERNAL_GTE)
                         .id(hit.id)
+                        .timeout(MonitorRunnerService.monitorCtx.indexTimeout)
                 )
             }
 
@@ -480,6 +489,7 @@ class AlertService(
                     .source(alertIndex)
                     .filter(QueryBuilders.termsQuery("_id", alertIds))
                     .refresh(true)
+                    .timeout(ALERTS_SEARCH_TIMEOUT)
                     .execute(
                         object : ActionListener<BulkByScrollResponse> {
                             override fun onResponse(response: BulkByScrollResponse) = cont.resume(response)
