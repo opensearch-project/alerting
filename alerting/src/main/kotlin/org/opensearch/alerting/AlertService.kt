@@ -314,7 +314,7 @@ class AlertService(
     suspend fun upsertMonitorErrorAlert(monitor: Monitor, errorMessage: String) {
         val newErrorAlertId = "$ERROR_ALERT_ID_PREFIX-${monitor.id}-${UUID.randomUUID()}"
 
-        val searchRequest = SearchRequest("${monitor.dataSources.alertsIndex}*")
+        val searchRequest = SearchRequest(monitor.dataSources.alertsIndex)
             .source(
                 SearchSourceBuilder()
                     .sort(Alert.START_TIME_FIELD, SortOrder.DESC)
