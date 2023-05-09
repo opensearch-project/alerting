@@ -23,11 +23,11 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
-import org.opensearch.alerting.DeleteMonitorService
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.WorkflowMetadata
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
@@ -214,17 +214,11 @@ class TransportDeleteWorkflowAction @Inject constructor(
          */
         private suspend fun tryDeletingMonitors(monitors: List<Monitor>, refreshPolicy: RefreshPolicy): List<String> {
             val nonDeletedMonitorIds = mutableListOf<String>()
-
             for (monitor in monitors) {
-                val monitorId = monitor.id
                 try {
-                    val monitorIsWorkflowDelegate = DeleteMonitorService.monitorIsWorkflowDelegate(monitorId)
-                    if (monitorIsWorkflowDelegate) {
-                        nonDeletedMonitorIds.add(monitorId)
-                    }
                     DeleteMonitorService.deleteMonitor(monitor, refreshPolicy)
                 } catch (ex: Exception) {
-                    nonDeletedMonitorIds.add(monitorId)
+                    nonDeletedMonitorIds.add(monitor.id)
                 }
             }
             return nonDeletedMonitorIds
@@ -270,7 +264,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
                 }
                 workflow.copy(id = hit.id, version = hit.version)
             }
-            val workflowMonitors = workflows.filter { it.id != workflowIdToBeDeleted }.flatMap { (it.inputs[0] as CompositeInput).getMonitorIds() }.distinct()
+            val workflowMonitors = workflows.flatMap { (it.inputs[0] as CompositeInput).getMonitorIds() }.distinct()
             // Monitors that can be deleted -> all workflow delegates - monitors belonging to different workflows
             val deletableMonitorIds = monitorIds.minus(workflowMonitors.toSet())
 

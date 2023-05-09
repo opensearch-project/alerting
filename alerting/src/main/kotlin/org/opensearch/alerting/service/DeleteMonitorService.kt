@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting
+package org.opensearch.alerting.service
 
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -22,6 +22,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
@@ -50,7 +51,7 @@ object DeleteMonitorService :
     fun initialize(
         client: Client
     ) {
-        this.client = client
+        DeleteMonitorService.client = client
     }
 
     /**
