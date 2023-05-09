@@ -17,6 +17,7 @@ import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.admin.indices.open.OpenIndexRequest
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
 import org.opensearch.action.fieldcaps.FieldCapabilitiesRequest
+import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.action.SearchMonitorAction
@@ -47,6 +48,7 @@ import org.opensearch.index.query.QueryBuilders
 import org.opensearch.script.Script
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase
+import java.time.Instant
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit.MILLIS
@@ -605,7 +607,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage!!.contains("Trigger errors"))
 
-        val oldAlertStartTime = getAlertsResponse.alerts[0].startTime
+        val oldLastNotificationTime = getAlertsResponse.alerts[0].lastNotificationTime
 
         executeMonitorResponse = executeMonitor(monitor, id, false)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
@@ -619,7 +621,157 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         Assert.assertEquals(0, getAlertsResponse.alerts[0].errorHistory.size)
         Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage!!.contains("Trigger errors"))
-        Assert.assertTrue(getAlertsResponse.alerts[0].startTime.isAfter(oldAlertStartTime))
+        Assert.assertTrue(getAlertsResponse.alerts[0].lastNotificationTime!!.isAfter(oldLastNotificationTime))
+    }
+
+    fun `test monitor error alert cleared after successful monitor run`() {
+        val customAlertIndex = "custom-alert-index"
+        val customAlertHistoryIndex = "custom-alert-history-index"
+        val customAlertHistoryIndexPattern = "<custom_alert_history_index-{now/d}-1>"
+        val docQuery = DocLevelQuery(query = "source:12345", name = "1")
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(docQuery)
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(
+                alertsIndex = customAlertIndex,
+                alertsHistoryIndex = customAlertHistoryIndex,
+                alertsHistoryIndexPattern = customAlertHistoryIndexPattern
+            )
+        )
+
+        val monitorResponse = createMonitor(monitor)
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+
+        monitor = monitorResponse!!.monitor
+        val id = monitorResponse.id
+
+        // Close index to force error alert
+        client().admin().indices().close(CloseIndexRequest(index)).get()
+
+        var executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 0)
+        searchAlerts(id)
+        var table = Table("asc", "id", null, 1, 0, "")
+        var getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, customAlertIndex))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertEquals(1, getAlertsResponse.alerts.size)
+        Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage == "IndexClosedException[closed]")
+        Assert.assertNull(getAlertsResponse.alerts[0].endTime)
+
+        // Open index to have monitor run successfully
+        client().admin().indices().open(OpenIndexRequest(index)).get()
+        // Execute monitor again and expect successful run
+        executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        // Verify that alert is moved to history index
+        table = Table("asc", "id", null, 10, 0, "")
+        getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, customAlertIndex))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertEquals(0, getAlertsResponse.alerts.size)
+
+        table = Table("asc", "id", null, 10, 0, "")
+        getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, customAlertHistoryIndex))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertEquals(1, getAlertsResponse.alerts.size)
+        Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage == "IndexClosedException[closed]")
+        Assert.assertNotNull(getAlertsResponse.alerts[0].endTime)
+    }
+
+    fun `test multiple monitor error alerts cleared after successful monitor run`() {
+        val customAlertIndex = "custom-alert-index"
+        val customAlertHistoryIndex = "custom-alert-history-index"
+        val customAlertHistoryIndexPattern = "<custom_alert_history_index-{now/d}-1>"
+        val docQuery = DocLevelQuery(query = "source:12345", name = "1")
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(docQuery)
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(
+                alertsIndex = customAlertIndex,
+                alertsHistoryIndex = customAlertHistoryIndex,
+                alertsHistoryIndexPattern = customAlertHistoryIndexPattern
+            )
+        )
+
+        val monitorResponse = createMonitor(monitor)
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+
+        monitor = monitorResponse!!.monitor
+        val monitorId = monitorResponse.id
+
+        // Close index to force error alert
+        client().admin().indices().close(CloseIndexRequest(index)).get()
+
+        var executeMonitorResponse = executeMonitor(monitor, monitorId, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 0)
+        // Create 10 old alerts to simulate having "old error alerts"(2.6)
+        for (i in 1..10) {
+            val startTimestamp = Instant.now().minusSeconds(3600 * 24 * i.toLong()).toEpochMilli()
+            val oldErrorAlertAsString = """
+                {"id":"$i","version":-1,"monitor_id":"$monitorId",
+                "schema_version":4,"monitor_version":1,"monitor_name":"geCNcHKTlp","monitor_user":{"name":"","backend_roles":[],
+                "roles":[],"custom_attribute_names":[],"user_requested_tenant":null},"trigger_id":"_nnk_YcB5pHgSZwYwO2r",
+                "trigger_name":"NoOp trigger","finding_ids":[],"related_doc_ids":[],"state":"ERROR","error_message":"some monitor error",
+                "alert_history":[],"severity":"","action_execution_results":[],
+                "start_time":$startTimestamp,"last_notification_time":$startTimestamp,"end_time":null,"acknowledged_time":null}
+            """.trimIndent()
+
+            client().index(
+                IndexRequest(customAlertIndex)
+                    .id("$i")
+                    .routing(monitorId)
+                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+                    .source(oldErrorAlertAsString, XContentType.JSON)
+            ).get()
+        }
+        var table = Table("asc", "id", null, 1000, 0, "")
+        var getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, customAlertIndex))
+            .get()
+
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertEquals(1 + 10, getAlertsResponse.alerts.size)
+        val newErrorAlert = getAlertsResponse.alerts.firstOrNull { it.errorMessage == "IndexClosedException[closed]" }
+        Assert.assertNotNull(newErrorAlert)
+        Assert.assertNull(newErrorAlert!!.endTime)
+
+        // Open index to have monitor run successfully
+        client().admin().indices().open(OpenIndexRequest(index)).get()
+        // Execute monitor again and expect successful run
+        executeMonitorResponse = executeMonitor(monitor, monitorId, false)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
+        // Verify that alert is moved to history index
+        table = Table("asc", "id", null, 1000, 0, "")
+        getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, customAlertIndex))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertEquals(0, getAlertsResponse.alerts.size)
+
+        table = Table("asc", "id", null, 1000, 0, "")
+        getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, customAlertHistoryIndex))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertEquals(11, getAlertsResponse.alerts.size)
+        getAlertsResponse.alerts.forEach { alert -> assertNotNull(alert.endTime) }
     }
 
     fun `test execute monitor with custom query index and nested mappings`() {

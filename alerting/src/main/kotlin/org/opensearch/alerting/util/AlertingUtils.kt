@@ -18,6 +18,8 @@ import org.opensearch.commons.alerting.util.isBucketLevelMonitor
 
 private val logger = LogManager.getLogger("AlertingUtils")
 
+val MAX_SEARCH_SIZE = 10000
+
 /**
  * RFC 5322 compliant pattern matching: https://www.ietf.org/rfc/rfc5322.txt
  * Regex was based off of this post: https://stackoverflow.com/a/201378

@@ -475,7 +475,7 @@ class AlertIndices(
             clusterStateRequest,
             object : ActionListener<ClusterStateResponse> {
                 override fun onResponse(clusterStateResponse: ClusterStateResponse) {
-                    if (clusterStateResponse.state.metadata.indices.isNotEmpty()) {
+                    if (!clusterStateResponse.state.metadata.indices.isEmpty) {
                         val indicesToDelete = getIndicesToDelete(clusterStateResponse)
                         logger.info("Deleting old $tag indices viz $indicesToDelete")
                         deleteAllOldHistoryIndices(indicesToDelete)
@@ -510,7 +510,7 @@ class AlertIndices(
     ): String? {
         val creationTime = indexMetadata.creationDate
         if ((Instant.now().toEpochMilli() - creationTime) > retentionPeriodMillis) {
-            val alias = indexMetadata.aliases.entries.firstOrNull { writeIndex == it.value.alias }
+            val alias = indexMetadata.aliases.firstOrNull { writeIndex == it.value.alias }
             if (alias != null) {
                 if (historyEnabled) {
                     // If the index has the write alias and history is enabled, don't delete the index
