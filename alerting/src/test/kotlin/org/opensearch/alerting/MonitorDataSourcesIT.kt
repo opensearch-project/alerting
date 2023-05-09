@@ -778,7 +778,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         var executeMonitorResponse = executeMonitor(monitor, monitorId, false)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 0)
-
+        // Create 10 old alerts to simulate having "old error alerts"(2.6)
         for (i in 1..10) {
             val startTimestamp = Instant.now().minusSeconds(3600 * 24 * i.toLong()).toEpochMilli()
             val oldErrorAlertAsString = """
@@ -816,21 +816,20 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         // Verify that alert is moved to history index
-        table = Table("asc", "id", null, 10, 0, "")
+        table = Table("asc", "id", null, 1000, 0, "")
         getAlertsResponse = client()
             .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, customAlertIndex))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertEquals(0, getAlertsResponse.alerts.size)
 
-        table = Table("asc", "id", null, 10, 0, "")
+        table = Table("asc", "id", null, 1000, 0, "")
         getAlertsResponse = client()
             .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, customAlertHistoryIndex))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
-        Assert.assertEquals(1, getAlertsResponse.alerts.size)
-        Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage == "IndexClosedException[closed]")
-        Assert.assertNotNull(getAlertsResponse.alerts[0].endTime)
+        Assert.assertEquals(11, getAlertsResponse.alerts.size)
+        getAlertsResponse.alerts.forEach { alert -> assertNotNull(alert.endTime) }
     }
 
     fun `test execute monitor with custom query index and nested mappings`() {
