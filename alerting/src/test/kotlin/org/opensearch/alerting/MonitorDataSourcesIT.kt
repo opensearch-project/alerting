@@ -7,6 +7,7 @@ package org.opensearch.alerting
 
 import org.junit.Assert
 import org.opensearch.action.admin.cluster.state.ClusterStateRequest
+import org.opensearch.action.admin.indices.alias.Alias
 import org.opensearch.action.admin.indices.close.CloseIndexRequest
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
 import org.opensearch.action.admin.indices.delete.DeleteIndexRequest
@@ -847,6 +848,59 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals("Findings saved for test monitor", 1, findings.size)
         assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("2"))
         assertEquals("Didn't match all 4 queries", 1, findings[0].docLevelQueries.size)
+    }
+
+    fun `test cleanup monitor on partial create monitor failure`() {
+        val docQuery = DocLevelQuery(query = "dnbkjndsfkjbnds:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customQueryIndex = "custom_alerts_index"
+        val analyzer = "dfbdfbafd"
+        val testDoc = """{
+            "rule": {"title": "some_title"},
+            "message": "msg 1 2 3 4"
+        }"""
+        indexDoc(index, "2", testDoc)
+        client().admin().indices()
+            .create(
+                CreateIndexRequest(customQueryIndex + "-000001").alias(Alias(customQueryIndex))
+                    .mapping(
+                        """
+                        {
+                          "_meta": {
+                            "schema_version": 1
+                          },
+                          "properties": {
+                            "query": {
+                              "type": "percolator_ext"
+                            },
+                            "monitor_id": {
+                              "type": "text"
+                            },
+                            "index": {
+                              "type": "text"
+                            }
+                          }
+                        }
+                        """.trimIndent()
+                    )
+            ).get()
+
+        client().admin().indices().close(CloseIndexRequest(customQueryIndex + "-000001")).get()
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(
+                queryIndex = customQueryIndex,
+                queryIndexMappingsByType = mapOf(Pair("text", mapOf(Pair("analyzer", analyzer)))),
+            )
+        )
+        try {
+            createMonitor(monitor)
+            fail("monitor creation should fail due to incorrect analyzer name in test setup")
+        } catch (e: Exception) {
+            Assert.assertEquals(client().search(SearchRequest(SCHEDULED_JOBS_INDEX)).get().hits.hits.size, 0)
+        }
     }
 
     fun `test execute monitor without create when no monitors exists`() {
