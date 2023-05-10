@@ -155,8 +155,8 @@ class TransportDeleteMonitorAction @Inject constructor(
             monitorId: String,
         ): DeleteResponse {
             val deleteResponse = deleteMonitorDocument(client, deleteRequest)
-            deleteDocLevelMonitorQueriesAndIndices(client, monitor, monitorId)
             deleteMetadata(client, monitor)
+            deleteDocLevelMonitorQueriesAndIndices(client, monitor, monitorId)
             return deleteResponse
         }
 
