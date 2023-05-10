@@ -20,6 +20,7 @@ import org.opensearch.action.admin.cluster.health.ClusterHealthAction
 import org.opensearch.action.admin.cluster.health.ClusterHealthRequest
 import org.opensearch.action.admin.cluster.health.ClusterHealthResponse
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
+import org.opensearch.action.delete.DeleteRequest
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.index.IndexRequest
@@ -177,7 +178,7 @@ class TransportIndexMonitorAction @Inject constructor(
         client: Client,
         actionListener: ActionListener<IndexMonitorResponse>,
         request: IndexMonitorRequest,
-        user: User?
+        user: User?,
     ) {
         val indices = mutableListOf<String>()
         // todo: for doc level alerting: check if index is present before monitor is created.
@@ -230,7 +231,7 @@ class TransportIndexMonitorAction @Inject constructor(
         client: Client,
         actionListener: ActionListener<IndexMonitorResponse>,
         request: IndexMonitorRequest,
-        user: User?
+        user: User?,
     ) {
         client.threadPool().threadContext.stashContext().use {
             IndexMonitorHandler(client, actionListener, request, user).resolveUserAndStartForAD()
@@ -241,7 +242,7 @@ class TransportIndexMonitorAction @Inject constructor(
         private val client: Client,
         private val actionListener: ActionListener<IndexMonitorResponse>,
         private val request: IndexMonitorRequest,
-        private val user: User?
+        private val user: User?,
     ) {
 
         fun resolveUserAndStart() {
@@ -492,16 +493,30 @@ class TransportIndexMonitorAction @Inject constructor(
                     )
                     return
                 }
-                request.monitor = request.monitor.copy(id = indexResponse.id)
-                var (metadata, created) = MonitorMetadataService.getOrCreateMetadata(request.monitor)
-                if (created == false) {
-                    log.warn("Metadata doc id:${metadata.id} exists, but it shouldn't!")
+                var metadata: MonitorMetadata?
+                try { // delete monitor if metadata creation fails, log the right error and re-throw the error to fail listener
+                    request.monitor = request.monitor.copy(id = indexResponse.id)
+                    var (monitorMetadata: MonitorMetadata, created: Boolean) = MonitorMetadataService.getOrCreateMetadata(request.monitor)
+                    if (created == false) {
+                        log.warn("Metadata doc id:${monitorMetadata.id} exists, but it shouldn't!")
+                    }
+                    metadata = monitorMetadata
+                } catch (t: Exception) {
+                    log.error("failed to create metadata for monitor ${indexResponse.id}. deleting monitor")
+                    cleanupMonitorAfterPartialFailure(request.monitor, indexResponse)
+                    throw t
                 }
-                if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
-                    indexDocLevelMonitorQueries(request.monitor, indexResponse.id, metadata, request.refreshPolicy)
+                try {
+                    if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                        indexDocLevelMonitorQueries(request.monitor, indexResponse.id, metadata, request.refreshPolicy)
+                    }
+                    // When inserting queries in queryIndex we could update sourceToQueryIndexMapping
+                    MonitorMetadataService.upsertMetadata(metadata, updating = true)
+                } catch (t: Exception) {
+                    log.error("failed to index doc level queries monitor ${indexResponse.id}. deleting monitor", t)
+                    cleanupMonitorAfterPartialFailure(request.monitor, indexResponse)
+                    throw t
                 }
-                // When inserting queries in queryIndex we could update sourceToQueryIndexMapping
-                MonitorMetadataService.upsertMetadata(metadata, updating = true)
 
                 actionListener.onResponse(
                     IndexMonitorResponse(
@@ -511,6 +526,24 @@ class TransportIndexMonitorAction @Inject constructor(
                 )
             } catch (t: Exception) {
                 actionListener.onFailure(AlertingException.wrap(t))
+            }
+        }
+
+        private suspend fun cleanupMonitorAfterPartialFailure(monitor: Monitor, indexMonitorResponse: IndexResponse) {
+            // we simply log the success (debug log) or failure (error log) when we try clean up partially failed monitor creation request
+            try {
+                TransportDeleteMonitorAction.deleteAllResourcesForMonitor(
+                    client,
+                    monitor = monitor,
+                    DeleteRequest(SCHEDULED_JOBS_INDEX, indexMonitorResponse.id).setRefreshPolicy(RefreshPolicy.IMMEDIATE),
+                    indexMonitorResponse.id
+                )
+                log.debug(
+                    "Cleaned up monitor related resources after monitor creation request partial failure. " +
+                        "Monitor id : ${indexMonitorResponse.id}"
+                )
+            } catch (e: Exception) {
+                log.error("Failed to clean up monitor after monitor creation request partial failure", e)
             }
         }
 

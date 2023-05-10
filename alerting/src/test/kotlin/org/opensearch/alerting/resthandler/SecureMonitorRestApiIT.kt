@@ -39,17 +39,20 @@ import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomAlert
 import org.opensearch.alerting.randomBucketLevelMonitor
 import org.opensearch.alerting.randomBucketLevelTrigger
+import org.opensearch.alerting.randomDocumentLevelMonitor
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.randomTemplateScript
 import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
 import org.opensearch.client.RestClient
+import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.rest.SecureRestClientBuilder
@@ -1477,6 +1480,68 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             assertEquals("Incorrect number of alerts", 1, alerts.size)
         } finally {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
+        }
+    }
+
+    /**
+     * We want to verify that user roles/permissions do not affect clean up of monitors during partial monitor creation failure
+     */
+    fun `test create monitor failure clean up with a user without delete monitor access`() {
+        enableFilterBy()
+        createUser(user, user, listOf(TEST_HR_BACKEND_ROLE, "role2").toTypedArray())
+        createTestIndex(TEST_HR_INDEX)
+        createCustomIndexRole(
+            ALERTING_INDEX_MONITOR_ACCESS,
+            TEST_HR_INDEX,
+            getClusterPermissionsFromCustomRole(ALERTING_INDEX_MONITOR_ACCESS)
+        )
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_INDEX_MONITOR_ACCESS, READALL_AND_MONITOR_ROLE),
+            listOf(TEST_HR_BACKEND_ROLE, "role2"),
+            false
+        )
+        val docLevelQueryIndex = ".opensearch-alerting-queries-000001"
+        createIndex(
+            docLevelQueryIndex, Settings.EMPTY,
+            """
+                 "properties" : {
+                  "query": {
+                              "type": "percolator_ext"
+                            },
+                            "monitor_id": {
+                              "type": "text"
+                            },
+                            "index": {
+                              "type": "text"
+                            }
+                }
+                }
+            """.trimIndent(),
+            ".opensearch-alerting-queries"
+        )
+        closeIndex(docLevelQueryIndex) // close index to simulate doc level query indexing failure
+        try {
+            val monitor = randomDocumentLevelMonitor(
+                withMetadata = false,
+                triggers = listOf(),
+                inputs = listOf(DocLevelMonitorInput("description", listOf(TEST_HR_INDEX), emptyList()))
+            )
+            userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+            fail("Monitor creation should have failed due to error in indexing doc level queries")
+        } catch (e: ResponseException) {
+            val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).size(10).toString()
+            val searchResponse = client().makeRequest(
+                "GET", "$ALERTING_BASE_URI/_search",
+                emptyMap(),
+                StringEntity(search, ContentType.APPLICATION_JSON)
+            )
+            val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
+            val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+            val numberDocsFound = hits["total"]?.get("value")
+            assertEquals("Monitors found. Clean up unsuccessful", 0, numberDocsFound)
+        } finally {
+            deleteRoleAndRoleMapping(ALERTING_INDEX_MONITOR_ACCESS)
         }
     }
 }
