@@ -168,7 +168,7 @@ class TransportDeleteMonitorAction @Inject constructor(
             } catch (e: Exception) {
                 // we only log the error and don't fail the request because if monitor document has been deleted,
                 // we cannot retry based on this failure
-                log.error("Failed to delete workflow metadata for monitor ${monitor.id}.", e)
+                log.error("Failed to delete monitor metadata ${deleteRequest.id()}.", e)
             }
         }
 
@@ -234,7 +234,7 @@ class TransportDeleteMonitorAction @Inject constructor(
             } catch (e: Exception) {
                 // we only log the error and don't fail the request because if monitor document has been deleted successfully,
                 // we cannot retry based on this failure
-                log.error("Failed to delete workflow metadata for monitor ${monitor.id}.", e)
+                log.error("Failed to delete doc level queries from query index.", e)
             }
         }
     }
