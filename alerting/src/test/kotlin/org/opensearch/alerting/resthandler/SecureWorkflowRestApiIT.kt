@@ -994,7 +994,11 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
             // refer: `test create monitor with enable filter by`
             return
         }
-        val createdMonitor = createMonitor(monitor = randomQueryLevelMonitor())
+        val createdMonitor = createMonitorWithClient(
+            monitor = randomQueryLevelMonitor(),
+            client = client(),
+            rbacRoles = listOf("admin")
+        )
 
         assertNotNull("The monitor was not created", createdMonitor)
 
