@@ -171,7 +171,7 @@ object MonitorMetadataService :
             else null
             val runContext = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR)
                 createFullRunContext(monitorIndex, metadata.lastRunContext as MutableMap<String, MutableMap<String, Any>>)
-            } else null
+            else null
             return if (runContext != null) {
                 metadata.copy(
                     lastRunContext = runContext
@@ -184,12 +184,15 @@ object MonitorMetadataService :
         }
     }
 
-    private suspend fun createNewMetadata(monitor: Monitor, createWithRunContext: Boolean, workflowMetadataId: String? = null): MonitorMetadata {
-        val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+    private suspend fun createNewMetadata(
+        monitor: Monitor,
+        createWithRunContext: Boolean,
+        workflowMetadataId: String? = null,
+    ): MonitorMetadata {
+        val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR)
             (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
         else null
-        val runContext =
-            if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR && createWithRunContext)
+        val runContext = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR && createWithRunContext)
                 createFullRunContext(monitorIndex)
             else emptyMap()
         return MonitorMetadata(
@@ -202,8 +205,7 @@ object MonitorMetadataService :
             sourceToQueryIndexMapping = mutableMapOf()
         )
     }
-
-    private suspend fun createFullRunContext(
+        suspend fun createFullRunContext(
         index: String?,
         existingRunContext: MutableMap<String, MutableMap<String, Any>>? = null
     ): MutableMap<String, MutableMap<String, Any>> {

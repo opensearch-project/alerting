@@ -35,6 +35,7 @@ import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
@@ -532,11 +533,9 @@ class TransportIndexMonitorAction @Inject constructor(
         private suspend fun cleanupMonitorAfterPartialFailure(monitor: Monitor, indexMonitorResponse: IndexResponse) {
             // we simply log the success (debug log) or failure (error log) when we try clean up partially failed monitor creation request
             try {
-                TransportDeleteMonitorAction.deleteAllResourcesForMonitor(
-                    client,
+                DeleteMonitorService.deleteMonitor(
                     monitor = monitor,
-                    DeleteRequest(SCHEDULED_JOBS_INDEX, indexMonitorResponse.id).setRefreshPolicy(RefreshPolicy.IMMEDIATE),
-                    indexMonitorResponse.id
+                    RefreshPolicy.IMMEDIATE
                 )
                 log.debug(
                     "Cleaned up monitor related resources after monitor creation request partial failure. " +

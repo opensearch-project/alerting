@@ -251,7 +251,10 @@ fun randomWorkflow(
         enabledTime = enabledTime,
         workflowType = WorkflowType.COMPOSITE,
         user = user,
-        inputs = listOf(CompositeInput(Sequence(delegates)))
+        inputs = listOf(CompositeInput(Sequence(delegates))),
+        version = -1L,
+        schemaVersion = 0,
+        triggers = emptyList(),
     )
 }
 
@@ -274,7 +277,10 @@ fun randomWorkflowWithDelegates(
         enabledTime = enabledTime,
         workflowType = WorkflowType.COMPOSITE,
         user = user,
-        inputs = listOf(CompositeInput(Sequence(delegates)))
+        inputs = listOf(CompositeInput(Sequence(delegates))),
+        version = -1L,
+        schemaVersion = 0,
+        triggers = emptyList()
     )
 }
 

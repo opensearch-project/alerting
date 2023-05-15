@@ -40,7 +40,7 @@ import org.opensearch.commons.alerting.model.Table
 import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.index.IndexService
 import org.opensearch.index.query.TermQueryBuilder
-import org.opensearch.index.reindex.ReindexModulePlugin
+import org.opensearch.index.reindex.ReindexPlugin
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.join.ParentJoinPlugin
 import org.opensearch.painless.PainlessPlugin
