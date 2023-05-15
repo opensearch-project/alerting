@@ -186,7 +186,11 @@ object MonitorMetadataService :
         }
     }
 
-    private suspend fun createNewMetadata(monitor: Monitor, createWithRunContext: Boolean, workflowMetadataId: String? = null): MonitorMetadata {
+    private suspend fun createNewMetadata(
+        monitor: Monitor,
+        createWithRunContext: Boolean,
+        workflowMetadataId: String? = null,
+    ): MonitorMetadata {
         val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
             (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
         } else null
