@@ -24,12 +24,13 @@ import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.transport.TransportDeleteWorkflowAction.Companion.WORKFLOW_DELEGATE_PATH
+import org.opensearch.alerting.transport.TransportDeleteWorkflowAction.Companion.WORKFLOW_MONITOR_PATH
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
 import org.opensearch.commons.alerting.action.DeleteMonitorResponse
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
-import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
@@ -139,10 +140,10 @@ object DeleteMonitorService :
      */
     suspend fun monitorIsWorkflowDelegate(monitorId: String): Boolean {
         val queryBuilder = QueryBuilders.nestedQuery(
-            Workflow.WORKFLOW_DELEGATE_PATH,
+            WORKFLOW_DELEGATE_PATH,
             QueryBuilders.boolQuery().must(
                 QueryBuilders.matchQuery(
-                    Workflow.WORKFLOW_MONITOR_PATH,
+                    WORKFLOW_MONITOR_PATH,
                     monitorId
                 )
             ),

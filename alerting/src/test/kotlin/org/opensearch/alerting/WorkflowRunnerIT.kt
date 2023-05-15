@@ -665,11 +665,17 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         """.trimIndent()
 
         val queryLevelTrigger = randomQueryLevelTrigger(condition = Script(queryTriggerScript))
-        val queryMonitorResponse = createMonitor(randomQueryLevelMonitor(inputs = listOf(queryMonitorInput), triggers = listOf(queryLevelTrigger)))!!
+        val queryMonitorResponse =
+            createMonitor(randomQueryLevelMonitor(inputs = listOf(queryMonitorInput), triggers = listOf(queryLevelTrigger)))!!
 
         // 1. docMonitor (chainedFinding = null) 2. bucketMonitor (chainedFinding = docMonitor) 3. docMonitor (chainedFinding = bucketMonitor) 4. queryMonitor (chainedFinding = docMonitor 3)
         var workflow = randomWorkflow(
-            monitorIds = listOf(docLevelMonitorResponse.id, bucketLevelMonitorResponse.id, docLevelMonitorResponse1.id, queryMonitorResponse.id)
+            monitorIds = listOf(
+                docLevelMonitorResponse.id,
+                bucketLevelMonitorResponse.id,
+                docLevelMonitorResponse1.id,
+                queryMonitorResponse.id
+            )
         )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
@@ -707,20 +713,36 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
                     val expectedTriggeredDocIds = listOf("3", "4", "5", "6")
                     assertEquals(expectedTriggeredDocIds, triggeredDocIds.sorted())
 
-                    val getAlertsResponse = assertAlerts(docLevelMonitorResponse.id, docLevelMonitorResponse.monitor.dataSources.alertsIndex, 4)
+                    val getAlertsResponse =
+                        assertAlerts(docLevelMonitorResponse.id, docLevelMonitorResponse.monitor.dataSources.alertsIndex, 4)
                     assertAcknowledges(getAlertsResponse.alerts, docLevelMonitorResponse.id, 4)
-                    assertFindings(docLevelMonitorResponse.id, docLevelMonitorResponse.monitor.dataSources.findingsIndex, 4, 4, listOf("3", "4", "5", "6"))
+                    assertFindings(
+                        docLevelMonitorResponse.id,
+                        docLevelMonitorResponse.monitor.dataSources.findingsIndex,
+                        4,
+                        4,
+                        listOf("3", "4", "5", "6")
+                    )
                 }
                 // Verify second bucket level monitor execution, alerts and findings
                 bucketLevelMonitorResponse.monitor.name -> {
                     val searchResult = monitorRunResults.inputResults.results.first()
                     @Suppress("UNCHECKED_CAST")
-                    val buckets = searchResult.stringMap("aggregations")?.stringMap("composite_agg")?.get("buckets") as List<Map<String, Any>>
+                    val buckets =
+                        searchResult
+                            .stringMap("aggregations")?.stringMap("composite_agg")?.get("buckets") as List<Map<String, Any>>
                     assertEquals("Incorrect search result", 2, buckets.size)
 
-                    val getAlertsResponse = assertAlerts(bucketLevelMonitorResponse.id, bucketLevelMonitorResponse.monitor.dataSources.alertsIndex, 2)
+                    val getAlertsResponse =
+                        assertAlerts(bucketLevelMonitorResponse.id, bucketLevelMonitorResponse.monitor.dataSources.alertsIndex, 2)
                     assertAcknowledges(getAlertsResponse.alerts, bucketLevelMonitorResponse.id, 2)
-                    assertFindings(bucketLevelMonitorResponse.id, bucketLevelMonitorResponse.monitor.dataSources.findingsIndex, 1, 4, listOf("3", "4", "5", "6"))
+                    assertFindings(
+                        bucketLevelMonitorResponse.id,
+                        bucketLevelMonitorResponse.monitor.dataSources.findingsIndex,
+                        1,
+                        4,
+                        listOf("3", "4", "5", "6")
+                    )
                 }
                 // Verify third doc level monitor execution, alerts and findings
                 docLevelMonitorResponse1.monitor.name -> {
@@ -733,9 +755,16 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
                     val expectedTriggeredDocIds = listOf("5", "6")
                     assertEquals(expectedTriggeredDocIds, triggeredDocIds.sorted())
 
-                    val getAlertsResponse = assertAlerts(docLevelMonitorResponse1.id, docLevelMonitorResponse1.monitor.dataSources.alertsIndex, 2)
+                    val getAlertsResponse =
+                        assertAlerts(docLevelMonitorResponse1.id, docLevelMonitorResponse1.monitor.dataSources.alertsIndex, 2)
                     assertAcknowledges(getAlertsResponse.alerts, docLevelMonitorResponse1.id, 2)
-                    assertFindings(docLevelMonitorResponse1.id, docLevelMonitorResponse1.monitor.dataSources.findingsIndex, 2, 2, listOf("5", "6"))
+                    assertFindings(
+                        docLevelMonitorResponse1.id,
+                        docLevelMonitorResponse1.monitor.dataSources.findingsIndex,
+                        2,
+                        2,
+                        listOf("5", "6")
+                    )
                 }
                 // Verify fourth query level monitor execution
                 queryMonitorResponse.monitor.name -> {
@@ -743,10 +772,14 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
                     val values = monitorRunResults.triggerResults.values
                     assertEquals(1, values.size)
                     @Suppress("UNCHECKED_CAST")
-                    val totalHits = ((monitorRunResults.inputResults.results[0]["hits"] as Map<String, Any>)["total"] as Map<String, Any>) ["value"]
+                    val totalHits =
+                        ((monitorRunResults.inputResults.results[0]["hits"] as Map<String, Any>)["total"] as Map<String, Any>)["value"]
                     assertEquals(2, totalHits)
                     @Suppress("UNCHECKED_CAST")
-                    val docIds = ((monitorRunResults.inputResults.results[0]["hits"] as Map<String, Any>)["hits"] as List<Map<String, String>>).map { it["_id"]!! }
+                    val docIds =
+                        (
+                            (monitorRunResults.inputResults.results[0]["hits"] as Map<String, Any>)["hits"] as List<Map<String, String>>
+                            ).map { it["_id"]!! }
                     assertEquals(listOf("5", "6"), docIds.sorted())
                 }
             }
@@ -823,7 +856,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         customFindingsIndex: String,
         findingSize: Int,
         matchedQueryNumber: Int,
-        relatedDocIds: List<String>
+        relatedDocIds: List<String>,
     ) {
         val findings = searchFindings(monitorId, customFindingsIndex)
         assertEquals("Findings saved for test monitor", findingSize, findings.size)
@@ -837,7 +870,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
     private fun assertAlerts(
         monitorId: String,
         customAlertsIndex: String,
-        alertSize: Int
+        alertSize: Int,
     ): GetAlertsResponse {
         val alerts = searchAlerts(monitorId, customAlertsIndex)
         assertEquals("Alert saved for test monitor", alertSize, alerts.size)

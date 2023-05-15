@@ -140,7 +140,8 @@ class TransportIndexWorkflowAction @Inject constructor(
         ) {
             if (transformedRequest.rbacRoles?.stream()?.anyMatch { !user.backendRoles.contains(it) } == true) {
                 log.error(
-                    "User specified backend roles, ${transformedRequest.rbacRoles}, that they don' have access to. User backend roles: ${user.backendRoles}"
+                    "User specified backend roles, ${transformedRequest.rbacRoles}, " +
+                        "that they don' have access to. User backend roles: ${user.backendRoles}"
                 )
                 actionListener.onFailure(
                     AlertingException.wrap(
@@ -153,7 +154,8 @@ class TransportIndexWorkflowAction @Inject constructor(
                 return
             } else if (transformedRequest.rbacRoles?.isEmpty() == true) {
                 log.error(
-                    "Non-admin user are not allowed to specify an empty set of backend roles. Please don't pass in the parameter or pass in at least one backend role."
+                    "Non-admin user are not allowed to specify an empty set of backend roles. " +
+                        "Please don't pass in the parameter or pass in at least one backend role."
                 )
                 actionListener.onFailure(
                     AlertingException.wrap(
@@ -543,7 +545,9 @@ class TransportIndexWorkflowAction @Inject constructor(
                 val chainedMonitorIndices = getMonitorIndices(chainedFindingMonitor)
 
                 if (!delegateMonitorIndices.equalsIgnoreOrder(chainedMonitorIndices)) {
-                    throw AlertingException.wrap(IllegalArgumentException("Delegate monitor and it's chained finding monitor must query the same indices"))
+                    throw AlertingException.wrap(
+                        IllegalArgumentException("Delegate monitor and it's chained finding monitor must query the same indices")
+                    )
                 }
             }
         }
@@ -703,7 +707,11 @@ class TransportIndexWorkflowAction @Inject constructor(
         val indices = mutableListOf<String>()
 
         val searchInputs =
-            monitors.flatMap { monitor -> monitor.inputs.filter { it.name() == SearchInput.SEARCH_FIELD || it.name() == DocLevelMonitorInput.DOC_LEVEL_INPUT_FIELD } }
+            monitors.flatMap { monitor ->
+                monitor.inputs.filter {
+                    it.name() == SearchInput.SEARCH_FIELD || it.name() == DocLevelMonitorInput.DOC_LEVEL_INPUT_FIELD
+                }
+            }
         searchInputs.forEach {
             val inputIndices = if (it.name() == SearchInput.SEARCH_FIELD) (it as SearchInput).indices
             else (it as DocLevelMonitorInput).indices

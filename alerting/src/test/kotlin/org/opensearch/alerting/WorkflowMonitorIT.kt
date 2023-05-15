@@ -640,6 +640,7 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
         // Verify that the workflow metadata is deleted
         try {
             searchWorkflowMetadata(workflowId)
+            fail("expected searchWorkflowMetadata method to throw exception")
         } catch (e: Exception) {
             e.message?.let {
                 assertTrue(
@@ -651,6 +652,7 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
         // Verify that the monitors metadata are deleted
         try {
             searchMonitorMetadata(monitorMetadataId1)
+            fail("expected searchMonitorMetadata method to throw exception")
         } catch (e: Exception) {
             e.message?.let {
                 assertTrue(
@@ -662,6 +664,7 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
 
         try {
             searchMonitorMetadata(monitorMetadataId2)
+            fail("expected searchMonitorMetadata method to throw exception")
         } catch (e: Exception) {
             e.message?.let {
                 assertTrue(

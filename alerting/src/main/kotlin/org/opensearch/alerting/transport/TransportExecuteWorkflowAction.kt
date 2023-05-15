@@ -47,7 +47,11 @@ class TransportExecuteWorkflowAction @Inject constructor(
 ) : HandledTransportAction<ExecuteWorkflowRequest, ExecuteWorkflowResponse>(
     ExecuteWorkflowAction.NAME, transportService, actionFilters, ::ExecuteWorkflowRequest
 ) {
-    override fun doExecute(task: Task, execWorkflowRequest: ExecuteWorkflowRequest, actionListener: ActionListener<ExecuteWorkflowResponse>) {
+    override fun doExecute(
+        task: Task,
+        execWorkflowRequest: ExecuteWorkflowRequest,
+        actionListener: ActionListener<ExecuteWorkflowResponse>,
+    ) {
         val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
         log.debug("User and roles string from thread context: $userStr")
         val user: User? = User.parse(userStr)

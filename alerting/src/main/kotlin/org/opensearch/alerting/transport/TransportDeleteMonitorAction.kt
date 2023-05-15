@@ -71,7 +71,12 @@ class TransportDeleteMonitorAction @Inject constructor(
         }
 
         GlobalScope.launch(Dispatchers.IO + CoroutineName("DeleteMonitorAction")) {
-            DeleteMonitorHandler(client, actionListener, user, transformedRequest.monitorId).resolveUserAndStart(transformedRequest.refreshPolicy)
+            DeleteMonitorHandler(
+                client,
+                actionListener,
+                user,
+                transformedRequest.monitorId
+            ).resolveUserAndStart(transformedRequest.refreshPolicy)
         }
     }
 
@@ -90,7 +95,11 @@ class TransportDeleteMonitorAction @Inject constructor(
 
                 if (DeleteMonitorService.monitorIsWorkflowDelegate(monitor.id)) {
                     actionListener.onFailure(
-                        AlertingException("Monitor can't be deleted because it is a part of workflow(s)", RestStatus.FORBIDDEN, IllegalStateException())
+                        AlertingException(
+                            "Monitor can't be deleted because it is a part of workflow(s)",
+                            RestStatus.FORBIDDEN,
+                            IllegalStateException()
+                        )
                     )
                 } else if (canDelete) {
                     actionListener.onResponse(

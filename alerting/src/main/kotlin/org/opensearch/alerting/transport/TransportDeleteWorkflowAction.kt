@@ -74,7 +74,6 @@ class TransportDeleteWorkflowAction @Inject constructor(
     AlertingActions.DELETE_WORKFLOW_ACTION_NAME, transportService, actionFilters, ::DeleteWorkflowRequest
 ),
     SecureTransportAction {
-
     private val log = LogManager.getLogger(javaClass)
 
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
@@ -233,10 +232,10 @@ class TransportDeleteWorkflowAction @Inject constructor(
             // Retrieve monitors belonging to another workflows
             val queryBuilder = QueryBuilders.boolQuery().mustNot(QueryBuilders.termQuery("_id", workflowIdToBeDeleted)).filter(
                 QueryBuilders.nestedQuery(
-                    Workflow.WORKFLOW_DELEGATE_PATH,
+                    WORKFLOW_DELEGATE_PATH,
                     QueryBuilders.boolQuery().must(
                         QueryBuilders.termsQuery(
-                            Workflow.WORKFLOW_MONITOR_PATH,
+                            WORKFLOW_MONITOR_PATH,
                             monitorIds
                         )
                     ),
@@ -321,5 +320,10 @@ class TransportDeleteWorkflowAction @Inject constructor(
             val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, WorkflowMetadata.getId(workflow.id))
             val deleteResponse: DeleteResponse = client.suspendUntil { delete(deleteRequest, it) }
         }
+    }
+
+    companion object {
+        const val WORKFLOW_DELEGATE_PATH = "workflow.inputs.composite_input.sequence.delegates"
+        const val WORKFLOW_MONITOR_PATH = "workflow.inputs.composite_input.sequence.delegates.monitor_id"
     }
 }
