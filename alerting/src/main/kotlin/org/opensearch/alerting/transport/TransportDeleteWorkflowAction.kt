@@ -132,7 +132,8 @@ class TransportDeleteWorkflowAction @Inject constructor(
                     val delegateMonitorIds = (workflow.inputs[0] as CompositeInput).getMonitorIds()
                     var deletableMonitors = listOf<Monitor>()
                     // User can only delete the delegate monitors only in the case if all monitors can be deleted
-                    // Partial monitor deletion is not available
+                    // if there are monitors in this workflow that are referenced in other workflows, we cannot delete the monitors.
+                    // We will not partially delete monitors. we delete them all or fail the request.
                     if (deleteDelegateMonitors == true) {
                         deletableMonitors = getDeletableDelegates(workflowId, delegateMonitorIds, user)
                         val monitorsDiff = delegateMonitorIds.toMutableList()
@@ -162,25 +163,22 @@ class TransportDeleteWorkflowAction @Inject constructor(
                         // Update delete workflow response
                         deleteWorkflowResponse.nonDeletedMonitors = failedMonitorIds
                         // Delete monitors workflow metadata
-                        // Monitor metadata will be in monitorId-workflowId-metadata format
+                        // Monitor metadata will be in workflowId-monitorId-metadata format
                         metadataIdsToDelete.addAll(deletableMonitors.map { MonitorMetadata.getId(it, workflowMetadataId) })
                     }
-                    // Delete the monitors workflow metadata
-                    val deleteMonitorWorkflowMetadataResponse: BulkByScrollResponse = client.suspendUntil {
-                        DeleteByQueryRequestBuilder(this, DeleteByQueryAction.INSTANCE)
-                            .source(ScheduledJob.SCHEDULED_JOBS_INDEX)
-                            .filter(QueryBuilders.idsQuery().addIds(*metadataIdsToDelete.toTypedArray()))
-                            .execute(it)
+                    try {
+                        // Delete the monitors workflow metadata
+                        val deleteMonitorWorkflowMetadataResponse: BulkByScrollResponse = client.suspendUntil {
+                            DeleteByQueryRequestBuilder(this, DeleteByQueryAction.INSTANCE)
+                                .source(ScheduledJob.SCHEDULED_JOBS_INDEX)
+                                .filter(QueryBuilders.idsQuery().addIds(*metadataIdsToDelete.toTypedArray()))
+                                .execute(it)
+                        }
+                    } catch (t: Exception) {
+                        log.error("failed to delete delegate monitor metadata. But proceeding with workflow deletion", t)
                     }
 
-                    if (deleteMonitorWorkflowMetadataResponse.isTimedOut) {
-                        actionListener.onFailure(
-                            AlertingException.wrap(
-                                OpenSearchException("Cannot delete monitors workflow metadata due to timeout.")
-                            )
-                        )
-                        return
-                    }
+
                     actionListener.onResponse(deleteWorkflowResponse)
                 } else {
                     actionListener.onFailure(
@@ -200,13 +198,14 @@ class TransportDeleteWorkflowAction @Inject constructor(
                         )
                     )
                 } else {
+                    log.error("Failed to delete workflow $workflowId", t)
                     actionListener.onFailure(AlertingException.wrap(t))
                 }
             }
         }
 
         /**
-         * Tries to delete the given list of the monitors. Return value contains all the monitorIds which deletion failed
+         * Tries to delete the given list of the monitors. Return value contains all the monitorIds for which deletion failed
          * @param monitorIds list of monitor ids to be deleted
          * @param refreshPolicy
          * @return list of the monitors that were not deleted
@@ -217,6 +216,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
                 try {
                     DeleteMonitorService.deleteMonitor(monitor, refreshPolicy)
                 } catch (ex: Exception) {
+                    log.error("failed to delete delegate monitor ${monitor.id} for $workflowId")
                     nonDeletedMonitorIds.add(monitor.id)
                 }
             }
@@ -224,7 +224,8 @@ class TransportDeleteWorkflowAction @Inject constructor(
         }
 
         /**
-         * Returns lit of monitor ids belonging only to a given workflow
+         * Returns lit of monitor ids belonging only to a given workflow.
+         * if filterBy is enabled, it filters and returns only those monitors which user has permission to delete.
          * @param workflowIdToBeDeleted Id of the workflow that should be deleted
          * @param monitorIds List of delegate monitor ids (underlying monitor ids)
          */
@@ -267,6 +268,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
             // Monitors that can be deleted -> all workflow delegates - monitors belonging to different workflows
             val deletableMonitorIds = monitorIds.minus(workflowMonitors.toSet())
 
+            // filtering further to get the list of monitors that user has permission to delete if filterby is enabled and user is not null
             val query = QueryBuilders.boolQuery().filter(QueryBuilders.termsQuery("_id", deletableMonitorIds))
             val searchSource = SearchSourceBuilder().query(query)
             val monitorSearchRequest = SearchRequest(ScheduledJob.SCHEDULED_JOBS_INDEX).source(searchSource)

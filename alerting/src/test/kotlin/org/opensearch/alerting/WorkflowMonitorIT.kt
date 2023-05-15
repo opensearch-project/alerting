@@ -5,7 +5,9 @@
 
 package org.opensearch.alerting
 
+import org.opensearch.alerting.model.WorkflowMetadata
 import org.opensearch.alerting.transport.WorkflowSingleNodeTestCase
+import org.opensearch.commons.alerting.action.IndexMonitorResponse
 import org.opensearch.commons.alerting.model.ChainedMonitorFindings
 import org.opensearch.commons.alerting.model.CompositeInput
 import org.opensearch.commons.alerting.model.DataSources
@@ -615,11 +617,11 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
         val workflowMetadata = searchWorkflowMetadata(workflowId)
         assertNotNull(workflowMetadata)
 
-        val monitorMetadataId1 = "${monitorResponse.id}-${workflowMetadata!!.id}"
+        val monitorMetadataId1 = getDelegateMonitorMetadataId(workflowMetadata, monitorResponse)
         val monitorMetadata1 = searchMonitorMetadata(monitorMetadataId1)
         assertNotNull(monitorMetadata1)
 
-        val monitorMetadataId2 = "${monitorResponse2.id}-${workflowMetadata!!.id}"
+        val monitorMetadataId2 = getDelegateMonitorMetadataId(workflowMetadata, monitorResponse2)
         val monitorMetadata2 = searchMonitorMetadata(monitorMetadataId2)
         assertNotNull(monitorMetadata2)
 
@@ -674,6 +676,11 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
             }
         }
     }
+
+    private fun getDelegateMonitorMetadataId(
+        workflowMetadata: WorkflowMetadata?,
+        monitorResponse: IndexMonitorResponse,
+    ) = "${workflowMetadata!!.id}-${monitorResponse.id}-metadata"
 
     fun `test delete workflow delegate monitor part of another workflow not deleted`() {
         val docLevelInput = DocLevelMonitorInput(
