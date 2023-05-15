@@ -175,10 +175,8 @@ class TransportDeleteWorkflowAction @Inject constructor(
                                 .execute(it)
                         }
                     } catch (t: Exception) {
-                        log.error("failed to delete delegate monitor metadata. But proceeding with workflow deletion", t)
+                        log.error("Failed to delete delegate monitor metadata. But proceeding with workflow deletion $workflowId", t)
                     }
-
-
                     actionListener.onResponse(deleteWorkflowResponse)
                 } else {
                     actionListener.onFailure(
