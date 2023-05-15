@@ -81,8 +81,7 @@ interface SecureTransportAction {
                 actionListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException(
-                            "Filter by user backend roles is enabled with security disabled.",
-                            RestStatus.FORBIDDEN
+                            "Filter by user backend roles is enabled with security disabled.", RestStatus.FORBIDDEN
                         )
                     )
                 )

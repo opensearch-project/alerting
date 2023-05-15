@@ -98,7 +98,10 @@ object WorkflowMetadataService :
         } catch (e: Exception) {
             // If the update is set to false and id is set conflict exception will be thrown
             if (e is OpenSearchException && e.status() == RestStatus.CONFLICT && !updating) {
-                log.debug("Metadata with ${metadata.id} for workflow ${metadata.workflowId} already exist. Instead of creating new, updating existing metadata will be performed")
+                log.debug(
+                    "Metadata with ${metadata.id} for workflow ${metadata.workflowId} already exist." +
+                        " Instead of creating new, updating existing metadata will be performed"
+                )
                 return upsertWorkflowMetadata(metadata, true)
             }
             log.error("Error saving metadata", e)
@@ -157,6 +160,8 @@ object WorkflowMetadataService :
     }
 
     private fun createNewWorkflowMetadata(workflow: Workflow, executionId: String, isTempWorkflow: Boolean): WorkflowMetadata {
+        // In the case of temp workflow (ie. workflow is in dry-run) use timestampWithUUID-metadata format
+        // In the case of regular workflow execution, use the workflowId-metadata format
         val id = if (isTempWorkflow) "${LocalDateTime.now(ZoneOffset.UTC)}${UUID.randomUUID()}" else workflow.id
         return WorkflowMetadata(
             id = WorkflowMetadata.getId(id),
