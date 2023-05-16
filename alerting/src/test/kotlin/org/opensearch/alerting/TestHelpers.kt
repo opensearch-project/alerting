@@ -253,7 +253,6 @@ fun randomWorkflow(
         workflowType = WorkflowType.COMPOSITE,
         user = user,
         inputs = listOf(CompositeInput(Sequence(delegates))),
-        version = -1L,
         schemaVersion = 0,
         triggers = emptyList(),
     )
@@ -279,7 +278,6 @@ fun randomWorkflowWithDelegates(
         workflowType = WorkflowType.COMPOSITE,
         user = user,
         inputs = listOf(CompositeInput(Sequence(delegates))),
-        version = -1L,
         schemaVersion = 0,
         triggers = emptyList()
     )
@@ -393,6 +391,7 @@ fun randomScript(source: String = "return " + OpenSearchRestTestCase.randomBoole
 
 val ADMIN = "admin"
 val ALERTING_BASE_URI = "/_plugins/_alerting/monitors"
+val WORKFLOW_ALERTING_BASE_URI = "/_plugins/_alerting/workflows"
 val DESTINATION_BASE_URI = "/_plugins/_alerting/destinations"
 val LEGACY_OPENDISTRO_ALERTING_BASE_URI = "/_opendistro/_alerting/monitors"
 val LEGACY_OPENDISTRO_DESTINATION_BASE_URI = "/_opendistro/_alerting/destinations"
