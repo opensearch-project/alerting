@@ -33,10 +33,6 @@ class RestGetWorkflowAction : BaseRestHandler() {
             RestHandler.Route(
                 RestRequest.Method.GET,
                 "${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowID}"
-            ),
-            RestHandler.Route(
-                RestRequest.Method.HEAD,
-                "${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowID}"
             )
         )
     }

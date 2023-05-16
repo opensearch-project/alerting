@@ -888,26 +888,6 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    @Throws(Exception::class)
-    fun `test checking if a workflow exists`() {
-        val query = randomQueryLevelMonitor()
-        val monitor = createMonitor(query)
-
-        // val monitor = createMonitor(docLevelMonitor)
-        val storedMonitor = getMonitor(monitor.id)
-        assertEquals("Indexed and retrieved monitor differ", monitor, storedMonitor)
-        val workflow = createRandomWorkflow(monitorIds = listOf(monitor.id))
-
-        val headResponse = client().makeRequest("HEAD", workflow.relativeUrl())
-        assertEquals("Unable to HEAD workflow", RestStatus.OK, headResponse.restStatus())
-        assertNull("Workflow response contains unexpected body", headResponse.entity)
-    }
-
-    fun `test checking if a non-existent workflow exists`() {
-        val headResponse = client().makeRequest("HEAD", "$WORKFLOW_ALERTING_BASE_URI/foobarbaz")
-        assertEquals("Unexpected status", RestStatus.NOT_FOUND, headResponse.restStatus())
-    }
-
     fun `test delete workflow`() {
         val query = randomQueryLevelMonitor()
         val monitor = createMonitor(query)
