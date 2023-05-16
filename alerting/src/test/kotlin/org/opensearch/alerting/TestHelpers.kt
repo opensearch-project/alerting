@@ -253,7 +253,6 @@ fun randomWorkflow(
         workflowType = WorkflowType.COMPOSITE,
         user = user,
         inputs = listOf(CompositeInput(Sequence(delegates))),
-        version = -1L,
         schemaVersion = 0,
         triggers = emptyList(),
     )
@@ -279,7 +278,6 @@ fun randomWorkflowWithDelegates(
         workflowType = WorkflowType.COMPOSITE,
         user = user,
         inputs = listOf(CompositeInput(Sequence(delegates))),
-        version = -1L,
         schemaVersion = 0,
         triggers = emptyList()
     )

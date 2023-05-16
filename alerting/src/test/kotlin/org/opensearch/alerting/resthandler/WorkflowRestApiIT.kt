@@ -654,7 +654,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
                 )
             }
         }
-        val updatedWorkflow = updateWorkflow(workflowResponse.copy(enabled = true))
+        val updatedWorkflow = updateWorkflow(workflowResponse.copy(enabled = true, enabledTime = workflow.enabledTime))
         assertNotNull(updatedWorkflow)
         val getWorkflow = getWorkflow(workflowId = updatedWorkflow.id)
         assertTrue(getWorkflow.enabled)
