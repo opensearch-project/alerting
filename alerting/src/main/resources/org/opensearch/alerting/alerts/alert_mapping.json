@@ -25,6 +25,9 @@
     "severity": {
       "type": "keyword"
     },
+    "workflow_execution_id": {
+      "type": "keyword"
+    },
     "monitor_name": {
       "type": "text",
       "fields": {
