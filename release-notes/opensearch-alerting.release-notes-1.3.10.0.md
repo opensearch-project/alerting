@@ -6,3 +6,6 @@ Compatible with OpenSearch 1.3.10
 
 ### Bug Fixes
 * Fix 1.3.10 build issues. ([#918](https://github.com/opensearch-project/alerting/pull/918))
+
+### Documentation
+* Added 1.3.10 release notes. ([#]())
