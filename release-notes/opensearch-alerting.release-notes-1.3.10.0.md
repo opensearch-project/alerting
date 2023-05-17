@@ -8,4 +8,4 @@ Compatible with OpenSearch 1.3.10
 * Fix 1.3.10 build issues. ([#918](https://github.com/opensearch-project/alerting/pull/918))
 
 ### Documentation
-* Added 1.3.10 release notes. ([#]())
+* Added 1.3.10 release notes. ([#922](https://github.com/opensearch-project/alerting/pull/922))
