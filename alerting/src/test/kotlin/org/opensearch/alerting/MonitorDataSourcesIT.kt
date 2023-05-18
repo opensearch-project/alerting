@@ -1072,8 +1072,14 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertNotEquals(0, searchResponse.hits.hits.size)
 
         deleteMonitor(monitorId)
-        assertIndexNotExists(customQueryIndex + "*")
-        assertAliasNotExists(customQueryIndex)
+        // Verify that queryIndex is not deleted, because it writeIndex
+        assertIndexExists(customQueryIndex + "*")
+        assertAliasExists(customQueryIndex)
+        // Verify queries are deleted
+        searchResponse = client().search(
+            SearchRequest(customQueryIndex).source(SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
+        ).get()
+        assertEquals(0, searchResponse.hits.hits.size)
     }
 
     fun `test execute monitor with custom findings index and pattern`() {
@@ -2116,14 +2122,17 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertFalse(monitorResponse?.id.isNullOrEmpty())
 
         // Expect queryIndex to rollover after setting new source_index with close to limit amount of fields in mappings
+        // and old query index to be deleted, since it's not used anymore
         var getIndexResponse: GetIndexResponse =
-            client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
-        assertEquals(2, getIndexResponse.indices.size)
+            client().admin().indices().getIndex(GetIndexRequest().indices(DOC_LEVEL_QUERIES_INDEX + "*")).get()
+        assertEquals(1, getIndexResponse.indices.size)
+        assertEquals(DOC_LEVEL_QUERIES_INDEX + "-000002", getIndexResponse.indices[0])
 
         deleteMonitor(updatedMonitor.id)
         getIndexResponse =
-            client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+            client().admin().indices().getIndex(GetIndexRequest().indices(DOC_LEVEL_QUERIES_INDEX + "*")).get()
         assertEquals(1, getIndexResponse.indices.size)
+        assertEquals(DOC_LEVEL_QUERIES_INDEX + "-000002", getIndexResponse.indices[0])
     }
 
     fun `test queryIndex gets increased max fields in mappings`() {

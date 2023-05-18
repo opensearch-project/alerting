@@ -215,25 +215,42 @@ class QueryIndexManagement private constructor(
         val indicesStatsResponse: IndicesStatsResponse = client.admin().indices().suspendUntil {
             stats(IndicesStatsRequest().indices(*concreteIndices.toTypedArray()).docs(true), it)
         }
+        var allMetadataDocs: List<MonitorMetadata>? = null
+
+        // Populate candidates for deletion
+        val indicesToDelete = mutableListOf<String>()
         indicesStatsResponse.indices.forEach {
             val concreteQueryIndex = it.key
             val stats = it.value
             if (stats.total.docs.count == 0L) {
-                var error = false
-                try {
-                    log.info("Deleting query index: [$concreteQueryIndex]")
-                    val ack: AcknowledgedResponse =
-                        client.admin().indices().suspendUntil { delete(DeleteIndexRequest(concreteQueryIndex), it) }
-                } catch (e: IndexNotFoundException) {
-                    /** Continue if index does not exists **/
-                } catch (e: Exception) {
-                    log.error("Error deleting query index: [$concreteQueryIndex]", e)
-                    error = true
+                indicesToDelete += concreteIndices
+            } else {
+                // If it has some docs that might mean that deletion of queries failed while deleting monitor.
+                // We will check if this queryIndex exists in any of existing MonitorMetadata docs
+                if (allMetadataDocs == null) {
+                    allMetadataDocs = MonitorMetadataService.getAllMetadataDocs()
                 }
-                if (!error) {
-                    deletedQueryIndices.add(concreteQueryIndex)
-                    log.info("Deleted query index: [$concreteQueryIndex]")
+                if (allMetadataDocs!!.none { metadata -> metadata.sourceToQueryIndexMapping.values.contains(concreteQueryIndex) }) {
+                    indicesToDelete += concreteIndices
                 }
+            }
+        }
+
+        indicesToDelete.forEach { concreteQueryIndex ->
+            var error = false
+            try {
+                log.info("Deleting query index: [$concreteQueryIndex]")
+                val ack: AcknowledgedResponse =
+                    client.admin().indices().suspendUntil { delete(DeleteIndexRequest(concreteQueryIndex), it) }
+            } catch (e: IndexNotFoundException) {
+                /** Continue if index does not exists **/
+            } catch (e: Exception) {
+                log.error("Error deleting query index: [$concreteQueryIndex]", e)
+                error = true
+            }
+            if (!error) {
+                deletedQueryIndices.add(concreteQueryIndex)
+                log.info("Deleted query index: [$concreteQueryIndex]")
             }
         }
         return deletedQueryIndices

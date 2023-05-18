@@ -151,8 +151,8 @@ class TransportDeleteMonitorAction @Inject constructor(
             deleteRequest: DeleteRequest,
         ): DeleteResponse {
             val deleteResponse = deleteMonitorDocument(client, deleteRequest)
-            deleteMetadata(client, monitor)
             deleteDocLevelMonitorQueriesAndIndices(client, clusterService, monitor)
+            deleteMetadata(client, monitor)
             return deleteResponse
         }
 
@@ -192,7 +192,6 @@ class TransportDeleteMonitorAction @Inject constructor(
                 val metadata = MonitorMetadataService.getMetadata(monitor)
                 metadata?.sourceToQueryIndexMapping
                     ?.map { it.value }
-                    ?.filter { it != queryIndexWriteIndex } // Skip deleting queryIndexWriteIndex to avoid potential race conditions with existing monitors
                     ?.forEach { queryIndex ->
 
                         val indicesExistsResponse: IndicesExistsResponse =
@@ -202,44 +201,38 @@ class TransportDeleteMonitorAction @Inject constructor(
                         if (indicesExistsResponse.isExists == false) {
                             return
                         }
-                        // Check if there's any queries from other monitors in this queryIndex,
-                        // to avoid unnecessary doc deletion, if we could just delete index completely
-                        val searchResponse: SearchResponse = client.suspendUntil {
-                            search(
-                                SearchRequest(queryIndex).source(
-                                    SearchSourceBuilder()
-                                        .size(0)
-                                        .query(
-                                            QueryBuilders.boolQuery().mustNot(
-                                                QueryBuilders.matchQuery("monitor_id", monitor.id)
+                        // In case we're dealing with writeIndex, we can't delete it, but we can delete queries
+                        if (queryIndex == queryIndexWriteIndex) {
+                            deleteQueriesForMonitor(queryIndex, monitor, client)
+                        } else {
+                            // Check if there's any queries from other monitors in this queryIndex,
+                            // to avoid unnecessary doc deletion, if we could just delete index completely
+                            val searchResponse: SearchResponse = client.suspendUntil {
+                                search(
+                                    SearchRequest(queryIndex).source(
+                                        SearchSourceBuilder()
+                                            .size(0)
+                                            .query(
+                                                QueryBuilders.boolQuery().mustNot(
+                                                    QueryBuilders.matchQuery("monitor_id", monitor.id)
+                                                )
                                             )
-                                        )
-                                ).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN),
-                                it
-                            )
-                        }
-                        if (searchResponse.hits.totalHits.value == 0L) {
-                            val ack: AcknowledgedResponse = client.suspendUntil {
-                                client.admin().indices().delete(
-                                    DeleteIndexRequest(queryIndex).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN), it
+                                    ).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN),
+                                    it
                                 )
                             }
-                            if (ack.isAcknowledged == false) {
-                                log.error("Deletion of concrete queryIndex:$queryIndex is not ack'd!")
-                            }
-                        } else {
-                            // Delete all queries added by this monitor
-                            val response: BulkByScrollResponse = suspendCoroutine { cont ->
-                                DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-                                    .source(queryIndex)
-                                    .filter(QueryBuilders.matchQuery("monitor_id", monitor.id))
-                                    .refresh(true)
-                                    .execute(
-                                        object : ActionListener<BulkByScrollResponse> {
-                                            override fun onResponse(response: BulkByScrollResponse) = cont.resume(response)
-                                            override fun onFailure(t: Exception) = cont.resumeWithException(t)
-                                        }
+                            if (searchResponse.hits.totalHits.value == 0L) {
+                                val ack: AcknowledgedResponse = client.suspendUntil {
+                                    client.admin().indices().delete(
+                                        DeleteIndexRequest(queryIndex).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN), it
                                     )
+                                }
+                                if (ack.isAcknowledged == false) {
+                                    log.error("Deletion of concrete queryIndex:$queryIndex is not ack'd!")
+                                }
+                            } else {
+                                // Delete all queries added by this monitor
+                                deleteQueriesForMonitor(queryIndex, monitor, client)
                             }
                         }
                     }
@@ -247,6 +240,21 @@ class TransportDeleteMonitorAction @Inject constructor(
                 // we only log the error and don't fail the request because if monitor document has been deleted successfully,
                 // we cannot retry based on this failure
                 log.error("Failed to delete doc level queries from query index.", e)
+            }
+        }
+
+        private suspend fun deleteQueriesForMonitor(queryIndex: String, monitor: Monitor, client: Client) {
+            val response: BulkByScrollResponse = suspendCoroutine { cont ->
+                DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+                    .source(queryIndex)
+                    .filter(QueryBuilders.matchQuery("monitor_id", monitor.id))
+                    .refresh(true)
+                    .execute(
+                        object : ActionListener<BulkByScrollResponse> {
+                            override fun onResponse(response: BulkByScrollResponse) = cont.resume(response)
+                            override fun onFailure(t: Exception) = cont.resumeWithException(t)
+                        }
+                    )
             }
         }
     }
