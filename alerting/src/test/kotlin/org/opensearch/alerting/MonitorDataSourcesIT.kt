@@ -27,13 +27,11 @@ import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.transport.AlertingSingleNodeTestCase
-import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.DocLevelMonitorQueries.Companion.INDEX_PATTERN_SUFFIX
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
 import org.opensearch.commons.alerting.action.AlertingActions
-import org.opensearch.commons.alerting.action.DeleteMonitorRequest
 import org.opensearch.commons.alerting.action.GetAlertsRequest
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DataSources
@@ -1074,8 +1072,14 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertNotEquals(0, searchResponse.hits.hits.size)
 
         deleteMonitor(monitorId)
-        assertIndexNotExists(customQueryIndex + "*")
-        assertAliasNotExists(customQueryIndex)
+        // Verify that queryIndex is not deleted, because it writeIndex
+        assertIndexExists(customQueryIndex + "*")
+        assertAliasExists(customQueryIndex)
+        // Verify queries are deleted
+        searchResponse = client().search(
+            SearchRequest(customQueryIndex).source(SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
+        ).get()
+        assertEquals(0, searchResponse.hits.hits.size)
     }
 
     fun `test execute monitor with custom findings index and pattern`() {
@@ -1961,22 +1965,18 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(alerts != null)
         Assert.assertTrue(alerts.size == 2)
         // Delete monitor #1
-        client().execute(
-            AlertingActions.DELETE_MONITOR_ACTION_TYPE, DeleteMonitorRequest(monitorResponse.id, WriteRequest.RefreshPolicy.IMMEDIATE)
-        ).get()
+        deleteMonitor(monitorResponse.id)
         // Expect first concrete queryIndex to be deleted since that one was only used by this monitor
         getIndexResponse =
             client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
         assertEquals(1, getIndexResponse.indices.size)
         assertEquals(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "-000002", getIndexResponse.indices[0])
         // Delete monitor #2
-        client().execute(
-            AlertingActions.DELETE_MONITOR_ACTION_TYPE, DeleteMonitorRequest(monitorResponse2.id, WriteRequest.RefreshPolicy.IMMEDIATE)
-        ).get()
-        // Expect second concrete queryIndex to be deleted since that one was only used by this monitor
+        deleteMonitor(monitorResponse2.id)
+        // Expect the only queryIndex(writeIndex) not to be deleted
         getIndexResponse =
             client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
-        assertEquals(0, getIndexResponse.indices.size)
+        assertEquals(1, getIndexResponse.indices.size)
     }
 
     fun `test queryIndex rollover failure source_index field count over limit`() {
@@ -2122,22 +2122,22 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertFalse(monitorResponse?.id.isNullOrEmpty())
 
         // Expect queryIndex to rollover after setting new source_index with close to limit amount of fields in mappings
+        // and old query index to be deleted, since it's not used anymore
         var getIndexResponse: GetIndexResponse =
-            client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
-        assertEquals(2, getIndexResponse.indices.size)
+            client().admin().indices().getIndex(GetIndexRequest().indices(DOC_LEVEL_QUERIES_INDEX + "*")).get()
+        assertEquals(1, getIndexResponse.indices.size)
+        assertEquals(DOC_LEVEL_QUERIES_INDEX + "-000002", getIndexResponse.indices[0])
 
         deleteMonitor(updatedMonitor.id)
-        waitUntil {
-            getIndexResponse =
-                client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
-            return@waitUntil getIndexResponse.indices.isEmpty()
-        }
-        assertEquals(0, getIndexResponse.indices.size)
+        getIndexResponse =
+            client().admin().indices().getIndex(GetIndexRequest().indices(DOC_LEVEL_QUERIES_INDEX + "*")).get()
+        assertEquals(1, getIndexResponse.indices.size)
+        assertEquals(DOC_LEVEL_QUERIES_INDEX + "-000002", getIndexResponse.indices[0])
     }
 
     fun `test queryIndex gets increased max fields in mappings`() {
         val testSourceIndex = "test_source_index"
-        createIndex(testSourceIndex, Settings.builder().put("index.mapping.total_fields.limit", "10000").build())
+        createIndex(testSourceIndex, Settings.builder().put("index.mapping.total_fields.limit", "15000").build())
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
@@ -2148,7 +2148,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         // This doc should create 12000 fields in index mapping. It's easier to add mappings like this then via api
         val docPayload: StringBuilder = StringBuilder(100000)
         docPayload.append("{")
-        for (i in 1..9998) {
+        for (i in 1..12000) {
             docPayload.append(""" "id$i":$i,""")
         }
         docPayload.append("\"test_field\" : \"us-west-2\" }")
@@ -2166,15 +2166,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val field_max_limit = getIndexResponse
             .getSetting(DOC_LEVEL_QUERIES_INDEX + "-000001", MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.key).toInt()
 
-        assertEquals(10000 + DocLevelMonitorQueries.QUERY_INDEX_BASE_FIELDS_COUNT, field_max_limit)
-
-        deleteMonitor(monitorResponse.id)
-        waitUntil {
-            getIndexResponse =
-                client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
-            return@waitUntil getIndexResponse.indices.isEmpty()
-        }
-        assertEquals(0, getIndexResponse.indices.size)
+        assertEquals(15008, field_max_limit)
     }
 
     fun `test queryIndex bwc when index was not an alias`() {

@@ -23,6 +23,8 @@ import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
+import org.opensearch.action.search.SearchRequest
+import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -43,11 +45,16 @@ import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentParser
+import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.RestStatus
+import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.transport.RemoteTransportException
 
 private val log = LogManager.getLogger(MonitorMetadataService::class.java)
+
+private const val MAX_SEARCH_SIZE = 10000
+private val SEARCH_TIMEOUT = TimeValue.timeValueMinutes(5)
 
 object MonitorMetadataService :
     CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("MonitorMetadataService")) {
@@ -249,5 +256,39 @@ object MonitorMetadataService :
                 else shard.seqNoStats?.globalCheckpoint ?: SequenceNumbers.UNASSIGNED_SEQ_NO
         }
         return lastRunContext
+    }
+
+    suspend fun getAllMetadataDocs(): List<MonitorMetadata> {
+        val size = MAX_SEARCH_SIZE
+        val searchTimeout = SEARCH_TIMEOUT
+
+        val allMonitorMetadataDocs = mutableListOf<MonitorMetadata>()
+        var fromIndex = 0
+
+        do {
+            val searchRequest = SearchRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
+                .source(
+                    SearchSourceBuilder()
+                        .query(
+                            QueryBuilders.existsQuery("metadata")
+                        )
+                        .from(fromIndex)
+                        .size(size)
+                )
+
+            searchRequest.cancelAfterTimeInterval = searchTimeout
+
+            val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
+
+            for (hit in searchResponse.hits) {
+                val xcp = XContentFactory.xContent(XContentType.JSON)
+                    .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
+                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                allMonitorMetadataDocs.add(MonitorMetadata.parse(xcp))
+            }
+            fromIndex += searchResponse.hits.totalHits.value.toInt()
+        } while (searchResponse.hits.totalHits.value > allMonitorMetadataDocs.size)
+
+        return allMonitorMetadataDocs
     }
 }

@@ -534,9 +534,9 @@ class TransportIndexMonitorAction @Inject constructor(
             try {
                 TransportDeleteMonitorAction.deleteAllResourcesForMonitor(
                     client,
-                    monitor = monitor,
+                    clusterService,
+                    monitor.copy(id = indexMonitorResponse.id),
                     DeleteRequest(SCHEDULED_JOBS_INDEX, indexMonitorResponse.id).setRefreshPolicy(RefreshPolicy.IMMEDIATE),
-                    indexMonitorResponse.id
                 )
                 log.debug(
                     "Cleaned up monitor related resources after monitor creation request partial failure. " +
