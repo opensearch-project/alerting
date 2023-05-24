@@ -86,8 +86,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     @Before
     fun create() {
         if (userClient == null) {
-            createUser(user, user, arrayOf())
-            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user).setSocketTimeout(60000).build()
+            createUser(user, arrayOf())
+            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, password).setSocketTimeout(60000).build()
         }
     }
 
@@ -1342,7 +1342,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     TODO: https://github.com/opensearch-project/alerting/issues/300
      */
     fun `test execute query-level monitor with user having partial index permissions`() {
-        createUser(user, user, arrayOf(TEST_HR_BACKEND_ROLE))
+        createUser(user, arrayOf(TEST_HR_BACKEND_ROLE))
         createTestIndex(TEST_HR_INDEX)
         createIndexRoleWithDocLevelSecurity(
             TEST_HR_ROLE,
@@ -1398,7 +1398,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test execute bucket-level monitor with user having partial index permissions`() {
-        createUser(user, user, arrayOf(TEST_HR_BACKEND_ROLE))
+        createUser(user, arrayOf(TEST_HR_BACKEND_ROLE))
         createTestIndex(TEST_HR_INDEX)
         createIndexRoleWithDocLevelSecurity(
             TEST_HR_ROLE,
@@ -1474,7 +1474,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
      */
     fun `test create monitor failure clean up with a user without delete monitor access`() {
         enableFilterBy()
-        createUser(user, user, listOf(TEST_HR_BACKEND_ROLE, "role2").toTypedArray())
+        createUser(user, listOf(TEST_HR_BACKEND_ROLE, "role2").toTypedArray())
         createTestIndex(TEST_HR_INDEX)
         createCustomIndexRole(
             ALERTING_INDEX_MONITOR_ACCESS,
