@@ -395,7 +395,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             listOf("role2"),
             getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
         )
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
             .setSocketTimeout(60000).build()
 
         val getMonitorResponse = getUserClient?.makeRequest(
@@ -588,7 +588,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             listOf("role2"),
             getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
         )
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
             .setSocketTimeout(60000).build()
 
         val getMonitorResponse = getUserClient?.makeRequest(
@@ -724,7 +724,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             listOf("role2"),
             getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
         )
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
             .setSocketTimeout(60000).build()
 
         val getMonitorResponse = getUserClient?.makeRequest(
@@ -777,7 +777,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             false
         )
 
-        val updateUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), updateUser, updateUser)
+        val updateUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), updateUser, password)
             .setSocketTimeout(60000).build()
         val updatedMonitor = updateMonitorWithClient(updateUserClient, createdMonitor, listOf("role5"))
 
@@ -828,7 +828,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             listOf("role1", "role2"),
             getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
         )
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
             .setSocketTimeout(60000).build()
 
         val getMonitorResponse = getUserClient?.makeRequest(
