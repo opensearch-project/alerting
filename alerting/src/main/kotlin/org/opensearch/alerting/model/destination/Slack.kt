@@ -5,15 +5,14 @@
 
 package org.opensearch.alerting.model.destination
 
-import org.opensearch.common.Strings
 import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
+import org.opensearch.core.common.Strings
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.core.xcontent.XContentParser
 import java.io.IOException
-import java.lang.IllegalStateException
 
 /**
  * A value object that represents a Slack message. Slack message will be
