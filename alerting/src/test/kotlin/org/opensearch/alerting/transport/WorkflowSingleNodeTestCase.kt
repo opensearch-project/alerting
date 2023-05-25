@@ -15,6 +15,9 @@ import org.opensearch.alerting.model.WorkflowMetadata
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.DeleteWorkflowRequest
+import org.opensearch.commons.alerting.action.GetWorkflowRequest
+import org.opensearch.commons.alerting.action.GetWorkflowResponse
 import org.opensearch.commons.alerting.action.IndexWorkflowRequest
 import org.opensearch.commons.alerting.action.IndexWorkflowResponse
 import org.opensearch.commons.alerting.model.ScheduledJob

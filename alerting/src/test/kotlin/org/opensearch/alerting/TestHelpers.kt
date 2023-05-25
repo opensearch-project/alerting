@@ -253,8 +253,7 @@ fun randomWorkflow(
         user = user,
         inputs = listOf(CompositeInput(Sequence(delegates))),
         version = -1L,
-        schemaVersion = 0,
-        triggers = emptyList(),
+        schemaVersion = 0
     )
 }
 
@@ -279,8 +278,7 @@ fun randomWorkflowWithDelegates(
         user = user,
         inputs = listOf(CompositeInput(Sequence(delegates))),
         version = -1L,
-        schemaVersion = 0,
-        triggers = emptyList()
+        schemaVersion = 0
     )
 }
 

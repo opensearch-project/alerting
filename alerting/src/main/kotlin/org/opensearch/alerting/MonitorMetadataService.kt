@@ -57,13 +57,14 @@ object MonitorMetadataService :
     private lateinit var clusterService: ClusterService
     private lateinit var settings: Settings
 
-    @Volatile private lateinit var indexTimeout: TimeValue
+    @Volatile
+    private lateinit var indexTimeout: TimeValue
 
     fun initialize(
         client: Client,
         clusterService: ClusterService,
         xContentRegistry: NamedXContentRegistry,
-        settings: Settings
+        settings: Settings,
     ) {
         this.clusterService = clusterService
         this.client = client
@@ -119,7 +120,7 @@ object MonitorMetadataService :
         monitor: Monitor,
         createWithRunContext: Boolean = true,
         skipIndex: Boolean = false,
-        workflowMetadataId: String? = null
+        workflowMetadataId: String? = null,
     ): Pair<MonitorMetadata, Boolean> {
         try {
             val created = true
@@ -193,8 +194,8 @@ object MonitorMetadataService :
             (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
         else null
         val runContext = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR && createWithRunContext)
-                createFullRunContext(monitorIndex)
-            else emptyMap()
+            createFullRunContext(monitorIndex)
+        else emptyMap()
         return MonitorMetadata(
             id = MonitorMetadata.getId(monitor, workflowMetadataId),
             seqNo = SequenceNumbers.UNASSIGNED_SEQ_NO,
@@ -205,9 +206,10 @@ object MonitorMetadataService :
             sourceToQueryIndexMapping = mutableMapOf()
         )
     }
-        suspend fun createFullRunContext(
+
+    suspend fun createFullRunContext(
         index: String?,
-        existingRunContext: MutableMap<String, MutableMap<String, Any>>? = null
+        existingRunContext: MutableMap<String, MutableMap<String, Any>>? = null,
     ): MutableMap<String, MutableMap<String, Any>> {
         val lastRunContext = existingRunContext?.toMutableMap() ?: mutableMapOf()
         try {

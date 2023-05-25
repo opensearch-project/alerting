@@ -47,6 +47,7 @@ import org.opensearch.alerting.settings.LegacyOpenDistroAlertingSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings
 import org.opensearch.alerting.transport.TransportAcknowledgeAlertAction
 import org.opensearch.alerting.transport.TransportDeleteMonitorAction
+import org.opensearch.alerting.transport.TransportDeleteWorkflowAction
 import org.opensearch.alerting.transport.TransportExecuteMonitorAction
 import org.opensearch.alerting.transport.TransportExecuteWorkflowAction
 import org.opensearch.alerting.transport.TransportGetAlertsAction
@@ -55,6 +56,7 @@ import org.opensearch.alerting.transport.TransportGetEmailAccountAction
 import org.opensearch.alerting.transport.TransportGetEmailGroupAction
 import org.opensearch.alerting.transport.TransportGetFindingsSearchAction
 import org.opensearch.alerting.transport.TransportGetMonitorAction
+import org.opensearch.alerting.transport.TransportGetWorkflowAction
 import org.opensearch.alerting.transport.TransportIndexMonitorAction
 import org.opensearch.alerting.transport.TransportIndexWorkflowAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction

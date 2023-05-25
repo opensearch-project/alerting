@@ -20,6 +20,7 @@ import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.alerting.action.ExecuteWorkflowResponse
 import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.use
 import org.opensearch.alerting.workflow.WorkflowRunnerService
 import org.opensearch.client.Client
 import org.opensearch.common.inject.Inject
