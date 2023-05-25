@@ -25,6 +25,7 @@ import org.opensearch.alerting.util.destinationmigration.sendNotification
 import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isTestAction
 import org.opensearch.alerting.util.use
+import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.node.NodeClient
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.Table
@@ -40,7 +41,8 @@ abstract class MonitorRunner {
         monitorCtx: MonitorRunnerExecutionContext,
         periodStart: Instant,
         periodEnd: Instant,
-        dryRun: Boolean
+        dryRun: Boolean,
+        workflowRunContext: WorkflowRunContext? = null
     ): MonitorRunResult<*>
 
     suspend fun runAction(

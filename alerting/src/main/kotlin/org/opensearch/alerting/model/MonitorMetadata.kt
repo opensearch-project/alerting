@@ -119,8 +119,17 @@ data class MonitorMetadata(
             return MonitorMetadata(sin)
         }
 
-        fun getId(monitor: Monitor): String {
-            return monitor.id + "-metadata"
+        /** workflowMetadataId is used as key for monitor metadata in the case when the workflow execution happens
+         so the monitor lastRunContext (in the case of doc level monitor) is not interfering with the monitor execution
+         WorkflowMetadataId will be either workflowId-metadata (when executing the workflow as it is scheduled)
+         or timestampWithUUID-metadata (when a workflow is executed in a dry-run mode)
+         In the case of temp workflow, doc level monitors must have lastRunContext created from scratch
+         That's why we are using workflowMetadataId - in order to ensure that the doc level monitor metadata is created from scratch
+         **/
+        fun getId(monitor: Monitor, workflowMetadataId: String? = null): String {
+            return if (workflowMetadataId.isNullOrEmpty()) "${monitor.id}-metadata"
+            // WorkflowMetadataId already contains -metadata suffix
+            else "$workflowMetadataId-${monitor.id}-metadata"
         }
     }
 }
