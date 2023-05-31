@@ -428,8 +428,8 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 2, findings.size)
-        val foundFindings = findings.filter { it.relatedDocIds.contains("1") || it.relatedDocIds.contains("5") }
-        assertEquals("Didn't find findings for docs 1 and 5", 2, foundFindings.size)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
+        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("5"))
     }
 
     fun `test execute monitor with new index added after first execution that generates alerts and findings`() {
