@@ -6,10 +6,13 @@
 package org.opensearch.alerting.transport
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope
+import org.opensearch.action.admin.indices.alias.get.GetAliasesRequest
+import org.opensearch.action.admin.indices.get.GetIndexRequest
 import org.opensearch.action.admin.indices.get.GetIndexRequestBuilder
 import org.opensearch.action.admin.indices.get.GetIndexResponse
 import org.opensearch.action.admin.indices.refresh.RefreshAction
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
+import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.ExecuteMonitorAction
@@ -23,6 +26,7 @@ import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.DeleteMonitorRequest
 import org.opensearch.commons.alerting.action.GetFindingsRequest
 import org.opensearch.commons.alerting.action.GetFindingsResponse
 import org.opensearch.commons.alerting.action.IndexMonitorRequest
@@ -40,7 +44,7 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.test.OpenSearchSingleNodeTestCase
 import java.time.Instant
-import java.util.*
+import java.util.Locale
 
 /**
  * A test that keep a singleton node started for all tests that can be used to get
@@ -88,6 +92,45 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
             .setSource(doc, XContentType.JSON).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE).get()
     }
 
+    protected fun assertIndexExists(index: String) {
+        val getIndexResponse =
+            client().admin().indices().getIndex(
+                GetIndexRequest().indices(index).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN)
+            ).get()
+        assertTrue(getIndexResponse.indices.size > 0)
+    }
+
+    protected fun assertIndexNotExists(index: String) {
+        val getIndexResponse =
+            client().admin().indices().getIndex(
+                GetIndexRequest().indices(index).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN)
+            ).get()
+        assertFalse(getIndexResponse.indices.size > 0)
+    }
+
+    protected fun assertAliasNotExists(alias: String) {
+        val aliasesResponse = client().admin().indices().getAliases(GetAliasesRequest()).get()
+        val foundAlias = aliasesResponse.aliases.values().forEach {
+            it.value.forEach {
+                if (it.alias == alias) {
+                    fail("alias exists, but it shouldn't")
+                }
+            }
+        }
+    }
+
+    protected fun assertAliasExists(alias: String) {
+        val aliasesResponse = client().admin().indices().getAliases(GetAliasesRequest()).get()
+        val foundAlias = aliasesResponse.aliases.values().forEach {
+            it.value.forEach {
+                if (it.alias == alias) {
+                    return
+                }
+            }
+        }
+        fail("alias doesn't exists, but it should")
+    }
+
     protected fun createMonitor(monitor: Monitor): IndexMonitorResponse? {
         val request = IndexMonitorRequest(
             monitorId = Monitor.NO_ID,
@@ -110,6 +153,13 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
             monitor = monitor
         )
         return client().execute(AlertingActions.INDEX_MONITOR_ACTION_TYPE, request).actionGet()
+    }
+
+    protected fun deleteMonitor(monitorId: String): Boolean {
+        client().execute(
+            AlertingActions.DELETE_MONITOR_ACTION_TYPE, DeleteMonitorRequest(monitorId, WriteRequest.RefreshPolicy.IMMEDIATE)
+        ).get()
+        return true
     }
 
     protected fun searchAlerts(id: String, indices: String = AlertIndices.ALERT_INDEX, refresh: Boolean = true): List<Alert> {

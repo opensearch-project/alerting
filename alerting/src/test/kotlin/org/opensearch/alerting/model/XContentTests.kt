@@ -80,7 +80,13 @@ class XContentTests : OpenSearchTestCase() {
     }
 
     fun `test MonitorMetadata`() {
-        val monitorMetadata = MonitorMetadata("monitorId-metadata", "monitorId", emptyList(), emptyMap())
+        val monitorMetadata = MonitorMetadata(
+            id = "monitorId-metadata",
+            monitorId = "monitorId",
+            lastActionExecutionTimes = emptyList(),
+            lastRunContext = emptyMap(),
+            sourceToQueryIndexMapping = mutableMapOf()
+        )
         val monitorMetadataString = monitorMetadata.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS).string()
         val parsedMonitorMetadata = MonitorMetadata.parse(parser(monitorMetadataString))
         assertEquals("Round tripping MonitorMetadata doesn't work", monitorMetadata, parsedMonitorMetadata)
