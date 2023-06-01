@@ -19,11 +19,8 @@ jobs:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
         include:
           - os: windows-latest
-            os_build_args: -x integTest -x jacocoTestReport
             working_directory: X:\
             os_java_options: -Xmx4096M
-          - os: macos-latest
-            os_build_args: -x integTest -x jacocoTestReport
     # Job name
     name: Build Alerting with JDK ${{ matrix.java }} on ${{ matrix.os }}
     # This job runs on Linux
