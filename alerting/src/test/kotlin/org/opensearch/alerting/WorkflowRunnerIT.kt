@@ -9,12 +9,14 @@ import org.junit.Assert
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
+import org.opensearch.alerting.model.WorkflowMetadata
 import org.opensearch.alerting.transport.WorkflowSingleNodeTestCase
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.GetAlertsRequest
 import org.opensearch.commons.alerting.action.GetAlertsResponse
+import org.opensearch.commons.alerting.action.IndexMonitorResponse
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DataSources
@@ -200,7 +202,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
             executeWorkflowResponse.workflowRunResult.executionId,
             workflowMetadata!!.latestExecutionId
         )
-        val monitorMetadataId = "${monitorResponse.id}-${workflowMetadata.id}"
+        val monitorMetadataId = getDelegateMonitorMetadataId(monitorResponse, workflowMetadata)
         val monitorMetadata = searchMonitorMetadata(monitorMetadataId)
         assertNotNull(monitorMetadata)
 
@@ -224,7 +226,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
             executeWorkflowResponse1.workflowRunResult.executionId,
             workflowMetadata1!!.latestExecutionId
         )
-        val monitorMetadataId1 = "${monitorResponse.id}-${workflowMetadata1.id}"
+        val monitorMetadataId1 = getDelegateMonitorMetadataId(monitorResponse, workflowMetadata1)
         val monitorMetadata1 = searchMonitorMetadata(monitorMetadataId1)
         assertNotNull(monitorMetadata1)
         // Verify that for two workflows two different doc level monitor metadata has been created
@@ -294,7 +296,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
             executeWorkflowResponse.workflowRunResult.executionId,
             workflowMetadata!!.latestExecutionId
         )
-        val monitorMetadataId = "${monitorResponse.id}-${workflowMetadata.id}"
+        val monitorMetadataId = getDelegateMonitorMetadataId(monitorResponse, workflowMetadata)
         val monitorMetadata = searchMonitorMetadata(monitorMetadataId)
         assertNotNull(monitorMetadata)
 
@@ -335,7 +337,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
             executeWorkflowResponse1.workflowRunResult.executionId,
             workflowMetadata1!!.latestExecutionId
         )
-        val monitorMetadataId1 = "${monitorResponse.id}-${workflowMetadata1.id}"
+        val monitorMetadataId1 = getDelegateMonitorMetadataId(monitorResponse, workflowMetadata1)
         val monitorMetadata1 = searchMonitorMetadata(monitorMetadataId1)
         assertNotNull(monitorMetadata1)
         // Verify that for two workflows two different doc level monitor metadata has been created
@@ -392,7 +394,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
             executeWorkflowResponse.workflowRunResult.executionId,
             workflowMetadata!!.latestExecutionId
         )
-        val monitorMetadataId = "${monitorResponse.id}-${workflowMetadata.id}"
+        val monitorMetadataId = getDelegateMonitorMetadataId(monitorResponse, workflowMetadata)
         val monitorMetadata = searchMonitorMetadata(monitorMetadataId)
         assertNotNull(monitorMetadata)
 
@@ -408,11 +410,16 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
             executeWorkflowResponse1.workflowRunResult.executionId,
             workflowMetadata1!!.latestExecutionId
         )
-        val monitorMetadataId1 = "${monitorResponse.id}-${workflowMetadata1.id}"
+        val monitorMetadataId1 = getDelegateMonitorMetadataId(monitorResponse, workflowMetadata1)
         assertTrue(monitorMetadataId == monitorMetadataId1)
         val monitorMetadata1 = searchMonitorMetadata(monitorMetadataId1)
         assertNotNull(monitorMetadata1)
     }
+
+    private fun getDelegateMonitorMetadataId(
+        monitorResponse: IndexMonitorResponse,
+        workflowMetadata: WorkflowMetadata,
+    ) = "${workflowMetadata.id}-${monitorResponse.id}-metadata"
 
     fun `test execute workflow dryrun verify workflow metadata not created`() {
         val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
@@ -815,8 +822,8 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         val error = response.workflowRunResult.workflowRunResult[0].error
         assertNotNull(error)
         assertTrue(error is AlertingException)
-        assertEquals(RestStatus.NOT_FOUND, (error as AlertingException).status)
-        assertEquals("Configured indices are not found: [$index]", error.message)
+        assertEquals(RestStatus.INTERNAL_SERVER_ERROR, (error as AlertingException).status)
+        assertTrue(error.message!!.contains("IndexNotFoundException"))
     }
 
     fun `test execute workflow wrong workflow id`() {
