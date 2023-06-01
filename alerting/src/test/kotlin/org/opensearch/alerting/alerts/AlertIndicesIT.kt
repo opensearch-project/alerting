@@ -64,7 +64,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         executeMonitor(createRandomMonitor())
         assertIndexExists(AlertIndices.ALERT_INDEX)
         assertIndexExists(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
-        verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 6)
+        verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 7)
         verifyIndexSchemaVersion(AlertIndices.ALERT_INDEX, 4)
         verifyIndexSchemaVersion(AlertIndices.ALERT_HISTORY_WRITE_INDEX, 4)
     }
@@ -75,7 +75,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
 
         putFindingMappings(
             AlertIndices.findingMapping().trimStart('{').trimEnd('}')
-                .replace("\"schema_version\": 2", "\"schema_version\": 0")
+                .replace("\"schema_version\": 3", "\"schema_version\": 0")
         )
         assertIndexExists(AlertIndices.FINDING_HISTORY_WRITE_INDEX)
         verifyIndexSchemaVersion(AlertIndices.FINDING_HISTORY_WRITE_INDEX, 0)
@@ -88,8 +88,8 @@ class AlertIndicesIT : AlertingRestTestCase() {
         val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
         executeMonitor(trueMonitor.id)
         assertIndexExists(AlertIndices.FINDING_HISTORY_WRITE_INDEX)
-        verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 6)
-        verifyIndexSchemaVersion(AlertIndices.FINDING_HISTORY_WRITE_INDEX, 2)
+        verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 7)
+        verifyIndexSchemaVersion(AlertIndices.FINDING_HISTORY_WRITE_INDEX, 3)
     }
 
     fun `test alert index gets recreated automatically if deleted`() {
