@@ -80,6 +80,8 @@ import javax.management.remote.JMXServiceURL
  */
 abstract class AlertingRestTestCase : ODFERestTestCase() {
 
+    protected val password = "D%LMX3bo#@U3XqVQ"
+
     protected val isDebuggingTest = DisableOnDebug(null).isDebugging
     protected val isDebuggingRemoteCluster = System.getProperty("cluster.debug", "false")!!.toBoolean()
     protected val numberOfNodes = System.getProperty("cluster.number_of_nodes", "1")!!.toInt()
@@ -1133,11 +1135,11 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client().updateSettings(DestinationSettings.ALLOW_LIST.key, allowedDestinations)
     }
 
-    fun createUser(name: String, passwd: String, backendRoles: Array<String>) {
+    fun createUser(name: String, backendRoles: Array<String>) {
         val request = Request("PUT", "/_plugins/_security/api/internalusers/$name")
         val broles = backendRoles.joinToString { it -> "\"$it\"" }
         var entity = " {\n" +
-            "\"password\": \"$passwd\",\n" +
+            "\"password\": \"$password\",\n" +
             "\"backend_roles\": [$broles],\n" +
             "\"attributes\": {\n" +
             "}} "
@@ -1277,7 +1279,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     fun createUserWithTestData(user: String, index: String, role: String, backendRole: String) {
-        createUser(user, user, arrayOf(backendRole))
+        createUser(user, arrayOf(backendRole))
         createTestIndex(index)
         createIndexRole(role, index)
         createUserRolesMapping(role, arrayOf(user))
@@ -1290,7 +1292,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         backendRoles: List<String>,
         clusterPermissions: String?
     ) {
-        createUser(user, user, backendRoles.toTypedArray())
+        createUser(user, backendRoles.toTypedArray())
         createTestIndex(index)
         createCustomIndexRole(role, index, clusterPermissions)
         createUserRolesMapping(role, arrayOf(user))
@@ -1302,7 +1304,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         backendRoles: List<String>,
         isExistingRole: Boolean
     ) {
-        createUser(user, user, backendRoles.toTypedArray())
+        createUser(user, backendRoles.toTypedArray())
         for (role in roles) {
             if (isExistingRole) {
                 updateRoleMapping(role, listOf(user), true)
@@ -1319,7 +1321,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         backendRole: String,
         dlsQuery: String
     ) {
-        createUser(user, user, arrayOf(backendRole))
+        createUser(user, arrayOf(backendRole))
         createTestIndex(index)
         createIndexRoleWithDocLevelSecurity(role, index, dlsQuery)
         createUserRolesMapping(role, arrayOf(user))
@@ -1333,7 +1335,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         dlsQuery: String,
         clusterPermissions: String?
     ) {
-        createUser(user, user, arrayOf(backendRole))
+        createUser(user, arrayOf(backendRole))
         createTestIndex(index)
         createIndexRoleWithDocLevelSecurity(role, index, dlsQuery)
         createCustomIndexRole(role, index, clusterPermissions)
