@@ -79,14 +79,15 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     val user = "userD"
+    private val password = "Passw0rd124!!!!fdfsasfljh3@#$@#gfdgfdg!@#"
     var userClient: RestClient? = null
 
     @Before
     fun create() {
 
         if (userClient == null) {
-            createUser(user, user, arrayOf())
-            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user)
+            createUser(user, password, arrayOf())
+            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, password)
                 .setSocketTimeout(60000)
                 .setConnectionRequestTimeout(180000)
                 .build()
@@ -105,6 +106,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
@@ -135,6 +137,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
@@ -159,7 +162,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test create monitor with an user with read-only role`() {
 
-        createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
+        createUserWithTestData(user, password, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
         createUserRolesMapping(ALERTING_READ_ONLY_ACCESS, arrayOf(user))
 
         try {
@@ -184,6 +187,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
@@ -213,6 +217,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
@@ -239,6 +244,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
@@ -273,6 +279,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     fun `test get monitor with an user with get monitor role`() {
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
@@ -300,6 +307,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     fun `test get monitor with an user without get monitor role`() {
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
@@ -378,6 +386,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUserWithRoles(
             user,
+            password,
             listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
             listOf(TEST_HR_BACKEND_ROLE, "role2"),
             false
@@ -393,12 +402,13 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         val getUser = "getUser"
         createUserWithTestDataAndCustomRole(
             getUser,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf("role2"),
             getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
         )
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
             .setSocketTimeout(60000)
             .setConnectionRequestTimeout(180000)
             .build()
@@ -441,6 +451,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUserWithRoles(
             user,
+            password,
             listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
             listOf(TEST_HR_BACKEND_ROLE, "role2"),
             false
@@ -468,6 +479,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUserWithRoles(
             user,
+            password,
             listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
             listOf(TEST_HR_BACKEND_ROLE, "role2"),
             false
@@ -503,6 +515,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUserWithRoles(
             user,
+            password,
             listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
             listOf(TEST_HR_BACKEND_ROLE, "role2"),
             false
@@ -534,6 +547,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         // user should have access to the admin monitor
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
@@ -576,6 +590,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUserWithRoles(
             user,
+            password,
             listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
             listOf(TEST_HR_BACKEND_ROLE, "role2"),
             false
@@ -588,12 +603,13 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         val getUser = "getUser"
         createUserWithTestDataAndCustomRole(
             getUser,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf("role2"),
             getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
         )
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
             .setSocketTimeout(60000)
             .setConnectionRequestTimeout(180000)
             .build()
@@ -640,6 +656,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUserWithRoles(
             user,
+            password,
             listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
             listOf(TEST_HR_BACKEND_ROLE, "role2"),
             false
@@ -669,6 +686,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUserWithRoles(
             user,
+            password,
             listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
             listOf(TEST_HR_BACKEND_ROLE, "role2"),
             false
@@ -714,6 +732,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUserWithRoles(
             user,
+            password,
             listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
             listOf(TEST_HR_BACKEND_ROLE, "role2"),
             false
@@ -726,12 +745,13 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         val getUser = "getUser"
         createUserWithTestDataAndCustomRole(
             getUser,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf("role2"),
             getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
         )
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
             .setSocketTimeout(60000)
             .setConnectionRequestTimeout(180000)
             .build()
@@ -769,6 +789,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUserWithRoles(
             user,
+            password,
             listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
             listOf(TEST_HR_BACKEND_ROLE, "role2"),
             false
@@ -781,12 +802,13 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         val updateUser = "updateUser"
         createUserWithRoles(
             updateUser,
+            password,
             listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
             listOf(TEST_HR_BACKEND_ROLE, "role5"),
             false
         )
 
-        val updateUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), updateUser, updateUser)
+        val updateUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), updateUser, password)
             .setSocketTimeout(60000)
             .setConnectionRequestTimeout(180000)
             .build()
@@ -822,6 +844,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         createUserWithRoles(
             user,
+            password,
             listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
             listOf(TEST_HR_BACKEND_ROLE, "role2"),
             false
@@ -834,12 +857,13 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         val getUser = "getUser"
         createUserWithTestDataAndCustomRole(
             getUser,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf("role1", "role2"),
             getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
         )
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
             .setSocketTimeout(60000)
             .setConnectionRequestTimeout(180000)
             .build()
@@ -986,6 +1010,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         // add alerting roles and search as userOne - must return 1 docs
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
@@ -1054,6 +1079,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     fun `test execute monitor with an user with execute monitor access`() {
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
@@ -1080,6 +1106,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     fun `test execute monitor with an user without execute monitor access`() {
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
@@ -1106,6 +1133,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     fun `test delete monitor with an user with delete monitor access`() {
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
@@ -1134,6 +1162,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     fun `test delete monitor with an user without delete monitor access`() {
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
@@ -1251,6 +1280,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         // add alerting roles and search as userOne - must return 1 docs
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
@@ -1299,7 +1329,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     fun `test admin all access with enable filter by`() {
 
         enableFilterBy()
-        createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
+        createUserWithTestData(user, password, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
         createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
         try {
             // randomMonitor has a dummy user, api ignores the User passed as part of monitor, it picks user info from the logged-in user.
@@ -1359,7 +1389,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
      */
     fun `test execute query-level monitor with user having partial index permissions`() {
 
-        createUser(user, user, arrayOf(TEST_HR_BACKEND_ROLE))
+        createUser(user, password, arrayOf(TEST_HR_BACKEND_ROLE))
         createTestIndex(TEST_HR_INDEX)
         createIndexRoleWithDocLevelSecurity(
             TEST_HR_ROLE,
@@ -1414,7 +1444,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test execute bucket-level monitor with user having partial index permissions`() {
 
-        createUser(user, user, arrayOf(TEST_HR_BACKEND_ROLE))
+        createUser(user, password, arrayOf(TEST_HR_BACKEND_ROLE))
         createTestIndex(TEST_HR_INDEX)
         createIndexRoleWithDocLevelSecurity(
             TEST_HR_ROLE,
@@ -1488,7 +1518,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
      */
     fun `test create monitor failure clean up with a user without delete monitor access`() {
         enableFilterBy()
-        createUser(user, user, listOf(TEST_HR_BACKEND_ROLE, "role2").toTypedArray())
+        createUser(user, password, listOf(TEST_HR_BACKEND_ROLE, "role2").toTypedArray())
         createTestIndex(TEST_HR_INDEX)
         createCustomIndexRole(
             ALERTING_INDEX_MONITOR_ACCESS,
@@ -1497,6 +1527,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         )
         createUserWithRoles(
             user,
+            password,
             listOf(ALERTING_INDEX_MONITOR_ACCESS, READALL_AND_MONITOR_ROLE),
             listOf(TEST_HR_BACKEND_ROLE, "role2"),
             false

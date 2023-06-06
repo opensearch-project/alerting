@@ -12,12 +12,14 @@ import org.opensearch.client.RequestOptions
 import org.opensearch.client.RestClient
 import org.opensearch.client.WarningsHandler
 import org.opensearch.common.io.PathUtils
+import org.opensearch.common.settings.MockSecureSettings
+import org.opensearch.common.settings.SecureSettings
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.ConfigConstants.OPENSEARCH_SECURITY_SSL_HTTP_ENABLED
 import org.opensearch.commons.ConfigConstants.OPENSEARCH_SECURITY_SSL_HTTP_KEYSTORE_FILEPATH
-import org.opensearch.commons.ConfigConstants.OPENSEARCH_SECURITY_SSL_HTTP_KEYSTORE_KEYPASSWORD
-import org.opensearch.commons.ConfigConstants.OPENSEARCH_SECURITY_SSL_HTTP_KEYSTORE_PASSWORD
+import org.opensearch.commons.ConfigConstants.OPENSEARCH_SECURITY_SSL_HTTP_KEYSTORE_KEYPASSWORD_SETTING
+import org.opensearch.commons.ConfigConstants.OPENSEARCH_SECURITY_SSL_HTTP_KEYSTORE_PASSWORD_SETTING
 import org.opensearch.commons.ConfigConstants.OPENSEARCH_SECURITY_SSL_HTTP_PEMCERT_FILEPATH
 import org.opensearch.commons.rest.SecureRestClientBuilder
 import org.opensearch.core.xcontent.DeprecationHandler
@@ -102,6 +104,13 @@ abstract class ODFERestTestCase : OpenSearchRestTestCase() {
         }
     }
 
+    protected open fun createSecureSettings(): SecureSettings? {
+        val mockSecureSettings = MockSecureSettings()
+        mockSecureSettings.setString(OPENSEARCH_SECURITY_SSL_HTTP_KEYSTORE_PASSWORD_SETTING.key, "changeit")
+        mockSecureSettings.setString(OPENSEARCH_SECURITY_SSL_HTTP_KEYSTORE_KEYPASSWORD_SETTING.key, "changeit")
+        return mockSecureSettings
+    }
+
     /**
      * Returns the REST client settings used for super-admin actions like cleaning up after the test has completed.
      */
@@ -112,8 +121,7 @@ abstract class ODFERestTestCase : OpenSearchRestTestCase() {
             .put(OPENSEARCH_SECURITY_SSL_HTTP_ENABLED, isHttps())
             .put(OPENSEARCH_SECURITY_SSL_HTTP_PEMCERT_FILEPATH, "sample.pem")
             .put(OPENSEARCH_SECURITY_SSL_HTTP_KEYSTORE_FILEPATH, "test-kirk.jks")
-            .put(OPENSEARCH_SECURITY_SSL_HTTP_KEYSTORE_PASSWORD, "changeit")
-            .put(OPENSEARCH_SECURITY_SSL_HTTP_KEYSTORE_KEYPASSWORD, "changeit")
+            .setSecureSettings(createSecureSettings())
             .build()
     }
 
@@ -124,9 +132,9 @@ abstract class ODFERestTestCase : OpenSearchRestTestCase() {
             return when (keystore != null) {
                 true -> {
                     // create adminDN (super-admin) client
-                    val uri = javaClass.classLoader.getResource("sample.pem").toURI()
+                    val uri = javaClass.classLoader.getResource("security/sample.pem").toURI()
                     val configPath = PathUtils.get(uri).parent.toAbsolutePath()
-                    SecureRestClientBuilder(settings, configPath)
+                    SecureRestClientBuilder(settings, configPath, hosts)
                         .setSocketTimeout(60000)
                         .setConnectionRequestTimeout(180000)
                         .build()

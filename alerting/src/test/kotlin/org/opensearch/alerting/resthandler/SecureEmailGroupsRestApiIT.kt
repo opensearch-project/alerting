@@ -53,14 +53,15 @@ class SecureEmailGroupsRestApiIT : AlertingRestTestCase() {
     }
 
     val user = "userC"
+    private val password = "Passw0rd124!!!!fdfsasfljh3@#$@#gfdgfdg!@#"
     var userClient: RestClient? = null
 
     @Before
     fun create() {
 
         if (userClient == null) {
-            createUser(user, user, arrayOf())
-            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user)
+            createUser(user, password, arrayOf())
+            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, password)
                 .setSocketTimeout(60000)
                 .setConnectionRequestTimeout(180000)
                 .build()
@@ -79,6 +80,7 @@ class SecureEmailGroupsRestApiIT : AlertingRestTestCase() {
     fun `test get email groups with an user with get email group role`() {
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
@@ -106,6 +108,7 @@ class SecureEmailGroupsRestApiIT : AlertingRestTestCase() {
     fun `test search email groups with an user with search email group role`() {
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
