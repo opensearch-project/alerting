@@ -162,7 +162,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test create monitor with an user with read-only role`() {
 
-        createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE, password)
+        createUserWithTestData(user, password, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
         createUserRolesMapping(ALERTING_READ_ONLY_ACCESS, arrayOf(user))
 
         try {
@@ -1329,7 +1329,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     fun `test admin all access with enable filter by`() {
 
         enableFilterBy()
-        createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE, password)
+        createUserWithTestData(user, password, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
         createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
         try {
             // randomMonitor has a dummy user, api ignores the User passed as part of monitor, it picks user info from the logged-in user.
