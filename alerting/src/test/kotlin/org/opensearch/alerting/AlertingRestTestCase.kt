@@ -1252,8 +1252,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         deleteRole(role)
     }
 
-    fun createUserWithTestData(user: String, index: String, role: String, backendRole: String) {
-        createUser(user, user, arrayOf(backendRole))
+    fun createUserWithTestData(user: String, index: String, role: String, backendRole: String, password: String? = null) {
+        createUser(user, password ?: user, arrayOf(backendRole))
         createTestIndex(index)
         createIndexRole(role, index)
         createUserRolesMapping(role, arrayOf(user))
@@ -1261,12 +1261,13 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     fun createUserWithTestDataAndCustomRole(
         user: String,
+        password: String,
         index: String,
         role: String,
         backendRoles: List<String>,
         clusterPermissions: String?
     ) {
-        createUser(user, user, backendRoles.toTypedArray())
+        createUser(user, password, backendRoles.toTypedArray())
         createTestIndex(index)
         createCustomIndexRole(role, index, clusterPermissions)
         createUserRolesMapping(role, arrayOf(user))
@@ -1274,11 +1275,12 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     fun createUserWithRoles(
         user: String,
+        password: String,
         roles: List<String>,
         backendRoles: List<String>,
         isExistingRole: Boolean
     ) {
-        createUser(user, user, backendRoles.toTypedArray())
+        createUser(user, password ?: user, backendRoles.toTypedArray())
         for (role in roles) {
             if (isExistingRole) {
                 updateRoleMapping(role, listOf(user), true)

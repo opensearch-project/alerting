@@ -42,14 +42,15 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
     }
 
     val user = "userA"
+    private val password = "Passw0rd124!!!!fdfsasfljh3@#$@#gfdgfdg!@#"
     var userClient: RestClient? = null
 
     @Before
     fun create() {
 
         if (userClient == null) {
-            createUser(user, user, arrayOf())
-            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user)
+            createUser(user, password, arrayOf())
+            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, password)
                 .setSocketTimeout(60000)
                 .setConnectionRequestTimeout(180000)
                 .build()
@@ -140,6 +141,7 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
     fun `test get destination with an user with get destination role`() {
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),

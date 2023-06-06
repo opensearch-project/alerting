@@ -53,14 +53,15 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
     }
 
     val user = "userB"
+    private val password = "Passw0rd124!!!!fdfsasfljh3@#$@#gfdgfdg!@#"
     var userClient: RestClient? = null
 
     @Before
     fun create() {
 
         if (userClient == null) {
-            createUser(user, user, arrayOf())
-            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user)
+            createUser(user, password, arrayOf())
+            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, password)
                 .setSocketTimeout(60000)
                 .setConnectionRequestTimeout(180000)
                 .build()
@@ -79,6 +80,7 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
     fun `test get email accounts with an user with get email account role`() {
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
@@ -108,6 +110,7 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
 
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
@@ -135,6 +138,7 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
     fun `test get email accounts with an user without get email account role`() {
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
@@ -161,6 +165,7 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
     fun `test search email accounts with an user without search email account role`() {
         createUserWithTestDataAndCustomRole(
             user,
+            password,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
