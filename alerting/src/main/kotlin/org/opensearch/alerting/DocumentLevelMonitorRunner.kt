@@ -88,7 +88,11 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             monitorResult = monitorResult.copy(error = AlertingException.wrap(e))
         }
 
-        var (monitorMetadata, _) = MonitorMetadataService.getOrCreateMetadata(monitor, createWithRunContext = false)
+        var (monitorMetadata, _) = MonitorMetadataService.getOrCreateMetadata(
+            monitor,
+            createWithRunContext = false,
+            skipIndex = isTempMonitor
+        )
 
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
 
