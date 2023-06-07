@@ -89,14 +89,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         var (monitorMetadata, _) = MonitorMetadataService.getOrCreateMetadata(monitor, createWithRunContext = false)
 
-        monitorCtx.docLevelMonitorQueries!!.initDocLevelQueryIndex(monitor.dataSources)
-        monitorCtx.docLevelMonitorQueries!!.indexDocLevelQueries(
-            monitor = monitor,
-            monitorId = monitor.id,
-            monitorMetadata,
-            indexTimeout = monitorCtx.indexTimeout!!
-        )
-
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
 
         val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
