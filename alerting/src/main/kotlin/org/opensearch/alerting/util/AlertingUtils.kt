@@ -6,25 +6,14 @@
 package org.opensearch.alerting.util
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.action.index.IndexRequest
-import org.opensearch.action.index.IndexResponse
-import org.opensearch.action.support.WriteRequest
-import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.AggregationResultBucket
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.Monitor
-import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.action.Action
 import org.opensearch.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.alerting.model.action.ActionExecutionScope
 import org.opensearch.alerting.model.destination.Destination
-import org.opensearch.alerting.opensearchapi.suspendUntil
-import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
-import org.opensearch.client.Client
-import org.opensearch.common.settings.Settings
-import org.opensearch.common.xcontent.ToXContent
-import org.opensearch.common.xcontent.XContentFactory
 
 private val logger = LogManager.getLogger("AlertingUtils")
 
@@ -122,14 +111,4 @@ fun defaultToPerExecutionAction(
     }
 
     return false
-}
-
-suspend fun updateMonitorMetadata(client: Client, settings: Settings, monitorMetadata: MonitorMetadata): IndexResponse {
-    val indexRequest = IndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
-        .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-        .source(monitorMetadata.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-        .id(monitorMetadata.id)
-        .timeout(AlertingSettings.INDEX_TIMEOUT.get(settings))
-
-    return client.suspendUntil { client.index(indexRequest, it) }
 }

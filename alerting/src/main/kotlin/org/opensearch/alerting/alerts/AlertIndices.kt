@@ -6,6 +6,7 @@
 package org.opensearch.alerting.alerts
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.ExceptionsHelper
 import org.opensearch.ResourceAlreadyExistsException
 import org.opensearch.action.ActionListener
 import org.opensearch.action.admin.cluster.state.ClusterStateRequest
@@ -36,6 +37,7 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDING_HISTO
 import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDING_HISTORY_RETENTION_PERIOD
 import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDING_HISTORY_ROLLOVER_PERIOD
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
+import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.client.Client
 import org.opensearch.cluster.ClusterChangedEvent
@@ -293,8 +295,12 @@ class AlertIndices(
         return try {
             val createIndexResponse: CreateIndexResponse = client.admin().indices().suspendUntil { create(request, it) }
             createIndexResponse.isAcknowledged
-        } catch (e: ResourceAlreadyExistsException) {
-            true
+        } catch (t: Exception) {
+            if (ExceptionsHelper.unwrapCause(t) is ResourceAlreadyExistsException) {
+                true
+            } else {
+                throw AlertingException.wrap(t)
+            }
         }
     }
 

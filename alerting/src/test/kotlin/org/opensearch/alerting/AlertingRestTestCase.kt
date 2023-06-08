@@ -74,7 +74,6 @@ import javax.management.MBeanServerInvocationHandler
 import javax.management.ObjectName
 import javax.management.remote.JMXConnectorFactory
 import javax.management.remote.JMXServiceURL
-import kotlin.collections.HashMap
 
 abstract class AlertingRestTestCase : ODFERestTestCase() {
 
@@ -652,7 +651,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun refreshIndex(index: String): Response {
-        val response = client().makeRequest("POST", "/$index/_refresh")
+        val response = client().makeRequest("POST", "/$index/_refresh?expand_wildcards=all")
         assertEquals("Unable to refresh index", RestStatus.OK, response.restStatus())
         return response
     }
@@ -1135,10 +1134,11 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client().performRequest(request)
     }
 
-    fun createIndexRoleWithDocLevelSecurity(name: String, index: String, dlsQuery: String) {
+    fun createIndexRoleWithDocLevelSecurity(name: String, index: String, dlsQuery: String, clusterPermissions: String? = "") {
         val request = Request("PUT", "/_plugins/_security/api/roles/$name")
         var entity = "{\n" +
             "\"cluster_permissions\": [\n" +
+            "\"$clusterPermissions\"\n" +
             "],\n" +
             "\"index_permissions\": [\n" +
             "{\n" +
@@ -1199,10 +1199,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         user: String,
         index: String,
         role: String,
-        backendRole: String,
+        backendRoles: List<String>,
         clusterPermissions: String?
     ) {
-        createUser(user, user, arrayOf(backendRole))
+        createUser(user, user, backendRoles.toTypedArray())
         createTestIndex(index)
         createCustomIndexRole(role, index, clusterPermissions)
         createUserRolesMapping(role, arrayOf(user))

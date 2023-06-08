@@ -18,38 +18,13 @@ import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.NamedXContentRegistry
 import org.opensearch.common.xcontent.XContentHelper
-import org.opensearch.common.xcontent.XContentParser
-import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.index.IndexNotFoundException
 
 /**
  * This is an accessor class to retrieve documents/information from the Alerting config index.
  */
 class AlertingConfigAccessor {
     companion object {
-
-        suspend fun getMonitorMetadata(client: Client, xContentRegistry: NamedXContentRegistry, metadataId: String): MonitorMetadata? {
-            return try {
-                val jobSource = getAlertingConfigDocumentSource(client, "Monitor Metadata", metadataId)
-                withContext(Dispatchers.IO) {
-                    val xcp = XContentHelper.createParser(
-                        xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                        jobSource, XContentType.JSON
-                    )
-                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                    MonitorMetadata.parse(xcp)
-                }
-            } catch (e: IllegalStateException) {
-                if (e.message?.equals("Monitor Metadata document with id $metadataId not found or source is empty") == true) {
-                    return null
-                } else throw e
-            } catch (e: IndexNotFoundException) {
-                if (e.message?.equals("no such index [.opendistro-alerting-config]") == true) {
-                    return null
-                } else throw e
-            }
-        }
 
         suspend fun getEmailAccountInfo(client: Client, xContentRegistry: NamedXContentRegistry, emailAccountId: String): EmailAccount {
             val source = getAlertingConfigDocumentSource(client, "Email account", emailAccountId)

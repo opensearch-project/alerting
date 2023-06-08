@@ -7,8 +7,7 @@ package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
-import org.opensearch.action.admin.indices.get.GetIndexRequest
-import org.opensearch.action.admin.indices.get.GetIndexResponse
+import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.search.SearchAction
@@ -21,23 +20,24 @@ import org.opensearch.alerting.core.model.DocLevelQuery
 import org.opensearch.alerting.core.model.ScheduledJob
 import org.opensearch.alerting.model.ActionExecutionResult
 import org.opensearch.alerting.model.Alert
-import org.opensearch.alerting.model.AlertingConfigAccessor.Companion.getMonitorMetadata
 import org.opensearch.alerting.model.DocumentExecutionContext
 import org.opensearch.alerting.model.DocumentLevelTrigger
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.Finding
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.Monitor
+import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.action.PerAlertActionScope
 import org.opensearch.alerting.opensearchapi.string
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
-import org.opensearch.alerting.util.updateMonitorMetadata
 import org.opensearch.client.Client
+import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.bytes.BytesReference
@@ -46,6 +46,7 @@ import org.opensearch.common.xcontent.XContentBuilder
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.index.query.BoolQueryBuilder
+import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.percolator.PercolateQueryBuilderExt
 import org.opensearch.rest.RestStatus
@@ -54,8 +55,7 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortOrder
 import java.io.IOException
 import java.time.Instant
-import java.util.UUID
-import kotlin.collections.HashMap
+import java.util.*
 import kotlin.math.max
 
 object DocumentLevelMonitorRunner : MonitorRunner() {
@@ -69,6 +69,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         dryrun: Boolean
     ): MonitorRunResult<DocumentLevelTriggerRunResult> {
         logger.debug("Document-level-monitor is running ...")
+        val isTempMonitor = dryrun || monitor.id == Monitor.NO_ID
         var monitorResult = MonitorRunResult<DocumentLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
 
         try {
@@ -78,33 +79,26 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         } catch (e: Exception) {
             val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
             logger.error("Error setting up alerts and findings indices for monitor: $id", e)
-            return monitorResult.copy(error = AlertingException.wrap(e))
+            monitorResult = monitorResult.copy(error = AlertingException.wrap(e))
         }
 
         try {
             validate(monitor)
         } catch (e: Exception) {
             logger.error("Failed to start Document-level-monitor. Error: ${e.message}")
-            return monitorResult.copy(error = AlertingException.wrap(e))
+            monitorResult = monitorResult.copy(error = AlertingException.wrap(e))
         }
 
-        monitorCtx.docLevelMonitorQueries!!.initDocLevelQueryIndex()
-        monitorCtx.docLevelMonitorQueries!!.indexDocLevelQueries(
+        var (monitorMetadata, _) = MonitorMetadataService.getOrCreateMetadata(
             monitor = monitor,
-            monitorId = monitor.id,
-            indexTimeout = monitorCtx.indexTimeout!!
+            createWithRunContext = false,
+            skipIndex = isTempMonitor
         )
 
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
-        val index = docLevelMonitorInput.indices[0]
+
         val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
 
-        var monitorMetadata = getMonitorMetadata(monitorCtx.client!!, monitorCtx.xContentRegistry!!, "${monitor.id}-metadata")
-        if (monitorMetadata == null) {
-            monitorMetadata = createMonitorMetadata(monitor.id)
-        }
-
-        val isTempMonitor = dryrun || monitor.id == Monitor.NO_ID
         val lastRunContext = if (monitorMetadata.lastRunContext.isNullOrEmpty()) mutableMapOf()
         else monitorMetadata.lastRunContext.toMutableMap() as MutableMap<String, MutableMap<String, Any>>
 
@@ -115,11 +109,20 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         val docsToQueries = mutableMapOf<String, MutableList<String>>()
 
         try {
-            val getIndexRequest = GetIndexRequest().indices(index)
-            val getIndexResponse: GetIndexResponse = monitorCtx.client!!.suspendUntil {
-                monitorCtx.client!!.admin().indices().getIndex(getIndexRequest, it)
-            }
-            val indices = getIndexResponse.indices()
+            // Resolve all passed indices to concrete indices
+            val indices = IndexUtils.resolveAllIndices(
+                docLevelMonitorInput.indices,
+                monitorCtx.clusterService!!,
+                monitorCtx.indexNameExpressionResolver!!
+            )
+
+            monitorCtx.docLevelMonitorQueries!!.initDocLevelQueryIndex()
+            monitorCtx.docLevelMonitorQueries!!.indexDocLevelQueries(
+                monitor = monitor,
+                monitorId = monitor.id,
+                monitorMetadata,
+                indexTimeout = monitorCtx.indexTimeout!!
+            )
 
             // cleanup old indices that are not monitored anymore from the same monitor
             for (ind in updatedLastRunContext.keys) {
@@ -131,8 +134,13 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             indices.forEach { indexName ->
                 // Prepare lastRunContext for each index
                 val indexLastRunContext = lastRunContext.getOrPut(indexName) {
-                    val indexCreatedRecently = createdRecently(monitor, indexName, periodStart, periodEnd, getIndexResponse)
-                    createRunContext(monitorCtx.clusterService!!, monitorCtx.client!!, indexName, indexCreatedRecently)
+                    val isIndexCreatedRecently = createdRecently(
+                        monitor,
+                        periodStart,
+                        periodEnd,
+                        monitorCtx.clusterService!!.state().metadata.index(indexName)
+                    )
+                    MonitorMetadataService.createRunContextForIndex(indexName, isIndexCreatedRecently)
                 }
 
                 // Prepare updatedLastRunContext for each index
@@ -160,7 +168,13 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 val matchingDocs = getMatchingDocs(monitor, monitorCtx, docExecutionContext, indexName)
 
                 if (matchingDocs.isNotEmpty()) {
-                    val matchedQueriesForDocs = getMatchedQueries(monitorCtx, matchingDocs.map { it.second }, monitor, indexName)
+                    val matchedQueriesForDocs = getMatchedQueries(
+                        monitorCtx,
+                        matchingDocs.map { it.second },
+                        monitor,
+                        monitorMetadata,
+                        indexName
+                    )
 
                     matchedQueriesForDocs.forEach { hit ->
                         val id = hit.id.replace("_${indexName}_${monitor.id}", "")
@@ -214,7 +228,10 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         // Don't update monitor if this is a test monitor
         if (!isTempMonitor) {
-            updateMonitorMetadata(monitorCtx.client!!, monitorCtx.settings!!, monitorMetadata.copy(lastRunContext = updatedLastRunContext))
+            MonitorMetadataService.upsertMetadata(
+                monitorMetadata.copy(lastRunContext = updatedLastRunContext),
+                true
+            )
         }
 
         // TODO: Update the Document as part of the Trigger and return back the trigger action result
@@ -259,6 +276,16 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             val alert = monitorCtx.alertService!!.composeDocLevelAlert(
                 listOf(it.first),
                 listOf(it.second),
+                triggerCtx,
+                monitorResult.alertError() ?: triggerResult.alertError()
+            )
+            alerts.add(alert)
+        }
+
+        if (findingDocPairs.isEmpty() && monitorResult.error != null) {
+            val alert = monitorCtx.alertService!!.composeDocLevelAlert(
+                listOf(),
+                listOf(),
                 triggerCtx,
                 monitorResult.alertError() ?: triggerResult.alertError()
             )
@@ -366,42 +393,22 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             throw IOException("Invalid input with document-level-monitor.")
         }
 
-        val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
-        if (docLevelMonitorInput.indices.size > 1) {
-            throw IOException("Only one index is supported with document-level-monitor.")
+        if ((monitor.inputs[0] as DocLevelMonitorInput).indices.isEmpty()) {
+            throw IllegalArgumentException("DocLevelMonitorInput has no indices")
         }
-    }
-
-    suspend fun createRunContext(
-        clusterService: ClusterService,
-        client: Client,
-        index: String,
-        createdRecently: Boolean = false
-    ): HashMap<String, Any> {
-        val lastRunContext = HashMap<String, Any>()
-        lastRunContext["index"] = index
-        val count = getShardsCount(clusterService, index)
-        lastRunContext["shards_count"] = count
-
-        for (i: Int in 0 until count) {
-            val shard = i.toString()
-            val maxSeqNo: Long = if (createdRecently) -1L else getMaxSeqNo(client, index, shard)
-            lastRunContext[shard] = maxSeqNo
-        }
-        return lastRunContext
     }
 
     // Checks if the index was created from the last execution run or when the monitor was last updated to ensure that
     // new index is monitored from the beginning of that index
     private fun createdRecently(
         monitor: Monitor,
-        index: String,
         periodStart: Instant,
         periodEnd: Instant,
-        getIndexResponse: GetIndexResponse
+        indexMetadata: IndexMetadata
     ): Boolean {
         val lastExecutionTime = if (periodStart == periodEnd) monitor.lastUpdateTime else periodStart
-        return getIndexResponse.settings.get(index).getAsLong("index.creation_date", 0L) > lastExecutionTime.toEpochMilli()
+        val indexCreationDate = indexMetadata.settings.get("index.creation_date")?.toLong() ?: 0L
+        return indexCreationDate > lastExecutionTime.toEpochMilli()
     }
 
     /**
@@ -506,17 +513,27 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         monitorCtx: MonitorRunnerExecutionContext,
         docs: List<BytesReference>,
         monitor: Monitor,
+        monitorMetadata: MonitorMetadata,
         index: String
     ): SearchHits {
-        val boolQueryBuilder = BoolQueryBuilder().filter(QueryBuilders.matchQuery("index", index))
+        val boolQueryBuilder = BoolQueryBuilder().must(QueryBuilders.matchQuery("index", index).operator(Operator.AND))
 
         val percolateQueryBuilder = PercolateQueryBuilderExt("query", docs, XContentType.JSON)
         if (monitor.id.isNotEmpty()) {
-            boolQueryBuilder.filter(QueryBuilders.matchQuery("monitor_id", monitor.id))
+            boolQueryBuilder.must(QueryBuilders.matchQuery("monitor_id", monitor.id).operator(Operator.AND))
         }
         boolQueryBuilder.filter(percolateQueryBuilder)
 
-        val searchRequest = SearchRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)
+        val queryIndex = monitorMetadata.sourceToQueryIndexMapping[index + monitor.id]
+        if (queryIndex == null) {
+            val message = "Failed to resolve concrete queryIndex from sourceIndex during monitor execution!" +
+                " sourceIndex:$index queryIndex:${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}"
+            logger.error(message)
+            throw AlertingException.wrap(
+                OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR)
+            )
+        }
+        val searchRequest = SearchRequest(queryIndex)
         val searchSourceBuilder = SearchSourceBuilder()
         searchSourceBuilder.query(boolQueryBuilder)
         searchRequest.source(searchSourceBuilder)
