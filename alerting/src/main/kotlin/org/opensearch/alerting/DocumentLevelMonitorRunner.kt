@@ -8,8 +8,6 @@ package org.opensearch.alerting
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
 import org.opensearch.OpenSearchStatusException
-import org.opensearch.action.admin.indices.get.GetIndexRequest
-import org.opensearch.action.admin.indices.get.GetIndexResponse
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.search.SearchAction
@@ -24,9 +22,11 @@ import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.client.Client
+import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.bytes.BytesReference
@@ -54,6 +54,7 @@ import org.opensearch.search.sort.SortOrder
 import java.io.IOException
 import java.time.Instant
 import java.util.UUID
+import kotlin.collections.HashMap
 import kotlin.math.max
 
 object DocumentLevelMonitorRunner : MonitorRunner() {
@@ -88,13 +89,13 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         }
 
         var (monitorMetadata, _) = MonitorMetadataService.getOrCreateMetadata(
-            monitor = monitor,
+            monitor,
             createWithRunContext = false,
             skipIndex = isTempMonitor
         )
 
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
-        val index = docLevelMonitorInput.indices[0]
+
         val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
 
         val lastRunContext = if (monitorMetadata.lastRunContext.isNullOrEmpty()) mutableMapOf()
@@ -107,6 +108,13 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         val docsToQueries = mutableMapOf<String, MutableList<String>>()
 
         try {
+            // Resolve all passed indices to concrete indices
+            val indices = IndexUtils.resolveAllIndices(
+                docLevelMonitorInput.indices,
+                monitorCtx.clusterService!!,
+                monitorCtx.indexNameExpressionResolver!!
+            )
+
             monitorCtx.docLevelMonitorQueries!!.initDocLevelQueryIndex(monitor.dataSources)
             monitorCtx.docLevelMonitorQueries!!.indexDocLevelQueries(
                 monitor = monitor,
@@ -114,12 +122,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 monitorMetadata,
                 indexTimeout = monitorCtx.indexTimeout!!
             )
-
-            val getIndexRequest = GetIndexRequest().indices(index)
-            val getIndexResponse: GetIndexResponse = monitorCtx.client!!.suspendUntil {
-                monitorCtx.client!!.admin().indices().getIndex(getIndexRequest, it)
-            }
-            val indices = getIndexResponse.indices()
 
             // cleanup old indices that are not monitored anymore from the same monitor
             for (ind in updatedLastRunContext.keys) {
@@ -131,8 +133,13 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             indices.forEach { indexName ->
                 // Prepare lastRunContext for each index
                 val indexLastRunContext = lastRunContext.getOrPut(indexName) {
-                    val indexCreatedRecently = createdRecently(monitor, indexName, periodStart, periodEnd, getIndexResponse)
-                    MonitorMetadataService.createRunContextForIndex(indexName, indexCreatedRecently)
+                    val isIndexCreatedRecently = createdRecently(
+                        monitor,
+                        periodStart,
+                        periodEnd,
+                        monitorCtx.clusterService!!.state().metadata.index(indexName)
+                    )
+                    MonitorMetadataService.createRunContextForIndex(indexName, isIndexCreatedRecently)
                 }
 
                 // Prepare updatedLastRunContext for each index
@@ -385,9 +392,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             throw IOException("Invalid input with document-level-monitor.")
         }
 
-        val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
-        if (docLevelMonitorInput.indices.size > 1) {
-            throw IOException("Only one index is supported with document-level-monitor.")
+        if ((monitor.inputs[0] as DocLevelMonitorInput).indices.isEmpty()) {
+            throw IllegalArgumentException("DocLevelMonitorInput has no indices")
         }
     }
 
@@ -414,13 +420,13 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
     // new index is monitored from the beginning of that index
     private fun createdRecently(
         monitor: Monitor,
-        index: String,
         periodStart: Instant,
         periodEnd: Instant,
-        getIndexResponse: GetIndexResponse
+        indexMetadata: IndexMetadata
     ): Boolean {
         val lastExecutionTime = if (periodStart == periodEnd) monitor.lastUpdateTime else periodStart
-        return getIndexResponse.settings.get(index).getAsLong("index.creation_date", 0L) > lastExecutionTime.toEpochMilli()
+        val indexCreationDate = indexMetadata.settings.get("index.creation_date")?.toLong() ?: 0L
+        return indexCreationDate > lastExecutionTime.toEpochMilli()
     }
 
     /**
