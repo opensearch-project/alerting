@@ -5,10 +5,14 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.apache.hc.core5.http.ContentType
+import org.apache.hc.core5.http.HttpHeaders
+import org.apache.hc.core5.http.io.entity.StringEntity
+import org.apache.hc.core5.http.message.BasicHeader
 import org.apache.http.HttpHeaders
 import org.apache.http.entity.ContentType
 import org.apache.http.message.BasicHeader
-import org.apache.http.nio.entity.NStringEntity
+import org.apache.http.nio.entity.StringEntity
 import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
@@ -429,7 +433,9 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
             false
         )
 
-        val userWithDifferentRoleClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), userWithDifferentRole, userWithDifferentRole)
+        val userWithDifferentRoleClient = SecureRestClientBuilder(
+            clusterHosts.toTypedArray(), isHttps(), userWithDifferentRole, userWithDifferentRole
+        )
             .setSocketTimeout(60000).build()
 
         try {
@@ -551,7 +557,11 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
         val monitor = randomQueryLevelMonitor(enabled = true)
 
         val createdMonitor = createMonitorWithClient(client(), monitor = monitor, listOf(TEST_HR_BACKEND_ROLE, "role1", "role2"))
-        val createdWorkflow = createWorkflowWithClient(client(), randomWorkflow(monitorIds = listOf(createdMonitor.id)), listOf(TEST_HR_BACKEND_ROLE, "role1", "role2"))
+        val createdWorkflow = createWorkflowWithClient(
+            client(),
+            randomWorkflow(monitorIds = listOf(createdMonitor.id)),
+            listOf(TEST_HR_BACKEND_ROLE, "role1", "role2")
+        )
         assertNotNull("The workflow was not created", createdWorkflow)
 
         // user should have access to the admin monitor
@@ -604,7 +614,10 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
         )
 
         val createdMonitor = createMonitorWithClient(userClient!!, randomQueryLevelMonitor(), listOf(TEST_HR_BACKEND_ROLE, "role2"))
-        val createdWorkflow = createWorkflowWithClient(userClient!!, workflow = randomWorkflow(enabled = true, monitorIds = listOf(createdMonitor.id)), listOf(TEST_HR_BACKEND_ROLE, "role2"))
+        val createdWorkflow = createWorkflowWithClient(
+            client = userClient!!, workflow = randomWorkflow(enabled = true, monitorIds = listOf(createdMonitor.id)),
+            rbacRoles = listOf(TEST_HR_BACKEND_ROLE, "role2")
+        )
         assertNotNull("The workflow was not created", createdWorkflow)
 
         // getUser should have access to the monitor
@@ -962,7 +975,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
             "POST",
             "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(searchMonitor, ContentType.APPLICATION_JSON)
+            StringEntity(searchMonitor, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search monitor failed", RestStatus.OK, adminMonitorSearchResponse.restStatus())
 
@@ -1015,7 +1028,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
             "POST",
             "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search monitor failed", RestStatus.OK, adminSearchResponse.restStatus())
 
@@ -1073,7 +1086,10 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
 
             assertNotNull("The monitor was not created", createdMonitor)
 
-            val createdWorkflow = createWorkflowWithClient(userClient!!, workflow = randomWorkflow(monitorIds = listOf(createdMonitor.id), enabled = true))
+            val createdWorkflow = createWorkflowWithClient(
+                client = userClient!!,
+                workflow = randomWorkflow(monitorIds = listOf(createdMonitor.id), enabled = true)
+            )
             assertNotNull("The workflow was not created", createdWorkflow)
             assertTrue("The workflow was not enabled", createdWorkflow.enabled)
 
@@ -1200,7 +1216,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
             "POST",
             "$ALERTING_BASE_URI/_search",
             emptyMap(),
-            NStringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
         assertEquals("Search monitor failed", RestStatus.OK, adminSearchResponse.restStatus())
 
@@ -1281,7 +1297,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
                 "GET",
                 "$WORKFLOW_ALERTING_BASE_URI/$id",
                 emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON)
+                StringEntity(search, ContentType.APPLICATION_JSON)
             )
             assertEquals("Get workflow failed", RestStatus.OK, adminGetResponse.restStatus())
 
@@ -1290,7 +1306,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
                 "DELETE",
                 "$WORKFLOW_ALERTING_BASE_URI/$id",
                 emptyMap(),
-                NStringEntity(search, ContentType.APPLICATION_JSON)
+                StringEntity(search, ContentType.APPLICATION_JSON)
             )
             assertEquals("Delete workflow failed", RestStatus.OK, adminDeleteResponse.restStatus())
         } finally {
