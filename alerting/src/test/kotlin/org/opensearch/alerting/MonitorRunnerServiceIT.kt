@@ -1152,8 +1152,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             .lte("{{period_end}}")
             .format("epoch_millis")
         val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field").field("test_field"),
-            TermsValuesSourceBuilder("number").field("number")
+            TermsValuesSourceBuilder("test_field").field("test_field")
         )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
