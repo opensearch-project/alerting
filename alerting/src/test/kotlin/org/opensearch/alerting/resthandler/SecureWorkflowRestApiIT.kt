@@ -9,10 +9,6 @@ import org.apache.hc.core5.http.ContentType
 import org.apache.hc.core5.http.HttpHeaders
 import org.apache.hc.core5.http.io.entity.StringEntity
 import org.apache.hc.core5.http.message.BasicHeader
-import org.apache.http.HttpHeaders
-import org.apache.http.entity.ContentType
-import org.apache.http.message.BasicHeader
-import org.apache.http.nio.entity.StringEntity
 import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
