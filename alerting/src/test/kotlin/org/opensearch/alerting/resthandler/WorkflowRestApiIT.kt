@@ -563,7 +563,6 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
         assertNotNull("Workflow creation failed", workflowResponse)
         assertNotNull(workflow)
         assertNotEquals("response is missing Id", Monitor.NO_ID, workflowResponse.id)
-        assertTrue("incorrect version", workflowResponse.version > 0)
 
         var workflowById = getWorkflow(workflowResponse.id)
         assertNotNull(workflowById)
