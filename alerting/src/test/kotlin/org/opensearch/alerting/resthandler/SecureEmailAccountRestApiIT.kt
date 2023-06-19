@@ -59,8 +59,8 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
     fun create() {
 
         if (userClient == null) {
-            createUser(user, user, arrayOf())
-            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user)
+            createUser(user, arrayOf())
+            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, password)
                 .setSocketTimeout(60000)
                 .setConnectionRequestTimeout(180000)
                 .build()
