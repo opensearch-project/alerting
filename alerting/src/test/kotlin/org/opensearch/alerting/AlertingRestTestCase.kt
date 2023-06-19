@@ -1410,7 +1410,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         backendRoles: List<String>,
         clusterPermissions: List<String?>
     ) {
-        createUser(user, user, backendRoles.toTypedArray())
+        createUser(user, backendRoles.toTypedArray())
         createTestIndex(index)
         createCustomIndexRole(role, index, clusterPermissions)
         createUserRolesMapping(role, arrayOf(user))

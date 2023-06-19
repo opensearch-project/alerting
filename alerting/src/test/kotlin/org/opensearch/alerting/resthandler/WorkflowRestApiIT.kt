@@ -29,6 +29,7 @@ import org.opensearch.rest.RestStatus
 import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.junit.annotations.TestLogging
+import java.time.Instant
 import java.util.Collections
 import java.util.Locale
 import java.util.UUID
@@ -653,7 +654,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
                 )
             }
         }
-        val updatedWorkflow = updateWorkflow(workflowResponse.copy(enabled = true, enabledTime = workflow.enabledTime))
+        val updatedWorkflow = updateWorkflow(workflowResponse.copy(enabled = true, enabledTime = Instant.now()))
         assertNotNull(updatedWorkflow)
         val getWorkflow = getWorkflow(workflowId = updatedWorkflow.id)
         assertTrue(getWorkflow.enabled)

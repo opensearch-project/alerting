@@ -81,7 +81,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
     @Before
     fun create() {
         if (userClient == null) {
-            createUser(user, user, arrayOf())
+            createUser(user, arrayOf())
             userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user).setSocketTimeout(60000).build()
         }
     }
@@ -1312,7 +1312,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test execute workflow with bucket-level and doc-level chained monitors with user having partial index permissions`() {
-        createUser(user, user, arrayOf(TEST_HR_BACKEND_ROLE))
+        createUser(user, arrayOf(TEST_HR_BACKEND_ROLE))
         createTestIndex(TEST_HR_INDEX)
 
         createIndexRoleWithDocLevelSecurity(
