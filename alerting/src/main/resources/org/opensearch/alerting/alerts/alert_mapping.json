@@ -4,7 +4,7 @@
     "required": true
   },
   "_meta" : {
-    "schema_version": 4
+    "schema_version": 5
   },
   "properties": {
     "schema_version": {
@@ -23,6 +23,9 @@
       "type": "long"
     },
     "severity": {
+      "type": "keyword"
+    },
+    "execution_id": {
       "type": "keyword"
     },
     "monitor_name": {
