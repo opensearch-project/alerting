@@ -74,6 +74,9 @@
         }
       }
     },
+    "workflow_execution_id": {
+      "type": "keyword"
+    },
     "trigger_id": {
       "type": "keyword"
     },

@@ -290,7 +290,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 listOf(it.first),
                 listOf(it.second),
                 triggerCtx,
-                monitorResult.alertError() ?: triggerResult.alertError()
+                monitorResult.alertError() ?: triggerResult.alertError(),
+                workflowExecutionId // TODO add execution id for other types of monitors also
             )
             alerts.add(alert)
         }
@@ -300,7 +301,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 listOf(),
                 listOf(),
                 triggerCtx,
-                monitorResult.alertError() ?: triggerResult.alertError()
+                monitorResult.alertError() ?: triggerResult.alertError(),
+                workflowExecutionId
             )
             alerts.add(alert)
         }

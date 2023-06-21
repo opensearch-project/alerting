@@ -114,7 +114,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
 
         val workflowId = workflowResponse.id
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
-        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.workflowRunResult
+        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.monitorRunResults
         assertEquals(2, monitorsRunResults.size)
 
         assertEquals(monitor1.name, monitorsRunResults[0].monitorName)
@@ -123,11 +123,11 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         Assert.assertEquals(monitor2.name, monitorsRunResults[1].monitorName)
         Assert.assertEquals(1, monitorsRunResults[1].triggerResults.size)
 
-        val getAlertsResponse = assertAlerts(monitorResponse.id, customAlertsIndex1, 2)
+        val getAlertsResponse = assertAlerts(monitorResponse.id, customAlertsIndex1, alertSize = 2)
         assertAcknowledges(getAlertsResponse.alerts, monitorResponse.id, 2)
         assertFindings(monitorResponse.id, customFindingsIndex1, 2, 2, listOf("1", "2"))
 
-        val getAlertsResponse2 = assertAlerts(monitorResponse2.id, customAlertsIndex2, 1)
+        val getAlertsResponse2 = assertAlerts(monitorResponse2.id, customAlertsIndex2, alertSize = 1)
         assertAcknowledges(getAlertsResponse2.alerts, monitorResponse2.id, 1)
         assertFindings(monitorResponse2.id, customFindingsIndex2, 1, 1, listOf("2"))
     }
@@ -185,14 +185,14 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
 
         val workflowId = workflowResponse.id
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
-        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.workflowRunResult
+        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.monitorRunResults
         assertEquals(1, monitorsRunResults.size)
 
         assertEquals(monitor.name, monitorsRunResults[0].monitorName)
         assertEquals(1, monitorsRunResults[0].triggerResults.size)
 
         // Assert and not ack the alerts (in order to verify later on that all the alerts are generated)
-        assertAlerts(monitorResponse.id, customAlertsIndex, 2)
+        assertAlerts(monitorResponse.id, customAlertsIndex, alertSize = 2)
         assertFindings(monitorResponse.id, customFindingsIndex, 2, 2, listOf("1", "2"))
         // Verify workflow and monitor delegate metadata
         val workflowMetadata = searchWorkflowMetadata(id = workflowId)
@@ -209,13 +209,13 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         // Execute second workflow
         val workflowId1 = workflowResponse1.id
         val executeWorkflowResponse1 = executeWorkflow(workflowById1, workflowId1, false)!!
-        val monitorsRunResults1 = executeWorkflowResponse1.workflowRunResult.workflowRunResult
+        val monitorsRunResults1 = executeWorkflowResponse1.workflowRunResult.monitorRunResults
         assertEquals(1, monitorsRunResults1.size)
 
         assertEquals(monitor.name, monitorsRunResults1[0].monitorName)
         assertEquals(1, monitorsRunResults1[0].triggerResults.size)
 
-        val getAlertsResponse = assertAlerts(monitorResponse.id, customAlertsIndex, 4)
+        val getAlertsResponse = assertAlerts(monitorResponse.id, customAlertsIndex, alertSize = 4)
         assertAcknowledges(getAlertsResponse.alerts, monitorResponse.id, 4)
         assertFindings(monitorResponse.id, customFindingsIndex, 4, 4, listOf("1", "2", "1", "2"))
         // Verify workflow and monitor delegate metadata
@@ -280,13 +280,13 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
 
         val workflowId = workflowResponse.id
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
-        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.workflowRunResult
+        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.monitorRunResults
         assertEquals(1, monitorsRunResults.size)
 
         assertEquals(monitor.name, monitorsRunResults[0].monitorName)
         assertEquals(1, monitorsRunResults[0].triggerResults.size)
 
-        assertAlerts(monitorResponse.id, AlertIndices.ALERT_INDEX, 2)
+        assertAlerts(monitorResponse.id, AlertIndices.ALERT_INDEX, alertSize = 2)
         assertFindings(monitorResponse.id, AlertIndices.FINDING_HISTORY_WRITE_INDEX, 2, 2, listOf("1", "2"))
         // Verify workflow and monitor delegate metadata
         val workflowMetadata = searchWorkflowMetadata(id = workflowId)
@@ -318,14 +318,14 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         // Execute second workflow
         val workflowId1 = workflowResponse1.id
         val executeWorkflowResponse1 = executeWorkflow(workflowById1, workflowId1, false)!!
-        val monitorsRunResults1 = executeWorkflowResponse1.workflowRunResult.workflowRunResult
+        val monitorsRunResults1 = executeWorkflowResponse1.workflowRunResult.monitorRunResults
         assertEquals(1, monitorsRunResults1.size)
 
         assertEquals(monitor.name, monitorsRunResults1[0].monitorName)
         assertEquals(1, monitorsRunResults1[0].triggerResults.size)
 
         // Verify alerts for the custom index
-        val getAlertsResponse = assertAlerts(monitorResponse.id, customAlertsIndex, 2)
+        val getAlertsResponse = assertAlerts(monitorResponse.id, customAlertsIndex, alertSize = 2)
         assertAcknowledges(getAlertsResponse.alerts, monitorResponse.id, 2)
         assertFindings(monitorResponse.id, customFindingsIndex, 2, 2, listOf("1", "2"))
 
@@ -384,7 +384,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         // First execution
         val workflowId = workflowResponse.id
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
-        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.workflowRunResult
+        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.monitorRunResults
         assertEquals(2, monitorsRunResults.size)
 
         val workflowMetadata = searchWorkflowMetadata(id = workflowId)
@@ -400,7 +400,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
 
         // Second execution
         val executeWorkflowResponse1 = executeWorkflow(workflowById, workflowId, false)!!
-        val monitorsRunResults1 = executeWorkflowResponse1.workflowRunResult.workflowRunResult
+        val monitorsRunResults1 = executeWorkflowResponse1.workflowRunResult.monitorRunResults
         assertEquals(2, monitorsRunResults1.size)
 
         val workflowMetadata1 = searchWorkflowMetadata(id = workflowId)
@@ -457,7 +457,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, true)
 
         assertNotNull("Workflow run result is null", executeWorkflowResponse)
-        val monitorsRunResults = executeWorkflowResponse!!.workflowRunResult.workflowRunResult
+        val monitorsRunResults = executeWorkflowResponse!!.workflowRunResult.monitorRunResults
         assertEquals(2, monitorsRunResults.size)
 
         var exception: Exception? = null
@@ -469,7 +469,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         assertTrue(exception is NoSuchElementException)
     }
 
-    fun `test execute workflow with custom alerts and finding index with bucket level doc level delegates when bucket level delegate is used in chained finding`() {
+    fun `test execute workflow with custom alerts and finding index with bucket and doc monitor bucket monitor used as chained finding`() {
         val query = QueryBuilders.rangeQuery("test_strict_date_time")
             .gt("{{period_end}}||-10d")
             .lte("{{period_end}}")
@@ -557,14 +557,15 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
         assertNotNull(executeWorkflowResponse)
 
-        for (monitorRunResults in executeWorkflowResponse.workflowRunResult.workflowRunResult) {
+        for (monitorRunResults in executeWorkflowResponse.workflowRunResult.monitorRunResults) {
             if (bucketLevelMonitorResponse.monitor.name == monitorRunResults.monitorName) {
                 val searchResult = monitorRunResults.inputResults.results.first()
+
                 @Suppress("UNCHECKED_CAST")
                 val buckets = searchResult.stringMap("aggregations")?.stringMap("composite_agg")?.get("buckets") as List<Map<String, Any>>
                 assertEquals("Incorrect search result", 3, buckets.size)
 
-                val getAlertsResponse = assertAlerts(bucketLevelMonitorResponse.id, bucketCustomAlertsIndex, 2)
+                val getAlertsResponse = assertAlerts(bucketLevelMonitorResponse.id, bucketCustomAlertsIndex, alertSize = 2)
                 assertAcknowledges(getAlertsResponse.alerts, bucketLevelMonitorResponse.id, 2)
                 assertFindings(bucketLevelMonitorResponse.id, bucketCustomFindingsIndex, 1, 4, listOf("1", "2", "3", "4"))
             } else {
@@ -577,14 +578,14 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
                 val expectedTriggeredDocIds = listOf("1", "2", "3", "4")
                 assertEquals(expectedTriggeredDocIds, triggeredDocIds.sorted())
 
-                val getAlertsResponse = assertAlerts(docLevelMonitorResponse.id, docCustomAlertsIndex, 4)
+                val getAlertsResponse = assertAlerts(docLevelMonitorResponse.id, docCustomAlertsIndex, alertSize = 4)
                 assertAcknowledges(getAlertsResponse.alerts, docLevelMonitorResponse.id, 4)
                 assertFindings(docLevelMonitorResponse.id, docCustomFindingsIndex, 4, 4, listOf("1", "2", "3", "4"))
             }
         }
     }
 
-    fun `test execute workflow with custom alerts and finding index with bucket level and doc level delegates when doc level delegate is used in chained finding`() {
+    fun `test execute with custom alerts and finding index with bucket and doc monitor when doc monitor  is used in chained finding`() {
         val docQuery1 = DocLevelQuery(query = "test_field_1:\"test_value_2\"", name = "1")
         val docQuery2 = DocLevelQuery(query = "test_field_1:\"test_value_3\"", name = "2")
 
@@ -703,7 +704,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
         assertNotNull(executeWorkflowResponse)
 
-        for (monitorRunResults in executeWorkflowResponse.workflowRunResult.workflowRunResult) {
+        for (monitorRunResults in executeWorkflowResponse.workflowRunResult.monitorRunResults) {
             when (monitorRunResults.monitorName) {
                 // Verify first doc level monitor execution, alerts and findings
                 docLevelMonitorResponse.monitor.name -> {
@@ -717,7 +718,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
                     assertEquals(expectedTriggeredDocIds, triggeredDocIds.sorted())
 
                     val getAlertsResponse =
-                        assertAlerts(docLevelMonitorResponse.id, docLevelMonitorResponse.monitor.dataSources.alertsIndex, 4)
+                        assertAlerts(docLevelMonitorResponse.id, docLevelMonitorResponse.monitor.dataSources.alertsIndex, alertSize = 4)
                     assertAcknowledges(getAlertsResponse.alerts, docLevelMonitorResponse.id, 4)
                     assertFindings(
                         docLevelMonitorResponse.id,
@@ -730,6 +731,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
                 // Verify second bucket level monitor execution, alerts and findings
                 bucketLevelMonitorResponse.monitor.name -> {
                     val searchResult = monitorRunResults.inputResults.results.first()
+
                     @Suppress("UNCHECKED_CAST")
                     val buckets =
                         searchResult
@@ -737,7 +739,9 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
                     assertEquals("Incorrect search result", 2, buckets.size)
 
                     val getAlertsResponse =
-                        assertAlerts(bucketLevelMonitorResponse.id, bucketLevelMonitorResponse.monitor.dataSources.alertsIndex, 2)
+                        assertAlerts(
+                            bucketLevelMonitorResponse.id, bucketLevelMonitorResponse.monitor.dataSources.alertsIndex, alertSize = 2
+                        )
                     assertAcknowledges(getAlertsResponse.alerts, bucketLevelMonitorResponse.id, 2)
                     assertFindings(
                         bucketLevelMonitorResponse.id,
@@ -759,7 +763,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
                     assertEquals(expectedTriggeredDocIds, triggeredDocIds.sorted())
 
                     val getAlertsResponse =
-                        assertAlerts(docLevelMonitorResponse1.id, docLevelMonitorResponse1.monitor.dataSources.alertsIndex, 2)
+                        assertAlerts(docLevelMonitorResponse1.id, docLevelMonitorResponse1.monitor.dataSources.alertsIndex, alertSize = 2)
                     assertAcknowledges(getAlertsResponse.alerts, docLevelMonitorResponse1.id, 2)
                     assertFindings(
                         docLevelMonitorResponse1.id,
@@ -780,7 +784,8 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
                     assertEquals(2, totalHits)
                     @Suppress("UNCHECKED_CAST")
                     val docIds =
-                        ((monitorRunResults.inputResults.results[0]["hits"] as Map<String, Any>)["hits"] as List<Map<String, String>>).map { it["_id"]!! }
+                        ((monitorRunResults.inputResults.results[0]["hits"] as Map<String, Any>)["hits"] as List<Map<String, String>>)
+                            .map { it["_id"]!! }
                     assertEquals(listOf("5", "6"), docIds.sorted())
                 }
             }
@@ -809,7 +814,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
         deleteIndex(index)
 
         val response = executeWorkflow(workflowById, workflowById!!.id, false)!!
-        val error = response.workflowRunResult.workflowRunResult[0].error
+        val error = response.workflowRunResult.monitorRunResults[0].error
         assertNotNull(error)
         assertTrue(error is AlertingException)
         assertEquals(RestStatus.NOT_FOUND, (error as AlertingException).status)
@@ -870,16 +875,17 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
 
     private fun assertAlerts(
         monitorId: String,
-        customAlertsIndex: String,
+        alertsIndex: String? = AlertIndices.ALERT_INDEX,
+        executionId: String? = null,
         alertSize: Int,
     ): GetAlertsResponse {
-        val alerts = searchAlerts(monitorId, customAlertsIndex)
+        val alerts = searchAlerts(monitorId, alertsIndex!!, executionId = executionId)
         assertEquals("Alert saved for test monitor", alertSize, alerts.size)
         val table = Table("asc", "id", null, alertSize, 0, "")
         var getAlertsResponse = client()
             .execute(
                 AlertingActions.GET_ALERTS_ACTION_TYPE,
-                GetAlertsRequest(table, "ALL", "ALL", null, customAlertsIndex)
+                GetAlertsRequest(table, "ALL", "ALL", null, alertsIndex)
             )
             .get()
         assertTrue(getAlertsResponse != null)
@@ -991,11 +997,144 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
 
         val executeResult = executeWorkflow(id = workflowResponse!!.id)
         assertNotNull(executeResult)
-        assertEquals(2, executeResult!!.workflowRunResult.workflowRunResult.size)
+        assertEquals(2, executeResult!!.workflowRunResult.monitorRunResults.size)
     }
 
     private fun getDelegateMonitorMetadataId(
         workflowMetadata: WorkflowMetadata?,
         monitorResponse: IndexMonitorResponse,
     ) = "${workflowMetadata!!.id}-${monitorResponse.id}-metadata"
+
+    fun `test chained alerts for AND OR and NOT conditions`() {
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
+        val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
+        val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customFindingsIndex1 = "custom_findings_index"
+        val customFindingsIndexPattern1 = "custom_findings_index-1"
+        var monitor1 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput1),
+            triggers = listOf(trigger1),
+            dataSources = DataSources(
+                findingsIndex = customFindingsIndex1,
+                findingsIndexPattern = customFindingsIndexPattern1
+            )
+        )
+        val monitorResponse = createMonitor(monitor1)!!
+
+        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4")
+        val docLevelInput2 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery2))
+        val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customFindingsIndex2 = "custom_findings_index_2"
+        val customFindingsIndexPattern2 = "custom_findings_index-2"
+        var monitor2 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput2),
+            triggers = listOf(trigger2),
+            dataSources = DataSources(
+                findingsIndex = customFindingsIndex2,
+                findingsIndexPattern = customFindingsIndexPattern2
+            )
+        )
+
+        val monitorResponse2 = createMonitor(monitor2)!!
+        val andTrigger = randomChainedAlertTrigger(
+            condition = Script("monitor[id=${monitorResponse.id}] && monitor[id=${monitorResponse2.id}]")
+        )
+        val notTrigger = randomChainedAlertTrigger(
+            condition = Script("!monitor[id=${monitorResponse.id}] || !monitor[id=${monitorResponse2.id}]")
+        )
+        var workflow = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
+            triggers = listOf(andTrigger, notTrigger)
+        )
+        val workflowResponse = upsertWorkflow(workflow)!!
+        val workflowById = searchWorkflow(workflowResponse.id)
+        assertNotNull(workflowById)
+        val workflowId = workflowResponse.id
+
+        var executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
+        var triggerResults = executeWorkflowResponse.workflowRunResult.triggerResults
+        Assert.assertEquals(triggerResults.size, 2)
+        Assert.assertTrue(triggerResults.containsKey(andTrigger.id))
+        Assert.assertTrue(triggerResults.containsKey(notTrigger.id))
+        var andTriggerResult = triggerResults[andTrigger.id]
+        var notTriggerResult = triggerResults[notTrigger.id]
+        Assert.assertTrue(notTriggerResult!!.triggered)
+        Assert.assertFalse(andTriggerResult!!.triggered)
+        var chainedAlerts = searchChainedAlerts(
+            executeWorkflowResponse.workflowRunResult.executionId,
+            workflowId,
+            monitor1.dataSources.alertsIndex,
+        )
+        Assert.assertTrue(chainedAlerts.size == 1)
+        Assert.assertTrue(chainedAlerts[0].executionId == executeWorkflowResponse.workflowRunResult.executionId)
+        Assert.assertTrue(chainedAlerts[0].monitorId == "")
+        Assert.assertTrue(chainedAlerts[0].triggerId == notTrigger.id)
+        var testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS))
+        // Matches monitor1
+        val testDoc1 = """{
+            "message" : "This is an error from IAD region",
+            "source.ip.v6.v2" : 16644, 
+            "test_strict_date_time" : "$testTime",
+            "test_field_1" : "us-west-2"
+        }"""
+        indexDoc(index, "1", testDoc1)
+
+        testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS))
+        // Matches monitor1 and monitor2
+        val testDoc2 = """{
+            "message" : "This is an error from IAD region",
+            "source.ip.v6.v2" : 16645, 
+            "test_strict_date_time" : "$testTime",
+            "test_field_1" : "us-west-2"
+        }"""
+        indexDoc(index, "2", testDoc2)
+
+        testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS))
+        // Doesn't match
+        val testDoc3 = """{
+            "message" : "This is an error from IAD region",
+            "source.ip.v6.v2" : 16645, 
+            "test_strict_date_time" : "$testTime",
+            "test_field_1" : "us-east-1"
+        }"""
+        indexDoc(index, "3", testDoc3)
+        executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
+        triggerResults = executeWorkflowResponse.workflowRunResult.triggerResults
+        Assert.assertEquals(triggerResults.size, 2)
+        Assert.assertTrue(triggerResults.containsKey(andTrigger.id))
+        Assert.assertTrue(triggerResults.containsKey(notTrigger.id))
+        andTriggerResult = triggerResults[andTrigger.id]
+        notTriggerResult = triggerResults[notTrigger.id]
+        Assert.assertFalse(notTriggerResult!!.triggered)
+        Assert.assertTrue(andTriggerResult!!.triggered)
+        chainedAlerts = searchChainedAlerts(
+            executeWorkflowResponse.workflowRunResult.executionId,
+            workflowId,
+            monitor1.dataSources.alertsIndex,
+        )
+        Assert.assertTrue(chainedAlerts.size == 1)
+        Assert.assertTrue(chainedAlerts[0].executionId == executeWorkflowResponse.workflowRunResult.executionId)
+        Assert.assertTrue(chainedAlerts[0].monitorId == "")
+        Assert.assertTrue(chainedAlerts[0].triggerId == andTrigger.id)
+        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.monitorRunResults
+        assertEquals(2, monitorsRunResults.size)
+
+        assertEquals(monitor1.name, monitorsRunResults[0].monitorName)
+        assertEquals(1, monitorsRunResults[0].triggerResults.size)
+
+        Assert.assertEquals(monitor2.name, monitorsRunResults[1].monitorName)
+        Assert.assertEquals(1, monitorsRunResults[1].triggerResults.size)
+
+        val getAlertsResponse = assertAlerts(
+            monitorResponse.id, executionId = executeWorkflowResponse.workflowRunResult.executionId, alertSize = 2
+        )
+        assertAcknowledges(getAlertsResponse.alerts, monitorResponse.id, 2)
+        assertFindings(monitorResponse.id, customFindingsIndex1, 2, 2, listOf("1", "2"))
+
+        val getAlertsResponse2 = assertAlerts(
+            monitorId = monitorResponse2.id, executionId = executeWorkflowResponse.workflowRunResult.executionId, alertSize = 1
+        )
+        assertAcknowledges(getAlertsResponse2.alerts, monitorResponse2.id, 1)
+        assertFindings(monitorResponse2.id, customFindingsIndex2, 1, 1, listOf("2"))
+    }
 }

@@ -1,14 +1,10 @@
-/*
- * Copyright OpenSearch Contributors
- * SPDX-License-Identifier: Apache-2.0
- */
-
 package org.opensearch.alerting.resthandler
 
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.action.AcknowledgeChainedAlertsAction
 import org.opensearch.alerting.util.REFRESH
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
@@ -27,45 +23,39 @@ import java.io.IOException
 private val log: Logger = LogManager.getLogger(RestAcknowledgeAlertAction::class.java)
 
 /**
- * This class consists of the REST handler to acknowledge alerts.
- * The user provides the monitorID to which these alerts pertain and in the content of the request provides
- * the ids to the alerts user would like to acknowledge.
+ * This class consists of the REST handler to acknowledge chained alerts.
+ * The user provides the workflowId to which these alerts pertain and in the content of the request provides
+ * the ids to the chained alerts user would like to acknowledge.
  */
-class RestAcknowledgeAlertAction : BaseRestHandler() {
+class RestAcknowledgeChainedAlertAction : BaseRestHandler() {
 
     override fun getName(): String {
-            return "acknowledge_alert_action"
+        return "acknowledge_chained_alert_action"
     }
 
     override fun routes(): List<Route> {
-        return listOf()
-    }
-
-    override fun replacedRoutes(): MutableList<ReplacedRoute> {
         // Acknowledge alerts
         return mutableListOf(
-            ReplacedRoute(
+            Route(
                 POST,
-                "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts",
-                POST,
-                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts"
+                "${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowId}/_acknowledge/alerts"
             )
         )
     }
 
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts")
+        log.debug("${request.method()} ${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowId}/_acknowledge/alerts")
 
-        val monitorId = request.param("monitorID")
-        require(!monitorId.isNullOrEmpty()) { "Missing monitor id." }
+        val workflowId = request.param("workflowId")
+        require(!workflowId.isNullOrEmpty()) { "Missing workflow id." }
         val alertIds = getAlertIds(request.contentParser())
         require(alertIds.isNotEmpty()) { "You must provide at least one alert id." }
         val refreshPolicy = RefreshPolicy.parse(request.param(REFRESH, RefreshPolicy.IMMEDIATE.value))
 
-        val acknowledgeAlertRequest = AcknowledgeAlertRequest(monitorId, alertIds, refreshPolicy)
+        val acknowledgeAlertRequest = AcknowledgeAlertRequest(workflowId, alertIds, refreshPolicy)
         return RestChannelConsumer { channel ->
-            client.execute(AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_TYPE, acknowledgeAlertRequest, RestToXContentListener(channel))
+            client.execute(AcknowledgeChainedAlertsAction.INSTANCE, acknowledgeAlertRequest, RestToXContentListener(channel))
         }
     }
 

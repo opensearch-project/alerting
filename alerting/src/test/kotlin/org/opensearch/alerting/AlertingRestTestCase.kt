@@ -169,7 +169,12 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return response
     }
 
-    protected fun deleteWorkflowWithClient(client: RestClient, workflow: Workflow, deleteDelegates: Boolean = false, refresh: Boolean = true): Response {
+    protected fun deleteWorkflowWithClient(
+        client: RestClient,
+        workflow: Workflow,
+        deleteDelegates: Boolean = false,
+        refresh: Boolean = true,
+    ): Response {
         val response = client.makeRequest(
             "DELETE",
             "$WORKFLOW_ALERTING_BASE_URI/${workflow.id}?refresh=$refresh&deleteDelegateMonitors=$deleteDelegates",
@@ -1570,7 +1575,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return shuffleXContent(toXContent(builder, ToXContent.EMPTY_PARAMS)).string()
     }
 
-    protected fun getWorkflow(workflowId: String, header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")): Workflow {
+    protected fun getWorkflow(
+        workflowId: String,
+        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
+    ): Workflow {
         val response = client().makeRequest("GET", "$WORKFLOW_ALERTING_BASE_URI/$workflowId", null, header)
         assertEquals("Unable to get workflow $workflowId", RestStatus.OK, response.restStatus())
 

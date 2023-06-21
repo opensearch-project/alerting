@@ -10,7 +10,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import org.apache.logging.log4j.LogManager
-import org.apache.lucene.search.join.ScoreMode
 import org.opensearch.action.ActionListener
 import org.opensearch.action.admin.indices.delete.DeleteIndexRequest
 import org.opensearch.action.admin.indices.exists.indices.IndicesExistsRequest
@@ -23,12 +22,10 @@ import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.opensearchapi.suspendUntil
-import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
 import org.opensearch.commons.alerting.action.DeleteMonitorResponse
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
-import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
@@ -137,34 +134,6 @@ object DeleteMonitorService :
      * @param monitorId id of monitor that is checked if it is a workflow delegate
      */
     suspend fun monitorIsWorkflowDelegate(monitorId: String): Boolean {
-        val queryBuilder = QueryBuilders.nestedQuery(
-            Workflow.WORKFLOW_DELEGATE_PATH,
-            QueryBuilders.boolQuery().must(
-                QueryBuilders.matchQuery(
-                    Workflow.WORKFLOW_MONITOR_PATH,
-                    monitorId
-                )
-            ),
-            ScoreMode.None
-        )
-        try {
-            val searchRequest = SearchRequest()
-                .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
-                .source(SearchSourceBuilder().query(queryBuilder))
-
-            client.threadPool().threadContext.stashContext().use {
-                val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
-                if (searchResponse.hits.totalHits?.value == 0L) {
-                    return false
-                }
-
-                val workflowIds = searchResponse.hits.hits.map { it.id }.joinToString()
-                log.info("Monitor $monitorId can't be deleted since it belongs to $workflowIds")
-                return true
-            }
-        } catch (ex: Exception) {
-            log.error("Error getting the monitor workflows", ex)
-            throw AlertingException.wrap(ex)
-        }
+        return false
     }
 }

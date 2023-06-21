@@ -429,8 +429,9 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
             false
         )
 
-        val userWithDifferentRoleClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), userWithDifferentRole, userWithDifferentRole)
-            .setSocketTimeout(60000).build()
+        val userWithDifferentRoleClient = SecureRestClientBuilder(
+            clusterHosts.toTypedArray(), isHttps(), userWithDifferentRole, userWithDifferentRole
+        ).setSocketTimeout(60000).build()
 
         try {
             createWorkflowWithClient(
@@ -551,7 +552,9 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
         val monitor = randomQueryLevelMonitor(enabled = true)
 
         val createdMonitor = createMonitorWithClient(client(), monitor = monitor, listOf(TEST_HR_BACKEND_ROLE, "role1", "role2"))
-        val createdWorkflow = createWorkflowWithClient(client(), randomWorkflow(monitorIds = listOf(createdMonitor.id)), listOf(TEST_HR_BACKEND_ROLE, "role1", "role2"))
+        val createdWorkflow = createWorkflowWithClient(
+            client(), randomWorkflow(monitorIds = listOf(createdMonitor.id)), listOf(TEST_HR_BACKEND_ROLE, "role1", "role2")
+        )
         assertNotNull("The workflow was not created", createdWorkflow)
 
         // user should have access to the admin monitor
@@ -604,7 +607,10 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
         )
 
         val createdMonitor = createMonitorWithClient(userClient!!, randomQueryLevelMonitor(), listOf(TEST_HR_BACKEND_ROLE, "role2"))
-        val createdWorkflow = createWorkflowWithClient(userClient!!, workflow = randomWorkflow(enabled = true, monitorIds = listOf(createdMonitor.id)), listOf(TEST_HR_BACKEND_ROLE, "role2"))
+        val createdWorkflow = createWorkflowWithClient(
+            userClient!!,
+            workflow = randomWorkflow(enabled = true, monitorIds = listOf(createdMonitor.id)), listOf(TEST_HR_BACKEND_ROLE, "role2")
+        )
         assertNotNull("The workflow was not created", createdWorkflow)
 
         // getUser should have access to the monitor
@@ -1073,7 +1079,9 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
 
             assertNotNull("The monitor was not created", createdMonitor)
 
-            val createdWorkflow = createWorkflowWithClient(userClient!!, workflow = randomWorkflow(monitorIds = listOf(createdMonitor.id), enabled = true))
+            val createdWorkflow = createWorkflowWithClient(
+                userClient!!, workflow = randomWorkflow(monitorIds = listOf(createdMonitor.id), enabled = true)
+            )
             assertNotNull("The workflow was not created", createdWorkflow)
             assertTrue("The workflow was not enabled", createdWorkflow.enabled)
 

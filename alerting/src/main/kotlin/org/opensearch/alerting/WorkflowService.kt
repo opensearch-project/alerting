@@ -6,6 +6,7 @@
 package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.ExceptionsHelper
 import org.opensearch.OpenSearchException
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
@@ -71,8 +72,12 @@ class WorkflowService(
             }
             return indexToRelatedDocIdsMap
         } catch (t: Exception) {
+            val unwrappedException = ExceptionsHelper.unwrapCause(t) as Exception
+            if (unwrappedException.message?.contains("Configured indices are not found") == true) {
+                return emptyMap()
+            }
             log.error("Error getting finding doc ids: ${t.message}", t)
-            throw AlertingException.wrap(t)
+            throw t
         }
     }
 

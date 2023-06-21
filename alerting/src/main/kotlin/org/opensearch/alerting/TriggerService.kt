@@ -6,7 +6,9 @@
 package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.alerting.chainedAlertCondition.parsers.ChainedAlertExpressionParser
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
+import org.opensearch.alerting.model.ChainedAlertTriggerRunResult
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
@@ -19,10 +21,12 @@ import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelec
 import org.opensearch.commons.alerting.model.AggregationResultBucket
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.ChainedAlertTrigger
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
+import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
 import org.opensearch.search.aggregations.Aggregation
@@ -82,6 +86,23 @@ class TriggerService(val scriptService: ScriptService) {
             logger.info("Error running script for monitor ${monitor.id}, trigger: ${trigger.id}", e)
             // if the script fails we need to send an alert so set triggered = true
             DocumentLevelTriggerRunResult(trigger.name, emptyList(), e)
+        }
+    }
+
+    fun runChainedAlertTrigger(
+        workflow: Workflow,
+        trigger: ChainedAlertTrigger,
+        alertGeneratingMonitors: Map<String, Boolean>,
+    ): ChainedAlertTriggerRunResult {
+        return try {
+            val evaluate = ChainedAlertExpressionParser(trigger.condition.idOrCode)
+                .parse()
+                .evaluate(alertGeneratingMonitors)
+            ChainedAlertTriggerRunResult(trigger.name, triggered = evaluate, null)
+        } catch (e: Exception) {
+            logger.error("Error running chained alert trigger script for workflow ${workflow.id}, trigger: ${trigger.id}", e)
+            // if the script fails we need to send an alert so set triggered = true
+            ChainedAlertTriggerRunResult(trigger.name, false, e)
         }
     }
 

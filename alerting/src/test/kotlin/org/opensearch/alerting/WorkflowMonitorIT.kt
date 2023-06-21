@@ -8,6 +8,7 @@ package org.opensearch.alerting
 import org.opensearch.alerting.model.WorkflowMetadata
 import org.opensearch.alerting.transport.WorkflowSingleNodeTestCase
 import org.opensearch.commons.alerting.action.IndexMonitorResponse
+import org.opensearch.commons.alerting.model.ChainedAlertTrigger
 import org.opensearch.commons.alerting.model.ChainedMonitorFindings
 import org.opensearch.commons.alerting.model.CompositeInput
 import org.opensearch.commons.alerting.model.DataSources
@@ -16,6 +17,7 @@ import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.rest.RestRequest
+import org.opensearch.script.Script
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -611,7 +613,7 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
 
         val workflowId = workflowResponse.id
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
-        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.workflowRunResult
+        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.monitorRunResults
         assertEquals(2, monitorsRunResults.size)
 
         val workflowMetadata = searchWorkflowMetadata(workflowId)
@@ -1265,5 +1267,70 @@ class WorkflowMonitorIT : WorkflowSingleNodeTestCase() {
                 )
             }
         }
+    }
+
+    fun `test create workflow with chained alert triggers`() {
+        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(docQuery1)
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val customFindingsIndex = "custom_findings_index"
+        val customFindingsIndexPattern = "custom_findings_index-1"
+        val customQueryIndex = "custom_alerts_index"
+        val monitor1 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(
+                queryIndex = customQueryIndex,
+                findingsIndex = customFindingsIndex,
+                findingsIndexPattern = customFindingsIndexPattern
+            )
+        )
+
+        val monitor2 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(
+                queryIndex = customQueryIndex,
+                findingsIndex = customFindingsIndex,
+                findingsIndexPattern = customFindingsIndexPattern
+            )
+        )
+
+        val monitorResponse1 = createMonitor(monitor1)!!
+        val monitorResponse2 = createMonitor(monitor2)!!
+
+        val chainedAlertTrigger1 = randomChainedAlertTrigger(
+            condition = Script("monitor[id=${monitorResponse1.id}] && monitor[id=${monitorResponse2.id}")
+        )
+        val chainedAlertTrigger2 = randomChainedAlertTrigger(
+            condition = Script("monitor[id=${monitorResponse1.id}] || monitor[id=${monitorResponse2.id}]")
+        )
+        val workflow = randomWorkflow(
+            monitorIds = listOf(monitorResponse1.id, monitorResponse2.id),
+            triggers = listOf(
+                chainedAlertTrigger1,
+                chainedAlertTrigger2
+            )
+        )
+        val workflowResponse = upsertWorkflow(workflow)!!
+        val workflowById = searchWorkflow(workflowResponse.id)!!
+
+        assertEquals("Workflow input not correct", workflowById.triggers.size, 2)
+        assertEquals("Workflow input not correct", workflowById.triggers.get(0).name, chainedAlertTrigger1.name)
+        assertEquals("Workflow input not correct", workflowById.triggers.get(1).name, chainedAlertTrigger2.name)
+        assertEquals("Workflow input not correct", workflowById.triggers.get(0).id, chainedAlertTrigger1.id)
+        assertEquals("Workflow input not correct", workflowById.triggers.get(1).id, chainedAlertTrigger2.id)
+        assertEquals(
+            "Workflow input not correct",
+            (workflowById.triggers.get(0) as ChainedAlertTrigger).condition.idOrCode,
+            chainedAlertTrigger1.condition.idOrCode
+        )
+        assertEquals(
+            "Workflow input not correct",
+            (workflowById.triggers.get(1) as ChainedAlertTrigger).condition.idOrCode,
+            chainedAlertTrigger2.condition.idOrCode
+        )
     }
 }
