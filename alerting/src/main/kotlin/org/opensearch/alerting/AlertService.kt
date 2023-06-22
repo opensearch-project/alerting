@@ -550,6 +550,14 @@ class AlertService(
                         throw IllegalStateException("Unexpected attempt to save ${alert.state} alert: $alert")
                     }
                 }
+                Alert.State.AUDIT -> {
+                    listOf<DocWriteRequest<*>>(
+                        IndexRequest(alertsIndex)
+                            .routing(alert.monitorId)
+                            .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
+                            .id(if (alert.id != Alert.NO_ID) alert.id else null)
+                    )
+                }
                 Alert.State.DELETED -> {
                     throw IllegalStateException("Unexpected attempt to save ${alert.state} alert: $alert")
                 }
