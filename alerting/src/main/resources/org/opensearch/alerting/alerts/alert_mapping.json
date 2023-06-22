@@ -13,6 +13,9 @@
     "monitor_id": {
       "type": "keyword"
     },
+    "workflow_id": {
+      "type": "keyword"
+    },
     "monitor_version": {
       "type": "long"
     },
