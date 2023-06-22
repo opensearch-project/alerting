@@ -6,6 +6,8 @@
 package org.opensearch.alerting.util
 
 import org.apache.lucene.search.join.ScoreMode
+import org.opensearch.cluster.service.ClusterService
+import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
@@ -30,6 +32,29 @@ fun isADMonitor(monitor: Monitor): Boolean {
         return true
     }
     return false
+}
+
+fun getADBackendRoleFilterEnabled(clusterService: ClusterService, settings: Settings): Boolean {
+    var adBackendRoleFilterEnabled: Boolean
+    val metaData = clusterService.state().metadata()
+    val adFilterString = "plugins.anomaly_detection.filter_by_backend_roles"
+
+    // get default value for setting
+    if (clusterService.clusterSettings.get(adFilterString) != null) {
+        adBackendRoleFilterEnabled = clusterService.clusterSettings.get(adFilterString).getDefault(settings) as Boolean
+    } else {
+        // default setting doesn't exist, so returning false as it means AD plugins isn't in cluster anyway
+        return false
+    }
+
+    // Transient settings are prioritized so those are checked first.
+    return if (metaData.transientSettings().get(adFilterString) != null) {
+        metaData.transientSettings().getAsBoolean(adFilterString, adBackendRoleFilterEnabled)
+    } else if (metaData.persistentSettings().get(adFilterString) != null) {
+        metaData.persistentSettings().getAsBoolean(adFilterString, adBackendRoleFilterEnabled)
+    } else {
+        adBackendRoleFilterEnabled
+    }
 }
 
 fun addUserBackendRolesFilter(user: User?, searchSourceBuilder: SearchSourceBuilder): SearchSourceBuilder {
