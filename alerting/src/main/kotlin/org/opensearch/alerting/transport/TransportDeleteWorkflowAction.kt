@@ -160,8 +160,6 @@ class TransportDeleteWorkflowAction @Inject constructor(
 
                     if (deleteDelegateMonitors == true) {
                         val failedMonitorIds = tryDeletingMonitors(deletableMonitors, RefreshPolicy.IMMEDIATE)
-                        // Update delete workflow response
-                        deleteWorkflowResponse.nonDeletedMonitors = failedMonitorIds
                         // Delete monitors workflow metadata
                         // Monitor metadata will be in workflowId-monitorId-metadata format
                         metadataIdsToDelete.addAll(deletableMonitors.map { MonitorMetadata.getId(it, workflowMetadataId) })

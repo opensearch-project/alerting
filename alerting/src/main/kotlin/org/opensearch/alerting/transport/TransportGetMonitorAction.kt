@@ -6,10 +6,14 @@
 package org.opensearch.alerting.transport
 
 import org.apache.logging.log4j.LogManager
+import org.apache.lucene.search.join.ScoreMode
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
+import org.opensearch.action.search.SearchAction
+import org.opensearch.action.search.SearchRequest
+import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.GetMonitorAction
@@ -27,7 +31,9 @@ import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
+import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 
@@ -108,7 +114,15 @@ class TransportGetMonitorAction @Inject constructor(
                         }
 
                         actionListener.onResponse(
-                            GetMonitorResponse(response.id, response.version, response.seqNo, response.primaryTerm, RestStatus.OK, monitor)
+                            GetMonitorResponse(
+                                response.id,
+                                response.version,
+                                response.seqNo,
+                                response.primaryTerm,
+                                RestStatus.OK,
+                                monitor,
+                                getAssociatedWorkflows(response.id)
+                            )
                         )
                     }
 
@@ -117,6 +131,29 @@ class TransportGetMonitorAction @Inject constructor(
                     }
                 }
             )
+        }
+    }
+
+    private fun getAssociatedWorkflows(id: String): List<String> {
+        try {
+            val queryBuilder = QueryBuilders.nestedQuery(
+                TransportDeleteWorkflowAction.WORKFLOW_DELEGATE_PATH,
+                QueryBuilders.boolQuery().must(
+                    QueryBuilders.matchQuery(
+                        TransportDeleteWorkflowAction.WORKFLOW_MONITOR_PATH,
+                        id
+                    )
+                ),
+                ScoreMode.None
+            )
+            val searchRequest = SearchRequest()
+                .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
+                .source(SearchSourceBuilder().query(queryBuilder).fetchField("_id"))
+            val searchResponse: SearchResponse = client.execute(SearchAction.INSTANCE, searchRequest).get()
+            return searchResponse.hits.hits.map { it.id }
+        } catch (e: java.lang.Exception) {
+            log.error("failed to fetch associated workflows for monitor $id", e)
+            return emptyList()
         }
     }
 }

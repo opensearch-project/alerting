@@ -34,7 +34,7 @@ private val log: Logger = LogManager.getLogger(RestAcknowledgeAlertAction::class
 class RestAcknowledgeAlertAction : BaseRestHandler() {
 
     override fun getName(): String {
-            return "acknowledge_alert_action"
+        return "acknowledge_alert_action"
     }
 
     override fun routes(): List<Route> {

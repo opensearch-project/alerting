@@ -41,7 +41,6 @@ import org.opensearch.commons.alerting.action.GetWorkflowResponse
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.CompositeInput
 import org.opensearch.commons.alerting.model.DataSources
-import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.util.optionalTimeField
 import org.opensearch.commons.utils.recreateObject
@@ -130,8 +129,7 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
             try {
                 val queryBuilder = QueryBuilders.boolQuery()
                     .filter(
-                        QueryBuilders.termQuery
-                            (
+                        QueryBuilders.termQuery(
                             Alert.MONITOR_ID_FIELD,
                             request.monitorId
                         )
