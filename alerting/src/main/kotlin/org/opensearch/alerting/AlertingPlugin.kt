@@ -26,6 +26,7 @@ import org.opensearch.alerting.core.schedule.JobScheduler
 import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSettings
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.resthandler.RestAcknowledgeAlertAction
+import org.opensearch.alerting.resthandler.RestAcknowledgeChainedAlertAction
 import org.opensearch.alerting.resthandler.RestDeleteMonitorAction
 import org.opensearch.alerting.resthandler.RestDeleteWorkflowAction
 import org.opensearch.alerting.resthandler.RestExecuteMonitorAction
@@ -49,6 +50,7 @@ import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroAlertingSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings
 import org.opensearch.alerting.transport.TransportAcknowledgeAlertAction
+import org.opensearch.alerting.transport.TransportAcknowledgeChainedAlertAction
 import org.opensearch.alerting.transport.TransportDeleteMonitorAction
 import org.opensearch.alerting.transport.TransportDeleteWorkflowAction
 import org.opensearch.alerting.transport.TransportExecuteMonitorAction
@@ -183,6 +185,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestExecuteMonitorAction(),
             RestExecuteWorkflowAction(),
             RestAcknowledgeAlertAction(),
+            RestAcknowledgeChainedAlertAction(),
             RestScheduledJobStatsHandler("_alerting"),
             RestSearchEmailAccountAction(),
             RestGetEmailAccountAction(),
@@ -205,6 +208,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(SearchMonitorAction.INSTANCE, TransportSearchMonitorAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.DELETE_MONITOR_ACTION_TYPE, TransportDeleteMonitorAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_TYPE, TransportAcknowledgeAlertAction::class.java),
+            ActionPlugin.ActionHandler(
+                AlertingActions.ACKNOWLEDGE_CHAINED_ALERTS_ACTION_TYPE, TransportAcknowledgeChainedAlertAction::class.java
+            ),
             ActionPlugin.ActionHandler(GetEmailAccountAction.INSTANCE, TransportGetEmailAccountAction::class.java),
             ActionPlugin.ActionHandler(SearchEmailAccountAction.INSTANCE, TransportSearchEmailAccountAction::class.java),
             ActionPlugin.ActionHandler(GetEmailGroupAction.INSTANCE, TransportGetEmailGroupAction::class.java),

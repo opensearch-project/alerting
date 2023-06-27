@@ -2,13 +2,11 @@ package org.opensearch.alerting.resthandler
 
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
-import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.alerting.action.AcknowledgeChainedAlertsAction
-import org.opensearch.alerting.util.REFRESH
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
-import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
+import org.opensearch.commons.alerting.action.AcknowledgeChainedAlertRequest
+import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
@@ -22,7 +20,7 @@ private val log: Logger = LogManager.getLogger(RestAcknowledgeAlertAction::class
 
 /**
  * This class consists of the REST handler to acknowledge chained alerts.
- * The user provides the workflowId to which these alerts pertain and in the content of the request provides
+ * The user provides the workflowID to which these alerts pertain and in the content of the request provides
  * the ids to the chained alerts user would like to acknowledge.
  */
 class RestAcknowledgeChainedAlertAction : BaseRestHandler() {
@@ -36,24 +34,23 @@ class RestAcknowledgeChainedAlertAction : BaseRestHandler() {
         return mutableListOf(
             Route(
                 POST,
-                "${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowId}/_acknowledge/alerts"
+                "${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowID}/_acknowledge/alerts"
             )
         )
     }
 
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        log.debug("${request.method()} ${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowId}/_acknowledge/alerts")
+        log.debug("${request.method()} ${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowID}/_acknowledge/alerts")
 
-        val workflowId = request.param("workflowId")
+        val workflowId = request.param("workflowID")
         require(!workflowId.isNullOrEmpty()) { "Missing workflow id." }
         val alertIds = getAlertIds(request.contentParser())
         require(alertIds.isNotEmpty()) { "You must provide at least one alert id." }
-        val refreshPolicy = RefreshPolicy.parse(request.param(REFRESH, RefreshPolicy.IMMEDIATE.value))
 
-        val acknowledgeAlertRequest = AcknowledgeAlertRequest(workflowId, alertIds, refreshPolicy)
+        val acknowledgeAlertRequest = AcknowledgeChainedAlertRequest(workflowId, alertIds)
         return RestChannelConsumer { channel ->
-            client.execute(AcknowledgeChainedAlertsAction.INSTANCE, acknowledgeAlertRequest, RestToXContentListener(channel))
+            client.execute(AlertingActions.ACKNOWLEDGE_CHAINED_ALERTS_ACTION_TYPE, acknowledgeAlertRequest, RestToXContentListener(channel))
         }
     }
 

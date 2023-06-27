@@ -16,6 +16,7 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.action.support.WriteRequest
 import org.opensearch.action.update.UpdateRequest
 import org.opensearch.alerting.action.AcknowledgeChainedAlertsAction
 import org.opensearch.alerting.action.GetMonitorAction
@@ -33,8 +34,8 @@ import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
 import org.opensearch.commons.alerting.action.AcknowledgeAlertResponse
+import org.opensearch.commons.alerting.action.AcknowledgeChainedAlertRequest
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.GetWorkflowRequest
 import org.opensearch.commons.alerting.action.GetWorkflowResponse
@@ -72,7 +73,7 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
     AcknowledgeChainedAlertsAction.NAME,
     transportService,
     actionFilters,
-    ::AcknowledgeAlertRequest
+    ::AcknowledgeChainedAlertRequest
 ) {
     // TODO use AcknowledgeChainedAlertRequest
     @Volatile
@@ -84,16 +85,16 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
 
     override fun doExecute(
         task: Task,
-        acknowledgeAlertRequest: ActionRequest,
+        AcknowledgeChainedAlertRequest: ActionRequest,
         actionListener: ActionListener<AcknowledgeAlertResponse>,
     ) {
-        val request = acknowledgeAlertRequest as? AcknowledgeAlertRequest
-            ?: recreateObject(acknowledgeAlertRequest) { AcknowledgeAlertRequest(it) }
+        val request = AcknowledgeChainedAlertRequest as? AcknowledgeChainedAlertRequest
+            ?: recreateObject(AcknowledgeChainedAlertRequest) { AcknowledgeChainedAlertRequest(it) }
         client.threadPool().threadContext.stashContext().use {
             scope.launch {
                 val getWorkflowResponse: GetWorkflowResponse =
                     transportGetWorkflowAction.client.suspendUntil {
-                        val getWorkflowRequest = GetWorkflowRequest(workflowId = request.monitorId, method = RestRequest.Method.GET)
+                        val getWorkflowRequest = GetWorkflowRequest(workflowId = request.workflowId, method = RestRequest.Method.GET)
 
                         execute(AlertingActions.GET_WORKFLOW_ACTION_TYPE, getWorkflowRequest, it)
                     }
@@ -104,7 +105,7 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
                                 String.format(
                                     Locale.ROOT,
                                     "No workflow found with id [%s]",
-                                    request.monitorId
+                                    request.workflowId
                                 )
                             )
                         )
@@ -119,7 +120,7 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
     inner class AcknowledgeHandler(
         private val client: Client,
         private val actionListener: ActionListener<AcknowledgeAlertResponse>,
-        private val request: AcknowledgeAlertRequest,
+        private val request: AcknowledgeChainedAlertRequest,
     ) {
         val alerts = mutableMapOf<String, Alert>()
 
@@ -128,13 +129,10 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
         private suspend fun findActiveAlerts(workflow: Workflow) {
             try {
                 val queryBuilder = QueryBuilders.boolQuery()
-                    .filter(
-                        QueryBuilders.termQuery(
-                            Alert.MONITOR_ID_FIELD,
-                            request.monitorId
-                        )
+                    .must(
+                        QueryBuilders.wildcardQuery("workflow_execution_id", "*${request.workflowId}*")
                     )
-                    .filter(QueryBuilders.termsQuery("_id", request.alertIds))
+                    .must(QueryBuilders.termsQuery("_id", request.alertIds))
                 if (workflow.inputs.isEmpty() || (workflow.inputs[0] is CompositeInput) == false) {
                     actionListener.onFailure(
                         OpenSearchStatusException("Workflow ${workflow.id} is invalid", RestStatus.INTERNAL_SERVER_ERROR)
@@ -142,11 +140,11 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
                     return
                 }
                 val compositeInput = workflow.inputs[0] as CompositeInput
-                val monitorId = compositeInput.sequence.delegates[0].monitorId
-                val dataSources: DataSources = getDataSources(monitorId)
+                val workflowId = compositeInput.sequence.delegates[0].monitorId
+                val dataSources: DataSources = getDataSources(workflowId)
                 val searchRequest = SearchRequest()
                     .indices(dataSources.alertsIndex)
-                    .routing(request.monitorId)
+                    .routing(request.workflowId)
                     .source(
                         SearchSourceBuilder()
                             .query(queryBuilder)
@@ -158,7 +156,7 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
                 val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
                 onSearchResponse(searchResponse, workflow, dataSources)
             } catch (t: Exception) {
-                log.error("Failed to acknowledge chained alert ${request.alertIds} for workflow ${request.monitorId}", t)
+                log.error("Failed to acknowledge chained alert ${request.alertIds} for workflow ${request.workflowId}", t)
                 actionListener.onFailure(AlertingException.wrap(t))
             }
         }
@@ -179,8 +177,8 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
                     ResourceNotFoundException(
                         String.format(
                             Locale.ROOT,
-                            "No monitor found with id [%s]",
-                            request.monitorId
+                            "No workflow found with id [%s]",
+                            request.workflowId
                         )
                     )
                 )
@@ -209,7 +207,7 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
                         !isAlertHistoryEnabled
                     ) {
                         val updateRequest = UpdateRequest(dataSources.alertsIndex, alert.id)
-                            .routing(request.monitorId)
+                            .routing(request.workflowId)
                             .setIfSeqNo(hit.seqNo)
                             .setIfPrimaryTerm(hit.primaryTerm)
                             .doc(
@@ -221,7 +219,7 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
                         updateRequests.add(updateRequest)
                     } else {
                         val copyRequest = IndexRequest(alertsHistoryIndex)
-                            .routing(request.monitorId)
+                            .routing(request.workflowId)
                             .id(alert.id)
                             .source(
                                 alert.copy(state = Alert.State.ACKNOWLEDGED, acknowledgedTime = Instant.now())
@@ -235,17 +233,17 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
             try {
                 val updateResponse: BulkResponse? = if (updateRequests.isNotEmpty()) {
                     client.suspendUntil {
-                        client.bulk(BulkRequest().add(updateRequests).setRefreshPolicy(request.refreshPolicy), it)
+                        client.bulk(BulkRequest().add(updateRequests).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE), it)
                     }
                 } else null
                 val copyResponse: BulkResponse? = if (copyRequests.isNotEmpty()) {
                     client.suspendUntil {
-                        client.bulk(BulkRequest().add(copyRequests).setRefreshPolicy(request.refreshPolicy), it)
+                        client.bulk(BulkRequest().add(copyRequests).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE), it)
                     }
                 } else null
                 onBulkResponse(updateResponse, copyResponse, dataSources)
             } catch (t: Exception) {
-                log.error("Failed to acknowledge chained alert ${request.alertIds} for workflow ${request.monitorId}", t)
+                log.error("Failed to acknowledge chained alert ${request.alertIds} for workflow ${request.workflowId}", t)
                 actionListener.onFailure(AlertingException.wrap(t))
             }
         }
@@ -280,7 +278,7 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
                     failed.add(alerts[item.id]!!)
                 } else {
                     val deleteRequest = DeleteRequest(dataSources.alertsIndex, item.id)
-                        .routing(request.monitorId)
+                        .routing(request.workflowId)
                     deleteRequests.add(deleteRequest)
                 }
             }
@@ -288,7 +286,7 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
             if (deleteRequests.isNotEmpty()) {
                 try {
                     val deleteResponse: BulkResponse = client.suspendUntil {
-                        client.bulk(BulkRequest().add(deleteRequests).setRefreshPolicy(request.refreshPolicy), it)
+                        client.bulk(BulkRequest().add(deleteRequests).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE), it)
                     }
                     deleteResponse.items.forEach { item ->
                         missing.remove(item.id)
