@@ -116,7 +116,7 @@ class TransportGetAlertsAction @Inject constructor(
         }
         if (getAlertsRequest.workflowIds.isNullOrEmpty() == false) {
             val bqb: BoolQueryBuilder = QueryBuilders.boolQuery()
-            getAlertsRequest.workflowIds!!.forEach { bqb.should(QueryBuilders.wildcardQuery("execution_id", "*$it*")) }
+            getAlertsRequest.workflowIds!!.forEach { bqb.should(QueryBuilders.wildcardQuery("workflow_execution_id", "*$it*")) }
             queryBuilder.must(bqb)
             if (getAlertsRequest.monitorId.isNullOrEmpty() && getAlertsRequest.monitorIds.isNullOrEmpty()) {
                 queryBuilder.must(QueryBuilders.termQuery("monitor_id", ""))

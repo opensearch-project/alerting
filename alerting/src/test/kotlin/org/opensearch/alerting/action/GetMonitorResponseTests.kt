@@ -18,7 +18,7 @@ import java.time.ZoneId
 class GetMonitorResponseTests : OpenSearchTestCase() {
 
     fun `test get monitor response`() {
-        val req = GetMonitorResponse("1234", 1L, 2L, 0L, RestStatus.OK, null)
+        val req = GetMonitorResponse("1234", 1L, 2L, 0L, RestStatus.OK, null, null)
         assertNotNull(req)
 
         val out = BytesStreamOutput()
@@ -51,7 +51,7 @@ class GetMonitorResponseTests : OpenSearchTestCase() {
             triggers = mutableListOf(),
             uiMetadata = mutableMapOf()
         )
-        val req = GetMonitorResponse("1234", 1L, 2L, 0L, RestStatus.OK, monitor)
+        val req = GetMonitorResponse("1234", 1L, 2L, 0L, RestStatus.OK, monitor, null)
         assertNotNull(req)
 
         val out = BytesStreamOutput()

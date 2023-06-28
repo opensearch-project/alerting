@@ -489,9 +489,9 @@ run {
     useCluster testClusters.integTest
 }
 
-// Only apply jacoco test coverage if we are running a local single node cluster
-if (!usingRemoteCluster && !usingMultiNode) {
-    apply from: '../build-tools/opensearchplugin-coverage.gradle'
-}
+//// Only apply jacoco test coverage if we are running a local single node cluster
+//if (!usingRemoteCluster && !usingMultiNode) {
+//    apply from: '../build-tools/opensearchplugin-coverage.gradle'
+//}
 
 apply from: '../build-tools/pkgbuild.gradle'

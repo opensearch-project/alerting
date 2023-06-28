@@ -16,6 +16,7 @@ import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.moveAlerts
 import org.opensearch.alerting.core.JobRunner
 import org.opensearch.alerting.model.MonitorRunResult
+import org.opensearch.alerting.model.WorkflowRunResult
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.script.TriggerExecutionContext
@@ -30,6 +31,7 @@ import org.opensearch.alerting.settings.DestinationSettings.Companion.HOST_DENY_
 import org.opensearch.alerting.settings.DestinationSettings.Companion.loadDestinationSettings
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.isDocLevelMonitor
+import org.opensearch.alerting.workflow.CompositeWorkflowRunner
 import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.service.ClusterService
@@ -38,6 +40,7 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -182,20 +185,22 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     override fun doClose() { }
 
     override fun postIndex(job: ScheduledJob) {
-        if (job !is Monitor) {
-            throw IllegalArgumentException("Invalid job type")
-        }
-
-        launch {
-            try {
-                monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
-                    if (monitorCtx.alertIndices!!.isAlertInitialized(job.dataSources)) {
-                        moveAlerts(monitorCtx.client!!, job.id, job)
+        if (job is Monitor) {
+            launch {
+                try {
+                    monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
+                        if (monitorCtx.alertIndices!!.isAlertInitialized(job.dataSources)) {
+                            moveAlerts(monitorCtx.client!!, job.id, job)
+                        }
                     }
+                } catch (e: Exception) {
+                    logger.error("Failed to move active alerts for monitor [${job.id}].", e)
                 }
-            } catch (e: Exception) {
-                logger.error("Failed to move active alerts for monitor [${job.id}].", e)
             }
+        } else if (job is Workflow) {
+            // do nothing
+        } else {
+            throw IllegalArgumentException("Invalid job type")
         }
     }
 
@@ -214,15 +219,31 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     }
 
     override fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant) {
-        if (job !is Monitor) {
-            throw IllegalArgumentException("Invalid job type")
-        }
-        launch {
-            runJob(job, periodStart, periodEnd, false)
+        when (job) {
+            is Workflow -> {
+                launch {
+                    runJob(job, periodStart, periodEnd, false)
+                }
+            }
+            is Monitor -> {
+                launch {
+                    runJob(job, periodStart, periodEnd, false)
+                }
+            }
+            else -> {
+                throw IllegalArgumentException("Invalid job type")
+            }
         }
     }
 
+    suspend fun runJob(workflow: Workflow, periodStart: Instant, periodEnd: Instant, dryrun: Boolean): WorkflowRunResult {
+        return CompositeWorkflowRunner.runWorkflow(workflow, monitorCtx, periodStart, periodEnd, dryrun)
+    }
+
     suspend fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant, dryrun: Boolean): MonitorRunResult<*> {
+        if (job is Workflow) {
+            CompositeWorkflowRunner.runWorkflow(workflow = job, monitorCtx, periodStart, periodEnd, dryrun)
+        }
         val monitor = job as Monitor
         val runResult = if (monitor.isBucketLevelMonitor()) {
             BucketLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)

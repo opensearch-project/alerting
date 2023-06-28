@@ -248,7 +248,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         val bqb = BoolQueryBuilder()
         bqb.must(TermQueryBuilder(Alert.MONITOR_ID_FIELD, monitorId))
         if (executionId.isNullOrEmpty() == false) {
-            bqb.must(TermQueryBuilder(Alert.EXECUTION_ID_FIELD, executionId))
+            bqb.must(TermQueryBuilder(Alert.WORKFLOW_EXECUTION_ID_FIELD, executionId))
         }
         ssb.query(bqb)
         val searchResponse = client().prepareSearch(indices).setRouting(monitorId).setSource(ssb).get()
@@ -274,7 +274,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         val ssb = SearchSourceBuilder()
         ssb.version(true)
         var bqb = BoolQueryBuilder()
-        bqb.must(TermQueryBuilder(Alert.EXECUTION_ID_FIELD, executionId))
+        bqb.must(TermQueryBuilder(Alert.WORKFLOW_EXECUTION_ID_FIELD, executionId))
         bqb.must(TermQueryBuilder(Alert.MONITOR_ID_FIELD, ""))
         ssb.query(bqb)
         val searchResponse = client().prepareSearch(indices).setRouting(workflowId).setSource(ssb).get()

@@ -69,7 +69,6 @@ import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
-import org.opensearch.alerting.workflow.WorkflowRunnerService
 import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.node.DiscoveryNodes
@@ -153,11 +152,10 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
 
         @JvmField val FINDING_BASE_URI = "/_plugins/_alerting/findings"
 
-        @JvmField val ALERTING_JOB_TYPES = listOf("monitor")
+        @JvmField val ALERTING_JOB_TYPES = listOf("monitor", "workflow")
     }
 
     lateinit var runner: MonitorRunnerService
-    lateinit var workflowRunner: WorkflowRunnerService
     lateinit var scheduler: JobScheduler
     lateinit var sweeper: JobSweeper
     lateinit var scheduledJobIndices: ScheduledJobIndices
@@ -268,22 +266,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerTriggerService(TriggerService(scriptService))
             .registerAlertService(AlertService(client, xContentRegistry, alertIndices))
             .registerDocLevelMonitorQueries(DocLevelMonitorQueries(client, clusterService))
-            .registerConsumers()
-            .registerDestinationSettings()
-        workflowRunner = WorkflowRunnerService
-            .registerClusterService(clusterService)
-            .registerClient(client)
-            .registerNamedXContentRegistry(xContentRegistry)
-            .registerScriptService(scriptService)
-            .registerIndexNameExpressionResolver(indexNameExpressionResolver)
-            .registerSettings(settings)
-            .registerThreadPool(threadPool)
-            .registerAlertIndices(alertIndices)
-            .registerInputService(InputService(client, scriptService, namedWriteableRegistry, xContentRegistry))
-            .registerTriggerService(TriggerService(scriptService))
-            .registerAlertService(AlertService(client, xContentRegistry, alertIndices))
-            .registerDocLevelMonitorQueries(DocLevelMonitorQueries(client, clusterService))
-            .registerWorkflowService(WorkflowService(client, xContentRegistry))
             .registerConsumers()
             .registerDestinationSettings()
         scheduledJobIndices = ScheduledJobIndices(client.admin(), clusterService)

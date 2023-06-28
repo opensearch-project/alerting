@@ -1066,7 +1066,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
             monitor1.dataSources.alertsIndex,
         )
         Assert.assertTrue(chainedAlerts.size == 1)
-        Assert.assertTrue(chainedAlerts[0].executionId == executeWorkflowResponse.workflowRunResult.executionId)
+        Assert.assertTrue(chainedAlerts[0].workflowExecutionId == executeWorkflowResponse.workflowRunResult.executionId)
         Assert.assertTrue(chainedAlerts[0].monitorId == "")
         Assert.assertTrue(chainedAlerts[0].triggerId == notTrigger.id)
         var testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS))
@@ -1113,7 +1113,7 @@ class WorkflowRunnerIT : WorkflowSingleNodeTestCase() {
             monitor1.dataSources.alertsIndex,
         )
         Assert.assertTrue(chainedAlerts.size == 1)
-        Assert.assertTrue(chainedAlerts[0].executionId == executeWorkflowResponse.workflowRunResult.executionId)
+        Assert.assertTrue(chainedAlerts[0].workflowExecutionId == executeWorkflowResponse.workflowRunResult.executionId)
         Assert.assertTrue(chainedAlerts[0].monitorId == "")
         Assert.assertTrue(chainedAlerts[0].triggerId == andTrigger.id)
         val monitorsRunResults = executeWorkflowResponse.workflowRunResult.monitorRunResults
