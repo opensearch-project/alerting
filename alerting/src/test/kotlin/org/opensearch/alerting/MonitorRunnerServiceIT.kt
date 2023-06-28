@@ -1196,7 +1196,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         indexDoc(
             index,
             "2",
-            """{"user_id": "1",
+            """{"user_id": "2",
             "ip_addr": "12345678",
             "user_agent": "chrome"
             }
@@ -1255,6 +1255,14 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         @Suppress("UNCHECKED_CAST")
         val buckets = searchResult.stringMap("aggregations")?.stringMap("hot")?.get("buckets") as List<Map<String, Any>>
         assertEquals("Incorrect search result", 2, buckets.size)
+        val distinctUserCountAgg1 = buckets.find {
+            it.get("key_as_string") == "12345678|chrome"
+        }!!.get("distinct_user_count") as Map<String, Integer>
+        assertEquals(2, distinctUserCountAgg1.get("value"))
+        val distinctUserCountAgg2 = buckets.find {
+            it.get("key_as_string") == "3443534|chrome"
+        }!!.get("distinct_user_count") as Map<String, Integer>
+        assertEquals(1, distinctUserCountAgg2.get("value"))
     }
 
     fun `test bucket-level monitor alert creation and completion`() {
