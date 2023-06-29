@@ -14,6 +14,7 @@ import org.opensearch.commons.alerting.util.IndexUtils.Companion._PRIMARY_TERM
 import org.opensearch.commons.alerting.util.IndexUtils.Companion._SEQ_NO
 import org.opensearch.commons.alerting.util.IndexUtils.Companion._VERSION
 import org.opensearch.core.xcontent.ToXContent
+import org.opensearch.core.xcontent.ToXContentFragment
 import org.opensearch.core.xcontent.ToXContentObject
 import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.rest.RestStatus
@@ -26,7 +27,7 @@ class GetMonitorResponse : ActionResponse, ToXContentObject {
     var primaryTerm: Long
     var status: RestStatus
     var monitor: Monitor?
-    var associatedWorkflows: List<String>?
+    var associatedWorkflows: List<AssociatedWorkflow>?
 
     constructor(
         id: String,
@@ -35,7 +36,7 @@ class GetMonitorResponse : ActionResponse, ToXContentObject {
         primaryTerm: Long,
         status: RestStatus,
         monitor: Monitor?,
-        associatedCompositeMonitors: List<String>?,
+        associatedCompositeMonitors: List<AssociatedWorkflow>?,
     ) : super() {
         this.id = id
         this.version = version
@@ -56,7 +57,7 @@ class GetMonitorResponse : ActionResponse, ToXContentObject {
         monitor = if (sin.readBoolean()) {
             Monitor.readFrom(sin) // monitor
         } else null,
-        associatedCompositeMonitors = sin.readOptionalStringList(),
+        associatedCompositeMonitors = sin.readList((AssociatedWorkflow)::readFrom),
     )
 
     @Throws(IOException::class)
@@ -72,7 +73,9 @@ class GetMonitorResponse : ActionResponse, ToXContentObject {
         } else {
             out.writeBoolean(false)
         }
-        out.writeOptionalStringCollection(associatedWorkflows)
+        associatedWorkflows?.forEach {
+            it.writeTo(out)
+        }
     }
 
     @Throws(IOException::class)
@@ -86,9 +89,45 @@ class GetMonitorResponse : ActionResponse, ToXContentObject {
             builder.field("monitor", monitor)
         }
         if (associatedWorkflows != null) {
-            builder.field("associated_workflows", associatedWorkflows)
+            builder.field("associated_workflows", associatedWorkflows!!.toTypedArray())
+        }
+        return builder.endObject()
+    }
+
+    class AssociatedWorkflow : ToXContentFragment {
+        val id: String
+        val name: String
+
+        constructor(id: String, name: String) {
+            this.id = id
+            this.name = name
         }
 
-        return builder.endObject()
+        override fun toXContent(builder: XContentBuilder, params: ToXContent.Params?): XContentBuilder {
+            builder.startObject()
+                .field("id", id)
+                .field("name", name)
+                .endObject()
+            return builder
+        }
+
+        fun writeTo(out: StreamOutput) {
+            out.writeString(id)
+            out.writeString(name)
+        }
+
+        @Throws(IOException::class)
+        constructor(sin: StreamInput) : this(
+            sin.readString(),
+            sin.readString()
+        )
+
+        companion object {
+            @JvmStatic
+            @Throws(IOException::class)
+            fun readFrom(sin: StreamInput): AssociatedWorkflow {
+                return AssociatedWorkflow(sin)
+            }
+        }
     }
 }

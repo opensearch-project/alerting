@@ -19,6 +19,7 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.GetMonitorAction
 import org.opensearch.alerting.action.GetMonitorRequest
 import org.opensearch.alerting.action.GetMonitorResponse
+import org.opensearch.alerting.action.GetMonitorResponse.AssociatedWorkflow
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
@@ -30,6 +31,7 @@ import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
@@ -45,8 +47,8 @@ class TransportGetMonitorAction @Inject constructor(
     actionFilters: ActionFilters,
     val xContentRegistry: NamedXContentRegistry,
     val clusterService: ClusterService,
-    settings: Settings
-) : HandledTransportAction<GetMonitorRequest, GetMonitorResponse> (
+    settings: Settings,
+) : HandledTransportAction<GetMonitorRequest, GetMonitorResponse>(
     GetMonitorAction.NAME,
     transportService,
     actionFilters,
@@ -54,7 +56,8 @@ class TransportGetMonitorAction @Inject constructor(
 ),
     SecureTransportAction {
 
-    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile
+    override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
         listenFilterBySettingChange(clusterService)
@@ -134,8 +137,9 @@ class TransportGetMonitorAction @Inject constructor(
         }
     }
 
-    private fun getAssociatedWorkflows(id: String): List<String> {
+    private fun getAssociatedWorkflows(id: String): List<AssociatedWorkflow> {
         try {
+            val associatedWorkflows = mutableListOf<AssociatedWorkflow>()
             val queryBuilder = QueryBuilders.nestedQuery(
                 TransportDeleteWorkflowAction.WORKFLOW_DELEGATE_PATH,
                 QueryBuilders.boolQuery().must(
@@ -149,8 +153,21 @@ class TransportGetMonitorAction @Inject constructor(
             val searchRequest = SearchRequest()
                 .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
                 .source(SearchSourceBuilder().query(queryBuilder).fetchField("_id"))
-            val searchResponse: SearchResponse = client.execute(SearchAction.INSTANCE, searchRequest).get()
-            return searchResponse.hits.hits.map { it.id }
+            val response: SearchResponse = client.execute(SearchAction.INSTANCE, searchRequest).get()
+
+            for (hit in response.hits) {
+                XContentType.JSON.xContent().createParser(
+                    xContentRegistry,
+                    LoggingDeprecationHandler.INSTANCE,
+                    hit.sourceAsString
+                ).use { hitsParser ->
+                    val workflow = ScheduledJob.parse(hitsParser, hit.id, hit.version)
+                    if (workflow is Workflow) {
+                        associatedWorkflows.add(AssociatedWorkflow(hit.id, workflow.name))
+                    }
+                }
+            }
+            return associatedWorkflows
         } catch (e: java.lang.Exception) {
             log.error("failed to fetch associated workflows for monitor $id", e)
             return emptyList()
