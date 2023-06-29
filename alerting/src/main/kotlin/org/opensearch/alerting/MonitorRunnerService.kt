@@ -120,6 +120,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         return this
     }
 
+    fun registerWorkflowService(workflowService: WorkflowService): MonitorRunnerService {
+        this.monitorCtx.workflowService = workflowService
+        return this
+    }
+
     // Must be called after registerClusterService and registerSettings in AlertingPlugin
     fun registerConsumers(): MonitorRunnerService {
         monitorCtx.retryPolicy = BackoffPolicy.constantBackoff(

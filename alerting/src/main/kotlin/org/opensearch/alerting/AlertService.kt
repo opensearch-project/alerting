@@ -27,6 +27,7 @@ import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.getBucketKeysHash
+import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client
 import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
@@ -108,7 +109,8 @@ class AlertService(
         ctx: QueryLevelTriggerExecutionContext,
         result: QueryLevelTriggerRunResult,
         alertError: AlertError?,
-        executionId: String? = null
+        executionId: String? = null,
+        workflorwRunContext: WorkflowRunContext?
     ): Alert? {
         val currentTime = Instant.now()
         val currentAlert = ctx.alert
@@ -166,7 +168,7 @@ class AlertService(
                 errorMessage = alertError?.message,
                 errorHistory = updatedHistory,
                 actionExecutionResults = updatedActionExecutionResults,
-                schemaVersion = IndexUtils.alertIndexSchemaVersion
+                schemaVersion = IndexUtils.alertIndexSchemaVersion,
             )
         } else {
             val alertState = if (alertError == null) Alert.State.ACTIVE else Alert.State.ERROR
@@ -174,7 +176,8 @@ class AlertService(
                 monitor = ctx.monitor, trigger = ctx.trigger, startTime = currentTime,
                 lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
                 errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
-                schemaVersion = IndexUtils.alertIndexSchemaVersion
+                schemaVersion = IndexUtils.alertIndexSchemaVersion, executionId = executionId,
+                workflowId = workflorwRunContext?.workflowId ?: ""
             )
         }
     }
@@ -186,6 +189,7 @@ class AlertService(
         ctx: DocumentLevelTriggerExecutionContext,
         alertError: AlertError?,
         workflowExecutionId: String? = null,
+        workflorwRunContext: WorkflowRunContext?
     ): Alert {
         val currentTime = Instant.now()
 
@@ -194,7 +198,7 @@ class AlertService(
             id = UUID.randomUUID().toString(), monitor = ctx.monitor, trigger = ctx.trigger, startTime = currentTime,
             lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
             schemaVersion = IndexUtils.alertIndexSchemaVersion, findingIds = findings, relatedDocIds = relatedDocIds,
-            workflowExecutionId = workflowExecutionId
+            executionId = workflowExecutionId, workflowId = workflorwRunContext?.workflowId ?: ""
         )
     }
 
@@ -209,9 +213,8 @@ class AlertService(
             state = Alert.State.ACTIVE,
             errorMessage = null, schemaVersion = -1,
             chainedAlertTrigger = ctx.trigger,
-            workflowExecutionId = executionId,
-            user = workflow.user!!
-
+            executionId = executionId,
+            workflow = workflow
         )
     }
 
@@ -266,7 +269,9 @@ class AlertService(
         trigger: BucketLevelTrigger,
         currentAlerts: MutableMap<String, Alert>,
         aggResultBuckets: List<AggregationResultBucket>,
-        findings: List<String>
+        findings: List<String>,
+        executionId: String? = null,
+        workflorwRunContext: WorkflowRunContext?
     ): Map<AlertCategory, List<Alert>> {
         val dedupedAlerts = mutableListOf<Alert>()
         val newAlerts = mutableListOf<Alert>()
@@ -287,7 +292,7 @@ class AlertService(
                     lastNotificationTime = currentTime, state = Alert.State.ACTIVE, errorMessage = null,
                     errorHistory = mutableListOf(), actionExecutionResults = mutableListOf(),
                     schemaVersion = IndexUtils.alertIndexSchemaVersion, aggregationResultBucket = aggAlertBucket,
-                    findingIds = findings
+                    findingIds = findings, executionId = executionId, workflowId = workflorwRunContext?.workflowId ?: ""
                 )
                 newAlerts.add(newAlert)
             }

@@ -227,7 +227,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 docsToQueries,
                 queryToDocIds,
                 dryrun,
-                workflowRunContext?.executionId
+                workflowRunContext?.executionId,
+                workflowRunContext
             )
         }
 
@@ -252,7 +253,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         docsToQueries: Map<String, List<String>>,
         queryToDocIds: Map<DocLevelQuery, Set<String>>,
         dryrun: Boolean,
-        workflowExecutionId: String? = null
+        workflowExecutionId: String? = null,
+        workflowRunContext: WorkflowRunContext?
     ): DocumentLevelTriggerRunResult {
         val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger)
         val triggerResult = monitorCtx.triggerService!!.runDocLevelTrigger(monitor, trigger, queryToDocIds)
@@ -291,7 +293,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 listOf(it.second),
                 triggerCtx,
                 monitorResult.alertError() ?: triggerResult.alertError(),
-                workflowExecutionId // TODO add execution id for other types of monitors also
+                workflowExecutionId,
+                workflowRunContext
             )
             alerts.add(alert)
         }
@@ -302,7 +305,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 listOf(),
                 triggerCtx,
                 monitorResult.alertError() ?: triggerResult.alertError(),
-                workflowExecutionId
+                workflowExecutionId,
+                workflowRunContext
             )
             alerts.add(alert)
         }

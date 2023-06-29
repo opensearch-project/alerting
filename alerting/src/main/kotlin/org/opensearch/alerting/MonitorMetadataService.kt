@@ -153,7 +153,7 @@ object MonitorMetadataService :
                     XContentType.JSON
                 )
                 XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                MonitorMetadata.parse(xcp)
+                MonitorMetadata.parse(xcp, getResponse.id, getResponse.seqNo, getResponse.primaryTerm)
             } else {
                 null
             }

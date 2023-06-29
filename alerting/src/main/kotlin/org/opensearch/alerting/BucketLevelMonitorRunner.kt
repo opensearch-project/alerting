@@ -170,7 +170,9 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     trigger,
                     currentAlertsForTrigger,
                     triggerResult.aggregationResultBuckets.values.toList(),
-                    findings
+                    findings,
+                    workflowRunContext?.executionId,
+                    workflowRunContext
                 ).toMutableMap()
                 val dedupedAlerts = categorizedAlerts.getOrDefault(AlertCategory.DEDUPED, emptyList())
                 var newAlerts = categorizedAlerts.getOrDefault(AlertCategory.NEW, emptyList())

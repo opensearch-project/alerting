@@ -38,6 +38,7 @@ import org.opensearch.alerting.resthandler.RestGetEmailGroupAction
 import org.opensearch.alerting.resthandler.RestGetFindingsAction
 import org.opensearch.alerting.resthandler.RestGetMonitorAction
 import org.opensearch.alerting.resthandler.RestGetWorkflowAction
+import org.opensearch.alerting.resthandler.RestGetWorkflowAlertsAction
 import org.opensearch.alerting.resthandler.RestIndexMonitorAction
 import org.opensearch.alerting.resthandler.RestIndexWorkflowAction
 import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
@@ -62,6 +63,7 @@ import org.opensearch.alerting.transport.TransportGetEmailGroupAction
 import org.opensearch.alerting.transport.TransportGetFindingsSearchAction
 import org.opensearch.alerting.transport.TransportGetMonitorAction
 import org.opensearch.alerting.transport.TransportGetWorkflowAction
+import org.opensearch.alerting.transport.TransportGetWorkflowAlertsAction
 import org.opensearch.alerting.transport.TransportIndexMonitorAction
 import org.opensearch.alerting.transport.TransportIndexWorkflowAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
@@ -191,6 +193,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestGetEmailGroupAction(),
             RestGetDestinationsAction(),
             RestGetAlertsAction(),
+            RestGetWorkflowAlertsAction(),
             RestGetFindingsAction(),
             RestGetWorkflowAction(),
             RestDeleteWorkflowAction()
@@ -215,6 +218,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(SearchEmailGroupAction.INSTANCE, TransportSearchEmailGroupAction::class.java),
             ActionPlugin.ActionHandler(GetDestinationsAction.INSTANCE, TransportGetDestinationsAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.GET_ALERTS_ACTION_TYPE, TransportGetAlertsAction::class.java),
+            ActionPlugin.ActionHandler(AlertingActions.GET_WORKFLOW_ALERTS_ACTION_TYPE, TransportGetWorkflowAlertsAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.GET_FINDINGS_ACTION_TYPE, TransportGetFindingsSearchAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.INDEX_WORKFLOW_ACTION_TYPE, TransportIndexWorkflowAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.GET_WORKFLOW_ACTION_TYPE, TransportGetWorkflowAction::class.java),
@@ -266,6 +270,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerTriggerService(TriggerService(scriptService))
             .registerAlertService(AlertService(client, xContentRegistry, alertIndices))
             .registerDocLevelMonitorQueries(DocLevelMonitorQueries(client, clusterService))
+            .registerWorkflowService(WorkflowService(client, xContentRegistry))
             .registerConsumers()
             .registerDestinationSettings()
         scheduledJobIndices = ScheduledJobIndices(client.admin(), clusterService)

@@ -275,7 +275,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         try {
             val searchRequest = SearchRequest(dataSources.alertsIndex)
             val queryBuilder = QueryBuilders.boolQuery()
-            queryBuilder.filter(QueryBuilders.termQuery("workflow_execution_id", executionId))
+            queryBuilder.filter(QueryBuilders.termQuery("execution_id", executionId))
             queryBuilder.filter(QueryBuilders.termQuery("state", Alert.State.ACTIVE.name))
             searchRequest.source().query(queryBuilder)
             val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(searchRequest, it) }
