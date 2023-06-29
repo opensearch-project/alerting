@@ -13,6 +13,7 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.SearchMonitorAction
 import org.opensearch.alerting.action.SearchMonitorRequest
+import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
@@ -52,7 +53,13 @@ class TransportSearchMonitorAction @Inject constructor(
         val searchSourceBuilder = searchMonitorRequest.searchRequest.source()
         val queryBuilder = if (searchSourceBuilder.query() == null) BoolQueryBuilder()
         else QueryBuilders.boolQuery().must(searchSourceBuilder.query())
-        queryBuilder.filter(QueryBuilders.existsQuery(Monitor.MONITOR_TYPE))
+
+        if (searchMonitorRequest.searchRequest.indices().size == 1 &&
+            !searchMonitorRequest.searchRequest.indices().contains(ALL_ALERT_INDEX_PATTERN)
+        ) {
+            queryBuilder.filter(QueryBuilders.existsQuery(Monitor.MONITOR_TYPE))
+        }
+
         searchSourceBuilder.query(queryBuilder)
             .seqNoAndPrimaryTerm(true)
             .version(true)
