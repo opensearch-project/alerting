@@ -6,6 +6,6 @@
 package org.opensearch.alerting.chainedAlertCondition.tokens
 
 /**
- * To define the tokens in Trigger expression such as query[tag=“sev1"] or query[name=“sev1"] or query[id=“sev1"]
+ * To define the tokens in Trigger expression such as monitor[id=“id1"] or monitor[id=“id2"] and monitor[id=“id3"]
  */
 internal data class CAExpressionToken(val value: String) : ExpressionToken

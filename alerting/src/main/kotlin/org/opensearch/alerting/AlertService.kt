@@ -205,7 +205,8 @@ class AlertService(
     fun composeChainedAlert(
         ctx: ChainedAlertTriggerExecutionContext,
         executionId: String,
-        workflow: Workflow
+        workflow: Workflow,
+        associatedAlertIds: List<String>
     ): Alert {
         return Alert(
             startTime = Instant.now(),
@@ -214,7 +215,8 @@ class AlertService(
             errorMessage = null, schemaVersion = -1,
             chainedAlertTrigger = ctx.trigger,
             executionId = executionId,
-            workflow = workflow
+            workflow = workflow,
+            associatedAlertIds = associatedAlertIds
         )
     }
 

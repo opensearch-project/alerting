@@ -14,6 +14,7 @@ data class ChainedAlertTriggerRunResult(
     var triggered: Boolean,
     override var error: Exception?,
     var actionResults: MutableMap<String, ActionRunResult> = mutableMapOf(),
+    val associatedAlertIds: Set<String>,
 ) : TriggerRunResult(triggerName, error) {
 
     @Throws(IOException::class)
@@ -22,7 +23,8 @@ data class ChainedAlertTriggerRunResult(
         triggerName = sin.readString(),
         error = sin.readException(),
         triggered = sin.readBoolean(),
-        actionResults = sin.readMap() as MutableMap<String, ActionRunResult>
+        actionResults = sin.readMap() as MutableMap<String, ActionRunResult>,
+        associatedAlertIds = sin.readStringList().toSet()
     )
 
     override fun alertError(): AlertError? {
@@ -49,6 +51,7 @@ data class ChainedAlertTriggerRunResult(
         super.writeTo(out)
         out.writeBoolean(triggered)
         out.writeMap(actionResults as Map<String, ActionRunResult>)
+        out.writeStringCollection(associatedAlertIds)
     }
 
     companion object {

@@ -49,7 +49,7 @@ class TriggerService(val scriptService: ScriptService) {
     fun runQueryLevelTrigger(
         monitor: Monitor,
         trigger: QueryLevelTrigger,
-        ctx: QueryLevelTriggerExecutionContext
+        ctx: QueryLevelTriggerExecutionContext,
     ): QueryLevelTriggerRunResult {
         return try {
             val triggered = scriptService.compile(trigger.condition, TriggerScript.CONTEXT)
@@ -67,7 +67,7 @@ class TriggerService(val scriptService: ScriptService) {
     fun runDocLevelTrigger(
         monitor: Monitor,
         trigger: DocumentLevelTrigger,
-        queryToDocIds: Map<DocLevelQuery, Set<String>>
+        queryToDocIds: Map<DocLevelQuery, Set<String>>,
     ): DocumentLevelTriggerRunResult {
         return try {
             var triggeredDocs = mutableListOf<String>()
@@ -92,17 +92,27 @@ class TriggerService(val scriptService: ScriptService) {
     fun runChainedAlertTrigger(
         workflow: Workflow,
         trigger: ChainedAlertTrigger,
-        alertGeneratingMonitors: Map<String, Boolean>,
+        alertGeneratingMonitors: Set<String>,
+        monitorIdToAlertIdsMap: Map<String, Set<String>>,
     ): ChainedAlertTriggerRunResult {
+        val associatedAlertIds = mutableSetOf<String>()
         return try {
-            val evaluate = ChainedAlertExpressionParser(trigger.condition.idOrCode)
-                .parse()
-                .evaluate(alertGeneratingMonitors)
-            ChainedAlertTriggerRunResult(trigger.name, triggered = evaluate, null)
+            val parsedTriggerCondition = ChainedAlertExpressionParser(trigger.condition.idOrCode).parse()
+            val evaluate = parsedTriggerCondition.evaluate(alertGeneratingMonitors)
+            if (evaluate) {
+                val monitorIdsInTriggerCondition = parsedTriggerCondition.getMonitorIds(parsedTriggerCondition)
+                monitorIdsInTriggerCondition.forEach { associatedAlertIds.addAll(monitorIdToAlertIdsMap.getOrDefault(it, emptySet())) }
+            }
+            ChainedAlertTriggerRunResult(trigger.name, triggered = evaluate, null, associatedAlertIds = associatedAlertIds)
         } catch (e: Exception) {
             logger.error("Error running chained alert trigger script for workflow ${workflow.id}, trigger: ${trigger.id}", e)
             // if the script fails we need to send an alert so set triggered = true
-            ChainedAlertTriggerRunResult(trigger.name, false, e)
+            ChainedAlertTriggerRunResult(
+                triggerName = trigger.name,
+                triggered = false,
+                error = e,
+                associatedAlertIds = emptySet()
+            )
         }
     }
 
@@ -110,7 +120,7 @@ class TriggerService(val scriptService: ScriptService) {
     fun runBucketLevelTrigger(
         monitor: Monitor,
         trigger: BucketLevelTrigger,
-        ctx: BucketLevelTriggerExecutionContext
+        ctx: BucketLevelTriggerExecutionContext,
     ): BucketLevelTriggerRunResult {
         return try {
             val bucketIndices =

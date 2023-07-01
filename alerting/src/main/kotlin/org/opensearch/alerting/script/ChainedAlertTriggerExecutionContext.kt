@@ -12,14 +12,16 @@ data class ChainedAlertTriggerExecutionContext(
     val periodEnd: Instant?,
     val error: Exception? = null,
     val trigger: ChainedAlertTrigger,
-    val monitorHasAlertsMap: Map<String, Boolean>,
+    val alertGeneratingMonitors: Set<String>,
+    val monitorIdToAlertIdsMap: Map<String, Set<String>>
 ) {
 
     constructor(
         workflow: Workflow,
         workflowRunResult: WorkflowRunResult,
         trigger: ChainedAlertTrigger,
-        monitorHasAlertsMap: Map<String, Boolean>,
+        alertGeneratingMonitors: Set<String>,
+        monitorIdToAlertIdsMap: Map<String, Set<String>>
     ) :
         this(
             workflow,
@@ -28,7 +30,8 @@ data class ChainedAlertTriggerExecutionContext(
             workflowRunResult.executionEndTime,
             workflowRunResult.error,
             trigger,
-            monitorHasAlertsMap
+            alertGeneratingMonitors,
+            monitorIdToAlertIdsMap
         )
 
     /**
@@ -41,7 +44,8 @@ data class ChainedAlertTriggerExecutionContext(
             "results" to workflowRunResult,
             "periodStart" to periodStart,
             "error" to error,
-            "monitorHasAlertsMap" to monitorHasAlertsMap
+            "alertGeneratingMonitors" to alertGeneratingMonitors,
+            "monitorIdToAlertIdsMap" to monitorIdToAlertIdsMap
         )
     }
 }

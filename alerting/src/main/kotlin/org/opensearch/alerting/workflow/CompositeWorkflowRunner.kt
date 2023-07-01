@@ -142,14 +142,15 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         if (dataSources != null) {
             try {
                 monitorCtx.alertIndices!!.createOrUpdateAlertIndex(dataSources)
-                val monitorHasAlertsMap = fetchAlertsGeneratedInCurrentExecution(dataSources, executionId, monitorCtx)
+                val monitorIdToAlertIdsMap = fetchAlertsGeneratedInCurrentExecution(dataSources, executionId, monitorCtx)
                 for (trigger in workflow.triggers) {
                     val caTrigger = trigger as ChainedAlertTrigger
                     val triggerCtx = ChainedAlertTriggerExecutionContext(
                         workflow = workflow,
                         workflowRunResult = workflowRunResult,
                         trigger = caTrigger,
-                        monitorHasAlertsMap = monitorHasAlertsMap,
+                        alertGeneratingMonitors = monitorIdToAlertIdsMap.keys,
+                        monitorIdToAlertIdsMap = monitorIdToAlertIdsMap
                     )
                     runChainedAlertTrigger(dataSources, monitorCtx, workflow, trigger, executionId, triggerCtx, dryRun, triggerResults)
                 }
@@ -253,14 +254,18 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         dryRun: Boolean,
         triggerResults: MutableMap<String, ChainedAlertTriggerRunResult>,
     ) {
-        val triggerRunResult = monitorCtx.triggerService!!.runChainedAlertTrigger(workflow, trigger, triggerCtx.monitorHasAlertsMap)
+        val triggerRunResult = monitorCtx.triggerService!!.runChainedAlertTrigger(
+            workflow, trigger, triggerCtx.alertGeneratingMonitors, triggerCtx.monitorIdToAlertIdsMap
+        )
         triggerResults[trigger.id] = triggerRunResult
         if (triggerRunResult.triggered) {
             val actionCtx = triggerCtx
             for (action in trigger.actions) {
                 triggerRunResult.actionResults[action.id] = this.runAction(action, actionCtx, monitorCtx, workflow, dryRun)
             }
-            val alert = monitorCtx.alertService!!.composeChainedAlert(triggerCtx, executionId, workflow)
+            val alert = monitorCtx.alertService!!.composeChainedAlert(
+                triggerCtx, executionId, workflow, triggerRunResult.associatedAlertIds.toList()
+            )
             if (!dryRun && workflow.id != Workflow.NO_ID) {
                 monitorCtx.retryPolicy?.let { monitorCtx.alertService!!.saveAlerts(dataSources, listOf(alert), it, routing = workflow.id) }
             }
@@ -271,7 +276,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         dataSources: DataSources,
         executionId: String,
         monitorCtx: MonitorRunnerExecutionContext,
-    ): MutableMap<String, Boolean> {
+    ): MutableMap<String, MutableSet<String>> {
         try {
             val searchRequest = SearchRequest(dataSources.alertsIndex)
             val queryBuilder = QueryBuilders.boolQuery()
@@ -288,9 +293,13 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 val alert = Alert.parse(xcp, hit.id, hit.version)
                 alert
             }
-            val map = mutableMapOf<String, Boolean>()
+            val map = mutableMapOf<String, MutableSet<String>>()
             for (alert in alerts) {
-                map[alert.monitorId] = true
+                if (map.containsKey(alert.monitorId)) {
+                    map[alert.monitorId]!!.add(alert.id)
+                } else {
+                    map[alert.monitorId] = mutableSetOf(alert.id)
+                }
             }
             return map
         } catch (e: Exception) {

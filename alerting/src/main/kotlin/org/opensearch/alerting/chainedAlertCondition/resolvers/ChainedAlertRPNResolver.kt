@@ -9,7 +9,6 @@ import org.opensearch.alerting.chainedAlertCondition.tokens.CAExpressionOperator
 import org.opensearch.alerting.chainedAlertCondition.tokens.CAExpressionToken
 import org.opensearch.alerting.chainedAlertCondition.tokens.ChainedAlertExpressionConstant
 import org.opensearch.alerting.chainedAlertCondition.tokens.ExpressionToken
-import java.util.Optional
 import java.util.Stack
 
 /**
@@ -41,12 +40,12 @@ class ChainedAlertRPNResolver(
      * @param queryToDocIds Map to hold the resultant document id per query id
      * @return evaluates the final set of document id
      */
-    override fun evaluate(monitorIdAlertPresentMap: Map<String, Boolean>): Boolean {
+    override fun evaluate(alertGeneratingMonitors: Set<String>): Boolean {
         val tokenStack = Stack<Boolean>()
         val res = true
         for (expToken in polishNotation) {
             when (expToken) {
-                is CAExpressionToken -> tokenStack.push(resolveMonitorExpression(expToken.value, monitorIdAlertPresentMap))
+                is CAExpressionToken -> tokenStack.push(resolveMonitorExpression(expToken.value, alertGeneratingMonitors))
                 is CAExpressionOperator -> {
                     val right = tokenStack.pop()
                     val expr = when (expToken) {
@@ -62,7 +61,36 @@ class ChainedAlertRPNResolver(
         return tokenStack.pop()
     }
 
-    private fun resolveMonitorExpression(monitorExpString: String, monitorIdAlertPresentMap: Map<String, Boolean>): Boolean {
+    override fun getMonitorIds(parsedTriggerCondition: ChainedAlertRPNResolver): Set<String> {
+        val monitorIds = mutableSetOf<String>()
+        for (expToken in polishNotation) {
+            when (expToken) {
+                is CAExpressionToken -> {
+                    val monitorExpString = expToken.value
+                    if (!monitorExpString.startsWith(ChainedAlertExpressionConstant.ConstantType.MONITOR.ident))
+                        continue
+                    val token = monitorExpString.substringAfter(ChainedAlertExpressionConstant.ConstantType.BRACKET_LEFT.ident)
+                        .substringBefore(ChainedAlertExpressionConstant.ConstantType.BRACKET_RIGHT.ident)
+                    if (token.isEmpty()) continue
+                    val tokens = token.split(ChainedAlertExpressionConstant.ConstantType.EQUALS.ident)
+                    if (tokens.isEmpty() || tokens.size != 2) continue
+                    val identifier = tokens[0]
+                    val value = tokens[1]
+                    when (identifier) {
+                        ChainedAlertExpressionConstant.ConstantType.ID.ident -> {
+                            monitorIds.add(value)
+                        }
+                    }
+                }
+                is CAExpressionOperator -> {
+                    continue
+                }
+            }
+        }
+        return monitorIds
+    }
+
+    private fun resolveMonitorExpression(monitorExpString: String, alertGeneratingMonitors: Set<String>): Boolean {
         if (!monitorExpString.startsWith(ChainedAlertExpressionConstant.ConstantType.MONITOR.ident)) return false
         val token = monitorExpString.substringAfter(ChainedAlertExpressionConstant.ConstantType.BRACKET_LEFT.ident)
             .substringBefore(ChainedAlertExpressionConstant.ConstantType.BRACKET_RIGHT.ident)
@@ -73,15 +101,10 @@ class ChainedAlertRPNResolver(
 
         val identifier = tokens[0]
         val value = tokens[1]
-        var isAlertPresent = false
-        when (identifier) {
-            ChainedAlertExpressionConstant.ConstantType.ID.ident -> {
-                val key: Optional<String> = monitorIdAlertPresentMap.keys.stream().filter { it == value }.findFirst()
-                if (key.isPresent) {
-                    isAlertPresent = monitorIdAlertPresentMap[key.get()]!!
-                }
-            }
+
+        return when (identifier) {
+            ChainedAlertExpressionConstant.ConstantType.ID.ident -> alertGeneratingMonitors.contains(value)
+            else -> false
         }
-        return isAlertPresent
     }
 }
