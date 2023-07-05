@@ -6,15 +6,20 @@
 package org.opensearch.alerting.transport
 
 import org.apache.logging.log4j.LogManager
+import org.apache.lucene.search.join.ScoreMode
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionListener
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
+import org.opensearch.action.search.SearchAction
+import org.opensearch.action.search.SearchRequest
+import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.GetMonitorAction
 import org.opensearch.alerting.action.GetMonitorRequest
 import org.opensearch.alerting.action.GetMonitorResponse
+import org.opensearch.alerting.action.GetMonitorResponse.AssociatedWorkflow
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.use
@@ -27,8 +32,11 @@ import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
+import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 
@@ -40,13 +48,17 @@ class TransportGetMonitorAction @Inject constructor(
     actionFilters: ActionFilters,
     val xContentRegistry: NamedXContentRegistry,
     val clusterService: ClusterService,
-    settings: Settings
-) : HandledTransportAction<GetMonitorRequest, GetMonitorResponse> (
-    GetMonitorAction.NAME, transportService, actionFilters, ::GetMonitorRequest
+    settings: Settings,
+) : HandledTransportAction<GetMonitorRequest, GetMonitorResponse>(
+    GetMonitorAction.NAME,
+    transportService,
+    actionFilters,
+    ::GetMonitorRequest
 ),
     SecureTransportAction {
 
-    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile
+    override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
         listenFilterBySettingChange(clusterService)
@@ -84,8 +96,10 @@ class TransportGetMonitorAction @Inject constructor(
                         var monitor: Monitor? = null
                         if (!response.isSourceEmpty) {
                             XContentHelper.createParser(
-                                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                                response.sourceAsBytesRef, XContentType.JSON
+                                xContentRegistry,
+                                LoggingDeprecationHandler.INSTANCE,
+                                response.sourceAsBytesRef,
+                                XContentType.JSON
                             ).use { xcp ->
                                 monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
 
@@ -104,7 +118,15 @@ class TransportGetMonitorAction @Inject constructor(
                         }
 
                         actionListener.onResponse(
-                            GetMonitorResponse(response.id, response.version, response.seqNo, response.primaryTerm, RestStatus.OK, monitor)
+                            GetMonitorResponse(
+                                response.id,
+                                response.version,
+                                response.seqNo,
+                                response.primaryTerm,
+                                RestStatus.OK,
+                                monitor,
+                                getAssociatedWorkflows(response.id)
+                            )
                         )
                     }
 
@@ -113,6 +135,43 @@ class TransportGetMonitorAction @Inject constructor(
                     }
                 }
             )
+        }
+    }
+
+    private fun getAssociatedWorkflows(id: String): List<AssociatedWorkflow> {
+        try {
+            val associatedWorkflows = mutableListOf<AssociatedWorkflow>()
+            val queryBuilder = QueryBuilders.nestedQuery(
+                TransportDeleteWorkflowAction.WORKFLOW_DELEGATE_PATH,
+                QueryBuilders.boolQuery().must(
+                    QueryBuilders.matchQuery(
+                        TransportDeleteWorkflowAction.WORKFLOW_MONITOR_PATH,
+                        id
+                    )
+                ),
+                ScoreMode.None
+            )
+            val searchRequest = SearchRequest()
+                .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
+                .source(SearchSourceBuilder().query(queryBuilder).fetchField("_id"))
+            val response: SearchResponse = client.execute(SearchAction.INSTANCE, searchRequest).get()
+
+            for (hit in response.hits) {
+                XContentType.JSON.xContent().createParser(
+                    xContentRegistry,
+                    LoggingDeprecationHandler.INSTANCE,
+                    hit.sourceAsString
+                ).use { hitsParser ->
+                    val workflow = ScheduledJob.parse(hitsParser, hit.id, hit.version)
+                    if (workflow is Workflow) {
+                        associatedWorkflows.add(AssociatedWorkflow(hit.id, workflow.name))
+                    }
+                }
+            }
+            return associatedWorkflows
+        } catch (e: java.lang.Exception) {
+            log.error("failed to fetch associated workflows for monitor $id", e)
+            return emptyList()
         }
     }
 }

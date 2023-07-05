@@ -24,6 +24,7 @@ import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.opensearchapi.firstFailureOrNull
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.script.ChainedAlertTriggerExecutionContext
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.util.IndexUtils
@@ -47,6 +48,7 @@ import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.NoOpTrigger
 import org.opensearch.commons.alerting.model.Trigger
+import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.model.action.AlertCategory
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
@@ -123,7 +125,9 @@ class AlertService(
     fun composeQueryLevelAlert(
         ctx: QueryLevelTriggerExecutionContext,
         result: QueryLevelTriggerRunResult,
-        alertError: AlertError?
+        alertError: AlertError?,
+        executionId: String? = null,
+        workflorwRunContext: WorkflowRunContext?
     ): Alert? {
         val currentTime = Instant.now()
         val currentAlert = ctx.alert
@@ -164,8 +168,11 @@ class AlertService(
         val updatedHistory = currentAlert?.errorHistory.update(alertError)
         return if (alertError == null && !result.triggered) {
             currentAlert?.copy(
-                state = Alert.State.COMPLETED, endTime = currentTime, errorMessage = null,
-                errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
+                state = Alert.State.COMPLETED,
+                endTime = currentTime,
+                errorMessage = null,
+                errorHistory = updatedHistory,
+                actionExecutionResults = updatedActionExecutionResults,
                 schemaVersion = IndexUtils.alertIndexSchemaVersion
             )
         } else if (alertError == null && currentAlert?.isAcknowledged() == true) {
@@ -173,9 +180,12 @@ class AlertService(
         } else if (currentAlert != null) {
             val alertState = if (alertError == null) Alert.State.ACTIVE else Alert.State.ERROR
             currentAlert.copy(
-                state = alertState, lastNotificationTime = currentTime, errorMessage = alertError?.message,
-                errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
-                schemaVersion = IndexUtils.alertIndexSchemaVersion
+                state = alertState,
+                lastNotificationTime = currentTime,
+                errorMessage = alertError?.message,
+                errorHistory = updatedHistory,
+                actionExecutionResults = updatedActionExecutionResults,
+                schemaVersion = IndexUtils.alertIndexSchemaVersion,
             )
         } else {
             val alertState = if (alertError == null) Alert.State.ACTIVE else Alert.State.ERROR
@@ -183,7 +193,8 @@ class AlertService(
                 monitor = ctx.monitor, trigger = ctx.trigger, startTime = currentTime,
                 lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
                 errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
-                schemaVersion = IndexUtils.alertIndexSchemaVersion
+                schemaVersion = IndexUtils.alertIndexSchemaVersion, executionId = executionId,
+                workflowId = workflorwRunContext?.workflowId ?: ""
             )
         }
     }
@@ -193,7 +204,9 @@ class AlertService(
         findings: List<String>,
         relatedDocIds: List<String>,
         ctx: DocumentLevelTriggerExecutionContext,
-        alertError: AlertError?
+        alertError: AlertError?,
+        workflowExecutionId: String? = null,
+        workflorwRunContext: WorkflowRunContext?
     ): Alert {
         val currentTime = Instant.now()
 
@@ -201,7 +214,8 @@ class AlertService(
         return Alert(
             id = UUID.randomUUID().toString(), monitor = ctx.monitor, trigger = ctx.trigger, startTime = currentTime,
             lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
-            schemaVersion = IndexUtils.alertIndexSchemaVersion, findingIds = findings, relatedDocIds = relatedDocIds
+            schemaVersion = IndexUtils.alertIndexSchemaVersion, findingIds = findings, relatedDocIds = relatedDocIds,
+            executionId = workflowExecutionId, workflowId = workflorwRunContext?.workflowId ?: ""
         )
     }
 
@@ -221,6 +235,25 @@ class AlertService(
             executionId = executionId ?: ""
         )
     }
+
+    fun composeChainedAlert(
+        ctx: ChainedAlertTriggerExecutionContext,
+        executionId: String,
+        workflow: Workflow,
+        associatedAlertIds: List<String>
+    ): Alert {
+        return Alert(
+            startTime = Instant.now(),
+            lastNotificationTime = Instant.now(),
+            state = Alert.State.ACTIVE,
+            errorMessage = null, schemaVersion = -1,
+            chainedAlertTrigger = ctx.trigger,
+            executionId = executionId,
+            workflow = workflow,
+            associatedAlertIds = associatedAlertIds
+        )
+    }
+
 
     fun updateActionResultsForBucketLevelAlert(
         currentAlert: Alert,
@@ -273,7 +306,9 @@ class AlertService(
         trigger: BucketLevelTrigger,
         currentAlerts: MutableMap<String, Alert>,
         aggResultBuckets: List<AggregationResultBucket>,
-        findings: List<String>
+        findings: List<String>,
+        executionId: String? = null,
+        workflorwRunContext: WorkflowRunContext?
     ): Map<AlertCategory, List<Alert>> {
         val dedupedAlerts = mutableListOf<Alert>()
         val newAlerts = mutableListOf<Alert>()
@@ -294,7 +329,7 @@ class AlertService(
                     lastNotificationTime = currentTime, state = Alert.State.ACTIVE, errorMessage = null,
                     errorHistory = mutableListOf(), actionExecutionResults = mutableListOf(),
                     schemaVersion = IndexUtils.alertIndexSchemaVersion, aggregationResultBucket = aggAlertBucket,
-                    findingIds = findings
+                    findingIds = findings, executionId = executionId, workflowId = workflorwRunContext?.workflowId ?: ""
                 )
                 newAlerts.add(newAlert)
             }
@@ -520,7 +555,8 @@ class AlertService(
         dataSources: DataSources,
         alerts: List<Alert>,
         retryPolicy: BackoffPolicy,
-        allowUpdatingAcknowledgedAlert: Boolean = false
+        allowUpdatingAcknowledgedAlert: Boolean = false,
+        routing: String? = null // routing is mandatory and set as monitor id. for workflow chained alerts we pass workflow id as routing
     ) {
         val alertsIndex = dataSources.alertsIndex
         val alertsHistoryIndex = dataSources.alertsHistoryIndex
@@ -534,7 +570,7 @@ class AlertService(
                 Alert.State.ACTIVE, Alert.State.ERROR -> {
                     listOf<DocWriteRequest<*>>(
                         IndexRequest(alertsIndex)
-                            .routing(alert.monitorId)
+                            .routing(if (routing.isNullOrEmpty()) alert.monitorId else routing)
                             .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                             .id(if (alert.id != Alert.NO_ID) alert.id else null)
                     )
@@ -545,7 +581,7 @@ class AlertService(
                     if (allowUpdatingAcknowledgedAlert) {
                         listOf<DocWriteRequest<*>>(
                             IndexRequest(alertsIndex)
-                                .routing(alert.monitorId)
+                                .routing(if (routing.isNullOrEmpty()) alert.monitorId else routing)
                                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                                 .id(if (alert.id != Alert.NO_ID) alert.id else null)
                         )
@@ -571,7 +607,7 @@ class AlertService(
                         // Only add completed alert to history index if history is enabled
                         if (alertIndices.isAlertHistoryEnabled()) {
                             IndexRequest(alertsHistoryIndex)
-                                .routing(alert.monitorId)
+                                .routing(if (routing.isNullOrEmpty()) alert.monitorId else routing)
                                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                                 .id(alert.id)
                         } else null
@@ -583,7 +619,7 @@ class AlertService(
         if (requestsToRetry.isEmpty()) return
         // Retry Bulk requests if there was any 429 response
         retryPolicy.retry(logger, listOf(RestStatus.TOO_MANY_REQUESTS)) {
-            val bulkRequest = BulkRequest().add(requestsToRetry)
+            val bulkRequest = BulkRequest().add(requestsToRetry).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
             val bulkResponse: BulkResponse = client.suspendUntil { client.bulk(bulkRequest, it) }
             val failedResponses = (bulkResponse.items ?: arrayOf()).filter { it.isFailed }
             requestsToRetry = failedResponses.filter { it.status() == RestStatus.TOO_MANY_REQUESTS }

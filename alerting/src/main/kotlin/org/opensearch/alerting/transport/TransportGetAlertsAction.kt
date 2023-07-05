@@ -38,9 +38,11 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.utils.logger
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
+import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
@@ -61,7 +63,10 @@ class TransportGetAlertsAction @Inject constructor(
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<ActionRequest, GetAlertsResponse>(
-    AlertingActions.GET_ALERTS_ACTION_NAME, transportService, actionFilters, ::GetAlertsRequest
+    AlertingActions.GET_ALERTS_ACTION_NAME,
+    transportService,
+    actionFilters,
+    ::GetAlertsRequest
 ),
     SecureTransportAction {
 
@@ -91,11 +96,13 @@ class TransportGetAlertsAction @Inject constructor(
 
         val queryBuilder = QueryBuilders.boolQuery()
 
-        if (getAlertsRequest.severityLevel != "ALL")
+        if (getAlertsRequest.severityLevel != "ALL") {
             queryBuilder.filter(QueryBuilders.termQuery("severity", getAlertsRequest.severityLevel))
+        }
 
-        if (getAlertsRequest.alertState != "ALL")
+        if (getAlertsRequest.alertState != "ALL") {
             queryBuilder.filter(QueryBuilders.termQuery("state", getAlertsRequest.alertState))
+        }
 
         if (getAlertsRequest.alertIds.isNullOrEmpty() == false) {
             queryBuilder.filter(QueryBuilders.termsQuery("_id", getAlertsRequest.alertIds))
@@ -105,6 +112,14 @@ class TransportGetAlertsAction @Inject constructor(
             queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getAlertsRequest.monitorId))
         } else if (getAlertsRequest.monitorIds.isNullOrEmpty() == false) {
             queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getAlertsRequest.monitorIds))
+        }
+        if (getAlertsRequest.workflowIds.isNullOrEmpty() == false) {
+            val bqb: BoolQueryBuilder = QueryBuilders.boolQuery()
+            getAlertsRequest.workflowIds!!.forEach { bqb.should(QueryBuilders.wildcardQuery("execution_id", "*$it*")) }
+            queryBuilder.must(bqb)
+            if (getAlertsRequest.monitorId.isNullOrEmpty() && getAlertsRequest.monitorIds.isNullOrEmpty()) {
+                queryBuilder.must(QueryBuilders.termQuery("monitor_id", ""))
+            }
         }
         if (!tableProp.searchString.isNullOrBlank()) {
             queryBuilder
@@ -150,7 +165,7 @@ class TransportGetAlertsAction @Inject constructor(
         var alertIndex = AlertIndices.ALL_ALERT_INDEX_PATTERN
         if (!getAlertsRequest.alertIndex.isNullOrEmpty()) {
             alertIndex = getAlertsRequest.alertIndex!!
-        } else if (!getAlertsRequest.monitorId.isNullOrEmpty()) {
+        } else if (getAlertsRequest.monitorId.isNullOrEmpty() == false) {
             val retrievedMonitor = getMonitor(getAlertsRequest)
             if (retrievedMonitor != null) {
                 alertIndex = retrievedMonitor.dataSources.alertsIndex
@@ -175,6 +190,7 @@ class TransportGetAlertsAction @Inject constructor(
             )
             return ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
         } catch (t: Exception) {
+            log.error("Failure in fetching monitor ${getAlertsRequest.monitorId} to resolve alert index in get alerts action", t)
             return null
         }
     }
@@ -216,8 +232,10 @@ class TransportGetAlertsAction @Inject constructor(
                     val totalAlertCount = response.hits.totalHits?.value?.toInt()
                     val alerts = response.hits.map { hit ->
                         val xcp = XContentHelper.createParser(
-                            xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                            hit.sourceRef, XContentType.JSON
+                            xContentRegistry,
+                            LoggingDeprecationHandler.INSTANCE,
+                            hit.sourceRef,
+                            XContentType.JSON
                         )
                         XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
                         val alert = Alert.parse(xcp, hit.id, hit.version)

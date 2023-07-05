@@ -166,7 +166,13 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 // TODO: Should triggerResult's aggregationResultBucket be a list? If not, getCategorizedAlertsForBucketLevelMonitor can
                 //  be refactored to use a map instead
                 val categorizedAlerts = monitorCtx.alertService!!.getCategorizedAlertsForBucketLevelMonitor(
-                    monitor, trigger, currentAlertsForTrigger, triggerResult.aggregationResultBuckets.values.toList(), findings
+                    monitor,
+                    trigger,
+                    currentAlertsForTrigger,
+                    triggerResult.aggregationResultBuckets.values.toList(),
+                    findings,
+                    workflowRunContext?.executionId,
+                    workflowRunContext
                 ).toMutableMap()
                 val dedupedAlerts = categorizedAlerts.getOrDefault(AlertCategory.DEDUPED, emptyList())
                 var newAlerts = categorizedAlerts.getOrDefault(AlertCategory.NEW, emptyList())
@@ -182,7 +188,10 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                  */
                 if (!dryrun && monitor.id != Monitor.NO_ID) {
                     monitorCtx.alertService!!.saveAlerts(
-                        monitor.dataSources, dedupedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = true
+                        monitor.dataSources,
+                        dedupedAlerts,
+                        monitorCtx.retryPolicy!!,
+                        allowUpdatingAcknowledgedAlert = true
                     )
                     newAlerts = monitorCtx.alertService!!.saveNewAlerts(monitor.dataSources, newAlerts, monitorCtx.retryPolicy!!)
                 }

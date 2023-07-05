@@ -2305,7 +2305,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         val workflowId = workflowResponse.id
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
-        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.workflowRunResult
+        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.monitorRunResults
         assertEquals(2, monitorsRunResults.size)
 
         assertEquals(monitor1.name, monitorsRunResults[0].monitorName)
@@ -2376,7 +2376,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         val workflowId = workflowResponse.id
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
-        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.workflowRunResult
+        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.monitorRunResults
         assertEquals(1, monitorsRunResults.size)
 
         assertEquals(monitor.name, monitorsRunResults[0].monitorName)
@@ -2400,7 +2400,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         // Execute second workflow
         val workflowId1 = workflowResponse1.id
         val executeWorkflowResponse1 = executeWorkflow(workflowById1, workflowId1, false)!!
-        val monitorsRunResults1 = executeWorkflowResponse1.workflowRunResult.workflowRunResult
+        val monitorsRunResults1 = executeWorkflowResponse1.workflowRunResult.monitorRunResults
         assertEquals(1, monitorsRunResults1.size)
 
         assertEquals(monitor.name, monitorsRunResults1[0].monitorName)
@@ -2471,7 +2471,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         val workflowId = workflowResponse.id
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
-        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.workflowRunResult
+        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.monitorRunResults
         assertEquals(1, monitorsRunResults.size)
 
         assertEquals(monitor.name, monitorsRunResults[0].monitorName)
@@ -2509,7 +2509,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         // Execute second workflow
         val workflowId1 = workflowResponse1.id
         val executeWorkflowResponse1 = executeWorkflow(workflowById1, workflowId1, false)!!
-        val monitorsRunResults1 = executeWorkflowResponse1.workflowRunResult.workflowRunResult
+        val monitorsRunResults1 = executeWorkflowResponse1.workflowRunResult.monitorRunResults
         assertEquals(1, monitorsRunResults1.size)
 
         assertEquals(monitor.name, monitorsRunResults1[0].monitorName)
@@ -2575,7 +2575,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         // First execution
         val workflowId = workflowResponse.id
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
-        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.workflowRunResult
+        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.monitorRunResults
         assertEquals(2, monitorsRunResults.size)
 
         val workflowMetadata = searchWorkflowMetadata(id = workflowId)
@@ -2591,7 +2591,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         // Second execution
         val executeWorkflowResponse1 = executeWorkflow(workflowById, workflowId, false)!!
-        val monitorsRunResults1 = executeWorkflowResponse1.workflowRunResult.workflowRunResult
+        val monitorsRunResults1 = executeWorkflowResponse1.workflowRunResult.monitorRunResults
         assertEquals(2, monitorsRunResults1.size)
 
         val workflowMetadata1 = searchWorkflowMetadata(id = workflowId)
@@ -2653,7 +2653,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, true)
 
         assertNotNull("Workflow run result is null", executeWorkflowResponse)
-        val monitorsRunResults = executeWorkflowResponse!!.workflowRunResult.workflowRunResult
+        val monitorsRunResults = executeWorkflowResponse!!.workflowRunResult.monitorRunResults
         assertEquals(2, monitorsRunResults.size)
 
         var exception: java.lang.Exception? = null
@@ -2754,7 +2754,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
         assertNotNull(executeWorkflowResponse)
 
-        for (monitorRunResults in executeWorkflowResponse.workflowRunResult.workflowRunResult) {
+        for (monitorRunResults in executeWorkflowResponse.workflowRunResult.monitorRunResults) {
             if (bucketLevelMonitorResponse.monitor.name == monitorRunResults.monitorName) {
                 val searchResult = monitorRunResults.inputResults.results.first()
 
@@ -2902,7 +2902,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
         assertNotNull(executeWorkflowResponse)
 
-        for (monitorRunResults in executeWorkflowResponse.workflowRunResult.workflowRunResult) {
+        for (monitorRunResults in executeWorkflowResponse.workflowRunResult.monitorRunResults) {
             when (monitorRunResults.monitorName) {
                 // Verify first doc level monitor execution, alerts and findings
                 docLevelMonitorResponse.monitor.name -> {
@@ -3018,7 +3018,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         deleteIndex(index)
 
         val response = executeWorkflow(workflowById, workflowById!!.id, false)!!
-        val error = response.workflowRunResult.workflowRunResult[0].error
+        val error = response.workflowRunResult.monitorRunResults[0].error
         assertNotNull(error)
         assertTrue(error is AlertingException)
         assertEquals(RestStatus.INTERNAL_SERVER_ERROR, (error as AlertingException).status)
@@ -3200,7 +3200,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         val executeResult = executeWorkflow(id = workflowResponse!!.id)
         assertNotNull(executeResult)
-        assertEquals(2, executeResult!!.workflowRunResult.workflowRunResult.size)
+        assertEquals(2, executeResult!!.workflowRunResult.monitorRunResults.size)
     }
 
     fun `test create workflow success`() {
@@ -3790,7 +3790,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         val workflowId = workflowResponse.id
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
-        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.workflowRunResult
+        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.monitorRunResults
         assertEquals(2, monitorsRunResults.size)
 
         val workflowMetadata = searchWorkflowMetadata(workflowId)

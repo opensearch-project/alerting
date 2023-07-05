@@ -52,6 +52,7 @@ import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.IndexService
+import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.TermQueryBuilder
 import org.opensearch.index.reindex.ReindexModulePlugin
 import org.opensearch.index.seqno.SequenceNumbers
@@ -245,7 +246,12 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         return true
     }
 
-    protected fun searchAlerts(id: String, indices: String = AlertIndices.ALERT_INDEX, refresh: Boolean = true): List<Alert> {
+    protected fun searchAlerts(
+        monitorId: String,
+        indices: String = AlertIndices.ALERT_INDEX,
+        refresh: Boolean = true,
+        executionId: String? = null,
+    ): List<Alert> {
         try {
             if (refresh) refreshIndex(indices)
         } catch (e: Exception) {
@@ -254,9 +260,39 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         }
         val ssb = SearchSourceBuilder()
         ssb.version(true)
-        ssb.query(TermQueryBuilder(Alert.MONITOR_ID_FIELD, id))
-        val searchResponse = client().prepareSearch(indices).setRouting(id).setSource(ssb).get()
+        val bqb = BoolQueryBuilder()
+        bqb.must(TermQueryBuilder(Alert.MONITOR_ID_FIELD, monitorId))
+        if (executionId.isNullOrEmpty() == false) {
+            bqb.must(TermQueryBuilder(Alert.EXECUTION_ID_FIELD, executionId))
+        }
+        ssb.query(bqb)
+        val searchResponse = client().prepareSearch(indices).setRouting(monitorId).setSource(ssb).get()
 
+        return searchResponse.hits.hits.map {
+            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
+            Alert.parse(xcp, it.id, it.version)
+        }
+    }
+
+    protected fun searchChainedAlerts(
+        executionId: String,
+        workflowId: String,
+        indices: String = AlertIndices.ALERT_INDEX,
+        refresh: Boolean = true,
+    ): List<Alert> {
+        try {
+            if (refresh) refreshIndex(indices)
+        } catch (e: Exception) {
+            logger.warn("Could not refresh index $indices because: ${e.message}")
+            return emptyList()
+        }
+        val ssb = SearchSourceBuilder()
+        ssb.version(true)
+        var bqb = BoolQueryBuilder()
+        bqb.must(TermQueryBuilder(Alert.EXECUTION_ID_FIELD, executionId))
+        bqb.must(TermQueryBuilder(Alert.MONITOR_ID_FIELD, ""))
+        ssb.query(bqb)
+        val searchResponse = client().prepareSearch(indices).setSource(ssb).get()
         return searchResponse.hits.hits.map {
             val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
             Alert.parse(xcp, it.id, it.version)
