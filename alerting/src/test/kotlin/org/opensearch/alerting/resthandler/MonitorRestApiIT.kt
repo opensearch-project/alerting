@@ -1293,7 +1293,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             monitorAlertCounts[monitor.id] = alertCounts
 
             repeat(numAcknowledgedAlerts) {
-                createAlert(randomAlert(monitor).copy(acknowledgedTime = Instant.now(),state = Alert.State.ACKNOWLEDGED))
+                createAlert(randomAlert(monitor).copy(acknowledgedTime = Instant.now(), state = Alert.State.ACKNOWLEDGED))
             }
             repeat(numActiveAlerts) {
                 createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
@@ -1352,20 +1352,28 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             val monitorCounts = monitorAlertCounts[id]!!
 
             val acknowledged = (bucket["acknowledged"]!! as Map<String, Int>)["doc_count"]!!
-            assertEquals("Incorrect ${Alert.State.ACKNOWLEDGED} count returned for monitor $id",
-                monitorCounts[Alert.State.ACKNOWLEDGED.name], acknowledged)
+            assertEquals(
+                "Incorrect ${Alert.State.ACKNOWLEDGED} count returned for monitor $id",
+                monitorCounts[Alert.State.ACKNOWLEDGED.name], acknowledged
+            )
 
             val active = (bucket["active"]!! as Map<String, Int>)["doc_count"]!!
-            assertEquals("Incorrect ${Alert.State.ACTIVE} count returned for monitor $id",
-                monitorCounts[Alert.State.ACTIVE.name], active)
+            assertEquals(
+                "Incorrect ${Alert.State.ACTIVE} count returned for monitor $id",
+                monitorCounts[Alert.State.ACTIVE.name], active
+            )
 
             val errors = (bucket["errors"]!! as Map<String, Int>)["doc_count"]!!
-            assertEquals("Incorrect ${Alert.State.ERROR} count returned for monitor $id",
-                monitorCounts[Alert.State.ERROR.name], errors)
+            assertEquals(
+                "Incorrect ${Alert.State.ERROR} count returned for monitor $id",
+                monitorCounts[Alert.State.ERROR.name], errors
+            )
 
             val ignored = (bucket["ignored"]!! as Map<String, Int>)["doc_count"]!!
-            assertEquals("Incorrect IGNORED count returned for monitor $id",
-                monitorCounts["IGNORED"], ignored)
+            assertEquals(
+                "Incorrect IGNORED count returned for monitor $id",
+                monitorCounts["IGNORED"], ignored
+            )
         }
     }
 
