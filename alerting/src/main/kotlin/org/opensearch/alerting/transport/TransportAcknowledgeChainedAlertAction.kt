@@ -97,26 +97,31 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
             ?: recreateObject(AcknowledgeChainedAlertRequest) { AcknowledgeChainedAlertRequest(it) }
         client.threadPool().threadContext.stashContext().use {
             scope.launch {
-                val getWorkflowResponse: GetWorkflowResponse =
-                    transportGetWorkflowAction.client.suspendUntil {
-                        val getWorkflowRequest = GetWorkflowRequest(workflowId = request.workflowId, method = RestRequest.Method.GET)
+                try {
+                    val getWorkflowResponse: GetWorkflowResponse =
+                        transportGetWorkflowAction.client.suspendUntil {
+                            val getWorkflowRequest = GetWorkflowRequest(workflowId = request.workflowId, method = RestRequest.Method.GET)
 
-                        execute(AlertingActions.GET_WORKFLOW_ACTION_TYPE, getWorkflowRequest, it)
-                    }
-                if (getWorkflowResponse.workflow == null) {
-                    actionListener.onFailure(
-                        AlertingException.wrap(
-                            ResourceNotFoundException(
-                                String.format(
-                                    Locale.ROOT,
-                                    "No workflow found with id [%s]",
-                                    request.workflowId
+                            execute(AlertingActions.GET_WORKFLOW_ACTION_TYPE, getWorkflowRequest, it)
+                        }
+                    if (getWorkflowResponse.workflow == null) {
+                        actionListener.onFailure(
+                            AlertingException.wrap(
+                                ResourceNotFoundException(
+                                    String.format(
+                                        Locale.ROOT,
+                                        "No workflow found with id [%s]",
+                                        request.workflowId
+                                    )
                                 )
                             )
                         )
-                    )
-                } else {
-                    AcknowledgeHandler(client, actionListener, request).start(getWorkflowResponse.workflow!!)
+                    } else {
+                        AcknowledgeHandler(client, actionListener, request).start(getWorkflowResponse.workflow!!)
+                    }
+                } catch (e: Exception) {
+                    log.error("Failed to acknowledge chained alerts from request $request", e)
+                    actionListener.onFailure(AlertingException.wrap(e))
                 }
             }
         }
