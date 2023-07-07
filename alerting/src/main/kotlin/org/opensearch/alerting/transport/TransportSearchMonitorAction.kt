@@ -53,7 +53,8 @@ class TransportSearchMonitorAction @Inject constructor(
         val searchSourceBuilder = searchMonitorRequest.searchRequest.source()
             .seqNoAndPrimaryTerm(true)
             .version(true)
-        val queryBuilder = QueryBuilders.boolQuery().must(searchSourceBuilder.query())
+        val queryBuilder = if (searchSourceBuilder.query() == null) BoolQueryBuilder()
+        else QueryBuilders.boolQuery().must(searchSourceBuilder.query())
 
         // The SearchMonitor API supports one 'index' parameter of either the SCHEDULED_JOBS_INDEX or ALL_ALERT_INDEX_PATTERN.
         // When querying the ALL_ALERT_INDEX_PATTERN, we don't want to check whether the MONITOR_TYPE field exists
