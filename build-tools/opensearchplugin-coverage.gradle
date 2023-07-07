@@ -62,7 +62,3 @@ jacocoTestReport {
         xml.required = true // for coverlay
     }
 }
-
-project.gradle.projectsEvaluated {
-    jacocoTestReport.dependsOn integTest
-}

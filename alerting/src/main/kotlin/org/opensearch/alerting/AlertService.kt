@@ -210,7 +210,13 @@ class AlertService(
     ): Alert {
         val currentTime = Instant.now()
 
-        val alertState = if (alertError == null) Alert.State.ACTIVE else Alert.State.ERROR
+        val alertState = if (workflorwRunContext?.muteDelegateMonitorActions == true) {
+            Alert.State.AUDIT
+        } else if (alertError == null) {
+            Alert.State.ACTIVE
+        } else {
+            Alert.State.ERROR
+        }
         return Alert(
             id = UUID.randomUUID().toString(), monitor = ctx.monitor, trigger = ctx.trigger, startTime = currentTime,
             lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
@@ -227,12 +233,15 @@ class AlertService(
         workflowRunContext: WorkflowRunContext?
     ): Alert {
         val currentTime = Instant.now()
+        val alertState = if (workflowRunContext?.muteDelegateMonitorActions == true) {
+            Alert.State.AUDIT
+        } else {
+            Alert.State.ERROR
+        }
         return Alert(
             id = id, monitor = monitor, trigger = NoOpTrigger(), startTime = currentTime,
-            lastNotificationTime = currentTime, state = Alert.State.ERROR, errorMessage = alertError?.message,
-            schemaVersion = IndexUtils.alertIndexSchemaVersion,
-            workflowId = workflowRunContext?.workflowId ?: "",
-            executionId = executionId ?: ""
+            lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
+            schemaVersion = IndexUtils.alertIndexSchemaVersion, executionId = executionId, workflowId = workflowRunContext?.workflowId ?: ""
         )
     }
 
@@ -566,11 +575,12 @@ class AlertService(
             // In the rare event that a user acknowledges an alert between when it's read and when it's written
             // back we're ok if that acknowledgement is lost. It's easier to get the user to retry than for the runner to
             // spend time reloading the alert and writing it back.
+            val routingId = if (routing.isNullOrEmpty()) alert.monitorId else routing
             when (alert.state) {
                 Alert.State.ACTIVE, Alert.State.ERROR -> {
                     listOf<DocWriteRequest<*>>(
                         IndexRequest(alertsIndex)
-                            .routing(if (routing.isNullOrEmpty()) alert.monitorId else routing)
+                            .routing(routingId)
                             .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                             .id(if (alert.id != Alert.NO_ID) alert.id else null)
                     )
@@ -581,7 +591,7 @@ class AlertService(
                     if (allowUpdatingAcknowledgedAlert) {
                         listOf<DocWriteRequest<*>>(
                             IndexRequest(alertsIndex)
-                                .routing(if (routing.isNullOrEmpty()) alert.monitorId else routing)
+                                .routing(routingId)
                                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                                 .id(if (alert.id != Alert.NO_ID) alert.id else null)
                         )
@@ -590,9 +600,12 @@ class AlertService(
                     }
                 }
                 Alert.State.AUDIT -> {
+                    val index = if (alertIndices.isAlertHistoryEnabled()) {
+                        dataSources.alertsHistoryIndex
+                    } else dataSources.alertsIndex
                     listOf<DocWriteRequest<*>>(
-                        IndexRequest(alertsIndex)
-                            .routing(alert.monitorId)
+                        IndexRequest(index)
+                            .routing(routingId)
                             .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                             .id(if (alert.id != Alert.NO_ID) alert.id else null)
                     )
@@ -603,11 +616,11 @@ class AlertService(
                 Alert.State.COMPLETED -> {
                     listOfNotNull<DocWriteRequest<*>>(
                         DeleteRequest(alertsIndex, alert.id)
-                            .routing(alert.monitorId),
+                            .routing(routingId),
                         // Only add completed alert to history index if history is enabled
                         if (alertIndices.isAlertHistoryEnabled()) {
                             IndexRequest(alertsHistoryIndex)
-                                .routing(if (routing.isNullOrEmpty()) alert.monitorId else routing)
+                                .routing(routingId)
                                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                                 .id(alert.id)
                         } else null

@@ -6,6 +6,8 @@
 package org.opensearch.alerting
 
 import org.junit.Assert
+import org.mockito.Mockito
+import org.mockito.Mockito.mock
 import org.opensearch.action.admin.cluster.state.ClusterStateRequest
 import org.opensearch.action.admin.indices.alias.Alias
 import org.opensearch.action.admin.indices.close.CloseIndexRequest
@@ -31,7 +33,11 @@ import org.opensearch.alerting.transport.AlertingSingleNodeTestCase
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.DocLevelMonitorQueries.Companion.INDEX_PATTERN_SUFFIX
+import org.opensearch.alerting.workflow.CompositeWorkflowRunner
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.XContentHelper
+import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
 import org.opensearch.commons.alerting.action.AlertingActions
@@ -54,9 +60,12 @@ import org.opensearch.commons.alerting.model.ScheduledJob.Companion.DOC_LEVEL_QU
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.Table
+import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.mapper.MapperService
+import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.MatchQueryBuilder
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.index.query.TermQueryBuilder
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
@@ -3336,7 +3345,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                                 monitorRunResults.inputResults.results[0]["hits"]
                                     as kotlin.collections.Map<String, Any>
                                 )
-                            ["total"] as kotlin.collections.Map<String, Any>
+                                ["total"] as kotlin.collections.Map<String, Any>
                             )["value"]
                     assertEquals(2, totalHits)
                     @Suppress("UNCHECKED_CAST")
@@ -3346,7 +3355,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                                 monitorRunResults.inputResults.results[0]["hits"]
                                     as kotlin.collections.Map<String, Any>
                                 )
-                            ["hits"] as List<kotlin.collections.Map<String, String>>
+                                ["hits"] as List<kotlin.collections.Map<String, String>>
                             )
                             .map { it["_id"]!! }
                     assertEquals(listOf("5", "6"), docIds.sorted())
@@ -3436,6 +3445,31 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertTrue("Findings saved for test monitor", relatedDocIds.containsAll(findingDocIds))
     }
 
+    private fun getAuditStateAlerts(
+        alertsIndex: String? = AlertIndices.ALERT_INDEX,
+        monitorId: String,
+        executionId: String? = null,
+    ): List<Alert> {
+        val searchRequest = SearchRequest(alertsIndex)
+        val boolQueryBuilder = QueryBuilders.boolQuery()
+        boolQueryBuilder.must(TermQueryBuilder("monitor_id", monitorId))
+        if (executionId.isNullOrEmpty() == false)
+            boolQueryBuilder.must(TermQueryBuilder("execution_id", executionId))
+        searchRequest.source().query(boolQueryBuilder)
+        val searchResponse = client().search(searchRequest).get()
+        return searchResponse.hits.map { hit ->
+            val xcp = XContentHelper.createParser(
+                xContentRegistry(), LoggingDeprecationHandler.INSTANCE,
+                hit.sourceRef, XContentType.JSON
+            )
+            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+            val alert = Alert.parse(xcp, hit.id, hit.version)
+            alert
+        }
+
+
+    }
+
     private fun assertAlerts(
         monitorId: String,
         alertsIndex: String? = AlertIndices.ALERT_INDEX,
@@ -3474,6 +3508,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         ).get()
 
         assertEquals(alertSize, acknowledgeAlertResponse.acknowledged.size)
+    }
+
+    private fun assertAuditStateAlerts(
+        alerts: List<Alert>,
+    ) {
+        alerts.forEach { Assert.assertEquals(it.state, Alert.State.AUDIT) }
     }
 
     fun `test execute workflow with bucket-level and doc-level chained monitors`() {
@@ -3595,9 +3635,11 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         val monitorResponse2 = createMonitor(monitor2)!!
         val andTrigger = randomChainedAlertTrigger(
+            name = "1And2",
             condition = Script("monitor[id=${monitorResponse.id}] && monitor[id=${monitorResponse2.id}]")
         )
         val notTrigger = randomChainedAlertTrigger(
+            name = "Not1OrNot2",
             condition = Script("!monitor[id=${monitorResponse.id}] || !monitor[id=${monitorResponse2.id}]")
         )
         var workflow = randomWorkflow(
@@ -3683,16 +3725,22 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(monitor2.name, monitorsRunResults[1].monitorName)
         Assert.assertEquals(1, monitorsRunResults[1].triggerResults.size)
 
-        val getAlertsResponse = assertAlerts(
-            monitorResponse.id, executionId = executeWorkflowResponse.workflowRunResult.executionId, alertSize = 2
+        Assert.assertEquals(
+            monitor1.dataSources.alertsHistoryIndex,
+            CompositeWorkflowRunner.getDelegateMonitorAlertIndex(dataSources = monitor1.dataSources, workflow, true)
         )
-        assertAcknowledges(getAlertsResponse.alerts, monitorResponse.id, 2)
+        val alerts = getAuditStateAlerts(
+            monitorId = monitorResponse.id, executionId = executeWorkflowResponse.workflowRunResult.executionId,
+            alertsIndex = monitor1.dataSources.alertsHistoryIndex
+        )
+        assertAuditStateAlerts(alerts)
         assertFindings(monitorResponse.id, customFindingsIndex1, 2, 2, listOf("1", "2"))
 
-        val getAlertsResponse2 = assertAlerts(
-            monitorId = monitorResponse2.id, executionId = executeWorkflowResponse.workflowRunResult.executionId, alertSize = 1
+        val alerts1 = getAuditStateAlerts(
+            monitorId = monitorResponse2.id, executionId = executeWorkflowResponse.workflowRunResult.executionId,
+            alertsIndex = monitor2.dataSources.alertsHistoryIndex
         )
-        assertAcknowledges(getAlertsResponse2.alerts, monitorResponse2.id, 1)
+        assertAuditStateAlerts(alerts1)
         assertFindings(monitorResponse2.id, customFindingsIndex2, 1, 1, listOf("2"))
     }
 
