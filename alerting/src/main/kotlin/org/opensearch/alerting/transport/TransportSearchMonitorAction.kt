@@ -13,7 +13,6 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.action.SearchMonitorAction
 import org.opensearch.alerting.action.SearchMonitorRequest
-import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
