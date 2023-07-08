@@ -13,9 +13,6 @@
     "monitor_id": {
       "type": "keyword"
     },
-    "workflow_id": {
-      "type": "keyword"
-    },
     "monitor_version": {
       "type": "long"
     },
@@ -26,9 +23,6 @@
       "type": "long"
     },
     "severity": {
-      "type": "keyword"
-    },
-    "execution_id": {
       "type": "keyword"
     },
     "monitor_name": {
@@ -77,6 +71,15 @@
         }
       }
     },
+    "execution_id": {
+      "type": "keyword"
+    },
+    "workflow_id": {
+      "type": "keyword"
+    },
+    "workflow_name": {
+      "type": "keyword"
+    },
     "trigger_id": {
       "type": "keyword"
     },
@@ -90,6 +93,14 @@
       }
     },
     "finding_ids": {
+      "type" : "text",
+      "fields" : {
+        "keyword" : {
+          "type" : "keyword"
+        }
+      }
+    },
+    "associated_alert_ids": {
       "type" : "text",
       "fields" : {
         "keyword" : {

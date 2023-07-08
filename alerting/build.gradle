@@ -77,7 +77,6 @@ configurations.all {
         force "com.fasterxml.jackson.core:jackson-core:${versions.jackson}"
         force "com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:${versions.jackson}"
         force "commons-logging:commons-logging:${versions.commonslogging}"
-        force "org.apache.httpcomponents.core5:httpcore5:5.1.4"
         // force the version until OpenSearch upgrade to an invulnerable one, https://www.whitesourcesoftware.com/vulnerability-database/WS-2019-0379
         force "commons-codec:commons-codec:1.13"
 
@@ -112,8 +111,6 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
     implementation "org.jetbrains.kotlin:kotlin-stdlib-common:${kotlin_version}"
     implementation "org.jetbrains:annotations:13.0"
-
-    implementation "org.apache.httpcomponents.core5:httpcore5:5.1.4"
 
     api project(":alerting-core")
     implementation "com.github.seancfoley:ipaddress:5.3.3"
