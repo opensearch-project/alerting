@@ -80,7 +80,6 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
     actionFilters,
     ::AcknowledgeChainedAlertRequest
 ) {
-    // TODO use AcknowledgeChainedAlertRequest
     @Volatile
     private var isAlertHistoryEnabled = AlertingSettings.ALERT_HISTORY_ENABLED.get(settings)
 

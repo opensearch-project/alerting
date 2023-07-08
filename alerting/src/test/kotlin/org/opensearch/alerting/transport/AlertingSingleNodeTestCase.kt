@@ -37,6 +37,8 @@ import org.opensearch.commons.alerting.action.DeleteMonitorRequest
 import org.opensearch.commons.alerting.action.DeleteWorkflowRequest
 import org.opensearch.commons.alerting.action.GetFindingsRequest
 import org.opensearch.commons.alerting.action.GetFindingsResponse
+import org.opensearch.commons.alerting.action.GetWorkflowAlertsRequest
+import org.opensearch.commons.alerting.action.GetWorkflowAlertsResponse
 import org.opensearch.commons.alerting.action.GetWorkflowRequest
 import org.opensearch.commons.alerting.action.GetWorkflowResponse
 import org.opensearch.commons.alerting.action.IndexMonitorRequest
@@ -274,29 +276,28 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         }
     }
 
-    protected fun searchChainedAlerts(
-        executionId: String,
+    protected fun getWorkflowAlerts(
         workflowId: String,
-        indices: String = AlertIndices.ALERT_INDEX,
-        refresh: Boolean = true,
-    ): List<Alert> {
-        try {
-            if (refresh) refreshIndex(indices)
-        } catch (e: Exception) {
-            logger.warn("Could not refresh index $indices because: ${e.message}")
-            return emptyList()
-        }
-        val ssb = SearchSourceBuilder()
-        ssb.version(true)
-        var bqb = BoolQueryBuilder()
-        bqb.must(TermQueryBuilder(Alert.EXECUTION_ID_FIELD, executionId))
-        bqb.must(TermQueryBuilder(Alert.MONITOR_ID_FIELD, ""))
-        ssb.query(bqb)
-        val searchResponse = client().prepareSearch(indices).setSource(ssb).get()
-        return searchResponse.hits.hits.map {
-            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
-            Alert.parse(xcp, it.id, it.version)
-        }
+        getAssociatedAlerts: Boolean? = true,
+        alertState: Alert.State? = Alert.State.ACTIVE,
+        alertIndex: String? = "",
+        associatedAlertsIndex: String? = "",
+    ): GetWorkflowAlertsResponse {
+        val table = Table("asc", "monitor_id", null, 100, 0, null)
+        return client().execute(
+            AlertingActions.GET_WORKFLOW_ALERTS_ACTION_TYPE,
+            GetWorkflowAlertsRequest(
+                table = table,
+                severityLevel = "ALL",
+                alertState = alertState!!.name,
+                alertIndex = alertIndex,
+                associatedAlertsIndex = associatedAlertsIndex,
+                monitorIds = emptyList(),
+                workflowIds = listOf(workflowId),
+                alertIds = emptyList(),
+                getAssociatedAlerts = getAssociatedAlerts!!
+            )
+        ).get()
     }
 
     protected fun refreshIndex(index: String) {
@@ -306,7 +307,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     protected fun searchFindings(
         id: String,
         indices: String = AlertIndices.ALL_FINDING_INDEX_PATTERN,
-        refresh: Boolean = true
+        refresh: Boolean = true,
     ): List<Finding> {
         if (refresh) refreshIndex(indices)
 
@@ -341,7 +342,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     protected fun getMonitorResponse(
         monitorId: String,
         version: Long = 1L,
-        fetchSourceContext: FetchSourceContext = FetchSourceContext.FETCH_SOURCE
+        fetchSourceContext: FetchSourceContext = FetchSourceContext.FETCH_SOURCE,
     ) = client().execute(
         GetMonitorAction.INSTANCE,
         GetMonitorRequest(monitorId, version, RestRequest.Method.GET, fetchSourceContext)
@@ -471,6 +472,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
 
         return client().execute(AlertingActions.INDEX_WORKFLOW_ACTION_TYPE, request).actionGet()
     }
+
     protected fun getWorkflowById(id: String): GetWorkflowResponse {
         return client().execute(
             AlertingActions.GET_WORKFLOW_ACTION_TYPE,

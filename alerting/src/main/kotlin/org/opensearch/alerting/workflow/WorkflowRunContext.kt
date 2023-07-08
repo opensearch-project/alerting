@@ -12,5 +12,5 @@ data class WorkflowRunContext(
     val chainedMonitorId: String?,
     val executionId: String,
     val matchingDocIdsPerIndex: Map<String, List<String>>,
-    val muteDelegateMonitorActions: Boolean
+    val auditDelegateMonitorAlerts: Boolean
 )

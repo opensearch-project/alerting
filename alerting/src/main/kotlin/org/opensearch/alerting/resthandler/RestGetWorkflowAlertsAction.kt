@@ -73,7 +73,8 @@ class RestGetWorkflowAlertsAction : BaseRestHandler() {
             table,
             severityLevel,
             alertState,
-            null,
+            alertIndex = null,
+            associatedAlertsIndex = null,
             workflowIds = workflowIds,
             monitorIds = emptyList(),
             getAssociatedAlerts = getAssociatedAlerts

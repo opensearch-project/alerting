@@ -22,7 +22,6 @@ import org.opensearch.alerting.script.ChainedAlertTriggerExecutionContext
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.isDocLevelMonitor
 import org.opensearch.alerting.util.isQueryLevelMonitor
-import org.opensearch.client.Client
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentParserUtils
@@ -117,7 +116,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 chainedMonitorId = delegate.chainedMonitorFindings?.monitorId,
                 executionId = executionId,
                 matchingDocIdsPerIndex = indexToDocIds,
-                muteDelegateMonitorActions = workflow.triggers.isNotEmpty() // todo add flag at transport layer for sap to consume
+                auditDelegateMonitorAlerts = workflow.auditDelegateMonitorAlerts ?: true
             )
             try {
                 dataSources = delegateMonitor.dataSources
@@ -327,7 +326,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
     fun getDelegateMonitorAlertIndex(
         dataSources: DataSources,
         workflow: Workflow,
-        isAlertHistoryEnabled: Boolean
+        isAlertHistoryEnabled: Boolean,
     ): String {
         return if (workflow.triggers.isNotEmpty()) {
             if (isAlertHistoryEnabled) {

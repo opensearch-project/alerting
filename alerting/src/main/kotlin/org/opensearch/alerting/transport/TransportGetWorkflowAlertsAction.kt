@@ -47,7 +47,6 @@ import org.opensearch.search.sort.SortOrder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import java.io.IOException
-import java.util.stream.Collectors
 
 private val log = LogManager.getLogger(TransportGetAlertsAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
@@ -59,7 +58,6 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
     actionFilters: ActionFilters,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry,
-    val transportGetMonitorAction: TransportGetMonitorAction,
 ) : HandledTransportAction<ActionRequest, GetWorkflowAlertsResponse>(
     AlertingActions.GET_WORKFLOW_ALERTS_ACTION_NAME,
     transportService,
@@ -71,7 +69,11 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
     @Volatile
     override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
+    @Volatile
+    private var isAlertHistoryEnabled = AlertingSettings.ALERT_HISTORY_ENABLED.get(settings)
+
     init {
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERT_HISTORY_ENABLED) { isAlertHistoryEnabled = it }
         listenFilterBySettingChange(clusterService)
     }
 
@@ -147,7 +149,13 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
     }
 
     fun resolveAlertsIndexName(getAlertsRequest: GetWorkflowAlertsRequest): String {
-        return getAlertsRequest.alertIndex ?: AlertIndices.ALL_ALERT_INDEX_PATTERN
+        return if (getAlertsRequest.alertIndex.isNullOrEmpty()) AlertIndices.ALL_ALERT_INDEX_PATTERN
+        else getAlertsRequest.alertIndex!!
+    }
+
+    fun resolveAssociatedAlertsIndexName(getAlertsRequest: GetWorkflowAlertsRequest): String {
+        return if (getAlertsRequest.alertIndex.isNullOrEmpty()) AlertIndices.ALL_ALERT_INDEX_PATTERN
+        else getAlertsRequest.associatedAlertsIndex!!
     }
 
     suspend fun getAlerts(
@@ -195,7 +203,7 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
                 parseAlertsFromSearchResponse(response)
             )
             if (alerts.isNotEmpty() && getWorkflowAlertsRequest.getAssociatedAlerts == true)
-                getAssociatedAlerts(associatedAlerts, alerts, alertIndex)
+                getAssociatedAlerts(associatedAlerts, alerts, resolveAssociatedAlertsIndexName(getWorkflowAlertsRequest))
             actionListener.onResponse(GetWorkflowAlertsResponse(alerts, associatedAlerts, totalAlertCount))
         } catch (e: Exception) {
             actionListener.onFailure(AlertingException("Failed to get alerts", RestStatus.INTERNAL_SERVER_ERROR, e))
@@ -204,14 +212,11 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
 
     private suspend fun getAssociatedAlerts(associatedAlerts: MutableList<Alert>, alerts: MutableList<Alert>, alertIndex: String) {
         try {
-            val executionIds = alerts.stream().map { it.executionId }.collect(Collectors.toList())
+            val associatedAlertIds = mutableSetOf<String>()
+            alerts.forEach { associatedAlertIds.addAll(it.associatedAlertIds) }
+            if (associatedAlertIds.isEmpty()) return
             val queryBuilder = QueryBuilders.boolQuery()
-            queryBuilder.must(QueryBuilders.termsQuery(Alert.WORKFLOW_NAME_FIELD, ""))
-            if (executionIds.size > 0) {
-                queryBuilder.must(QueryBuilders.termsQuery(Alert.EXECUTION_ID_FIELD, executionIds))
-            } else {
-                return
-            }
+            queryBuilder.must(QueryBuilders.termsQuery(Alert.ALERT_ID_FIELD, associatedAlertIds))
             val searchRequest = SearchRequest(alertIndex)
             searchRequest.source().query(queryBuilder)
             val response: SearchResponse = client.suspendUntil { search(searchRequest, it) }

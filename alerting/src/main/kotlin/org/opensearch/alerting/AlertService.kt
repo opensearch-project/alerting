@@ -188,7 +188,10 @@ class AlertService(
                 schemaVersion = IndexUtils.alertIndexSchemaVersion,
             )
         } else {
-            val alertState = if (alertError == null) Alert.State.ACTIVE else Alert.State.ERROR
+            val alertState = if (workflorwRunContext?.auditDelegateMonitorAlerts == true) {
+                Alert.State.AUDIT
+            } else if (alertError == null) Alert.State.ACTIVE
+            else Alert.State.ERROR
             Alert(
                 monitor = ctx.monitor, trigger = ctx.trigger, startTime = currentTime,
                 lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
@@ -210,7 +213,7 @@ class AlertService(
     ): Alert {
         val currentTime = Instant.now()
 
-        val alertState = if (workflorwRunContext?.muteDelegateMonitorActions == true) {
+        val alertState = if (workflorwRunContext?.auditDelegateMonitorAlerts == true) {
             Alert.State.AUDIT
         } else if (alertError == null) {
             Alert.State.ACTIVE
@@ -233,7 +236,7 @@ class AlertService(
         workflowRunContext: WorkflowRunContext?
     ): Alert {
         val currentTime = Instant.now()
-        val alertState = if (workflowRunContext?.muteDelegateMonitorActions == true) {
+        val alertState = if (workflowRunContext?.auditDelegateMonitorAlerts == true) {
             Alert.State.AUDIT
         } else {
             Alert.State.ERROR
@@ -262,7 +265,6 @@ class AlertService(
             associatedAlertIds = associatedAlertIds
         )
     }
-
 
     fun updateActionResultsForBucketLevelAlert(
         currentAlert: Alert,
