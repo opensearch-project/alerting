@@ -233,7 +233,8 @@ fun randomWorkflow(
     enabled: Boolean = randomBoolean(),
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
-    triggers: List<Trigger> = emptyList()
+    triggers: List<Trigger> = emptyList(),
+    auditDelegateMonitorAlerts: Boolean? = true
 ): Workflow {
     val delegates = mutableListOf<Delegate>()
     if (!monitorIds.isNullOrEmpty()) {
@@ -257,6 +258,7 @@ fun randomWorkflow(
         version = -1L,
         schemaVersion = 0,
         triggers = triggers,
+        auditDelegateMonitorAlerts = auditDelegateMonitorAlerts
     )
 }
 

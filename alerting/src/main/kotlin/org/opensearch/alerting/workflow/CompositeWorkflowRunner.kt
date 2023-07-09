@@ -116,7 +116,8 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 chainedMonitorId = delegate.chainedMonitorFindings?.monitorId,
                 executionId = executionId,
                 matchingDocIdsPerIndex = indexToDocIds,
-                auditDelegateMonitorAlerts = workflow.auditDelegateMonitorAlerts ?: true
+                auditDelegateMonitorAlerts = if (workflow.auditDelegateMonitorAlerts == null) true
+                else workflow.auditDelegateMonitorAlerts!!
             )
             try {
                 dataSources = delegateMonitor.dataSources

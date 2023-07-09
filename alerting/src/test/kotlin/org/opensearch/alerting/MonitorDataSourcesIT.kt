@@ -2455,7 +2455,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 bucketLevelMonitorResponse.id,
                 docLevelMonitorResponse1.id,
                 queryMonitorResponse.id
-            )
+            ),
+            auditDelegateMonitorAlerts = false
         )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
@@ -2636,7 +2637,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val monitorResponse2 = createMonitor(monitor2)!!
 
         var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id, monitorResponse2.id)
+            monitorIds = listOf(monitorResponse.id, monitorResponse2.id), auditDelegateMonitorAlerts = false
         )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
@@ -2711,14 +2712,16 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val monitorResponse = createMonitor(monitor)!!
 
         var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id)
+            monitorIds = listOf(monitorResponse.id),
+            auditDelegateMonitorAlerts = false
         )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         assertNotNull(workflowById)
 
         var workflow1 = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id)
+            monitorIds = listOf(monitorResponse.id),
+            auditDelegateMonitorAlerts = false
         )
         val workflowResponse1 = upsertWorkflow(workflow1)!!
         val workflowById1 = searchWorkflow(workflowResponse1.id)
@@ -2813,7 +2816,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertNotNull(workflowById)
 
         val workflow1 = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id)
+            monitorIds = listOf(monitorResponse.id), auditDelegateMonitorAlerts = false
         )
         val workflowResponse1 = upsertWorkflow(workflow1)!!
         val workflowById1 = searchWorkflow(workflowResponse1.id)
@@ -3240,7 +3243,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 bucketLevelMonitorResponse.id,
                 docLevelMonitorResponse1.id,
                 queryMonitorResponse.id
-            )
+            ),
+            auditDelegateMonitorAlerts = false
         )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
@@ -3377,7 +3381,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         val monitorResponse = createMonitor(monitor)!!
         var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id)
+            monitorIds = listOf(monitorResponse.id), auditDelegateMonitorAlerts = false
         )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
