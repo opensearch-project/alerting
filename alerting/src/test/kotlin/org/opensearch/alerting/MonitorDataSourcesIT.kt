@@ -2248,6 +2248,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val compositeSources = listOf(
             TermsValuesSourceBuilder("test_field_1").field("test_field_1")
         )
+        val customAlertsHistoryIndex = "custom_alerts_history_index"
+        val customAlertsHistoryIndexPattern = "<custom_alerts_history_index-{now/d}-1>"
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(index), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
         // Bucket level monitor will reduce the size of matched doc ids on those that belong
@@ -2305,7 +2307,9 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docLevelMonitorResponse = createMonitor(docLevelMonitor)!!
         // 1. bucketMonitor (chainedFinding = null) 2. docMonitor (chainedFinding = bucketMonitor)
         var workflow = randomWorkflow(
-            monitorIds = listOf(bucketLevelMonitorResponse.id, docLevelMonitorResponse.id)
+            monitorIds = listOf(bucketLevelMonitorResponse.id, docLevelMonitorResponse.id),
+            enabled = false,
+            auditDelegateMonitorAlerts = false
         )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
@@ -2806,7 +2810,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val monitorResponse = createMonitor(monitor)!!
 
         val workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id)
+            monitorIds = listOf(monitorResponse.id), auditDelegateMonitorAlerts = false
         )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
@@ -3093,7 +3097,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docLevelMonitorResponse = createMonitor(docLevelMonitor)!!
         // 1. bucketMonitor (chainedFinding = null) 2. docMonitor (chainedFinding = bucketMonitor)
         var workflow = randomWorkflow(
-            monitorIds = listOf(bucketLevelMonitorResponse.id, docLevelMonitorResponse.id)
+            monitorIds = listOf(bucketLevelMonitorResponse.id, docLevelMonitorResponse.id), auditDelegateMonitorAlerts = false
         )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
