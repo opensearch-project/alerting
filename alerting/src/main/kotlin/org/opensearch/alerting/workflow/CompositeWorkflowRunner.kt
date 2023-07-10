@@ -13,7 +13,6 @@ import org.opensearch.alerting.DocumentLevelMonitorRunner
 import org.opensearch.alerting.MonitorRunnerExecutionContext
 import org.opensearch.alerting.QueryLevelMonitorRunner
 import org.opensearch.alerting.WorkflowMetadataService
-import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.model.ChainedAlertTriggerRunResult
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.WorkflowRunResult

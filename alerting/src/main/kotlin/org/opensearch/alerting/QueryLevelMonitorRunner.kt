@@ -40,7 +40,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
         val currentAlerts = try {
             monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor.dataSources)
             monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(monitor.dataSources)
-            monitorCtx.alertService!!.loadCurrentAlertsForQueryLevelMonitor(monitor)
+            monitorCtx.alertService!!.loadCurrentAlertsForQueryLevelMonitor(monitor, workflowRunContext)
         } catch (e: Exception) {
             // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
             val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id

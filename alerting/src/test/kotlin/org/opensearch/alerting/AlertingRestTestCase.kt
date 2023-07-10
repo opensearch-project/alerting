@@ -744,7 +744,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             .string()
             .let { StringEntity(it, APPLICATION_JSON) }
 
-
         val response = client().makeRequest(
             "POST", "${AlertingPlugin.WORKFLOW_BASE_URI}/$workflowId/_acknowledge/alerts",
             emptyMap(), request

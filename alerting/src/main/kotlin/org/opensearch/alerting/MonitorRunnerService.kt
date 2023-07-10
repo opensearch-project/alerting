@@ -284,6 +284,8 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     internal fun currentTime() = Instant.ofEpochMilli(monitorCtx.threadPool!!.absoluteTimeInMillis())
 
     internal fun isActionActionable(action: Action, alert: Alert?): Boolean {
+        if (alert != null && alert.state == Alert.State.AUDIT)
+            return false
         if (alert == null || action.throttle == null) {
             return true
         }

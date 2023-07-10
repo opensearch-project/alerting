@@ -77,7 +77,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             if (monitor.dataSources.findingsEnabled == true) {
                 monitorCtx.alertIndices!!.createOrUpdateInitialFindingHistoryIndex(monitor.dataSources)
             }
-            monitorCtx.alertService!!.loadCurrentAlertsForBucketLevelMonitor(monitor)
+            monitorCtx.alertService!!.loadCurrentAlertsForBucketLevelMonitor(monitor, workflowRunContext)
         } catch (e: Exception) {
             // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
             val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id

@@ -83,10 +83,11 @@ class AlertService(
 
     private val logger = LogManager.getLogger(AlertService::class.java)
 
-    suspend fun loadCurrentAlertsForQueryLevelMonitor(monitor: Monitor): Map<Trigger, Alert?> {
+    suspend fun loadCurrentAlertsForQueryLevelMonitor(monitor: Monitor, workflowRunContext: WorkflowRunContext?): Map<Trigger, Alert?> {
         val searchAlertsResponse: SearchResponse = searchAlerts(
             monitor = monitor,
-            size = monitor.triggers.size * 2 // We expect there to be only a single in-progress alert so fetch 2 to check
+            size = monitor.triggers.size * 2, // We expect there to be only a single in-progress alert so fetch 2 to check
+            workflowRunContext
         )
 
         val foundAlerts = searchAlertsResponse.hits.map { Alert.parse(contentParser(it.sourceRef), it.id, it.version) }
@@ -102,11 +103,15 @@ class AlertService(
         }
     }
 
-    suspend fun loadCurrentAlertsForBucketLevelMonitor(monitor: Monitor): Map<Trigger, MutableMap<String, Alert>> {
+    suspend fun loadCurrentAlertsForBucketLevelMonitor(
+        monitor: Monitor,
+        workflowRunContext: WorkflowRunContext?,
+    ): Map<Trigger, MutableMap<String, Alert>> {
         val searchAlertsResponse: SearchResponse = searchAlerts(
             monitor = monitor,
             // TODO: This should be limited based on a circuit breaker that limits Alerts
-            size = MAX_BUCKET_LEVEL_MONITOR_ALERT_SEARCH_COUNT
+            size = MAX_BUCKET_LEVEL_MONITOR_ALERT_SEARCH_COUNT,
+            workflowRunContext = workflowRunContext
         )
 
         val foundAlerts = searchAlertsResponse.hits.map { Alert.parse(contentParser(it.sourceRef), it.id, it.version) }
@@ -335,9 +340,12 @@ class AlertService(
                 currentAlerts.remove(aggAlertBucket.getBucketKeysHash())
             } else {
                 // New Alert
+                val alertState = if (workflorwRunContext?.auditDelegateMonitorAlerts == true) {
+                    Alert.State.AUDIT
+                } else Alert.State.ACTIVE
                 val newAlert = Alert(
                     monitor = monitor, trigger = trigger, startTime = currentTime,
-                    lastNotificationTime = currentTime, state = Alert.State.ACTIVE, errorMessage = null,
+                    lastNotificationTime = currentTime, state = alertState, errorMessage = null,
                     errorHistory = mutableListOf(), actionExecutionResults = mutableListOf(),
                     schemaVersion = IndexUtils.alertIndexSchemaVersion, aggregationResultBucket = aggAlertBucket,
                     findingIds = findings, executionId = executionId, workflowId = workflorwRunContext?.workflowId ?: ""
@@ -658,13 +666,16 @@ class AlertService(
         val savedAlerts = mutableListOf<Alert>()
         var alertsBeingIndexed = alerts
         var requestsToRetry: MutableList<IndexRequest> = alerts.map { alert ->
-            if (alert.state != Alert.State.ACTIVE) {
+            if (alert.state != Alert.State.ACTIVE && alert.state != Alert.State.AUDIT) {
                 throw IllegalStateException("Unexpected attempt to save new alert [$alert] with state [${alert.state}]")
             }
             if (alert.id != Alert.NO_ID) {
                 throw IllegalStateException("Unexpected attempt to save new alert [$alert] with an existing alert ID [${alert.id}]")
             }
-            IndexRequest(dataSources.alertsIndex)
+            val alertIndex = if (alert.state == Alert.State.AUDIT && alertIndices.isAlertHistoryEnabled()) {
+                dataSources.alertsHistoryIndex
+            } else dataSources.alertsIndex
+            IndexRequest(alertIndex)
                 .routing(alert.monitorId)
                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
         }.toMutableList()
@@ -723,13 +734,15 @@ class AlertService(
      * @param monitorId The Monitor to get Alerts for
      * @param size The number of search hits (Alerts) to return
      */
-    private suspend fun searchAlerts(monitor: Monitor, size: Int): SearchResponse {
+    private suspend fun searchAlerts(monitor: Monitor, size: Int, workflowRunContext: WorkflowRunContext?): SearchResponse {
         val monitorId = monitor.id
         val alertIndex = monitor.dataSources.alertsIndex
 
         val queryBuilder = QueryBuilders.boolQuery()
-            .filter(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, monitorId))
-
+            .must(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, monitorId))
+        if (workflowRunContext != null) {
+            queryBuilder.must(QueryBuilders.termQuery(Alert.WORKFLOW_ID_FIELD, workflowRunContext.workflowId))
+        }
         val searchSourceBuilder = SearchSourceBuilder()
             .size(size)
             .query(queryBuilder)
