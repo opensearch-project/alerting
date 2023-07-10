@@ -10,7 +10,6 @@ import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.Recipient
 import org.opensearch.alerting.util.DestinationType
-import org.opensearch.common.Strings
 import org.opensearch.commons.notifications.model.Chime
 import org.opensearch.commons.notifications.model.ConfigType
 import org.opensearch.commons.notifications.model.Email
@@ -22,6 +21,7 @@ import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.Slack
 import org.opensearch.commons.notifications.model.SmtpAccount
 import org.opensearch.commons.notifications.model.Webhook
+import org.opensearch.core.common.Strings
 import java.net.URI
 import java.net.URISyntaxException
 import java.util.Locale
