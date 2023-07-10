@@ -219,7 +219,7 @@ class AlertService(
         return Alert(
             id = id, monitor = monitor, trigger = NoOpTrigger(), startTime = currentTime,
             lastNotificationTime = currentTime, state = Alert.State.ERROR, errorMessage = alertError?.message,
-            schemaVersion = IndexUtils.alertIndexSchemaVersion
+            schemaVersion = IndexUtils.alertIndexSchemaVersion, executionId = ""
         )
     }
 
