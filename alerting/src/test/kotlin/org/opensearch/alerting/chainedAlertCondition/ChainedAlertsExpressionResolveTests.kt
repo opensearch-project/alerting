@@ -22,7 +22,7 @@ class ChainedAlertsExpressionResolveTests : OpenSearchTestCase() {
         Assert.assertTrue(equation.evaluate(alertGeneratingMonitors))
         val alertGeneratingMonitors2: Set<String> = setOf(
             "123",
-            "456"
+            "789"
         )
         Assert.assertFalse(equation.evaluate(alertGeneratingMonitors2))
     }
@@ -35,7 +35,12 @@ class ChainedAlertsExpressionResolveTests : OpenSearchTestCase() {
             "123",
             "456"
         )
-        Assert.assertTrue(equation.evaluate(alertGeneratingMonitors))
+        Assert.assertFalse(equation.evaluate(alertGeneratingMonitors))
+        val alertGeneratingMonitors1: Set<String> = setOf(
+            "123",
+            "223"
+        )
+        Assert.assertTrue(equation.evaluate(alertGeneratingMonitors1))
     }
 
     fun `test chained alert trigger expression evaluation simple OR`() {
@@ -48,8 +53,8 @@ class ChainedAlertsExpressionResolveTests : OpenSearchTestCase() {
         )
         Assert.assertTrue(equation.evaluate(alertGeneratingMonitors))
         val alertGeneratingMonitors2: Set<String> = setOf(
-            "123",
-            "456"
+            "234",
+            "567"
         )
         Assert.assertFalse(equation.evaluate(alertGeneratingMonitors2))
     }
@@ -98,20 +103,15 @@ class ChainedAlertsExpressionResolveTests : OpenSearchTestCase() {
             "abc"
         )
         Assert.assertTrue(equation.evaluate(alertGeneratingMonitors1))
-        // part 1 evaluates, part 2 evaluates
+        // part 1 not evaluates, part 2 not evaluates
         val alertGeneratingMonitors2: Set<String> = setOf(
-            "123",
-            "456",
             "789",
             "abc"
         )
         Assert.assertFalse(equation.evaluate(alertGeneratingMonitors2))
-        // part 1 evaluates, part 2 evaluates
+        // part 1 not evaluates, part 2 evaluates
         val alertGeneratingMonitors3: Set<String> = setOf(
-            "123",
-            "456",
-            "789",
-            "abc"
+            "789"
         )
         Assert.assertTrue(equation.evaluate(alertGeneratingMonitors3))
     }
