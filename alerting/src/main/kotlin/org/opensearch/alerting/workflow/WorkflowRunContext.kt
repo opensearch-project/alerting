@@ -10,7 +10,6 @@ data class WorkflowRunContext(
     val workflowId: String,
     val workflowMetadataId: String,
     val chainedMonitorId: String?,
-    val executionId: String,
     val matchingDocIdsPerIndex: Map<String, List<String>>,
     val auditDelegateMonitorAlerts: Boolean
 )

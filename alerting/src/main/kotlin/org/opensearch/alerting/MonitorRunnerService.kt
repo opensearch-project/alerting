@@ -49,6 +49,9 @@ import org.opensearch.script.ScriptService
 import org.opensearch.script.TemplateScript
 import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.util.UUID
 import kotlin.coroutines.CoroutineContext
 
 object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
@@ -250,12 +253,13 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             CompositeWorkflowRunner.runWorkflow(workflow = job, monitorCtx, periodStart, periodEnd, dryrun)
         }
         val monitor = job as Monitor
+        val executionId = "${monitor.id}_${LocalDateTime.now(ZoneOffset.UTC)}_${UUID.randomUUID()}"
         val runResult = if (monitor.isBucketLevelMonitor()) {
-            BucketLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
+            BucketLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun, executionId = executionId)
         } else if (monitor.isDocLevelMonitor()) {
-            DocumentLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
+            DocumentLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun, executionId = executionId)
         } else {
-            QueryLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
+            QueryLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun, executionId = executionId)
         }
         return runResult
     }

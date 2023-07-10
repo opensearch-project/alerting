@@ -113,7 +113,6 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 workflowId = workflowMetadata.workflowId,
                 workflowMetadataId = workflowMetadata.id,
                 chainedMonitorId = delegate.chainedMonitorFindings?.monitorId,
-                executionId = executionId,
                 matchingDocIdsPerIndex = indexToDocIds,
                 auditDelegateMonitorAlerts = if (workflow.auditDelegateMonitorAlerts == null) true
                 else workflow.auditDelegateMonitorAlerts!!
@@ -121,7 +120,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
             try {
                 dataSources = delegateMonitor.dataSources
                 val delegateRunResult =
-                    runDelegateMonitor(delegateMonitor, monitorCtx, periodStart, periodEnd, dryRun, workflowRunContext)
+                    runDelegateMonitor(delegateMonitor, monitorCtx, periodStart, periodEnd, dryRun, workflowRunContext, executionId)
                 resultList.add(delegateRunResult!!)
             } catch (ex: Exception) {
                 logger.error("Error executing workflow delegate monitor ${delegate.monitorId}", ex)
@@ -195,6 +194,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         periodEnd: Instant,
         dryRun: Boolean,
         workflowRunContext: WorkflowRunContext,
+        executionId: String,
     ): MonitorRunResult<*>? {
 
         if (delegateMonitor.isBucketLevelMonitor()) {
@@ -204,7 +204,8 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 periodStart,
                 periodEnd,
                 dryRun,
-                workflowRunContext
+                workflowRunContext,
+                executionId
             )
         } else if (delegateMonitor.isDocLevelMonitor()) {
             return DocumentLevelMonitorRunner.runMonitor(
@@ -213,7 +214,8 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 periodStart,
                 periodEnd,
                 dryRun,
-                workflowRunContext
+                workflowRunContext,
+                executionId
             )
         } else if (delegateMonitor.isQueryLevelMonitor()) {
             return QueryLevelMonitorRunner.runMonitor(
@@ -222,7 +224,8 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 periodStart,
                 periodEnd,
                 dryRun,
-                workflowRunContext
+                workflowRunContext,
+                executionId
             )
         } else {
             throw AlertingException.wrap(

@@ -27,7 +27,8 @@ object QueryLevelMonitorRunner : MonitorRunner() {
         periodStart: Instant,
         periodEnd: Instant,
         dryrun: Boolean,
-        workflowRunContext: WorkflowRunContext?
+        workflowRunContext: WorkflowRunContext?,
+        executionId: String
     ): MonitorRunResult<QueryLevelTriggerRunResult> {
         val roles = MonitorRunnerService.getRolesForMonitor(monitor)
         logger.debug("Running monitor: ${monitor.name} with roles: $roles Thread: ${Thread.currentThread().name}")
@@ -78,7 +79,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                 triggerCtx,
                 triggerResult,
                 monitorResult.alertError() ?: triggerResult.alertError(),
-                workflowRunContext?.executionId,
+                executionId,
                 workflowRunContext
             )
             if (updatedAlert != null) updatedAlerts += updatedAlert

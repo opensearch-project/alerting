@@ -131,7 +131,7 @@ class AlertService(
         ctx: QueryLevelTriggerExecutionContext,
         result: QueryLevelTriggerRunResult,
         alertError: AlertError?,
-        executionId: String? = null,
+        executionId: String,
         workflorwRunContext: WorkflowRunContext?
     ): Alert? {
         val currentTime = Instant.now()
@@ -213,7 +213,7 @@ class AlertService(
         relatedDocIds: List<String>,
         ctx: DocumentLevelTriggerExecutionContext,
         alertError: AlertError?,
-        workflowExecutionId: String? = null,
+        executionId: String,
         workflorwRunContext: WorkflowRunContext?
     ): Alert {
         val currentTime = Instant.now()
@@ -229,7 +229,7 @@ class AlertService(
             id = UUID.randomUUID().toString(), monitor = ctx.monitor, trigger = ctx.trigger, startTime = currentTime,
             lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
             schemaVersion = IndexUtils.alertIndexSchemaVersion, findingIds = findings, relatedDocIds = relatedDocIds,
-            executionId = workflowExecutionId, workflowId = workflorwRunContext?.workflowId ?: ""
+            executionId = executionId, workflowId = workflorwRunContext?.workflowId ?: ""
         )
     }
 
@@ -323,7 +323,7 @@ class AlertService(
         currentAlerts: MutableMap<String, Alert>,
         aggResultBuckets: List<AggregationResultBucket>,
         findings: List<String>,
-        executionId: String? = null,
+        executionId: String,
         workflorwRunContext: WorkflowRunContext?
     ): Map<AlertCategory, List<Alert>> {
         val dedupedAlerts = mutableListOf<Alert>()

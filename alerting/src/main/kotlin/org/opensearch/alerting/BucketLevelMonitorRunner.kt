@@ -61,7 +61,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         periodStart: Instant,
         periodEnd: Instant,
         dryrun: Boolean,
-        workflowRunContext: WorkflowRunContext?
+        workflowRunContext: WorkflowRunContext?,
+        executionId: String
     ): MonitorRunResult<BucketLevelTriggerRunResult> {
         val roles = MonitorRunnerService.getRolesForMonitor(monitor)
         logger.debug("Running monitor: ${monitor.name} with roles: $roles Thread: ${Thread.currentThread().name}")
@@ -158,7 +159,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             periodStart,
                             periodEnd,
                             !dryrun && monitor.id != Monitor.NO_ID,
-                            workflowRunContext
+                            executionId
                         )
                     } else {
                         emptyList()
@@ -171,7 +172,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     currentAlertsForTrigger,
                     triggerResult.aggregationResultBuckets.values.toList(),
                     findings,
-                    workflowRunContext?.executionId,
+                    executionId,
                     workflowRunContext
                 ).toMutableMap()
                 val dedupedAlerts = categorizedAlerts.getOrDefault(AlertCategory.DEDUPED, emptyList())
@@ -352,7 +353,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         periodStart: Instant,
         periodEnd: Instant,
         shouldCreateFinding: Boolean,
-        workflowRunContext: WorkflowRunContext? = null
+        executionId: String,
     ): List<String> {
         monitor.inputs.forEach { input ->
             if (input is SearchInput) {
@@ -409,7 +410,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             sr.source().query(queryBuilder)
                         }
                     val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(sr, it) }
-                    return createFindingPerIndex(searchResponse, monitor, monitorCtx, shouldCreateFinding, workflowRunContext?.executionId)
+                    return createFindingPerIndex(searchResponse, monitor, monitorCtx, shouldCreateFinding, executionId)
                 } else {
                     logger.error("Couldn't resolve groupBy field. Not generating bucket level monitor findings for monitor %${monitor.id}")
                 }
