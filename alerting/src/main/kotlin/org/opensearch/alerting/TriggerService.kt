@@ -112,7 +112,6 @@ class TriggerService(val scriptService: ScriptService) {
             ChainedAlertTriggerRunResult(trigger.name, triggered = evaluate, null, associatedAlertIds = associatedAlertIds)
         } catch (e: Exception) {
             logger.error("Error running chained alert trigger script for workflow ${workflow.id}, trigger: ${trigger.id}", e)
-            // if the script fails we need to send an alert so set triggered = true
             ChainedAlertTriggerRunResult(
                 triggerName = trigger.name,
                 triggered = false,
