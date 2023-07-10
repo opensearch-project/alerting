@@ -139,7 +139,7 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
             try {
                 val queryBuilder = QueryBuilders.boolQuery()
                     .must(
-                        QueryBuilders.wildcardQuery("workflow_id", "request.workflowId")
+                        QueryBuilders.wildcardQuery("workflow_id", request.workflowId)
                     )
                     .must(QueryBuilders.termsQuery("_id", request.alertIds))
                 if (workflow.inputs.isEmpty() || (workflow.inputs[0] is CompositeInput) == false) {
