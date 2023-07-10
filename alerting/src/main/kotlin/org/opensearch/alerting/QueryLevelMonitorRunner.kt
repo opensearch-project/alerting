@@ -67,7 +67,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
             val triggerResult = monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger, triggerCtx)
             triggerResults[trigger.id] = triggerResult
 
-            if (monitorCtx.triggerService!!.isQueryLevelTriggerActionable(triggerCtx, triggerResult)) {
+            if (monitorCtx.triggerService!!.isQueryLevelTriggerActionable(triggerCtx, triggerResult, workflowRunContext)) {
                 val actionCtx = triggerCtx.copy(error = monitorResult.error ?: triggerResult.error)
                 for (action in trigger.actions) {
                     triggerResult.actionResults[action.id] = this.runAction(action, actionCtx, monitorCtx, monitor, dryrun)
@@ -86,7 +86,14 @@ object QueryLevelMonitorRunner : MonitorRunner() {
 
         // Don't save alerts if this is a test monitor
         if (!dryrun && monitor.id != Monitor.NO_ID) {
-            monitorCtx.retryPolicy?.let { monitorCtx.alertService!!.saveAlerts(monitor.dataSources, updatedAlerts, it) }
+            monitorCtx.retryPolicy?.let {
+                monitorCtx.alertService!!.saveAlerts(
+                    monitor.dataSources,
+                    updatedAlerts,
+                    it,
+                    routingId = monitor.id
+                )
+            }
         }
         return monitorResult.copy(triggerResults = triggerResults)
     }

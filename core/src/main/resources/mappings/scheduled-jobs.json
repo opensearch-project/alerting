@@ -369,6 +369,9 @@
         "enabled": {
           "type": "boolean"
         },
+        "audit_delegate_monitor_alerts": {
+          "type": "boolean"
+        },
         "enabled_time": {
           "type": "date",
           "format": "strict_date_time||epoch_millis"

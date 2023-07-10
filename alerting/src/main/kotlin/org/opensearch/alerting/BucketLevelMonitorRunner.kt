@@ -191,7 +191,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                         monitor.dataSources,
                         dedupedAlerts,
                         monitorCtx.retryPolicy!!,
-                        allowUpdatingAcknowledgedAlert = true
+                        allowUpdatingAcknowledgedAlert = true,
+                        monitor.id
                     )
                     newAlerts = monitorCtx.alertService!!.saveNewAlerts(monitor.dataSources, newAlerts, monitorCtx.retryPolicy!!)
                 }
@@ -327,14 +328,16 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             // ACKNOWLEDGED Alerts should not be saved here since actions are not executed for them.
             if (!dryrun && monitor.id != Monitor.NO_ID) {
                 monitorCtx.alertService!!.saveAlerts(
-                    monitor.dataSources, updatedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = false
+                    monitor.dataSources, updatedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = false,
+                    routingId = monitor.id
                 )
                 // Save any COMPLETED Alerts that were not covered in updatedAlerts
                 monitorCtx.alertService!!.saveAlerts(
                     monitor.dataSources,
                     completedAlertsToUpdate.toList(),
                     monitorCtx.retryPolicy!!,
-                    allowUpdatingAcknowledgedAlert = false
+                    allowUpdatingAcknowledgedAlert = false,
+                    monitor.id
                 )
             }
         }

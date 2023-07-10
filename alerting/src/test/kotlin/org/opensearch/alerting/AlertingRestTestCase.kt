@@ -16,7 +16,6 @@ import org.junit.rules.DisableOnDebug
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
-import org.opensearch.alerting.action.GetMonitorResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRITE_INDEX
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
@@ -47,6 +46,7 @@ import org.opensearch.common.xcontent.json.JsonXContent.jsonXContent
 import org.opensearch.commons.alerting.action.GetFindingsResponse
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.ChainedAlertTrigger
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
@@ -56,7 +56,6 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.SearchInput
-import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.util.string
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -102,7 +101,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                 DocLevelMonitorInput.XCONTENT_REGISTRY,
                 QueryLevelTrigger.XCONTENT_REGISTRY,
                 BucketLevelTrigger.XCONTENT_REGISTRY,
-                DocumentLevelTrigger.XCONTENT_REGISTRY
+                DocumentLevelTrigger.XCONTENT_REGISTRY,
+                Workflow.XCONTENT_REGISTRY,
+                ChainedAlertTrigger.XCONTENT_REGISTRY
             ) + SearchModule(Settings.EMPTY, emptyList()).namedXContents
         )
     }
@@ -618,7 +619,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                         parser
                     )
                     while (parser.nextToken() != XContentParser.Token.END_ARRAY) {
-                        //do nothing
+                        // do nothing
                     }
                 }
             }
@@ -736,6 +737,22 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return response
     }
 
+    protected fun acknowledgeChainedAlerts(workflowId: String, vararg alertId: String): Response {
+        val request = jsonBuilder().startObject()
+            .array("alerts", *alertId.map { it }.toTypedArray())
+            .endObject()
+            .string()
+            .let { StringEntity(it, APPLICATION_JSON) }
+
+
+        val response = client().makeRequest(
+            "POST", "${AlertingPlugin.WORKFLOW_BASE_URI}/$workflowId/_acknowledge/alerts",
+            emptyMap(), request
+        )
+        assertEquals("Acknowledge call failed.", RestStatus.OK, response.restStatus())
+        return response
+    }
+
     protected fun getAlerts(
         client: RestClient,
         dataMap: Map<String, Any> = emptyMap(),
@@ -776,6 +793,28 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun executeWorkflow(workflowId: String, params: Map<String, String> = mutableMapOf()): Response {
         return executeWorkflow(client(), workflowId, params)
+    }
+
+    protected fun getWorkflowAlerts(
+        workflowId: String,
+        getAssociatedAlerts: Boolean = true,
+    ): Response {
+        return getWorkflowAlerts(client(), mutableMapOf(Pair("workflowIds", workflowId), Pair("getAssociatedAlerts", getAssociatedAlerts)))
+    }
+
+    protected fun getWorkflowAlerts(
+        client: RestClient,
+        dataMap: Map<String, Any> = emptyMap(),
+        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
+    ): Response {
+        var baseEndpoint = "$WORKFLOW_ALERTING_BASE_URI/alerts?"
+        for (entry in dataMap.entries) {
+            baseEndpoint += "${entry.key}=${entry.value}&"
+        }
+
+        val response = client.makeRequest("GET", baseEndpoint, null, header)
+        assertEquals("Get call failed.", RestStatus.OK, response.restStatus())
+        return response
     }
 
     protected fun executeMonitor(client: RestClient, monitorId: String, params: Map<String, String> = mutableMapOf()): Response {

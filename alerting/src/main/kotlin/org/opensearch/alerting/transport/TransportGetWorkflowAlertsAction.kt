@@ -216,7 +216,8 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
             alerts.forEach { associatedAlertIds.addAll(it.associatedAlertIds) }
             if (associatedAlertIds.isEmpty()) return
             val queryBuilder = QueryBuilders.boolQuery()
-            queryBuilder.must(QueryBuilders.termsQuery(Alert.ALERT_ID_FIELD, associatedAlertIds))
+            queryBuilder.must(QueryBuilders.termsQuery("_id", associatedAlertIds))
+            queryBuilder.must(QueryBuilders.termQuery(Alert.STATE_FIELD, Alert.State.AUDIT))
             val searchRequest = SearchRequest(alertIndex)
             searchRequest.source().query(queryBuilder)
             val response: SearchResponse = client.suspendUntil { search(searchRequest, it) }

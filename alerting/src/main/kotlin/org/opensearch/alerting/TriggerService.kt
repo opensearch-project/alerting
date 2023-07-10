@@ -16,6 +16,7 @@ import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.triggercondition.parsers.TriggerExpressionParser
 import org.opensearch.alerting.util.getBucketKeysHash
+import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorIndices.Fields.BUCKET_INDICES
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorIndices.Fields.PARENT_BUCKET_PATH
 import org.opensearch.commons.alerting.model.AggregationResultBucket
@@ -40,7 +41,12 @@ class TriggerService(val scriptService: ScriptService) {
     private val ALWAYS_RUN = Script("return true")
     private val NEVER_RUN = Script("return false")
 
-    fun isQueryLevelTriggerActionable(ctx: QueryLevelTriggerExecutionContext, result: QueryLevelTriggerRunResult): Boolean {
+    fun isQueryLevelTriggerActionable(
+        ctx: QueryLevelTriggerExecutionContext,
+        result: QueryLevelTriggerRunResult,
+        workflowRunContext: WorkflowRunContext?,
+    ): Boolean {
+        if (workflowRunContext?.auditDelegateMonitorAlerts == true) return false
         // Suppress actions if the current alert is acknowledged and there are no errors.
         val suppress = ctx.alert?.state == Alert.State.ACKNOWLEDGED && result.error == null && ctx.error == null
         return result.triggered && !suppress

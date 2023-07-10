@@ -567,7 +567,7 @@ class AlertService(
         alerts: List<Alert>,
         retryPolicy: BackoffPolicy,
         allowUpdatingAcknowledgedAlert: Boolean = false,
-        routing: String? = null // routing is mandatory and set as monitor id. for workflow chained alerts we pass workflow id as routing
+        routingId: String // routing is mandatory and set as monitor id. for workflow chained alerts we pass workflow id as routing
     ) {
         val alertsIndex = dataSources.alertsIndex
         val alertsHistoryIndex = dataSources.alertsHistoryIndex
@@ -577,7 +577,6 @@ class AlertService(
             // In the rare event that a user acknowledges an alert between when it's read and when it's written
             // back we're ok if that acknowledgement is lost. It's easier to get the user to retry than for the runner to
             // spend time reloading the alert and writing it back.
-            val routingId = if (routing.isNullOrEmpty()) alert.monitorId else routing
             when (alert.state) {
                 Alert.State.ACTIVE, Alert.State.ERROR -> {
                     listOf<DocWriteRequest<*>>(

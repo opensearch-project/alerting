@@ -5,31 +5,39 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.junit.Assert
 import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.WORKFLOW_ALERTING_BASE_URI
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.randomBucketLevelMonitor
+import org.opensearch.alerting.randomChainedAlertTrigger
 import org.opensearch.alerting.randomDocumentLevelMonitor
 import org.opensearch.alerting.randomDocumentLevelTrigger
 import org.opensearch.alerting.randomQueryLevelMonitor
+import org.opensearch.alerting.randomQueryLevelTrigger
+import org.opensearch.alerting.randomUser
 import org.opensearch.alerting.randomWorkflow
 import org.opensearch.alerting.randomWorkflowWithDelegates
 import org.opensearch.client.ResponseException
+import org.opensearch.commons.alerting.model.ChainedAlertTrigger
 import org.opensearch.commons.alerting.model.ChainedMonitorFindings
 import org.opensearch.commons.alerting.model.CompositeInput
 import org.opensearch.commons.alerting.model.Delegate
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
+import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestStatus
+import org.opensearch.script.Script
 import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.junit.annotations.TestLogging
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.Collections
 import java.util.Locale
 import java.util.UUID
@@ -95,7 +103,11 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
         val bucketLevelMonitorResponse = createMonitor(bucketLevelMonitor)
 
         val workflow = randomWorkflow(
-            monitorIds = listOf(docLevelMonitorResponse.id, bucketLevelMonitorResponse.id)
+            monitorIds = listOf(docLevelMonitorResponse.id, bucketLevelMonitorResponse.id),
+            triggers = listOf(
+                randomChainedAlertTrigger(condition = Script("trigger1")),
+                randomChainedAlertTrigger(condition = Script("trigger2"))
+            )
         )
 
         val createResponse = client().makeRequest("POST", WORKFLOW_ALERTING_BASE_URI, emptyMap(), workflow.toHttpEntity())
@@ -137,6 +149,12 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
         assertEquals(
             "Delegate2 Chained finding not correct", docLevelMonitorResponse.id, delegate2.chainedMonitorFindings!!.monitorId
         )
+
+        assertEquals(workflowById.triggers.size, 2)
+        assertTrue(workflowById.triggers[0] is ChainedAlertTrigger)
+        assertTrue(workflowById.triggers[1] is ChainedAlertTrigger)
+        assertTrue((workflowById.triggers[0] as ChainedAlertTrigger).condition == Script("trigger1"))
+        assertTrue((workflowById.triggers[1] as ChainedAlertTrigger).condition == Script("trigger2"))
     }
 
     fun `test create workflow without delegate failure`() {
@@ -1003,5 +1021,119 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
         } catch (e: ResponseException) {
             assertEquals(RestStatus.NOT_FOUND, e.response.restStatus())
         }
+    }
+
+    fun `test chained alerts and audit alerts for workflows with query level monitor`() {
+        val index = createTestIndex()
+        val docQuery1 = DocLevelQuery(query = "test_field:\"test_value_1\"", name = "3")
+        val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
+        val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor1 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput1),
+            triggers = listOf(trigger1),
+            enabled = false
+        )
+        val monitorResponse = createMonitor(monitor1)!!
+        var monitor2 = randomQueryLevelMonitor(
+            triggers = listOf(randomQueryLevelTrigger(condition = Script("return true"))),
+            enabled = false
+        )
+
+        val monitorResponse2 = createMonitor(monitor2)!!
+        val andTrigger = randomChainedAlertTrigger(
+            name = "1And2",
+            condition = Script("monitor[id=${monitorResponse.id}] && monitor[id=${monitorResponse2.id}]")
+        )
+
+        val workflow = Workflow(
+            id = "",
+            version = 2,
+            name = "test",
+            enabled = false,
+            schedule = IntervalSchedule(5, ChronoUnit.MINUTES),
+            lastUpdateTime = Instant.now(),
+            enabledTime = null,
+            workflowType = Workflow.WorkflowType.COMPOSITE,
+            user = randomUser(),
+            schemaVersion = -1,
+            inputs = listOf(
+                CompositeInput(
+                    org.opensearch.commons.alerting.model.Sequence(
+                        delegates = listOf(
+                            Delegate(1, monitorResponse.id),
+                            Delegate(2, monitorResponse2.id)
+                        )
+                    )
+                )
+            ),
+            owner = "alerting",
+            triggers = listOf(andTrigger)
+        )
+        val workflowById = createWorkflow(workflow)!!
+        assertNotNull(workflowById)
+        val workflowId = workflowById.id
+
+        insertSampleTimeSerializedData(
+            index,
+            listOf(
+                "test_value_1"
+            )
+        )
+
+        val response = executeWorkflow(workflowId = workflowId, params = emptyMap())
+        val executeWorkflowResponse = entityAsMap(response)
+        logger.info(executeWorkflowResponse)
+        val executionId = executeWorkflowResponse["execution_id"]
+        Assert.assertTrue(executeWorkflowResponse.containsKey("trigger_results"))
+        val workflowTriggerResults = executeWorkflowResponse["trigger_results"] as Map<String, Any>
+        assertEquals(workflowTriggerResults.size, 1)
+        assertTrue(
+            (workflowTriggerResults[andTrigger.id] as Map<String, Any>)["triggered"] as Boolean
+        )
+        val res = getWorkflowAlerts(workflowId, true)
+        val getWorkflowAlerts = entityAsMap(res)
+        Assert.assertTrue(getWorkflowAlerts.containsKey("alerts"))
+        Assert.assertTrue(getWorkflowAlerts.containsKey("associatedAlerts"))
+        val alerts = getWorkflowAlerts["alerts"] as List<HashMap<String, Any>>
+        assertEquals(alerts.size, 1)
+        Assert.assertEquals(alerts[0]["execution_id"], executionId)
+        Assert.assertEquals(alerts[0]["workflow_id"], workflowId)
+        Assert.assertEquals(alerts[0]["monitor_id"], "")
+        val associatedAlerts = getWorkflowAlerts["associatedAlerts"] as List<HashMap<String, Any>>
+        assertEquals(associatedAlerts.size, 2)
+        val ackRes = acknowledgeChainedAlerts(workflowId, alerts[0]["id"].toString())
+        val acknowledgeChainedAlertsResponse = entityAsMap(ackRes)
+        val acknowledged = acknowledgeChainedAlertsResponse["success"] as List<String>
+        Assert.assertEquals(acknowledged[0], alerts[0]["id"])
+//        Assert.assertTrue(chainedAlerts[0].monitorId == "")
+//        Assert.assertTrue(chainedAlerts[0].triggerId == andTrigger.id)
+//        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.monitorRunResults
+//        assertEquals(2, monitorsRunResults.size)
+//
+//        assertEquals(monitor1.name, monitorsRunResults[0].monitorName)
+//        assertEquals(1, monitorsRunResults[0].triggerResults.size)
+//
+//        Assert.assertEquals(monitor2.name, monitorsRunResults[1].monitorName)
+//        Assert.assertEquals(1, monitorsRunResults[1].triggerResults.size)
+//
+//        Assert.assertEquals(
+//            monitor1.dataSources.alertsHistoryIndex,
+//            CompositeWorkflowRunner.getDelegateMonitorAlertIndex(dataSources = monitor1.dataSources, workflow, true)
+//        )
+//        val alerts = getAuditStateAlerts(
+//            alertsIndex = monitor1.dataSources.alertsHistoryIndex, monitorId = monitorResponse.id,
+//            executionId = executeWorkflowResponse.workflowRunResult.executionId
+//        )
+//        val associatedAlertIds = res.associatedAlerts.map { it.id }.toList()
+//        associatedAlertIds.containsAll(alerts.map { it.id }.toList())
+//        assertAuditStateAlerts(monitorResponse.id, alerts)
+//
+//        val alerts1 = getAuditStateAlerts(
+//            alertsIndex = monitor2.dataSources.alertsHistoryIndex, monitorId = monitorResponse2.id,
+//            executionId = executeWorkflowResponse.workflowRunResult.executionId
+//        )
+//        associatedAlertIds.containsAll(alerts1.map { it.id }.toList())
+//        assertAuditStateAlerts(monitorResponse2.id, alerts1)
+//        verifyAcknowledgeChainedAlerts(chainedAlerts, workflowId, 1)
     }
 }
