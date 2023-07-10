@@ -3150,7 +3150,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         }
     }
 
-    fun `test execute workflow with custom alerts and finding index with bucket and doc monitor bucket monitor used as chained finding`() {
+    fun `test chained alerts for bucket level monitors generating audit alerts custom alerts index`() {
+        val customAlertIndex = "custom-alert-index"
+        val customAlertHistoryIndex = "custom-alert-history-index"
+        val customAlertHistoryIndexPattern = "<custom_alert_history_index-{now/d}-1>"
         val query = QueryBuilders.rangeQuery("test_strict_date_time")
             .gt("{{period_end}}||-10d")
             .lte("{{period_end}}")
@@ -3175,9 +3178,6 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 filter = null,
             )
         )
-        val bucketCustomAlertsIndex = "custom_alerts_index"
-        val bucketCustomFindingsIndex = "custom_findings_index"
-        val bucketCustomFindingsIndexPattern = "custom_findings_index-1"
 
         val bucketLevelMonitorResponse = createMonitor(
             randomBucketLevelMonitor(
@@ -3185,37 +3185,36 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 enabled = false,
                 triggers = listOf(trigger),
                 dataSources = DataSources(
-                    findingsEnabled = true,
-                    alertsIndex = bucketCustomAlertsIndex,
-                    findingsIndex = bucketCustomFindingsIndex,
-                    findingsIndexPattern = bucketCustomFindingsIndexPattern
+                    alertsIndex = customAlertIndex,
+                    alertsHistoryIndexPattern = customAlertHistoryIndexPattern,
+                    alertsHistoryIndex = customAlertHistoryIndex
+
                 )
             )
         )!!
 
-        val docQuery1 = DocLevelQuery(query = "test_field_1:\"test_value_2\"", name = "1")
-        val docQuery2 = DocLevelQuery(query = "test_field_1:\"test_value_1\"", name = "2")
-        val docQuery3 = DocLevelQuery(query = "test_field_1:\"test_value_3\"", name = "3")
-        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1, docQuery2, docQuery3))
-        val docTrigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        val docCustomAlertsIndex = "custom_alerts_index"
-        val docCustomFindingsIndex = "custom_findings_index"
-        val docCustomFindingsIndexPattern = "custom_findings_index-1"
-        var docLevelMonitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(docTrigger),
-            dataSources = DataSources(
-                alertsIndex = docCustomAlertsIndex,
-                findingsIndex = docCustomFindingsIndex,
-                findingsIndexPattern = docCustomFindingsIndexPattern
-            )
-        )
+        val bucketLevelMonitorResponse2 = createMonitor(
+            randomBucketLevelMonitor(
+                inputs = listOf(input),
+                enabled = false,
+                triggers = listOf(trigger),
+                dataSources = DataSources(
+                    alertsIndex = customAlertIndex,
+                    alertsHistoryIndexPattern = customAlertHistoryIndexPattern,
+                    alertsHistoryIndex = customAlertHistoryIndex
 
-        val docLevelMonitorResponse = createMonitor(docLevelMonitor)!!
+                )
+            )
+        )!!
+
+        val andTrigger = randomChainedAlertTrigger(
+            name = "1And2",
+            condition = Script("monitor[id=${bucketLevelMonitorResponse.id}] && monitor[id=${bucketLevelMonitorResponse2.id}]")
+        )
         // 1. bucketMonitor (chainedFinding = null) 2. docMonitor (chainedFinding = bucketMonitor)
         var workflow = randomWorkflow(
-            monitorIds = listOf(bucketLevelMonitorResponse.id, docLevelMonitorResponse.id), auditDelegateMonitorAlerts = false,
-
+            monitorIds = listOf(bucketLevelMonitorResponse.id, bucketLevelMonitorResponse2.id),
+            triggers = listOf(andTrigger)
         )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
@@ -3239,33 +3238,115 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
         assertNotNull(executeWorkflowResponse)
 
-        for (monitorRunResults in executeWorkflowResponse.workflowRunResult.monitorRunResults) {
-            if (bucketLevelMonitorResponse.monitor.name == monitorRunResults.monitorName) {
-                val searchResult = monitorRunResults.inputResults.results.first()
+        Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults.isNotEmpty())
+        Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults.containsKey(andTrigger.id))
+        Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults[andTrigger.id]!!.triggered)
 
-                @Suppress("UNCHECKED_CAST")
-                val buckets = searchResult.stringMap("aggregations")?.stringMap("composite_agg")
-                    ?.get("buckets") as List<kotlin.collections.Map<String, Any>>
-                assertEquals("Incorrect search result", 3, buckets.size)
+        val auditStateAlerts = getAuditStateAlerts(
+            alertsIndex = customAlertHistoryIndex,
+            monitorId = bucketLevelMonitorResponse.id,
+            executionId = executeWorkflowResponse.workflowRunResult.executionId
+        )
+        Assert.assertEquals(auditStateAlerts.size, 2)
 
-                val getAlertsResponse = assertAlerts(bucketLevelMonitorResponse.id, bucketCustomAlertsIndex, alertSize = 2)
-                assertAcknowledges(getAlertsResponse.alerts, bucketLevelMonitorResponse.id, 2)
-                assertFindings(bucketLevelMonitorResponse.id, bucketCustomFindingsIndex, 1, 4, listOf("1", "2", "3", "4"))
-            } else {
-                assertEquals(1, monitorRunResults.inputResults.results.size)
-                val values = monitorRunResults.triggerResults.values
-                assertEquals(1, values.size)
-                @Suppress("UNCHECKED_CAST")
-                val docLevelTrigger = values.iterator().next() as DocumentLevelTriggerRunResult
-                val triggeredDocIds = docLevelTrigger.triggeredDocs.map { it.split("|")[0] }
-                val expectedTriggeredDocIds = listOf("1", "2", "3", "4")
-                assertEquals(expectedTriggeredDocIds, triggeredDocIds.sorted())
+        val auditStateAlerts2 = getAuditStateAlerts(
+            alertsIndex = customAlertHistoryIndex,
+            monitorId = bucketLevelMonitorResponse2.id,
+            executionId = executeWorkflowResponse.workflowRunResult.executionId
+        )
+        Assert.assertEquals(auditStateAlerts2.size, 2)
+    }
 
-                val getAlertsResponse = assertAlerts(docLevelMonitorResponse.id, docCustomAlertsIndex, alertSize = 4)
-                assertAcknowledges(getAlertsResponse.alerts, docLevelMonitorResponse.id, 4)
-                assertFindings(docLevelMonitorResponse.id, docCustomFindingsIndex, 4, 4, listOf("1", "2", "3", "4"))
-            }
-        }
+    fun `test chained alerts for bucket level monitors generating audit alerts`() {
+        val query = QueryBuilders.rangeQuery("test_strict_date_time")
+            .gt("{{period_end}}||-10d")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
+        val compositeSources = listOf(
+            TermsValuesSourceBuilder("test_field_1").field("test_field_1")
+        )
+        val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
+        val input = SearchInput(indices = listOf(index), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
+        // Bucket level monitor will reduce the size of matched doc ids on those that belong to a bucket that contains more than 1 document after term grouping
+        val triggerScript = """
+            params.docCount > 1
+        """.trimIndent()
+
+        var trigger = randomBucketLevelTrigger()
+        trigger = trigger.copy(
+            bucketSelector = BucketSelectorExtAggregationBuilder(
+                name = trigger.id,
+                bucketsPathsMap = mapOf("docCount" to "_count"),
+                script = Script(triggerScript),
+                parentBucketPath = "composite_agg",
+                filter = null,
+            )
+        )
+
+        val bucketLevelMonitorResponse = createMonitor(
+            randomBucketLevelMonitor(
+                inputs = listOf(input),
+                enabled = false,
+                triggers = listOf(trigger)
+            )
+        )!!
+
+        val bucketLevelMonitorResponse2 = createMonitor(
+            randomBucketLevelMonitor(
+                inputs = listOf(input),
+                enabled = false,
+                triggers = listOf(trigger)
+            )
+        )!!
+
+        val andTrigger = randomChainedAlertTrigger(
+            name = "1And2",
+            condition = Script("monitor[id=${bucketLevelMonitorResponse.id}] && monitor[id=${bucketLevelMonitorResponse2.id}]")
+        )
+        // 1. bucketMonitor (chainedFinding = null) 2. docMonitor (chainedFinding = bucketMonitor)
+        var workflow = randomWorkflow(
+            monitorIds = listOf(bucketLevelMonitorResponse.id, bucketLevelMonitorResponse2.id),
+            triggers = listOf(andTrigger)
+        )
+        val workflowResponse = upsertWorkflow(workflow)!!
+        val workflowById = searchWorkflow(workflowResponse.id)
+        assertNotNull(workflowById)
+
+        // Creates 5 documents
+        insertSampleTimeSerializedData(
+            index,
+            listOf(
+                "test_value_1",
+                "test_value_1", // adding duplicate to verify aggregation
+                "test_value_2",
+                "test_value_2",
+                "test_value_3"
+            )
+        )
+
+        val workflowId = workflowResponse.id
+        // 1. bucket level monitor should reduce the doc findings to 4 (1, 2, 3, 4)
+        // 2. Doc level monitor will match those 4 documents although it contains rules for matching all 5 documents (docQuery3 matches the fifth)
+        val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
+        assertNotNull(executeWorkflowResponse)
+
+        Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults.isNotEmpty())
+        Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults.containsKey(andTrigger.id))
+        Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults[andTrigger.id]!!.triggered)
+
+        val auditStateAlerts = getAuditStateAlerts(
+            alertsIndex = bucketLevelMonitorResponse.monitor.dataSources.alertsHistoryIndex,
+            monitorId = bucketLevelMonitorResponse.id,
+            executionId = executeWorkflowResponse.workflowRunResult.executionId
+        )
+        Assert.assertEquals(auditStateAlerts.size, 2)
+
+        val auditStateAlerts2 = getAuditStateAlerts(
+            alertsIndex = bucketLevelMonitorResponse.monitor.dataSources.alertsHistoryIndex,
+            monitorId = bucketLevelMonitorResponse2.id,
+            executionId = executeWorkflowResponse.workflowRunResult.executionId
+        )
+        Assert.assertEquals(auditStateAlerts2.size, 2)
     }
 
     fun `test execute with custom alerts and finding index with bucket and doc monitor when doc monitor  is used in chained finding`() {
