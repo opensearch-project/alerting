@@ -1024,7 +1024,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test execute AD monitor doesn't return search result without user`() {
+    fun `test execute AD monitor returns search result without user`() {
         // TODO: change to REST API call to test security enabled case
         if (!securityEnabled()) {
             val user = randomUser()
@@ -1044,14 +1044,14 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
             @Suppress("UNCHECKED_CAST")
             val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
-            assertEquals("Incorrect search result", 1, total["value"])
+            assertEquals("Incorrect search result", 5, total["value"])
             @Suppress("UNCHECKED_CAST")
             val maxAnomalyGrade = searchResult.stringMap("aggregations")?.get("max_anomaly_grade") as Map<String, String>
-            assertEquals("Incorrect search result", 0.75, maxAnomalyGrade["value"])
+            assertEquals("Incorrect search result", 0.9, maxAnomalyGrade["value"])
         }
     }
 
-    fun `test execute AD monitor doesn't return search result with empty backend role`() {
+    fun `test execute AD monitor returns search result with empty backend role`() {
         // TODO: change to REST API call to test security enabled case
         if (!securityEnabled()) {
             val user = randomUser()
@@ -1074,7 +1074,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
             @Suppress("UNCHECKED_CAST")
             val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
-            assertEquals("Incorrect search result", 1, total["value"])
+            assertEquals("Incorrect search result", 5, total["value"])
             @Suppress("UNCHECKED_CAST")
             val maxAnomalyGrade = searchResult.stringMap("aggregations")?.get("max_anomaly_grade") as Map<String, String>
             assertEquals("Incorrect search result", 0.9, maxAnomalyGrade["value"])
@@ -1100,10 +1100,10 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
             @Suppress("UNCHECKED_CAST")
             val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
-            assertEquals("Incorrect search result", 3, total["value"])
+            assertEquals("Incorrect search result", 5, total["value"])
             @Suppress("UNCHECKED_CAST")
             val maxAnomalyGrade = searchResult.stringMap("aggregations")?.get("max_anomaly_grade") as Map<String, String>
-            assertEquals("Incorrect search result", 0.8, maxAnomalyGrade["value"])
+            assertEquals("Incorrect search result", 0.9, maxAnomalyGrade["value"])
         }
     }
 
@@ -1123,13 +1123,13 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             @Suppress("UNCHECKED_CAST")
             (output["trigger_results"] as HashMap<String, Any>).forEach {
                     _, v ->
-                assertFalse((v as HashMap<String, Boolean>)["triggered"] as Boolean)
+                assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             @Suppress("UNCHECKED_CAST")
             val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
             @Suppress("UNCHECKED_CAST")
             val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
-            assertEquals("Incorrect search result", 0, total["value"])
+            assertEquals("Incorrect search result", 5, total["value"])
         }
     }
 

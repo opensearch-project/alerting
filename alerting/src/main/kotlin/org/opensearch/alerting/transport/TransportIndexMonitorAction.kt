@@ -45,7 +45,7 @@ import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.addUserBackendRolesFilter
-import org.opensearch.alerting.util.getADBackendRoleFilterEnabled
+import org.opensearch.alerting.util.getRoleFilterEnabled
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.use
 import org.opensearch.client.Client
@@ -270,7 +270,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     request.monitor = request.monitor
                         .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttNames))
                     val searchSourceBuilder = SearchSourceBuilder().size(0)
-                    if (getADBackendRoleFilterEnabled(clusterService, settings)) {
+                    if (getRoleFilterEnabled(clusterService, settings, "plugins.anomaly_detection.filter_by_backend_roles")) {
                         addUserBackendRolesFilter(user, searchSourceBuilder)
                     }
                     val searchRequest = SearchRequest().indices(".opendistro-anomaly-detectors").source(searchSourceBuilder)

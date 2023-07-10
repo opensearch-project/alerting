@@ -15,7 +15,7 @@ import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.util.AggregationQueryRewriter
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.executeTransportAction
-import org.opensearch.alerting.util.getADBackendRoleFilterEnabled
+import org.opensearch.alerting.util.getRoleFilterEnabled
 import org.opensearch.alerting.util.toMap
 import org.opensearch.alerting.util.use
 import org.opensearch.alerting.workflow.WorkflowRunContext
@@ -207,7 +207,7 @@ class InputService(
                 // Monitor runner will send transport request to check permission first. If security plugin response
                 // is yes, user has permission to query AD result. If AD role filter enabled, we will add user role
                 // filter to protect data at user role level; otherwise, user can query any AD result.
-                if (getADBackendRoleFilterEnabled(clusterService, settings)) {
+                if (getRoleFilterEnabled(clusterService, settings, "plugins.anomaly_detection.filter_by_backend_roles")) {
                     addUserBackendRolesFilter(monitor.user, searchRequest.source())
                 }
                 val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
