@@ -21,7 +21,6 @@ import org.opensearch.alerting.util.destinationmigration.DestinationConversionUt
 import org.opensearch.alerting.util.destinationmigration.DestinationConversionUtils.Companion.convertEmailGroupToNotificationConfig
 import org.opensearch.alerting.util.destinationmigration.NotificationApiUtils.Companion.createNotificationConfig
 import org.opensearch.client.node.NodeClient
-import org.opensearch.common.Strings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentParserUtils
@@ -31,6 +30,7 @@ import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.notifications.action.CreateNotificationConfigRequest
 import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
+import org.opensearch.core.common.Strings
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.query.QueryBuilders
