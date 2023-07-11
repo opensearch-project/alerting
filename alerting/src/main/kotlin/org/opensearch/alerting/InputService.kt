@@ -14,9 +14,9 @@ import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.util.AggregationQueryRewriter
 import org.opensearch.alerting.util.addUserBackendRolesFilter
-import org.opensearch.alerting.util.executeTransportAction
+import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.executeTransportAction
+import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.toMap
 import org.opensearch.alerting.util.getRoleFilterEnabled
-import org.opensearch.alerting.util.toMap
 import org.opensearch.alerting.util.use
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client

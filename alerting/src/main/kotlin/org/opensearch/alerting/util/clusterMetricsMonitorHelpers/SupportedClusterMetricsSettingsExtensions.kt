@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting.util
+package org.opensearch.alerting.util.clusterMetricsMonitorHelpers
 
 import org.opensearch.action.ActionResponse
 import org.opensearch.action.admin.cluster.health.ClusterHealthRequest
@@ -29,6 +29,8 @@ import org.opensearch.client.Client
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.support.XContentMapValues
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 
 /**
  * Calls the appropriate transport action for the API requested in the [clusterMetricsInput].
@@ -39,9 +41,23 @@ import org.opensearch.commons.alerting.model.ClusterMetricsInput
 fun executeTransportAction(clusterMetricsInput: ClusterMetricsInput, client: Client): ActionResponse {
     val request = resolveToActionRequest(clusterMetricsInput)
     return when (clusterMetricsInput.clusterMetricType) {
+        ClusterMetricsInput.ClusterMetricType.CAT_INDICES -> {
+            request as CatIndicesRequestWrapper
+            val healthResponse = client.admin().cluster().health(request.clusterHealthRequest).get()
+            val indexSettingsResponse = client.admin().indices().getSettings(request.indexSettingsRequest).get()
+            val indicesResponse = client.admin().indices().stats(request.indicesStatsRequest).get()
+            val stateResponse = client.admin().cluster().state(request.clusterStateRequest).get()
+            return CatIndicesResponseWrapper(healthResponse, stateResponse, indexSettingsResponse, indicesResponse)
+        }
         ClusterMetricsInput.ClusterMetricType.CAT_PENDING_TASKS -> client.admin().cluster()
             .pendingClusterTasks(request as PendingClusterTasksRequest).get()
         ClusterMetricsInput.ClusterMetricType.CAT_RECOVERY -> client.admin().indices().recoveries(request as RecoveryRequest).get()
+        ClusterMetricsInput.ClusterMetricType.CAT_SHARDS -> {
+            request as CatShardsRequestWrapper
+            val stateResponse = client.admin().cluster().state(request.clusterStateRequest).get()
+            val indicesResponse = client.admin().indices().stats(request.indicesStatsRequest).get()
+            return CatShardsResponseWrapper(stateResponse, indicesResponse)
+        }
         ClusterMetricsInput.ClusterMetricType.CAT_SNAPSHOTS -> client.admin().cluster().getSnapshots(request as GetSnapshotsRequest).get()
         ClusterMetricsInput.ClusterMetricType.CAT_TASKS -> client.admin().cluster().listTasks(request as ListTasksRequest).get()
         ClusterMetricsInput.ClusterMetricType.CLUSTER_HEALTH -> client.admin().cluster().health(request as ClusterHealthRequest).get()
@@ -73,6 +89,14 @@ fun ActionResponse.toMap(): Map<String, Any> {
         is ClusterGetSettingsResponse -> redactFieldsFromResponse(
             this.convertToMap(),
             SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CLUSTER_SETTINGS.defaultPath)
+        )
+        is CatIndicesResponseWrapper -> redactFieldsFromResponse(
+            this.convertToMap(),
+            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CAT_INDICES.defaultPath)
+        )
+        is CatShardsResponseWrapper -> redactFieldsFromResponse(
+            this.convertToMap(),
+            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CAT_SHARDS.defaultPath)
         )
         is NodesStatsResponse -> redactFieldsFromResponse(
             this.convertToMap(),

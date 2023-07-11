@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting.util
+package org.opensearch.alerting.util.clusterMetricsMonitorHelpers
 
 import org.opensearch.test.OpenSearchTestCase
 

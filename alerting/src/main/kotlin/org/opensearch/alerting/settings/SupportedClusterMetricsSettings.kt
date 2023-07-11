@@ -14,6 +14,8 @@ import org.opensearch.action.admin.cluster.state.ClusterStateRequest
 import org.opensearch.action.admin.cluster.stats.ClusterStatsRequest
 import org.opensearch.action.admin.cluster.tasks.PendingClusterTasksRequest
 import org.opensearch.action.admin.indices.recovery.RecoveryRequest
+import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.CatIndicesRequestWrapper
+import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.CatShardsRequestWrapper
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
@@ -84,12 +86,14 @@ class SupportedClusterMetricsSettings : org.opensearch.commons.alerting.settings
         fun resolveToActionRequest(clusterMetricsInput: ClusterMetricsInput): ActionRequest {
             val pathParams = clusterMetricsInput.parsePathParams()
             return when (clusterMetricsInput.clusterMetricType) {
+                ClusterMetricType.CAT_INDICES -> CatIndicesRequestWrapper(pathParams)
                 ClusterMetricType.CAT_PENDING_TASKS -> PendingClusterTasksRequest()
                 ClusterMetricType.CAT_RECOVERY -> {
                     if (pathParams.isEmpty()) return RecoveryRequest()
                     val pathParamsArray = pathParams.split(",").toTypedArray()
                     return RecoveryRequest(*pathParamsArray)
                 }
+                ClusterMetricType.CAT_SHARDS -> CatShardsRequestWrapper(pathParams)
                 ClusterMetricType.CAT_SNAPSHOTS -> {
                     return GetSnapshotsRequest(pathParams, arrayOf(GetSnapshotsRequest.ALL_SNAPSHOTS))
                 }
