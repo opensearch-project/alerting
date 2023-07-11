@@ -42,7 +42,6 @@ import org.opensearch.commons.utils.logger
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
-import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
@@ -114,11 +113,12 @@ class TransportGetAlertsAction @Inject constructor(
             queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getAlertsRequest.monitorIds))
         }
         if (getAlertsRequest.workflowIds.isNullOrEmpty() == false) {
-            val bqb: BoolQueryBuilder = QueryBuilders.boolQuery()
             queryBuilder.must(QueryBuilders.termsQuery("workflow_id", getAlertsRequest.workflowIds))
             if (getAlertsRequest.monitorId.isNullOrEmpty() && getAlertsRequest.monitorIds.isNullOrEmpty()) {
                 queryBuilder.must(QueryBuilders.termQuery("monitor_id", ""))
             }
+        } else {
+            queryBuilder.must(QueryBuilders.termQuery("workflow_id", ""))
         }
         if (!tableProp.searchString.isNullOrBlank()) {
             queryBuilder

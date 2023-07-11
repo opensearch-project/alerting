@@ -41,6 +41,9 @@ task dummyIntegTest(type: Test) {
     }
 }
 
+integTest {
+    systemProperty 'jacoco.dir', "${jacocoDir}"
+}
 
 testClusters.integTest {
     //Hack: to fix jacocoagent path with gradle 6.5, add the missing "/" at the start of the jacocoagent path.
@@ -61,4 +64,8 @@ jacocoTestReport {
         html.required = true // human readable
         xml.required = true // for coverlay
     }
+}
+
+project.gradle.projectsEvaluated {
+    jacocoTestReport.dependsOn integTest
 }

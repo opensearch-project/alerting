@@ -336,7 +336,6 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         }
     }
 
-    // todo use flag in workflow
     fun getDelegateMonitorAlertIndex(
         dataSources: DataSources,
         workflow: Workflow,

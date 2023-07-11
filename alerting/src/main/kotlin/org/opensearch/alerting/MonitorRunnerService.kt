@@ -147,8 +147,10 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 MOVE_ALERTS_BACKOFF_MILLIS.get(monitorCtx.settings),
                 MOVE_ALERTS_BACKOFF_COUNT.get(monitorCtx.settings)
             )
-        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(MOVE_ALERTS_BACKOFF_MILLIS, MOVE_ALERTS_BACKOFF_COUNT) {
-                millis, count ->
+        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(
+            MOVE_ALERTS_BACKOFF_MILLIS,
+            MOVE_ALERTS_BACKOFF_COUNT
+        ) { millis, count ->
             monitorCtx.moveAlertsRetryPolicy = BackoffPolicy.exponentialBackoff(millis, count)
         }
 
@@ -194,7 +196,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         runnerSupervisor.cancel()
     }
 
-    override fun doClose() { }
+    override fun doClose() {}
 
     override fun postIndex(job: ScheduledJob) {
         if (job is Monitor) {
@@ -210,7 +212,15 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 }
             }
         } else if (job is Workflow) {
-            // do nothing
+            launch {
+                try {
+                    monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
+                        moveAlerts(monitorCtx.client!!, job.id, job, monitorCtx)
+                    }
+                } catch (e: Exception) {
+                    logger.error("Failed to move active alerts for monitor [${job.id}].", e)
+                }
+            }
         } else {
             throw IllegalArgumentException("Invalid job type")
         }
@@ -220,9 +230,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         launch {
             try {
                 monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
-                    if (monitorCtx.alertIndices!!.isAlertInitialized()) {
-                        moveAlerts(monitorCtx.client!!, jobId, null)
-                    }
+                    moveAlerts(monitorCtx.client!!, jobId, null, monitorCtx)
                 }
             } catch (e: Exception) {
                 logger.error("Failed to move active alerts for monitor [$jobId].", e)
@@ -262,6 +270,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 object : ActionListener<AcknowledgedResponse> {
                     override fun onResponse(response: AcknowledgedResponse) {
                     }
+
                     override fun onFailure(t: Exception) {
                         logger.error("Failed to update config index schema", t)
                     }

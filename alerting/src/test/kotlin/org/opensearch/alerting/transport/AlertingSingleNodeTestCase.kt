@@ -71,6 +71,7 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 /**
  * A test that keep a singleton node started for all tests that can be used to get
@@ -490,5 +491,13 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     protected fun executeWorkflow(workflow: Workflow? = null, id: String? = null, dryRun: Boolean = true): ExecuteWorkflowResponse? {
         val request = ExecuteWorkflowRequest(dryRun, TimeValue(Instant.now().toEpochMilli()), id, workflow)
         return client().execute(ExecuteWorkflowAction.INSTANCE, request).get()
+    }
+
+    override fun nodeSettings(): Settings {
+        return Settings.builder()
+            .put(super.nodeSettings())
+            .put("opendistro.scheduled_jobs.sweeper.period", TimeValue(5, TimeUnit.SECONDS))
+            .put("opendistro.scheduled_jobs.enabled", true)
+            .build()
     }
 }

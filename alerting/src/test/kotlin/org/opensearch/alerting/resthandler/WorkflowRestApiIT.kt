@@ -1105,35 +1105,5 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
         val acknowledgeChainedAlertsResponse = entityAsMap(ackRes)
         val acknowledged = acknowledgeChainedAlertsResponse["success"] as List<String>
         Assert.assertEquals(acknowledged[0], alerts[0]["id"])
-//        Assert.assertTrue(chainedAlerts[0].monitorId == "")
-//        Assert.assertTrue(chainedAlerts[0].triggerId == andTrigger.id)
-//        val monitorsRunResults = executeWorkflowResponse.workflowRunResult.monitorRunResults
-//        assertEquals(2, monitorsRunResults.size)
-//
-//        assertEquals(monitor1.name, monitorsRunResults[0].monitorName)
-//        assertEquals(1, monitorsRunResults[0].triggerResults.size)
-//
-//        Assert.assertEquals(monitor2.name, monitorsRunResults[1].monitorName)
-//        Assert.assertEquals(1, monitorsRunResults[1].triggerResults.size)
-//
-//        Assert.assertEquals(
-//            monitor1.dataSources.alertsHistoryIndex,
-//            CompositeWorkflowRunner.getDelegateMonitorAlertIndex(dataSources = monitor1.dataSources, workflow, true)
-//        )
-//        val alerts = getAuditStateAlerts(
-//            alertsIndex = monitor1.dataSources.alertsHistoryIndex, monitorId = monitorResponse.id,
-//            executionId = executeWorkflowResponse.workflowRunResult.executionId
-//        )
-//        val associatedAlertIds = res.associatedAlerts.map { it.id }.toList()
-//        associatedAlertIds.containsAll(alerts.map { it.id }.toList())
-//        assertAuditStateAlerts(monitorResponse.id, alerts)
-//
-//        val alerts1 = getAuditStateAlerts(
-//            alertsIndex = monitor2.dataSources.alertsHistoryIndex, monitorId = monitorResponse2.id,
-//            executionId = executeWorkflowResponse.workflowRunResult.executionId
-//        )
-//        associatedAlertIds.containsAll(alerts1.map { it.id }.toList())
-//        assertAuditStateAlerts(monitorResponse2.id, alerts1)
-//        verifyAcknowledgeChainedAlerts(chainedAlerts, workflowId, 1)
     }
 }
