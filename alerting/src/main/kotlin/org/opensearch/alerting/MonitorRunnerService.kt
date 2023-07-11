@@ -15,7 +15,7 @@ import org.opensearch.action.ActionListener
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.alerts.moveAlerts
+import org.opensearch.alerting.alerts.AlertMover.Companion.moveAlerts
 import org.opensearch.alerting.core.JobRunner
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.model.MonitorRunResult
@@ -231,6 +231,15 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             try {
                 monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
                     moveAlerts(monitorCtx.client!!, jobId, null, monitorCtx)
+                }
+            } catch (e: Exception) {
+                logger.error("Failed to move active alerts for workflow [$jobId]. Could be a monitor", e)
+            }
+            try {
+                monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
+                    if (monitorCtx.alertIndices!!.isAlertInitialized()) {
+                        moveAlerts(monitorCtx.client!!, jobId, null)
+                    }
                 }
             } catch (e: Exception) {
                 logger.error("Failed to move active alerts for monitor [$jobId].", e)

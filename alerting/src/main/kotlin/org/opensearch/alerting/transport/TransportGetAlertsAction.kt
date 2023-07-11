@@ -38,7 +38,6 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.authuser.User
-import org.opensearch.commons.utils.logger
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
@@ -162,7 +161,7 @@ class TransportGetAlertsAction @Inject constructor(
      */
     suspend fun resolveAlertsIndexName(getAlertsRequest: GetAlertsRequest): String {
         var alertIndex = AlertIndices.ALL_ALERT_INDEX_PATTERN
-        if (!getAlertsRequest.alertIndex.isNullOrEmpty()) {
+        if (getAlertsRequest.alertIndex.isNullOrEmpty() == false) {
             alertIndex = getAlertsRequest.alertIndex!!
         } else if (getAlertsRequest.monitorId.isNullOrEmpty() == false) {
             val retrievedMonitor = getMonitor(getAlertsRequest)
