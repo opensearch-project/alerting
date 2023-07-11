@@ -113,9 +113,6 @@ class TransportGetAlertsAction @Inject constructor(
         }
         if (getAlertsRequest.workflowIds.isNullOrEmpty() == false) {
             queryBuilder.must(QueryBuilders.termsQuery("workflow_id", getAlertsRequest.workflowIds))
-            if (getAlertsRequest.monitorId.isNullOrEmpty() && getAlertsRequest.monitorIds.isNullOrEmpty()) {
-                queryBuilder.must(QueryBuilders.termQuery("monitor_id", ""))
-            }
         } else {
             queryBuilder.must(QueryBuilders.termQuery("workflow_id", ""))
         }
