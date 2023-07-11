@@ -124,6 +124,8 @@ class TriggerService(val scriptService: ScriptService) {
         val keyField = Aggregation.CommonFields.KEY.preferredName
         val keyValuesList = mutableListOf<String>()
         when {
+            bucket[keyField] is List<*> && bucket.containsKey(Aggregation.CommonFields.KEY_AS_STRING.preferredName) ->
+                keyValuesList.add(bucket[Aggregation.CommonFields.KEY_AS_STRING.preferredName] as String)
             bucket[keyField] is String -> keyValuesList.add(bucket[keyField] as String)
             // In the case where the key field is an Int
             bucket[keyField] is Int -> keyValuesList.add(bucket[keyField].toString())
