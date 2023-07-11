@@ -149,7 +149,7 @@ class AlertMover {
                     (workflow.inputs[0] as CompositeInput).sequence.delegates.isNotEmpty()
                 ) {
                     var i = 0
-                    val delegates = (workflow.inputs[i] as CompositeInput).sequence.delegates
+                    val delegates = (workflow.inputs[0] as CompositeInput).sequence.delegates
                     try {
                         var getResponse: GetResponse? = null
                         while (i < delegates.size && (getResponse == null || getResponse.isExists == false)) {
