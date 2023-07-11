@@ -113,10 +113,14 @@ class CatIndicesWrappersIT : OpenSearchSingleNodeTestCase() {
         assertEquals(pathParamsIndices.size, returnedIndices.keys.size)
         testIndices.forEach { (indexName, docCount) ->
             if (pathParamsIndices.contains(indexName)) {
-                assertEquals(indexName, returnedIndices[indexName]
-                    ?.get(CatIndicesResponseWrapper.IndexInfo.INDEX_FIELD) as String)
-                assertEquals(docCount.toString(), returnedIndices[indexName]
-                    ?.get(CatIndicesResponseWrapper.IndexInfo.DOCS_COUNT_FIELD) as String)
+                assertEquals(
+                    indexName,
+                    returnedIndices[indexName]?.get(CatIndicesResponseWrapper.IndexInfo.INDEX_FIELD) as String
+                )
+                assertEquals(
+                    docCount.toString(),
+                    returnedIndices[indexName]?.get(CatIndicesResponseWrapper.IndexInfo.DOCS_COUNT_FIELD) as String
+                )
             }
         }
     }
@@ -151,10 +155,14 @@ class CatIndicesWrappersIT : OpenSearchSingleNodeTestCase() {
 
         assertEquals(testIndices.size, returnedIndices.keys.size)
         testIndices.forEach { (indexName, docCount) ->
-            assertEquals(indexName, returnedIndices[indexName]
-                ?.get(CatIndicesResponseWrapper.IndexInfo.INDEX_FIELD) as String)
-            assertEquals(docCount.toString(), returnedIndices[indexName]
-                ?.get(CatIndicesResponseWrapper.IndexInfo.DOCS_COUNT_FIELD) as String)
+            assertEquals(
+                indexName,
+                returnedIndices[indexName]?.get(CatIndicesResponseWrapper.IndexInfo.INDEX_FIELD) as String
+            )
+            assertEquals(
+                docCount.toString(),
+                returnedIndices[indexName]?.get(CatIndicesResponseWrapper.IndexInfo.DOCS_COUNT_FIELD) as String
+            )
         }
     }
 
