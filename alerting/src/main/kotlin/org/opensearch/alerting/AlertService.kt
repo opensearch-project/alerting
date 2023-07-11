@@ -29,6 +29,7 @@ import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.MAX_SEARCH_SIZE
 import org.opensearch.alerting.util.getBucketKeysHash
+import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client
 import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.unit.TimeValue
@@ -213,13 +214,17 @@ class AlertService(
     fun composeMonitorErrorAlert(
         id: String,
         monitor: Monitor,
-        alertError: AlertError
+        alertError: AlertError,
+        executionId: String?,
+        workflowRunContext: WorkflowRunContext?
     ): Alert {
         val currentTime = Instant.now()
         return Alert(
             id = id, monitor = monitor, trigger = NoOpTrigger(), startTime = currentTime,
             lastNotificationTime = currentTime, state = Alert.State.ERROR, errorMessage = alertError?.message,
-            schemaVersion = IndexUtils.alertIndexSchemaVersion, executionId = ""
+            schemaVersion = IndexUtils.alertIndexSchemaVersion,
+            workflowId = workflowRunContext?.workflowId ?: "",
+            executionId = executionId ?: ""
         )
     }
 
@@ -319,7 +324,12 @@ class AlertService(
         } ?: listOf()
     }
 
-    suspend fun upsertMonitorErrorAlert(monitor: Monitor, errorMessage: String) {
+    suspend fun upsertMonitorErrorAlert(
+        monitor: Monitor,
+        errorMessage: String,
+        executionId: String?,
+        workflowRunContext: WorkflowRunContext?,
+    ) {
         val newErrorAlertId = "$ERROR_ALERT_ID_PREFIX-${monitor.id}-${UUID.randomUUID()}"
 
         val searchRequest = SearchRequest(monitor.dataSources.alertsIndex)
@@ -334,7 +344,8 @@ class AlertService(
             )
         val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
 
-        var alert = composeMonitorErrorAlert(newErrorAlertId, monitor, AlertError(Instant.now(), errorMessage))
+        var alert =
+            composeMonitorErrorAlert(newErrorAlertId, monitor, AlertError(Instant.now(), errorMessage), executionId, workflowRunContext)
 
         if (searchResponse.hits.totalHits.value > 0L) {
             if (searchResponse.hits.totalHits.value > 1L) {

@@ -248,7 +248,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 // If any error happened during trigger execution, upsert monitor error alert
                 val errorMessage = constructErrorMessageFromTriggerResults(triggerResults = triggerResults)
                 if (errorMessage.isNotEmpty()) {
-                    monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor = monitor, errorMessage = errorMessage)
+                    monitorCtx.alertService!!.upsertMonitorErrorAlert(
+                        monitor = monitor,
+                        errorMessage = errorMessage,
+                        executionId = workflowRunContext?.executionId,
+                        workflowRunContext
+                    )
                 } else {
                     onSuccessfulMonitorRun(monitorCtx, monitor)
                 }
@@ -263,7 +268,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             return monitorResult.copy(triggerResults = triggerResults)
         } catch (e: Exception) {
             val errorMessage = ExceptionsHelper.detailedMessage(e)
-            monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor, errorMessage)
+            monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor, errorMessage, workflowRunContext?.executionId, workflowRunContext)
             logger.error("Failed running Document-level-monitor ${monitor.name}", e)
             val alertingException = AlertingException(
                 errorMessage,
