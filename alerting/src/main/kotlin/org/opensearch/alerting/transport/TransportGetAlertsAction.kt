@@ -59,8 +59,7 @@ class TransportGetAlertsAction @Inject constructor(
     clusterService: ClusterService,
     actionFilters: ActionFilters,
     val settings: Settings,
-    val xContentRegistry: NamedXContentRegistry,
-    val transportGetMonitorAction: TransportGetMonitorAction
+    val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<ActionRequest, GetAlertsResponse>(
     AlertingActions.GET_ALERTS_ACTION_NAME, transportService, actionFilters, ::GetAlertsRequest
 ),
