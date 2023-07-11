@@ -2580,6 +2580,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         monitorId: String,
         customAlertsIndex: String,
         alertSize: Int,
+        workflowId: String? = null,
     ): GetAlertsResponse {
         val alerts = searchAlerts(monitorId, customAlertsIndex)
         assertEquals("Alert saved for test monitor", alertSize, alerts.size)
@@ -2587,7 +2588,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         var getAlertsResponse = client()
             .execute(
                 AlertingActions.GET_ALERTS_ACTION_TYPE,
-                GetAlertsRequest(table, "ALL", "ALL", null, customAlertsIndex)
+                GetAlertsRequest(
+                    table, "ALL", "ALL", null, customAlertsIndex,
+                    workflowIds = if (workflowId == null) emptyList() else listOf(workflowId)
+                )
             )
             .get()
         assertTrue(getAlertsResponse != null)
@@ -2685,7 +2689,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(monitor2.name, monitorsRunResults[1].monitorName)
         Assert.assertEquals(1, monitorsRunResults[1].triggerResults.size)
 
-        val getAlertsResponse = assertAlerts(monitorResponse.id, customAlertsIndex1, alertSize = 2)
+        val getAlertsResponse = assertAlerts(monitorResponse.id, customAlertsIndex1, alertSize = 2, workflowId = workflowId)
         assertAcknowledges(getAlertsResponse.alerts, monitorResponse.id, 2)
         assertFindings(monitorResponse.id, customFindingsIndex1, 2, 2, listOf("1", "2"))
 
