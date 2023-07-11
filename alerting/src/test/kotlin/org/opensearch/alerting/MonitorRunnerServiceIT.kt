@@ -42,7 +42,10 @@ import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
 import org.opensearch.search.aggregations.bucket.composite.TermsValuesSourceBuilder
+import org.opensearch.search.aggregations.bucket.terms.MultiTermsAggregationBuilder
 import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
+import org.opensearch.search.aggregations.metrics.CardinalityAggregationBuilder
+import org.opensearch.search.aggregations.support.MultiTermsValuesSourceConfig
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.net.URLEncoder
 import java.time.Instant
@@ -1177,6 +1180,89 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         @Suppress("UNCHECKED_CAST")
         val buckets = searchResult.stringMap("aggregations")?.stringMap("composite_agg")?.get("buckets") as List<Map<String, Any>>
         assertEquals("Incorrect search result", 2, buckets.size)
+    }
+
+    fun `test execute bucket-level monitor returns search result with multi term agg`() {
+        val index = "test_index_1234"
+        indexDoc(
+            index,
+            "1",
+            """{"user_id": "1",
+            "ip_addr": "12345678",
+            "user_agent": "chrome"
+            }
+            """.trimIndent()
+        )
+        indexDoc(
+            index,
+            "2",
+            """{"user_id": "2",
+            "ip_addr": "12345678",
+            "user_agent": "chrome"
+            }
+            """.trimIndent()
+        )
+        indexDoc(
+            index,
+            "3",
+            """{"user_id": "2",
+            "ip_addr": "3443534",
+            "user_agent": "chrome"
+            }
+            """.trimIndent()
+        )
+
+        val triggerScript = """
+            params.docCount > 0
+        """.trimIndent()
+
+        var trigger = randomBucketLevelTrigger()
+        trigger = trigger.copy(
+            bucketSelector = BucketSelectorExtAggregationBuilder(
+                name = trigger.id,
+                bucketsPathsMap = mapOf("_value" to "distinct_user_count", "docCount" to "_count"),
+                script = Script(triggerScript),
+                parentBucketPath = "hot",
+                filter = null
+            )
+        )
+
+        val m = randomBucketLevelMonitor(
+            triggers = listOf(trigger),
+            inputs = listOf(
+                SearchInput(
+                    listOf(index),
+                    SearchSourceBuilder().aggregation(
+                        MultiTermsAggregationBuilder("hot")
+                            .terms(
+                                listOf(
+                                    MultiTermsValuesSourceConfig.Builder().setFieldName("ip_addr.keyword").build(),
+                                    MultiTermsValuesSourceConfig.Builder().setFieldName("user_agent.keyword").build()
+                                )
+                            )
+                            .subAggregation(CardinalityAggregationBuilder("distinct_user_count").field("user_id.keyword"))
+                    )
+                )
+            )
+        )
+        val monitor = createMonitor(m)
+        val response = executeMonitor(monitor.id, params = DRYRUN_MONITOR)
+        val output = entityAsMap(response)
+
+        assertEquals(monitor.name, output["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        val buckets = searchResult.stringMap("aggregations")?.stringMap("hot")?.get("buckets") as List<Map<String, Any>>
+        assertEquals("Incorrect search result", 2, buckets.size)
+        val distinctUserCountAgg1 = buckets.find {
+            it.get("key_as_string") == "12345678|chrome"
+        }!!.get("distinct_user_count") as Map<String, Integer>
+        assertEquals(2, distinctUserCountAgg1.get("value"))
+        val distinctUserCountAgg2 = buckets.find {
+            it.get("key_as_string") == "3443534|chrome"
+        }!!.get("distinct_user_count") as Map<String, Integer>
+        assertEquals(1, distinctUserCountAgg2.get("value"))
     }
 
     fun `test bucket-level monitor alert creation and completion`() {
