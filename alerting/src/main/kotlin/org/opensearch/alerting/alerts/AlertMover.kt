@@ -148,7 +148,7 @@ class AlertMover {
                     workflow.inputs.isNotEmpty() && workflow.inputs[0] is CompositeInput &&
                     (workflow.inputs[0] as CompositeInput).sequence.delegates.isNotEmpty()
                 ) {
-                    val i = 0
+                    var i = 0
                     val delegates = (workflow.inputs[i] as CompositeInput).sequence.delegates
                     try {
                         var getResponse: GetResponse? = null
@@ -156,7 +156,7 @@ class AlertMover {
                             getResponse =
                                 client.suspendUntil {
                                     client.get(
-                                        GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, delegates[0].monitorId),
+                                        GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, delegates[i].monitorId),
                                         it
                                     )
                                 }
@@ -174,8 +174,9 @@ class AlertMover {
                                     if (monitor.dataSources.alertsHistoryIndex == null) alertHistoryIndex
                                     else monitor.dataSources.alertsHistoryIndex!!
                             }
+                            i++
                         }
-                    } catch (e: java.lang.Exception) {
+                    } catch (e: Exception) {
                         log.error("Failed to get delegate monitor for workflow $workflowId. Assuming default alert indices", e)
                     }
                 }

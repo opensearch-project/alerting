@@ -2342,7 +2342,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                     ?.get("buckets") as List<kotlin.collections.Map<String, Any>>
                 assertEquals("Incorrect search result", 3, buckets.size)
 
-                val getAlertsResponse = assertAlerts(bucketLevelMonitorResponse.id, bucketCustomAlertsIndex, 2)
+                val getAlertsResponse = assertAlerts(bucketLevelMonitorResponse.id, bucketCustomAlertsIndex, 2, workflowId)
                 assertAcknowledges(getAlertsResponse.alerts, bucketLevelMonitorResponse.id, 2)
                 assertFindings(bucketLevelMonitorResponse.id, bucketCustomFindingsIndex, 1, 4, listOf("1", "2", "3", "4"))
             } else {
@@ -2355,7 +2355,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 val expectedTriggeredDocIds = listOf("1", "2", "3", "4")
                 assertEquals(expectedTriggeredDocIds, triggeredDocIds.sorted())
 
-                val getAlertsResponse = assertAlerts(docLevelMonitorResponse.id, docCustomAlertsIndex, 4)
+                val getAlertsResponse = assertAlerts(docLevelMonitorResponse.id, docCustomAlertsIndex, 4, workflowId)
                 assertAcknowledges(getAlertsResponse.alerts, docLevelMonitorResponse.id, 4)
                 assertFindings(docLevelMonitorResponse.id, docCustomFindingsIndex, 4, 4, listOf("1", "2", "3", "4"))
             }
@@ -2496,7 +2496,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                     assertEquals(expectedTriggeredDocIds, triggeredDocIds.sorted())
 
                     val getAlertsResponse =
-                        assertAlerts(docLevelMonitorResponse.id, docLevelMonitorResponse.monitor.dataSources.alertsIndex, 4)
+                        assertAlerts(docLevelMonitorResponse.id, docLevelMonitorResponse.monitor.dataSources.alertsIndex, 4, workflowId)
                     assertAcknowledges(getAlertsResponse.alerts, docLevelMonitorResponse.id, 4)
                     assertFindings(
                         docLevelMonitorResponse.id,
@@ -2518,7 +2518,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                     assertEquals("Incorrect search result", 2, buckets.size)
 
                     val getAlertsResponse =
-                        assertAlerts(bucketLevelMonitorResponse.id, bucketLevelMonitorResponse.monitor.dataSources.alertsIndex, 2)
+                        assertAlerts(
+                            bucketLevelMonitorResponse.id,
+                            bucketLevelMonitorResponse.monitor.dataSources.alertsIndex,
+                            2,
+                            workflowId
+                        )
                     assertAcknowledges(getAlertsResponse.alerts, bucketLevelMonitorResponse.id, 2)
                     assertFindings(
                         bucketLevelMonitorResponse.id,
@@ -2540,7 +2545,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                     assertEquals(expectedTriggeredDocIds, triggeredDocIds.sorted())
 
                     val getAlertsResponse =
-                        assertAlerts(docLevelMonitorResponse1.id, docLevelMonitorResponse1.monitor.dataSources.alertsIndex, 2)
+                        assertAlerts(docLevelMonitorResponse1.id, docLevelMonitorResponse1.monitor.dataSources.alertsIndex, 2, workflowId)
                     assertAcknowledges(getAlertsResponse.alerts, docLevelMonitorResponse1.id, 2)
                     assertFindings(
                         docLevelMonitorResponse1.id,
@@ -2580,28 +2585,20 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         monitorId: String,
         customAlertsIndex: String,
         alertSize: Int,
-        workflowId: String? = null,
+        workflowId: String,
     ): GetAlertsResponse {
-        val alerts = searchAlerts(monitorId, customAlertsIndex)
-        assertEquals("Alert saved for test monitor", alertSize, alerts.size)
         val table = Table("asc", "id", null, alertSize, 0, "")
-        var getAlertsResponse = client()
+        val getAlertsResponse = client()
             .execute(
                 AlertingActions.GET_ALERTS_ACTION_TYPE,
                 GetAlertsRequest(
-                    table, "ALL", "ALL", null, customAlertsIndex,
-                    workflowIds = if (workflowId == null) emptyList() else listOf(workflowId)
+                    table, "ALL", "ALL", monitorId, customAlertsIndex,
+                    workflowIds = listOf(workflowId)
                 )
             )
             .get()
         assertTrue(getAlertsResponse != null)
         assertTrue(getAlertsResponse.alerts.size == alertSize)
-        getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, null))
-            .get()
-        assertTrue(getAlertsResponse != null)
-        assertTrue(getAlertsResponse.alerts.size == alertSize)
-
         return getAlertsResponse
     }
 
@@ -2693,7 +2690,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertAcknowledges(getAlertsResponse.alerts, monitorResponse.id, 2)
         assertFindings(monitorResponse.id, customFindingsIndex1, 2, 2, listOf("1", "2"))
 
-        val getAlertsResponse2 = assertAlerts(monitorResponse2.id, customAlertsIndex2, alertSize = 1)
+        val getAlertsResponse2 = assertAlerts(monitorResponse2.id, customAlertsIndex2, alertSize = 1, workflowId = workflowId)
         assertAcknowledges(getAlertsResponse2.alerts, monitorResponse2.id, 1)
         assertFindings(monitorResponse2.id, customFindingsIndex2, 1, 1, listOf("2"))
     }
@@ -2760,7 +2757,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals(1, monitorsRunResults[0].triggerResults.size)
 
         // Assert and not ack the alerts (in order to verify later on that all the alerts are generated)
-        assertAlerts(monitorResponse.id, customAlertsIndex, alertSize = 2)
+        assertAlerts(monitorResponse.id, customAlertsIndex, alertSize = 2, workflowId)
         assertFindings(monitorResponse.id, customFindingsIndex, 2, 2, listOf("1", "2"))
         // Verify workflow and monitor delegate metadata
         val workflowMetadata = searchWorkflowMetadata(id = workflowId)
@@ -2783,8 +2780,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals(monitor.name, monitorsRunResults1[0].monitorName)
         assertEquals(1, monitorsRunResults1[0].triggerResults.size)
 
-        val getAlertsResponse = assertAlerts(monitorResponse.id, customAlertsIndex, alertSize = 4)
-        assertAcknowledges(getAlertsResponse.alerts, monitorResponse.id, 4)
+        val getAlertsResponse = assertAlerts(monitorResponse.id, customAlertsIndex, alertSize = 2, workflowId1)
+        assertAcknowledges(getAlertsResponse.alerts, monitorResponse.id, 2)
         assertFindings(monitorResponse.id, customFindingsIndex, 4, 4, listOf("1", "2", "1", "2"))
         // Verify workflow and monitor delegate metadata
         val workflowMetadata1 = searchWorkflowMetadata(id = workflowId1)
@@ -2854,7 +2851,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals(monitor.name, monitorsRunResults[0].monitorName)
         assertEquals(1, monitorsRunResults[0].triggerResults.size)
 
-        assertAlerts(monitorResponse.id, AlertIndices.ALERT_INDEX, alertSize = 2)
+        assertAlerts(monitorResponse.id, AlertIndices.ALERT_INDEX, alertSize = 2, workflowId)
         assertFindings(monitorResponse.id, AlertIndices.FINDING_HISTORY_WRITE_INDEX, 2, 2, listOf("1", "2"))
         // Verify workflow and monitor delegate metadata
         val workflowMetadata = searchWorkflowMetadata(id = workflowId)
@@ -2893,7 +2890,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals(1, monitorsRunResults1[0].triggerResults.size)
 
         // Verify alerts for the custom index
-        val getAlertsResponse = assertAlerts(monitorResponse.id, customAlertsIndex, alertSize = 2)
+        val getAlertsResponse = assertAlerts(monitorResponse.id, customAlertsIndex, alertSize = 2, workflowId1)
         assertAcknowledges(getAlertsResponse.alerts, monitorResponse.id, 2)
         assertFindings(monitorResponse.id, customFindingsIndex, 2, 2, listOf("1", "2"))
 
@@ -3134,7 +3131,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                     ?.get("buckets") as List<kotlin.collections.Map<String, Any>>
                 assertEquals("Incorrect search result", 3, buckets.size)
 
-                val getAlertsResponse = assertAlerts(bucketLevelMonitorResponse.id, bucketCustomAlertsIndex, alertSize = 2)
+                val getAlertsResponse = assertAlerts(bucketLevelMonitorResponse.id, bucketCustomAlertsIndex, alertSize = 2, workflowId)
                 assertAcknowledges(getAlertsResponse.alerts, bucketLevelMonitorResponse.id, 2)
                 assertFindings(bucketLevelMonitorResponse.id, bucketCustomFindingsIndex, 1, 4, listOf("1", "2", "3", "4"))
             } else {
@@ -3147,7 +3144,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 val expectedTriggeredDocIds = listOf("1", "2", "3", "4")
                 assertEquals(expectedTriggeredDocIds, triggeredDocIds.sorted())
 
-                val getAlertsResponse = assertAlerts(docLevelMonitorResponse.id, docCustomAlertsIndex, alertSize = 4)
+                val getAlertsResponse = assertAlerts(docLevelMonitorResponse.id, docCustomAlertsIndex, alertSize = 4, workflowId)
                 assertAcknowledges(getAlertsResponse.alerts, docLevelMonitorResponse.id, 4)
                 assertFindings(docLevelMonitorResponse.id, docCustomFindingsIndex, 4, 4, listOf("1", "2", "3", "4"))
             }
@@ -3487,7 +3484,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                     assertEquals(expectedTriggeredDocIds, triggeredDocIds.sorted())
 
                     val getAlertsResponse =
-                        assertAlerts(docLevelMonitorResponse.id, docLevelMonitorResponse.monitor.dataSources.alertsIndex, alertSize = 4)
+                        assertAlerts(
+                            docLevelMonitorResponse.id,
+                            docLevelMonitorResponse.monitor.dataSources.alertsIndex,
+                            alertSize = 4,
+                            workflowId = workflowId
+                        )
                     assertAcknowledges(getAlertsResponse.alerts, docLevelMonitorResponse.id, 4)
                     assertFindings(
                         docLevelMonitorResponse.id,
@@ -3510,7 +3512,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
                     val getAlertsResponse =
                         assertAlerts(
-                            bucketLevelMonitorResponse.id, bucketLevelMonitorResponse.monitor.dataSources.alertsIndex, alertSize = 2
+                            bucketLevelMonitorResponse.id,
+                            bucketLevelMonitorResponse.monitor.dataSources.alertsIndex,
+                            alertSize = 2,
+                            workflowId
                         )
                     assertAcknowledges(getAlertsResponse.alerts, bucketLevelMonitorResponse.id, 2)
                     assertFindings(
@@ -3533,7 +3538,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                     assertEquals(expectedTriggeredDocIds, triggeredDocIds.sorted())
 
                     val getAlertsResponse =
-                        assertAlerts(docLevelMonitorResponse1.id, docLevelMonitorResponse1.monitor.dataSources.alertsIndex, alertSize = 2)
+                        assertAlerts(
+                            docLevelMonitorResponse1.id,
+                            docLevelMonitorResponse1.monitor.dataSources.alertsIndex,
+                            alertSize = 2,
+                            workflowId
+                        )
                     assertAcknowledges(getAlertsResponse.alerts, docLevelMonitorResponse1.id, 2)
                     assertFindings(
                         docLevelMonitorResponse1.id,
@@ -3681,6 +3691,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         alertsIndex: String? = AlertIndices.ALERT_INDEX,
         executionId: String? = null,
         alertSize: Int,
+        workflowId: String
     ): GetAlertsResponse {
         val alerts = searchAlerts(monitorId, alertsIndex!!, executionId = executionId)
         assertEquals("Alert saved for test monitor", alertSize, alerts.size)
@@ -3694,7 +3705,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertTrue(getAlertsResponse != null)
         assertTrue(getAlertsResponse.alerts.size == alertSize)
         getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, null))
+            .execute(
+                AlertingActions.GET_ALERTS_ACTION_TYPE,
+                GetAlertsRequest(table, "ALL", "ALL", monitorId, null, workflowIds = listOf(workflowId))
+            )
             .get()
         assertTrue(getAlertsResponse != null)
         assertTrue(getAlertsResponse.alerts.size == alertSize)

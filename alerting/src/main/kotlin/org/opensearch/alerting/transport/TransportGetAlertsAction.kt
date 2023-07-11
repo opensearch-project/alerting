@@ -114,7 +114,10 @@ class TransportGetAlertsAction @Inject constructor(
         if (getAlertsRequest.workflowIds.isNullOrEmpty() == false) {
             queryBuilder.must(QueryBuilders.termsQuery("workflow_id", getAlertsRequest.workflowIds))
         } else {
-            queryBuilder.must(QueryBuilders.termQuery("workflow_id", ""))
+            val noWorklfowIdQuery = QueryBuilders.boolQuery()
+                .should(QueryBuilders.boolQuery().mustNot(QueryBuilders.existsQuery(Alert.WORKFLOW_ID_FIELD)))
+                .should(QueryBuilders.termsQuery(Alert.WORKFLOW_ID_FIELD, ""))
+            queryBuilder.must(noWorklfowIdQuery)
         }
         if (!tableProp.searchString.isNullOrBlank()) {
             queryBuilder
