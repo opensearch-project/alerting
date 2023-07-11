@@ -1215,6 +1215,50 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    fun `test query all alerts in all states with filter by1`() {
+        enableFilterBy()
+        putAlertMappings()
+        val adminUser = User(ADMIN, listOf(ADMIN), listOf(ALL_ACCESS_ROLE), listOf())
+        var monitor = createRandomMonitor(refresh = true).copy(user = adminUser)
+        createAlert(randomAlert(monitor).copy(state = Alert.State.ACKNOWLEDGED))
+        createAlert(randomAlert(monitor).copy(state = Alert.State.COMPLETED))
+        createAlert(randomAlert(monitor).copy(state = Alert.State.ERROR))
+        createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
+        randomAlert(monitor).copy(id = "foobar")
+
+        val inputMap = HashMap<String, Any>()
+        inputMap["missing"] = "_last"
+        inputMap["monitorId"] = monitor.id
+
+        // search as "admin" - must get 4 docs
+        val adminResponseMap = getAlerts(client(), inputMap).asMap()
+        assertEquals(4, adminResponseMap["totalAlerts"])
+
+        // search as userOne without alerting roles - must return 403 Forbidden
+        try {
+            getAlerts(userClient as RestClient, inputMap).asMap()
+            fail("Expected 403 FORBIDDEN response")
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
+        }
+//        createUserWithTestDataAndCustomRole(
+//            user,
+//            TEST_HR_INDEX,
+//            TEST_HR_ROLE,
+//            listOf(ADMIN),
+//            getClusterPermissionsFromCustomRole(ALERTING_INDEX_MONITOR_ACCESS)
+//        )
+        createUserWithRoles(user, listOf(ALERTING_FULL_ACCESS_ROLE), listOf(ADMIN), false)
+        // add alerting roles and search as userOne - must return 0 docs
+//        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
+        try {
+            val responseMap = getAlerts(userClient as RestClient, inputMap).asMap()
+            assertEquals(4, responseMap["totalAlerts"])
+        } finally {
+            deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
+        }
+    }
+
     fun `test get alerts with an user with get alerts role`() {
         putAlertMappings()
         val ackAlertsUser = User(ADMIN, listOf(ADMIN), listOf(ALERTING_GET_ALERTS_ACCESS), listOf())
