@@ -16,6 +16,8 @@ import org.opensearch.action.ActionRequest
 import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.delete.DeleteRequest
+import org.opensearch.action.get.GetRequest
+import org.opensearch.action.get.GetResponse
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
@@ -23,12 +25,10 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.action.update.UpdateRequest
-import org.opensearch.alerting.action.GetMonitorAction
-import org.opensearch.alerting.action.GetMonitorRequest
-import org.opensearch.alerting.action.GetMonitorResponse
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.ScheduledJobUtils
 import org.opensearch.alerting.util.use
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
@@ -42,21 +42,18 @@ import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AcknowledgeAlertResponse
 import org.opensearch.commons.alerting.action.AcknowledgeChainedAlertRequest
 import org.opensearch.commons.alerting.action.AlertingActions
-import org.opensearch.commons.alerting.action.GetWorkflowRequest
-import org.opensearch.commons.alerting.action.GetWorkflowResponse
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.CompositeInput
 import org.opensearch.commons.alerting.model.DataSources
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.util.optionalTimeField
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.query.QueryBuilders
-import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestStatus
 import org.opensearch.search.builder.SearchSourceBuilder
-import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import java.time.Instant
@@ -72,8 +69,6 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
     actionFilters: ActionFilters,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry,
-    val transportGetMonitorAction: TransportGetMonitorAction,
-    val transportGetWorkflowAction: TransportGetWorkflowAction,
 ) : HandledTransportAction<ActionRequest, AcknowledgeAlertResponse>(
     AlertingActions.ACKNOWLEDGE_CHAINED_ALERTS_ACTION_NAME,
     transportService,
@@ -97,13 +92,8 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
         client.threadPool().threadContext.stashContext().use {
             scope.launch {
                 try {
-                    val getWorkflowResponse: GetWorkflowResponse =
-                        transportGetWorkflowAction.client.suspendUntil {
-                            val getWorkflowRequest = GetWorkflowRequest(workflowId = request.workflowId, method = RestRequest.Method.GET)
-
-                            execute(AlertingActions.GET_WORKFLOW_ACTION_TYPE, getWorkflowRequest, it)
-                        }
-                    if (getWorkflowResponse.workflow == null) {
+                    val getResponse = getWorkflow(request.workflowId)
+                    if (getResponse.isExists == false) {
                         actionListener.onFailure(
                             AlertingException.wrap(
                                 ResourceNotFoundException(
@@ -116,7 +106,8 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
                             )
                         )
                     } else {
-                        AcknowledgeHandler(client, actionListener, request).start(getWorkflowResponse.workflow!!)
+                        val workflow = ScheduledJobUtils.parseWorkflowFromScheduledJobDocSource(xContentRegistry, getResponse)
+                        AcknowledgeHandler(client, actionListener, request).start(workflow = workflow)
                     }
                 } catch (e: Exception) {
                     log.error("Failed to acknowledge chained alerts from request $request", e)
@@ -124,6 +115,10 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
                 }
             }
         }
+    }
+
+    private suspend fun getWorkflow(workflowId: String): GetResponse {
+        return client.suspendUntil { client.get(GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, workflowId), it) }
     }
 
     inner class AcknowledgeHandler(
@@ -171,28 +166,8 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
         }
 
         private suspend fun getDataSources(monitorId: String): DataSources {
-            val getMonitorResponse: GetMonitorResponse =
-                transportGetMonitorAction.client.suspendUntil {
-                    val getMonitorRequest = GetMonitorRequest(
-                        monitorId = monitorId,
-                        -3L,
-                        RestRequest.Method.GET,
-                        FetchSourceContext.FETCH_SOURCE
-                    )
-                    execute(GetMonitorAction.INSTANCE, getMonitorRequest, it)
-                }
-            if (getMonitorResponse.monitor == null) {
-                throw AlertingException.wrap(
-                    ResourceNotFoundException(
-                        String.format(
-                            Locale.ROOT,
-                            "No workflow found with id [%s]",
-                            request.workflowId
-                        )
-                    )
-                )
-            }
-            return getMonitorResponse.monitor!!.dataSources
+            val getResponse: GetResponse = client.suspendUntil { client.get(GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, monitorId), it) }
+            return ScheduledJobUtils.parseMonitorFromScheduledJobDocSource(xContentRegistry, getResponse).dataSources
         }
 
         private suspend fun onSearchResponse(response: SearchResponse, workflow: Workflow, dataSources: DataSources) {

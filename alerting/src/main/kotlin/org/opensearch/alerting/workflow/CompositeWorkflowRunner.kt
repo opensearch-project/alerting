@@ -303,7 +303,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         try {
             val searchRequest =
                 SearchRequest(getDelegateMonitorAlertIndex(dataSources, workflow, monitorCtx.alertIndices!!.isAlertHistoryEnabled()))
-            val queryBuilder = QueryBuilders.boolQuery()
+            val queryBuilder = boolQuery()
             queryBuilder.must(QueryBuilders.termQuery("execution_id", executionId))
             queryBuilder.must(QueryBuilders.termQuery("state", getDelegateMonitorAlertState(workflow)))
             val noErrorQuery = boolQuery()

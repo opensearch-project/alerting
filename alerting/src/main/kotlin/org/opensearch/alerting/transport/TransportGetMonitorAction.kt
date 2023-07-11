@@ -22,6 +22,8 @@ import org.opensearch.alerting.action.GetMonitorResponse
 import org.opensearch.alerting.action.GetMonitorResponse.AssociatedWorkflow
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_DELEGATE_PATH
+import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_MONITOR_PATH
 import org.opensearch.alerting.util.use
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
@@ -142,10 +144,10 @@ class TransportGetMonitorAction @Inject constructor(
         try {
             val associatedWorkflows = mutableListOf<AssociatedWorkflow>()
             val queryBuilder = QueryBuilders.nestedQuery(
-                TransportDeleteWorkflowAction.WORKFLOW_DELEGATE_PATH,
+                WORKFLOW_DELEGATE_PATH,
                 QueryBuilders.boolQuery().must(
                     QueryBuilders.matchQuery(
-                        TransportDeleteWorkflowAction.WORKFLOW_MONITOR_PATH,
+                        WORKFLOW_MONITOR_PATH,
                         id
                     )
                 ),

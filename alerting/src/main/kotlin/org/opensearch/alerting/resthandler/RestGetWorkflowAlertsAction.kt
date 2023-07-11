@@ -20,7 +20,7 @@ import org.opensearch.rest.RestRequest.Method.GET
 import org.opensearch.rest.action.RestToXContentListener
 
 /**
- * This class consists of the REST handler to retrieve alerts .
+ * This class consists of the REST handler to retrieve chained alerts by workflow id.
  */
 class RestGetWorkflowAlertsAction : BaseRestHandler() {
 
