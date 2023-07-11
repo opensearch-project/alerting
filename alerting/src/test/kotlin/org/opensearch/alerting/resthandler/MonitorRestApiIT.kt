@@ -1340,7 +1340,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             "GET",
             "$ALERTING_BASE_URI/_search",
             hashMapOf("index" to AlertIndices.ALL_ALERT_INDEX_PATTERN),
-            StringEntity(sourceBuilder.toString(), ContentType.APPLICATION_JSON)
+            NStringEntity(sourceBuilder.toString(), ContentType.APPLICATION_JSON)
         )
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content).map()
         val aggregations = (xcp["aggregations"]!! as Map<String, Map<String, Any>>)
