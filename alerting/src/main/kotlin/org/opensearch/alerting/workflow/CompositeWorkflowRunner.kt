@@ -35,6 +35,9 @@ import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.index.query.QueryBuilders.boolQuery
+import org.opensearch.index.query.QueryBuilders.existsQuery
+import org.opensearch.index.query.QueryBuilders.termsQuery
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -303,6 +306,10 @@ object CompositeWorkflowRunner : WorkflowRunner() {
             val queryBuilder = QueryBuilders.boolQuery()
             queryBuilder.must(QueryBuilders.termQuery("execution_id", executionId))
             queryBuilder.must(QueryBuilders.termQuery("state", getDelegateMonitorAlertState(workflow)))
+            val noErrorQuery = boolQuery()
+                .should(boolQuery().mustNot(existsQuery(Alert.ERROR_MESSAGE_FIELD)))
+                .should(termsQuery(Alert.ERROR_MESSAGE_FIELD, ""))
+            queryBuilder.must(noErrorQuery)
             searchRequest.source().query(queryBuilder)
             val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(searchRequest, it) }
             val alerts = searchResponse.hits.map { hit ->
