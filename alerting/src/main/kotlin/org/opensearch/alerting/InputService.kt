@@ -15,12 +15,15 @@ import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.util.AggregationQueryRewriter
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.executeTransportAction
+import org.opensearch.alerting.util.getRoleFilterEnabled
 import org.opensearch.alerting.util.toMap
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client
+import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.NamedWriteableAwareStreamInput
 import org.opensearch.common.io.stream.NamedWriteableRegistry
+import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
@@ -44,7 +47,9 @@ class InputService(
     val client: Client,
     val scriptService: ScriptService,
     val namedWriteableRegistry: NamedWriteableRegistry,
-    val xContentRegistry: NamedXContentRegistry
+    val xContentRegistry: NamedXContentRegistry,
+    val clusterService: ClusterService,
+    val settings: Settings
 ) {
 
     private val logger = LogManager.getLogger(InputService::class.java)
@@ -197,13 +202,6 @@ class InputService(
 
             // Add user role filter for AD result
             client.threadPool().threadContext.stashContext().use {
-                // Currently we have no way to verify if user has AD read permission or not. So we always add user
-                // role filter here no matter AD backend role filter enabled or not. If we don't add user role filter
-                // when AD backend filter disabled, user can run monitor on any detector and get anomaly data even
-                // they have no AD read permission. So if domain disabled AD backend role filter, monitor runner
-                // still can't get AD result with different user backend role, even the monitor user has permission
-                // to read AD result. This is a short term solution to trade off between user experience and security.
-                //
                 // Possible long term solution:
                 // 1.Use secure rest client to send request to AD search result API. If no permission exception,
                 // that mean user has read access on AD result. Then don't need to add user role filter when query
@@ -212,7 +210,9 @@ class InputService(
                 // Monitor runner will send transport request to check permission first. If security plugin response
                 // is yes, user has permission to query AD result. If AD role filter enabled, we will add user role
                 // filter to protect data at user role level; otherwise, user can query any AD result.
-                addUserBackendRolesFilter(monitor.user, searchRequest.source())
+                if (getRoleFilterEnabled(clusterService, settings, "plugins.anomaly_detection.filter_by_backend_roles")) {
+                    addUserBackendRolesFilter(monitor.user, searchRequest.source())
+                }
                 val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
                 results += searchResponse.convertToMap()
             }
