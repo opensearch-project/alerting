@@ -110,6 +110,14 @@ class TransportGetAlertsAction @Inject constructor(
         } else if (getAlertsRequest.monitorIds.isNullOrEmpty() == false) {
             queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getAlertsRequest.monitorIds))
         }
+        if (getAlertsRequest.workflowIds.isNullOrEmpty() == false) {
+            queryBuilder.must(QueryBuilders.termsQuery("workflow_id", getAlertsRequest.workflowIds))
+        } else {
+            val noWorklfowIdQuery = QueryBuilders.boolQuery()
+                .should(QueryBuilders.boolQuery().mustNot(QueryBuilders.existsQuery(Alert.WORKFLOW_ID_FIELD)))
+                .should(QueryBuilders.termsQuery(Alert.WORKFLOW_ID_FIELD, ""))
+            queryBuilder.must(noWorklfowIdQuery)
+        }
         if (!tableProp.searchString.isNullOrBlank()) {
             queryBuilder
                 .must(
@@ -152,9 +160,9 @@ class TransportGetAlertsAction @Inject constructor(
      */
     suspend fun resolveAlertsIndexName(getAlertsRequest: GetAlertsRequest): String {
         var alertIndex = AlertIndices.ALL_ALERT_INDEX_PATTERN
-        if (!getAlertsRequest.alertIndex.isNullOrEmpty()) {
+        if (getAlertsRequest.alertIndex.isNullOrEmpty() == false) {
             alertIndex = getAlertsRequest.alertIndex!!
-        } else if (!getAlertsRequest.monitorId.isNullOrEmpty()) {
+        } else if (getAlertsRequest.monitorId.isNullOrEmpty() == false) {
             val retrievedMonitor = getMonitor(getAlertsRequest)
             if (retrievedMonitor != null) {
                 alertIndex = retrievedMonitor.dataSources.alertsIndex
@@ -179,6 +187,7 @@ class TransportGetAlertsAction @Inject constructor(
             )
             return ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
         } catch (t: Exception) {
+            log.error("Failure in fetching monitor ${getAlertsRequest.monitorId} to resolve alert index in get alerts action", t)
             return null
         }
     }
