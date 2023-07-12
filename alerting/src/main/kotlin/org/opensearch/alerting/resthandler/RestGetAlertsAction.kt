@@ -57,6 +57,11 @@ class RestGetAlertsAction : BaseRestHandler() {
         val severityLevel = request.param("severityLevel", "ALL")
         val alertState = request.param("alertState", "ALL")
         val monitorId: String? = request.param("monitorId")
+        val workflowId: String? = request.param("workflowIds")
+        val workflowIds = mutableListOf<String>()
+        if (workflowId.isNullOrEmpty() == false) {
+            workflowIds.add(workflowId)
+        }
         val table = Table(
             sortOrder,
             sortString,
@@ -66,7 +71,7 @@ class RestGetAlertsAction : BaseRestHandler() {
             searchString
         )
 
-        val getAlertsRequest = GetAlertsRequest(table, severityLevel, alertState, monitorId, null)
+        val getAlertsRequest = GetAlertsRequest(table, severityLevel, alertState, monitorId, null, workflowIds = workflowIds)
         return RestChannelConsumer {
                 channel ->
             client.execute(AlertingActions.GET_ALERTS_ACTION_TYPE, getAlertsRequest, RestToXContentListener(channel))

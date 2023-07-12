@@ -28,6 +28,7 @@ import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.CompositeInput
+import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.Workflow
@@ -166,9 +167,7 @@ class AlertMover {
                                         monitorCtx.xContentRegistry!!,
                                         response = getResponse
                                     )
-                                /** check if alert index is initialized **/
-                                if (monitorCtx.alertIndices!!.isAlertInitialized(monitor.dataSources) == false)
-                                    return
+
                                 alertIndex = monitor.dataSources.alertsIndex
                                 alertHistoryIndex =
                                     if (monitor.dataSources.alertsHistoryIndex == null) alertHistoryIndex
@@ -181,8 +180,12 @@ class AlertMover {
                     }
                 }
             }
+            val dataSources = DataSources().copy(alertsHistoryIndex = alertHistoryIndex, alertsIndex = alertIndex)
+            /** check if alert index is initialized **/
+            if (monitorCtx.alertIndices!!.isAlertInitialized(dataSources) == false)
+                return
             val boolQuery = QueryBuilders.boolQuery()
-                .filter(QueryBuilders.termQuery(Alert.WORKFLOW_ID_FIELD, workflowId))
+                .must(QueryBuilders.termQuery(Alert.WORKFLOW_ID_FIELD, workflowId))
 
             if (workflow != null) {
                 boolQuery.mustNot(QueryBuilders.termsQuery(Alert.TRIGGER_ID_FIELD, workflow.triggers.map { it.id }))
