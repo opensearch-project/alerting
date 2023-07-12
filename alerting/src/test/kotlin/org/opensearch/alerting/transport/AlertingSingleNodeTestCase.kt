@@ -37,6 +37,8 @@ import org.opensearch.commons.alerting.action.DeleteMonitorRequest
 import org.opensearch.commons.alerting.action.DeleteWorkflowRequest
 import org.opensearch.commons.alerting.action.GetFindingsRequest
 import org.opensearch.commons.alerting.action.GetFindingsResponse
+import org.opensearch.commons.alerting.action.GetWorkflowAlertsRequest
+import org.opensearch.commons.alerting.action.GetWorkflowAlertsResponse
 import org.opensearch.commons.alerting.action.GetWorkflowRequest
 import org.opensearch.commons.alerting.action.GetWorkflowResponse
 import org.opensearch.commons.alerting.action.IndexMonitorRequest
@@ -52,6 +54,7 @@ import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.IndexService
+import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.TermQueryBuilder
 import org.opensearch.index.reindex.ReindexPlugin
 import org.opensearch.index.seqno.SequenceNumbers
@@ -68,6 +71,7 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 /**
  * A test that keep a singleton node started for all tests that can be used to get
@@ -245,7 +249,12 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         return true
     }
 
-    protected fun searchAlerts(id: String, indices: String = AlertIndices.ALERT_INDEX, refresh: Boolean = true): List<Alert> {
+    protected fun searchAlerts(
+        monitorId: String,
+        indices: String = AlertIndices.ALERT_INDEX,
+        refresh: Boolean = true,
+        executionId: String? = null,
+    ): List<Alert> {
         try {
             if (refresh) refreshIndex(indices)
         } catch (e: Exception) {
@@ -254,13 +263,42 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         }
         val ssb = SearchSourceBuilder()
         ssb.version(true)
-        ssb.query(TermQueryBuilder(Alert.MONITOR_ID_FIELD, id))
-        val searchResponse = client().prepareSearch(indices).setRouting(id).setSource(ssb).get()
+        val bqb = BoolQueryBuilder()
+        bqb.must(TermQueryBuilder(Alert.MONITOR_ID_FIELD, monitorId))
+        if (executionId.isNullOrEmpty() == false) {
+            bqb.must(TermQueryBuilder(Alert.EXECUTION_ID_FIELD, executionId))
+        }
+        ssb.query(bqb)
+        val searchResponse = client().prepareSearch(indices).setRouting(monitorId).setSource(ssb).get()
 
         return searchResponse.hits.hits.map {
             val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
             Alert.parse(xcp, it.id, it.version)
         }
+    }
+
+    protected fun getWorkflowAlerts(
+        workflowId: String,
+        getAssociatedAlerts: Boolean? = true,
+        alertState: Alert.State? = Alert.State.ACTIVE,
+        alertIndex: String? = "",
+        associatedAlertsIndex: String? = "",
+    ): GetWorkflowAlertsResponse {
+        val table = Table("asc", "monitor_id", null, 100, 0, null)
+        return client().execute(
+            AlertingActions.GET_WORKFLOW_ALERTS_ACTION_TYPE,
+            GetWorkflowAlertsRequest(
+                table = table,
+                severityLevel = "ALL",
+                alertState = alertState!!.name,
+                alertIndex = alertIndex,
+                associatedAlertsIndex = associatedAlertsIndex,
+                monitorIds = emptyList(),
+                workflowIds = listOf(workflowId),
+                alertIds = emptyList(),
+                getAssociatedAlerts = getAssociatedAlerts!!
+            )
+        ).get()
     }
 
     protected fun refreshIndex(index: String) {
@@ -270,7 +308,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     protected fun searchFindings(
         id: String,
         indices: String = AlertIndices.ALL_FINDING_INDEX_PATTERN,
-        refresh: Boolean = true
+        refresh: Boolean = true,
     ): List<Finding> {
         if (refresh) refreshIndex(indices)
 
@@ -305,7 +343,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     protected fun getMonitorResponse(
         monitorId: String,
         version: Long = 1L,
-        fetchSourceContext: FetchSourceContext = FetchSourceContext.FETCH_SOURCE
+        fetchSourceContext: FetchSourceContext = FetchSourceContext.FETCH_SOURCE,
     ) = client().execute(
         GetMonitorAction.INSTANCE,
         GetMonitorRequest(monitorId, version, RestRequest.Method.GET, fetchSourceContext)
@@ -435,6 +473,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
 
         return client().execute(AlertingActions.INDEX_WORKFLOW_ACTION_TYPE, request).actionGet()
     }
+
     protected fun getWorkflowById(id: String): GetWorkflowResponse {
         return client().execute(
             AlertingActions.GET_WORKFLOW_ACTION_TYPE,
@@ -452,5 +491,13 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     protected fun executeWorkflow(workflow: Workflow? = null, id: String? = null, dryRun: Boolean = true): ExecuteWorkflowResponse? {
         val request = ExecuteWorkflowRequest(dryRun, TimeValue(Instant.now().toEpochMilli()), id, workflow)
         return client().execute(ExecuteWorkflowAction.INSTANCE, request).get()
+    }
+
+    override fun nodeSettings(): Settings {
+        return Settings.builder()
+            .put(super.nodeSettings())
+            .put("opendistro.scheduled_jobs.sweeper.period", TimeValue(5, TimeUnit.SECONDS))
+            .put("opendistro.scheduled_jobs.enabled", true)
+            .build()
     }
 }

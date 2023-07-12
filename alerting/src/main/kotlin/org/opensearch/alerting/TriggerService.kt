@@ -6,7 +6,9 @@
 package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.alerting.chainedAlertCondition.parsers.ChainedAlertExpressionParser
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
+import org.opensearch.alerting.model.ChainedAlertTriggerRunResult
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
@@ -14,15 +16,18 @@ import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.triggercondition.parsers.TriggerExpressionParser
 import org.opensearch.alerting.util.getBucketKeysHash
+import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorIndices.Fields.BUCKET_INDICES
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorIndices.Fields.PARENT_BUCKET_PATH
 import org.opensearch.commons.alerting.model.AggregationResultBucket
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.ChainedAlertTrigger
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
+import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
 import org.opensearch.search.aggregations.Aggregation
@@ -36,7 +41,12 @@ class TriggerService(val scriptService: ScriptService) {
     private val ALWAYS_RUN = Script("return true")
     private val NEVER_RUN = Script("return false")
 
-    fun isQueryLevelTriggerActionable(ctx: QueryLevelTriggerExecutionContext, result: QueryLevelTriggerRunResult): Boolean {
+    fun isQueryLevelTriggerActionable(
+        ctx: QueryLevelTriggerExecutionContext,
+        result: QueryLevelTriggerRunResult,
+        workflowRunContext: WorkflowRunContext?,
+    ): Boolean {
+        if (workflowRunContext?.auditDelegateMonitorAlerts == true) return false
         // Suppress actions if the current alert is acknowledged and there are no errors.
         val suppress = ctx.alert?.state == Alert.State.ACKNOWLEDGED && result.error == null && ctx.error == null
         return result.triggered && !suppress
@@ -82,6 +92,32 @@ class TriggerService(val scriptService: ScriptService) {
             logger.info("Error running script for monitor ${monitor.id}, trigger: ${trigger.id}", e)
             // if the script fails we need to send an alert so set triggered = true
             DocumentLevelTriggerRunResult(trigger.name, emptyList(), e)
+        }
+    }
+
+    fun runChainedAlertTrigger(
+        workflow: Workflow,
+        trigger: ChainedAlertTrigger,
+        alertGeneratingMonitors: Set<String>,
+        monitorIdToAlertIdsMap: Map<String, Set<String>>,
+    ): ChainedAlertTriggerRunResult {
+        val associatedAlertIds = mutableSetOf<String>()
+        return try {
+            val parsedTriggerCondition = ChainedAlertExpressionParser(trigger.condition.idOrCode).parse()
+            val evaluate = parsedTriggerCondition.evaluate(alertGeneratingMonitors)
+            if (evaluate) {
+                val monitorIdsInTriggerCondition = parsedTriggerCondition.getMonitorIds(parsedTriggerCondition)
+                monitorIdsInTriggerCondition.forEach { associatedAlertIds.addAll(monitorIdToAlertIdsMap.getOrDefault(it, emptySet())) }
+            }
+            ChainedAlertTriggerRunResult(trigger.name, triggered = evaluate, null, associatedAlertIds = associatedAlertIds)
+        } catch (e: Exception) {
+            logger.error("Error running chained alert trigger script for workflow ${workflow.id}, trigger: ${trigger.id}", e)
+            ChainedAlertTriggerRunResult(
+                triggerName = trigger.name,
+                triggered = false,
+                error = e,
+                associatedAlertIds = emptySet()
+            )
         }
     }
 
