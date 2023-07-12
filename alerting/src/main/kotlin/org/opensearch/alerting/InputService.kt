@@ -14,9 +14,9 @@ import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.util.AggregationQueryRewriter
 import org.opensearch.alerting.util.addUserBackendRolesFilter
-import org.opensearch.alerting.util.executeTransportAction
+import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.executeTransportAction
+import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.toMap
 import org.opensearch.alerting.util.getRoleFilterEnabled
-import org.opensearch.alerting.util.toMap
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
@@ -91,10 +91,8 @@ class InputService(
 
                         val searchSource = scriptService.compile(
                             Script(
-                                ScriptType.INLINE,
-                                Script.DEFAULT_TEMPLATE_LANG,
-                                rewrittenQuery.toString(),
-                                searchParams
+                                ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
+                                rewrittenQuery.toString(), searchParams
                             ),
                             TemplateScript.CONTEXT
                         )
@@ -185,10 +183,8 @@ class InputService(
             val searchParams = mapOf("period_start" to periodStart.toEpochMilli(), "period_end" to periodEnd.toEpochMilli())
             val searchSource = scriptService.compile(
                 Script(
-                    ScriptType.INLINE,
-                    Script.DEFAULT_TEMPLATE_LANG,
-                    input.query.toString(),
-                    searchParams
+                    ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
+                    input.query.toString(), searchParams
                 ),
                 TemplateScript.CONTEXT
             )
