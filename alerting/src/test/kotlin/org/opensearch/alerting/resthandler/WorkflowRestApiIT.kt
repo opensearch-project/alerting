@@ -1069,7 +1069,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
             owner = "alerting",
             triggers = listOf(andTrigger)
         )
-        val workflowById = createWorkflow(workflow)!!
+        val workflowById = createWorkflow(workflow)
         assertNotNull(workflowById)
         val workflowId = workflowById.id
 
@@ -1079,7 +1079,18 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
                 "test_value_1"
             )
         )
-
+        val searchMonitorResponse = searchMonitors()
+        logger.error(searchMonitorResponse)
+        val jobsList = searchMonitorResponse.hits.toList()
+        var numMonitors = 0
+        var numWorkflows = 0
+        jobsList.forEach {
+            val map = it.sourceAsMap
+            if (map["type"] == "workflow") numWorkflows++
+            else if (map["type"] == "monitor") numMonitors++
+        }
+        Assert.assertEquals(numMonitors, 2)
+        Assert.assertEquals(numWorkflows, 1)
         val response = executeWorkflow(workflowId = workflowId, params = emptyMap())
         val executeWorkflowResponse = entityAsMap(response)
         logger.info(executeWorkflowResponse)
