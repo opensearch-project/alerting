@@ -25,7 +25,6 @@ import org.opensearch.alerting.util.destinationmigration.publishLegacyNotificati
 import org.opensearch.alerting.util.destinationmigration.sendNotification
 import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isTestAction
-import org.opensearch.alerting.util.use
 import org.opensearch.client.node.NodeClient
 import org.opensearch.commons.alerting.model.Table
 import org.opensearch.commons.alerting.model.Workflow
