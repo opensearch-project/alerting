@@ -31,6 +31,8 @@ import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_DELEGATE_PATH
+import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_MONITOR_PATH
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -321,10 +323,5 @@ class TransportDeleteWorkflowAction @Inject constructor(
             val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, WorkflowMetadata.getId(workflow.id))
             val deleteResponse: DeleteResponse = client.suspendUntil { delete(deleteRequest, it) }
         }
-    }
-
-    companion object {
-        const val WORKFLOW_DELEGATE_PATH = "workflow.inputs.composite_input.sequence.delegates"
-        const val WORKFLOW_MONITOR_PATH = "workflow.inputs.composite_input.sequence.delegates.monitor_id"
     }
 }

@@ -46,6 +46,7 @@ import org.opensearch.common.xcontent.json.JsonXContent.jsonXContent
 import org.opensearch.commons.alerting.action.GetFindingsResponse
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.ChainedAlertTrigger
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
@@ -100,7 +101,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                 DocLevelMonitorInput.XCONTENT_REGISTRY,
                 QueryLevelTrigger.XCONTENT_REGISTRY,
                 BucketLevelTrigger.XCONTENT_REGISTRY,
-                DocumentLevelTrigger.XCONTENT_REGISTRY
+                DocumentLevelTrigger.XCONTENT_REGISTRY,
+                Workflow.XCONTENT_REGISTRY,
+                ChainedAlertTrigger.XCONTENT_REGISTRY
             ) + SearchModule(Settings.EMPTY, emptyList()).namedXContents
         )
     }
@@ -124,7 +127,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client: RestClient,
         monitor: Monitor,
         rbacRoles: List<String>? = null,
-        refresh: Boolean = true
+        refresh: Boolean = true,
     ): Monitor {
         val response = client.makeRequest(
             "POST", "$ALERTING_BASE_URI?refresh=$refresh", emptyMap(),
@@ -170,7 +173,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client: RestClient,
         workflow: Workflow,
         deleteDelegates: Boolean = false,
-        refresh: Boolean = true
+        refresh: Boolean = true,
     ): Response {
         val response = client.makeRequest(
             "DELETE",
@@ -240,7 +243,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun getEmailAccount(
         emailAccountID: String,
-        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
     ): EmailAccount {
         val response = client().makeRequest("GET", "$EMAIL_ACCOUNT_BASE_URI/$emailAccountID", null, header)
         assertEquals("Unable to get email account $emailAccountID", RestStatus.OK, response.restStatus())
@@ -300,7 +303,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun getEmailGroup(
         emailGroupID: String,
-        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
     ): EmailGroup {
         val response = client().makeRequest("GET", "$EMAIL_GROUP_BASE_URI/$emailGroupID", null, header)
         assertEquals("Unable to get email group $emailGroupID", RestStatus.OK, response.restStatus())
@@ -382,7 +385,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun getDestinations(
         client: RestClient,
         dataMap: Map<String, Any> = emptyMap(),
-        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
     ): List<Map<String, Any>> {
 
         var baseEndpoint = "$DESTINATION_BASE_URI?"
@@ -563,7 +566,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client: RestClient,
         monitor: Monitor,
         rbacRoles: List<String> = emptyList(),
-        refresh: Boolean = true
+        refresh: Boolean = true,
     ): Monitor {
         val response = client.makeRequest(
             "PUT", "${monitor.relativeUrl()}?refresh=$refresh",
@@ -578,7 +581,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client: RestClient,
         workflow: Workflow,
         rbacRoles: List<String> = emptyList(),
-        refresh: Boolean = true
+        refresh: Boolean = true,
     ): Workflow {
         val response = client.makeRequest(
             "PUT",
@@ -609,6 +612,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                 "_id" -> id = parser.text()
                 "_version" -> version = parser.longValue()
                 "monitor" -> monitor = Monitor.parse(parser)
+                "associated_workflows" -> {
+                    XContentParserUtils.ensureExpectedToken(
+                        XContentParser.Token.START_ARRAY,
+                        parser.currentToken(),
+                        parser
+                    )
+                    while (parser.nextToken() != XContentParser.Token.END_ARRAY) {
+                        // do nothing
+                    }
+                }
             }
         }
 
@@ -620,7 +633,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun searchAlertsWithFilter(
         monitor: Monitor,
         indices: String = AlertIndices.ALERT_INDEX,
-        refresh: Boolean = true
+        refresh: Boolean = true,
     ): List<Alert> {
         if (refresh) refreshIndex(indices)
 
@@ -644,7 +657,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         monitorName: String = "NO_NAME",
         index: String = "testIndex",
         docLevelQueries: List<DocLevelQuery> = listOf(DocLevelQuery(query = "test_field:\"us-west-2\"", name = "testQuery")),
-        matchingDocIds: List<String>
+        matchingDocIds: List<String>,
     ): String {
         val finding = Finding(
             id = UUID.randomUUID().toString(),
@@ -665,7 +678,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun searchFindings(
         monitor: Monitor,
         indices: String = AlertIndices.ALL_FINDING_INDEX_PATTERN,
-        refresh: Boolean = true
+        refresh: Boolean = true,
     ): List<Finding> {
         if (refresh) refreshIndex(indices)
 
@@ -724,10 +737,25 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return response
     }
 
+    protected fun acknowledgeChainedAlerts(workflowId: String, vararg alertId: String): Response {
+        val request = jsonBuilder().startObject()
+            .array("alerts", *alertId.map { it }.toTypedArray())
+            .endObject()
+            .string()
+            .let { StringEntity(it, APPLICATION_JSON) }
+
+        val response = client().makeRequest(
+            "POST", "${AlertingPlugin.WORKFLOW_BASE_URI}/$workflowId/_acknowledge/alerts",
+            emptyMap(), request
+        )
+        assertEquals("Acknowledge call failed.", RestStatus.OK, response.restStatus())
+        return response
+    }
+
     protected fun getAlerts(
         client: RestClient,
         dataMap: Map<String, Any> = emptyMap(),
-        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
     ): Response {
         var baseEndpoint = "$ALERTING_BASE_URI/alerts?"
         for (entry in dataMap.entries) {
@@ -741,7 +769,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun getAlerts(
         dataMap: Map<String, Any> = emptyMap(),
-        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
     ): Response {
         return getAlerts(client(), dataMap, header)
     }
@@ -764,6 +792,28 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun executeWorkflow(workflowId: String, params: Map<String, String> = mutableMapOf()): Response {
         return executeWorkflow(client(), workflowId, params)
+    }
+
+    protected fun getWorkflowAlerts(
+        workflowId: String,
+        getAssociatedAlerts: Boolean = true,
+    ): Response {
+        return getWorkflowAlerts(client(), mutableMapOf(Pair("workflowIds", workflowId), Pair("getAssociatedAlerts", getAssociatedAlerts)))
+    }
+
+    protected fun getWorkflowAlerts(
+        client: RestClient,
+        dataMap: Map<String, Any> = emptyMap(),
+        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
+    ): Response {
+        var baseEndpoint = "$WORKFLOW_ALERTING_BASE_URI/alerts?"
+        for (entry in dataMap.entries) {
+            baseEndpoint += "${entry.key}=${entry.value}&"
+        }
+
+        val response = client.makeRequest("GET", baseEndpoint, null, header)
+        assertEquals("Get call failed.", RestStatus.OK, response.restStatus())
+        return response
     }
 
     protected fun executeMonitor(client: RestClient, monitorId: String, params: Map<String, String> = mutableMapOf()): Response {
@@ -880,7 +930,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun createTestAlias(
         alias: String = randomAlphaOfLength(10).lowercase(Locale.ROOT),
         numOfAliasIndices: Int = randomIntBetween(1, 10),
-        includeWriteIndex: Boolean = true
+        includeWriteIndex: Boolean = true,
     ): MutableMap<String, MutableMap<String, Boolean>> {
         return createTestAlias(alias = alias, indices = randomAliasIndices(alias, numOfAliasIndices, includeWriteIndex))
     }
@@ -891,7 +941,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             alias = alias,
             num = randomIntBetween(1, 10),
             includeWriteIndex = true
-        )
+        ),
     ): MutableMap<String, MutableMap<String, Boolean>> {
         val indicesMap = mutableMapOf<String, Boolean>()
         val indicesJson = jsonBuilder().startObject().startArray("actions")
@@ -916,7 +966,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun randomAliasIndices(
         alias: String,
         num: Int = randomIntBetween(1, 10),
-        includeWriteIndex: Boolean = true
+        includeWriteIndex: Boolean = true,
     ): Map<String, Boolean> {
         val indices = mutableMapOf<String, Boolean>()
         val writeIndex = randomIntBetween(0, num)
@@ -1395,7 +1445,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         index: String,
         role: String,
         backendRoles: List<String>,
-        clusterPermissions: String?
+        clusterPermissions: String?,
     ) {
         createUser(user, backendRoles.toTypedArray())
         createTestIndex(index)
@@ -1408,7 +1458,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         index: String,
         role: String,
         backendRoles: List<String>,
-        clusterPermissions: List<String?>
+        clusterPermissions: List<String?>,
     ) {
         createUser(user, backendRoles.toTypedArray())
         createTestIndex(index)
@@ -1420,7 +1470,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         user: String,
         roles: List<String>,
         backendRoles: List<String>,
-        isExistingRole: Boolean
+        isExistingRole: Boolean,
     ) {
         createUser(user, backendRoles.toTypedArray())
         for (role in roles) {
@@ -1437,7 +1487,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         index: String,
         role: String,
         backendRole: String,
-        dlsQuery: String
+        dlsQuery: String,
     ) {
         createUser(user, arrayOf(backendRole))
         createTestIndex(index)
@@ -1451,7 +1501,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         role: String,
         backendRole: String,
         dlsQuery: String,
-        clusterPermissions: String?
+        clusterPermissions: String?,
     ) {
         createUser(user, arrayOf(backendRole))
         createTestIndex(index)
@@ -1524,7 +1574,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client: RestClient,
         workflow: Workflow,
         rbacRoles: List<String>? = null,
-        refresh: Boolean = true
+        refresh: Boolean = true,
     ): Workflow {
         val response = client.makeRequest(
             "POST", "$WORKFLOW_ALERTING_BASE_URI?refresh=$refresh", emptyMap(),

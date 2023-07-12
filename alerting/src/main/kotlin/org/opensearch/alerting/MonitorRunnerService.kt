@@ -15,10 +15,11 @@ import org.opensearch.action.ActionListener
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.alerts.moveAlerts
+import org.opensearch.alerting.alerts.AlertMover.Companion.moveAlerts
 import org.opensearch.alerting.core.JobRunner
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.model.MonitorRunResult
+import org.opensearch.alerting.model.WorkflowRunResult
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.script.TriggerExecutionContext
@@ -34,6 +35,7 @@ import org.opensearch.alerting.settings.DestinationSettings.Companion.loadDestin
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.isDocLevelMonitor
+import org.opensearch.alerting.workflow.CompositeWorkflowRunner
 import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.service.ClusterService
@@ -42,6 +44,7 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -50,6 +53,9 @@ import org.opensearch.script.ScriptService
 import org.opensearch.script.TemplateScript
 import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.util.UUID
 import kotlin.coroutines.CoroutineContext
 
 object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
@@ -121,6 +127,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         return this
     }
 
+    fun registerWorkflowService(workflowService: WorkflowService): MonitorRunnerService {
+        this.monitorCtx.workflowService = workflowService
+        return this
+    }
+
     // Must be called after registerClusterService and registerSettings in AlertingPlugin
     fun registerConsumers(): MonitorRunnerService {
         monitorCtx.retryPolicy = BackoffPolicy.constantBackoff(
@@ -136,8 +147,10 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 MOVE_ALERTS_BACKOFF_MILLIS.get(monitorCtx.settings),
                 MOVE_ALERTS_BACKOFF_COUNT.get(monitorCtx.settings)
             )
-        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(MOVE_ALERTS_BACKOFF_MILLIS, MOVE_ALERTS_BACKOFF_COUNT) {
-                millis, count ->
+        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(
+            MOVE_ALERTS_BACKOFF_MILLIS,
+            MOVE_ALERTS_BACKOFF_COUNT
+        ) { millis, count ->
             monitorCtx.moveAlertsRetryPolicy = BackoffPolicy.exponentialBackoff(millis, count)
         }
 
@@ -183,28 +196,45 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         runnerSupervisor.cancel()
     }
 
-    override fun doClose() { }
+    override fun doClose() {}
 
     override fun postIndex(job: ScheduledJob) {
-        if (job !is Monitor) {
-            throw IllegalArgumentException("Invalid job type")
-        }
-
-        launch {
-            try {
-                monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
-                    if (monitorCtx.alertIndices!!.isAlertInitialized(job.dataSources)) {
-                        moveAlerts(monitorCtx.client!!, job.id, job)
+        if (job is Monitor) {
+            launch {
+                try {
+                    monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
+                        if (monitorCtx.alertIndices!!.isAlertInitialized(job.dataSources)) {
+                            moveAlerts(monitorCtx.client!!, job.id, job)
+                        }
                     }
+                } catch (e: Exception) {
+                    logger.error("Failed to move active alerts for monitor [${job.id}].", e)
                 }
-            } catch (e: Exception) {
-                logger.error("Failed to move active alerts for monitor [${job.id}].", e)
             }
+        } else if (job is Workflow) {
+            launch {
+                try {
+                    monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
+                        moveAlerts(monitorCtx.client!!, job.id, job, monitorCtx)
+                    }
+                } catch (e: Exception) {
+                    logger.error("Failed to move active alerts for monitor [${job.id}].", e)
+                }
+            }
+        } else {
+            throw IllegalArgumentException("Invalid job type")
         }
     }
 
     override fun postDelete(jobId: String) {
         launch {
+            try {
+                monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
+                    moveAlerts(monitorCtx.client!!, jobId, null, monitorCtx)
+                }
+            } catch (e: Exception) {
+                logger.error("Failed to move active alerts for workflow [$jobId]. Could be a monitor", e)
+            }
             try {
                 monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
                     if (monitorCtx.alertIndices!!.isAlertInitialized()) {
@@ -218,16 +248,28 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     }
 
     override fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant) {
-        if (job !is Monitor) {
-            throw IllegalArgumentException("Invalid job type")
-        }
-        launch {
-            runJob(job, periodStart, periodEnd, false)
+        when (job) {
+            is Workflow -> {
+                launch {
+                    runJob(job, periodStart, periodEnd, false)
+                }
+            }
+            is Monitor -> {
+                launch {
+                    runJob(job, periodStart, periodEnd, false)
+                }
+            }
+            else -> {
+                throw IllegalArgumentException("Invalid job type")
+            }
         }
     }
 
-    suspend fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant, dryrun: Boolean): MonitorRunResult<*> {
+    suspend fun runJob(workflow: Workflow, periodStart: Instant, periodEnd: Instant, dryrun: Boolean): WorkflowRunResult {
+        return CompositeWorkflowRunner.runWorkflow(workflow, monitorCtx, periodStart, periodEnd, dryrun)
+    }
 
+    suspend fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant, dryrun: Boolean): MonitorRunResult<*> {
         // Updating the scheduled job index at the start of monitor execution runs for when there is an upgrade the the schema mapping
         // has not been updated.
         if (!IndexUtils.scheduledJobIndexUpdated && monitorCtx.clusterService != null && monitorCtx.client != null) {
@@ -237,6 +279,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 object : ActionListener<AcknowledgedResponse> {
                     override fun onResponse(response: AcknowledgedResponse) {
                     }
+
                     override fun onFailure(t: Exception) {
                         logger.error("Failed to update config index schema", t)
                     }
@@ -244,13 +287,17 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             )
         }
 
+        if (job is Workflow) {
+            CompositeWorkflowRunner.runWorkflow(workflow = job, monitorCtx, periodStart, periodEnd, dryrun)
+        }
         val monitor = job as Monitor
+        val executionId = "${monitor.id}_${LocalDateTime.now(ZoneOffset.UTC)}_${UUID.randomUUID()}"
         val runResult = if (monitor.isBucketLevelMonitor()) {
-            BucketLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
+            BucketLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun, executionId = executionId)
         } else if (monitor.isDocLevelMonitor()) {
-            DocumentLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
+            DocumentLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun, executionId = executionId)
         } else {
-            QueryLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
+            QueryLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun, executionId = executionId)
         }
         return runResult
     }
@@ -279,6 +326,8 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     internal fun currentTime() = Instant.ofEpochMilli(monitorCtx.threadPool!!.absoluteTimeInMillis())
 
     internal fun isActionActionable(action: Action, alert: Alert?): Boolean {
+        if (alert != null && alert.state == Alert.State.AUDIT)
+            return false
         if (alert == null || action.throttle == null) {
             return true
         }

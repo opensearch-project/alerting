@@ -7,6 +7,8 @@ package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchException
+import org.opensearch.action.admin.indices.exists.indices.IndicesExistsRequest
+import org.opensearch.action.admin.indices.exists.indices.IndicesExistsResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -42,6 +44,10 @@ class WorkflowService(
      */
     suspend fun getFindingDocIdsByExecutionId(chainedMonitor: Monitor, workflowExecutionId: String): Map<String, List<String>> {
         try {
+            val existsResponse: IndicesExistsResponse = client.admin().indices().suspendUntil {
+                exists(IndicesExistsRequest(chainedMonitor.dataSources.findingsIndex).local(true), it)
+            }
+            if (existsResponse.isExists == false) return emptyMap()
             // Search findings index per monitor and workflow execution id
             val bqb = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery(Finding.MONITOR_ID_FIELD, chainedMonitor.id))
                 .filter(QueryBuilders.termQuery(Finding.EXECUTION_ID_FIELD, workflowExecutionId))
