@@ -1,6 +1,6 @@
 {
   "_meta" : {
-    "schema_version": 7
+    "schema_version": 8
   },
   "properties": {
     "monitor": {
@@ -367,6 +367,9 @@
           "type": "keyword"
         },
         "enabled": {
+          "type": "boolean"
+        },
+        "audit_delegate_monitor_alerts": {
           "type": "boolean"
         },
         "enabled_time": {
