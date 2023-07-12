@@ -5333,7 +5333,6 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test postIndex on workflow update with trigger deletion`() {
-        val monitorRunnerService = getInstanceFromNode(MonitorRunnerService.javaClass)
         val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
@@ -5385,6 +5384,74 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val updatedWorkflow = searchWorkflow(workflowResponse.id)
         Assert.assertTrue(updatedWorkflow!!.triggers.size == 1)
         Assert.assertTrue(updatedWorkflow.triggers[0].id == notTrigger.id)
+        OpenSearchTestCase.waitUntil({
+            val searchRequest = SearchRequest(AlertIndices.ALERT_HISTORY_ALL)
+            val sr = client().search(searchRequest).get()
+            sr.hits.hits.size == 3
+        }, 5, TimeUnit.MINUTES)
+        val searchRequest = SearchRequest(AlertIndices.ALERT_HISTORY_ALL)
+        val sr = client().search(searchRequest).get()
+        Assert.assertTrue(sr.hits.hits.size == 3)
+        val alerts = sr.hits.map { hit ->
+            val xcp = XContentHelper.createParser(
+                xContentRegistry(),
+                LoggingDeprecationHandler.INSTANCE,
+                hit.sourceRef,
+                XContentType.JSON
+            )
+            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+            val alert = Alert.parse(xcp, hit.id, hit.version)
+            alert
+        }
+        Assert.assertTrue(alerts.stream().anyMatch { it.state == Alert.State.DELETED && chainedAlerts[0].id == it.id })
+    }
+
+    fun `test postDelete on workflow deletion`() {
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
+        val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
+        val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor1 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput1),
+            triggers = listOf(trigger1)
+        )
+        var monitor2 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput1),
+            triggers = listOf(trigger1)
+        )
+        val monitorResponse = createMonitor(monitor1)!!
+        val monitorResponse2 = createMonitor(monitor2)!!
+
+        val andTrigger = randomChainedAlertTrigger(
+            name = "1And2",
+            condition = Script("monitor[id=${monitorResponse.id}] && monitor[id=${monitorResponse2.id}]")
+        )
+        val notTrigger = randomChainedAlertTrigger(
+            name = "Not1OrNot2",
+            condition = Script("!monitor[id=${monitorResponse.id}] || !monitor[id=${monitorResponse2.id}]")
+        )
+        var workflow = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
+            triggers = listOf(andTrigger)
+        )
+        val workflowResponse = upsertWorkflow(workflow)!!
+        val workflowById = searchWorkflow(workflowResponse.id)
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc1 = """{
+            "message" : "This is an error from IAD region",
+            "source.ip.v6.v2" : 16644, 
+            "test_strict_date_time" : "$testTime",
+            "test_field_1" : "us-west-2"
+        }"""
+        indexDoc(index, "1", testDoc1)
+        val workflowId = workflowById!!.id
+        var executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
+        var res = getWorkflowAlerts(
+            workflowId,
+        )
+        var chainedAlerts = res.alerts
+        Assert.assertTrue(chainedAlerts.size == 1)
+        val deleteRes = deleteWorkflow(workflowId, false)
+        logger.info(deleteRes)
         OpenSearchTestCase.waitUntil({
             val searchRequest = SearchRequest(AlertIndices.ALERT_HISTORY_ALL)
             val sr = client().search(searchRequest).get()

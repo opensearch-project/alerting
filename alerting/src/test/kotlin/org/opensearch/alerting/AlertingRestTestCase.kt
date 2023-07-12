@@ -41,7 +41,6 @@ import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.common.xcontent.json.JsonXContent.jsonXContent
 import org.opensearch.commons.alerting.action.GetFindingsResponse
 import org.opensearch.commons.alerting.model.Alert
@@ -662,9 +661,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", StringEntity(request, APPLICATION_JSON))
         assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
 
-        val searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        val searchResponse = SearchResponse.fromXContent(createParser(jsonXContent, httpResponse.entity.content))
         return searchResponse.hits.hits.map {
-            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
+            val xcp = createParser(jsonXContent, it.sourceRef).also { it.nextToken() }
             Alert.parse(xcp, it.id, it.version)
         }.filter { alert -> alert.monitorId == monitor.id }
     }
@@ -707,9 +706,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", StringEntity(request, APPLICATION_JSON))
         assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
 
-        val searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        val searchResponse = SearchResponse.fromXContent(createParser(jsonXContent, httpResponse.entity.content))
         return searchResponse.hits.hits.map {
-            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
+            val xcp = createParser(jsonXContent, it.sourceRef).also { it.nextToken() }
             Finding.parse(xcp)
         }.filter { finding -> finding.monitorId == monitor.id }
     }
@@ -732,9 +731,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", searchParams, StringEntity(request, APPLICATION_JSON))
         assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
 
-        val searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        val searchResponse = SearchResponse.fromXContent(createParser(jsonXContent, httpResponse.entity.content))
         return searchResponse.hits.hits.map {
-            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
+            val xcp = createParser(jsonXContent, it.sourceRef).also { it.nextToken() }
             Alert.parse(xcp, it.id, it.version)
         }
     }
@@ -881,6 +880,18 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         }
 
         return GetFindingsResponse(response.restStatus(), totalFindings, findings)
+    }
+
+    protected fun searchMonitors(): SearchResponse {
+        var baseEndpoint = "${AlertingPlugin.MONITOR_BASE_URI}/_search?"
+        val request = """
+                { "version" : true,
+                  "query": { "match_all": {} }
+                }
+        """.trimIndent()
+        val httpResponse = adminClient().makeRequest("POST", baseEndpoint, StringEntity(request, APPLICATION_JSON))
+        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
+        return SearchResponse.fromXContent(createParser(jsonXContent, httpResponse.entity.content))
     }
 
     protected fun indexDoc(index: String, id: String, doc: String, refresh: Boolean = true): Response {
@@ -1606,7 +1617,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         )
         assertEquals("Unable to create a new monitor", RestStatus.CREATED, response.restStatus())
 
-        val workflowJson = JsonXContent.jsonXContent.createParser(
+        val workflowJson = jsonXContent.createParser(
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
