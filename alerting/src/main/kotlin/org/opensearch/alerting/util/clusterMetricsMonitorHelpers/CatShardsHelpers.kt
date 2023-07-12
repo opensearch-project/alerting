@@ -52,7 +52,9 @@ class CatShardsRequestWrapper(val pathParams: String = "") : ActionRequest() {
         if (pathParams.isNotBlank()) {
             indicesList = pathParams.split(",").toTypedArray()
 
-            require(validate() == null) { "The path parameters do not form a valid, comma-separated list of data streams, indices, or index aliases." }
+            require(validate() == null) {
+                "The path parameters do not form a valid, comma-separated list of data streams, indices, or index aliases."
+            }
 
             clusterStateRequest = clusterStateRequest.indices(*indicesList)
             indicesStatsRequest = indicesStatsRequest.indices(*indicesList)
@@ -173,7 +175,8 @@ class CatShardsResponseWrapper(
                 searchScrollTotal = getOrNull(commonStats, CommonStats::getSearch, { it.total.scrollCount })?.toString(),
                 segmentsCount = getOrNull(commonStats, CommonStats::getSegments, SegmentsStats::getCount)?.toString(),
                 segmentsMemory = getOrNull(commonStats, CommonStats::getSegments, SegmentsStats::getZeroMemory)?.toString(),
-                segmentsIndexWriterMemory = getOrNull(commonStats, CommonStats::getSegments, SegmentsStats::getIndexWriterMemory)?.toString(),
+                segmentsIndexWriterMemory =
+                getOrNull(commonStats, CommonStats::getSegments, SegmentsStats::getIndexWriterMemory)?.toString(),
                 segmentsVersionMapMemory = getOrNull(commonStats, CommonStats::getSegments, SegmentsStats::getVersionMapMemory)?.toString(),
                 fixedBitsetMemory = getOrNull(commonStats, CommonStats::getSegments, SegmentsStats::getBitsetMemory)?.toString(),
                 globalCheckpoint = getOrNull(shardStats, ShardStats::getSeqNoStats, SeqNoStats::getGlobalCheckpoint)?.toString(),
@@ -211,7 +214,8 @@ class CatShardsResponseWrapper(
                 shardInfo = shardInfo.copy(
                     unassignedReason = shard.unassignedInfo().reason.name,
                     unassignedAt = UnassignedInfo.DATE_TIME_FORMATTER.format(unassignedTime),
-                    unassignedFor = TimeValue.timeValueMillis(System.currentTimeMillis() - shard.unassignedInfo().unassignedTimeInMillis).stringRep,
+                    unassignedFor =
+                    TimeValue.timeValueMillis(System.currentTimeMillis() - shard.unassignedInfo().unassignedTimeInMillis).stringRep,
                     unassignedDetails = shard.unassignedInfo().details
                 )
             }
