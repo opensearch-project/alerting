@@ -23,6 +23,7 @@ import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.authuser.User
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.ExistsQueryBuilder
@@ -60,7 +61,9 @@ class TransportSearchMonitorAction @Inject constructor(
         // When querying the ALL_ALERT_INDEX_PATTERN, we don't want to check whether the MONITOR_TYPE field exists
         // because we're querying alert indexes.
         if (searchMonitorRequest.searchRequest.indices().contains(ScheduledJob.SCHEDULED_JOBS_INDEX)) {
-            queryBuilder.filter(QueryBuilders.existsQuery(Monitor.MONITOR_TYPE))
+            val monitorWorkflowType = QueryBuilders.boolQuery().should(QueryBuilders.existsQuery(Monitor.MONITOR_TYPE))
+                .should(QueryBuilders.existsQuery(Workflow.WORKFLOW_TYPE))
+            queryBuilder.must(monitorWorkflowType)
         }
 
         searchSourceBuilder.query(queryBuilder)
