@@ -26,7 +26,6 @@ import org.opensearch.action.admin.indices.recovery.RecoveryResponse
 import org.opensearch.action.admin.indices.settings.get.GetSettingsResponse
 import org.opensearch.action.admin.indices.stats.IndicesStatsResponse
 import org.opensearch.alerting.opensearchapi.convertToMap
-import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.SupportedClusterMetricsSettings
 import org.opensearch.alerting.settings.SupportedClusterMetricsSettings.Companion.resolveToActionRequest
 import org.opensearch.client.Client
@@ -43,49 +42,49 @@ import kotlin.collections.HashMap
  * @param client The [Client] used to call the respective transport action.
  * @throws IllegalArgumentException When the requested API is not supported by this feature.
  */
-suspend fun executeTransportAction(clusterMetricsInput: ClusterMetricsInput, client: Client): ActionResponse {
+fun executeTransportAction(clusterMetricsInput: ClusterMetricsInput, client: Client): ActionResponse {
     val request = resolveToActionRequest(clusterMetricsInput)
     return when (clusterMetricsInput.clusterMetricType) {
         ClusterMetricsInput.ClusterMetricType.CAT_INDICES -> {
             request as CatIndicesRequestWrapper
             val healthResponse: ClusterHealthResponse =
-                client.suspendUntil { admin().cluster().health(request.clusterHealthRequest) }
+                client.admin().cluster().health(request.clusterHealthRequest).get()
             val indexSettingsResponse: GetSettingsResponse =
-                client.suspendUntil { client.admin().indices().getSettings(request.indexSettingsRequest) }
+                client.admin().indices().getSettings(request.indexSettingsRequest).get()
             val indicesResponse: IndicesStatsResponse =
-                client.suspendUntil { client.admin().indices().stats(request.indicesStatsRequest) }
+                client.admin().indices().stats(request.indicesStatsRequest).get()
             val stateResponse: ClusterStateResponse =
-                client.suspendUntil { client.admin().cluster().state(request.clusterStateRequest) }
+                client.admin().cluster().state(request.clusterStateRequest).get()
             return CatIndicesResponseWrapper(healthResponse, stateResponse, indexSettingsResponse, indicesResponse)
         }
         ClusterMetricsInput.ClusterMetricType.CAT_PENDING_TASKS ->
-            client.suspendUntil { client.admin().cluster().pendingClusterTasks(request as PendingClusterTasksRequest) }
+            client.admin().cluster().pendingClusterTasks(request as PendingClusterTasksRequest).get()
         ClusterMetricsInput.ClusterMetricType.CAT_RECOVERY ->
-            client.suspendUntil { client.admin().indices().recoveries(request as RecoveryRequest) }
+            client.admin().indices().recoveries(request as RecoveryRequest).get()
         ClusterMetricsInput.ClusterMetricType.CAT_SHARDS -> {
             request as CatShardsRequestWrapper
             val stateResponse: ClusterStateResponse =
-                client.suspendUntil { client.admin().cluster().state(request.clusterStateRequest) }
+                client.admin().cluster().state(request.clusterStateRequest).get()
             val indicesResponse: IndicesStatsResponse =
-                client.suspendUntil { client.admin().indices().stats(request.indicesStatsRequest) }
+                client.admin().indices().stats(request.indicesStatsRequest).get()
             return CatShardsResponseWrapper(stateResponse, indicesResponse)
         }
         ClusterMetricsInput.ClusterMetricType.CAT_SNAPSHOTS ->
-            client.suspendUntil { client.admin().cluster().getSnapshots(request as GetSnapshotsRequest) }
+            client.admin().cluster().getSnapshots(request as GetSnapshotsRequest).get()
         ClusterMetricsInput.ClusterMetricType.CAT_TASKS ->
-            client.suspendUntil { client.admin().cluster().listTasks(request as ListTasksRequest) }
+            client.admin().cluster().listTasks(request as ListTasksRequest).get()
         ClusterMetricsInput.ClusterMetricType.CLUSTER_HEALTH ->
-            client.suspendUntil { client.admin().cluster().health(request as ClusterHealthRequest) }
+            client.admin().cluster().health(request as ClusterHealthRequest).get()
         ClusterMetricsInput.ClusterMetricType.CLUSTER_SETTINGS -> {
             val stateResponse: ClusterStateResponse =
-                client.suspendUntil { client.admin().cluster().state(request as ClusterStateRequest) }
+                client.admin().cluster().state(request as ClusterStateRequest).get()
             val metadata: Metadata = stateResponse.state.metadata
             return ClusterGetSettingsResponse(metadata.persistentSettings(), metadata.transientSettings(), Settings.EMPTY)
         }
         ClusterMetricsInput.ClusterMetricType.CLUSTER_STATS ->
-            client.suspendUntil { client.admin().cluster().clusterStats(request as ClusterStatsRequest) }
+            client.admin().cluster().clusterStats(request as ClusterStatsRequest).get()
         ClusterMetricsInput.ClusterMetricType.NODES_STATS ->
-            client.suspendUntil { client.admin().cluster().nodesStats(request as NodesStatsRequest) }
+            client.admin().cluster().nodesStats(request as NodesStatsRequest).get()
         else -> throw IllegalArgumentException("Unsupported API request type: ${request.javaClass.name}")
     }
 }
