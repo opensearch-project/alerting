@@ -26,6 +26,8 @@ import org.opensearch.index.IndexNotFoundException
 class IndexUtils {
 
     companion object {
+        val VALID_INDEX_NAME_REGEX = Regex("""^(?![_\-\+])(?!.*\.\.)[^\s,\\\/\*\?"<>|#:\.]{1,255}$""")
+
         const val _META = "_meta"
         const val SCHEMA_VERSION = "schema_version"
 
