@@ -77,7 +77,7 @@ class CatIndicesWrappersIT : OpenSearchSingleNodeTestCase() {
         assertThrows(IllegalArgumentException::class.java) { CatIndicesRequestWrapper(pathParams = pathParams) }
     }
 
-    suspend fun `test CatIndicesResponseWrapper returns with only indices in pathParams`() {
+    fun `test CatIndicesResponseWrapper returns with only indices in pathParams`() {
         // GIVEN
         val testIndices = (1..5).map {
             "test-index${randomAlphaOfLength(10).lowercase()}" to randomIntBetween(1, 10)
@@ -125,7 +125,7 @@ class CatIndicesWrappersIT : OpenSearchSingleNodeTestCase() {
         }
     }
 
-    suspend fun `test CatIndicesResponseWrapper returns with all indices when empty pathParams`() {
+    fun `test CatIndicesResponseWrapper returns with all indices when empty pathParams`() {
         // GIVEN
         val testIndices = (1..5).map {
             "test-index${randomAlphaOfLength(10).lowercase()}" to randomIntBetween(1, 10)
