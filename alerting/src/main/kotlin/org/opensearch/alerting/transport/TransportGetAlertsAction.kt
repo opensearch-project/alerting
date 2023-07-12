@@ -8,17 +8,15 @@ package org.opensearch.alerting.transport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionListener
 import org.opensearch.action.ActionRequest
+import org.opensearch.action.get.GetRequest
+import org.opensearch.action.get.GetResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.alerting.action.GetMonitorAction
-import org.opensearch.alerting.action.GetMonitorRequest
-import org.opensearch.alerting.action.GetMonitorResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -37,15 +35,15 @@ import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.GetAlertsRequest
 import org.opensearch.commons.alerting.action.GetAlertsResponse
 import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
-import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
-import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.search.sort.SortBuilders
 import org.opensearch.search.sort.SortOrder
 import org.opensearch.tasks.Task
@@ -61,10 +59,12 @@ class TransportGetAlertsAction @Inject constructor(
     clusterService: ClusterService,
     actionFilters: ActionFilters,
     val settings: Settings,
-    val xContentRegistry: NamedXContentRegistry,
-    val transportGetMonitorAction: TransportGetMonitorAction
+    val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<ActionRequest, GetAlertsResponse>(
-    AlertingActions.GET_ALERTS_ACTION_NAME, transportService, actionFilters, ::GetAlertsRequest
+    AlertingActions.GET_ALERTS_ACTION_NAME,
+    transportService,
+    actionFilters,
+    ::GetAlertsRequest
 ),
     SecureTransportAction {
 
@@ -94,11 +94,13 @@ class TransportGetAlertsAction @Inject constructor(
 
         val queryBuilder = QueryBuilders.boolQuery()
 
-        if (getAlertsRequest.severityLevel != "ALL")
+        if (getAlertsRequest.severityLevel != "ALL") {
             queryBuilder.filter(QueryBuilders.termQuery("severity", getAlertsRequest.severityLevel))
+        }
 
-        if (getAlertsRequest.alertState != "ALL")
+        if (getAlertsRequest.alertState != "ALL") {
             queryBuilder.filter(QueryBuilders.termQuery("state", getAlertsRequest.alertState))
+        }
 
         if (getAlertsRequest.alertIds.isNullOrEmpty() == false) {
             queryBuilder.filter(QueryBuilders.termsQuery("_id", getAlertsRequest.alertIds))
@@ -108,6 +110,14 @@ class TransportGetAlertsAction @Inject constructor(
             queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getAlertsRequest.monitorId))
         } else if (getAlertsRequest.monitorIds.isNullOrEmpty() == false) {
             queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getAlertsRequest.monitorIds))
+        }
+        if (getAlertsRequest.workflowIds.isNullOrEmpty() == false) {
+            queryBuilder.must(QueryBuilders.termsQuery("workflow_id", getAlertsRequest.workflowIds))
+        } else {
+            val noWorklfowIdQuery = QueryBuilders.boolQuery()
+                .should(QueryBuilders.boolQuery().mustNot(QueryBuilders.existsQuery(Alert.WORKFLOW_ID_FIELD)))
+                .should(QueryBuilders.termsQuery(Alert.WORKFLOW_ID_FIELD, ""))
+            queryBuilder.must(noWorklfowIdQuery)
         }
         if (!tableProp.searchString.isNullOrBlank()) {
             queryBuilder
@@ -153,26 +163,34 @@ class TransportGetAlertsAction @Inject constructor(
         var alertIndex = AlertIndices.ALL_ALERT_INDEX_PATTERN
         if (getAlertsRequest.alertIndex.isNullOrEmpty() == false) {
             alertIndex = getAlertsRequest.alertIndex!!
-        } else if (getAlertsRequest.monitorId.isNullOrEmpty() == false)
-            withContext(Dispatchers.IO) {
-                val getMonitorRequest = GetMonitorRequest(
-                    getAlertsRequest.monitorId!!,
-                    -3L,
-                    RestRequest.Method.GET,
-                    FetchSourceContext.FETCH_SOURCE
-                )
-                val getMonitorResponse: GetMonitorResponse =
-                    transportGetMonitorAction.client.suspendUntil {
-                        execute(GetMonitorAction.INSTANCE, getMonitorRequest, it)
-                    }
-                if (getMonitorResponse.monitor != null) {
-                    alertIndex = getMonitorResponse.monitor!!.dataSources.alertsIndex
-                }
+        } else if (getAlertsRequest.monitorId.isNullOrEmpty() == false) {
+            val retrievedMonitor = getMonitor(getAlertsRequest)
+            if (retrievedMonitor != null) {
+                alertIndex = retrievedMonitor.dataSources.alertsIndex
             }
+        }
         return if (alertIndex == AlertIndices.ALERT_INDEX)
             AlertIndices.ALL_ALERT_INDEX_PATTERN
         else
             alertIndex
+    }
+
+    private suspend fun getMonitor(getAlertsRequest: GetAlertsRequest): Monitor? {
+        val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, getAlertsRequest.monitorId!!)
+        try {
+            val getResponse: GetResponse = client.suspendUntil { client.get(getRequest, it) }
+            if (!getResponse.isExists) {
+                return null
+            }
+            val xcp = XContentHelper.createParser(
+                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                getResponse.sourceAsBytesRef, XContentType.JSON
+            )
+            return ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
+        } catch (t: Exception) {
+            log.error("Failure in fetching monitor ${getAlertsRequest.monitorId} to resolve alert index in get alerts action", t)
+            return null
+        }
     }
 
     fun getAlerts(
@@ -212,8 +230,10 @@ class TransportGetAlertsAction @Inject constructor(
                     val totalAlertCount = response.hits.totalHits?.value?.toInt()
                     val alerts = response.hits.map { hit ->
                         val xcp = XContentHelper.createParser(
-                            xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                            hit.sourceRef, XContentType.JSON
+                            xContentRegistry,
+                            LoggingDeprecationHandler.INSTANCE,
+                            hit.sourceRef,
+                            XContentType.JSON
                         )
                         XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
                         val alert = Alert.parse(xcp, hit.id, hit.version)

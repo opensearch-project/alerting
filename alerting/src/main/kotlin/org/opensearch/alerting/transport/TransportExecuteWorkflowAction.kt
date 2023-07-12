@@ -21,7 +21,6 @@ import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.alerting.action.ExecuteWorkflowResponse
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.use
-import org.opensearch.alerting.workflow.WorkflowRunnerService
 import org.opensearch.client.Client
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
@@ -64,14 +63,14 @@ class TransportExecuteWorkflowAction @Inject constructor(
                         workflow.schedule.getPeriodEndingAt(Instant.ofEpochMilli(execWorkflowRequest.requestEnd.millis))
                     try {
                         val workflowRunResult =
-                            WorkflowRunnerService.runJob(workflow, periodStart, periodEnd, execWorkflowRequest.dryrun)
-                        withContext(Dispatchers.IO) {
+                            MonitorRunnerService.runJob(workflow, periodStart, periodEnd, execWorkflowRequest.dryrun)
+                        withContext(Dispatchers.IO, {
                             actionListener.onResponse(
                                 ExecuteWorkflowResponse(
                                     workflowRunResult
                                 )
                             )
-                        }
+                        })
                     } catch (e: Exception) {
                         log.error("Unexpected error running workflow", e)
                         withContext(Dispatchers.IO) {

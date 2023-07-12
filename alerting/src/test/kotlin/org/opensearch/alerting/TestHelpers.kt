@@ -35,6 +35,7 @@ import org.opensearch.commons.alerting.model.ActionExecutionResult
 import org.opensearch.commons.alerting.model.AggregationResultBucket
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.ChainedAlertTrigger
 import org.opensearch.commons.alerting.model.ChainedMonitorFindings
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
 import org.opensearch.commons.alerting.model.CompositeInput
@@ -231,7 +232,9 @@ fun randomWorkflow(
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
     enabled: Boolean = randomBoolean(),
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
-    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS)
+    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+    triggers: List<Trigger> = emptyList(),
+    auditDelegateMonitorAlerts: Boolean? = true
 ): Workflow {
     val delegates = mutableListOf<Delegate>()
     if (!monitorIds.isNullOrEmpty()) {
@@ -254,7 +257,8 @@ fun randomWorkflow(
         inputs = listOf(CompositeInput(Sequence(delegates))),
         version = -1L,
         schemaVersion = 0,
-        triggers = listOf()
+        triggers = triggers,
+        auditDelegateMonitorAlerts = auditDelegateMonitorAlerts
     )
 }
 
@@ -267,6 +271,7 @@ fun randomWorkflowWithDelegates(
     enabled: Boolean = randomBoolean(),
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+    triggers: List<Trigger> = emptyList()
 ): Workflow {
     return Workflow(
         id = id,
@@ -280,7 +285,7 @@ fun randomWorkflowWithDelegates(
         inputs = listOf(CompositeInput(Sequence(delegates))),
         version = -1L,
         schemaVersion = 0,
-        triggers = emptyList()
+        triggers = triggers
     )
 }
 
@@ -757,4 +762,23 @@ fun assertUserNull(monitor: Monitor) {
 
 fun assertUserNull(workflow: Workflow) {
     assertNull("User is not null", workflow.user)
+}
+
+fun randomChainedAlertTrigger(
+    id: String = UUIDs.base64UUID(),
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    severity: String = "1",
+    condition: Script = randomScript(),
+    actions: List<Action> = mutableListOf(),
+    destinationId: String = ""
+): ChainedAlertTrigger {
+    return ChainedAlertTrigger(
+        id = id,
+        name = name,
+        severity = severity,
+        condition = condition,
+        actions = if (actions.isEmpty() && destinationId.isNotBlank()) {
+            (0..randomInt(10)).map { randomAction(destinationId = destinationId) }
+        } else actions
+    )
 }
