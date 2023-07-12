@@ -1101,6 +1101,17 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
         Assert.assertEquals(alerts[0]["monitor_id"], "")
         val associatedAlerts = getWorkflowAlerts["associatedAlerts"] as List<HashMap<String, Any>>
         assertEquals(associatedAlerts.size, 2)
+
+        val getAlertsRes = getAlerts(java.util.Map.of("workflowIds", listOf(workflowId)))
+        val getAlertsMap = getAlertsRes.asMap()
+        Assert.assertTrue(getAlertsMap.containsKey("alerts"))
+        val getAlertsAlerts = getWorkflowAlerts["alerts"] as List<HashMap<String, Any>>
+        assertEquals(alerts.size, 1)
+        Assert.assertEquals(getAlertsAlerts[0]["execution_id"], executionId)
+        Assert.assertEquals(getAlertsAlerts[0]["workflow_id"], workflowId)
+        Assert.assertEquals(getAlertsAlerts[0]["monitor_id"], "")
+        Assert.assertEquals(getAlertsAlerts[0]["id"], alerts[0]["id"])
+
         val ackRes = acknowledgeChainedAlerts(workflowId, alerts[0]["id"].toString())
         val acknowledgeChainedAlertsResponse = entityAsMap(ackRes)
         val acknowledged = acknowledgeChainedAlertsResponse["success"] as List<String>
