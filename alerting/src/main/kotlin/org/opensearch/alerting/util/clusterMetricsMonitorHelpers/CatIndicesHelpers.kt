@@ -53,7 +53,9 @@ class CatIndicesRequestWrapper(val pathParams: String = "") : ActionRequest() {
         if (pathParams.isNotBlank()) {
             indicesList = pathParams.split(",").toTypedArray()
 
-            require(validate() == null) { "The path parameters do not form a valid, comma-separated list of data streams, indices, or index aliases." }
+            require(validate() == null) {
+                "The path parameters do not form a valid, comma-separated list of data streams, indices, or index aliases."
+            }
 
             clusterHealthRequest = clusterHealthRequest.indices(*indicesList)
             clusterStateRequest = clusterStateRequest.indices(*indicesList)
