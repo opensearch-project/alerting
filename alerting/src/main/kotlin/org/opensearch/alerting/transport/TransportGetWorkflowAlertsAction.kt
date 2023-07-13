@@ -98,8 +98,11 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
             queryBuilder.filter(QueryBuilders.termQuery("severity", getWorkflowAlertsRequest.severityLevel))
         }
 
-        if (getWorkflowAlertsRequest.alertState != "ALL") {
-            queryBuilder.filter(QueryBuilders.termQuery("state", getWorkflowAlertsRequest.alertState))
+        if (getWorkflowAlertsRequest.alertState == "ALL") {
+            QueryBuilders.boolQuery()
+                .filter(QueryBuilders.boolQuery().mustNot(QueryBuilders.termsQuery(Alert.STATE_FIELD, Alert.State.AUDIT.name)))
+        } else {
+            queryBuilder.filter(QueryBuilders.termQuery(Alert.STATE_FIELD, getWorkflowAlertsRequest.alertState))
         }
 
         if (getWorkflowAlertsRequest.alertIds.isNullOrEmpty() == false) {
@@ -148,7 +151,7 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
     }
 
     fun resolveAlertsIndexName(getAlertsRequest: GetWorkflowAlertsRequest): String {
-        return if (getAlertsRequest.alertIndex.isNullOrEmpty()) AlertIndices.ALL_ALERT_INDEX_PATTERN
+        return if (getAlertsRequest.alertIndex.isNullOrEmpty()) AlertIndices.ALERT_INDEX
         else getAlertsRequest.alertIndex!!
     }
 
