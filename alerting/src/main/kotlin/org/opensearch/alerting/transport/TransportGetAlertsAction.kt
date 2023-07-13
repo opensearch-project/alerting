@@ -116,18 +116,18 @@ class TransportGetAlertsAction @Inject constructor(
         if (getAlertsRequest.monitorId != null) {
             queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getAlertsRequest.monitorId))
             if (getAlertsRequest.workflowIds.isNullOrEmpty()) {
-                val noWorklfowIdQuery = QueryBuilders.boolQuery()
+                val noWorkflowIdQuery = QueryBuilders.boolQuery()
                     .should(QueryBuilders.boolQuery().mustNot(QueryBuilders.existsQuery(Alert.WORKFLOW_ID_FIELD)))
                     .should(QueryBuilders.termsQuery(Alert.WORKFLOW_ID_FIELD, ""))
-                queryBuilder.must(noWorklfowIdQuery)
+                queryBuilder.must(noWorkflowIdQuery)
             }
         } else if (getAlertsRequest.monitorIds.isNullOrEmpty() == false) {
             queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getAlertsRequest.monitorIds))
             if (getAlertsRequest.workflowIds.isNullOrEmpty()) {
-                val noWorklfowIdQuery = QueryBuilders.boolQuery()
+                val noWorkflowIdQuery = QueryBuilders.boolQuery()
                     .should(QueryBuilders.boolQuery().mustNot(QueryBuilders.existsQuery(Alert.WORKFLOW_ID_FIELD)))
                     .should(QueryBuilders.termsQuery(Alert.WORKFLOW_ID_FIELD, ""))
-                queryBuilder.must(noWorklfowIdQuery)
+                queryBuilder.must(noWorkflowIdQuery)
             }
         }
         if (getAlertsRequest.workflowIds.isNullOrEmpty() == false) {
