@@ -310,7 +310,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 .should(boolQuery().mustNot(existsQuery(Alert.ERROR_MESSAGE_FIELD)))
                 .should(termsQuery(Alert.ERROR_MESSAGE_FIELD, ""))
             queryBuilder.must(noErrorQuery)
-            searchRequest.source().query(queryBuilder)
+            searchRequest.source().query(queryBuilder).size(9999)
             val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(searchRequest, it) }
             val alerts = searchResponse.hits.map { hit ->
                 val xcp = XContentHelper.createParser(
