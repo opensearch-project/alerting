@@ -16,13 +16,13 @@ import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
-import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
+import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 

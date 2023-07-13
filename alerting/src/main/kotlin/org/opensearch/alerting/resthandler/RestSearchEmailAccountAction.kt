@@ -12,11 +12,12 @@ import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.util.context
 import org.opensearch.client.node.NodeClient
-import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
+import org.opensearch.core.common.bytes.BytesReference
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent.EMPTY_PARAMS
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.BaseRestHandler
@@ -26,7 +27,6 @@ import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestResponse
-import org.opensearch.rest.RestStatus
 import org.opensearch.rest.action.RestResponseListener
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.io.IOException

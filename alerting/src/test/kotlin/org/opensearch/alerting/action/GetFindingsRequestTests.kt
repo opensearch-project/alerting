@@ -6,9 +6,9 @@
 package org.opensearch.alerting.action
 
 import org.opensearch.common.io.stream.BytesStreamOutput
-import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.commons.alerting.action.GetFindingsRequest
 import org.opensearch.commons.alerting.model.Table
+import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.test.OpenSearchTestCase
 
 class GetFindingsRequestTests : OpenSearchTestCase() {

@@ -22,14 +22,14 @@ import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.io.stream.BytesStreamOutput
-import org.opensearch.common.io.stream.NamedWriteableAwareStreamInput
-import org.opensearch.common.io.stream.NamedWriteableRegistry
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.core.common.io.stream.NamedWriteableAwareStreamInput
+import org.opensearch.core.common.io.stream.NamedWriteableRegistry
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.MatchQueryBuilder

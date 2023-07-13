@@ -75,8 +75,6 @@ import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.node.DiscoveryNodes
 import org.opensearch.cluster.service.ClusterService
-import org.opensearch.common.io.stream.NamedWriteableRegistry
-import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.common.settings.IndexScopedSettings
 import org.opensearch.common.settings.Setting
@@ -94,6 +92,8 @@ import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.core.common.io.stream.NamedWriteableRegistry
+import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.env.Environment

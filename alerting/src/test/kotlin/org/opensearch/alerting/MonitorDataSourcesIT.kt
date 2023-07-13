@@ -35,7 +35,6 @@ import org.opensearch.alerting.workflow.CompositeWorkflowRunner
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
-import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
 import org.opensearch.commons.alerting.action.AcknowledgeAlertResponse
@@ -60,13 +59,14 @@ import org.opensearch.commons.alerting.model.ScheduledJob.Companion.DOC_LEVEL_QU
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.Table
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.XContentParser
+import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.mapper.MapperService
 import org.opensearch.index.query.MatchQueryBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.query.TermQueryBuilder
 import org.opensearch.rest.RestRequest
-import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
 import org.opensearch.search.aggregations.bucket.composite.TermsValuesSourceBuilder

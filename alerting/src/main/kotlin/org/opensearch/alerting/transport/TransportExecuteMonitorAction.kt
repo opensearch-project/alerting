@@ -37,8 +37,8 @@ import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.authuser.User
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
-import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import java.time.Instant

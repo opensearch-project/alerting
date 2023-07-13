@@ -56,9 +56,9 @@ import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.rest.SecureRestClientBuilder
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.index.query.QueryBuilders
-import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
 import org.opensearch.search.aggregations.bucket.composite.TermsValuesSourceBuilder

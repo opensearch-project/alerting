@@ -11,13 +11,14 @@ import org.opensearch.alerting.util.IF_PRIMARY_TERM
 import org.opensearch.alerting.util.IF_SEQ_NO
 import org.opensearch.alerting.util.REFRESH
 import org.opensearch.client.node.NodeClient
-import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.IndexWorkflowRequest
 import org.opensearch.commons.alerting.action.IndexWorkflowResponse
 import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentParser
+import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
@@ -26,7 +27,6 @@ import org.opensearch.rest.RestChannel
 import org.opensearch.rest.RestHandler
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestResponse
-import org.opensearch.rest.RestStatus
 import org.opensearch.rest.action.RestResponseListener
 import java.io.IOException
 import java.time.Instant

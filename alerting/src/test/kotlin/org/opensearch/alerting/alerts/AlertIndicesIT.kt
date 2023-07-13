@@ -22,7 +22,7 @@ import org.opensearch.common.xcontent.json.JsonXContent.jsonXContent
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.ScheduledJob
-import org.opensearch.rest.RestStatus
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.test.OpenSearchTestCase
 import java.util.concurrent.TimeUnit
 

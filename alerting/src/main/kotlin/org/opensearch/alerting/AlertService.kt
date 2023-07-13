@@ -32,12 +32,10 @@ import org.opensearch.alerting.util.MAX_SEARCH_SIZE
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client
-import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
-import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.alerts.AlertError
 import org.opensearch.commons.alerting.model.ActionExecutionResult
@@ -50,14 +48,16 @@ import org.opensearch.commons.alerting.model.NoOpTrigger
 import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.model.action.AlertCategory
+import org.opensearch.core.common.bytes.BytesReference
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
+import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.VersionType
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
 import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
-import org.opensearch.rest.RestStatus
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortOrder
 import java.time.Instant
@@ -248,7 +248,7 @@ class AlertService(
         }
         return Alert(
             id = id, monitor = monitor, trigger = NoOpTrigger(), startTime = currentTime,
-            lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
+            lastNotificationTime = currentTime, state = alertState, errorMessage = alertError.message,
             schemaVersion = IndexUtils.alertIndexSchemaVersion, executionId = executionId, workflowId = workflowRunContext?.workflowId ?: ""
         )
     }

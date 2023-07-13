@@ -13,11 +13,11 @@ import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.client.Client
-import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.core.common.bytes.BytesReference
 import org.opensearch.core.xcontent.NamedXContentRegistry
 
 /**
