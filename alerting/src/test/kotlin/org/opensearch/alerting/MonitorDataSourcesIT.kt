@@ -4071,6 +4071,38 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         )
         var chainedAlerts = res.alerts
         Assert.assertTrue(chainedAlerts.size == 1)
+
+        // verify get alerts api with defaults set in query params returns only chained alerts and not audit alerts
+        val table = Table("asc", "id", null, 1, 0, "")
+        val getAlertsDefaultParamsResponse = client().execute(
+            AlertingActions.GET_ALERTS_ACTION_TYPE,
+            GetAlertsRequest(
+                table = table,
+                severityLevel = "ALL",
+                alertState = "ALL",
+                monitorId = null,
+                alertIndex = null,
+                monitorIds = null,
+                workflowIds = null,
+                alertIds = null
+            )
+        ).get()
+        Assert.assertEquals(getAlertsDefaultParamsResponse.alerts.size, 1)
+        val getAuditAlertsForMonitor1 = client().execute(
+            AlertingActions.GET_ALERTS_ACTION_TYPE,
+            GetAlertsRequest(
+                table = table,
+                severityLevel = "ALL",
+                alertState = "AUDIT",
+                monitorId = monitorResponse.id,
+                alertIndex = null,
+                monitorIds = null,
+                workflowIds = listOf(workflowId),
+                alertIds = null
+            )
+        ).get()
+        Assert.assertEquals(getAuditAlertsForMonitor1.alerts.size, 1)
+
         Assert.assertTrue(res.associatedAlerts.isEmpty())
         verifyAcknowledgeChainedAlerts(chainedAlerts, workflowId, 1)
         Assert.assertTrue(chainedAlerts[0].executionId == executeWorkflowResponse.workflowRunResult.executionId)
