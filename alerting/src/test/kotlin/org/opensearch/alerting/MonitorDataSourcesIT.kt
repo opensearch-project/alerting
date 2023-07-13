@@ -303,6 +303,65 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals("Findings saved for test monitor", 4, findings.size)
     }
 
+    fun `test execute monitor without triggers`() {
+        val docQuery = DocLevelQuery(query = "eventType:\"login\"", name = "3")
+
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(docQuery)
+        )
+        val customFindingsIndex = "custom_findings_index"
+        val customFindingsIndexPattern = "custom_findings_index-1"
+        val customQueryIndex = "custom_alerts_index"
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(),
+            dataSources = DataSources(
+                queryIndex = customQueryIndex,
+                findingsIndex = customFindingsIndex,
+                findingsIndexPattern = customFindingsIndexPattern
+            )
+        )
+        val monitorResponse = createMonitor(monitor)
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+
+        val testDoc = """{
+            "eventType" : "login"
+        }"""
+        indexDoc(index, "1", testDoc)
+
+        monitor = monitorResponse!!.monitor
+        val id = monitorResponse.id
+        // Execute dry run first and expect no alerts or findings
+        var executeMonitorResponse = executeMonitor(monitor, id, true)
+        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 0)
+        searchAlerts(id)
+        var table = Table("asc", "id", null, 1, 0, "")
+        var getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.isEmpty())
+        var findings = searchFindings(id, customFindingsIndex)
+        assertEquals("Findings saved for test monitor", 0, findings.size)
+
+        // Execute real run - expect findings, but no alerts
+        executeMonitorResponse = executeMonitor(monitor, id, false)
+
+        searchAlerts(id)
+        table = Table("asc", "id", null, 1, 0, "")
+        getAlertsResponse = client()
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .get()
+        Assert.assertTrue(getAlertsResponse != null)
+        Assert.assertTrue(getAlertsResponse.alerts.isEmpty())
+
+        findings = searchFindings(id, customFindingsIndex)
+        assertEquals("Findings saved for test monitor", 1, findings.size)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
+        assertEquals("Didn't match query", 1, findings[0].docLevelQueries.size)
+    }
+
     fun `test execute monitor with custom query index`() {
         val q1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
         val q2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4")
@@ -1391,6 +1450,78 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             client().execute(SearchMonitorAction.INSTANCE, SearchMonitorRequest(searchRequest))
                 .get()
         Assert.assertEquals(searchMonitorResponse.hits.hits.size, 1)
+    }
+
+    fun `test execute pre-existing monitor without triggers`() {
+        val request = CreateIndexRequest(SCHEDULED_JOBS_INDEX).mapping(ScheduledJobIndices.scheduledJobMappings())
+            .settings(Settings.builder().put("index.hidden", true).build())
+        client().admin().indices().create(request)
+        val monitorStringWithoutName = """
+        {
+        "monitor": {
+        "type": "monitor",
+        "schema_version": 0,
+        "name": "UayEuXpZtb",
+        "monitor_type": "doc_level_monitor",
+        "user": {
+        "name": "",
+        "backend_roles": [],
+        "roles": [],
+        "custom_attribute_names": [],
+        "user_requested_tenant": null
+        },
+        "enabled": true,
+        "enabled_time": 1662753436791,
+        "schedule": {
+        "period": {
+        "interval": 5,
+        "unit": "MINUTES"
+        }
+        },
+        "inputs": [{
+        "doc_level_input": {
+        "description": "description",
+        "indices": [
+        "$index"
+        ],
+        "queries": [{
+        "id": "63efdcce-b5a1-49f4-a25f-6b5f9496a755",
+        "name": "3",
+        "query": "test_field:\"us-west-2\"",
+        "tags": []
+        }]
+        }
+        }],
+        "triggers": [],
+        "last_update_time": 1662753436791
+        }
+        }
+        """.trimIndent()
+        val monitorId = "abc"
+        indexDoc(SCHEDULED_JOBS_INDEX, monitorId, monitorStringWithoutName)
+        val getMonitorResponse = getMonitorResponse(monitorId)
+        Assert.assertNotNull(getMonitorResponse)
+        Assert.assertNotNull(getMonitorResponse.monitor)
+        val monitor = getMonitorResponse.monitor
+
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+        indexDoc(index, "1", testDoc)
+        var executeMonitorResponse = executeMonitor(monitor!!, monitorId, false)
+        Assert.assertNotNull(executeMonitorResponse)
+        if (executeMonitorResponse != null) {
+            Assert.assertNotNull(executeMonitorResponse.monitorRunResult.monitorName)
+        }
+        val alerts = searchAlerts(monitorId)
+        assertEquals(0, alerts.size)
+
+        val findings = searchFindings(monitorId)
+        assertEquals("Findings saved for test monitor", 1, findings.size)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
     }
 
     fun `test execute monitor with empty source index`() {
