@@ -1079,7 +1079,18 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
                 "test_value_1"
             )
         )
-
+        val searchMonitorResponse = searchMonitors()
+        logger.error(searchMonitorResponse)
+        val jobsList = searchMonitorResponse.hits.toList()
+        var numMonitors = 0
+        var numWorkflows = 0
+        jobsList.forEach {
+            val map = it.sourceAsMap
+            if (map["type"] == "workflow") numWorkflows++
+            else if (map["type"] == "monitor") numMonitors++
+        }
+        Assert.assertEquals(numMonitors, 2)
+        Assert.assertEquals(numWorkflows, 1)
         val response = executeWorkflow(workflowId = workflowId, params = emptyMap())
         val executeWorkflowResponse = entityAsMap(response)
         logger.info(executeWorkflowResponse)
@@ -1101,6 +1112,17 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
         Assert.assertEquals(alerts[0]["monitor_id"], "")
         val associatedAlerts = getWorkflowAlerts["associatedAlerts"] as List<HashMap<String, Any>>
         assertEquals(associatedAlerts.size, 2)
+
+        val getAlertsRes = getAlerts(java.util.Map.of("workflowIds", listOf(workflowId)))
+        val getAlertsMap = getAlertsRes.asMap()
+        Assert.assertTrue(getAlertsMap.containsKey("alerts"))
+        val getAlertsAlerts = getWorkflowAlerts["alerts"] as List<HashMap<String, Any>>
+        assertEquals(alerts.size, 1)
+        Assert.assertEquals(getAlertsAlerts[0]["execution_id"], executionId)
+        Assert.assertEquals(getAlertsAlerts[0]["workflow_id"], workflowId)
+        Assert.assertEquals(getAlertsAlerts[0]["monitor_id"], "")
+        Assert.assertEquals(getAlertsAlerts[0]["id"], alerts[0]["id"])
+
         val ackRes = acknowledgeChainedAlerts(workflowId, alerts[0]["id"].toString())
         val acknowledgeChainedAlertsResponse = entityAsMap(ackRes)
         val acknowledged = acknowledgeChainedAlertsResponse["success"] as List<String>

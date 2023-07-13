@@ -883,6 +883,18 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return GetFindingsResponse(response.restStatus(), totalFindings, findings)
     }
 
+    protected fun searchMonitors(): SearchResponse {
+        var baseEndpoint = "${AlertingPlugin.MONITOR_BASE_URI}/_search?"
+        val request = """
+                { "version" : true,
+                  "query": { "match_all": {} }
+                }
+        """.trimIndent()
+        val httpResponse = adminClient().makeRequest("POST", baseEndpoint, StringEntity(request, APPLICATION_JSON))
+        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
+        return SearchResponse.fromXContent(createParser(jsonXContent, httpResponse.entity.content))
+    }
+
     protected fun indexDoc(index: String, id: String, doc: String, refresh: Boolean = true): Response {
         return indexDoc(client(), index, id, doc, refresh)
     }
