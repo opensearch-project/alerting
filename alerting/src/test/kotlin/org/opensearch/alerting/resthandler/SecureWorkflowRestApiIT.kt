@@ -1407,10 +1407,10 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
         try {
             executeWorkflow(workflowId = workflowResponse.id)
             val bucketAlerts = searchAlerts(bucketMonitor)
-            assertEquals("Incorrect number of alerts", 2, bucketAlerts.size)
+            assertEquals("Incorrect number of alerts", 0, bucketAlerts.size)
 
             val docAlerts = searchAlerts(docMonitor)
-            assertEquals("Incorrect number of alerts", 1, docAlerts.size)
+            assertEquals("Incorrect number of alerts", 0, docAlerts.size)
         } finally {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
         }
