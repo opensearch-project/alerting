@@ -9,6 +9,7 @@ allprojects {
         // For some reason this dependency isn't getting setup automatically by the jacoco plugin
         tasks.withType(JacocoReport) { 
             dependsOn tasks.withType(Test)
+            dependsOn "alerting-core:test"
         }
     }
 }
