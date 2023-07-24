@@ -14,8 +14,8 @@ import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.randomEmailAccount
 import org.opensearch.client.ResponseException
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.index.query.QueryBuilders
-import org.opensearch.rest.RestStatus
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.test.junit.annotations.TestLogging

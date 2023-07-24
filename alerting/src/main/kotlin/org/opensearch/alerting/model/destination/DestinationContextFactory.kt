@@ -12,7 +12,7 @@ import org.opensearch.alerting.model.destination.email.Recipient
 import org.opensearch.alerting.settings.DestinationSettings.Companion.SecureDestinationSettings
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.client.Client
-import org.opensearch.common.settings.SecureString
+import org.opensearch.core.common.settings.SecureString
 import org.opensearch.core.xcontent.NamedXContentRegistry
 
 /**

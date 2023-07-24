@@ -37,8 +37,8 @@ import org.opensearch.commons.alerting.model.action.PerAlertActionScope
 import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
 import org.opensearch.commons.alerting.model.action.Throttle
 import org.opensearch.commons.authuser.User
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.index.query.QueryBuilders
-import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
 import org.opensearch.search.aggregations.bucket.composite.TermsValuesSourceBuilder

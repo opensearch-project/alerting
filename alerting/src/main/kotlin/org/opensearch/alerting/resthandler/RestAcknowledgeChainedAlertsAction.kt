@@ -9,10 +9,10 @@ import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.client.node.NodeClient
-import org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken
 import org.opensearch.commons.alerting.action.AcknowledgeChainedAlertRequest
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.core.xcontent.XContentParser
+import org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.RestHandler.Route

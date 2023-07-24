@@ -33,7 +33,6 @@ import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
-import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.AlertingPluginInterface
@@ -48,13 +47,14 @@ import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.action.PerAlertActionScope
 import org.opensearch.commons.alerting.util.string
+import org.opensearch.core.common.bytes.BytesReference
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.percolator.PercolateQueryBuilderExt
-import org.opensearch.rest.RestStatus
 import org.opensearch.search.SearchHits
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortOrder

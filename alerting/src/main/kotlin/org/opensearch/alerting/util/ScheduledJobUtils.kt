@@ -14,8 +14,8 @@ import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
-import org.opensearch.rest.RestStatus
 
 private val log = LogManager.getLogger(ScheduledJobUtils::class.java)
 

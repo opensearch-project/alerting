@@ -16,7 +16,7 @@ import org.opensearch.alerting.parser
 import org.opensearch.alerting.randomUser
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.common.io.stream.BytesStreamOutput
-import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.test.OpenSearchTestCase
 import java.time.Instant
 

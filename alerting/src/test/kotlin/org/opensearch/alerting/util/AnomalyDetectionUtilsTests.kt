@@ -7,10 +7,10 @@ package org.opensearch.alerting.util
 
 import org.opensearch.alerting.ANOMALY_RESULT_INDEX
 import org.opensearch.alerting.randomQueryLevelMonitor
-import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.commons.alerting.model.Input
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
+import org.opensearch.core.common.io.stream.StreamOutput
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.index.query.QueryBuilders

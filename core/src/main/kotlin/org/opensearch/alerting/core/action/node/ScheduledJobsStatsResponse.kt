@@ -11,8 +11,8 @@ import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSetting
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.cluster.ClusterName
 import org.opensearch.cluster.health.ClusterIndexHealth
-import org.opensearch.common.io.stream.StreamInput
-import org.opensearch.common.io.stream.StreamOutput
+import org.opensearch.core.common.io.stream.StreamInput
+import org.opensearch.core.common.io.stream.StreamOutput
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.ToXContentFragment
 import org.opensearch.core.xcontent.XContentBuilder

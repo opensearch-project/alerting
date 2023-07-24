@@ -5,9 +5,9 @@
 
 package org.opensearch.alerting.model
 
-import org.opensearch.common.io.stream.StreamOutput
-import org.opensearch.common.io.stream.Writeable
 import org.opensearch.commons.alerting.alerts.AlertError
+import org.opensearch.core.common.io.stream.StreamOutput
+import org.opensearch.core.common.io.stream.Writeable
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentBuilder
 import java.io.IOException
