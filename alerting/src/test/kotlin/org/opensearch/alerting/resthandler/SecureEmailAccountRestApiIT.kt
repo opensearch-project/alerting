@@ -24,7 +24,7 @@ import org.opensearch.alerting.makeRequest
 import org.opensearch.client.ResponseException
 import org.opensearch.client.RestClient
 import org.opensearch.commons.rest.SecureRestClientBuilder
-import org.opensearch.rest.RestStatus
+import org.opensearch.core.rest.RestStatus
 
 val SEARCH_EMAIL_ACCOUNT_DSL = """
                 {

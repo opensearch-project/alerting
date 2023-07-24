@@ -9,7 +9,7 @@ import org.junit.Assert
 import org.opensearch.alerting.randomBucketLevelMonitorRunResult
 import org.opensearch.alerting.randomQueryLevelMonitorRunResult
 import org.opensearch.common.io.stream.BytesStreamOutput
-import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.test.OpenSearchTestCase
 
 class ExecuteMonitorResponseTests : OpenSearchTestCase() {

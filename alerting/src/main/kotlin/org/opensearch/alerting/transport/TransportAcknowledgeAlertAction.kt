@@ -34,7 +34,6 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
-import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
 import org.opensearch.commons.alerting.action.AcknowledgeAlertResponse
@@ -45,6 +44,7 @@ import org.opensearch.commons.alerting.util.optionalTimeField
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
+import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
@@ -52,7 +52,7 @@ import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import java.time.Instant
-import java.util.*
+import java.util.Locale
 
 private val log = LogManager.getLogger(TransportAcknowledgeAlertAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)

@@ -6,7 +6,7 @@
 package org.opensearch.alerting.core.action.node
 
 import org.opensearch.action.ActionType
-import org.opensearch.common.io.stream.Writeable
+import org.opensearch.core.common.io.stream.Writeable
 
 class ScheduledJobsStatsAction : ActionType<ScheduledJobsStatsResponse>(NAME, reader) {
     companion object {

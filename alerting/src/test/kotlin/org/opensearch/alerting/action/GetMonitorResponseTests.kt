@@ -7,10 +7,10 @@ package org.opensearch.alerting.action
 
 import org.opensearch.alerting.randomUser
 import org.opensearch.common.io.stream.BytesStreamOutput
-import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.commons.alerting.model.CronSchedule
 import org.opensearch.commons.alerting.model.Monitor
-import org.opensearch.rest.RestStatus
+import org.opensearch.core.common.io.stream.StreamInput
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.test.OpenSearchTestCase
 import java.time.Instant
 import java.time.ZoneId

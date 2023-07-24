@@ -11,9 +11,9 @@ import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.unit.TimeValue
-import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.core.xcontent.XContentParser
+import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.RestHandler
 import org.opensearch.rest.RestRequest

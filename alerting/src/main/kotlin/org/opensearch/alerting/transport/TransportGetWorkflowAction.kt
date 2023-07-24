@@ -26,9 +26,9 @@ import org.opensearch.commons.alerting.action.GetWorkflowRequest
 import org.opensearch.commons.alerting.action.GetWorkflowResponse
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.index.IndexNotFoundException
-import org.opensearch.rest.RestStatus
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 
