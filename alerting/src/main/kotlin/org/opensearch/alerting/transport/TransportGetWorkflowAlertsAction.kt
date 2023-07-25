@@ -13,6 +13,7 @@ import org.opensearch.action.ActionListener
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
+import org.opensearch.action.search.SearchScrollRequest
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.alerts.AlertIndices
@@ -25,6 +26,7 @@ import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
@@ -35,12 +37,13 @@ import org.opensearch.commons.alerting.action.GetWorkflowAlertsResponse
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
-import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.rest.RestStatus
+import org.opensearch.search.Scroll
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortBuilders
 import org.opensearch.search.sort.SortOrder
@@ -221,12 +224,20 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
             val queryBuilder = QueryBuilders.boolQuery()
             queryBuilder.must(QueryBuilders.termsQuery("_id", associatedAlertIds))
             queryBuilder.must(QueryBuilders.termQuery(Alert.STATE_FIELD, Alert.State.AUDIT))
-            val searchRequest = SearchRequest(alertIndex)
-            searchRequest.source().query(queryBuilder)
-            val response: SearchResponse = client.suspendUntil { search(searchRequest, it) }
+            val scroll = Scroll(TimeValue.timeValueMinutes(1L))
+            val scrollSize = 100 // Number of hits to return per scroll
+            var searchRequest = SearchRequest(alertIndex)
+            searchRequest.source().query(queryBuilder).size(scrollSize)
+            searchRequest.scroll(scroll)
+            var response: SearchResponse = client.suspendUntil { search(searchRequest, it) }
             associatedAlerts.addAll(parseAlertsFromSearchResponse(response))
+            val scrollId = response.scrollId
+            while (response.hits.hits.isNotEmpty()) {
+                response = client.suspendUntil { client.searchScroll(SearchScrollRequest(scrollId), it) }
+                associatedAlerts.addAll(parseAlertsFromSearchResponse(response))
+            }
         } catch (e: Exception) {
-            log.error("Failed to get associated alerts in get workflow alerts action", e)
+            log.error("Failed to get associated alerts in get workflow alerts action.", e)
         }
     }
 
