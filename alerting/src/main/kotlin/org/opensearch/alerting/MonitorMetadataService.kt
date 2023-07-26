@@ -120,7 +120,7 @@ object MonitorMetadataService :
         monitor: Monitor,
         createWithRunContext: Boolean = true,
         skipIndex: Boolean = false,
-        workflowMetadataId: String? = null,
+        workflowMetadataId: String? = null
     ): Pair<MonitorMetadata, Boolean> {
         try {
             val created = true
@@ -152,7 +152,7 @@ object MonitorMetadataService :
                     getResponse.sourceAsBytesRef, XContentType.JSON
                 )
                 XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                MonitorMetadata.parse(xcp)
+                MonitorMetadata.parse(xcp, getResponse.id, getResponse.seqNo, getResponse.primaryTerm)
             } else {
                 null
             }
