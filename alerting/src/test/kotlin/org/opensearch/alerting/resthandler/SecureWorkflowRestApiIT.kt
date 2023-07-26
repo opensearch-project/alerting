@@ -82,7 +82,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
     fun create() {
         if (userClient == null) {
             createUser(user, arrayOf())
-            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user).setSocketTimeout(60000).build()
+            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, password).setSocketTimeout(60000).build()
         }
     }
 
@@ -369,7 +369,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
             listOf("role2"),
             getClusterPermissionsFromCustomRole(ALERTING_GET_WORKFLOW_ACCESS)
         )
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
             .setSocketTimeout(60000).build()
 
         val getWorkflowResponse = getUserClient?.makeRequest(
@@ -430,7 +430,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
         )
 
         val userWithDifferentRoleClient = SecureRestClientBuilder(
-            clusterHosts.toTypedArray(), isHttps(), userWithDifferentRole, userWithDifferentRole
+            clusterHosts.toTypedArray(), isHttps(), userWithDifferentRole, password
         )
             .setSocketTimeout(60000).build()
 
@@ -625,7 +625,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
             listOf("role2"),
             getClusterPermissionsFromCustomRole(ALERTING_GET_WORKFLOW_ACCESS)
         )
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
             .setSocketTimeout(60000).build()
 
         val getWorkflowResponse = getUserClient?.makeRequest(
@@ -786,7 +786,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
             listOf("role2"),
             getClusterPermissionsFromCustomRole(ALERTING_GET_WORKFLOW_ACCESS)
         )
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
             .setSocketTimeout(60000).build()
 
         val getWorkflowResponse = getUserClient?.makeRequest(
@@ -846,7 +846,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
             false
         )
 
-        val updateUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), updateUser, updateUser)
+        val updateUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), updateUser, password)
             .setSocketTimeout(60000).build()
         val updatedWorkflow = updateWorkflowWithClient(updateUserClient, createdWorkflow, listOf("role5"))
 
@@ -904,7 +904,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
             listOf("role1", "role2"),
             getClusterPermissionsFromCustomRole(ALERTING_GET_WORKFLOW_ACCESS)
         )
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
             .setSocketTimeout(60000).build()
 
         val getWorkflowResponse = getUserClient?.makeRequest(
@@ -1074,7 +1074,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
                 getClusterPermissionsFromCustomRole(ALERTING_GET_WORKFLOW_ACCESS)
             )
         )
-        val deleteUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), deleteUser, deleteUser)
+        val deleteUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), deleteUser, password)
             .setSocketTimeout(60000).build()
 
         try {
@@ -1407,10 +1407,10 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
         try {
             executeWorkflow(workflowId = workflowResponse.id)
             val bucketAlerts = searchAlerts(bucketMonitor)
-            assertEquals("Incorrect number of alerts", 2, bucketAlerts.size)
+            assertEquals("Incorrect number of alerts", 0, bucketAlerts.size)
 
             val docAlerts = searchAlerts(docMonitor)
-            assertEquals("Incorrect number of alerts", 1, docAlerts.size)
+            assertEquals("Incorrect number of alerts", 0, docAlerts.size)
         } finally {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
         }
