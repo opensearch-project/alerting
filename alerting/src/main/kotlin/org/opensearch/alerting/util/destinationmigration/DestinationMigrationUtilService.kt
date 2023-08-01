@@ -24,7 +24,6 @@ import org.opensearch.alerting.util.use
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.Strings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.alerting.model.ScheduledJob
@@ -175,7 +174,7 @@ class DestinationMigrationUtilService {
                         hasMoreResults = false
                     }
                     for (hit in response.hits) {
-                        val xcp = XContentFactory.xContent(XContentType.JSON)
+                        val xcp = XContentType.JSON.xContent()
                             .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
                         var notificationConfig: NotificationConfig? = null
                         var userStr = ""

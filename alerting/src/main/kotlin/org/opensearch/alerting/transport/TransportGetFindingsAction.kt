@@ -33,7 +33,6 @@ import org.opensearch.common.Strings
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.GetFindingsRequest
@@ -186,7 +185,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
         val findingsWithDocs = mutableListOf<FindingWithDocs>()
         val findings = mutableListOf<Finding>()
         for (hit in searchResponse.hits) {
-            val xcp = XContentFactory.xContent(XContentType.JSON)
+            val xcp = XContentType.JSON.xContent()
                 .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
             XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
             val finding = Finding.parse(xcp)

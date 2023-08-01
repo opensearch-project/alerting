@@ -39,7 +39,7 @@ import org.opensearch.alerting.workflow.CompositeWorkflowRunner
 import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.service.ClusterService
-import org.opensearch.common.component.AbstractLifecycleComponent
+import org.opensearch.common.lifecycle.AbstractLifecycleComponent
 import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor

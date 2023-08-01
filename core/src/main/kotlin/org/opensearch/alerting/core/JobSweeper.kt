@@ -24,7 +24,7 @@ import org.opensearch.cluster.routing.IndexShardRoutingTable
 import org.opensearch.cluster.routing.Murmur3HashFunction
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.Strings
-import org.opensearch.common.component.LifecycleListener
+import org.opensearch.common.lifecycle.LifecycleListener
 import org.opensearch.common.logging.Loggers
 import org.opensearch.common.lucene.uid.Versions
 import org.opensearch.common.settings.Settings
