@@ -23,7 +23,6 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.authuser.User
@@ -153,7 +152,7 @@ class TransportGetDestinationsAction @Inject constructor(
                         val version = hit.version
                         val seqNo = hit.seqNo.toInt()
                         val primaryTerm = hit.primaryTerm.toInt()
-                        val xcp = XContentFactory.xContent(XContentType.JSON)
+                        val xcp = XContentType.JSON.xContent()
                             .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
                         XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
                         XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
