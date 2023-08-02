@@ -242,7 +242,7 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
                 if (!tableProp.missing.isNullOrBlank()) {
                     sortBuilder.missing(tableProp.missing)
                 }
-                searchRequest.source().sort(sortBuilder).size(tableProp.size)
+                searchRequest.source().sort(sortBuilder).size(tableProp.size).from(tableProp.startIndex)
             }
             queryBuilder.must(QueryBuilders.termsQuery("_id", associatedAlertIds))
             queryBuilder.must(QueryBuilders.termQuery(Alert.STATE_FIELD, Alert.State.AUDIT))
