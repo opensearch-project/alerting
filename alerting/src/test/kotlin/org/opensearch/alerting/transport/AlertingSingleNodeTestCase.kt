@@ -283,19 +283,20 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         alertState: Alert.State? = Alert.State.ACTIVE,
         alertIndex: String? = "",
         associatedAlertsIndex: String? = "",
+        alertIds: List<String>? = emptyList(),
+        table: Table? = Table("asc", "monitor_id", null, 100, 0, null),
     ): GetWorkflowAlertsResponse {
-        val table = Table("asc", "monitor_id", null, 100, 0, null)
         return client().execute(
             AlertingActions.GET_WORKFLOW_ALERTS_ACTION_TYPE,
             GetWorkflowAlertsRequest(
-                table = table,
+                table = table!!,
                 severityLevel = "ALL",
                 alertState = alertState!!.name,
                 alertIndex = alertIndex,
                 associatedAlertsIndex = associatedAlertsIndex,
                 monitorIds = emptyList(),
                 workflowIds = listOf(workflowId),
-                alertIds = emptyList(),
+                alertIds = alertIds,
                 getAssociatedAlerts = getAssociatedAlerts!!
             )
         ).get()

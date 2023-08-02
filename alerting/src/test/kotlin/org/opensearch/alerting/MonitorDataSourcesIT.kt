@@ -6,6 +6,7 @@
 package org.opensearch.alerting
 
 import org.junit.Assert
+import org.opensearch.action.DocWriteRequest
 import org.opensearch.action.admin.cluster.state.ClusterStateRequest
 import org.opensearch.action.admin.indices.alias.Alias
 import org.opensearch.action.admin.indices.close.CloseIndexRequest
@@ -17,6 +18,8 @@ import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.admin.indices.open.OpenIndexRequest
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
+import org.opensearch.action.bulk.BulkRequest
+import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.fieldcaps.FieldCapabilitiesRequest
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchRequest
@@ -3691,7 +3694,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         alertsIndex: String? = AlertIndices.ALERT_INDEX,
         executionId: String? = null,
         alertSize: Int,
-        workflowId: String
+        workflowId: String,
     ): GetAlertsResponse {
         val alerts = searchAlerts(monitorId, alertsIndex!!, executionId = executionId)
         assertEquals("Alert saved for test monitor", alertSize, alerts.size)
@@ -5636,5 +5639,79 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             alert
         }
         Assert.assertTrue(alerts.stream().anyMatch { it.state == Alert.State.DELETED && chainedAlerts[0].id == it.id })
+    }
+
+    fun `test get chained alerts with alertId paginating for associated alerts`() {
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
+        val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
+        val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor1 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput1),
+            triggers = listOf(trigger1)
+        )
+        var monitor2 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput1),
+            triggers = listOf(trigger1)
+        )
+        val monitorResponse = createMonitor(monitor1)!!
+        val monitorResponse2 = createMonitor(monitor2)!!
+
+        val andTrigger = randomChainedAlertTrigger(
+            name = "1And2",
+            condition = Script("monitor[id=${monitorResponse.id}] && monitor[id=${monitorResponse2.id}]")
+        )
+        var workflow = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
+            triggers = listOf(andTrigger)
+        )
+        val workflowResponse = upsertWorkflow(workflow)!!
+        val workflowById = searchWorkflow(workflowResponse.id)
+        val workflowId = workflowById!!.id
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc1 = """{
+            "message" : "This is an error from IAD region",
+            "source.ip.v6.v2" : 16644, 
+            "test_strict_date_time" : "$testTime",
+            "test_field_1" : "us-west-2"
+        }"""
+        var i = 1
+        val indexRequests = mutableListOf<IndexRequest>()
+        while (i++ < 300) {
+            indexRequests += IndexRequest(index).source(testDoc1, XContentType.JSON).id("$i").opType(DocWriteRequest.OpType.INDEX)
+        }
+        val bulkResponse: BulkResponse =
+            client().bulk(BulkRequest().add(indexRequests).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).get()
+        if (bulkResponse.hasFailures()) {
+            fail("Bulk request to index to test index has failed")
+        }
+        var executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
+        var res = getWorkflowAlerts(
+            workflowId = workflowId
+        )
+        Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults[andTrigger.id]!!.triggered)
+        var chainedAlerts = res.alerts
+        Assert.assertTrue(chainedAlerts.size == 1)
+        Assert.assertEquals(res.associatedAlerts.size, 10)
+        var res100to200 = getWorkflowAlerts(
+            workflowId = workflowId,
+            alertIds = listOf(res.alerts[0].id),
+            table = Table("asc", "monitor_id", null, 100, 100, null)
+
+        )
+        Assert.assertEquals(res100to200.associatedAlerts.size, 100)
+        var res200to300 = getWorkflowAlerts(
+            workflowId = workflowId,
+            alertIds = listOf(res.alerts[0].id),
+            table = Table("asc", "monitor_id", null, 200, 100, null)
+
+        )
+        Assert.assertEquals(res100to200.associatedAlerts.size, 100)
+        var res0to99 = getWorkflowAlerts(
+            workflowId = workflowId,
+            alertIds = listOf(res.alerts[0].id),
+            table = Table("asc", "monitor_id", null, 100, 0, null)
+
+        )
+        Assert.assertEquals(res0to99.associatedAlerts.size, 100)
     }
 }
