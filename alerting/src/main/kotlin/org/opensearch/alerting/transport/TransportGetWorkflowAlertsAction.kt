@@ -125,13 +125,18 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
                         .field("trigger_name")
                 )
         }
+        // if alert id is mentioned we cannot set "from" field as it may not return id. we would be using it to paginate associated alerts
+        val from = if (getWorkflowAlertsRequest.alertIds.isNullOrEmpty())
+            tableProp.startIndex
+        else 0
+
         val searchSourceBuilder = SearchSourceBuilder()
             .version(true)
             .seqNoAndPrimaryTerm(true)
             .query(queryBuilder)
             .sort(sortBuilder)
             .size(tableProp.size)
-            .from(tableProp.startIndex)
+            .from(from)
 
         client.threadPool().threadContext.stashContext().use {
             scope.launch {
@@ -205,22 +210,42 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
                 parseAlertsFromSearchResponse(response)
             )
             if (alerts.isNotEmpty() && getWorkflowAlertsRequest.getAssociatedAlerts == true)
-                getAssociatedAlerts(associatedAlerts, alerts, resolveAssociatedAlertsIndexName(getWorkflowAlertsRequest))
+                getAssociatedAlerts(
+                    associatedAlerts,
+                    alerts,
+                    resolveAssociatedAlertsIndexName(getWorkflowAlertsRequest),
+                    getWorkflowAlertsRequest
+                )
             actionListener.onResponse(GetWorkflowAlertsResponse(alerts, associatedAlerts, totalAlertCount))
         } catch (e: Exception) {
             actionListener.onFailure(AlertingException("Failed to get alerts", RestStatus.INTERNAL_SERVER_ERROR, e))
         }
     }
 
-    private suspend fun getAssociatedAlerts(associatedAlerts: MutableList<Alert>, alerts: MutableList<Alert>, alertIndex: String) {
+    private suspend fun getAssociatedAlerts(
+        associatedAlerts: MutableList<Alert>,
+        alerts: MutableList<Alert>,
+        alertIndex: String,
+        getWorkflowAlertsRequest: GetWorkflowAlertsRequest,
+    ) {
         try {
             val associatedAlertIds = mutableSetOf<String>()
             alerts.forEach { associatedAlertIds.addAll(it.associatedAlertIds) }
             if (associatedAlertIds.isEmpty()) return
             val queryBuilder = QueryBuilders.boolQuery()
+            val searchRequest = SearchRequest(alertIndex)
+            // if chained alert id param is non-null, paginate the associated alerts.
+            if (getWorkflowAlertsRequest.alertIds.isNullOrEmpty() == false) {
+                val tableProp = getWorkflowAlertsRequest.table
+                val sortBuilder = SortBuilders.fieldSort(tableProp.sortString)
+                    .order(SortOrder.fromString(tableProp.sortOrder))
+                if (!tableProp.missing.isNullOrBlank()) {
+                    sortBuilder.missing(tableProp.missing)
+                }
+                searchRequest.source().sort(sortBuilder).size(tableProp.size)
+            }
             queryBuilder.must(QueryBuilders.termsQuery("_id", associatedAlertIds))
             queryBuilder.must(QueryBuilders.termQuery(Alert.STATE_FIELD, Alert.State.AUDIT))
-            val searchRequest = SearchRequest(alertIndex)
             searchRequest.source().query(queryBuilder)
             val response: SearchResponse = client.suspendUntil { search(searchRequest, it) }
             associatedAlerts.addAll(parseAlertsFromSearchResponse(response))
