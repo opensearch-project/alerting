@@ -25,6 +25,7 @@ import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.alerting.util.getCombinedTriggerRunResult
+import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Alert
@@ -59,7 +60,9 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         monitorCtx: MonitorRunnerExecutionContext,
         periodStart: Instant,
         periodEnd: Instant,
-        dryrun: Boolean
+        dryrun: Boolean,
+        workflowRunContext: WorkflowRunContext?,
+        executionId: String
     ): MonitorRunResult<BucketLevelTriggerRunResult> {
         val roles = MonitorRunnerService.getRolesForMonitor(monitor)
         logger.debug("Running monitor: ${monitor.name} with roles: $roles Thread: ${Thread.currentThread().name}")
@@ -75,7 +78,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             if (monitor.dataSources.findingsEnabled == true) {
                 monitorCtx.alertIndices!!.createOrUpdateInitialFindingHistoryIndex(monitor.dataSources)
             }
-            monitorCtx.alertService!!.loadCurrentAlertsForBucketLevelMonitor(monitor)
+            monitorCtx.alertService!!.loadCurrentAlertsForBucketLevelMonitor(monitor, workflowRunContext)
         } catch (e: Exception) {
             // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
             val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
@@ -118,7 +121,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     monitor,
                     periodStart,
                     periodEnd,
-                    monitorResult.inputResults
+                    monitorResult.inputResults,
+                    workflowRunContext
                 )
                 if (firstIteration) {
                     firstPageOfInputResults = inputResults
@@ -154,7 +158,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             monitorCtx,
                             periodStart,
                             periodEnd,
-                            !dryrun && monitor.id != Monitor.NO_ID
+                            !dryrun && monitor.id != Monitor.NO_ID,
+                            executionId
                         )
                     } else {
                         emptyList()
@@ -166,7 +171,9 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     trigger,
                     currentAlertsForTrigger,
                     triggerResult.aggregationResultBuckets.values.toList(),
-                    findings
+                    findings,
+                    executionId,
+                    workflowRunContext
                 ).toMutableMap()
                 val dedupedAlerts = categorizedAlerts.getOrDefault(AlertCategory.DEDUPED, emptyList())
                 var newAlerts = categorizedAlerts.getOrDefault(AlertCategory.NEW, emptyList())
@@ -185,7 +192,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                         monitor.dataSources,
                         dedupedAlerts,
                         monitorCtx.retryPolicy!!,
-                        allowUpdatingAcknowledgedAlert = true
+                        allowUpdatingAcknowledgedAlert = true,
+                        monitor.id
                     )
                     newAlerts = monitorCtx.alertService!!.saveNewAlerts(monitor.dataSources, newAlerts, monitorCtx.retryPolicy!!)
                 }
@@ -326,17 +334,16 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             // ACKNOWLEDGED Alerts should not be saved here since actions are not executed for them.
             if (!dryrun && monitor.id != Monitor.NO_ID) {
                 monitorCtx.alertService!!.saveAlerts(
-                    monitor.dataSources,
-                    updatedAlerts,
-                    monitorCtx.retryPolicy!!,
-                    allowUpdatingAcknowledgedAlert = false
+                    monitor.dataSources, updatedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = false,
+                    routingId = monitor.id
                 )
                 // Save any COMPLETED Alerts that were not covered in updatedAlerts
                 monitorCtx.alertService!!.saveAlerts(
                     monitor.dataSources,
                     completedAlertsToUpdate.toList(),
                     monitorCtx.retryPolicy!!,
-                    allowUpdatingAcknowledgedAlert = false
+                    allowUpdatingAcknowledgedAlert = false,
+                    monitor.id
                 )
             }
         }
@@ -350,7 +357,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         monitorCtx: MonitorRunnerExecutionContext,
         periodStart: Instant,
         periodEnd: Instant,
-        shouldCreateFinding: Boolean
+        shouldCreateFinding: Boolean,
+        executionId: String,
     ): List<String> {
         monitor.inputs.forEach { input ->
             if (input is SearchInput) {
@@ -361,14 +369,14 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 for (aggFactory in (query.aggregations() as AggregatorFactories.Builder).aggregatorFactories) {
                     when (aggFactory) {
                         is CompositeAggregationBuilder -> {
-                            var grouByFields = 0 // if number of fields used to group by > 1 we won't calculate findings
+                            var groupByFields = 0 // if number of fields used to group by > 1 we won't calculate findings
                             val sources = aggFactory.sources()
                             for (source in sources) {
-                                if (grouByFields > 0) {
+                                if (groupByFields > 0) {
                                     logger.error("grouByFields > 0. not generating findings for bucket level monitor ${monitor.id}")
                                     return listOf()
                                 }
-                                grouByFields++
+                                groupByFields++
                                 fieldName = source.field()
                             }
                         }
@@ -409,7 +417,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             sr.source().query(queryBuilder)
                         }
                     val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(sr, it) }
-                    return createFindingPerIndex(searchResponse, monitor, monitorCtx, shouldCreateFinding)
+                    return createFindingPerIndex(searchResponse, monitor, monitorCtx, shouldCreateFinding, executionId)
                 } else {
                     logger.error("Couldn't resolve groupBy field. Not generating bucket level monitor findings for monitor %${monitor.id}")
                 }
@@ -422,7 +430,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         searchResponse: SearchResponse,
         monitor: Monitor,
         monitorCtx: MonitorRunnerExecutionContext,
-        shouldCreateFinding: Boolean
+        shouldCreateFinding: Boolean,
+        workflowExecutionId: String? = null
     ): List<String> {
         val docIdsByIndexName: MutableMap<String, MutableList<String>> = mutableMapOf()
         for (hit in searchResponse.hits.hits) {
@@ -441,7 +450,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     monitorName = monitor.name,
                     index = it.key,
                     timestamp = Instant.now(),
-                    docLevelQueries = listOf()
+                    docLevelQueries = listOf(),
+                    executionId = workflowExecutionId
                 )
 
                 val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()

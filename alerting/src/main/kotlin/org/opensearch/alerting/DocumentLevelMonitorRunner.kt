@@ -20,12 +20,14 @@ import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.MonitorRunResult
+import org.opensearch.alerting.model.userErrorMessage
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
+import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.metadata.IndexMetadata
@@ -49,6 +51,7 @@ import org.opensearch.commons.alerting.util.string
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.index.query.BoolQueryBuilder
+import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.percolator.PercolateQueryBuilderExt
 import org.opensearch.rest.RestStatus
@@ -68,7 +71,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         monitorCtx: MonitorRunnerExecutionContext,
         periodStart: Instant,
         periodEnd: Instant,
-        dryrun: Boolean
+        dryrun: Boolean,
+        workflowRunContext: WorkflowRunContext?,
+        executionId: String
     ): MonitorRunResult<DocumentLevelTriggerRunResult> {
         logger.debug("Document-level-monitor is running ...")
         val isTempMonitor = dryrun || monitor.id == Monitor.NO_ID
@@ -94,7 +99,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         var (monitorMetadata, _) = MonitorMetadataService.getOrCreateMetadata(
             monitor = monitor,
             createWithRunContext = false,
-            skipIndex = isTempMonitor
+            skipIndex = isTempMonitor,
+            workflowRunContext?.workflowMetadataId
         )
 
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
@@ -133,6 +139,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 }
             }
 
+            // Map of document ids per index when monitor is workflow delegate and has chained findings
+            val matchingDocIdsPerIndex = workflowRunContext?.matchingDocIdsPerIndex
+
             indices.forEach { indexName ->
                 // Prepare lastRunContext for each index
                 val indexLastRunContext = lastRunContext.getOrPut(indexName) {
@@ -167,7 +176,13 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 // Prepare DocumentExecutionContext for each index
                 val docExecutionContext = DocumentExecutionContext(queries, indexLastRunContext, indexUpdatedRunContext)
 
-                val matchingDocs = getMatchingDocs(monitor, monitorCtx, docExecutionContext, indexName)
+                val matchingDocs = getMatchingDocs(
+                    monitor,
+                    monitorCtx,
+                    docExecutionContext,
+                    indexName,
+                    matchingDocIdsPerIndex?.get(indexName)
+                )
 
                 if (matchingDocs.isNotEmpty()) {
                     val matchedQueriesForDocs = getMatchedQueries(
@@ -191,63 +206,108 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 }
             }
             monitorResult = monitorResult.copy(inputResults = InputRunResults(listOf(inputRunResults)))
+
+            /*
+             populate the map queryToDocIds with pairs of <DocLevelQuery object from queries in monitor metadata &
+             list of matched docId from inputRunResults>
+             this fixes the issue of passing id, name, tags fields of DocLevelQuery object correctly to TriggerExpressionParser
+             */
+            queries.forEach {
+                if (inputRunResults.containsKey(it.id)) {
+                    queryToDocIds[it] = inputRunResults[it.id]!!
+                }
+            }
+
+            val idQueryMap: Map<String, DocLevelQuery> = queries.associateBy { it.id }
+
+            val triggerResults = mutableMapOf<String, DocumentLevelTriggerRunResult>()
+            // If there are no triggers defined, we still want to generate findings
+            if (monitor.triggers.isEmpty()) {
+                if (dryrun == false && monitor.id != Monitor.NO_ID) {
+                    docsToQueries.forEach {
+                        val triggeredQueries = it.value.map { queryId -> idQueryMap[queryId]!! }
+                        createFindings(monitor, monitorCtx, triggeredQueries, it.key, true)
+                    }
+                }
+            } else {
+                monitor.triggers.forEach {
+                    triggerResults[it.id] = runForEachDocTrigger(
+                        monitorCtx,
+                        monitorResult,
+                        it as DocumentLevelTrigger,
+                        monitor,
+                        idQueryMap,
+                        docsToQueries,
+                        queryToDocIds,
+                        dryrun,
+                        executionId = executionId,
+                        workflowRunContext = workflowRunContext
+                    )
+                }
+            }
+            // Don't update monitor if this is a test monitor
+            if (!isTempMonitor) {
+                // If any error happened during trigger execution, upsert monitor error alert
+                val errorMessage = constructErrorMessageFromTriggerResults(triggerResults = triggerResults)
+                if (errorMessage.isNotEmpty()) {
+                    monitorCtx.alertService!!.upsertMonitorErrorAlert(
+                        monitor = monitor,
+                        errorMessage = errorMessage,
+                        executionId = executionId,
+                        workflowRunContext
+                    )
+                } else {
+                    onSuccessfulMonitorRun(monitorCtx, monitor)
+                }
+
+                MonitorMetadataService.upsertMetadata(
+                    monitorMetadata.copy(lastRunContext = updatedLastRunContext),
+                    true
+                )
+            }
+
+            // TODO: Update the Document as part of the Trigger and return back the trigger action result
+            return monitorResult.copy(triggerResults = triggerResults)
         } catch (e: Exception) {
-            logger.error("Failed to start Document-level-monitor ${monitor.name}", e)
+            val errorMessage = ExceptionsHelper.detailedMessage(e)
+            monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor, errorMessage, executionId, workflowRunContext)
+            logger.error("Failed running Document-level-monitor ${monitor.name}", e)
             val alertingException = AlertingException(
-                ExceptionsHelper.unwrapCause(e).cause?.message.toString(),
+                errorMessage,
                 RestStatus.INTERNAL_SERVER_ERROR,
                 e
             )
-            monitorResult = monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
+            return monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
         }
+    }
 
-        /*
-         populate the map queryToDocIds with pairs of <DocLevelQuery object from queries in monitor metadata &
-         list of matched docId from inputRunResults>
-         this fixes the issue of passing id, name, tags fields of DocLevelQuery object correctly to TriggerExpressionParser
-         */
-        queries.forEach {
-            if (inputRunResults.containsKey(it.id)) {
-                queryToDocIds[it] = inputRunResults[it.id]!!
-            }
-        }
-
-        val idQueryMap: Map<String, DocLevelQuery> = queries.associateBy { it.id }
-
-        val triggerResults = mutableMapOf<String, DocumentLevelTriggerRunResult>()
-        // If there are no triggers defined, we still want to generate findings
-        if (monitor.triggers.isEmpty()) {
-            if (dryrun == false && monitor.id != Monitor.NO_ID) {
-                docsToQueries.forEach {
-                    val triggeredQueries = it.value.map { queryId -> idQueryMap[queryId]!! }
-                    createFindings(monitor, monitorCtx, triggeredQueries, it.key, true)
-                }
-            }
-        } else {
-            monitor.triggers.forEach {
-                triggerResults[it.id] = runForEachDocTrigger(
-                    monitorCtx,
-                    monitorResult,
-                    it as DocumentLevelTrigger,
-                    monitor,
-                    idQueryMap,
-                    docsToQueries,
-                    queryToDocIds,
-                    dryrun
-                )
-            }
-        }
-
-        // Don't update monitor if this is a test monitor
-        if (!isTempMonitor) {
-            MonitorMetadataService.upsertMetadata(
-                monitorMetadata.copy(lastRunContext = updatedLastRunContext),
-                true
+    private suspend fun onSuccessfulMonitorRun(monitorCtx: MonitorRunnerExecutionContext, monitor: Monitor) {
+        monitorCtx.alertService!!.clearMonitorErrorAlert(monitor)
+        if (monitor.dataSources.alertsHistoryIndex != null) {
+            monitorCtx.alertService!!.moveClearedErrorAlertsToHistory(
+                monitor.id,
+                monitor.dataSources.alertsIndex,
+                monitor.dataSources.alertsHistoryIndex!!
             )
         }
+    }
 
-        // TODO: Update the Document as part of the Trigger and return back the trigger action result
-        return monitorResult.copy(triggerResults = triggerResults)
+    private fun constructErrorMessageFromTriggerResults(
+        triggerResults: MutableMap<String, DocumentLevelTriggerRunResult>? = null
+    ): String {
+        var errorMessage = ""
+        if (triggerResults != null) {
+            val triggersErrorBuilder = StringBuilder()
+            triggerResults.forEach {
+                if (it.value.error != null) {
+                    triggersErrorBuilder.append("[${it.key}]: [${it.value.error!!.userErrorMessage()}]").append(" | ")
+                }
+            }
+            if (triggersErrorBuilder.isNotEmpty()) {
+                errorMessage = "Trigger errors: $triggersErrorBuilder"
+            }
+        }
+        return errorMessage
     }
 
     private suspend fun runForEachDocTrigger(
@@ -258,7 +318,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         idQueryMap: Map<String, DocLevelQuery>,
         docsToQueries: Map<String, List<String>>,
         queryToDocIds: Map<DocLevelQuery, Set<String>>,
-        dryrun: Boolean
+        dryrun: Boolean,
+        workflowRunContext: WorkflowRunContext?,
+        executionId: String
     ): DocumentLevelTriggerRunResult {
         val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger)
         val triggerResult = monitorCtx.triggerService!!.runDocLevelTrigger(monitor, trigger, queryToDocIds)
@@ -269,7 +331,14 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         // TODO: Implement throttling for findings
         docsToQueries.forEach {
             val triggeredQueries = it.value.map { queryId -> idQueryMap[queryId]!! }
-            val findingId = createFindings(monitor, monitorCtx, triggeredQueries, it.key, !dryrun && monitor.id != Monitor.NO_ID)
+            val findingId = createFindings(
+                monitor,
+                monitorCtx,
+                triggeredQueries,
+                it.key,
+                !dryrun && monitor.id != Monitor.NO_ID,
+                executionId
+            )
             findings.add(findingId)
 
             if (triggerResult.triggeredDocs.contains(it.key)) {
@@ -289,17 +358,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 listOf(it.first),
                 listOf(it.second),
                 triggerCtx,
-                monitorResult.alertError() ?: triggerResult.alertError()
-            )
-            alerts.add(alert)
-        }
-
-        if (findingDocPairs.isEmpty() && monitorResult.error != null) {
-            val alert = monitorCtx.alertService!!.composeDocLevelAlert(
-                listOf(),
-                listOf(),
-                triggerCtx,
-                monitorResult.alertError() ?: triggerResult.alertError()
+                monitorResult.alertError() ?: triggerResult.alertError(),
+                executionId = executionId,
+                workflorwRunContext = workflowRunContext
             )
             alerts.add(alert)
         }
@@ -339,7 +400,14 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 alert.copy(actionExecutionResults = actionExecutionResults)
             }
 
-            monitorCtx.retryPolicy?.let { monitorCtx.alertService!!.saveAlerts(monitor.dataSources, updatedAlerts, it) }
+            monitorCtx.retryPolicy?.let {
+                monitorCtx.alertService!!.saveAlerts(
+                    monitor.dataSources,
+                    updatedAlerts,
+                    it,
+                    routingId = monitor.id
+                )
+            }
         }
         return triggerResult
     }
@@ -349,7 +417,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         monitorCtx: MonitorRunnerExecutionContext,
         docLevelQueries: List<DocLevelQuery>,
         matchingDocId: String,
-        shouldCreateFinding: Boolean
+        shouldCreateFinding: Boolean,
+        workflowExecutionId: String? = null,
     ): String {
         // Before the "|" is the doc id and after the "|" is the index
         val docIndex = matchingDocId.split("|")
@@ -362,7 +431,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             monitorName = monitor.name,
             index = docIndex[1],
             docLevelQueries = docLevelQueries,
-            timestamp = Instant.now()
+            timestamp = Instant.now(),
+            executionId = workflowExecutionId
         )
 
         val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
@@ -484,7 +554,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         monitor: Monitor,
         monitorCtx: MonitorRunnerExecutionContext,
         docExecutionCtx: DocumentExecutionContext,
-        index: String
+        index: String,
+        docIds: List<String>? = null
     ): List<Pair<String, BytesReference>> {
         val count: Int = docExecutionCtx.updatedLastRunContext["shards_count"] as Int
         val matchingDocs = mutableListOf<Pair<String, BytesReference>>()
@@ -500,7 +571,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     shard,
                     prevSeqNo,
                     maxSeqNo,
-                    null
+                    null,
+                    docIds
                 )
 
                 if (hits.hits.isNotEmpty()) {
@@ -519,7 +591,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         shard: String,
         prevSeqNo: Long?,
         maxSeqNo: Long,
-        query: String?
+        query: String?,
+        docIds: List<String>? = null
     ): SearchHits {
         if (prevSeqNo?.equals(maxSeqNo) == true && maxSeqNo != 0L) {
             return SearchHits.empty()
@@ -529,6 +602,10 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         if (query != null) {
             boolQueryBuilder.must(QueryBuilders.queryStringQuery(query))
+        }
+
+        if (!docIds.isNullOrEmpty()) {
+            boolQueryBuilder.filter(QueryBuilders.termsQuery("_id", docIds))
         }
 
         val request: SearchRequest = SearchRequest()
@@ -554,11 +631,11 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         monitorMetadata: MonitorMetadata,
         index: String
     ): SearchHits {
-        val boolQueryBuilder = BoolQueryBuilder().filter(QueryBuilders.matchQuery("index", index))
+        val boolQueryBuilder = BoolQueryBuilder().must(QueryBuilders.matchQuery("index", index).operator(Operator.AND))
 
         val percolateQueryBuilder = PercolateQueryBuilderExt("query", docs, XContentType.JSON)
         if (monitor.id.isNotEmpty()) {
-            boolQueryBuilder.filter(QueryBuilders.matchQuery("monitor_id", monitor.id))
+            boolQueryBuilder.must(QueryBuilders.matchQuery("monitor_id", monitor.id).operator(Operator.AND))
         }
         boolQueryBuilder.filter(percolateQueryBuilder)
 
@@ -576,8 +653,15 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         searchSourceBuilder.query(boolQueryBuilder)
         searchRequest.source(searchSourceBuilder)
 
-        val response: SearchResponse = monitorCtx.client!!.suspendUntil {
-            monitorCtx.client!!.execute(SearchAction.INSTANCE, searchRequest, it)
+        var response: SearchResponse
+        try {
+            response = monitorCtx.client!!.suspendUntil {
+                monitorCtx.client!!.execute(SearchAction.INSTANCE, searchRequest, it)
+            }
+        } catch (e: Exception) {
+            throw IllegalStateException(
+                "Failed to run percolate search for sourceIndex [$index] and queryIndex [$queryIndex] for ${docs.size} document(s)", e
+            )
         }
 
         if (response.status() !== RestStatus.OK) {

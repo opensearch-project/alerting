@@ -1,6 +1,6 @@
 {
   "_meta" : {
-    "schema_version": 6
+    "schema_version": 8
   },
   "properties": {
     "monitor": {
@@ -299,6 +299,154 @@
         }
       }
     },
+    "workflow": {
+      "dynamic": "false",
+      "properties": {
+        "schema_version": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "owner": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "workflow_type": {
+          "type": "keyword"
+        },
+        "user": {
+          "properties": {
+            "name": {
+              "type": "text",
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "ignore_above": 256
+                }
+              }
+            },
+            "backend_roles": {
+              "type" : "text",
+              "fields" : {
+                "keyword" : {
+                  "type" : "keyword"
+                }
+              }
+            },
+            "roles": {
+              "type" : "text",
+              "fields" : {
+                "keyword" : {
+                  "type" : "keyword"
+                }
+              }
+            },
+            "custom_attribute_names": {
+              "type" : "text",
+              "fields" : {
+                "keyword" : {
+                  "type" : "keyword"
+                }
+              }
+            }
+          }
+        },
+        "type": {
+          "type": "keyword"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "audit_delegate_monitor_alerts": {
+          "type": "boolean"
+        },
+        "enabled_time": {
+          "type": "date",
+          "format": "strict_date_time||epoch_millis"
+        },
+        "last_update_time": {
+          "type": "date",
+          "format": "strict_date_time||epoch_millis"
+        },
+        "schedule": {
+          "properties": {
+            "period": {
+              "properties": {
+                "interval": {
+                  "type": "integer"
+                },
+                "unit": {
+                  "type": "keyword"
+                }
+              }
+            },
+            "cron": {
+              "properties": {
+                "expression": {
+                  "type": "text"
+                },
+                "timezone": {
+                  "type": "keyword"
+                }
+              }
+            }
+          }
+        },
+        "inputs": {
+          "type": "nested",
+          "properties": {
+            "composite_input": {
+              "type": "nested",
+              "properties": {
+                "sequence": {
+                  "properties": {
+                    "delegates": {
+                      "type": "nested",
+                      "properties": {
+                        "order": {
+                          "type": "integer"
+                        },
+                        "monitor_id": {
+                          "type": "keyword"
+                        },
+                        "chained_monitor_findings": {
+                          "properties": {
+                            "monitor_id": {
+                              "type": "keyword"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "group_by_fields": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        }
+      }
+    },
     "destination": {
       "dynamic": "false",
       "properties": {
@@ -516,6 +664,29 @@
         "source_to_query_index_mapping": {
           "type": "object",
           "enabled": false
+        }
+      }
+    },
+    "workflow_metadata" : {
+      "properties": {
+        "workflow_id": {
+          "type": "keyword"
+        },
+        "monitor_ids": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 1000
+            }
+          }
+        },
+        "latest_run_time": {
+          "type": "date",
+          "format": "strict_date_time||epoch_millis"
+        },
+        "latest_execution_id": {
+          "type": "keyword"
         }
       }
     }

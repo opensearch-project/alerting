@@ -35,8 +35,12 @@ import org.opensearch.commons.alerting.model.ActionExecutionResult
 import org.opensearch.commons.alerting.model.AggregationResultBucket
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.ChainedAlertTrigger
+import org.opensearch.commons.alerting.model.ChainedMonitorFindings
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
+import org.opensearch.commons.alerting.model.CompositeInput
 import org.opensearch.commons.alerting.model.DataSources
+import org.opensearch.commons.alerting.model.Delegate
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
@@ -47,7 +51,10 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.Schedule
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.model.Sequence
 import org.opensearch.commons.alerting.model.Trigger
+import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.commons.alerting.model.Workflow.WorkflowType
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.commons.alerting.model.action.ActionExecutionScope
@@ -218,6 +225,71 @@ fun randomDocumentLevelMonitor(
     )
 }
 
+fun randomWorkflow(
+    id: String = Workflow.NO_ID,
+    monitorIds: List<String>,
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    user: User? = randomUser(),
+    schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
+    enabled: Boolean = randomBoolean(),
+    enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
+    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+    triggers: List<Trigger> = emptyList(),
+    auditDelegateMonitorAlerts: Boolean? = true
+): Workflow {
+    val delegates = mutableListOf<Delegate>()
+    if (!monitorIds.isNullOrEmpty()) {
+        delegates.add(Delegate(1, monitorIds[0]))
+        for (i in 1 until monitorIds.size) {
+            // Order of monitors in workflow will be the same like forwarded meaning that the first monitorId will be used as second monitor chained finding
+            delegates.add(Delegate(i + 1, monitorIds [i], ChainedMonitorFindings(monitorIds[i - 1])))
+        }
+    }
+
+    return Workflow(
+        id = id,
+        name = name,
+        enabled = enabled,
+        schedule = schedule,
+        lastUpdateTime = lastUpdateTime,
+        enabledTime = enabledTime,
+        workflowType = WorkflowType.COMPOSITE,
+        user = user,
+        inputs = listOf(CompositeInput(Sequence(delegates))),
+        version = -1L,
+        schemaVersion = 0,
+        triggers = triggers,
+        auditDelegateMonitorAlerts = auditDelegateMonitorAlerts
+    )
+}
+
+fun randomWorkflowWithDelegates(
+    id: String = Workflow.NO_ID,
+    delegates: List<Delegate>,
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    user: User? = randomUser(),
+    schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
+    enabled: Boolean = randomBoolean(),
+    enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
+    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+    triggers: List<Trigger> = emptyList()
+): Workflow {
+    return Workflow(
+        id = id,
+        name = name,
+        enabled = enabled,
+        schedule = schedule,
+        lastUpdateTime = lastUpdateTime,
+        enabledTime = enabledTime,
+        workflowType = WorkflowType.COMPOSITE,
+        user = user,
+        inputs = listOf(CompositeInput(Sequence(delegates))),
+        version = -1L,
+        schemaVersion = 0,
+        triggers = triggers
+    )
+}
+
 fun randomQueryLevelTrigger(
     id: String = UUIDs.base64UUID(),
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
@@ -326,6 +398,7 @@ fun randomScript(source: String = "return " + OpenSearchRestTestCase.randomBoole
 
 val ADMIN = "admin"
 val ALERTING_BASE_URI = "/_plugins/_alerting/monitors"
+val WORKFLOW_ALERTING_BASE_URI = "/_plugins/_alerting/workflows"
 val DESTINATION_BASE_URI = "/_plugins/_alerting/destinations"
 val LEGACY_OPENDISTRO_ALERTING_BASE_URI = "/_opendistro/_alerting/monitors"
 val LEGACY_OPENDISTRO_DESTINATION_BASE_URI = "/_opendistro/_alerting/destinations"
@@ -698,4 +771,27 @@ fun assertUserNull(map: Map<String, Any?>) {
 
 fun assertUserNull(monitor: Monitor) {
     assertNull("User is not null", monitor.user)
+}
+
+fun assertUserNull(workflow: Workflow) {
+    assertNull("User is not null", workflow.user)
+}
+
+fun randomChainedAlertTrigger(
+    id: String = UUIDs.base64UUID(),
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    severity: String = "1",
+    condition: Script = randomScript(),
+    actions: List<Action> = mutableListOf(),
+    destinationId: String = ""
+): ChainedAlertTrigger {
+    return ChainedAlertTrigger(
+        id = id,
+        name = name,
+        severity = severity,
+        condition = condition,
+        actions = if (actions.isEmpty() && destinationId.isNotBlank()) {
+            (0..randomInt(10)).map { randomAction(destinationId = destinationId) }
+        } else actions
+    )
 }

@@ -34,6 +34,7 @@ import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
@@ -44,6 +45,7 @@ import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.addUserBackendRolesFilter
+import org.opensearch.alerting.util.getRoleFilterEnabled
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
@@ -186,7 +188,7 @@ class TransportIndexMonitorAction @Inject constructor(
         client: Client,
         actionListener: ActionListener<IndexMonitorResponse>,
         request: IndexMonitorRequest,
-        user: User?
+        user: User?,
     ) {
         val indices = mutableListOf<String>()
         // todo: for doc level alerting: check if index is present before monitor is created.
@@ -239,7 +241,7 @@ class TransportIndexMonitorAction @Inject constructor(
         client: Client,
         actionListener: ActionListener<IndexMonitorResponse>,
         request: IndexMonitorRequest,
-        user: User?
+        user: User?,
     ) {
         client.threadPool().threadContext.stashContext().use {
             IndexMonitorHandler(client, actionListener, request, user).resolveUserAndStartForAD()
@@ -250,7 +252,7 @@ class TransportIndexMonitorAction @Inject constructor(
         private val client: Client,
         private val actionListener: ActionListener<IndexMonitorResponse>,
         private val request: IndexMonitorRequest,
-        private val user: User?
+        private val user: User?,
     ) {
 
         fun resolveUserAndStart() {
@@ -277,7 +279,9 @@ class TransportIndexMonitorAction @Inject constructor(
                     request.monitor = request.monitor
                         .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttNames))
                     val searchSourceBuilder = SearchSourceBuilder().size(0)
-                    addUserBackendRolesFilter(user, searchSourceBuilder)
+                    if (getRoleFilterEnabled(clusterService, settings, "plugins.anomaly_detection.filter_by_backend_roles")) {
+                        addUserBackendRolesFilter(user, searchSourceBuilder)
+                    }
                     val searchRequest = SearchRequest().indices(".opendistro-anomaly-detectors").source(searchSourceBuilder)
                     client.search(
                         searchRequest,
@@ -503,16 +507,30 @@ class TransportIndexMonitorAction @Inject constructor(
                     )
                     return
                 }
-                request.monitor = request.monitor.copy(id = indexResponse.id)
-                var (metadata, created) = MonitorMetadataService.getOrCreateMetadata(request.monitor)
-                if (created == false) {
-                    log.warn("Metadata doc id:${metadata.id} exists, but it shouldn't!")
+                var metadata: MonitorMetadata?
+                try { // delete monitor if metadata creation fails, log the right error and re-throw the error to fail listener
+                    request.monitor = request.monitor.copy(id = indexResponse.id)
+                    var (monitorMetadata: MonitorMetadata, created: Boolean) = MonitorMetadataService.getOrCreateMetadata(request.monitor)
+                    if (created == false) {
+                        log.warn("Metadata doc id:${monitorMetadata.id} exists, but it shouldn't!")
+                    }
+                    metadata = monitorMetadata
+                } catch (t: Exception) {
+                    log.error("failed to create metadata for monitor ${indexResponse.id}. deleting monitor")
+                    cleanupMonitorAfterPartialFailure(request.monitor, indexResponse)
+                    throw t
                 }
-                if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
-                    indexDocLevelMonitorQueries(request.monitor, indexResponse.id, metadata, request.refreshPolicy)
+                try {
+                    if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                        indexDocLevelMonitorQueries(request.monitor, indexResponse.id, metadata, request.refreshPolicy)
+                    }
+                    // When inserting queries in queryIndex we could update sourceToQueryIndexMapping
+                    MonitorMetadataService.upsertMetadata(metadata, updating = true)
+                } catch (t: Exception) {
+                    log.error("failed to index doc level queries monitor ${indexResponse.id}. deleting monitor", t)
+                    cleanupMonitorAfterPartialFailure(request.monitor, indexResponse)
+                    throw t
                 }
-                // When inserting queries in queryIndex we could update sourceToQueryIndexMapping
-                MonitorMetadataService.upsertMetadata(metadata, updating = true)
 
                 actionListener.onResponse(
                     IndexMonitorResponse(
@@ -525,6 +543,22 @@ class TransportIndexMonitorAction @Inject constructor(
                 )
             } catch (t: Exception) {
                 actionListener.onFailure(AlertingException.wrap(t))
+            }
+        }
+
+        private suspend fun cleanupMonitorAfterPartialFailure(monitor: Monitor, indexMonitorResponse: IndexResponse) {
+            // we simply log the success (debug log) or failure (error log) when we try clean up partially failed monitor creation request
+            try {
+                DeleteMonitorService.deleteMonitor(
+                    monitor = monitor,
+                    RefreshPolicy.IMMEDIATE
+                )
+                log.debug(
+                    "Cleaned up monitor related resources after monitor creation request partial failure. " +
+                        "Monitor id : ${indexMonitorResponse.id}"
+                )
+            } catch (e: Exception) {
+                log.error("Failed to clean up monitor after monitor creation request partial failure", e)
             }
         }
 

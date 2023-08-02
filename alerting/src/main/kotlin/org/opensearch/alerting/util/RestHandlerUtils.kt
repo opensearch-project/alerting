@@ -6,7 +6,7 @@
 package org.opensearch.alerting.util
 
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.common.Strings
+import org.opensearch.core.common.Strings
 import org.opensearch.rest.RestRequest
 import org.opensearch.search.fetch.subphase.FetchSourceContext
 
@@ -18,7 +18,7 @@ import org.opensearch.search.fetch.subphase.FetchSourceContext
  * @return FetchSourceContext
  */
 fun context(request: RestRequest): FetchSourceContext? {
-    val userAgent = Strings.coalesceToEmpty(request.header("User-Agent"))
+    val userAgent = if (request.header("User-Agent") == null) "" else request.header("User-Agent")
     return if (!userAgent.contains(AlertingPlugin.OPEN_SEARCH_DASHBOARDS_USER_AGENT)) {
         FetchSourceContext(true, Strings.EMPTY_ARRAY, AlertingPlugin.UI_METADATA_EXCLUDE)
     } else null

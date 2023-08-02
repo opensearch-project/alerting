@@ -42,7 +42,10 @@ import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
 import org.opensearch.search.aggregations.bucket.composite.TermsValuesSourceBuilder
+import org.opensearch.search.aggregations.bucket.terms.MultiTermsAggregationBuilder
 import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
+import org.opensearch.search.aggregations.metrics.CardinalityAggregationBuilder
+import org.opensearch.search.aggregations.support.MultiTermsValuesSourceConfig
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.net.URLEncoder
 import java.time.Instant
@@ -1024,7 +1027,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test execute AD monitor doesn't return search result without user`() {
+    fun `test execute AD monitor returns search result without user`() {
         // TODO: change to REST API call to test security enabled case
         if (!securityEnabled()) {
             val user = randomUser()
@@ -1044,14 +1047,14 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
             @Suppress("UNCHECKED_CAST")
             val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
-            assertEquals("Incorrect search result", 1, total["value"])
+            assertEquals("Incorrect search result", 5, total["value"])
             @Suppress("UNCHECKED_CAST")
             val maxAnomalyGrade = searchResult.stringMap("aggregations")?.get("max_anomaly_grade") as Map<String, String>
-            assertEquals("Incorrect search result", 0.75, maxAnomalyGrade["value"])
+            assertEquals("Incorrect search result", 0.9, maxAnomalyGrade["value"])
         }
     }
 
-    fun `test execute AD monitor doesn't return search result with empty backend role`() {
+    fun `test execute AD monitor returns search result with empty backend role`() {
         // TODO: change to REST API call to test security enabled case
         if (!securityEnabled()) {
             val user = randomUser()
@@ -1074,7 +1077,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
             @Suppress("UNCHECKED_CAST")
             val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
-            assertEquals("Incorrect search result", 1, total["value"])
+            assertEquals("Incorrect search result", 5, total["value"])
             @Suppress("UNCHECKED_CAST")
             val maxAnomalyGrade = searchResult.stringMap("aggregations")?.get("max_anomaly_grade") as Map<String, String>
             assertEquals("Incorrect search result", 0.9, maxAnomalyGrade["value"])
@@ -1100,10 +1103,10 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
             @Suppress("UNCHECKED_CAST")
             val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
-            assertEquals("Incorrect search result", 3, total["value"])
+            assertEquals("Incorrect search result", 5, total["value"])
             @Suppress("UNCHECKED_CAST")
             val maxAnomalyGrade = searchResult.stringMap("aggregations")?.get("max_anomaly_grade") as Map<String, String>
-            assertEquals("Incorrect search result", 0.8, maxAnomalyGrade["value"])
+            assertEquals("Incorrect search result", 0.9, maxAnomalyGrade["value"])
         }
     }
 
@@ -1123,13 +1126,13 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             @Suppress("UNCHECKED_CAST")
             (output["trigger_results"] as HashMap<String, Any>).forEach {
                     _, v ->
-                assertFalse((v as HashMap<String, Boolean>)["triggered"] as Boolean)
+                assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             @Suppress("UNCHECKED_CAST")
             val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
             @Suppress("UNCHECKED_CAST")
             val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
-            assertEquals("Incorrect search result", 0, total["value"])
+            assertEquals("Incorrect search result", 5, total["value"])
         }
     }
 
@@ -1177,6 +1180,89 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         @Suppress("UNCHECKED_CAST")
         val buckets = searchResult.stringMap("aggregations")?.stringMap("composite_agg")?.get("buckets") as List<Map<String, Any>>
         assertEquals("Incorrect search result", 2, buckets.size)
+    }
+
+    fun `test execute bucket-level monitor returns search result with multi term agg`() {
+        val index = "test_index_1234"
+        indexDoc(
+            index,
+            "1",
+            """{"user_id": "1",
+            "ip_addr": "12345678",
+            "user_agent": "chrome"
+            }
+            """.trimIndent()
+        )
+        indexDoc(
+            index,
+            "2",
+            """{"user_id": "2",
+            "ip_addr": "12345678",
+            "user_agent": "chrome"
+            }
+            """.trimIndent()
+        )
+        indexDoc(
+            index,
+            "3",
+            """{"user_id": "2",
+            "ip_addr": "3443534",
+            "user_agent": "chrome"
+            }
+            """.trimIndent()
+        )
+
+        val triggerScript = """
+            params.docCount > 0
+        """.trimIndent()
+
+        var trigger = randomBucketLevelTrigger()
+        trigger = trigger.copy(
+            bucketSelector = BucketSelectorExtAggregationBuilder(
+                name = trigger.id,
+                bucketsPathsMap = mapOf("_value" to "distinct_user_count", "docCount" to "_count"),
+                script = Script(triggerScript),
+                parentBucketPath = "hot",
+                filter = null
+            )
+        )
+
+        val m = randomBucketLevelMonitor(
+            triggers = listOf(trigger),
+            inputs = listOf(
+                SearchInput(
+                    listOf(index),
+                    SearchSourceBuilder().aggregation(
+                        MultiTermsAggregationBuilder("hot")
+                            .terms(
+                                listOf(
+                                    MultiTermsValuesSourceConfig.Builder().setFieldName("ip_addr.keyword").build(),
+                                    MultiTermsValuesSourceConfig.Builder().setFieldName("user_agent.keyword").build()
+                                )
+                            )
+                            .subAggregation(CardinalityAggregationBuilder("distinct_user_count").field("user_id.keyword"))
+                    )
+                )
+            )
+        )
+        val monitor = createMonitor(m)
+        val response = executeMonitor(monitor.id, params = DRYRUN_MONITOR)
+        val output = entityAsMap(response)
+
+        assertEquals(monitor.name, output["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        val buckets = searchResult.stringMap("aggregations")?.stringMap("hot")?.get("buckets") as List<Map<String, Any>>
+        assertEquals("Incorrect search result", 2, buckets.size)
+        val distinctUserCountAgg1 = buckets.find {
+            it.get("key_as_string") == "12345678|chrome"
+        }!!.get("distinct_user_count") as Map<String, Integer>
+        assertEquals(2, distinctUserCountAgg1.get("value"))
+        val distinctUserCountAgg2 = buckets.find {
+            it.get("key_as_string") == "3443534|chrome"
+        }!!.get("distinct_user_count") as Map<String, Integer>
+        assertEquals(1, distinctUserCountAgg2.get("value"))
     }
 
     fun `test bucket-level monitor alert creation and completion`() {

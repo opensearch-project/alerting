@@ -1,6 +1,8 @@
 {
+  "/_cat/indices": {},
   "/_cat/pending_tasks": {},
   "/_cat/recovery": {},
+  "/_cat/shards": {},
   "/_cat/snapshots": {},
   "/_cat/tasks": {},
   "/_cluster/health": {},

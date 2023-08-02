@@ -24,12 +24,13 @@ import org.opensearch.alerting.util.destinationmigration.publishLegacyNotificati
 import org.opensearch.alerting.util.destinationmigration.sendNotification
 import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isTestAction
+import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.node.NodeClient
-import org.opensearch.common.Strings
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.Table
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
+import org.opensearch.core.common.Strings
 import java.time.Instant
 
 abstract class MonitorRunner {
@@ -39,7 +40,9 @@ abstract class MonitorRunner {
         monitorCtx: MonitorRunnerExecutionContext,
         periodStart: Instant,
         periodEnd: Instant,
-        dryRun: Boolean
+        dryRun: Boolean,
+        workflowRunContext: WorkflowRunContext? = null,
+        executionId: String
     ): MonitorRunResult<*>
 
     suspend fun runAction(

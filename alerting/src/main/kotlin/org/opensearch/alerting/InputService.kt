@@ -14,18 +14,27 @@ import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.util.AggregationQueryRewriter
 import org.opensearch.alerting.util.addUserBackendRolesFilter
-import org.opensearch.alerting.util.executeTransportAction
-import org.opensearch.alerting.util.toMap
+import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.executeTransportAction
+import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.toMap
+import org.opensearch.alerting.util.getRoleFilterEnabled
+import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client
+import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.io.stream.NamedWriteableAwareStreamInput
 import org.opensearch.common.io.stream.NamedWriteableRegistry
+import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.index.query.BoolQueryBuilder
+import org.opensearch.index.query.MatchQueryBuilder
+import org.opensearch.index.query.QueryBuilder
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.index.query.TermsQueryBuilder
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
 import org.opensearch.script.ScriptType
@@ -38,7 +47,9 @@ class InputService(
     val client: Client,
     val scriptService: ScriptService,
     val namedWriteableRegistry: NamedWriteableRegistry,
-    val xContentRegistry: NamedXContentRegistry
+    val xContentRegistry: NamedXContentRegistry,
+    val clusterService: ClusterService,
+    val settings: Settings
 ) {
 
     private val logger = LogManager.getLogger(InputService::class.java)
@@ -47,11 +58,15 @@ class InputService(
         monitor: Monitor,
         periodStart: Instant,
         periodEnd: Instant,
-        prevResult: InputRunResults? = null
+        prevResult: InputRunResults? = null,
+        workflowRunContext: WorkflowRunContext? = null
     ): InputRunResults {
         return try {
             val results = mutableListOf<Map<String, Any>>()
             val aggTriggerAfterKey: MutableMap<String, TriggerAfterKey> = mutableMapOf()
+
+            // If monitor execution is triggered from a workflow
+            val matchingDocIdsPerIndex = workflowRunContext?.matchingDocIdsPerIndex
 
             // TODO: If/when multiple input queries are supported for Bucket-Level Monitor execution, aggTriggerAfterKeys will
             //  need to be updated to account for it
@@ -63,15 +78,21 @@ class InputService(
                             "period_start" to periodStart.toEpochMilli(),
                             "period_end" to periodEnd.toEpochMilli()
                         )
+
                         // Deep copying query before passing it to rewriteQuery since otherwise, the monitor.input is modified directly
                         // which causes a strange bug where the rewritten query persists on the Monitor across executions
                         val rewrittenQuery = AggregationQueryRewriter.rewriteQuery(deepCopyQuery(input.query), prevResult, monitor.triggers)
+
+                        // Rewrite query to consider the doc ids per given index
+                        if (chainedFindingExist(matchingDocIdsPerIndex) && rewrittenQuery.query() != null) {
+                            val updatedSourceQuery = updateInputQueryWithFindingDocIds(rewrittenQuery.query(), matchingDocIdsPerIndex!!)
+                            rewrittenQuery.query(updatedSourceQuery)
+                        }
+
                         val searchSource = scriptService.compile(
                             Script(
-                                ScriptType.INLINE,
-                                Script.DEFAULT_TEMPLATE_LANG,
-                                rewrittenQuery.toString(),
-                                searchParams
+                                ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
+                                rewrittenQuery.toString(), searchParams
                             ),
                             TemplateScript.CONTEXT
                         )
@@ -107,6 +128,35 @@ class InputService(
         }
     }
 
+    /**
+     * Extends the given query builder with query that filters the given indices with the given doc ids per index
+     * Used whenever we want to select the documents that were found in chained delegate execution of the current workflow run
+     *
+     * @param query Original bucket monitor query
+     * @param matchingDocIdsPerIndex Map of finding doc ids grouped by index
+     */
+    private fun updateInputQueryWithFindingDocIds(
+        query: QueryBuilder,
+        matchingDocIdsPerIndex: Map<String, List<String>>,
+    ): QueryBuilder {
+        val queryBuilder = QueryBuilders.boolQuery().must(query)
+        val shouldQuery = QueryBuilders.boolQuery()
+
+        matchingDocIdsPerIndex.forEach { entry ->
+            shouldQuery
+                .should()
+                .add(
+                    BoolQueryBuilder()
+                        .must(MatchQueryBuilder("_index", entry.key))
+                        .must(TermsQueryBuilder("_id", entry.value))
+                )
+        }
+        return queryBuilder.must(shouldQuery)
+    }
+
+    private fun chainedFindingExist(indexToDocIds: Map<String, List<String>>?) =
+        !indexToDocIds.isNullOrEmpty()
+
     private fun deepCopyQuery(query: SearchSourceBuilder): SearchSourceBuilder {
         val out = BytesStreamOutput()
         query.writeTo(out)
@@ -133,10 +183,8 @@ class InputService(
             val searchParams = mapOf("period_start" to periodStart.toEpochMilli(), "period_end" to periodEnd.toEpochMilli())
             val searchSource = scriptService.compile(
                 Script(
-                    ScriptType.INLINE,
-                    Script.DEFAULT_TEMPLATE_LANG,
-                    input.query.toString(),
-                    searchParams
+                    ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
+                    input.query.toString(), searchParams
                 ),
                 TemplateScript.CONTEXT
             )
@@ -150,13 +198,6 @@ class InputService(
 
             // Add user role filter for AD result
             client.threadPool().threadContext.stashContext().use {
-                // Currently we have no way to verify if user has AD read permission or not. So we always add user
-                // role filter here no matter AD backend role filter enabled or not. If we don't add user role filter
-                // when AD backend filter disabled, user can run monitor on any detector and get anomaly data even
-                // they have no AD read permission. So if domain disabled AD backend role filter, monitor runner
-                // still can't get AD result with different user backend role, even the monitor user has permission
-                // to read AD result. This is a short term solution to trade off between user experience and security.
-                //
                 // Possible long term solution:
                 // 1.Use secure rest client to send request to AD search result API. If no permission exception,
                 // that mean user has read access on AD result. Then don't need to add user role filter when query
@@ -165,7 +206,9 @@ class InputService(
                 // Monitor runner will send transport request to check permission first. If security plugin response
                 // is yes, user has permission to query AD result. If AD role filter enabled, we will add user role
                 // filter to protect data at user role level; otherwise, user can query any AD result.
-                addUserBackendRolesFilter(monitor.user, searchRequest.source())
+                if (getRoleFilterEnabled(clusterService, settings, "plugins.anomaly_detection.filter_by_backend_roles")) {
+                    addUserBackendRolesFilter(monitor.user, searchRequest.source())
+                }
                 val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
                 results += searchResponse.convertToMap()
             }

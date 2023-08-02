@@ -26,6 +26,8 @@ import org.opensearch.index.IndexNotFoundException
 class IndexUtils {
 
     companion object {
+        val VALID_INDEX_NAME_REGEX = Regex("""^(?![_\-\+])(?!.*\.\.)[^\s,\\\/\*\?"<>|#:\.]{1,255}$""")
+
         const val _META = "_meta"
         const val SCHEMA_VERSION = "schema_version"
 
@@ -100,7 +102,7 @@ class IndexUtils {
 
         @JvmStatic
         fun getIndexNameWithAlias(clusterState: ClusterState, alias: String): String {
-            return clusterState.metadata.indices.first { it.value.aliases.containsKey(alias) }.key
+            return clusterState.metadata.indices.entries.first { it.value.aliases.containsKey(alias) }.key
         }
 
         @JvmStatic
@@ -127,7 +129,7 @@ class IndexUtils {
             actionListener: ActionListener<AcknowledgedResponse>
         ) {
             if (clusterState.metadata.indices.containsKey(index)) {
-                if (shouldUpdateIndex(clusterState.metadata.indices[index], mapping)) {
+                if (shouldUpdateIndex(clusterState.metadata.indices[index]!!, mapping)) {
                     val putMappingRequest: PutMappingRequest = PutMappingRequest(index).source(mapping, XContentType.JSON)
                     client.putMapping(putMappingRequest, actionListener)
                 } else {
