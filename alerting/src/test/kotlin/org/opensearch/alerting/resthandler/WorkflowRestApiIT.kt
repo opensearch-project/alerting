@@ -1101,7 +1101,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
         assertTrue(
             (workflowTriggerResults[andTrigger.id] as Map<String, Any>)["triggered"] as Boolean
         )
-        val res = getWorkflowAlerts(workflowId, true)
+        val res = getWorkflowAlerts(workflowId = workflowId, getAssociatedAlerts = true)
         val getWorkflowAlerts = entityAsMap(res)
         Assert.assertTrue(getWorkflowAlerts.containsKey("alerts"))
         Assert.assertTrue(getWorkflowAlerts.containsKey("associatedAlerts"))
@@ -1113,6 +1113,18 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
         val associatedAlerts = getWorkflowAlerts["associatedAlerts"] as List<HashMap<String, Any>>
         assertEquals(associatedAlerts.size, 2)
 
+        val res1 = getWorkflowAlerts(workflowId = workflowId, alertId = alerts[0]["id"].toString(), getAssociatedAlerts = true)
+        val getWorkflowAlerts1 = entityAsMap(res1)
+        Assert.assertTrue(getWorkflowAlerts1.containsKey("alerts"))
+        Assert.assertTrue(getWorkflowAlerts1.containsKey("associatedAlerts"))
+        val alerts1 = getWorkflowAlerts1["alerts"] as List<HashMap<String, Any>>
+        assertEquals(alerts1.size, 1)
+        Assert.assertEquals(alerts1[0]["execution_id"], executionId)
+        Assert.assertEquals(alerts1[0]["workflow_id"], workflowId)
+        Assert.assertEquals(alerts1[0]["monitor_id"], "")
+        val associatedAlerts1 = getWorkflowAlerts1["associatedAlerts"] as List<HashMap<String, Any>>
+        assertEquals(associatedAlerts1.size, 2)
+
         val getAlertsRes = getAlerts()
         val getAlertsMap = getAlertsRes.asMap()
         Assert.assertTrue(getAlertsMap.containsKey("alerts"))
@@ -1121,11 +1133,11 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
         Assert.assertEquals(getAlertsAlerts[0]["execution_id"], executionId)
         Assert.assertEquals(getAlertsAlerts[0]["workflow_id"], workflowId)
         Assert.assertEquals(getAlertsAlerts[0]["monitor_id"], "")
-        Assert.assertEquals(getAlertsAlerts[0]["id"], alerts[0]["id"])
+        Assert.assertEquals(getAlertsAlerts[0]["id"], alerts1[0]["id"])
 
-        val ackRes = acknowledgeChainedAlerts(workflowId, alerts[0]["id"].toString())
+        val ackRes = acknowledgeChainedAlerts(workflowId, alerts1[0]["id"].toString())
         val acknowledgeChainedAlertsResponse = entityAsMap(ackRes)
         val acknowledged = acknowledgeChainedAlertsResponse["success"] as List<String>
-        Assert.assertEquals(acknowledged[0], alerts[0]["id"])
+        Assert.assertEquals(acknowledged[0], alerts1[0]["id"])
     }
 }
