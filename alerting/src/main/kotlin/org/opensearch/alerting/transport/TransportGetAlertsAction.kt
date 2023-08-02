@@ -8,17 +8,15 @@ package org.opensearch.alerting.transport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionListener
 import org.opensearch.action.ActionRequest
+import org.opensearch.action.get.GetRequest
+import org.opensearch.action.get.GetResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.alerting.action.GetMonitorAction
-import org.opensearch.alerting.action.GetMonitorRequest
-import org.opensearch.alerting.action.GetMonitorResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -38,13 +36,13 @@ import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.GetAlertsRequest
 import org.opensearch.commons.alerting.action.GetAlertsResponse
 import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
-import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
-import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.search.sort.SortBuilders
 import org.opensearch.search.sort.SortOrder
 import org.opensearch.tasks.Task
@@ -60,8 +58,7 @@ class TransportGetAlertsAction @Inject constructor(
     clusterService: ClusterService,
     actionFilters: ActionFilters,
     val settings: Settings,
-    val xContentRegistry: NamedXContentRegistry,
-    val transportGetMonitorAction: TransportGetMonitorAction
+    val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<ActionRequest, GetAlertsResponse>(
     AlertingActions.GET_ALERTS_ACTION_NAME, transportService, actionFilters, ::GetAlertsRequest
 ),
@@ -150,25 +147,35 @@ class TransportGetAlertsAction @Inject constructor(
      */
     suspend fun resolveAlertsIndexName(getAlertsRequest: GetAlertsRequest): String {
         var alertIndex = AlertIndices.ALL_ALERT_INDEX_PATTERN
-        if (getAlertsRequest.alertIndex.isNullOrEmpty() == false) {
+        if (!getAlertsRequest.alertIndex.isNullOrEmpty()) {
             alertIndex = getAlertsRequest.alertIndex!!
-        } else if (getAlertsRequest.monitorId.isNullOrEmpty() == false)
-            withContext(Dispatchers.IO) {
-                val getMonitorRequest = GetMonitorRequest(
-                    getAlertsRequest.monitorId!!,
-                    -3L,
-                    RestRequest.Method.GET,
-                    FetchSourceContext.FETCH_SOURCE
-                )
-                val getMonitorResponse: GetMonitorResponse =
-                    transportGetMonitorAction.client.suspendUntil {
-                        execute(GetMonitorAction.INSTANCE, getMonitorRequest, it)
-                    }
-                if (getMonitorResponse.monitor != null) {
-                    alertIndex = getMonitorResponse.monitor!!.dataSources.alertsIndex
-                }
+        } else if (!getAlertsRequest.monitorId.isNullOrEmpty()) {
+            val retrievedMonitor = getMonitor(getAlertsRequest)
+            if (retrievedMonitor != null) {
+                alertIndex = retrievedMonitor.dataSources.alertsIndex
             }
-        return alertIndex
+        }
+        return if (alertIndex == AlertIndices.ALERT_INDEX)
+            AlertIndices.ALL_ALERT_INDEX_PATTERN
+        else
+            alertIndex
+    }
+
+    private suspend fun getMonitor(getAlertsRequest: GetAlertsRequest): Monitor? {
+        val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, getAlertsRequest.monitorId!!)
+        try {
+            val getResponse: GetResponse = client.suspendUntil { client.get(getRequest, it) }
+            if (!getResponse.isExists) {
+                return null
+            }
+            val xcp = XContentHelper.createParser(
+                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                getResponse.sourceAsBytesRef, XContentType.JSON
+            )
+            return ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
+        } catch (t: Exception) {
+            return null
+        }
     }
 
     fun getAlerts(
