@@ -61,21 +61,24 @@ import org.opensearch.Version;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.get.GetRequest;
 import org.opensearch.core.ParseField;
-import org.opensearch.common.bytes.BytesReference;
-import org.opensearch.common.io.stream.InputStreamStreamInput;
-import org.opensearch.common.io.stream.NamedWriteableAwareStreamInput;
-import org.opensearch.common.io.stream.NamedWriteableRegistry;
-import org.opensearch.common.io.stream.StreamInput;
-import org.opensearch.common.io.stream.StreamOutput;
+import org.opensearch.core.common.bytes.BytesReference;
+import org.opensearch.core.common.io.stream.InputStreamStreamInput;
+import org.opensearch.core.common.io.stream.NamedWriteableAwareStreamInput;
+import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
+import org.opensearch.core.common.io.stream.StreamInput;
+import org.opensearch.core.common.io.stream.StreamOutput;
 import org.opensearch.core.xcontent.ConstructingObjectParser;
+import org.opensearch.core.xcontent.MediaType;
+import org.opensearch.core.xcontent.MediaTypeRegistry;
 import org.opensearch.common.xcontent.LoggingDeprecationHandler;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.XContentBuilder;
-import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.common.xcontent.XContentHelper;
-import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.common.xcontent.XContentType;
+import org.opensearch.core.indices.breaker.CircuitBreakerService;
+import org.opensearch.core.indices.breaker.NoneCircuitBreakerService;
+import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.index.analysis.FieldNameAnalyzer;
 import org.opensearch.index.fielddata.IndexFieldData;
 import org.opensearch.index.fielddata.IndexFieldDataCache;
@@ -91,8 +94,6 @@ import org.opensearch.index.query.QueryRewriteContext;
 import org.opensearch.index.query.QueryShardContext;
 import org.opensearch.index.query.QueryShardException;
 import org.opensearch.index.query.Rewriteable;
-import org.opensearch.indices.breaker.CircuitBreakerService;
-import org.opensearch.indices.breaker.NoneCircuitBreakerService;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -128,7 +129,7 @@ public class PercolateQueryBuilderExt extends AbstractQueryBuilder<PercolateQuer
     private final String field;
     private String name;
     private final List<BytesReference> documents;
-    private final XContentType documentXContentType;
+    private final MediaType documentXContentType;
 
     private final String indexedDocumentIndex;
     private final String indexedDocumentId;
@@ -155,7 +156,7 @@ public class PercolateQueryBuilderExt extends AbstractQueryBuilder<PercolateQuer
      * @param documents                  The binary blob containing document to percolate
      * @param documentXContentType      The content type of the binary blob containing the document to percolate
      */
-    public PercolateQueryBuilderExt(String field, List<BytesReference> documents, XContentType documentXContentType) {
+    public PercolateQueryBuilderExt(String field, List<BytesReference> documents, MediaType documentXContentType) {
         if (field == null) {
             throw new IllegalArgumentException("[field] is a required argument");
         }
@@ -257,7 +258,11 @@ public class PercolateQueryBuilderExt extends AbstractQueryBuilder<PercolateQuer
         }
         documents = in.readList(StreamInput::readBytesReference);
         if (documents.isEmpty() == false) {
-            documentXContentType = in.readEnum(XContentType.class);
+            if (in.getVersion().onOrAfter(Version.V_3_0_0)) {
+                documentXContentType = in.readMediaType();
+            } else {
+                documentXContentType = in.readEnum(XContentType.class);
+            }
         } else {
             documentXContentType = null;
         }
@@ -303,7 +308,11 @@ public class PercolateQueryBuilderExt extends AbstractQueryBuilder<PercolateQuer
             out.writeBytesReference(document);
         }
         if (documents.isEmpty() == false) {
-            out.writeEnum(documentXContentType);
+            if (out.getVersion().onOrAfter(Version.V_3_0_0)) {
+                documentXContentType.writeTo(out);
+            } else {
+                out.writeEnum((XContentType) documentXContentType);
+            }
         }
     }
 
@@ -437,7 +446,7 @@ public class PercolateQueryBuilderExt extends AbstractQueryBuilder<PercolateQuer
                 PercolateQueryBuilderExt rewritten = new PercolateQueryBuilderExt(
                         field,
                         Collections.singletonList(source),
-                        XContentHelper.xContentType(source)
+                        MediaTypeRegistry.xContentType(source)
                 );
                 if (name != null) {
                     rewritten.setName(name);
@@ -563,7 +572,7 @@ public class PercolateQueryBuilderExt extends AbstractQueryBuilder<PercolateQuer
     }
 
     // pkg-private for testing
-    XContentType getXContentType() {
+    MediaType getXContentType() {
         return documentXContentType;
     }
 

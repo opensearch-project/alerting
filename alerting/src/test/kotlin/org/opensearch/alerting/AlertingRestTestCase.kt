@@ -39,13 +39,12 @@ import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
-import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.common.xcontent.json.JsonXContent.jsonXContent
 import org.opensearch.commons.alerting.action.GetFindingsResponse
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.ChainedAlertTrigger
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
@@ -55,12 +54,14 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.util.string
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.core.xcontent.XContentParser
-import org.opensearch.rest.RestStatus
+import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.search.SearchModule
 import java.net.URLEncoder
 import java.nio.file.Files
@@ -70,6 +71,7 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.UUID
+import java.util.stream.Collectors
 import javax.management.MBeanServerInvocationHandler
 import javax.management.ObjectName
 import javax.management.remote.JMXConnectorFactory
@@ -79,6 +81,8 @@ import javax.management.remote.JMXServiceURL
  * Superclass for tests that interact with an external test cluster using OpenSearch's RestClient
  */
 abstract class AlertingRestTestCase : ODFERestTestCase() {
+
+    protected val password = "D%LMX3bo#@U3XqVQ"
 
     protected val isDebuggingTest = DisableOnDebug(null).isDebugging
     protected val isDebuggingRemoteCluster = System.getProperty("cluster.debug", "false")!!.toBoolean()
@@ -96,7 +100,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                 DocLevelMonitorInput.XCONTENT_REGISTRY,
                 QueryLevelTrigger.XCONTENT_REGISTRY,
                 BucketLevelTrigger.XCONTENT_REGISTRY,
-                DocumentLevelTrigger.XCONTENT_REGISTRY
+                DocumentLevelTrigger.XCONTENT_REGISTRY,
+                Workflow.XCONTENT_REGISTRY,
+                ChainedAlertTrigger.XCONTENT_REGISTRY
             ) + SearchModule(Settings.EMPTY, emptyList()).namedXContents
         )
     }
@@ -120,7 +126,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client: RestClient,
         monitor: Monitor,
         rbacRoles: List<String>? = null,
-        refresh: Boolean = true
+        refresh: Boolean = true,
     ): Monitor {
         val response = client.makeRequest(
             "POST", "$ALERTING_BASE_URI?refresh=$refresh", emptyMap(),
@@ -147,6 +153,34 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             monitor.toHttpEntity()
         )
         assertEquals("Unable to delete a monitor", RestStatus.OK, response.restStatus())
+
+        return response
+    }
+
+    protected fun deleteWorkflow(workflow: Workflow, deleteDelegates: Boolean = false, refresh: Boolean = true): Response {
+        val response = client().makeRequest(
+            "DELETE",
+            "$WORKFLOW_ALERTING_BASE_URI/${workflow.id}?refresh=$refresh&deleteDelegateMonitors=$deleteDelegates",
+            emptyMap(),
+            workflow.toHttpEntity()
+        )
+        assertEquals("Unable to delete a workflow", RestStatus.OK, response.restStatus())
+        return response
+    }
+
+    protected fun deleteWorkflowWithClient(
+        client: RestClient,
+        workflow: Workflow,
+        deleteDelegates: Boolean = false,
+        refresh: Boolean = true,
+    ): Response {
+        val response = client.makeRequest(
+            "DELETE",
+            "$WORKFLOW_ALERTING_BASE_URI/${workflow.id}?refresh=$refresh&deleteDelegateMonitors=$deleteDelegates",
+            emptyMap(),
+            workflow.toHttpEntity()
+        )
+        assertEquals("Unable to delete a workflow", RestStatus.OK, response.restStatus())
 
         return response
     }
@@ -208,7 +242,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun getEmailAccount(
         emailAccountID: String,
-        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
     ): EmailAccount {
         val response = client().makeRequest("GET", "$EMAIL_ACCOUNT_BASE_URI/$emailAccountID", null, header)
         assertEquals("Unable to get email account $emailAccountID", RestStatus.OK, response.restStatus())
@@ -268,7 +302,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun getEmailGroup(
         emailGroupID: String,
-        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
     ): EmailGroup {
         val response = client().makeRequest("GET", "$EMAIL_GROUP_BASE_URI/$emailGroupID", null, header)
         assertEquals("Unable to get email group $emailGroupID", RestStatus.OK, response.restStatus())
@@ -350,7 +384,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun getDestinations(
         client: RestClient,
         dataMap: Map<String, Any> = emptyMap(),
-        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
     ): List<Map<String, Any>> {
 
         var baseEndpoint = "$DESTINATION_BASE_URI?"
@@ -514,11 +548,24 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return getMonitor(monitorId = monitor.id)
     }
 
+    @Suppress("UNCHECKED_CAST")
+    protected fun updateWorkflow(workflow: Workflow, refresh: Boolean = false): Workflow {
+        val response = client().makeRequest(
+            "PUT",
+            "${workflow.relativeUrl()}?refresh=$refresh",
+            emptyMap(),
+            workflow.toHttpEntity()
+        )
+        assertEquals("Unable to update a workflow", RestStatus.OK, response.restStatus())
+        assertUserNull(response.asMap()["workflow"] as Map<String, Any>)
+        return getWorkflow(workflowId = workflow.id)
+    }
+
     protected fun updateMonitorWithClient(
         client: RestClient,
         monitor: Monitor,
         rbacRoles: List<String> = emptyList(),
-        refresh: Boolean = true
+        refresh: Boolean = true,
     ): Monitor {
         val response = client.makeRequest(
             "PUT", "${monitor.relativeUrl()}?refresh=$refresh",
@@ -527,6 +574,23 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         assertEquals("Unable to update a monitor", RestStatus.OK, response.restStatus())
         assertUserNull(response.asMap()["monitor"] as Map<String, Any>)
         return getMonitor(monitorId = monitor.id)
+    }
+
+    protected fun updateWorkflowWithClient(
+        client: RestClient,
+        workflow: Workflow,
+        rbacRoles: List<String> = emptyList(),
+        refresh: Boolean = true,
+    ): Workflow {
+        val response = client.makeRequest(
+            "PUT",
+            "${workflow.relativeUrl()}?refresh=$refresh",
+            emptyMap(),
+            createWorkflowEntityWithBackendRoles(workflow, rbacRoles)
+        )
+        assertEquals("Unable to update a workflow", RestStatus.OK, response.restStatus())
+        assertUserNull(response.asMap()["workflow"] as Map<String, Any>)
+        return getWorkflow(workflowId = workflow.id)
     }
 
     protected fun getMonitor(monitorId: String, header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")): Monitor {
@@ -547,6 +611,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                 "_id" -> id = parser.text()
                 "_version" -> version = parser.longValue()
                 "monitor" -> monitor = Monitor.parse(parser)
+                "associated_workflows" -> {
+                    XContentParserUtils.ensureExpectedToken(
+                        XContentParser.Token.START_ARRAY,
+                        parser.currentToken(),
+                        parser
+                    )
+                    while (parser.nextToken() != XContentParser.Token.END_ARRAY) {
+                        // do nothing
+                    }
+                }
             }
         }
 
@@ -558,7 +632,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun searchAlertsWithFilter(
         monitor: Monitor,
         indices: String = AlertIndices.ALERT_INDEX,
-        refresh: Boolean = true
+        refresh: Boolean = true,
     ): List<Alert> {
         if (refresh) refreshIndex(indices)
 
@@ -570,9 +644,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", StringEntity(request, APPLICATION_JSON))
         assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
 
-        val searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        val searchResponse = SearchResponse.fromXContent(createParser(jsonXContent, httpResponse.entity.content))
         return searchResponse.hits.hits.map {
-            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
+            val xcp = createParser(jsonXContent, it.sourceRef).also { it.nextToken() }
             Alert.parse(xcp, it.id, it.version)
         }.filter { alert -> alert.monitorId == monitor.id }
     }
@@ -582,7 +656,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         monitorName: String = "NO_NAME",
         index: String = "testIndex",
         docLevelQueries: List<DocLevelQuery> = listOf(DocLevelQuery(query = "test_field:\"us-west-2\"", name = "testQuery")),
-        matchingDocIds: List<String>
+        matchingDocIds: List<String>,
     ): String {
         val finding = Finding(
             id = UUID.randomUUID().toString(),
@@ -603,7 +677,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun searchFindings(
         monitor: Monitor,
         indices: String = AlertIndices.ALL_FINDING_INDEX_PATTERN,
-        refresh: Boolean = true
+        refresh: Boolean = true,
     ): List<Finding> {
         if (refresh) refreshIndex(indices)
 
@@ -615,9 +689,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", StringEntity(request, APPLICATION_JSON))
         assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
 
-        val searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        val searchResponse = SearchResponse.fromXContent(createParser(jsonXContent, httpResponse.entity.content))
         return searchResponse.hits.hits.map {
-            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
+            val xcp = createParser(jsonXContent, it.sourceRef).also { it.nextToken() }
             Finding.parse(xcp)
         }.filter { finding -> finding.monitorId == monitor.id }
     }
@@ -640,9 +714,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", searchParams, StringEntity(request, APPLICATION_JSON))
         assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
 
-        val searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        val searchResponse = SearchResponse.fromXContent(createParser(jsonXContent, httpResponse.entity.content))
         return searchResponse.hits.hits.map {
-            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
+            val xcp = createParser(jsonXContent, it.sourceRef).also { it.nextToken() }
             Alert.parse(xcp, it.id, it.version)
         }
     }
@@ -662,10 +736,25 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return response
     }
 
+    protected fun acknowledgeChainedAlerts(workflowId: String, vararg alertId: String): Response {
+        val request = jsonBuilder().startObject()
+            .array("alerts", *alertId.map { it }.toTypedArray())
+            .endObject()
+            .string()
+            .let { StringEntity(it, APPLICATION_JSON) }
+
+        val response = client().makeRequest(
+            "POST", "${AlertingPlugin.WORKFLOW_BASE_URI}/$workflowId/_acknowledge/alerts",
+            emptyMap(), request
+        )
+        assertEquals("Acknowledge call failed.", RestStatus.OK, response.restStatus())
+        return response
+    }
+
     protected fun getAlerts(
         client: RestClient,
         dataMap: Map<String, Any> = emptyMap(),
-        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
     ): Response {
         var baseEndpoint = "$ALERTING_BASE_URI/alerts?"
         for (entry in dataMap.entries) {
@@ -679,7 +768,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun getAlerts(
         dataMap: Map<String, Any> = emptyMap(),
-        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
     ): Response {
         return getAlerts(client(), dataMap, header)
     }
@@ -700,8 +789,38 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return executeMonitor(client(), monitorId, params)
     }
 
+    protected fun executeWorkflow(workflowId: String, params: Map<String, String> = mutableMapOf()): Response {
+        return executeWorkflow(client(), workflowId, params)
+    }
+
+    protected fun getWorkflowAlerts(
+        workflowId: String,
+        getAssociatedAlerts: Boolean = true,
+    ): Response {
+        return getWorkflowAlerts(client(), mutableMapOf(Pair("workflowIds", workflowId), Pair("getAssociatedAlerts", getAssociatedAlerts)))
+    }
+
+    protected fun getWorkflowAlerts(
+        client: RestClient,
+        dataMap: Map<String, Any> = emptyMap(),
+        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
+    ): Response {
+        var baseEndpoint = "$WORKFLOW_ALERTING_BASE_URI/alerts?"
+        for (entry in dataMap.entries) {
+            baseEndpoint += "${entry.key}=${entry.value}&"
+        }
+
+        val response = client.makeRequest("GET", baseEndpoint, null, header)
+        assertEquals("Get call failed.", RestStatus.OK, response.restStatus())
+        return response
+    }
+
     protected fun executeMonitor(client: RestClient, monitorId: String, params: Map<String, String> = mutableMapOf()): Response {
         return client.makeRequest("POST", "$ALERTING_BASE_URI/$monitorId/_execute", params)
+    }
+
+    protected fun executeWorkflow(client: RestClient, workflowId: String, params: Map<String, String> = mutableMapOf()): Response {
+        return client.makeRequest("POST", "$WORKFLOW_ALERTING_BASE_URI/$workflowId/_execute", params)
     }
 
     protected fun executeMonitor(monitor: Monitor, params: Map<String, String> = mapOf()): Response {
@@ -743,6 +862,18 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         }
 
         return GetFindingsResponse(response.restStatus(), totalFindings, findings)
+    }
+
+    protected fun searchMonitors(): SearchResponse {
+        var baseEndpoint = "${AlertingPlugin.MONITOR_BASE_URI}/_search?"
+        val request = """
+                { "version" : true,
+                  "query": { "match_all": {} }
+                }
+        """.trimIndent()
+        val httpResponse = adminClient().makeRequest("POST", baseEndpoint, StringEntity(request, APPLICATION_JSON))
+        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
+        return SearchResponse.fromXContent(createParser(jsonXContent, httpResponse.entity.content))
     }
 
     protected fun indexDoc(index: String, id: String, doc: String, refresh: Boolean = true): Response {
@@ -810,7 +941,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun createTestAlias(
         alias: String = randomAlphaOfLength(10).lowercase(Locale.ROOT),
         numOfAliasIndices: Int = randomIntBetween(1, 10),
-        includeWriteIndex: Boolean = true
+        includeWriteIndex: Boolean = true,
     ): MutableMap<String, MutableMap<String, Boolean>> {
         return createTestAlias(alias = alias, indices = randomAliasIndices(alias, numOfAliasIndices, includeWriteIndex))
     }
@@ -821,7 +952,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             alias = alias,
             num = randomIntBetween(1, 10),
             includeWriteIndex = true
-        )
+        ),
     ): MutableMap<String, MutableMap<String, Boolean>> {
         val indicesMap = mutableMapOf<String, Boolean>()
         val indicesJson = jsonBuilder().startObject().startArray("actions")
@@ -846,7 +977,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun randomAliasIndices(
         alias: String,
         num: Int = randomIntBetween(1, 10),
-        includeWriteIndex: Boolean = true
+        includeWriteIndex: Boolean = true,
     ): Map<String, Boolean> {
         val indices = mutableMapOf<String, Boolean>()
         val writeIndex = randomIntBetween(0, num)
@@ -1109,11 +1240,11 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client().updateSettings(DestinationSettings.ALLOW_LIST.key, allowedDestinations)
     }
 
-    fun createUser(name: String, passwd: String, backendRoles: Array<String>) {
+    fun createUser(name: String, backendRoles: Array<String>) {
         val request = Request("PUT", "/_plugins/_security/api/internalusers/$name")
         val broles = backendRoles.joinToString { it -> "\"$it\"" }
         var entity = " {\n" +
-            "\"password\": \"$passwd\",\n" +
+            "\"password\": \"$password\",\n" +
             "\"backend_roles\": [$broles],\n" +
             "\"attributes\": {\n" +
             "}} "
@@ -1182,11 +1313,72 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client().performRequest(request)
     }
 
+    private fun createCustomIndexRole(name: String, index: String, clusterPermissions: List<String?>) {
+        val request = Request("PUT", "/_plugins/_security/api/roles/$name")
+
+        val clusterPermissionsStr =
+            clusterPermissions.stream().map { p: String? -> "\"" + p + "\"" }.collect(
+                Collectors.joining(",")
+            )
+
+        var entity = "{\n" +
+            "\"cluster_permissions\": [\n" +
+            "$clusterPermissionsStr\n" +
+            "],\n" +
+            "\"index_permissions\": [\n" +
+            "{\n" +
+            "\"index_patterns\": [\n" +
+            "\"$index\"\n" +
+            "],\n" +
+            "\"dls\": \"\",\n" +
+            "\"fls\": [],\n" +
+            "\"masked_fields\": [],\n" +
+            "\"allowed_actions\": [\n" +
+            "\"crud\"\n" +
+            "]\n" +
+            "}\n" +
+            "],\n" +
+            "\"tenant_permissions\": []\n" +
+            "}"
+        request.setJsonEntity(entity)
+        client().performRequest(request)
+    }
+
     fun createIndexRoleWithDocLevelSecurity(name: String, index: String, dlsQuery: String, clusterPermissions: String? = "") {
         val request = Request("PUT", "/_plugins/_security/api/roles/$name")
         var entity = "{\n" +
             "\"cluster_permissions\": [\n" +
             "\"$clusterPermissions\"\n" +
+            "],\n" +
+            "\"index_permissions\": [\n" +
+            "{\n" +
+            "\"index_patterns\": [\n" +
+            "\"$index\"\n" +
+            "],\n" +
+            "\"dls\": \"$dlsQuery\",\n" +
+            "\"fls\": [],\n" +
+            "\"masked_fields\": [],\n" +
+            "\"allowed_actions\": [\n" +
+            "\"crud\"\n" +
+            "]\n" +
+            "}\n" +
+            "],\n" +
+            "\"tenant_permissions\": []\n" +
+            "}"
+        request.setJsonEntity(entity)
+        client().performRequest(request)
+    }
+
+    fun createIndexRoleWithDocLevelSecurity(name: String, index: String, dlsQuery: String, clusterPermissions: List<String>) {
+        val clusterPermissionsStr =
+            clusterPermissions.stream().map { p: String -> "\"" + getClusterPermissionsFromCustomRole(p) + "\"" }.collect(
+                Collectors.joining(",")
+            )
+
+        val request = Request("PUT", "/_plugins/_security/api/roles/$name")
+        var entity = "{\n" +
+            "\"cluster_permissions\": [\n" +
+            "$clusterPermissionsStr\n" +
             "],\n" +
             "\"index_permissions\": [\n" +
             "{\n" +
@@ -1253,7 +1445,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     fun createUserWithTestData(user: String, index: String, role: String, backendRole: String) {
-        createUser(user, user, arrayOf(backendRole))
+        createUser(user, arrayOf(backendRole))
         createTestIndex(index)
         createIndexRole(role, index)
         createUserRolesMapping(role, arrayOf(user))
@@ -1264,9 +1456,22 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         index: String,
         role: String,
         backendRoles: List<String>,
-        clusterPermissions: String?
+        clusterPermissions: String?,
     ) {
-        createUser(user, user, backendRoles.toTypedArray())
+        createUser(user, backendRoles.toTypedArray())
+        createTestIndex(index)
+        createCustomIndexRole(role, index, clusterPermissions)
+        createUserRolesMapping(role, arrayOf(user))
+    }
+
+    fun createUserWithTestDataAndCustomRole(
+        user: String,
+        index: String,
+        role: String,
+        backendRoles: List<String>,
+        clusterPermissions: List<String?>,
+    ) {
+        createUser(user, backendRoles.toTypedArray())
         createTestIndex(index)
         createCustomIndexRole(role, index, clusterPermissions)
         createUserRolesMapping(role, arrayOf(user))
@@ -1276,9 +1481,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         user: String,
         roles: List<String>,
         backendRoles: List<String>,
-        isExistingRole: Boolean
+        isExistingRole: Boolean,
     ) {
-        createUser(user, user, backendRoles.toTypedArray())
+        createUser(user, backendRoles.toTypedArray())
         for (role in roles) {
             if (isExistingRole) {
                 updateRoleMapping(role, listOf(user), true)
@@ -1293,9 +1498,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         index: String,
         role: String,
         backendRole: String,
-        dlsQuery: String
+        dlsQuery: String,
     ) {
-        createUser(user, user, arrayOf(backendRole))
+        createUser(user, arrayOf(backendRole))
         createTestIndex(index)
         createIndexRoleWithDocLevelSecurity(role, index, dlsQuery)
         createUserRolesMapping(role, arrayOf(user))
@@ -1307,9 +1512,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         role: String,
         backendRole: String,
         dlsQuery: String,
-        clusterPermissions: String?
+        clusterPermissions: String?,
     ) {
-        createUser(user, user, arrayOf(backendRole))
+        createUser(user, arrayOf(backendRole))
         createTestIndex(index)
         createIndexRoleWithDocLevelSecurity(role, index, dlsQuery)
         createCustomIndexRole(role, index, clusterPermissions)
@@ -1359,4 +1564,83 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             }
         }
     }
+
+    protected fun createRandomWorkflow(monitorIds: List<String>, refresh: Boolean = false): Workflow {
+        val workflow = randomWorkflow(monitorIds = monitorIds)
+        return createWorkflow(workflow, refresh)
+    }
+
+    private fun createWorkflowEntityWithBackendRoles(workflow: Workflow, rbacRoles: List<String>?): HttpEntity {
+        if (rbacRoles == null) {
+            return workflow.toHttpEntity()
+        }
+        val temp = workflow.toJsonString()
+        val toReplace = temp.lastIndexOf("}")
+        val rbacString = rbacRoles.joinToString { "\"$it\"" }
+        val jsonString = temp.substring(0, toReplace) + ", \"rbac_roles\": [$rbacString] }"
+        return StringEntity(jsonString, ContentType.APPLICATION_JSON)
+    }
+
+    protected fun createWorkflowWithClient(
+        client: RestClient,
+        workflow: Workflow,
+        rbacRoles: List<String>? = null,
+        refresh: Boolean = true,
+    ): Workflow {
+        val response = client.makeRequest(
+            "POST", "$WORKFLOW_ALERTING_BASE_URI?refresh=$refresh", emptyMap(),
+            createWorkflowEntityWithBackendRoles(workflow, rbacRoles)
+        )
+        assertEquals("Unable to create a new monitor", RestStatus.CREATED, response.restStatus())
+
+        val workflowJson = jsonXContent.createParser(
+            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            response.entity.content
+        ).map()
+        assertUserNull(workflowJson as HashMap<String, Any>)
+        return workflow.copy(id = workflowJson["_id"] as String)
+    }
+
+    protected fun createWorkflow(workflow: Workflow, refresh: Boolean = true): Workflow {
+        return createWorkflowWithClient(client(), workflow, emptyList(), refresh)
+    }
+
+    protected fun Workflow.toHttpEntity(): HttpEntity {
+        return StringEntity(toJsonString(), APPLICATION_JSON)
+    }
+
+    private fun Workflow.toJsonString(): String {
+        val builder = XContentFactory.jsonBuilder()
+        return shuffleXContent(toXContent(builder, ToXContent.EMPTY_PARAMS)).string()
+    }
+
+    protected fun getWorkflow(
+        workflowId: String,
+        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
+    ): Workflow {
+        val response = client().makeRequest("GET", "$WORKFLOW_ALERTING_BASE_URI/$workflowId", null, header)
+        assertEquals("Unable to get workflow $workflowId", RestStatus.OK, response.restStatus())
+
+        val parser = createParser(XContentType.JSON.xContent(), response.entity.content)
+        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser)
+
+        lateinit var id: String
+        var version: Long = 0
+        lateinit var workflow: Workflow
+
+        while (parser.nextToken() != XContentParser.Token.END_OBJECT) {
+            parser.nextToken()
+
+            when (parser.currentName()) {
+                "_id" -> id = parser.text()
+                "_version" -> version = parser.longValue()
+                "workflow" -> workflow = Workflow.parse(parser)
+            }
+        }
+
+        assertUserNull(workflow)
+        return workflow.copy(id = id, version = version)
+    }
+
+    protected fun Workflow.relativeUrl() = "$WORKFLOW_ALERTING_BASE_URI/$id"
 }

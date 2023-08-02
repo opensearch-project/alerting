@@ -37,11 +37,11 @@ import org.opensearch.commons.alerting.model.action.AlertCategory
 import org.opensearch.commons.alerting.model.action.PerAlertActionScope
 import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
 import org.opensearch.commons.alerting.util.string
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.QueryBuilders
-import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptType
 import org.opensearch.script.TemplateScript
@@ -61,7 +61,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         periodStart: Instant,
         periodEnd: Instant,
         dryrun: Boolean,
-        workflowRunContext: WorkflowRunContext?
+        workflowRunContext: WorkflowRunContext?,
+        executionId: String
     ): MonitorRunResult<BucketLevelTriggerRunResult> {
         val roles = MonitorRunnerService.getRolesForMonitor(monitor)
         logger.debug("Running monitor: ${monitor.name} with roles: $roles Thread: ${Thread.currentThread().name}")
@@ -77,7 +78,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             if (monitor.dataSources.findingsEnabled == true) {
                 monitorCtx.alertIndices!!.createOrUpdateInitialFindingHistoryIndex(monitor.dataSources)
             }
-            monitorCtx.alertService!!.loadCurrentAlertsForBucketLevelMonitor(monitor)
+            monitorCtx.alertService!!.loadCurrentAlertsForBucketLevelMonitor(monitor, workflowRunContext)
         } catch (e: Exception) {
             // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
             val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
@@ -158,7 +159,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             periodStart,
                             periodEnd,
                             !dryrun && monitor.id != Monitor.NO_ID,
-                            workflowRunContext
+                            executionId
                         )
                     } else {
                         emptyList()
@@ -166,7 +167,13 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 // TODO: Should triggerResult's aggregationResultBucket be a list? If not, getCategorizedAlertsForBucketLevelMonitor can
                 //  be refactored to use a map instead
                 val categorizedAlerts = monitorCtx.alertService!!.getCategorizedAlertsForBucketLevelMonitor(
-                    monitor, trigger, currentAlertsForTrigger, triggerResult.aggregationResultBuckets.values.toList(), findings
+                    monitor,
+                    trigger,
+                    currentAlertsForTrigger,
+                    triggerResult.aggregationResultBuckets.values.toList(),
+                    findings,
+                    executionId,
+                    workflowRunContext
                 ).toMutableMap()
                 val dedupedAlerts = categorizedAlerts.getOrDefault(AlertCategory.DEDUPED, emptyList())
                 var newAlerts = categorizedAlerts.getOrDefault(AlertCategory.NEW, emptyList())
@@ -182,7 +189,11 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                  */
                 if (!dryrun && monitor.id != Monitor.NO_ID) {
                     monitorCtx.alertService!!.saveAlerts(
-                        monitor.dataSources, dedupedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = true
+                        monitor.dataSources,
+                        dedupedAlerts,
+                        monitorCtx.retryPolicy!!,
+                        allowUpdatingAcknowledgedAlert = true,
+                        monitor.id
                     )
                     newAlerts = monitorCtx.alertService!!.saveNewAlerts(monitor.dataSources, newAlerts, monitorCtx.retryPolicy!!)
                 }
@@ -318,14 +329,16 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             // ACKNOWLEDGED Alerts should not be saved here since actions are not executed for them.
             if (!dryrun && monitor.id != Monitor.NO_ID) {
                 monitorCtx.alertService!!.saveAlerts(
-                    monitor.dataSources, updatedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = false
+                    monitor.dataSources, updatedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = false,
+                    routingId = monitor.id
                 )
                 // Save any COMPLETED Alerts that were not covered in updatedAlerts
                 monitorCtx.alertService!!.saveAlerts(
                     monitor.dataSources,
                     completedAlertsToUpdate.toList(),
                     monitorCtx.retryPolicy!!,
-                    allowUpdatingAcknowledgedAlert = false
+                    allowUpdatingAcknowledgedAlert = false,
+                    monitor.id
                 )
             }
         }
@@ -340,7 +353,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         periodStart: Instant,
         periodEnd: Instant,
         shouldCreateFinding: Boolean,
-        workflowRunContext: WorkflowRunContext? = null
+        executionId: String,
     ): List<String> {
         monitor.inputs.forEach { input ->
             if (input is SearchInput) {
@@ -397,7 +410,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             sr.source().query(queryBuilder)
                         }
                     val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(sr, it) }
-                    return createFindingPerIndex(searchResponse, monitor, monitorCtx, shouldCreateFinding, workflowRunContext?.executionId)
+                    return createFindingPerIndex(searchResponse, monitor, monitorCtx, shouldCreateFinding, executionId)
                 } else {
                     logger.error("Couldn't resolve groupBy field. Not generating bucket level monitor findings for monitor %${monitor.id}")
                 }

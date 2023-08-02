@@ -24,7 +24,7 @@ import org.opensearch.alerting.makeRequest
 import org.opensearch.client.ResponseException
 import org.opensearch.client.RestClient
 import org.opensearch.commons.rest.SecureRestClientBuilder
-import org.opensearch.rest.RestStatus
+import org.opensearch.core.rest.RestStatus
 
 val SEARCH_EMAIL_ACCOUNT_DSL = """
                 {
@@ -59,8 +59,8 @@ class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
     fun create() {
 
         if (userClient == null) {
-            createUser(user, user, arrayOf())
-            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user)
+            createUser(user, arrayOf())
+            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, password)
                 .setSocketTimeout(60000)
                 .setConnectionRequestTimeout(180000)
                 .build()

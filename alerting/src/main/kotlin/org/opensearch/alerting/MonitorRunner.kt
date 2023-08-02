@@ -42,7 +42,8 @@ abstract class MonitorRunner {
         periodStart: Instant,
         periodEnd: Instant,
         dryRun: Boolean,
-        workflowRunContext: WorkflowRunContext? = null
+        workflowRunContext: WorkflowRunContext? = null,
+        executionId: String
     ): MonitorRunResult<*>
 
     suspend fun runAction(

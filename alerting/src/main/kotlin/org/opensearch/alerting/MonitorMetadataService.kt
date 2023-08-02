@@ -35,16 +35,16 @@ import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
-import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentParser
+import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.seqno.SequenceNumbers
-import org.opensearch.rest.RestStatus
 import org.opensearch.transport.RemoteTransportException
 
 private val log = LogManager.getLogger(MonitorMetadataService::class.java)
@@ -120,7 +120,7 @@ object MonitorMetadataService :
         monitor: Monitor,
         createWithRunContext: Boolean = true,
         skipIndex: Boolean = false,
-        workflowMetadataId: String? = null,
+        workflowMetadataId: String? = null
     ): Pair<MonitorMetadata, Boolean> {
         try {
             val created = true
@@ -152,7 +152,7 @@ object MonitorMetadataService :
                     getResponse.sourceAsBytesRef, XContentType.JSON
                 )
                 XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                MonitorMetadata.parse(xcp)
+                MonitorMetadata.parse(xcp, getResponse.id, getResponse.seqNo, getResponse.primaryTerm)
             } else {
                 null
             }

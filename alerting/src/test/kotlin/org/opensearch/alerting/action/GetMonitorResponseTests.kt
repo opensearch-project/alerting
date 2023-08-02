@@ -7,10 +7,10 @@ package org.opensearch.alerting.action
 
 import org.opensearch.alerting.randomUser
 import org.opensearch.common.io.stream.BytesStreamOutput
-import org.opensearch.common.io.stream.StreamInput
 import org.opensearch.commons.alerting.model.CronSchedule
 import org.opensearch.commons.alerting.model.Monitor
-import org.opensearch.rest.RestStatus
+import org.opensearch.core.common.io.stream.StreamInput
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.test.OpenSearchTestCase
 import java.time.Instant
 import java.time.ZoneId
@@ -18,7 +18,7 @@ import java.time.ZoneId
 class GetMonitorResponseTests : OpenSearchTestCase() {
 
     fun `test get monitor response`() {
-        val req = GetMonitorResponse("1234", 1L, 2L, 0L, RestStatus.OK, null)
+        val req = GetMonitorResponse("1234", 1L, 2L, 0L, RestStatus.OK, null, null)
         assertNotNull(req)
 
         val out = BytesStreamOutput()
@@ -51,7 +51,7 @@ class GetMonitorResponseTests : OpenSearchTestCase() {
             triggers = mutableListOf(),
             uiMetadata = mutableMapOf()
         )
-        val req = GetMonitorResponse("1234", 1L, 2L, 0L, RestStatus.OK, monitor)
+        val req = GetMonitorResponse("1234", 1L, 2L, 0L, RestStatus.OK, monitor, null)
         assertNotNull(req)
 
         val out = BytesStreamOutput()

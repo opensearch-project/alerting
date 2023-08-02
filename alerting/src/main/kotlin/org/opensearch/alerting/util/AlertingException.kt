@@ -10,10 +10,10 @@ import org.opensearch.OpenSearchException
 import org.opensearch.OpenSearchSecurityException
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.core.common.Strings
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.index.IndexNotFoundException
 import org.opensearch.index.engine.VersionConflictEngineException
 import org.opensearch.indices.InvalidIndexNameException
-import org.opensearch.rest.RestStatus
 
 private val log = LogManager.getLogger(AlertingException::class.java)
 

@@ -56,9 +56,9 @@ import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.rest.SecureRestClientBuilder
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.index.query.QueryBuilders
-import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
 import org.opensearch.search.aggregations.bucket.composite.TermsValuesSourceBuilder
@@ -85,8 +85,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     fun create() {
 
         if (userClient == null) {
-            createUser(user, user, arrayOf())
-            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user)
+            createUser(user, arrayOf())
+            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, password)
                 .setSocketTimeout(60000)
                 .setConnectionRequestTimeout(180000)
                 .build()
@@ -398,7 +398,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             listOf("role2"),
             getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
         )
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
             .setSocketTimeout(60000)
             .setConnectionRequestTimeout(180000)
             .build()
@@ -593,7 +593,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             listOf("role2"),
             getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
         )
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
             .setSocketTimeout(60000)
             .setConnectionRequestTimeout(180000)
             .build()
@@ -731,7 +731,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             listOf("role2"),
             getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
         )
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
             .setSocketTimeout(60000)
             .setConnectionRequestTimeout(180000)
             .build()
@@ -786,7 +786,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             false
         )
 
-        val updateUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), updateUser, updateUser)
+        val updateUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), updateUser, password)
             .setSocketTimeout(60000)
             .setConnectionRequestTimeout(180000)
             .build()
@@ -839,7 +839,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             listOf("role1", "role2"),
             getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
         )
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, getUser)
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
             .setSocketTimeout(60000)
             .setConnectionRequestTimeout(180000)
             .build()
@@ -1230,6 +1230,50 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    fun `test query all alerts in all states with filter by1`() {
+        enableFilterBy()
+        putAlertMappings()
+        val adminUser = User(ADMIN, listOf(ADMIN), listOf(ALL_ACCESS_ROLE), listOf())
+        var monitor = createRandomMonitor(refresh = true).copy(user = adminUser)
+        createAlert(randomAlert(monitor).copy(state = Alert.State.ACKNOWLEDGED))
+        createAlert(randomAlert(monitor).copy(state = Alert.State.COMPLETED))
+        createAlert(randomAlert(monitor).copy(state = Alert.State.ERROR))
+        createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
+        randomAlert(monitor).copy(id = "foobar")
+
+        val inputMap = HashMap<String, Any>()
+        inputMap["missing"] = "_last"
+        inputMap["monitorId"] = monitor.id
+
+        // search as "admin" - must get 4 docs
+        val adminResponseMap = getAlerts(client(), inputMap).asMap()
+        assertEquals(4, adminResponseMap["totalAlerts"])
+
+        // search as userOne without alerting roles - must return 403 Forbidden
+        try {
+            getAlerts(userClient as RestClient, inputMap).asMap()
+            fail("Expected 403 FORBIDDEN response")
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
+        }
+//        createUserWithTestDataAndCustomRole(
+//            user,
+//            TEST_HR_INDEX,
+//            TEST_HR_ROLE,
+//            listOf(ADMIN),
+//            getClusterPermissionsFromCustomRole(ALERTING_INDEX_MONITOR_ACCESS)
+//        )
+        createUserWithRoles(user, listOf(ALERTING_FULL_ACCESS_ROLE), listOf(ADMIN), false)
+        // add alerting roles and search as userOne - must return 0 docs
+//        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
+        try {
+            val responseMap = getAlerts(userClient as RestClient, inputMap).asMap()
+            assertEquals(4, responseMap["totalAlerts"])
+        } finally {
+            deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
+        }
+    }
+
     fun `test get alerts with an user with get alerts role`() {
 
         putAlertMappings()
@@ -1358,8 +1402,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     TODO: https://github.com/opensearch-project/alerting/issues/300
      */
     fun `test execute query-level monitor with user having partial index permissions`() {
-
-        createUser(user, user, arrayOf(TEST_HR_BACKEND_ROLE))
+        createUser(user, arrayOf(TEST_HR_BACKEND_ROLE))
         createTestIndex(TEST_HR_INDEX)
         createIndexRoleWithDocLevelSecurity(
             TEST_HR_ROLE,
@@ -1413,8 +1456,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test execute bucket-level monitor with user having partial index permissions`() {
-
-        createUser(user, user, arrayOf(TEST_HR_BACKEND_ROLE))
+        createUser(user, arrayOf(TEST_HR_BACKEND_ROLE))
         createTestIndex(TEST_HR_INDEX)
         createIndexRoleWithDocLevelSecurity(
             TEST_HR_ROLE,
@@ -1488,7 +1530,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
      */
     fun `test create monitor failure clean up with a user without delete monitor access`() {
         enableFilterBy()
-        createUser(user, user, listOf(TEST_HR_BACKEND_ROLE, "role2").toTypedArray())
+        createUser(user, listOf(TEST_HR_BACKEND_ROLE, "role2").toTypedArray())
         createTestIndex(TEST_HR_INDEX)
         createCustomIndexRole(
             ALERTING_INDEX_MONITOR_ACCESS,

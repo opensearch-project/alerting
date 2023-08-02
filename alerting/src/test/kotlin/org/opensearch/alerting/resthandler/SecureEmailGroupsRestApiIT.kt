@@ -22,7 +22,7 @@ import org.opensearch.alerting.TEST_HR_ROLE
 import org.opensearch.alerting.makeRequest
 import org.opensearch.client.RestClient
 import org.opensearch.commons.rest.SecureRestClientBuilder
-import org.opensearch.rest.RestStatus
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.test.junit.annotations.TestLogging
 
 val SEARCH_EMAIL_GROUP_DSL = """
@@ -59,8 +59,8 @@ class SecureEmailGroupsRestApiIT : AlertingRestTestCase() {
     fun create() {
 
         if (userClient == null) {
-            createUser(user, user, arrayOf())
-            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, user)
+            createUser(user, arrayOf())
+            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, password)
                 .setSocketTimeout(60000)
                 .setConnectionRequestTimeout(180000)
                 .build()

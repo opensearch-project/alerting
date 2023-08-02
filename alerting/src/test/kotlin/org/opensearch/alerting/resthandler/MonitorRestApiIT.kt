@@ -37,7 +37,6 @@ import org.opensearch.alerting.toJsonString
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.client.ResponseException
 import org.opensearch.client.WarningFailureException
-import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Alert
@@ -49,12 +48,15 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.core.common.bytes.BytesReference
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.index.query.QueryBuilders
-import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
+import org.opensearch.search.aggregations.AggregationBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.search.sort.SortOrder
 import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.test.junit.annotations.TestLogging
 import org.opensearch.test.rest.OpenSearchRestTestCase
@@ -1259,6 +1261,118 @@ class MonitorRestApiIT : AlertingRestTestCase() {
                 "a query monitor with error trigger",
                 "Incompatible trigger [${trigger.id}] for monitor type [${Monitor.MonitorType.QUERY_LEVEL_MONITOR}]",
                 e.message
+            )
+        }
+    }
+
+    /**
+     * This use case is needed by the frontend plugin for displaying alert counts on the Monitors list page.
+     * https://github.com/opensearch-project/alerting-dashboards-plugin/blob/main/server/services/MonitorService.js#L235
+     */
+    fun `test get acknowledged, active, error, and ignored alerts counts`() {
+        putAlertMappings()
+        val monitorAlertCounts = hashMapOf<String, HashMap<String, Int>>()
+        val numMonitors = randomIntBetween(1, 10)
+        repeat(numMonitors) {
+            val monitor = createRandomMonitor(refresh = true)
+
+            val numAcknowledgedAlerts = randomIntBetween(1, 10)
+            val numActiveAlerts = randomIntBetween(1, 10)
+            var numCompletedAlerts = randomIntBetween(1, 10)
+            val numErrorAlerts = randomIntBetween(1, 10)
+            val numIgnoredAlerts = randomIntBetween(1, numCompletedAlerts)
+            numCompletedAlerts -= numIgnoredAlerts
+
+            val alertCounts = hashMapOf(
+                Alert.State.ACKNOWLEDGED.name to numAcknowledgedAlerts,
+                Alert.State.ACTIVE.name to numActiveAlerts,
+                Alert.State.COMPLETED.name to numCompletedAlerts,
+                Alert.State.ERROR.name to numErrorAlerts,
+                "IGNORED" to numIgnoredAlerts
+            )
+            monitorAlertCounts[monitor.id] = alertCounts
+
+            repeat(numAcknowledgedAlerts) {
+                createAlert(randomAlert(monitor).copy(acknowledgedTime = Instant.now(), state = Alert.State.ACKNOWLEDGED))
+            }
+            repeat(numActiveAlerts) {
+                createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
+            }
+            repeat(numCompletedAlerts) {
+                createAlert(randomAlert(monitor).copy(acknowledgedTime = Instant.now(), state = Alert.State.COMPLETED))
+            }
+            repeat(numErrorAlerts) {
+                createAlert(randomAlert(monitor).copy(state = Alert.State.ERROR))
+            }
+            repeat(numIgnoredAlerts) {
+                createAlert(randomAlert(monitor).copy(acknowledgedTime = null, state = Alert.State.COMPLETED))
+            }
+        }
+
+        val sourceBuilder = SearchSourceBuilder()
+            .size(0)
+            .query(QueryBuilders.termsQuery("monitor_id", monitorAlertCounts.keys))
+            .aggregation(
+                AggregationBuilders
+                    .terms("uniq_monitor_ids").field("monitor_id")
+                    .subAggregation(AggregationBuilders.filter("active", QueryBuilders.termQuery("state", "ACTIVE")))
+                    .subAggregation(AggregationBuilders.filter("acknowledged", QueryBuilders.termQuery("state", "ACKNOWLEDGED")))
+                    .subAggregation(AggregationBuilders.filter("errors", QueryBuilders.termQuery("state", "ERROR")))
+                    .subAggregation(
+                        AggregationBuilders.filter(
+                            "ignored",
+                            QueryBuilders.boolQuery()
+                                .filter(QueryBuilders.termQuery("state", "COMPLETED"))
+                                .mustNot(QueryBuilders.existsQuery("acknowledged_time"))
+                        )
+                    )
+                    .subAggregation(AggregationBuilders.max("last_notification_time").field("last_notification_time"))
+                    .subAggregation(
+                        AggregationBuilders.topHits("latest_alert")
+                            .size(1)
+                            .sort("start_time", SortOrder.DESC)
+                            .fetchSource(arrayOf("last_notification_time", "trigger_name"), null)
+                    )
+            )
+
+        val searchResponse = client().makeRequest(
+            "GET",
+            "$ALERTING_BASE_URI/_search",
+            hashMapOf("index" to AlertIndices.ALL_ALERT_INDEX_PATTERN),
+            StringEntity(sourceBuilder.toString(), ContentType.APPLICATION_JSON)
+        )
+        val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content).map()
+        val aggregations = (xcp["aggregations"]!! as Map<String, Map<String, Any>>)
+        val uniqMonitorIds = aggregations["uniq_monitor_ids"]!!
+        val buckets = uniqMonitorIds["buckets"]!! as ArrayList<Map<String, Any>>
+
+        assertEquals("Incorrect number of monitors returned", monitorAlertCounts.keys.size, buckets.size)
+        buckets.forEach { bucket ->
+            val id = bucket["key"]!!
+            val monitorCounts = monitorAlertCounts[id]!!
+
+            val acknowledged = (bucket["acknowledged"]!! as Map<String, Int>)["doc_count"]!!
+            assertEquals(
+                "Incorrect ${Alert.State.ACKNOWLEDGED} count returned for monitor $id",
+                monitorCounts[Alert.State.ACKNOWLEDGED.name], acknowledged
+            )
+
+            val active = (bucket["active"]!! as Map<String, Int>)["doc_count"]!!
+            assertEquals(
+                "Incorrect ${Alert.State.ACTIVE} count returned for monitor $id",
+                monitorCounts[Alert.State.ACTIVE.name], active
+            )
+
+            val errors = (bucket["errors"]!! as Map<String, Int>)["doc_count"]!!
+            assertEquals(
+                "Incorrect ${Alert.State.ERROR} count returned for monitor $id",
+                monitorCounts[Alert.State.ERROR.name], errors
+            )
+
+            val ignored = (bucket["ignored"]!! as Map<String, Int>)["doc_count"]!!
+            assertEquals(
+                "Incorrect IGNORED count returned for monitor $id",
+                monitorCounts["IGNORED"], ignored
             )
         }
     }

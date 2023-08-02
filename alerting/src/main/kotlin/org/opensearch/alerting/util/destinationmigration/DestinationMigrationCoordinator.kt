@@ -16,7 +16,7 @@ import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.service.ClusterService
-import org.opensearch.common.component.LifecycleListener
+import org.opensearch.common.lifecycle.LifecycleListener
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.threadpool.Scheduler
 import org.opensearch.threadpool.ThreadPool

@@ -4,7 +4,7 @@
     "required": true
   },
   "_meta" : {
-    "schema_version": 4
+    "schema_version": 5
   },
   "properties": {
     "schema_version": {
@@ -71,6 +71,15 @@
         }
       }
     },
+    "execution_id": {
+      "type": "keyword"
+    },
+    "workflow_id": {
+      "type": "keyword"
+    },
+    "workflow_name": {
+      "type": "keyword"
+    },
     "trigger_id": {
       "type": "keyword"
     },
@@ -84,6 +93,14 @@
       }
     },
     "finding_ids": {
+      "type" : "text",
+      "fields" : {
+        "keyword" : {
+          "type" : "keyword"
+        }
+      }
+    },
+    "associated_alert_ids": {
       "type" : "text",
       "fields" : {
         "keyword" : {

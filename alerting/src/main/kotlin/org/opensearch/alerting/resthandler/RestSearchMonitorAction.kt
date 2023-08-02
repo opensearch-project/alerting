@@ -16,16 +16,15 @@ import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.context
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
-import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
+import org.opensearch.core.common.bytes.BytesReference
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent.EMPTY_PARAMS
-import org.opensearch.index.query.QueryBuilders
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.BytesRestResponse
@@ -36,7 +35,6 @@ import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestRequest.Method.GET
 import org.opensearch.rest.RestRequest.Method.POST
 import org.opensearch.rest.RestResponse
-import org.opensearch.rest.RestStatus
 import org.opensearch.rest.action.RestResponseListener
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.io.IOException
@@ -97,14 +95,6 @@ class RestSearchMonitorAction(
         searchSourceBuilder.parseXContent(request.contentOrSourceParamParser())
         searchSourceBuilder.fetchSource(context(request))
 
-        val queryBuilder = QueryBuilders.boolQuery().must(searchSourceBuilder.query())
-        if (index == SCHEDULED_JOBS_INDEX) {
-            queryBuilder.filter(QueryBuilders.existsQuery(Monitor.MONITOR_TYPE))
-        }
-
-        searchSourceBuilder.query(queryBuilder)
-            .seqNoAndPrimaryTerm(true)
-            .version(true)
         val searchRequest = SearchRequest()
             .source(searchSourceBuilder)
             .indices(index)

@@ -24,7 +24,6 @@ import org.opensearch.client.Response
 import org.opensearch.client.RestClient
 import org.opensearch.client.WarningsHandler
 import org.opensearch.common.UUIDs
-import org.opensearch.common.settings.SecureString
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
@@ -35,6 +34,7 @@ import org.opensearch.commons.alerting.model.ActionExecutionResult
 import org.opensearch.commons.alerting.model.AggregationResultBucket
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.ChainedAlertTrigger
 import org.opensearch.commons.alerting.model.ChainedMonitorFindings
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
 import org.opensearch.commons.alerting.model.CompositeInput
@@ -63,6 +63,7 @@ import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
 import org.opensearch.commons.alerting.model.action.Throttle
 import org.opensearch.commons.alerting.util.string
 import org.opensearch.commons.authuser.User
+import org.opensearch.core.common.settings.SecureString
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentBuilder
@@ -231,7 +232,9 @@ fun randomWorkflow(
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
     enabled: Boolean = randomBoolean(),
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
-    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS)
+    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+    triggers: List<Trigger> = emptyList(),
+    auditDelegateMonitorAlerts: Boolean? = true
 ): Workflow {
     val delegates = mutableListOf<Delegate>()
     if (!monitorIds.isNullOrEmpty()) {
@@ -253,7 +256,9 @@ fun randomWorkflow(
         user = user,
         inputs = listOf(CompositeInput(Sequence(delegates))),
         version = -1L,
-        schemaVersion = 0
+        schemaVersion = 0,
+        triggers = triggers,
+        auditDelegateMonitorAlerts = auditDelegateMonitorAlerts
     )
 }
 
@@ -266,6 +271,7 @@ fun randomWorkflowWithDelegates(
     enabled: Boolean = randomBoolean(),
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+    triggers: List<Trigger> = emptyList()
 ): Workflow {
     return Workflow(
         id = id,
@@ -278,7 +284,8 @@ fun randomWorkflowWithDelegates(
         user = user,
         inputs = listOf(CompositeInput(Sequence(delegates))),
         version = -1L,
-        schemaVersion = 0
+        schemaVersion = 0,
+        triggers = triggers
     )
 }
 
@@ -390,6 +397,7 @@ fun randomScript(source: String = "return " + OpenSearchRestTestCase.randomBoole
 
 val ADMIN = "admin"
 val ALERTING_BASE_URI = "/_plugins/_alerting/monitors"
+val WORKFLOW_ALERTING_BASE_URI = "/_plugins/_alerting/workflows"
 val DESTINATION_BASE_URI = "/_plugins/_alerting/destinations"
 val LEGACY_OPENDISTRO_ALERTING_BASE_URI = "/_opendistro/_alerting/monitors"
 val LEGACY_OPENDISTRO_DESTINATION_BASE_URI = "/_opendistro/_alerting/destinations"
@@ -754,4 +762,23 @@ fun assertUserNull(monitor: Monitor) {
 
 fun assertUserNull(workflow: Workflow) {
     assertNull("User is not null", workflow.user)
+}
+
+fun randomChainedAlertTrigger(
+    id: String = UUIDs.base64UUID(),
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    severity: String = "1",
+    condition: Script = randomScript(),
+    actions: List<Action> = mutableListOf(),
+    destinationId: String = ""
+): ChainedAlertTrigger {
+    return ChainedAlertTrigger(
+        id = id,
+        name = name,
+        severity = severity,
+        condition = condition,
+        actions = if (actions.isEmpty() && destinationId.isNotBlank()) {
+            (0..randomInt(10)).map { randomAction(destinationId = destinationId) }
+        } else actions
+    )
 }
