@@ -5696,22 +5696,27 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             workflowId = workflowId,
             alertIds = listOf(res.alerts[0].id),
             table = Table("asc", "monitor_id", null, 100, 100, null)
-
         )
         Assert.assertEquals(res100to200.associatedAlerts.size, 100)
         var res200to300 = getWorkflowAlerts(
             workflowId = workflowId,
             alertIds = listOf(res.alerts[0].id),
-            table = Table("asc", "monitor_id", null, 200, 100, null)
-
+            table = Table("asc", "monitor_id", null, 100, 201, null)
         )
-        Assert.assertEquals(res100to200.associatedAlerts.size, 100)
+        Assert.assertEquals(res200to300.associatedAlerts.size, 100)
         var res0to99 = getWorkflowAlerts(
             workflowId = workflowId,
             alertIds = listOf(res.alerts[0].id),
             table = Table("asc", "monitor_id", null, 100, 0, null)
-
         )
         Assert.assertEquals(res0to99.associatedAlerts.size, 100)
+
+        val ids100to200 = res100to200.associatedAlerts.stream().map { it.id }.collect(Collectors.toSet())
+        val idsSet0to99 = res0to99.associatedAlerts.stream().map { it.id }.collect(Collectors.toSet())
+        val idsSet200to300 = res200to300.associatedAlerts.stream().map { it.id }.collect(Collectors.toSet())
+
+        Assert.assertTrue(idsSet0to99.all { it !in ids100to200 })
+        Assert.assertTrue(idsSet0to99.all { it !in idsSet200to300 })
+        Assert.assertTrue(ids100to200.all { it !in idsSet200to300 })
     }
 }
