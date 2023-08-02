@@ -814,9 +814,13 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun getWorkflowAlerts(
         workflowId: String,
+        alertId: String? = "",
         getAssociatedAlerts: Boolean = true,
     ): Response {
-        return getWorkflowAlerts(client(), mutableMapOf(Pair("workflowIds", workflowId), Pair("getAssociatedAlerts", getAssociatedAlerts)))
+        return getWorkflowAlerts(
+            client(),
+            mutableMapOf(Pair("workflowIds", workflowId), Pair("getAssociatedAlerts", getAssociatedAlerts), Pair("alertIds", alertId!!))
+        )
     }
 
     protected fun getWorkflowAlerts(

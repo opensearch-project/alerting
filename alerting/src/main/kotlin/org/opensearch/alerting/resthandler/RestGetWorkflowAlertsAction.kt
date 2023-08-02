@@ -55,10 +55,15 @@ class RestGetWorkflowAlertsAction : BaseRestHandler() {
         val severityLevel = request.param("severityLevel", "ALL")
         val alertState = request.param("alertState", "ALL")
         val workflowId: String? = request.param("workflowIds")
+        val alertId: String? = request.param("alertIds")
         val getAssociatedAlerts: Boolean = request.param("getAssociatedAlerts", "false").toBoolean()
         val workflowIds = mutableListOf<String>()
         if (workflowId.isNullOrEmpty() == false) {
             workflowIds.add(workflowId)
+        }
+        val alertIds = mutableListOf<String>()
+        if (alertId.isNullOrEmpty() == false) {
+            alertIds.add(alertId)
         }
         val table = Table(
             sortOrder,
@@ -77,7 +82,8 @@ class RestGetWorkflowAlertsAction : BaseRestHandler() {
             associatedAlertsIndex = null,
             workflowIds = workflowIds,
             monitorIds = emptyList(),
-            getAssociatedAlerts = getAssociatedAlerts
+            getAssociatedAlerts = getAssociatedAlerts,
+            alertIds = alertIds
         )
         return RestChannelConsumer { channel ->
             client.execute(AlertingActions.GET_WORKFLOW_ALERTS_ACTION_TYPE, getWorkflowAlertsRequest, RestToXContentListener(channel))
