@@ -1069,7 +1069,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
             owner = "alerting",
             triggers = listOf(andTrigger)
         )
-        val workflowById = createWorkflow(workflow)!!
+        val workflowById = createWorkflow(workflow)
         assertNotNull(workflowById)
         val workflowId = workflowById.id
 

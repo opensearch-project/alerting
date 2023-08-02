@@ -5499,7 +5499,6 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test postIndex on workflow update with trigger deletion`() {
-        val monitorRunnerService = getInstanceFromNode(MonitorRunnerService.javaClass)
         val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
