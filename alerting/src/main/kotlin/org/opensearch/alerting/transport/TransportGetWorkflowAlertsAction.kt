@@ -156,8 +156,14 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
     }
 
     fun resolveAlertsIndexName(getAlertsRequest: GetWorkflowAlertsRequest): String {
-        return if (getAlertsRequest.alertIndex.isNullOrEmpty()) AlertIndices.ALERT_INDEX
-        else getAlertsRequest.alertIndex!!
+        var alertIndex = AlertIndices.ALL_ALERT_INDEX_PATTERN
+        if (getAlertsRequest.alertIndex.isNullOrEmpty() == false) {
+            alertIndex = getAlertsRequest.alertIndex!!
+        }
+        return if (alertIndex == AlertIndices.ALERT_INDEX)
+            AlertIndices.ALL_ALERT_INDEX_PATTERN
+        else
+            alertIndex
     }
 
     fun resolveAssociatedAlertsIndexName(getAlertsRequest: GetWorkflowAlertsRequest): String {
