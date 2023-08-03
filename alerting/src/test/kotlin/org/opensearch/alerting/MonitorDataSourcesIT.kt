@@ -5719,4 +5719,87 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(idsSet0to99.all { it !in idsSet200to300 })
         Assert.assertTrue(ids100to200.all { it !in idsSet200to300 })
     }
+
+    fun `test existing chained alert active alert is updated on consequtive trigger condition match`() {
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
+        val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
+        val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor1 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput1),
+            triggers = listOf(trigger1)
+        )
+        var monitor2 = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput1),
+            triggers = listOf(trigger1)
+        )
+        val monitorResponse = createMonitor(monitor1)!!
+        val monitorResponse2 = createMonitor(monitor2)!!
+        val notTrigger = randomChainedAlertTrigger(
+            name = "Not1OrNot2",
+            condition = Script("!monitor[id=${monitorResponse.id}] || !monitor[id=${monitorResponse2.id}]")
+        )
+        var workflow = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
+            triggers = listOf(notTrigger)
+        )
+        val workflowResponse = upsertWorkflow(workflow)!!
+        val workflowById = searchWorkflow(workflowResponse.id)
+        val workflowId = workflowById!!.id
+
+        /** no ACTIVE alert exists and chained alert trigger matches. Expect: new ACTIVE alert created**/
+        var executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
+        assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults[notTrigger.id]!!.triggered)
+        val workflowAlerts = getWorkflowAlerts(workflowId)
+        Assert.assertTrue(workflowAlerts.alerts.size == 1)
+        Assert.assertEquals(workflowAlerts.alerts[0].state, Alert.State.ACTIVE)
+        /** ACTIVE alert exists and chained alert trigger matched again. Expect: existing alert updated and remains in ACTIVE*/
+        var executeWorkflowResponse1 = executeWorkflow(workflowById, workflowId, false)!!
+        assertTrue(executeWorkflowResponse1.workflowRunResult.triggerResults[notTrigger.id]!!.triggered)
+        val udpdatedActiveAlerts = getWorkflowAlerts(workflowId)
+        Assert.assertTrue(udpdatedActiveAlerts.alerts.size == 1)
+        Assert.assertEquals(udpdatedActiveAlerts.alerts[0].state, Alert.State.ACTIVE)
+        Assert.assertTrue(udpdatedActiveAlerts.alerts[0].lastNotificationTime!! > workflowAlerts.alerts[0].lastNotificationTime!!)
+
+        /** Acknowledge ACTIVE alert*/
+        val ackChainedAlerts = ackChainedAlerts(udpdatedActiveAlerts.alerts.stream().map { it.id }.collect(Collectors.toList()), workflowId)
+        Assert.assertTrue(ackChainedAlerts.acknowledged.size == 1)
+        Assert.assertTrue(ackChainedAlerts.missing.size == 0)
+        Assert.assertTrue(ackChainedAlerts.failed.size == 0)
+
+        /** ACKNOWLEDGED alert exists and chained alert trigger matched again. Expect: existing alert updated and remains ACKNOWLEDGED*/
+        var executeWorkflowResponse2 = executeWorkflow(workflowById, workflowId, false)!!
+        assertTrue(executeWorkflowResponse2.workflowRunResult.triggerResults[notTrigger.id]!!.triggered)
+        val acknowledgedAlert = getWorkflowAlerts(workflowId, alertState = Alert.State.ACKNOWLEDGED)
+        Assert.assertTrue(acknowledgedAlert.alerts.size == 1)
+        Assert.assertEquals(acknowledgedAlert.alerts[0].state, Alert.State.ACKNOWLEDGED)
+        Assert.assertTrue(acknowledgedAlert.alerts[0].lastNotificationTime!! == udpdatedActiveAlerts.alerts[0].lastNotificationTime!!)
+
+        /** ACKNOWLEDGED alert exists and chained alert trigger NOT matched. Expect: ACKNOWLEDGD alert marked as COMPLETED**/
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc1 = """{
+            "message" : "This is an error from IAD region",
+            "source.ip.v6.v2" : 16644, 
+            "test_strict_date_time" : "$testTime",
+            "test_field_1" : "us-west-2"
+        }"""
+        indexDoc(index, "1", testDoc1)
+        var executeWorkflowResponse3 = executeWorkflow(workflowById, workflowId, false)!!
+        assertFalse(executeWorkflowResponse3.workflowRunResult.triggerResults[notTrigger.id]!!.triggered)
+        val completedAlert = getWorkflowAlerts(workflowId, alertState = Alert.State.COMPLETED)
+        Assert.assertTrue(completedAlert.alerts.size == 1)
+        Assert.assertEquals(completedAlert.alerts[0].state, Alert.State.COMPLETED)
+        Assert.assertTrue(completedAlert.alerts[0].endTime!! > acknowledgedAlert.alerts[0].lastNotificationTime!!)
+
+        /** COMPLETED state alert exists and trigger matches. Expect: new ACTIVE state chaiend alert created*/
+        var executeWorkflowResponse4 = executeWorkflow(workflowById, workflowId, false)!!
+        assertTrue(executeWorkflowResponse4.workflowRunResult.triggerResults[notTrigger.id]!!.triggered)
+        val newActiveAlert = getWorkflowAlerts(workflowId, alertState = Alert.State.ACTIVE)
+        Assert.assertTrue(newActiveAlert.alerts.size == 1)
+        Assert.assertEquals(newActiveAlert.alerts[0].state, Alert.State.ACTIVE)
+        Assert.assertTrue(newActiveAlert.alerts[0].lastNotificationTime!! > acknowledgedAlert.alerts[0].lastNotificationTime!!)
+        val completedAlert1 = getWorkflowAlerts(workflowId, alertState = Alert.State.COMPLETED)
+        Assert.assertTrue(completedAlert1.alerts.size == 1)
+        Assert.assertEquals(completedAlert1.alerts[0].state, Alert.State.COMPLETED)
+        Assert.assertTrue(completedAlert1.alerts[0].endTime!! > acknowledgedAlert.alerts[0].lastNotificationTime!!)
+    }
 }

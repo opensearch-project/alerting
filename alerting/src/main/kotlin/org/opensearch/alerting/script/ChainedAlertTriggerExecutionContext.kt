@@ -6,6 +6,7 @@
 package org.opensearch.alerting.script
 
 import org.opensearch.alerting.model.WorkflowRunResult
+import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.ChainedAlertTrigger
 import org.opensearch.commons.alerting.model.Workflow
 import java.time.Instant
@@ -18,7 +19,8 @@ data class ChainedAlertTriggerExecutionContext(
     val error: Exception? = null,
     val trigger: ChainedAlertTrigger,
     val alertGeneratingMonitors: Set<String>,
-    val monitorIdToAlertIdsMap: Map<String, Set<String>>
+    val monitorIdToAlertIdsMap: Map<String, Set<String>>,
+    val alert: Alert? = null
 ) {
 
     constructor(
@@ -26,7 +28,8 @@ data class ChainedAlertTriggerExecutionContext(
         workflowRunResult: WorkflowRunResult,
         trigger: ChainedAlertTrigger,
         alertGeneratingMonitors: Set<String>,
-        monitorIdToAlertIdsMap: Map<String, Set<String>>
+        monitorIdToAlertIdsMap: Map<String, Set<String>>,
+        alert: Alert? = null
     ) :
         this(
             workflow,
@@ -36,7 +39,8 @@ data class ChainedAlertTriggerExecutionContext(
             workflowRunResult.error,
             trigger,
             alertGeneratingMonitors,
-            monitorIdToAlertIdsMap
+            monitorIdToAlertIdsMap,
+            alert
         )
 
     /**
