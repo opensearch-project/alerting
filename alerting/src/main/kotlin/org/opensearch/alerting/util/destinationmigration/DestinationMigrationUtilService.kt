@@ -22,7 +22,6 @@ import org.opensearch.alerting.util.destinationmigration.DestinationConversionUt
 import org.opensearch.alerting.util.destinationmigration.NotificationApiUtils.Companion.createNotificationConfig
 import org.opensearch.alerting.util.use
 import org.opensearch.client.node.NodeClient
-import org.opensearch.common.Strings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.ConfigConstants
@@ -30,6 +29,7 @@ import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.notifications.action.CreateNotificationConfigRequest
 import org.opensearch.commons.notifications.model.NotificationConfig
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
+import org.opensearch.core.common.Strings
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser

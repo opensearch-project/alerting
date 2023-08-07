@@ -246,7 +246,7 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
                 searchRequest.source().sort(sortBuilder).size(tableProp.size).from(tableProp.startIndex)
             }
             queryBuilder.must(QueryBuilders.termsQuery("_id", associatedAlertIds))
-            queryBuilder.must(QueryBuilders.termQuery(Alert.STATE_FIELD, Alert.State.AUDIT))
+            queryBuilder.must(QueryBuilders.termQuery(Alert.STATE_FIELD, Alert.State.AUDIT.name))
             searchRequest.source().query(queryBuilder)
             val response: SearchResponse = client.suspendUntil { search(searchRequest, it) }
             associatedAlerts.addAll(parseAlertsFromSearchResponse(response))
