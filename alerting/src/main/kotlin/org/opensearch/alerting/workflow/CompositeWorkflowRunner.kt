@@ -171,6 +171,8 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 val triggerCtx = ChainedAlertTriggerExecutionContext(
                     workflow = workflow,
                     workflowRunResult = workflowRunResult,
+                    periodStart = workflowRunResult.executionStartTime,
+                    periodEnd = workflowRunResult.executionEndTime,
                     trigger = caTrigger,
                     alertGeneratingMonitors = monitorIdToAlertIdsMap.keys,
                     monitorIdToAlertIdsMap = monitorIdToAlertIdsMap,

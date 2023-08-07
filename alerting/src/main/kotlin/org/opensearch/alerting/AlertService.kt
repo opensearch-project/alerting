@@ -347,7 +347,7 @@ class AlertService(
             else Alert.State.ERROR
             Alert(
                 startTime = Instant.now(),
-                lastNotificationTime = Instant.now(),
+                lastNotificationTime = currentTime,
                 state = Alert.State.ACTIVE,
                 errorMessage = null, schemaVersion = -1,
                 chainedAlertTrigger = ctx.trigger,

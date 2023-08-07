@@ -23,26 +23,6 @@ data class ChainedAlertTriggerExecutionContext(
     val alert: Alert? = null
 ) {
 
-    constructor(
-        workflow: Workflow,
-        workflowRunResult: WorkflowRunResult,
-        trigger: ChainedAlertTrigger,
-        alertGeneratingMonitors: Set<String>,
-        monitorIdToAlertIdsMap: Map<String, Set<String>>,
-        alert: Alert? = null
-    ) :
-        this(
-            workflow,
-            workflowRunResult,
-            workflowRunResult.executionStartTime,
-            workflowRunResult.executionEndTime,
-            workflowRunResult.error,
-            trigger,
-            alertGeneratingMonitors,
-            monitorIdToAlertIdsMap,
-            alert
-        )
-
     /**
      * Mustache templates need special permissions to reflectively introspect field names. To avoid doing this we
      * translate the context to a Map of Strings to primitive types, which can be accessed without reflection.
