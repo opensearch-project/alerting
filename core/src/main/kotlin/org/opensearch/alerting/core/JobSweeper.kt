@@ -23,7 +23,6 @@ import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.routing.IndexShardRoutingTable
 import org.opensearch.cluster.routing.Murmur3HashFunction
 import org.opensearch.cluster.service.ClusterService
-import org.opensearch.common.Strings
 import org.opensearch.common.lifecycle.LifecycleListener
 import org.opensearch.common.logging.Loggers
 import org.opensearch.common.lucene.uid.Versions
@@ -34,6 +33,7 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.core.common.Strings
 import org.opensearch.core.common.bytes.BytesReference
 import org.opensearch.core.index.shard.ShardId
 import org.opensearch.core.rest.RestStatus

@@ -6,7 +6,7 @@
 package org.opensearch.alerting.util
 
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.common.Strings
+import org.opensearch.core.common.Strings
 import org.opensearch.rest.RestRequest
 import org.opensearch.search.fetch.subphase.FetchSourceContext
 
