@@ -21,6 +21,7 @@ import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
+import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
@@ -51,6 +52,7 @@ import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.time.Instant
 import java.util.UUID
+import java.util.stream.Collectors
 
 object BucketLevelMonitorRunner : MonitorRunner() {
     private val logger = LogManager.getLogger(javaClass)
@@ -151,15 +153,17 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 if (triggerResults[trigger.id]?.error != null) continue
                 val findings =
                     if (monitor.triggers.size == 1 && monitor.dataSources.findingsEnabled == true) {
-                        logger.debug("Creating bucket level findings")
-                        createFindings(
+                        logger.debug("Creating bucket level monitor findings. MonitorId: ${monitor.id}")
+                        createFindingsAndPerDocumentAlerts(
                             triggerResult,
                             monitor,
                             monitorCtx,
                             periodStart,
                             periodEnd,
                             !dryrun && monitor.id != Monitor.NO_ID,
-                            executionId
+                            executionId,
+                            workflowRunContext,
+                            trigger
                         )
                     } else {
                         emptyList()
@@ -351,7 +355,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         return monitorResult.copy(inputResults = firstPageOfInputResults, triggerResults = triggerResults)
     }
 
-    private suspend fun createFindings(
+    private suspend fun createFindingsAndPerDocumentAlerts(
         triggerResult: BucketLevelTriggerRunResult,
         monitor: Monitor,
         monitorCtx: MonitorRunnerExecutionContext,
@@ -359,6 +363,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         periodEnd: Instant,
         shouldCreateFinding: Boolean,
         executionId: String,
+        workflowRunContext: WorkflowRunContext?,
+        trigger: BucketLevelTrigger
     ): List<String> {
         monitor.inputs.forEach { input ->
             if (input is SearchInput) {
@@ -417,7 +423,9 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             sr.source().query(queryBuilder)
                         }
                     val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(sr, it) }
-                    return createFindingPerIndex(searchResponse, monitor, monitorCtx, shouldCreateFinding, executionId)
+                    val findings = createFindingPerIndex(searchResponse, monitor, monitorCtx, shouldCreateFinding, executionId)
+                    createPerDocumentAlerts(monitorCtx, findings, workflowRunContext, executionId, monitor, trigger)
+                    return findings.stream().map { it.id }.collect(Collectors.toList())
                 } else {
                     logger.error("Couldn't resolve groupBy field. Not generating bucket level monitor findings for monitor %${monitor.id}")
                 }
@@ -426,20 +434,50 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         return listOf()
     }
 
+    private suspend fun createPerDocumentAlerts(
+        monitorCtx: MonitorRunnerExecutionContext,
+        findings: List<Finding>,
+        workflowRunContext: WorkflowRunContext?,
+        executionId: String,
+        monitor: Monitor,
+        trigger: BucketLevelTrigger,
+    ) {
+        val currentTime = Instant.now()
+        val alerts = mutableListOf<Alert>()
+        findings.forEach {
+            val alert = Alert(
+                id = UUID.randomUUID().toString(),
+                monitor = monitor,
+                startTime = currentTime,
+                lastNotificationTime = currentTime,
+                state = Alert.State.ACTIVE,
+                schemaVersion = IndexUtils.alertIndexSchemaVersion,
+                findingIds = listOf(it.id),
+                relatedDocIds = it.relatedDocIds,
+                executionId = executionId,
+                workflowId = workflowRunContext?.workflowId ?: "",
+                severity = trigger.severity, //
+                actionExecutionResults = listOf(), // todo
+            )
+            alerts.add(alert)
+        }
+        monitorCtx.alertService!!.saveAlerts(monitor.dataSources, alerts, monitorCtx.retryPolicy!!, false, monitor.id)
+    }
+
     private suspend fun createFindingPerIndex(
         searchResponse: SearchResponse,
         monitor: Monitor,
         monitorCtx: MonitorRunnerExecutionContext,
         shouldCreateFinding: Boolean,
-        workflowExecutionId: String? = null
-    ): List<String> {
+        workflowExecutionId: String? = null,
+    ): List<Finding> {
         val docIdsByIndexName: MutableMap<String, MutableList<String>> = mutableMapOf()
         for (hit in searchResponse.hits.hits) {
             val ids = docIdsByIndexName.getOrDefault(hit.index, mutableListOf())
             ids.add(hit.id)
             docIdsByIndexName[hit.index] = ids
         }
-        val findings = mutableListOf<String>()
+        val findings = mutableListOf<Finding>()
         var requestsToRetry: MutableList<IndexRequest> = mutableListOf()
         docIdsByIndexName.entries.forEach { it ->
             run {
@@ -464,15 +502,15 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                         .routing(finding.id)
                     requestsToRetry.add(indexRequest)
                 }
-                findings.add(finding.id)
+                findings.add(finding)
             }
         }
         if (requestsToRetry.isEmpty()) return listOf()
         monitorCtx.retryPolicy!!.retry(logger, listOf(RestStatus.TOO_MANY_REQUESTS)) {
             val bulkRequest = BulkRequest().add(requestsToRetry).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
             val bulkResponse: BulkResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.bulk(bulkRequest, it) }
+            val findingsBeingRetried = mutableListOf<Finding>()
             requestsToRetry = mutableListOf()
-            val findingsBeingRetried = mutableListOf<Alert>()
             bulkResponse.items.forEach { item ->
                 if (item.isFailed) {
                     if (item.status() == RestStatus.TOO_MANY_REQUESTS) {
