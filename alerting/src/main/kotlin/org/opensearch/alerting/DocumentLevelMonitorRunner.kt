@@ -454,7 +454,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             publishFinding(monitor, monitorCtx, finding)
         } catch (e: Exception) {
             // suppress exception
-            logger.info("Optional finding callback failed: ${e.message}")
+            logger.debug("Optional finding callback failed: ${e.message}")
         }
         return finding.id
     }
