@@ -349,7 +349,7 @@ class AlertService(
                 startTime = Instant.now(),
                 lastNotificationTime = currentTime,
                 state = Alert.State.ACTIVE,
-                errorMessage = null, schemaVersion = -1,
+                errorMessage = null, schemaVersion = IndexUtils.alertIndexSchemaVersion,
                 chainedAlertTrigger = ctx.trigger,
                 executionId = executionId,
                 workflow = workflow,
@@ -850,7 +850,7 @@ class AlertService(
     }
 
     /**
-     * Searches for Alerts in the monitor's alertIndex.
+     * Searches for ACTIVE/ACKNOWLEDGED chained alerts in the workflow's alertIndex.
      *
      * @param monitorId The Monitor to get Alerts for
      * @param size The number of search hits (Alerts) to return
