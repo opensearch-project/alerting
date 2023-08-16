@@ -8,7 +8,6 @@ package org.opensearch.alerting.util.clusterMetricsMonitorHelpers
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionRequestValidationException
-import org.opensearch.action.ActionResponse
 import org.opensearch.action.ValidateActions
 import org.opensearch.action.admin.cluster.health.ClusterHealthRequest
 import org.opensearch.action.admin.cluster.health.ClusterHealthResponse
@@ -23,6 +22,7 @@ import org.opensearch.action.support.IndicesOptions
 import org.opensearch.alerting.util.IndexUtils.Companion.VALID_INDEX_NAME_REGEX
 import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.common.time.DateFormatter
+import org.opensearch.core.action.ActionResponse
 import org.opensearch.core.common.io.stream.StreamOutput
 import org.opensearch.core.common.io.stream.Writeable
 import org.opensearch.core.xcontent.ToXContent
