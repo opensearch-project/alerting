@@ -7,7 +7,6 @@ package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
-import org.opensearch.action.ActionListener
 import org.opensearch.action.DocWriteRequest
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.action.bulk.BulkRequest
@@ -48,6 +47,7 @@ import org.opensearch.commons.alerting.model.NoOpTrigger
 import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.model.action.AlertCategory
+import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.bytes.BytesReference
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry

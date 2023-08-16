@@ -8,7 +8,6 @@ package org.opensearch.alerting.alerts
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
 import org.opensearch.ResourceAlreadyExistsException
-import org.opensearch.action.ActionListener
 import org.opensearch.action.admin.cluster.state.ClusterStateRequest
 import org.opensearch.action.admin.cluster.state.ClusterStateResponse
 import org.opensearch.action.admin.indices.alias.Alias
@@ -48,6 +47,7 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.DataSources
+import org.opensearch.core.action.ActionListener
 import org.opensearch.threadpool.Scheduler.Cancellable
 import org.opensearch.threadpool.ThreadPool
 import java.time.Instant

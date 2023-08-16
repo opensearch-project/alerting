@@ -7,7 +7,6 @@ package org.opensearch.alerting.util.clusterMetricsMonitorHelpers
 
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionRequestValidationException
-import org.opensearch.action.ActionResponse
 import org.opensearch.action.ValidateActions
 import org.opensearch.action.admin.cluster.state.ClusterStateRequest
 import org.opensearch.action.admin.cluster.state.ClusterStateResponse
@@ -18,6 +17,7 @@ import org.opensearch.action.admin.indices.stats.ShardStats
 import org.opensearch.alerting.util.IndexUtils.Companion.VALID_INDEX_NAME_REGEX
 import org.opensearch.cluster.routing.UnassignedInfo
 import org.opensearch.common.unit.TimeValue
+import org.opensearch.core.action.ActionResponse
 import org.opensearch.core.common.io.stream.StreamOutput
 import org.opensearch.core.common.io.stream.Writeable
 import org.opensearch.core.xcontent.ToXContent

@@ -5,7 +5,6 @@
 
 package org.opensearch.alerting.util.clusterMetricsMonitorHelpers
 
-import org.opensearch.action.ActionResponse
 import org.opensearch.action.admin.cluster.health.ClusterHealthRequest
 import org.opensearch.action.admin.cluster.health.ClusterHealthResponse
 import org.opensearch.action.admin.cluster.node.stats.NodesStatsRequest
@@ -34,8 +33,7 @@ import org.opensearch.cluster.metadata.Metadata
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.support.XContentMapValues
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
-import kotlin.collections.ArrayList
-import kotlin.collections.HashMap
+import org.opensearch.core.action.ActionResponse
 
 /**
  * Calls the appropriate transport action for the API requested in the [clusterMetricsInput].

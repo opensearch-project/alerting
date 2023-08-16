@@ -5,8 +5,8 @@
 
 package org.opensearch.alerting.action
 
-import org.opensearch.action.ActionResponse
 import org.opensearch.alerting.model.WorkflowRunResult
+import org.opensearch.core.action.ActionResponse
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.common.io.stream.StreamOutput
 import org.opensearch.core.xcontent.ToXContent
