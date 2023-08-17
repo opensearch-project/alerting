@@ -21,7 +21,6 @@ import org.opensearch.commons.alerting.util.IndexUtils
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
-import org.opensearch.index.IndexNotFoundException
 
 class IndexUtils {
 
@@ -149,10 +148,6 @@ class IndexUtils {
                     index
                 )
                 result.addAll(concreteIndices)
-            }
-
-            if (result.size == 0) {
-                throw IndexNotFoundException(indices[0])
             }
 
             return result
