@@ -293,7 +293,7 @@ String bwcRemoteFile = "https://github.com/opensearch-project/alerting/archive/r
                     node.setting("plugins.security.system_indices.enabled", "true")
                 }
             } else {
-                versions = ["1.3.0", opensearch_version]
+                versions = ["1.3.6", opensearch_version]
                 plugin(provider(new Callable<RegularFile>(){
                     @Override
                     RegularFile call() throws Exception {
