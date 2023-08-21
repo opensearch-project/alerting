@@ -250,8 +250,8 @@ task integTestRemote(type: RestIntegTestTask) {
 }
 integTestRemote.enabled = System.getProperty("tests.rest.cluster") != null
 
-String bwcMinVersion = "1.1.0.0"
-String bwcBundleVersion = "1.3.2.0"
+String bwcMinVersion = "1.3.0.0"
+String bwcBundleVersion = "1.3.12.0"
 Boolean bwcBundleTest = (project.findProperty('customDistributionDownloadType') != null &&
         project.properties['customDistributionDownloadType'] == "bundle");
 String bwcVersion = bwcBundleTest ? bwcBundleVersion : bwcMinVersion
@@ -259,7 +259,7 @@ String bwcCurrentVersion = opensearch_version.replace("-SNAPSHOT", "")
 String baseName = "alertingBwcCluster"
 String bwcFilePath = "src/test/resources/bwc"
 String bwcOpenSearchPlugin = "opensearch-alerting-" + bwcVersion + ".zip"
-String bwcRemoteFile = 'https://ci.opensearch.org/ci/dbc/bundle-build/1.1.0/20210930/linux/x64/builds/opensearch/plugins/' + bwcOpenSearchPlugin
+String bwcRemoteFile = "https://github.com/opensearch-project/alerting/archive/refs/tags/" + bwcVersion + ".zip"
 
 2.times {i ->
     testClusters {
@@ -267,7 +267,7 @@ String bwcRemoteFile = 'https://ci.opensearch.org/ci/dbc/bundle-build/1.1.0/2021
             testDistribution = "ARCHIVE"
             numberOfNodes = 3
             if (bwcBundleTest) {
-                versions = ["1.3.2", bwcCurrentVersion]
+                versions = ["1.3.12", bwcCurrentVersion]
                 nodes.each { node ->
                     node.extraConfigFile("kirk.pem", file("src/test/resources/kirk.pem"))
                     node.extraConfigFile("kirk-key.pem", file("src/test/resources/kirk-key.pem"))
@@ -293,7 +293,7 @@ String bwcRemoteFile = 'https://ci.opensearch.org/ci/dbc/bundle-build/1.1.0/2021
                     node.setting("plugins.security.system_indices.enabled", "true")
                 }
             } else {
-                versions = ["1.1.0", opensearch_version]
+                versions = ["1.3.0", opensearch_version]
                 plugin(provider(new Callable<RegularFile>(){
                     @Override
                     RegularFile call() throws Exception {
