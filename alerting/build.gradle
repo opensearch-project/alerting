@@ -250,7 +250,7 @@ task integTestRemote(type: RestIntegTestTask) {
 }
 integTestRemote.enabled = System.getProperty("tests.rest.cluster") != null
 
-String bwcMinVersion = "1.3.0.0"
+String bwcMinVersion = "1.3.6.0"
 String bwcBundleVersion = "1.3.12.0"
 Boolean bwcBundleTest = (project.findProperty('customDistributionDownloadType') != null &&
         project.properties['customDistributionDownloadType'] == "bundle");
