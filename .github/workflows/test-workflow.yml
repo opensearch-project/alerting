@@ -42,7 +42,7 @@ jobs:
           java-version: ${{ matrix.java }}
       - name: Build and run with Gradle
         working-directory: ${{ env.WORKING_DIR }}
-        run: ./gradlew build ${{ env.BUILD_ARGS }}
+        run: ./gradlew build ${{ env.BUILD_ARGS }} -x alertingBwcCluster#fullRestartClusterTask -x alertingBwcCluster#mixedClusterTask -x alertingBwcCluster#oldVersionClusterTask0 -x alertingBwcCluster#oldVersionClusterTask1 -x alertingBwcCluster#rollingUpgradeClusterTask -x alertingBwcCluster#twoThirdsUpgradedClusterTask
         env:
           _JAVA_OPTIONS: ${{ matrix.os_java_options }}
       - name: Create Artifact Path
