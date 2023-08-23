@@ -11,7 +11,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.Logger
 import org.opensearch.OpenSearchException
-import org.opensearch.action.ActionListener
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.search.ShardSearchFailure
@@ -23,13 +22,14 @@ import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.InjectSecurity
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.notifications.NotificationsPluginInterface
+import org.opensearch.core.action.ActionListener
+import org.opensearch.core.rest.RestStatus
+import org.opensearch.core.rest.RestStatus.BAD_GATEWAY
+import org.opensearch.core.rest.RestStatus.GATEWAY_TIMEOUT
+import org.opensearch.core.rest.RestStatus.SERVICE_UNAVAILABLE
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.QueryBuilders
-import org.opensearch.rest.RestStatus
-import org.opensearch.rest.RestStatus.BAD_GATEWAY
-import org.opensearch.rest.RestStatus.GATEWAY_TIMEOUT
-import org.opensearch.rest.RestStatus.SERVICE_UNAVAILABLE
 import org.opensearch.search.builder.SearchSourceBuilder
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume

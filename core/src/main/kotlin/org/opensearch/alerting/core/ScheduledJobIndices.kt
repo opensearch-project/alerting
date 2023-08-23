@@ -5,7 +5,6 @@
 
 package org.opensearch.alerting.core
 
-import org.opensearch.action.ActionListener
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
 import org.opensearch.client.AdminClient
@@ -13,6 +12,7 @@ import org.opensearch.cluster.health.ClusterIndexHealth
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.core.action.ActionListener
 
 /**
  * Initialize the OpenSearch components required to run [ScheduledJobs].

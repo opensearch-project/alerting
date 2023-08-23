@@ -19,11 +19,9 @@ jobs:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
         include:
           - os: windows-latest
-            os_build_args: -x integTest -x jacocoTestReport
+            os_build_args: -x integTest
             working_directory: X:\
             os_java_options: -Xmx4096M
-          - os: macos-latest
-            os_build_args: -x integTest -x jacocoTestReport
     # Job name
     name: Build Alerting with JDK ${{ matrix.java }} on ${{ matrix.os }}
     # This job runs on Linux
@@ -44,7 +42,7 @@ jobs:
           java-version: ${{ matrix.java }}
       - name: Build and run with Gradle
         working-directory: ${{ env.WORKING_DIR }}
-        run: ./gradlew build ${{ env.BUILD_ARGS }}
+        run: ./gradlew assemble integTest ${{ env.BUILD_ARGS }}
         env:
           _JAVA_OPTIONS: ${{ matrix.os_java_options }}
       - name: Create Artifact Path

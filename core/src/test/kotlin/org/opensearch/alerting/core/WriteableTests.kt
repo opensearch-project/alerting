@@ -9,7 +9,7 @@ import org.joda.time.DateTime
 import org.junit.Test
 import org.opensearch.alerting.core.schedule.JobSchedulerMetrics
 import org.opensearch.common.io.stream.BytesStreamOutput
-import org.opensearch.common.io.stream.StreamInput
+import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.test.OpenSearchTestCase.assertEquals
 
 class WriteableTests {

@@ -5,7 +5,6 @@
 
 package org.opensearch.alerting.util
 
-import org.opensearch.action.ActionListener
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.master.AcknowledgedResponse
@@ -19,6 +18,7 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.util.IndexUtils
+import org.opensearch.core.action.ActionListener
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.IndexNotFoundException

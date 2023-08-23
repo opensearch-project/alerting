@@ -7,14 +7,14 @@ package org.opensearch.alerting.transport
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
-import org.opensearch.action.ActionListener
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.authuser.User
-import org.opensearch.rest.RestStatus
+import org.opensearch.core.action.ActionListener
+import org.opensearch.core.rest.RestStatus
 
 private val log = LogManager.getLogger(SecureTransportAction::class.java)
 

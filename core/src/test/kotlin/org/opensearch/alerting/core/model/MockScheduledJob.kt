@@ -1,8 +1,8 @@
 package org.opensearch.alerting.core.model
 
-import org.opensearch.common.io.stream.StreamOutput
 import org.opensearch.commons.alerting.model.Schedule
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.core.common.io.stream.StreamOutput
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentBuilder
 import java.io.IOException

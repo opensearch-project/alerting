@@ -37,8 +37,8 @@ import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.index.mapper.MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING
-import org.opensearch.rest.RestStatus
 
 private val log = LogManager.getLogger(DocLevelMonitorQueries::class.java)
 

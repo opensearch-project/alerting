@@ -29,7 +29,7 @@ import org.opensearch.commons.notifications.model.ChannelMessage
 import org.opensearch.commons.notifications.model.EventSource
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import org.opensearch.commons.notifications.model.SeverityType
-import org.opensearch.rest.RestStatus
+import org.opensearch.core.rest.RestStatus
 
 class NotificationApiUtils {
 
