@@ -12,6 +12,7 @@ import org.opensearch.alerting.model.ChainedAlertTriggerRunResult
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
+import org.opensearch.alerting.script.ChainedAlertTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.triggercondition.parsers.TriggerExpressionParser
@@ -47,6 +48,15 @@ class TriggerService(val scriptService: ScriptService) {
         workflowRunContext: WorkflowRunContext?,
     ): Boolean {
         if (workflowRunContext?.auditDelegateMonitorAlerts == true) return false
+        // Suppress actions if the current alert is acknowledged and there are no errors.
+        val suppress = ctx.alert?.state == Alert.State.ACKNOWLEDGED && result.error == null && ctx.error == null
+        return result.triggered && !suppress
+    }
+
+    fun isChainedAlertTriggerActionable(
+        ctx: ChainedAlertTriggerExecutionContext,
+        result: ChainedAlertTriggerRunResult,
+    ): Boolean {
         // Suppress actions if the current alert is acknowledged and there are no errors.
         val suppress = ctx.alert?.state == Alert.State.ACKNOWLEDGED && result.error == null && ctx.error == null
         return result.triggered && !suppress

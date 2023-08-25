@@ -6,6 +6,7 @@
 package org.opensearch.alerting.script
 
 import org.opensearch.alerting.model.WorkflowRunResult
+import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.ChainedAlertTrigger
 import org.opensearch.commons.alerting.model.Workflow
 import java.time.Instant
@@ -18,26 +19,9 @@ data class ChainedAlertTriggerExecutionContext(
     val error: Exception? = null,
     val trigger: ChainedAlertTrigger,
     val alertGeneratingMonitors: Set<String>,
-    val monitorIdToAlertIdsMap: Map<String, Set<String>>
+    val monitorIdToAlertIdsMap: Map<String, Set<String>>,
+    val alert: Alert? = null
 ) {
-
-    constructor(
-        workflow: Workflow,
-        workflowRunResult: WorkflowRunResult,
-        trigger: ChainedAlertTrigger,
-        alertGeneratingMonitors: Set<String>,
-        monitorIdToAlertIdsMap: Map<String, Set<String>>
-    ) :
-        this(
-            workflow,
-            workflowRunResult,
-            workflowRunResult.executionStartTime,
-            workflowRunResult.executionEndTime,
-            workflowRunResult.error,
-            trigger,
-            alertGeneratingMonitors,
-            monitorIdToAlertIdsMap
-        )
 
     /**
      * Mustache templates need special permissions to reflectively introspect field names. To avoid doing this we
