@@ -2797,7 +2797,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         indexDoc(index, "2", testDoc2)
 
         testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS))
-        // Doesn't match
+        // Matches monitor1 and monitor2
         val testDoc3 = """{
             "message" : "This is an error from IAD region",
             "source.ip.v6.v2" : 16645, 
