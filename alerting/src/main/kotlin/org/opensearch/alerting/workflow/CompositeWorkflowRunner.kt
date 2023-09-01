@@ -98,12 +98,23 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                     IllegalStateException("Delegate monitor not found ${delegate.monitorId} for the workflow $workflow.id")
                 )
             if (delegate.chainedMonitorFindings != null) {
-                val chainedMonitor = monitorsById[delegate.chainedMonitorFindings!!.monitorId]
-                    ?: throw AlertingException.wrap(
-                        IllegalStateException("Chained finding monitor not found ${delegate.monitorId} for the workflow $workflow.id")
-                    )
+                val chainedMonitorIds: MutableList<String> = mutableListOf()
+                if (delegate.chainedMonitorFindings!!.monitorId.isNullOrBlank()) {
+                    chainedMonitorIds.addAll(delegate.chainedMonitorFindings!!.monitorIds)
+                } else {
+                    chainedMonitorIds.add(delegate.chainedMonitorFindings!!.monitorId!!)
+                }
+                val chainedMonitors = mutableListOf<Monitor>()
+                chainedMonitorIds.forEach {
+                    val chainedMonitor = monitorsById[it]
+                        ?: throw AlertingException.wrap(
+                            IllegalStateException("Chained finding monitor not found ${delegate.monitorId} for the workflow $workflow.id")
+                        )
+                    chainedMonitors.add(chainedMonitor)
+                }
+
                 try {
-                    indexToDocIds = monitorCtx.workflowService!!.getFindingDocIdsByExecutionId(chainedMonitor, executionId)
+                    indexToDocIds = monitorCtx.workflowService!!.getFindingDocIdsByExecutionId(chainedMonitors, executionId)
                 } catch (e: Exception) {
                     logger.error("Failed to execute workflow due to failure in chained findings.  Error: ${e.message}", e)
                     return WorkflowRunResult(
