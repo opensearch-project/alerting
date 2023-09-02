@@ -38,7 +38,7 @@ class WorkflowService(
      * Returns finding doc ids per index for the given workflow execution
      * Used for pre-filtering the dataset in the case of creating a workflow with chained findings
      *
-     * @param chainedMonitors Monitor that have previously executed
+     * @param chainedMonitors Monitors that have previously executed
      * @param workflowExecutionId Execution id of the current workflow
      */
     suspend fun getFindingDocIdsByExecutionId(chainedMonitors: List<Monitor>, workflowExecutionId: String): Map<String, List<String>> {
