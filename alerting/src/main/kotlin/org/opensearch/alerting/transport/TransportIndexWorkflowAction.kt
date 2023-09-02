@@ -527,27 +527,39 @@ class TransportIndexWorkflowAction @Inject constructor(
 
         val monitorsById = monitorDelegates.associateBy { it.id }
         delegates.forEach {
+
             val delegateMonitor = monitorsById[it.monitorId] ?: throw AlertingException.wrap(
                 IllegalArgumentException("Delegate monitor ${it.monitorId} doesn't exist")
             )
             if (it.chainedMonitorFindings != null) {
-                val chainedFindingMonitor =
-                    monitorsById[it.chainedMonitorFindings!!.monitorId] ?: throw AlertingException.wrap(
-                        IllegalArgumentException("Chained finding monitor doesn't exist")
-                    )
-
-                if (chainedFindingMonitor.isQueryLevelMonitor()) {
-                    throw AlertingException.wrap(IllegalArgumentException("Query level monitor can't be part of chained findings"))
+                val chainedMonitorIds: MutableList<String> = mutableListOf()
+                if (it.chainedMonitorFindings!!.monitorId.isNullOrBlank()) {
+                    chainedMonitorIds.addAll(it.chainedMonitorFindings!!.monitorIds)
+                } else {
+                    chainedMonitorIds.add(it.chainedMonitorFindings!!.monitorId!!)
                 }
+                chainedMonitorIds.forEach { chainedMonitorId ->
+                    val chainedFindingMonitor =
+                        monitorsById[chainedMonitorId] ?: throw AlertingException.wrap(
+                            IllegalArgumentException("Chained finding monitor $chainedMonitorId doesn't exist")
+                        )
 
-                val delegateMonitorIndices = getMonitorIndices(delegateMonitor)
+                    if (chainedFindingMonitor.isQueryLevelMonitor()) {
+                        throw AlertingException.wrap(IllegalArgumentException("Query level monitor can't be part of chained findings"))
+                    }
 
-                val chainedMonitorIndices = getMonitorIndices(chainedFindingMonitor)
+                    val delegateMonitorIndices = getMonitorIndices(delegateMonitor)
 
-                if (!delegateMonitorIndices.equalsIgnoreOrder(chainedMonitorIndices)) {
-                    throw AlertingException.wrap(
-                        IllegalArgumentException("Delegate monitor and it's chained finding monitor must query the same indices")
-                    )
+                    val chainedMonitorIndices = getMonitorIndices(chainedFindingMonitor)
+
+                    if (!delegateMonitorIndices.containsAll(chainedMonitorIndices)) {
+                        throw AlertingException.wrap(
+                            IllegalArgumentException(
+                                "Delegate monitor indices ${delegateMonitorIndices.joinToString()} " +
+                                    "doesn't query all of chained findings monitor's indices ${chainedMonitorIndices.joinToString()}}"
+                            )
+                        )
+                    }
                 }
             }
         }
@@ -580,7 +592,7 @@ class TransportIndexWorkflowAction @Inject constructor(
 
     private fun validateDelegateMonitorsExist(
         monitorIds: List<String>,
-        delegateMonitors: List<Monitor>
+        delegateMonitors: List<Monitor>,
     ) {
         val reqMonitorIds: MutableList<String> = monitorIds as MutableList<String>
         delegateMonitors.forEach {
@@ -600,7 +612,7 @@ class TransportIndexWorkflowAction @Inject constructor(
         request: IndexWorkflowRequest,
         user: User?,
         client: Client,
-        actionListener: ActionListener<AcknowledgedResponse>
+        actionListener: ActionListener<AcknowledgedResponse>,
     ) {
         val compositeInput = request.workflow.inputs[0] as CompositeInput
         val monitorIds = compositeInput.sequence.delegates.stream().map { it.monitorId }.collect(Collectors.toList())

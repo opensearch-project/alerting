@@ -38,17 +38,26 @@ class WorkflowService(
      * Returns finding doc ids per index for the given workflow execution
      * Used for pre-filtering the dataset in the case of creating a workflow with chained findings
      *
-     * @param chainedMonitor Monitor that is previously executed
+     * @param chainedMonitors Monitors that have previously executed
      * @param workflowExecutionId Execution id of the current workflow
      */
-    suspend fun getFindingDocIdsByExecutionId(chainedMonitor: Monitor, workflowExecutionId: String): Map<String, List<String>> {
+    suspend fun getFindingDocIdsByExecutionId(chainedMonitors: List<Monitor>, workflowExecutionId: String): Map<String, List<String>> {
+        if (chainedMonitors.isEmpty())
+            return emptyMap()
+        val dataSources = chainedMonitors[0].dataSources
         try {
             val existsResponse: IndicesExistsResponse = client.admin().indices().suspendUntil {
-                exists(IndicesExistsRequest(chainedMonitor.dataSources.findingsIndex).local(true), it)
+                exists(IndicesExistsRequest(dataSources.findingsIndex).local(true), it)
             }
             if (existsResponse.isExists == false) return emptyMap()
-            // Search findings index per monitor and workflow execution id
-            val bqb = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery(Finding.MONITOR_ID_FIELD, chainedMonitor.id))
+            // Search findings index to match id of monitors and workflow execution id
+            val bqb = QueryBuilders.boolQuery()
+                .filter(
+                    QueryBuilders.termsQuery(
+                        Finding.MONITOR_ID_FIELD,
+                        chainedMonitors.map { it.id }
+                    )
+                )
                 .filter(QueryBuilders.termQuery(Finding.EXECUTION_ID_FIELD, workflowExecutionId))
             val searchRequest = SearchRequest()
                 .source(
@@ -57,7 +66,7 @@ class WorkflowService(
                         .version(true)
                         .seqNoAndPrimaryTerm(true)
                 )
-                .indices(chainedMonitor.dataSources.findingsIndex)
+                .indices(dataSources.findingsIndex)
             val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
 
             // Get the findings docs
