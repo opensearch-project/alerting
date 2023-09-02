@@ -348,7 +348,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
-                    it.contains("Delegate monitor and it's chained finding monitor must query the same indices")
+                    it.contains("doesn't query all of chained findings monitor's indices")
                 )
             }
         }
