@@ -21,6 +21,7 @@ import org.opensearch.alerting.script.ChainedAlertTriggerExecutionContext
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.isDocLevelMonitor
 import org.opensearch.alerting.util.isQueryLevelMonitor
+import org.opensearch.cluster.routing.Preference
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
@@ -226,11 +227,6 @@ object CompositeWorkflowRunner : WorkflowRunner() {
             )
         }
         workflowRunResult.executionEndTime = Instant.now()
-
-        val sr = SearchRequest(dataSources!!.alertsIndex)
-        sr.source().query(QueryBuilders.matchAllQuery()).size(10)
-        val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(sr, it) }
-        searchResponse.hits
         return workflowRunResult
     }
 
@@ -340,6 +336,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         try {
             val searchRequest =
                 SearchRequest(getDelegateMonitorAlertIndex(dataSources, workflow, monitorCtx.alertIndices!!.isAlertHistoryEnabled()))
+            searchRequest.preference(Preference.PRIMARY_FIRST.type())
             val queryBuilder = boolQuery()
             queryBuilder.must(QueryBuilders.termQuery("execution_id", executionId))
             queryBuilder.must(QueryBuilders.termQuery("state", getDelegateMonitorAlertState(workflow).name))
