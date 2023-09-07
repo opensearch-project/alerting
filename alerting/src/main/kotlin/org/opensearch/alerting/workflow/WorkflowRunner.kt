@@ -30,6 +30,7 @@ import org.opensearch.commons.alerting.model.Table
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
+import org.opensearch.core.common.Strings
 import org.opensearch.script.Script
 import org.opensearch.script.TemplateScript
 import java.time.Instant
@@ -51,12 +52,15 @@ abstract class WorkflowRunner {
         dryrun: Boolean
     ): ActionRunResult {
         return try {
+            if (!MonitorRunnerService.isActionActionable(action, ctx.alert)) {
+                return ActionRunResult(action.id, action.name, mapOf(), true, null, null)
+            }
             val actionOutput = mutableMapOf<String, String>()
             actionOutput[Action.SUBJECT] = if (action.subjectTemplate != null) {
                 compileTemplate(action.subjectTemplate!!, ctx)
             } else ""
             actionOutput[Action.MESSAGE] = compileTemplate(action.messageTemplate, ctx)
-            if (actionOutput[Action.MESSAGE].isNullOrEmpty()) {
+            if (Strings.isNullOrEmpty(actionOutput[Action.MESSAGE])) {
                 throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
             }
             if (!dryrun) {

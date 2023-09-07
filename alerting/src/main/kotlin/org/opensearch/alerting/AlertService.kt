@@ -19,6 +19,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.model.ActionRunResult
+import org.opensearch.alerting.model.ChainedAlertTriggerRunResult
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.opensearchapi.firstFailureOrNull
 import org.opensearch.alerting.opensearchapi.retry
@@ -82,6 +83,26 @@ class AlertService(
     }
 
     private val logger = LogManager.getLogger(AlertService::class.java)
+
+    suspend fun loadCurrentAlertsForWorkflow(workflow: Workflow, dataSources: DataSources): Map<Trigger, Alert?> {
+        val searchAlertsResponse: SearchResponse = searchAlerts(
+            workflow = workflow,
+            size = workflow.triggers.size * 2, // We expect there to be only a single in-progress alert so fetch 2 to check
+            dataSources = dataSources
+        )
+
+        val foundAlerts = searchAlertsResponse.hits.map { Alert.parse(contentParser(it.sourceRef), it.id, it.version) }
+            .groupBy { it.triggerId }
+        foundAlerts.values.forEach { alerts ->
+            if (alerts.size > 1) {
+                logger.warn("Found multiple alerts for same trigger: $alerts")
+            }
+        }
+
+        return workflow.triggers.associateWith { trigger ->
+            foundAlerts[trigger.id]?.firstOrNull()
+        }
+    }
 
     suspend fun loadCurrentAlertsForQueryLevelMonitor(monitor: Monitor, workflowRunContext: WorkflowRunContext?): Map<Trigger, Alert?> {
         val searchAlertsResponse: SearchResponse = searchAlerts(
@@ -257,18 +278,84 @@ class AlertService(
         ctx: ChainedAlertTriggerExecutionContext,
         executionId: String,
         workflow: Workflow,
-        associatedAlertIds: List<String>
-    ): Alert {
-        return Alert(
-            startTime = Instant.now(),
-            lastNotificationTime = Instant.now(),
-            state = Alert.State.ACTIVE,
-            errorMessage = null, schemaVersion = -1,
-            chainedAlertTrigger = ctx.trigger,
-            executionId = executionId,
-            workflow = workflow,
-            associatedAlertIds = associatedAlertIds
-        )
+        associatedAlertIds: List<String>,
+        result: ChainedAlertTriggerRunResult,
+        alertError: AlertError? = null,
+    ): Alert? {
+
+        val currentTime = Instant.now()
+        val currentAlert = ctx.alert
+
+        val updatedActionExecutionResults = mutableListOf<ActionExecutionResult>()
+        val currentActionIds = mutableSetOf<String>()
+        if (currentAlert != null) {
+            // update current alert's action execution results
+            for (actionExecutionResult in currentAlert.actionExecutionResults) {
+                val actionId = actionExecutionResult.actionId
+                currentActionIds.add(actionId)
+                val actionRunResult = result.actionResults[actionId]
+                when {
+                    actionRunResult == null -> updatedActionExecutionResults.add(actionExecutionResult)
+                    actionRunResult.throttled ->
+                        updatedActionExecutionResults.add(
+                            actionExecutionResult.copy(
+                                throttledCount = actionExecutionResult.throttledCount + 1
+                            )
+                        )
+
+                    else -> updatedActionExecutionResults.add(actionExecutionResult.copy(lastExecutionTime = actionRunResult.executionTime))
+                }
+            }
+            // add action execution results which not exist in current alert
+            updatedActionExecutionResults.addAll(
+                result.actionResults.filter { !currentActionIds.contains(it.key) }
+                    .map { ActionExecutionResult(it.key, it.value.executionTime, if (it.value.throttled) 1 else 0) }
+            )
+        } else {
+            updatedActionExecutionResults.addAll(
+                result.actionResults.map {
+                    ActionExecutionResult(it.key, it.value.executionTime, if (it.value.throttled) 1 else 0)
+                }
+            )
+        }
+
+        // Merge the alert's error message to the current alert's history
+        val updatedHistory = currentAlert?.errorHistory.update(alertError)
+        return if (alertError == null && !result.triggered) {
+            currentAlert?.copy(
+                state = Alert.State.COMPLETED,
+                endTime = currentTime,
+                errorMessage = null,
+                errorHistory = updatedHistory,
+                actionExecutionResults = updatedActionExecutionResults,
+                schemaVersion = IndexUtils.alertIndexSchemaVersion
+            )
+        } else if (alertError == null && currentAlert?.isAcknowledged() == true) {
+            null
+        } else if (currentAlert != null) {
+            val alertState = Alert.State.ACTIVE
+            currentAlert.copy(
+                state = alertState,
+                lastNotificationTime = currentTime,
+                errorMessage = alertError?.message,
+                errorHistory = updatedHistory,
+                actionExecutionResults = updatedActionExecutionResults,
+                schemaVersion = IndexUtils.alertIndexSchemaVersion,
+            )
+        } else {
+            if (alertError == null) Alert.State.ACTIVE
+            else Alert.State.ERROR
+            Alert(
+                startTime = Instant.now(),
+                lastNotificationTime = currentTime,
+                state = Alert.State.ACTIVE,
+                errorMessage = null, schemaVersion = IndexUtils.alertIndexSchemaVersion,
+                chainedAlertTrigger = ctx.trigger,
+                executionId = executionId,
+                workflow = workflow,
+                associatedAlertIds = associatedAlertIds
+            )
+        }
     }
 
     fun updateActionResultsForBucketLevelAlert(
@@ -759,6 +846,37 @@ class AlertService(
             throw (searchResponse.firstFailureOrNull()?.cause ?: RuntimeException("Unknown error loading alerts"))
         }
 
+        return searchResponse
+    }
+
+    /**
+     * Searches for ACTIVE/ACKNOWLEDGED chained alerts in the workflow's alertIndex.
+     *
+     * @param monitorId The Monitor to get Alerts for
+     * @param size The number of search hits (Alerts) to return
+     */
+    private suspend fun searchAlerts(
+        workflow: Workflow,
+        size: Int,
+        dataSources: DataSources,
+    ): SearchResponse {
+        val workflowId = workflow.id
+        val alertIndex = dataSources.alertsIndex
+
+        val queryBuilder = QueryBuilders.boolQuery()
+            .must(QueryBuilders.termQuery(Alert.WORKFLOW_ID_FIELD, workflowId))
+            .must(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, ""))
+        val searchSourceBuilder = SearchSourceBuilder()
+            .size(size)
+            .query(queryBuilder)
+
+        val searchRequest = SearchRequest(alertIndex)
+            .routing(workflowId)
+            .source(searchSourceBuilder)
+        val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
+        if (searchResponse.status() != RestStatus.OK) {
+            throw (searchResponse.firstFailureOrNull()?.cause ?: RuntimeException("Unknown error loading alerts"))
+        }
         return searchResponse
     }
 
