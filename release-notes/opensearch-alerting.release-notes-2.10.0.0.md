@@ -8,12 +8,14 @@ Compatible with OpenSearch 2.10.0
 ### Feature
 * Add workflowIds field in getAlerts API  ([#1014](https://github.com/opensearch-project/alerting/pull/1014))
 * add alertId parameter in get chained alert API and paginate associated alerts if alertId param is mentioned ([#1071](https://github.com/opensearch-project/alerting/pull/1071))
+* Chained Alert Behaviour Changes ([#1079](https://github.com/opensearch-project/alerting/pull/1079))
 
 ### Bug Fixes
 * fix get alerts alertState query filter ([#1064](https://github.com/opensearch-project/alerting/pull/1064))
 
 ### Infrastructure
 * Upgrade the backport workflow ([#1028](https://github.com/opensearch-project/alerting/pull/1029))
+* Updates demo certs used in integ tests ([#1115](https://github.com/opensearch-project/alerting/pull/1115))
 
 ### Refactoring
 * Update actionGet to SuspendUntil for ClusterMetrics ([#1067](https://github.com/opensearch-project/alerting/pull/1067))
