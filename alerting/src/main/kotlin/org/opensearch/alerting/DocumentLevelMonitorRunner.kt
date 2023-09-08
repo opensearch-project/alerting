@@ -8,7 +8,6 @@ package org.opensearch.alerting
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
 import org.opensearch.OpenSearchStatusException
-import org.opensearch.action.ActionListener
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.search.SearchAction
@@ -27,12 +26,12 @@ import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
+import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
-import org.opensearch.common.bytes.BytesReference
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.AlertingPluginInterface
@@ -47,8 +46,12 @@ import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.action.PerAlertActionScope
 import org.opensearch.commons.alerting.util.string
+import org.opensearch.core.action.ActionListener
+import org.opensearch.core.common.bytes.BytesReference
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentBuilder
+import org.opensearch.index.IndexNotFoundException
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
@@ -70,7 +73,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         monitorCtx: MonitorRunnerExecutionContext,
         periodStart: Instant,
         periodEnd: Instant,
-        dryrun: Boolean
+        dryrun: Boolean,
+        workflowRunContext: WorkflowRunContext?,
+        executionId: String
     ): MonitorRunResult<DocumentLevelTriggerRunResult> {
         logger.debug("Document-level-monitor is running ...")
         val isTempMonitor = dryrun || monitor.id == Monitor.NO_ID
@@ -96,7 +101,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         var (monitorMetadata, _) = MonitorMetadataService.getOrCreateMetadata(
             monitor = monitor,
             createWithRunContext = false,
-            skipIndex = isTempMonitor
+            skipIndex = isTempMonitor,
+            workflowRunContext?.workflowMetadataId
         )
 
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
@@ -114,11 +120,15 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         try {
             // Resolve all passed indices to concrete indices
-            val indices = IndexUtils.resolveAllIndices(
+            val concreteIndices = IndexUtils.resolveAllIndices(
                 docLevelMonitorInput.indices,
                 monitorCtx.clusterService!!,
                 monitorCtx.indexNameExpressionResolver!!
             )
+            if (concreteIndices.isEmpty()) {
+                logger.error("indices not found-${docLevelMonitorInput.indices.joinToString(",")}")
+                throw IndexNotFoundException(docLevelMonitorInput.indices.joinToString(","))
+            }
 
             monitorCtx.docLevelMonitorQueries!!.initDocLevelQueryIndex(monitor.dataSources)
             monitorCtx.docLevelMonitorQueries!!.indexDocLevelQueries(
@@ -130,64 +140,91 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
             // cleanup old indices that are not monitored anymore from the same monitor
             for (ind in updatedLastRunContext.keys) {
-                if (!indices.contains(ind)) {
+                if (!concreteIndices.contains(ind)) {
                     updatedLastRunContext.remove(ind)
                 }
             }
 
-            indices.forEach { indexName ->
-                // Prepare lastRunContext for each index
-                val indexLastRunContext = lastRunContext.getOrPut(indexName) {
-                    val isIndexCreatedRecently = createdRecently(
-                        monitor,
-                        periodStart,
-                        periodEnd,
-                        monitorCtx.clusterService!!.state().metadata.index(indexName)
-                    )
-                    MonitorMetadataService.createRunContextForIndex(indexName, isIndexCreatedRecently)
-                }
+            // Map of document ids per index when monitor is workflow delegate and has chained findings
+            val matchingDocIdsPerIndex = workflowRunContext?.matchingDocIdsPerIndex
 
-                // Prepare updatedLastRunContext for each index
-                val indexUpdatedRunContext = updateLastRunContext(
-                    indexLastRunContext.toMutableMap(),
-                    monitorCtx,
-                    indexName
-                ) as MutableMap<String, Any>
-                updatedLastRunContext[indexName] = indexUpdatedRunContext
+            docLevelMonitorInput.indices.forEach { indexName ->
+                val concreteIndices = IndexUtils.resolveAllIndices(
+                    listOf(indexName),
+                    monitorCtx.clusterService!!,
+                    monitorCtx.indexNameExpressionResolver!!
+                )
+                val updatedIndexName = indexName.replace("*", "_")
+                val conflictingFields = monitorCtx.docLevelMonitorQueries!!.getAllConflictingFields(
+                    monitorCtx.clusterService!!.state(),
+                    concreteIndices
+                )
 
-                val count: Int = indexLastRunContext["shards_count"] as Int
-                for (i: Int in 0 until count) {
-                    val shard = i.toString()
-
-                    // update lastRunContext if its a temp monitor as we only want to view the last bit of data then
-                    // TODO: If dryrun, we should make it so we limit the search as this could still potentially give us lots of data
-                    if (isTempMonitor) {
-                        indexLastRunContext[shard] = max(-1, (indexUpdatedRunContext[shard] as String).toInt() - 10)
+                concreteIndices.forEach { concreteIndexName ->
+                    // Prepare lastRunContext for each index
+                    val indexLastRunContext = lastRunContext.getOrPut(concreteIndexName) {
+                        val isIndexCreatedRecently = createdRecently(
+                            monitor,
+                            periodStart,
+                            periodEnd,
+                            monitorCtx.clusterService!!.state().metadata.index(concreteIndexName)
+                        )
+                        MonitorMetadataService.createRunContextForIndex(concreteIndexName, isIndexCreatedRecently)
                     }
-                }
 
-                // Prepare DocumentExecutionContext for each index
-                val docExecutionContext = DocumentExecutionContext(queries, indexLastRunContext, indexUpdatedRunContext)
-
-                val matchingDocs = getMatchingDocs(monitor, monitorCtx, docExecutionContext, indexName)
-
-                if (matchingDocs.isNotEmpty()) {
-                    val matchedQueriesForDocs = getMatchedQueries(
+                    // Prepare updatedLastRunContext for each index
+                    val indexUpdatedRunContext = updateLastRunContext(
+                        indexLastRunContext.toMutableMap(),
                         monitorCtx,
-                        matchingDocs.map { it.second },
+                        concreteIndexName
+                    ) as MutableMap<String, Any>
+                    updatedLastRunContext[concreteIndexName] = indexUpdatedRunContext
+
+                    val count: Int = indexLastRunContext["shards_count"] as Int
+                    for (i: Int in 0 until count) {
+                        val shard = i.toString()
+
+                        // update lastRunContext if its a temp monitor as we only want to view the last bit of data then
+                        // TODO: If dryrun, we should make it so we limit the search as this could still potentially give us lots of data
+                        if (isTempMonitor) {
+                            indexLastRunContext[shard] = max(-1, (indexUpdatedRunContext[shard] as String).toInt() - 10)
+                        }
+                    }
+
+                    // Prepare DocumentExecutionContext for each index
+                    val docExecutionContext = DocumentExecutionContext(queries, indexLastRunContext, indexUpdatedRunContext)
+
+                    val matchingDocs = getMatchingDocs(
                         monitor,
-                        monitorMetadata,
-                        indexName
+                        monitorCtx,
+                        docExecutionContext,
+                        updatedIndexName,
+                        concreteIndexName,
+                        conflictingFields.toList(),
+                        matchingDocIdsPerIndex?.get(concreteIndexName)
                     )
 
-                    matchedQueriesForDocs.forEach { hit ->
-                        val id = hit.id.replace("_${indexName}_${monitor.id}", "")
+                    if (matchingDocs.isNotEmpty()) {
+                        val matchedQueriesForDocs = getMatchedQueries(
+                            monitorCtx,
+                            matchingDocs.map { it.second },
+                            monitor,
+                            monitorMetadata,
+                            updatedIndexName,
+                            concreteIndexName
+                        )
 
-                        val docIndices = hit.field("_percolator_document_slot").values.map { it.toString().toInt() }
-                        docIndices.forEach { idx ->
-                            val docIndex = "${matchingDocs[idx].first}|$indexName"
-                            inputRunResults.getOrPut(id) { mutableSetOf() }.add(docIndex)
-                            docsToQueries.getOrPut(docIndex) { mutableListOf() }.add(id)
+                        matchedQueriesForDocs.forEach { hit ->
+                            val id = hit.id
+                                .replace("_${updatedIndexName}_${monitor.id}", "")
+                                .replace("_${concreteIndexName}_${monitor.id}", "")
+
+                            val docIndices = hit.field("_percolator_document_slot").values.map { it.toString().toInt() }
+                            docIndices.forEach { idx ->
+                                val docIndex = "${matchingDocs[idx].first}|$concreteIndexName"
+                                inputRunResults.getOrPut(id) { mutableSetOf() }.add(docIndex)
+                                docsToQueries.getOrPut(docIndex) { mutableListOf() }.add(id)
+                            }
                         }
                     }
                 }
@@ -226,7 +263,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                         idQueryMap,
                         docsToQueries,
                         queryToDocIds,
-                        dryrun
+                        dryrun,
+                        executionId = executionId,
+                        workflowRunContext = workflowRunContext
                     )
                 }
             }
@@ -235,7 +274,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 // If any error happened during trigger execution, upsert monitor error alert
                 val errorMessage = constructErrorMessageFromTriggerResults(triggerResults = triggerResults)
                 if (errorMessage.isNotEmpty()) {
-                    monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor = monitor, errorMessage = errorMessage)
+                    monitorCtx.alertService!!.upsertMonitorErrorAlert(
+                        monitor = monitor,
+                        errorMessage = errorMessage,
+                        executionId = executionId,
+                        workflowRunContext
+                    )
                 } else {
                     onSuccessfulMonitorRun(monitorCtx, monitor)
                 }
@@ -250,7 +294,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             return monitorResult.copy(triggerResults = triggerResults)
         } catch (e: Exception) {
             val errorMessage = ExceptionsHelper.detailedMessage(e)
-            monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor, errorMessage)
+            monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor, errorMessage, executionId, workflowRunContext)
             logger.error("Failed running Document-level-monitor ${monitor.name}", e)
             val alertingException = AlertingException(
                 errorMessage,
@@ -298,7 +342,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         idQueryMap: Map<String, DocLevelQuery>,
         docsToQueries: Map<String, List<String>>,
         queryToDocIds: Map<DocLevelQuery, Set<String>>,
-        dryrun: Boolean
+        dryrun: Boolean,
+        workflowRunContext: WorkflowRunContext?,
+        executionId: String
     ): DocumentLevelTriggerRunResult {
         val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger)
         val triggerResult = monitorCtx.triggerService!!.runDocLevelTrigger(monitor, trigger, queryToDocIds)
@@ -309,7 +355,14 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         // TODO: Implement throttling for findings
         docsToQueries.forEach {
             val triggeredQueries = it.value.map { queryId -> idQueryMap[queryId]!! }
-            val findingId = createFindings(monitor, monitorCtx, triggeredQueries, it.key, !dryrun && monitor.id != Monitor.NO_ID)
+            val findingId = createFindings(
+                monitor,
+                monitorCtx,
+                triggeredQueries,
+                it.key,
+                !dryrun && monitor.id != Monitor.NO_ID,
+                executionId
+            )
             findings.add(findingId)
 
             if (triggerResult.triggeredDocs.contains(it.key)) {
@@ -329,7 +382,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 listOf(it.first),
                 listOf(it.second),
                 triggerCtx,
-                monitorResult.alertError() ?: triggerResult.alertError()
+                monitorResult.alertError() ?: triggerResult.alertError(),
+                executionId = executionId,
+                workflorwRunContext = workflowRunContext
             )
             alerts.add(alert)
         }
@@ -369,7 +424,14 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 alert.copy(actionExecutionResults = actionExecutionResults)
             }
 
-            monitorCtx.retryPolicy?.let { monitorCtx.alertService!!.saveAlerts(monitor.dataSources, updatedAlerts, it) }
+            monitorCtx.retryPolicy?.let {
+                monitorCtx.alertService!!.saveAlerts(
+                    monitor.dataSources,
+                    updatedAlerts,
+                    it,
+                    routingId = monitor.id
+                )
+            }
         }
         return triggerResult
     }
@@ -379,7 +441,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         monitorCtx: MonitorRunnerExecutionContext,
         docLevelQueries: List<DocLevelQuery>,
         matchingDocId: String,
-        shouldCreateFinding: Boolean
+        shouldCreateFinding: Boolean,
+        workflowExecutionId: String? = null,
     ): String {
         // Before the "|" is the doc id and after the "|" is the index
         val docIndex = matchingDocId.split("|")
@@ -392,7 +455,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             monitorName = monitor.name,
             index = docIndex[1],
             docLevelQueries = docLevelQueries,
-            timestamp = Instant.now()
+            timestamp = Instant.now(),
+            executionId = workflowExecutionId
         )
 
         val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
@@ -498,8 +562,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         if (response.status() !== RestStatus.OK) {
             throw IOException("Failed to get max seq no for shard: $shard")
         }
-        if (response.hits.hits.isEmpty())
+        if (response.hits.hits.isEmpty()) {
             return -1L
+        }
 
         return response.hits.hits[0].seqNo
     }
@@ -513,7 +578,10 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         monitor: Monitor,
         monitorCtx: MonitorRunnerExecutionContext,
         docExecutionCtx: DocumentExecutionContext,
-        index: String
+        index: String,
+        concreteIndex: String,
+        conflictingFields: List<String>,
+        docIds: List<String>? = null
     ): List<Pair<String, BytesReference>> {
         val count: Int = docExecutionCtx.updatedLastRunContext["shards_count"] as Int
         val matchingDocs = mutableListOf<Pair<String, BytesReference>>()
@@ -525,15 +593,16 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
                 val hits: SearchHits = searchShard(
                     monitorCtx,
-                    index,
+                    concreteIndex,
                     shard,
                     prevSeqNo,
                     maxSeqNo,
-                    null
+                    null,
+                    docIds
                 )
 
                 if (hits.hits.isNotEmpty()) {
-                    matchingDocs.addAll(getAllDocs(hits, index, monitor.id))
+                    matchingDocs.addAll(getAllDocs(hits, index, concreteIndex, monitor.id, conflictingFields))
                 }
             } catch (e: Exception) {
                 logger.warn("Failed to run for shard $shard. Error: ${e.message}")
@@ -548,7 +617,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         shard: String,
         prevSeqNo: Long?,
         maxSeqNo: Long,
-        query: String?
+        query: String?,
+        docIds: List<String>? = null
     ): SearchHits {
         if (prevSeqNo?.equals(maxSeqNo) == true && maxSeqNo != 0L) {
             return SearchHits.empty()
@@ -558,6 +628,10 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         if (query != null) {
             boolQueryBuilder.must(QueryBuilders.queryStringQuery(query))
+        }
+
+        if (!docIds.isNullOrEmpty()) {
+            boolQueryBuilder.filter(QueryBuilders.termsQuery("_id", docIds))
         }
 
         val request: SearchRequest = SearchRequest()
@@ -581,7 +655,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         docs: List<BytesReference>,
         monitor: Monitor,
         monitorMetadata: MonitorMetadata,
-        index: String
+        index: String,
+        concreteIndex: String
     ): SearchHits {
         val boolQueryBuilder = BoolQueryBuilder().must(QueryBuilders.matchQuery("index", index).operator(Operator.AND))
 
@@ -594,7 +669,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         val queryIndex = monitorMetadata.sourceToQueryIndexMapping[index + monitor.id]
         if (queryIndex == null) {
             val message = "Failed to resolve concrete queryIndex from sourceIndex during monitor execution!" +
-                " sourceIndex:$index queryIndex:${monitor.dataSources.queryIndex}"
+                " sourceIndex:$concreteIndex queryIndex:${monitor.dataSources.queryIndex}"
             logger.error(message)
             throw AlertingException.wrap(
                 OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR)
@@ -622,11 +697,23 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         return response.hits
     }
 
-    private fun getAllDocs(hits: SearchHits, index: String, monitorId: String): List<Pair<String, BytesReference>> {
+    private fun getAllDocs(
+        hits: SearchHits,
+        index: String,
+        concreteIndex: String,
+        monitorId: String,
+        conflictingFields: List<String>
+    ): List<Pair<String, BytesReference>> {
         return hits.map { hit ->
             val sourceMap = hit.sourceAsMap
 
-            transformDocumentFieldNames(sourceMap, "_${index}_$monitorId")
+            transformDocumentFieldNames(
+                sourceMap,
+                conflictingFields,
+                "_${index}_$monitorId",
+                "_${concreteIndex}_$monitorId",
+                ""
+            )
 
             var xContentBuilder = XContentFactory.jsonBuilder().map(sourceMap)
 
@@ -639,7 +726,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
     }
 
     /**
-     * Traverses document fields in leaves recursively and appends [fieldNameSuffix] to field names.
+     * Traverses document fields in leaves recursively and appends [fieldNameSuffixIndex] to field names with same names
+     * but different mappings & [fieldNameSuffixPattern] to field names which have unique names.
      *
      * Example for index name is my_log_index and Monitor ID is TReewWdsf2gdJFV:
      * {                         {
@@ -653,17 +741,36 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
      */
     private fun transformDocumentFieldNames(
         jsonAsMap: MutableMap<String, Any>,
-        fieldNameSuffix: String
+        conflictingFields: List<String>,
+        fieldNameSuffixPattern: String,
+        fieldNameSuffixIndex: String,
+        fieldNamePrefix: String
     ) {
         val tempMap = mutableMapOf<String, Any>()
         val it: MutableIterator<Map.Entry<String, Any>> = jsonAsMap.entries.iterator()
         while (it.hasNext()) {
             val entry = it.next()
             if (entry.value is Map<*, *>) {
-                transformDocumentFieldNames(entry.value as MutableMap<String, Any>, fieldNameSuffix)
-            } else if (entry.key.endsWith(fieldNameSuffix) == false) {
-                tempMap["${entry.key}$fieldNameSuffix"] = entry.value
-                it.remove()
+                transformDocumentFieldNames(
+                    entry.value as MutableMap<String, Any>,
+                    conflictingFields,
+                    fieldNameSuffixPattern,
+                    fieldNameSuffixIndex,
+                    if (fieldNamePrefix == "") entry.key else "$fieldNamePrefix.${entry.key}"
+                )
+            } else if (!entry.key.endsWith(fieldNameSuffixPattern) && !entry.key.endsWith(fieldNameSuffixIndex)) {
+                var alreadyReplaced = false
+                conflictingFields.forEach { conflictingField ->
+                    if (conflictingField == "$fieldNamePrefix.${entry.key}" || (fieldNamePrefix == "" && conflictingField == entry.key)) {
+                        tempMap["${entry.key}$fieldNameSuffixIndex"] = entry.value
+                        it.remove()
+                        alreadyReplaced = true
+                    }
+                }
+                if (!alreadyReplaced) {
+                    tempMap["${entry.key}$fieldNameSuffixPattern"] = entry.value
+                    it.remove()
+                }
             }
         }
         jsonAsMap.putAll(tempMap)
