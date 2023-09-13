@@ -115,7 +115,9 @@ class TransportGetAlertsAction @Inject constructor(
 
         if (getAlertsRequest.monitorId != null) {
             queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getAlertsRequest.monitorId))
-            if (getAlertsRequest.workflowIds.isNullOrEmpty()) {
+            if (
+                getAlertsRequest.workflowIds != null && getAlertsRequest.workflowIds!!.size == 1 && getAlertsRequest.workflowIds!![0] == ""
+            ) {
                 val noWorkflowIdQuery = QueryBuilders.boolQuery()
                     .should(QueryBuilders.boolQuery().mustNot(QueryBuilders.existsQuery(Alert.WORKFLOW_ID_FIELD)))
                     .should(QueryBuilders.termsQuery(Alert.WORKFLOW_ID_FIELD, ""))
@@ -123,14 +125,19 @@ class TransportGetAlertsAction @Inject constructor(
             }
         } else if (getAlertsRequest.monitorIds.isNullOrEmpty() == false) {
             queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getAlertsRequest.monitorIds))
-            if (getAlertsRequest.workflowIds.isNullOrEmpty()) {
+            if (
+                getAlertsRequest.workflowIds != null && getAlertsRequest.workflowIds!!.size == 1 && getAlertsRequest.workflowIds!![0] == ""
+            ) {
                 val noWorkflowIdQuery = QueryBuilders.boolQuery()
                     .should(QueryBuilders.boolQuery().mustNot(QueryBuilders.existsQuery(Alert.WORKFLOW_ID_FIELD)))
                     .should(QueryBuilders.termsQuery(Alert.WORKFLOW_ID_FIELD, ""))
                 queryBuilder.must(noWorkflowIdQuery)
             }
         }
-        if (getAlertsRequest.workflowIds.isNullOrEmpty() == false) {
+        if (
+            getAlertsRequest.workflowIds.isNullOrEmpty() == false &&
+            !(getAlertsRequest.workflowIds!!.size == 1 && getAlertsRequest.workflowIds!![0] == "")
+        ) {
             queryBuilder.must(QueryBuilders.termsQuery("workflow_id", getAlertsRequest.workflowIds))
         }
         if (!tableProp.searchString.isNullOrBlank()) {
