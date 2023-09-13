@@ -41,6 +41,7 @@ import org.opensearch.core.action.ActionListener
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
+import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
@@ -115,22 +116,15 @@ class TransportGetAlertsAction @Inject constructor(
 
         if (getAlertsRequest.monitorId != null) {
             queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getAlertsRequest.monitorId))
-            if (getAlertsRequest.workflowIds.isNullOrEmpty()) {
-                val noWorkflowIdQuery = QueryBuilders.boolQuery()
-                    .should(QueryBuilders.boolQuery().mustNot(QueryBuilders.existsQuery(Alert.WORKFLOW_ID_FIELD)))
-                    .should(QueryBuilders.termsQuery(Alert.WORKFLOW_ID_FIELD, ""))
-                queryBuilder.must(noWorkflowIdQuery)
-            }
+            addWorkflowIdNullOrEmptyCheck(getAlertsRequest, queryBuilder)
         } else if (getAlertsRequest.monitorIds.isNullOrEmpty() == false) {
             queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getAlertsRequest.monitorIds))
-            if (getAlertsRequest.workflowIds.isNullOrEmpty()) {
-                val noWorkflowIdQuery = QueryBuilders.boolQuery()
-                    .should(QueryBuilders.boolQuery().mustNot(QueryBuilders.existsQuery(Alert.WORKFLOW_ID_FIELD)))
-                    .should(QueryBuilders.termsQuery(Alert.WORKFLOW_ID_FIELD, ""))
-                queryBuilder.must(noWorkflowIdQuery)
-            }
+            addWorkflowIdNullOrEmptyCheck(getAlertsRequest, queryBuilder)
         }
-        if (getAlertsRequest.workflowIds.isNullOrEmpty() == false) {
+        if (
+            getAlertsRequest.workflowIds.isNullOrEmpty() == false &&
+            !(getAlertsRequest.workflowIds!!.size == 1 && getAlertsRequest.workflowIds!![0] == "")
+        ) {
             queryBuilder.must(QueryBuilders.termsQuery("workflow_id", getAlertsRequest.workflowIds))
         }
         if (!tableProp.searchString.isNullOrBlank()) {
@@ -165,6 +159,21 @@ class TransportGetAlertsAction @Inject constructor(
                     }
                 }
             }
+        }
+    }
+
+    // we add this check when we want to fetch alerts for monitors not generated as part of a workflow i.e. non-delegate monitor alerts
+    private fun addWorkflowIdNullOrEmptyCheck(
+        getAlertsRequest: GetAlertsRequest,
+        queryBuilder: BoolQueryBuilder,
+    ) {
+        if (
+            getAlertsRequest.workflowIds != null && getAlertsRequest.workflowIds!!.size == 1 && getAlertsRequest.workflowIds!![0] == ""
+        ) {
+            val noWorkflowIdQuery = QueryBuilders.boolQuery()
+                .should(QueryBuilders.boolQuery().mustNot(QueryBuilders.existsQuery(Alert.WORKFLOW_ID_FIELD)))
+                .should(QueryBuilders.termsQuery(Alert.WORKFLOW_ID_FIELD, ""))
+            queryBuilder.must(noWorkflowIdQuery)
         }
     }
 
