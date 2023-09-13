@@ -61,6 +61,8 @@ class RestGetAlertsAction : BaseRestHandler() {
         val workflowIds = mutableListOf<String>()
         if (workflowId.isNullOrEmpty() == false) {
             workflowIds.add(workflowId)
+        } else {
+            workflowIds.add("")
         }
         val table = Table(
             sortOrder,
