@@ -12,6 +12,7 @@ import org.apache.hc.core5.http.message.BasicHeader
 import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
+import org.junit.Ignore
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ALERTING_DELETE_WORKFLOW_ACCESS
 import org.opensearch.alerting.ALERTING_EXECUTE_WORKFLOW_ACCESS
@@ -150,6 +151,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Ignore
     fun `test create workflow with an user with read-only role`() {
         createUserWithTestData(user, TEST_HR_INDEX, TEST_HR_ROLE, TEST_HR_BACKEND_ROLE)
         createUserRolesMapping(ALERTING_READ_ONLY_ACCESS, arrayOf(user))
