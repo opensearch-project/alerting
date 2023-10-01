@@ -811,7 +811,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Delete request not successful", RestStatus.OK, deleteResponse.restStatus())
 
         // Wait 5 seconds for event to be processed and alerts moved
-        Thread.sleep(5000)
+        OpenSearchTestCase.waitUntil(5000)
 
         val alerts = searchAlerts(monitor)
         assertEquals("Active alert was not deleted", 0, alerts.size)
@@ -842,7 +842,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Update request not successful", RestStatus.OK, updateResponse.restStatus())
 
         // Wait 5 seconds for event to be processed and alerts moved
-        Thread.sleep(5000)
+        OpenSearchTestCase.waitUntil(5000)
 
         val alerts = searchAlerts(monitor)
         assertEquals("Active alert was not deleted", 0, alerts.size)
@@ -870,7 +870,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Update request not successful", RestStatus.OK, updateResponse.restStatus())
 
         // Wait 5 seconds for event to be processed and alerts moved
-        Thread.sleep(5000)
+        OpenSearchTestCase.waitUntil(5000)
 
         val alerts = searchAlerts(monitor)
         assertEquals("Active alert was not deleted", 0, alerts.size)
@@ -959,7 +959,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         enableScheduledJob()
         val monitorId = createMonitor(randomQueryLevelMonitor(enabled = true), refresh = true).id
 
-        if (isMultiNode) Thread.sleep(2000)
+        if (isMultiNode) OpenSearchTestCase.waitUntil(2000)
         var alertingStats = getAlertingStats()
         assertAlertingStatsSweeperEnabled(alertingStats, true)
         assertEquals("Scheduled job index does not exist", true, alertingStats["scheduled_job_index_exists"])
@@ -992,7 +992,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         enableScheduledJob()
 
         // Sleep briefly so sweep can reschedule the Monitor
-        Thread.sleep(2000)
+        OpenSearchTestCase.waitUntil(2000)
 
         alertingStats = getAlertingStats()
         assertAlertingStatsSweeperEnabled(alertingStats, true)
@@ -1018,7 +1018,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         enableScheduledJob()
         createRandomMonitor(refresh = true)
 
-        if (isMultiNode) Thread.sleep(2000)
+        if (isMultiNode) OpenSearchTestCase.waitUntil(2000)
         val responseMap = getAlertingStats()
         assertAlertingStatsSweeperEnabled(responseMap, true)
         assertEquals("Scheduled job index does not exist", true, responseMap["scheduled_job_index_exists"])
@@ -1051,7 +1051,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         enableScheduledJob()
         createRandomMonitor(refresh = true)
 
-        if (isMultiNode) Thread.sleep(2000)
+        if (isMultiNode) OpenSearchTestCase.waitUntil(2000)
         val responseMap = getAlertingStats("/jobs_info")
         assertAlertingStatsSweeperEnabled(responseMap, true)
         assertEquals("Scheduled job index does not exist", true, responseMap["scheduled_job_index_exists"])

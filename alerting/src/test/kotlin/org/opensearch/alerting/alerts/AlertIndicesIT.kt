@@ -140,7 +140,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         executeMonitor(trueMonitor)
 
         // Allow for a rollover index.
-        Thread.sleep(2000)
+        OpenSearchTestCase.waitUntil(2000)
         assertTrue("Did not find 3 alert indices", getAlertIndices().size >= 3)
     }
 
@@ -157,7 +157,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         executeMonitor(trueMonitor.id)
 
         // Allow for a rollover index.
-        Thread.sleep(2000)
+        OpenSearchTestCase.waitUntil(2000)
         assertTrue("Did not find 2 alert indices", getFindingIndices().size >= 2)
     }
 
