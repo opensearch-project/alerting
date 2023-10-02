@@ -19,6 +19,7 @@ import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.toMap
 import org.opensearch.alerting.util.getRoleFilterEnabled
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client
+import org.opensearch.cluster.routing.Preference
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.settings.Settings
@@ -99,7 +100,9 @@ class InputService(
                             .newInstance(searchParams)
                             .execute()
 
-                        val searchRequest = SearchRequest().indices(*input.indices.toTypedArray())
+                        val searchRequest = SearchRequest()
+                            .indices(*input.indices.toTypedArray())
+                            .preference(Preference.PRIMARY_FIRST.type())
                         XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource).use {
                             searchRequest.source(SearchSourceBuilder.fromXContent(it))
                         }
@@ -191,7 +194,9 @@ class InputService(
                 .newInstance(searchParams)
                 .execute()
 
-            val searchRequest = SearchRequest().indices(*input.indices.toTypedArray())
+            val searchRequest = SearchRequest()
+                .indices(*input.indices.toTypedArray())
+                .preference(Preference.PRIMARY_FIRST.type())
             XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource).use {
                 searchRequest.source(SearchSourceBuilder.fromXContent(it))
             }
