@@ -3152,8 +3152,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             searchWorkflowMetadata(id = workflowId)
         } catch (ex: java.lang.Exception) {
             exception = ex
+            assertTrue(exception is java.util.NoSuchElementException)
         }
-        assertTrue(exception is java.util.NoSuchElementException)
     }
 
     fun `test execute workflow with custom alerts and finding index with bucket and doc monitor bucket monitor used as chained finding`() {
