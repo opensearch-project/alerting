@@ -1140,4 +1140,49 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
         val acknowledged = acknowledgeChainedAlertsResponse["success"] as List<String>
         Assert.assertEquals(acknowledged[0], alerts1[0]["id"])
     }
+
+    fun `test run workflow as scheduled job success`() {
+        val index = createTestIndex()
+        val docQuery1 = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(docQuery1)
+        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            enabled = false
+        )
+        val monitorResponse = createMonitor(monitor)
+
+        val workflow = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id),
+            enabled = true,
+            schedule = IntervalSchedule(1, ChronoUnit.MINUTES)
+        )
+
+        val createResponse = client().makeRequest("POST", WORKFLOW_ALERTING_BASE_URI, emptyMap(), workflow.toHttpEntity())
+
+        assertEquals("Create workflow failed", RestStatus.CREATED, createResponse.restStatus())
+
+        val responseBody = createResponse.asMap()
+        val createdId = responseBody["_id"] as String
+        val createdVersion = responseBody["_version"] as Int
+
+        assertNotEquals("response is missing Id", Workflow.NO_ID, createdId)
+        assertTrue("incorrect version", createdVersion > 0)
+        assertEquals("Incorrect Location header", "$WORKFLOW_ALERTING_BASE_URI/$createdId", createResponse.getHeader("Location"))
+
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_field" : "us-west-2"
+        }"""
+
+        indexDoc(index, "1", testDoc)
+        Thread.sleep(80000)
+
+        val findings = searchFindings(monitor.copy(id = monitorResponse.id))
+        assertEquals("Findings saved for test monitor", 1, findings.size)
+    }
 }
