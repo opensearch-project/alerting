@@ -288,10 +288,15 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         }
 
         if (job is Workflow) {
+            logger.info("Executing scheduled workflow - id: ${job.id}, periodStart: $periodStart, periodEnd: $periodEnd, dryrun: $dryrun")
             CompositeWorkflowRunner.runWorkflow(workflow = job, monitorCtx, periodStart, periodEnd, dryrun)
         }
         val monitor = job as Monitor
         val executionId = "${monitor.id}_${LocalDateTime.now(ZoneOffset.UTC)}_${UUID.randomUUID()}"
+        logger.info(
+            "Executing scheduled monitor - id: ${monitor.id}, type: ${monitor.monitorType.name}, periodStart: $periodStart, " +
+                "periodEnd: $periodEnd, dryrun: $dryrun, executionId: $executionId"
+        )
         val runResult = if (monitor.isBucketLevelMonitor()) {
             BucketLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun, executionId = executionId)
         } else if (monitor.isDocLevelMonitor()) {
