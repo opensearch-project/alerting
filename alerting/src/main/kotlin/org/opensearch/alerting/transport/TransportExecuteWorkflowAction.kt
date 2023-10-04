@@ -62,6 +62,10 @@ class TransportExecuteWorkflowAction @Inject constructor(
                     val (periodStart, periodEnd) =
                         workflow.schedule.getPeriodEndingAt(Instant.ofEpochMilli(execWorkflowRequest.requestEnd.millis))
                     try {
+                        log.info(
+                            "Executing workflow from API - id: ${workflow.id}, periodStart: $periodStart, periodEnd: $periodEnd, " +
+                                "dryrun: ${execWorkflowRequest.dryrun}"
+                        )
                         val workflowRunResult =
                             MonitorRunnerService.runJob(workflow, periodStart, periodEnd, execWorkflowRequest.dryrun)
                         withContext(Dispatchers.IO, {

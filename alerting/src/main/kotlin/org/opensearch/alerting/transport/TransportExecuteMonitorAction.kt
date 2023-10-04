@@ -75,6 +75,10 @@ class TransportExecuteMonitorAction @Inject constructor(
                     val (periodStart, periodEnd) =
                         monitor.schedule.getPeriodEndingAt(Instant.ofEpochMilli(execMonitorRequest.requestEnd.millis))
                     try {
+                        log.info(
+                            "Executing monitor from API - id: ${monitor.id}, type: ${monitor.monitorType.name}, " +
+                                "periodStart: $periodStart, periodEnd: $periodEnd, dryrun: ${execMonitorRequest.dryrun}"
+                        )
                         val monitorRunResult = runner.runJob(monitor, periodStart, periodEnd, execMonitorRequest.dryrun)
                         withContext(Dispatchers.IO) {
                             actionListener.onResponse(ExecuteMonitorResponse(monitorRunResult))

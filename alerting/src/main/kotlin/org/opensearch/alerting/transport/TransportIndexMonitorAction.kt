@@ -486,6 +486,13 @@ class TransportIndexMonitorAction @Inject constructor(
                 .setIfPrimaryTerm(request.primaryTerm)
                 .timeout(indexTimeout)
 
+            log.info(
+                "Creating new monitor: ${request.monitor.toXContentWithUser(
+                    jsonBuilder(),
+                    ToXContent.MapParams(mapOf("with_type" to "true"))
+                )}"
+            )
+
             try {
                 val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
                 val failureReasons = checkShardsFailure(indexResponse)
@@ -647,6 +654,13 @@ class TransportIndexMonitorAction @Inject constructor(
                 .setIfSeqNo(request.seqNo)
                 .setIfPrimaryTerm(request.primaryTerm)
                 .timeout(indexTimeout)
+
+            log.info(
+                "Updating monitor, ${currentMonitor.id}, from: ${currentMonitor.toXContentWithUser(
+                    jsonBuilder(),
+                    ToXContent.MapParams(mapOf("with_type" to "true"))
+                )} \n to: ${request.monitor.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true")))}"
+            )
 
             try {
                 val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
