@@ -477,7 +477,7 @@ class AlertIndices(
     }
 
     private fun deleteOldIndices(tag: String, indices: String) {
-        logger.error("info deleteOldIndices")
+        logger.info("info deleteOldIndices")
         val clusterStateRequest = ClusterStateRequest()
             .clear()
             .indices(indices)
