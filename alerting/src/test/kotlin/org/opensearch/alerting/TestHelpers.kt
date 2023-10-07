@@ -475,7 +475,7 @@ fun randomDocLevelQuery(
     name: String = "${randomInt(5)}",
     tags: List<String> = mutableListOf(0..randomInt(10)).map { OpenSearchRestTestCase.randomAlphaOfLength(10) }
 ): DocLevelQuery {
-    return DocLevelQuery(id = id, query = query, name = name, tags = tags)
+    return DocLevelQuery(id = id, query = query, name = name, tags = tags, fields = listOf())
 }
 
 fun randomDocLevelMonitorInput(
