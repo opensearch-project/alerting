@@ -26,6 +26,8 @@ import org.opensearch.commons.alerting.model.Alert.State.ACTIVE
 import org.opensearch.commons.alerting.model.Alert.State.COMPLETED
 import org.opensearch.commons.alerting.model.Alert.State.ERROR
 import org.opensearch.commons.alerting.model.DataSources
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
+import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput
@@ -193,6 +195,31 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             exception = ex
         }
         Assert.assertEquals(404, exception?.response?.statusLine?.statusCode)
+    }
+
+    fun `test execute doclevel monitor without triggers success`() {
+        // use a non-existent monitoid to trigger a 404.
+        val index = "foo"
+        createIndex(index, Settings.EMPTY)
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "1", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf()
+            )
+        )
+        val doc = """
+            { "test_field": "us-west-2" }
+        """.trimIndent()
+        indexDoc(index, "1", doc)
+
+        val response = executeMonitor(monitor.id)
+        var output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+        assertTrue("Unexpected monitor error message", (output["error"] as String?).isNullOrEmpty())
+        assertTrue(searchFindings(monitor).size == 1)
+        assertTrue(searchAlerts(monitor).isEmpty())
     }
 
     fun `test acknowledged alert does not suppress subsequent errors`() {
