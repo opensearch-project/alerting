@@ -19,7 +19,7 @@ class FindingsRestApiIT : AlertingRestTestCase() {
 
     fun `test find Finding where doc is not retrieved`() {
         val testIndex = createTestIndex()
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
@@ -44,7 +44,7 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         }"""
         indexDoc(testIndex, "someId2", testDoc2)
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
@@ -84,7 +84,7 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         }"""
         indexDoc(testIndex, "someId2", testDoc2)
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
@@ -115,7 +115,7 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         }"""
         indexDoc(testIndex, "someId2", testDoc2)
 
-        val docLevelQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "realQuery", tags = listOf("sigma"))
+        val docLevelQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "realQuery", fields = listOf(), tags = listOf("sigma"))
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docLevelQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
@@ -150,7 +150,7 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         }"""
         indexDoc(testIndex, "someId2", testDoc2)
 
-        val docLevelQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "realQuery", tags = listOf("sigma"))
+        val docLevelQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "realQuery", fields = listOf(), tags = listOf("sigma"))
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docLevelQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
@@ -185,7 +185,7 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         }"""
         indexDoc(testIndex, "someId2", testDoc2)
 
-        val docLevelQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "realQuery", tags = listOf("sigma"))
+        val docLevelQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "realQuery", fields = listOf(), tags = listOf("sigma"))
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docLevelQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
