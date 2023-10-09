@@ -16,8 +16,8 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
         val eqString = "(query[name=sigma-123] && query[name=sigma-456])"
         val equation = TriggerExpressionParser(eqString).parse()
         val queryToDocIds = mutableMapOf<DocLevelQuery, Set<String>>()
-        queryToDocIds[DocLevelQuery("", "sigma-123", "", emptyList())] = mutableSetOf("1", "2", "3")
-        queryToDocIds[DocLevelQuery("", "sigma-456", "", emptyList())] = mutableSetOf("1", "2", "3")
+        queryToDocIds[DocLevelQuery("", "sigma-123", listOf(), "", emptyList())] = mutableSetOf("1", "2", "3")
+        queryToDocIds[DocLevelQuery("", "sigma-456", listOf(), "", emptyList())] = mutableSetOf("1", "2", "3")
         Assert.assertEquals("query[name=sigma-123] query[name=sigma-456] && ", equation.toString())
         Assert.assertEquals(mutableSetOf("1", "2", "3"), equation.evaluate(queryToDocIds))
     }
@@ -26,8 +26,8 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
         val eqString = "(query[name=sigma-123] && query[id=id1456])"
         val equation = TriggerExpressionParser(eqString).parse()
         val queryToDocIds = mutableMapOf<DocLevelQuery, Set<String>>()
-        queryToDocIds[DocLevelQuery("", "sigma-123", "", emptyList())] = mutableSetOf("6", "3", "7")
-        queryToDocIds[DocLevelQuery("id1456", "", "", emptyList())] = mutableSetOf("1", "2", "3")
+        queryToDocIds[DocLevelQuery("", "sigma-123", listOf(), "", emptyList())] = mutableSetOf("6", "3", "7")
+        queryToDocIds[DocLevelQuery("id1456", "", listOf(), "", emptyList())] = mutableSetOf("1", "2", "3")
         Assert.assertEquals("query[name=sigma-123] query[id=id1456] && ", equation.toString())
         Assert.assertEquals(mutableSetOf("3"), equation.evaluate(queryToDocIds))
     }
@@ -36,8 +36,8 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
         val eqString = "(query[name=sigma-123] && query[tag=sev2])"
         val equation = TriggerExpressionParser(eqString).parse()
         val queryToDocIds = mutableMapOf<DocLevelQuery, Set<String>>()
-        queryToDocIds[DocLevelQuery("", "sigma-123", "", emptyList())] = mutableSetOf("6", "8", "7")
-        queryToDocIds[DocLevelQuery("", "", "", mutableListOf("tag=sev2"))] = mutableSetOf("1", "2", "3")
+        queryToDocIds[DocLevelQuery("", "sigma-123", listOf(), "", emptyList())] = mutableSetOf("6", "8", "7")
+        queryToDocIds[DocLevelQuery("", "", listOf(), "", mutableListOf("tag=sev2"))] = mutableSetOf("1", "2", "3")
         Assert.assertEquals("query[name=sigma-123] query[tag=sev2] && ", equation.toString())
         Assert.assertEquals(emptySet<String>(), equation.evaluate(queryToDocIds))
     }
@@ -46,8 +46,8 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
         val eqString = "(query[name=sigma-123] || query[name=sigma-456])"
         val equation = TriggerExpressionParser(eqString).parse()
         val queryToDocIds = mutableMapOf<DocLevelQuery, Set<String>>()
-        queryToDocIds[DocLevelQuery("", "sigma-123", "", emptyList())] = mutableSetOf("1", "2", "3")
-        queryToDocIds[DocLevelQuery("", "sigma-456", "", emptyList())] = mutableSetOf("1", "2", "3")
+        queryToDocIds[DocLevelQuery("", "sigma-123", listOf(), "", emptyList())] = mutableSetOf("1", "2", "3")
+        queryToDocIds[DocLevelQuery("", "sigma-456", listOf(), "", emptyList())] = mutableSetOf("1", "2", "3")
         Assert.assertEquals("query[name=sigma-123] query[name=sigma-456] || ", equation.toString())
         Assert.assertEquals(mutableSetOf("1", "2", "3"), equation.evaluate(queryToDocIds))
     }
@@ -56,8 +56,8 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
         val eqString = "(query[name=sigma-123] || query[id=id1456])"
         val equation = TriggerExpressionParser(eqString).parse()
         val queryToDocIds = mutableMapOf<DocLevelQuery, Set<String>>()
-        queryToDocIds[DocLevelQuery("", "sigma-123", "", emptyList())] = mutableSetOf("6", "3", "7")
-        queryToDocIds[DocLevelQuery("id1456", "", "", emptyList())] = mutableSetOf("1", "2", "3")
+        queryToDocIds[DocLevelQuery("", "sigma-123", listOf(), "", emptyList())] = mutableSetOf("6", "3", "7")
+        queryToDocIds[DocLevelQuery("id1456", "", listOf(), "", emptyList())] = mutableSetOf("1", "2", "3")
         Assert.assertEquals("query[name=sigma-123] query[id=id1456] || ", equation.toString())
         Assert.assertEquals(mutableSetOf("6", "3", "7", "1", "2", "3"), equation.evaluate(queryToDocIds))
     }
@@ -66,8 +66,8 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
         val eqString = "(query[name=sigma-123] || query[tag=sev2])"
         val equation = TriggerExpressionParser(eqString).parse()
         val queryToDocIds = mutableMapOf<DocLevelQuery, Set<String>>()
-        queryToDocIds[DocLevelQuery("", "sigma-123", "", emptyList())] = mutableSetOf("6", "8", "7")
-        queryToDocIds[DocLevelQuery("", "", "", mutableListOf("tag=sev2"))] = emptySet()
+        queryToDocIds[DocLevelQuery("", "sigma-123", listOf(), "", emptyList())] = mutableSetOf("6", "8", "7")
+        queryToDocIds[DocLevelQuery("", "", listOf(), "", mutableListOf("tag=sev2"))] = emptySet()
         Assert.assertEquals("query[name=sigma-123] query[tag=sev2] || ", equation.toString())
         Assert.assertEquals(mutableSetOf("6", "8", "7"), equation.evaluate(queryToDocIds))
     }
@@ -76,8 +76,8 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
         val eqString = "!(query[name=sigma-456])"
         val equation = TriggerExpressionParser(eqString).parse()
         val queryToDocIds = mutableMapOf<DocLevelQuery, Set<String>>()
-        queryToDocIds[DocLevelQuery("", "sigma-123", "", emptyList())] = mutableSetOf("1", "2", "3")
-        queryToDocIds[DocLevelQuery("", "sigma-456", "", emptyList())] = mutableSetOf("4", "5", "6")
+        queryToDocIds[DocLevelQuery("", "sigma-123", listOf(), "", emptyList())] = mutableSetOf("1", "2", "3")
+        queryToDocIds[DocLevelQuery("", "sigma-456", listOf(), "", emptyList())] = mutableSetOf("4", "5", "6")
         Assert.assertEquals("query[name=sigma-456] ! ", equation.toString())
         Assert.assertEquals(mutableSetOf("1", "2", "3"), equation.evaluate(queryToDocIds))
     }
@@ -86,9 +86,9 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
         val eqString = "(query[name=sigma-123] && !query[name=sigma-456])"
         val equation = TriggerExpressionParser(eqString).parse()
         val queryToDocIds = mutableMapOf<DocLevelQuery, Set<String>>()
-        queryToDocIds[DocLevelQuery("", "sigma-123", "", emptyList())] = mutableSetOf("1", "2", "3", "11")
-        queryToDocIds[DocLevelQuery("", "sigma-456", "", emptyList())] = mutableSetOf("3", "4", "5")
-        queryToDocIds[DocLevelQuery("id_new", "", "", emptyList())] = mutableSetOf("11", "12", "13")
+        queryToDocIds[DocLevelQuery("", "sigma-123", listOf(), "", emptyList())] = mutableSetOf("1", "2", "3", "11")
+        queryToDocIds[DocLevelQuery("", "sigma-456", listOf(), "", emptyList())] = mutableSetOf("3", "4", "5")
+        queryToDocIds[DocLevelQuery("id_new", "", listOf(), "", emptyList())] = mutableSetOf("11", "12", "13")
         Assert.assertEquals("query[name=sigma-123] query[name=sigma-456] ! && ", equation.toString())
         Assert.assertEquals(mutableSetOf("1", "2", "11"), equation.evaluate(queryToDocIds))
     }
@@ -97,9 +97,9 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
         val eqString = "(query[name=sigma-123] || !query[id=id1456])"
         val equation = TriggerExpressionParser(eqString).parse()
         val queryToDocIds = mutableMapOf<DocLevelQuery, Set<String>>()
-        queryToDocIds[DocLevelQuery("", "sigma-123", "", emptyList())] = mutableSetOf("6", "3", "7")
-        queryToDocIds[DocLevelQuery("id1456", "", "", emptyList())] = mutableSetOf("11", "12", "15")
-        queryToDocIds[DocLevelQuery("id_new", "", "", emptyList())] = mutableSetOf("11", "12", "13")
+        queryToDocIds[DocLevelQuery("", "sigma-123", listOf(), "", emptyList())] = mutableSetOf("6", "3", "7")
+        queryToDocIds[DocLevelQuery("id1456", "", listOf(), "", emptyList())] = mutableSetOf("11", "12", "15")
+        queryToDocIds[DocLevelQuery("id_new", "", listOf(), "", emptyList())] = mutableSetOf("11", "12", "13")
         Assert.assertEquals("query[name=sigma-123] query[id=id1456] ! || ", equation.toString())
         Assert.assertEquals(mutableSetOf("6", "3", "7", "13"), equation.evaluate(queryToDocIds))
     }
@@ -109,10 +109,10 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
         val equation = TriggerExpressionParser(eqString).parse()
 
         val queryToDocIds = mutableMapOf<DocLevelQuery, Set<String>>()
-        queryToDocIds[DocLevelQuery("", "sigma-123", "", emptyList())] = mutableSetOf("1", "2", "3")
-        queryToDocIds[DocLevelQuery("id_random1", "", "", mutableListOf("sev1"))] = mutableSetOf("2", "3", "4")
-        queryToDocIds[DocLevelQuery("", "sigma-789", "", emptyList())] = mutableSetOf("11", "12", "13")
-        queryToDocIds[DocLevelQuery("id-2aw34", "", "", emptyList())] = mutableSetOf("13", "14", "15")
+        queryToDocIds[DocLevelQuery("", "sigma-123", listOf(), "", emptyList())] = mutableSetOf("1", "2", "3")
+        queryToDocIds[DocLevelQuery("id_random1", "", listOf(), "", mutableListOf("sev1"))] = mutableSetOf("2", "3", "4")
+        queryToDocIds[DocLevelQuery("", "sigma-789", listOf(), "", emptyList())] = mutableSetOf("11", "12", "13")
+        queryToDocIds[DocLevelQuery("id-2aw34", "", listOf(), "", emptyList())] = mutableSetOf("13", "14", "15")
 
         Assert.assertEquals(
             "query[name=sigma-123] query[tag=sev1] && query[name=sigma-789] ! query[id=id-2aw34] || ! || ",
