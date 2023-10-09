@@ -200,7 +200,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         // use a non-existent monitoid to trigger a 404.
         val index = "foo"
         createIndex(index, Settings.EMPTY)
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "1")
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "1", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val monitor = createMonitor(
             randomDocumentLevelMonitor(
