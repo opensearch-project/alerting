@@ -18,8 +18,10 @@ import org.opensearch.alerting.util.DestinationType
 import org.opensearch.client.ResponseException
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.core.rest.RestStatus
+import org.opensearch.test.OpenSearchTestCase
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 class DestinationMigrationUtilServiceIT : AlertingRestTestCase() {
 
@@ -79,8 +81,11 @@ class DestinationMigrationUtilServiceIT : AlertingRestTestCase() {
             }
 
             // Create cluster change event and wait for migration service to complete migrating data over
-            client().updateSettings("indices.recovery.max_bytes_per_sec", "40mb")
-            Thread.sleep(120000)
+            var request: Map<String, Any>? = null
+            request = client().updateSettings("indices.recovery.max_bytes_per_sec", "40mb")
+            OpenSearchTestCase.waitUntil({
+                return@waitUntil request == null
+            }, 2, TimeUnit.MINUTES)
 
             for (id in ids) {
                 val response = client().makeRequest(

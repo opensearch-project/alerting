@@ -811,7 +811,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Delete request not successful", RestStatus.OK, deleteResponse.restStatus())
 
         // Wait 5 seconds for event to be processed and alerts moved
-        Thread.sleep(5000)
+        OpenSearchTestCase.waitUntil({
+            val historyAlerts = searchAlerts(monitor, AlertIndices.ALERT_HISTORY_WRITE_INDEX)
+            return@waitUntil (historyAlerts.size == 1)
+        }, 5, TimeUnit.SECONDS)
 
         val alerts = searchAlerts(monitor)
         assertEquals("Active alert was not deleted", 0, alerts.size)
@@ -842,7 +845,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Update request not successful", RestStatus.OK, updateResponse.restStatus())
 
         // Wait 5 seconds for event to be processed and alerts moved
-        Thread.sleep(5000)
+        OpenSearchTestCase.waitUntil({
+            val historyAlerts = searchAlerts(monitor, AlertIndices.ALERT_HISTORY_WRITE_INDEX)
+            return@waitUntil (historyAlerts.size == 1)
+        }, 5, TimeUnit.SECONDS)
 
         val alerts = searchAlerts(monitor)
         assertEquals("Active alert was not deleted", 0, alerts.size)
@@ -870,7 +876,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Update request not successful", RestStatus.OK, updateResponse.restStatus())
 
         // Wait 5 seconds for event to be processed and alerts moved
-        Thread.sleep(5000)
+        OpenSearchTestCase.waitUntil({
+            val historyAlerts = searchAlerts(monitor, AlertIndices.ALERT_HISTORY_WRITE_INDEX)
+            return@waitUntil (historyAlerts.size == 1)
+        }, 5, TimeUnit.SECONDS)
 
         val alerts = searchAlerts(monitor)
         assertEquals("Active alert was not deleted", 0, alerts.size)
@@ -956,10 +965,13 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test monitor stats when disabling and re-enabling scheduled jobs with existing monitor`() {
         // Enable Monitor jobs
-        enableScheduledJob()
+
+        var response = enableScheduledJob()
         val monitorId = createMonitor(randomQueryLevelMonitor(enabled = true), refresh = true).id
 
-        if (isMultiNode) Thread.sleep(2000)
+        if (isMultiNode) OpenSearchTestCase.waitUntil({
+            return@waitUntil (response == null)
+        }, 2, TimeUnit.SECONDS)
         var alertingStats = getAlertingStats()
         assertAlertingStatsSweeperEnabled(alertingStats, true)
         assertEquals("Scheduled job index does not exist", true, alertingStats["scheduled_job_index_exists"])
@@ -989,10 +1001,12 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         )
 
         // Re-enable Monitor jobs
-        enableScheduledJob()
+        response = enableScheduledJob()
 
         // Sleep briefly so sweep can reschedule the Monitor
-        Thread.sleep(2000)
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil (response == null)
+        }, 2, TimeUnit.SECONDS)
 
         alertingStats = getAlertingStats()
         assertAlertingStatsSweeperEnabled(alertingStats, true)
@@ -1015,10 +1029,13 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test monitor stats jobs`() {
         // Enable the Monitor plugin.
-        enableScheduledJob()
+
+        var response = enableScheduledJob()
         createRandomMonitor(refresh = true)
 
-        if (isMultiNode) Thread.sleep(2000)
+        if (isMultiNode) OpenSearchTestCase.waitUntil({
+            return@waitUntil (response == null)
+        }, 2, TimeUnit.SECONDS)
         val responseMap = getAlertingStats()
         assertAlertingStatsSweeperEnabled(responseMap, true)
         assertEquals("Scheduled job index does not exist", true, responseMap["scheduled_job_index_exists"])
@@ -1048,10 +1065,12 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test monitor specific metric`() {
         // Enable the Monitor plugin.
-        enableScheduledJob()
+        var response = enableScheduledJob()
         createRandomMonitor(refresh = true)
 
-        if (isMultiNode) Thread.sleep(2000)
+        if (isMultiNode) OpenSearchTestCase.waitUntil({
+            return@waitUntil (response == null)
+        }, 2, TimeUnit.SECONDS)
         val responseMap = getAlertingStats("/jobs_info")
         assertAlertingStatsSweeperEnabled(responseMap, true)
         assertEquals("Scheduled job index does not exist", true, responseMap["scheduled_job_index_exists"])

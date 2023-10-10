@@ -35,12 +35,14 @@ import org.opensearch.index.query.QueryBuilders
 import org.opensearch.script.Script
 import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.test.junit.annotations.TestLogging
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.Collections
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
@@ -1180,7 +1182,10 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
         }"""
 
         indexDoc(index, "1", testDoc)
-        Thread.sleep(80000)
+        OpenSearchTestCase.waitUntil({
+            val findings = searchFindings(monitor.copy(id = monitorResponse.id))
+            return@waitUntil (findings.size == 1)
+        }, 80, TimeUnit.SECONDS)
 
         val findings = searchFindings(monitor.copy(id = monitorResponse.id))
         assertEquals("Findings saved for test monitor", 1, findings.size)
