@@ -63,7 +63,7 @@ import org.opensearch.test.junit.annotations.TestLogging
 import java.time.Instant
 
 // TODO investigate flaky nature of tests. not reproducible in local but fails in jenkins CI
-@AwaitsFix(bugUrl = "Replace with issue URL")
+@AwaitsFix(bugUrl = "https://github.com/opensearch-project/alerting/issues/1246")
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
 class SecureWorkflowRestApiIT : AlertingRestTestCase() {
