@@ -19,4 +19,4 @@ Compatible with OpenSearch 2.11.0
 * Ignore flaky security test suites. ([#1188](https://github.com/opensearch-project/alerting/pull/1188))
 
 ### Documentation
-* Added 2.11 release notes ([#]())
+* Added 2.11 release notes ([#1251](https://github.com/opensearch-project/alerting/pull/1251))
