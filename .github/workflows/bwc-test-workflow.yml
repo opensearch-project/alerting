@@ -18,8 +18,8 @@ jobs:
   build-linux:
     needs: Get-CI-Image-Tag
     strategy:
-          matrix:
-            java: [ 11 ]
+      matrix:
+        java: [ 11 ]
     # Job name
     name: Build and test Alerting
     # This job runs on Linux
