@@ -270,7 +270,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         }
     }
 
-    private fun generateExecutionId(
+    fun generateExecutionId(
         isTempWorkflow: Boolean,
         workflow: Workflow,
     ): String {

@@ -42,6 +42,7 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
             .build()
     }
 
+    @AwaitsFix(bugUrl = "https://github.com/opensearch-project/alerting/issues/1266")
     @Throws(Exception::class)
     @Suppress("UNCHECKED_CAST")
     fun `test backwards compatibility`() {
