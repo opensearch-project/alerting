@@ -10,7 +10,7 @@ on:
 
 jobs:
   Get-CI-Image-Tag:
-    uses: opensearch-project/opensearch-build/.github/workflows/get-ci-image-tag.yml
+    uses: opensearch-project/opensearch-build/.github/workflows/get-ci-image-tag.yml@main
     with:
       platform: centos7
       usage: opensearch
