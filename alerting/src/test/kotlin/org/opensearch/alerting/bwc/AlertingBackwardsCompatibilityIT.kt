@@ -7,7 +7,6 @@ package org.opensearch.alerting.bwc
 
 import org.apache.http.entity.ContentType.APPLICATION_JSON
 import org.apache.http.entity.StringEntity
-import org.junit.Ignore
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest
@@ -43,7 +42,7 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
             .build()
     }
 
-    @Ignore
+    @AwaitsFix(bugUrl = "https://github.com/opensearch-project/alerting/issues/1266")
     @Throws(Exception::class)
     @Suppress("UNCHECKED_CAST")
     fun `test backwards compatibility`() {
