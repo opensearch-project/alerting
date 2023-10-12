@@ -734,6 +734,51 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         }
     }
 
+    fun `test execute monitor with indices removed after first run`() {
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val index1 = createTestIndex()
+        val index2 = createTestIndex()
+        val index4 = createTestIndex()
+        val index5 = createTestIndex()
+
+        val docQuery = DocLevelQuery(query = "\"us-west-2\"", name = "3")
+        var docLevelInput = DocLevelMonitorInput("description", listOf(index1, index2, index4, index5), listOf(docQuery))
+
+        val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
+            )
+        )
+
+        indexDoc(index1, "1", testDoc)
+        indexDoc(index2, "1", testDoc)
+        indexDoc(index4, "1", testDoc)
+        indexDoc(index5, "1", testDoc)
+
+        var response = executeMonitor(monitor.id)
+
+        var output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        assertEquals(1, output.objectMap("trigger_results").values.size)
+        deleteIndex(index1)
+        deleteIndex(index2)
+
+        indexDoc(index4, "1", testDoc)
+        response = executeMonitor(monitor.id)
+
+        output = entityAsMap(response)
+        assertEquals(1, output.objectMap("trigger_results").values.size)
+    }
+
     @Suppress("UNCHECKED_CAST")
     /** helper that returns a field in a json map whose values are all json objects */
     private fun Map<String, Any>.objectMap(key: String): Map<String, Map<String, Any>> {
