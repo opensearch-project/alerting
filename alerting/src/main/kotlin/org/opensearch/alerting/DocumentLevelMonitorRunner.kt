@@ -138,7 +138,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             )
 
             // cleanup old indices that are not monitored anymore from the same monitor
-            for (ind in updatedLastRunContext.keys) {
+            val runContextKeys = updatedLastRunContext.keys.toMutableSet()
+            for (ind in runContextKeys) {
                 if (!concreteIndices.contains(ind)) {
                     updatedLastRunContext.remove(ind)
                 }
