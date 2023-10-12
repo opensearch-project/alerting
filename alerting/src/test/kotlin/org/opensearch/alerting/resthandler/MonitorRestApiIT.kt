@@ -877,8 +877,9 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
         // Wait 5 seconds for event to be processed and alerts moved
         OpenSearchTestCase.waitUntil({
+            val alerts = searchAlerts(monitor)
             val historyAlerts = searchAlerts(monitor, AlertIndices.ALERT_HISTORY_WRITE_INDEX)
-            return@waitUntil (historyAlerts.size == 1)
+            return@waitUntil (alerts.isEmpty() && historyAlerts.size == 1)
         }, 5, TimeUnit.SECONDS)
 
         val alerts = searchAlerts(monitor)

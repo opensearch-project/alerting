@@ -160,7 +160,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
 
         // Allow for a rollover index.
         OpenSearchTestCase.waitUntil({
-            return@waitUntil (getAlertIndices().size >= 2)
+            return@waitUntil (getFindingIndices().size >= 2)
         }, 2, TimeUnit.SECONDS)
         assertTrue("Did not find 2 alert indices", getFindingIndices().size >= 2)
     }
