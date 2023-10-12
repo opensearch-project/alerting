@@ -12,7 +12,7 @@ jobs:
   Get-CI-Image-Tag:
     uses: opensearch-project/opensearch-build/.github/workflows/get-ci-image-tag.yml@main
     with:
-      usage: opensearch
+      product: opensearch
 
   build-linux:
     needs: Get-CI-Image-Tag
