@@ -967,11 +967,11 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     fun `test monitor stats when disabling and re-enabling scheduled jobs with existing monitor`() {
         // Enable Monitor jobs
 
-        var response = enableScheduledJob()
+        enableScheduledJob()
         val monitorId = createMonitor(randomQueryLevelMonitor(enabled = true), refresh = true).id
 
         if (isMultiNode) OpenSearchTestCase.waitUntil({
-            return@waitUntil (response == null)
+            return@waitUntil false
         }, 2, TimeUnit.SECONDS)
         var alertingStats = getAlertingStats()
         assertAlertingStatsSweeperEnabled(alertingStats, true)
@@ -1002,11 +1002,11 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         )
 
         // Re-enable Monitor jobs
-        response = enableScheduledJob()
+        enableScheduledJob()
 
         // Sleep briefly so sweep can reschedule the Monitor
         OpenSearchTestCase.waitUntil({
-            return@waitUntil (response == null)
+            return@waitUntil false
         }, 2, TimeUnit.SECONDS)
 
         alertingStats = getAlertingStats()
@@ -1031,11 +1031,11 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     fun `test monitor stats jobs`() {
         // Enable the Monitor plugin.
 
-        var response = enableScheduledJob()
+        enableScheduledJob()
         createRandomMonitor(refresh = true)
 
         if (isMultiNode) OpenSearchTestCase.waitUntil({
-            return@waitUntil (response == null)
+            return@waitUntil false
         }, 2, TimeUnit.SECONDS)
         val responseMap = getAlertingStats()
         assertAlertingStatsSweeperEnabled(responseMap, true)
@@ -1066,11 +1066,11 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test monitor specific metric`() {
         // Enable the Monitor plugin.
-        var response = enableScheduledJob()
+        enableScheduledJob()
         createRandomMonitor(refresh = true)
 
         if (isMultiNode) OpenSearchTestCase.waitUntil({
-            return@waitUntil (response == null)
+            return@waitUntil false
         }, 2, TimeUnit.SECONDS)
         val responseMap = getAlertingStats("/jobs_info")
         assertAlertingStatsSweeperEnabled(responseMap, true)

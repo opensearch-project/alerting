@@ -81,10 +81,9 @@ class DestinationMigrationUtilServiceIT : AlertingRestTestCase() {
             }
 
             // Create cluster change event and wait for migration service to complete migrating data over
-            var request: Map<String, Any>? = null
-            request = client().updateSettings("indices.recovery.max_bytes_per_sec", "40mb")
+            client().updateSettings("indices.recovery.max_bytes_per_sec", "40mb")
             OpenSearchTestCase.waitUntil({
-                return@waitUntil request == null
+                return@waitUntil false
             }, 2, TimeUnit.MINUTES)
 
             for (id in ids) {
