@@ -44,8 +44,8 @@ jobs:
           java-version: ${{ matrix.java }}
       - name: Build and run with Gradle
         run: |
-          chown -R opensearch.opensearch `pwd`
-          su opensearch -c "whoami && java -version && ./gradlew assemble integTest"
+          chown -R 1000:1000 `pwd`
+          su `id -un 1000` -c "whoami && java -version && ./gradlew assemble integTest"
       - name: Create Artifact Path
         run: |
           mkdir -p alerting-artifacts

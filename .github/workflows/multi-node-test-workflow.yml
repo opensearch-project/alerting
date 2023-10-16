@@ -41,5 +41,5 @@ jobs:
         uses: actions/checkout@v2
       - name: Run integration tests with multi node config
         run: |
-          chown -R opensearch.opensearch `pwd`
-          su opensearch -c "whoami && java -version && ./gradlew integTest -PnumNodes=3"
+          chown -R 1000:1000 `pwd`
+          su `id -un 1000` -c "whoami && java -version && ./gradlew integTest -PnumNodes=3"
