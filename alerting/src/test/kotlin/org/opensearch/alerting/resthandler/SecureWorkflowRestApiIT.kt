@@ -9,10 +9,10 @@ import org.apache.hc.core5.http.ContentType
 import org.apache.hc.core5.http.HttpHeaders
 import org.apache.hc.core5.http.io.entity.StringEntity
 import org.apache.hc.core5.http.message.BasicHeader
+import org.apache.lucene.tests.util.LuceneTestCase.AwaitsFix
 import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
-import org.junit.Ignore
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ALERTING_DELETE_WORKFLOW_ACCESS
 import org.opensearch.alerting.ALERTING_EXECUTE_WORKFLOW_ACCESS
@@ -63,7 +63,7 @@ import org.opensearch.test.junit.annotations.TestLogging
 import java.time.Instant
 
 // TODO investigate flaky nature of tests. not reproducible in local but fails in jenkins CI
-@Ignore
+@AwaitsFix(bugUrl = "https://github.com/opensearch-project/alerting/issues/1246")
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
 class SecureWorkflowRestApiIT : AlertingRestTestCase() {
