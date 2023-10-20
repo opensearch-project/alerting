@@ -7,10 +7,10 @@ package org.opensearch.alerting.resthandler
 
 import org.apache.http.HttpHeaders
 import org.apache.http.message.BasicHeader
+import org.apache.lucene.tests.util.LuceneTestCase.AwaitsFix
 import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
-import org.junit.Ignore
 import org.opensearch.alerting.ALERTING_GET_DESTINATION_ACCESS
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.AlertingRestTestCase
@@ -30,7 +30,7 @@ import org.opensearch.test.junit.annotations.TestLogging
 import java.time.Instant
 
 // TODO investigate flaky nature of tests. not reproducible in local but fails in jenkins CI
-@Ignore
+@AwaitsFix(bugUrl = "some url")
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
 class SecureDestinationRestApiIT : AlertingRestTestCase() {
