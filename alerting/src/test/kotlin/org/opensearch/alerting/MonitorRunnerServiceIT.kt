@@ -45,6 +45,7 @@ import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
 import org.opensearch.search.aggregations.metrics.CardinalityAggregationBuilder
 import org.opensearch.search.aggregations.support.MultiTermsValuesSourceConfig
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.test.OpenSearchTestCase
 import java.net.URLEncoder
 import java.time.Instant
 import java.time.ZonedDateTime
@@ -53,6 +54,7 @@ import java.time.temporal.ChronoUnit
 import java.time.temporal.ChronoUnit.DAYS
 import java.time.temporal.ChronoUnit.MILLIS
 import java.time.temporal.ChronoUnit.MINUTES
+import java.util.concurrent.TimeUnit
 import kotlin.collections.HashMap
 
 class MonitorRunnerServiceIT : AlertingRestTestCase() {
@@ -137,7 +139,9 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         verifyAlert(firstRunAlert, monitor)
         // Runner uses ThreadPool.CachedTimeThread thread which only updates once every 200 ms. Wait a bit to
         // see lastNotificationTime change.
-        Thread.sleep(200)
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil false
+        }, 200, TimeUnit.MILLISECONDS)
         executeMonitor(monitor.id)
         val secondRunAlert = searchAlerts(monitor).single()
         verifyAlert(secondRunAlert, monitor)
@@ -239,7 +243,9 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
         // Runner uses ThreadPool.CachedTimeThread thread which only updates once every 200 ms. Wait a bit to
         // let lastNotificationTime change.  W/o this sleep the test can result in a false negative.
-        Thread.sleep(200)
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil false
+        }, 200, TimeUnit.MILLISECONDS)
         val response = executeMonitor(monitor.id)
 
         val output = entityAsMap(response)
@@ -739,7 +745,9 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         verifyAlert(activeAlert1.single(), monitor, ACTIVE)
         val actionResults1 = verifyActionExecutionResultInAlert(activeAlert1[0], mutableMapOf(Pair(actionThrottleEnabled.id, 0)))
 
-        Thread.sleep(200)
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil false
+        }, 200, TimeUnit.MILLISECONDS)
         updateMonitor(monitor.copy(triggers = listOf(trigger.copy(condition = NEVER_RUN)), id = monitor.id))
         executeMonitor(monitor.id)
         val completedAlert = searchAlerts(monitor, AlertIndices.ALL_ALERT_INDEX_PATTERN).single()
@@ -1372,7 +1380,9 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
         // Runner uses ThreadPool.CachedTimeThread thread which only updates once every 200 ms. Wait a bit to
         // let lastNotificationTime change.  W/o this sleep the test can result in a false negative.
-        Thread.sleep(200)
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil false
+        }, 200, TimeUnit.MILLISECONDS)
         executeMonitor(monitor.id)
 
         // Check that the lastNotification time of the acknowledged Alert wasn't updated and the active Alert's was
@@ -1392,7 +1402,9 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         )
 
         // Execute Monitor and check that both Alerts were updated
-        Thread.sleep(200)
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil (searchAlerts(monitor, AlertIndices.ALL_ALERT_INDEX_PATTERN).size == 2)
+        }, 200, TimeUnit.MILLISECONDS)
         executeMonitor(monitor.id)
         currentAlerts = searchAlerts(monitor, AlertIndices.ALL_ALERT_INDEX_PATTERN)
         val completedAlerts = currentAlerts.filter { it.state == COMPLETED }
@@ -1914,7 +1926,9 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
         // Runner uses ThreadPool.CachedTimeThread thread which only updates once every 200 ms. Wait a bit to
         // let Action executionTime change.  W/o this sleep the test can result in a false negative.
-        Thread.sleep(200)
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil false
+        }, 200, TimeUnit.MILLISECONDS)
         val monitorRunResultThrottled = entityAsMap(executeMonitor(monitor.id))
         verifyActionThrottleResultsForBucketLevelMonitor(
             monitorRunResult = monitorRunResultThrottled,
