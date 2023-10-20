@@ -1403,7 +1403,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
         // Execute Monitor and check that both Alerts were updated
         OpenSearchTestCase.waitUntil({
-            return@waitUntil (searchAlerts(monitor, AlertIndices.ALL_ALERT_INDEX_PATTERN).size == 2)
+            return@waitUntil false
         }, 200, TimeUnit.MILLISECONDS)
         executeMonitor(monitor.id)
         currentAlerts = searchAlerts(monitor, AlertIndices.ALL_ALERT_INDEX_PATTERN)
