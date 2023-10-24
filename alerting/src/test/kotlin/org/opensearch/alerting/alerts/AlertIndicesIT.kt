@@ -75,7 +75,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
 
         putFindingMappings(
             AlertIndices.findingMapping().trimStart('{').trimEnd('}')
-                .replace("\"schema_version\": 3", "\"schema_version\": 0")
+                .replace("\"schema_version\": 4", "\"schema_version\": 0")
         )
         assertIndexExists(AlertIndices.FINDING_HISTORY_WRITE_INDEX)
         verifyIndexSchemaVersion(AlertIndices.FINDING_HISTORY_WRITE_INDEX, 0)
@@ -89,7 +89,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         executeMonitor(trueMonitor.id)
         assertIndexExists(AlertIndices.FINDING_HISTORY_WRITE_INDEX)
         verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 8)
-        verifyIndexSchemaVersion(AlertIndices.FINDING_HISTORY_WRITE_INDEX, 3)
+        verifyIndexSchemaVersion(AlertIndices.FINDING_HISTORY_WRITE_INDEX, 4)
     }
 
     fun `test alert index gets recreated automatically if deleted`() {
