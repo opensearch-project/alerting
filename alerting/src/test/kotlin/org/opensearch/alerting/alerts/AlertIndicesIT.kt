@@ -37,7 +37,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
 
     fun `test create finding index`() {
         val testIndex = createTestIndex()
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
@@ -75,21 +75,21 @@ class AlertIndicesIT : AlertingRestTestCase() {
 
         putFindingMappings(
             AlertIndices.findingMapping().trimStart('{').trimEnd('}')
-                .replace("\"schema_version\": 3", "\"schema_version\": 0")
+                .replace("\"schema_version\": 4", "\"schema_version\": 0")
         )
         assertIndexExists(AlertIndices.FINDING_HISTORY_WRITE_INDEX)
         verifyIndexSchemaVersion(AlertIndices.FINDING_HISTORY_WRITE_INDEX, 0)
         wipeAllODFEIndices()
 
         val testIndex = createTestIndex()
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
         executeMonitor(trueMonitor.id)
         assertIndexExists(AlertIndices.FINDING_HISTORY_WRITE_INDEX)
         verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 8)
-        verifyIndexSchemaVersion(AlertIndices.FINDING_HISTORY_WRITE_INDEX, 3)
+        verifyIndexSchemaVersion(AlertIndices.FINDING_HISTORY_WRITE_INDEX, 4)
     }
 
     fun `test alert index gets recreated automatically if deleted`() {
@@ -114,7 +114,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         wipeAllODFEIndices()
         assertIndexDoesNotExist(AlertIndices.FINDING_HISTORY_WRITE_INDEX)
         val testIndex = createTestIndex()
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
@@ -150,7 +150,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         client().updateSettings(AlertingSettings.FINDING_HISTORY_INDEX_MAX_AGE.key, "1s")
 
         val testIndex = createTestIndex()
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
@@ -260,7 +260,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
 
         // Create monitor and execute
         val testIndex = createTestIndex()
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
