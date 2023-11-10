@@ -71,10 +71,21 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
                     //  the test execution by a lot (might have to wait for Job Scheduler plugin integration first)
                     // Waiting a minute to ensure the Monitor ran again at least once before checking if the job is running
                     // on time
+                    var passed = false
                     OpenSearchTestCase.waitUntil({
-                        return@waitUntil false
+                        try {
+                            // Run verifyMonitorStats until all assertion test passes
+                            verifyMonitorStats("/_plugins/_alerting")
+                            passed = true
+                            return@waitUntil true
+                        } catch (e: AssertionError) {
+                            return@waitUntil false
+                        }
                     }, 1, TimeUnit.MINUTES)
-                    verifyMonitorStats("/_plugins/_alerting")
+                    if (!passed) {
+                        // if it hit the max time (1 minute), run verifyMonitorStats again to make sure all the tests pass
+                        verifyMonitorStats("/_plugins/_alerting")
+                    }
                 }
             }
             break
