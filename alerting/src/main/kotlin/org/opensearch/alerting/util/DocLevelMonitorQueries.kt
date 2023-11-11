@@ -207,11 +207,25 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
 
         // Run through each backing index and apply appropriate mappings to query index
         indices.forEach { indexName ->
-            val concreteIndices = IndexUtils.resolveAllIndices(
+            var concreteIndices = IndexUtils.resolveAllIndices(
                 listOf(indexName),
                 monitorCtx.clusterService!!,
                 monitorCtx.indexNameExpressionResolver!!
             )
+            if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
+                IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
+            ) {
+                val lastWriteIndex = concreteIndices.find { monitorMetadata.lastRunContext.containsKey(it) }
+                if (lastWriteIndex != null) {
+                    val lastWriteIndexCreationDate =
+                        IndexUtils.getCreationDateForIndex(lastWriteIndex, monitorCtx.clusterService!!.state())
+                    concreteIndices = IndexUtils.getNewestIndicesByCreationDate(
+                        concreteIndices,
+                        monitorCtx.clusterService!!.state(),
+                        lastWriteIndexCreationDate
+                    )
+                }
+            }
             val updatedIndexName = indexName.replace("*", "_")
             val updatedProperties = mutableMapOf<String, Any>()
             val allFlattenPaths = mutableSetOf<Pair<String, String>>()
