@@ -18,9 +18,6 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.alerting.action.GetMonitorAction
-import org.opensearch.alerting.action.GetMonitorRequest
-import org.opensearch.alerting.action.GetMonitorResponse
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_FINDING_INDEX_PATTERN
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
@@ -35,6 +32,8 @@ import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.GetFindingsRequest
 import org.opensearch.commons.alerting.action.GetFindingsResponse
+import org.opensearch.commons.alerting.action.GetMonitorRequest
+import org.opensearch.commons.alerting.action.GetMonitorResponse
 import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.FindingDocument
 import org.opensearch.commons.alerting.model.FindingWithDocs
@@ -167,7 +166,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
                 )
                 val getMonitorResponse: GetMonitorResponse =
                     this@TransportGetFindingsSearchAction.client.suspendUntil {
-                        execute(GetMonitorAction.INSTANCE, getMonitorRequest, it)
+                        execute(AlertingActions.GET_MONITOR_ACTION_TYPE, getMonitorRequest, it)
                     }
                 indexName = getMonitorResponse.monitor?.dataSources?.findingsIndex ?: ALL_FINDING_INDEX_PATTERN
             }
