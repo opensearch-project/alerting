@@ -10,8 +10,6 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.alerting.action.SearchMonitorAction
-import org.opensearch.alerting.action.SearchMonitorRequest
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
@@ -20,6 +18,8 @@ import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
+import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.SearchMonitorRequest
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.Workflow
@@ -41,7 +41,7 @@ class TransportSearchMonitorAction @Inject constructor(
     clusterService: ClusterService,
     actionFilters: ActionFilters
 ) : HandledTransportAction<SearchMonitorRequest, SearchResponse>(
-    SearchMonitorAction.NAME, transportService, actionFilters, ::SearchMonitorRequest
+    AlertingActions.SEARCH_MONITORS_ACTION_NAME, transportService, actionFilters, ::SearchMonitorRequest
 ),
     SecureTransportAction {
     @Volatile
