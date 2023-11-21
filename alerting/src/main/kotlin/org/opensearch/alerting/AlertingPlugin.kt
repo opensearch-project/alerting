@@ -11,7 +11,6 @@ import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetEmailAccountAction
 import org.opensearch.alerting.action.GetEmailGroupAction
-import org.opensearch.alerting.action.GetMonitorAction
 import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
 import org.opensearch.alerting.action.SearchMonitorAction
@@ -193,7 +192,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         return listOf(
             ActionPlugin.ActionHandler(ScheduledJobsStatsAction.INSTANCE, ScheduledJobsStatsTransportAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.INDEX_MONITOR_ACTION_TYPE, TransportIndexMonitorAction::class.java),
-            ActionPlugin.ActionHandler(GetMonitorAction.INSTANCE, TransportGetMonitorAction::class.java),
+            ActionPlugin.ActionHandler(AlertingActions.GET_MONITOR_ACTION_TYPE, TransportGetMonitorAction::class.java),
             ActionPlugin.ActionHandler(ExecuteMonitorAction.INSTANCE, TransportExecuteMonitorAction::class.java),
             ActionPlugin.ActionHandler(SearchMonitorAction.INSTANCE, TransportSearchMonitorAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.DELETE_MONITOR_ACTION_TYPE, TransportDeleteMonitorAction::class.java),
