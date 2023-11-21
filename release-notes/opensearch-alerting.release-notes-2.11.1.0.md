@@ -12,4 +12,4 @@ Compatible with OpenSearch 2.11.1
 * Add nested fields param mapping findings index for doc level queries. ([#1276](https://github.com/opensearch-project/alerting/pull/1276))
 
 ### Documentation
-* Added 2.11.1 release notes. ([#]())
+* Added 2.11.1 release notes. ([#1306](https://github.com/opensearch-project/alerting/pull/1306))
