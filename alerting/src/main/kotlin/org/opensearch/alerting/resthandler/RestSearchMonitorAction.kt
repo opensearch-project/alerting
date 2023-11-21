@@ -9,8 +9,6 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.alerting.action.SearchMonitorAction
-import org.opensearch.alerting.action.SearchMonitorRequest
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.context
@@ -20,6 +18,8 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.SearchMonitorRequest
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.core.common.bytes.BytesReference
@@ -101,7 +101,7 @@ class RestSearchMonitorAction(
 
         val searchMonitorRequest = SearchMonitorRequest(searchRequest)
         return RestChannelConsumer { channel ->
-            client.execute(SearchMonitorAction.INSTANCE, searchMonitorRequest, searchMonitorResponse(channel))
+            client.execute(AlertingActions.SEARCH_MONITORS_ACTION_TYPE, searchMonitorRequest, searchMonitorResponse(channel))
         }
     }
 
