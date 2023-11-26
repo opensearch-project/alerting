@@ -397,6 +397,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
             assertEquals("Get workflow failed", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
         } finally {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
+            deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
             deleteUser(getUser)
             getUserClient?.close()
         }
@@ -447,6 +448,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
         } catch (e: ResponseException) {
             assertEquals("Create workflow failed", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
         } finally {
+            deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
             deleteUser(userWithDifferentRole)
             userWithDifferentRoleClient?.close()
         }
@@ -1104,6 +1106,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
             assertEquals("Delete workflow failed", RestStatus.OK, response?.restStatus())
         } finally {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
+            deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
             deleteUser(deleteUser)
             deleteUserClient?.close()
         }
