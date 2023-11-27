@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.apache.lucene.search.join.ScoreMode
 import org.opensearch.OpenSearchStatusException
+import org.opensearch.action.ActionRequest
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.search.SearchRequest
@@ -37,6 +38,7 @@ import org.opensearch.commons.alerting.action.GetMonitorResponse.AssociatedWorkf
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -55,7 +57,7 @@ class TransportGetMonitorAction @Inject constructor(
     val xContentRegistry: NamedXContentRegistry,
     val clusterService: ClusterService,
     settings: Settings,
-) : HandledTransportAction<GetMonitorRequest, GetMonitorResponse>(
+) : HandledTransportAction<ActionRequest, GetMonitorResponse>(
     AlertingActions.GET_MONITOR_ACTION_NAME,
     transportService,
     actionFilters,
@@ -70,12 +72,17 @@ class TransportGetMonitorAction @Inject constructor(
         listenFilterBySettingChange(clusterService)
     }
 
-    override fun doExecute(task: Task, getMonitorRequest: GetMonitorRequest, actionListener: ActionListener<GetMonitorResponse>) {
+    override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<GetMonitorResponse>) {
+        val transformedRequest = request as? GetMonitorRequest
+            ?: recreateObject(request) {
+                GetMonitorRequest(it)
+            }
+
         val user = readUserFromThreadContext(client)
 
-        val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, getMonitorRequest.monitorId)
-            .version(getMonitorRequest.version)
-            .fetchSourceContext(getMonitorRequest.srcContext)
+        val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, transformedRequest.monitorId)
+            .version(transformedRequest.version)
+            .fetchSourceContext(transformedRequest.srcContext)
 
         if (!validateUserBackendRoles(user, actionListener)) {
             return
@@ -115,7 +122,7 @@ class TransportGetMonitorAction @Inject constructor(
                                         monitor?.user,
                                         actionListener,
                                         "monitor",
-                                        getMonitorRequest.monitorId
+                                        transformedRequest.monitorId
                                     )
                                 ) {
                                     return

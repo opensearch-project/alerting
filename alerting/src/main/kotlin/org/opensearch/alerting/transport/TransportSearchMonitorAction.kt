@@ -6,6 +6,7 @@
 package org.opensearch.alerting.transport
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.action.ActionRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
@@ -24,6 +25,7 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.ExistsQueryBuilder
@@ -40,7 +42,7 @@ class TransportSearchMonitorAction @Inject constructor(
     val client: Client,
     clusterService: ClusterService,
     actionFilters: ActionFilters
-) : HandledTransportAction<SearchMonitorRequest, SearchResponse>(
+) : HandledTransportAction<ActionRequest, SearchResponse>(
     AlertingActions.SEARCH_MONITORS_ACTION_NAME, transportService, actionFilters, ::SearchMonitorRequest
 ),
     SecureTransportAction {
@@ -50,8 +52,13 @@ class TransportSearchMonitorAction @Inject constructor(
         listenFilterBySettingChange(clusterService)
     }
 
-    override fun doExecute(task: Task, searchMonitorRequest: SearchMonitorRequest, actionListener: ActionListener<SearchResponse>) {
-        val searchSourceBuilder = searchMonitorRequest.searchRequest.source()
+    override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<SearchResponse>) {
+        val transformedRequest = request as? SearchMonitorRequest
+            ?: recreateObject(request) {
+                SearchMonitorRequest(it)
+            }
+
+        val searchSourceBuilder = transformedRequest.searchRequest.source()
             .seqNoAndPrimaryTerm(true)
             .version(true)
         val queryBuilder = if (searchSourceBuilder.query() == null) BoolQueryBuilder()
@@ -60,7 +67,7 @@ class TransportSearchMonitorAction @Inject constructor(
         // The SearchMonitor API supports one 'index' parameter of either the SCHEDULED_JOBS_INDEX or ALL_ALERT_INDEX_PATTERN.
         // When querying the ALL_ALERT_INDEX_PATTERN, we don't want to check whether the MONITOR_TYPE field exists
         // because we're querying alert indexes.
-        if (searchMonitorRequest.searchRequest.indices().contains(ScheduledJob.SCHEDULED_JOBS_INDEX)) {
+        if (transformedRequest.searchRequest.indices().contains(ScheduledJob.SCHEDULED_JOBS_INDEX)) {
             val monitorWorkflowType = QueryBuilders.boolQuery().should(QueryBuilders.existsQuery(Monitor.MONITOR_TYPE))
                 .should(QueryBuilders.existsQuery(Workflow.WORKFLOW_TYPE))
             queryBuilder.must(monitorWorkflowType)
@@ -69,10 +76,10 @@ class TransportSearchMonitorAction @Inject constructor(
         searchSourceBuilder.query(queryBuilder)
             .seqNoAndPrimaryTerm(true)
             .version(true)
-        addOwnerFieldIfNotExists(searchMonitorRequest.searchRequest)
+        addOwnerFieldIfNotExists(transformedRequest.searchRequest)
         val user = readUserFromThreadContext(client)
         client.threadPool().threadContext.stashContext().use {
-            resolve(searchMonitorRequest, actionListener, user)
+            resolve(transformedRequest, actionListener, user)
         }
     }
 
