@@ -672,9 +672,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         monitorId: String = "NO_ID",
         monitorName: String = "NO_NAME",
         index: String = "testIndex",
-        docLevelQueries: List<DocLevelQuery> = listOf(
-            DocLevelQuery(query = "test_field:\"us-west-2\"", name = "testQuery", fields = listOf())
-        ),
+        docLevelQueries: List<DocLevelQuery> = listOf(DocLevelQuery(query = "test_field:\"us-west-2\"", name = "testQuery")),
         matchingDocIds: List<String>,
     ): String {
         val finding = Finding(

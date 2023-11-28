@@ -92,7 +92,7 @@ import java.util.stream.Collectors
 class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test execute monitor with dryrun`() {
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor = randomDocumentLevelMonitor(
@@ -136,7 +136,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute monitor with custom alerts index`() {
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customAlertsIndex = "custom_alerts_index"
@@ -186,10 +186,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val index2 = "index_456"
         val index3 = "index_789"
         val index4 = "index_012"
-        val q1 = DocLevelQuery(query = "properties:\"abcd\"", name = "1", fields = listOf())
-        val q2 = DocLevelQuery(query = "type.properties:\"abcd\"", name = "2", fields = listOf())
-        val q3 = DocLevelQuery(query = "type.something.properties:\"abcd\"", name = "3", fields = listOf())
-        val q4 = DocLevelQuery(query = "type.something.properties.lastone:\"abcd\"", name = "4", fields = listOf())
+        val q1 = DocLevelQuery(query = "properties:\"abcd\"", name = "1")
+        val q2 = DocLevelQuery(query = "type.properties:\"abcd\"", name = "2")
+        val q3 = DocLevelQuery(query = "type.something.properties:\"abcd\"", name = "3")
+        val q4 = DocLevelQuery(query = "type.something.properties.lastone:\"abcd\"", name = "4")
 
         createIndex(index1, Settings.EMPTY)
         createIndex(index2, Settings.EMPTY)
@@ -309,7 +309,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute monitor without triggers`() {
-        val docQuery = DocLevelQuery(query = "eventType:\"login\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "eventType:\"login\"", name = "3")
 
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery)
@@ -368,15 +368,15 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute monitor with custom query index`() {
-        val q1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
-        val q2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4", fields = listOf())
-        val q3 = DocLevelQuery(query = "source.ip.v4.v0:120", name = "5", fields = listOf())
-        val q4 = DocLevelQuery(query = "alias.some.fff:\"us-west-2\"", name = "6", fields = listOf())
-        val q5 = DocLevelQuery(query = "message:\"This is an error from IAD region\"", name = "7", fields = listOf())
-        val q6 = DocLevelQuery(query = "f1.type.f4:\"hello\"", name = "8", fields = listOf())
-        val q7 = DocLevelQuery(query = "f1.type.f2.f3:\"world\"", name = "9", fields = listOf())
-        val q8 = DocLevelQuery(query = "type:\"some type\"", name = "10", fields = listOf())
-        val q9 = DocLevelQuery(query = "properties:123", name = "11", fields = listOf())
+        val q1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
+        val q2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4")
+        val q3 = DocLevelQuery(query = "source.ip.v4.v0:120", name = "5")
+        val q4 = DocLevelQuery(query = "alias.some.fff:\"us-west-2\"", name = "6")
+        val q5 = DocLevelQuery(query = "message:\"This is an error from IAD region\"", name = "7")
+        val q6 = DocLevelQuery(query = "f1.type.f4:\"hello\"", name = "8")
+        val q7 = DocLevelQuery(query = "f1.type.f2.f3:\"world\"", name = "9")
+        val q8 = DocLevelQuery(query = "type:\"some type\"", name = "10")
+        val q9 = DocLevelQuery(query = "properties:123", name = "11")
 
         val docLevelInput = DocLevelMonitorInput(
             "description",
@@ -441,7 +441,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute monitor with non-flattened json doc as source`() {
-        val docQuery1 = DocLevelQuery(query = "source.device.port:12345 OR source.device.hwd.id:12345", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "source.device.port:12345 OR source.device.hwd.id:12345", name = "3")
 
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery1)
@@ -552,13 +552,13 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute monitor with custom query index old`() {
-        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
-        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4", fields = listOf())
-        val docQuery3 = DocLevelQuery(query = "source.ip.v4.v0:120", name = "5", fields = listOf())
-        val docQuery4 = DocLevelQuery(query = "alias.some.fff:\"us-west-2\"", name = "6", fields = listOf())
-        val docQuery5 = DocLevelQuery(query = "message:\"This is an error from IAD region\"", name = "7", fields = listOf())
-        val docQuery6 = DocLevelQuery(query = "type.subtype:\"some subtype\"", name = "8", fields = listOf())
-        val docQuery7 = DocLevelQuery(query = "supertype.type:\"some type\"", name = "9", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
+        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4")
+        val docQuery3 = DocLevelQuery(query = "source.ip.v4.v0:120", name = "5")
+        val docQuery4 = DocLevelQuery(query = "alias.some.fff:\"us-west-2\"", name = "6")
+        val docQuery5 = DocLevelQuery(query = "message:\"This is an error from IAD region\"", name = "7")
+        val docQuery6 = DocLevelQuery(query = "type.subtype:\"some subtype\"", name = "8")
+        val docQuery7 = DocLevelQuery(query = "supertype.type:\"some type\"", name = "9")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery1, docQuery2, docQuery3, docQuery4, docQuery5, docQuery6, docQuery7)
         )
@@ -614,7 +614,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test monitor error alert created and updated with new error`() {
-        val docQuery = DocLevelQuery(query = "source:12345", name = "1", fields = listOf())
+        val docQuery = DocLevelQuery(query = "source:12345", name = "1")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery)
         )
@@ -671,7 +671,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test monitor error alert created trigger run errored 2 times same error`() {
-        val docQuery = DocLevelQuery(query = "source:12345", name = "1", fields = listOf())
+        val docQuery = DocLevelQuery(query = "source:12345", name = "1")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery)
         )
@@ -720,7 +720,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val customAlertIndex = "custom-alert-index"
         val customAlertHistoryIndex = "custom-alert-history-index"
         val customAlertHistoryIndexPattern = "<custom_alert_history_index-{now/d}-1>"
-        val docQuery = DocLevelQuery(query = "source:12345", name = "1", fields = listOf())
+        val docQuery = DocLevelQuery(query = "source:12345", name = "1")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery)
         )
@@ -785,7 +785,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val customAlertIndex = "custom-alert-index"
         val customAlertHistoryIndex = "custom-alert-history-index"
         val customAlertHistoryIndexPattern = "<custom_alert_history_index-{now/d}-1>"
-        val docQuery = DocLevelQuery(query = "source:12345", name = "1", fields = listOf())
+        val docQuery = DocLevelQuery(query = "source:12345", name = "1")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery)
         )
@@ -867,7 +867,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute monitor with custom query index and nested mappings`() {
-        val docQuery1 = DocLevelQuery(query = "message:\"msg 1 2 3 4\"", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "message:\"msg 1 2 3 4\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
@@ -942,7 +942,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test cleanup monitor on partial create monitor failure`() {
-        val docQuery = DocLevelQuery(query = "dnbkjndsfkjbnds:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "dnbkjndsfkjbnds:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customQueryIndex = "custom_alerts_index"
@@ -995,7 +995,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute monitor without create when no monitors exists`() {
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customQueryIndex = "custom_alerts_index"
@@ -1036,7 +1036,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute monitor with custom query index and custom field mappings`() {
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customQueryIndex = "custom_alerts_index"
@@ -1069,7 +1069,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test delete monitor deletes all queries and metadata too`() {
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customQueryIndex = "custom_query_index"
@@ -1112,7 +1112,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute monitor with custom findings index and pattern`() {
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
@@ -1163,7 +1163,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         createIndex(testSourceIndex1, Settings.EMPTY)
         createIndex(testSourceIndex2, Settings.EMPTY)
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex1, testSourceIndex2), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
@@ -1220,7 +1220,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         createIndex(testSourceIndex1, Settings.EMPTY)
         createIndex(testSourceIndex2, Settings.EMPTY)
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex1, testSourceIndex2), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
@@ -1277,7 +1277,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         createIndex(testSourceIndex1, Settings.EMPTY)
         createIndex(testSourceIndex2, Settings.EMPTY)
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex1, testSourceIndex2), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
@@ -1530,7 +1530,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute monitor with empty source index`() {
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
@@ -1571,7 +1571,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute GetFindingsAction with monitorId param`() {
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
@@ -1608,7 +1608,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute GetFindingsAction with unknown monitorId`() {
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
@@ -1649,7 +1649,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute monitor with owner field`() {
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customAlertsIndex = "custom_alerts_index"
@@ -1690,7 +1690,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute GetFindingsAction with unknown findingIndex param`() {
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
@@ -1731,7 +1731,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test search custom alerts history index`() {
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
@@ -1779,7 +1779,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test search custom alerts history index after alert ack`() {
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
@@ -1849,7 +1849,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test get alerts by list of monitors containing both existent and non-existent ids`() {
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor = randomDocumentLevelMonitor(
@@ -1927,7 +1927,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val testSourceIndex = "test_source_index"
         createIndex(testSourceIndex, Settings.builder().put("index.mapping.total_fields.limit", "10000").build())
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor = randomDocumentLevelMonitor(
@@ -2018,7 +2018,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val testSourceIndex = "test_source_index"
         createIndex(testSourceIndex, Settings.EMPTY)
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor = randomDocumentLevelMonitor(
@@ -2046,7 +2046,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val testSourceIndex = "test_source_index"
         createIndex(testSourceIndex, Settings.EMPTY)
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor = randomDocumentLevelMonitor(
@@ -2124,7 +2124,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val testSourceIndex2 = "test_source_index2"
         createIndex(testSourceIndex1, Settings.builder().put("index.mapping.total_fields.limit", "10000").build())
         createIndex(testSourceIndex2, Settings.builder().put("index.mapping.total_fields.limit", "10000").build())
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex1), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor = randomDocumentLevelMonitor(
@@ -2172,7 +2172,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     fun `test queryIndex gets increased max fields in mappings`() {
         val testSourceIndex = "test_source_index"
         createIndex(testSourceIndex, Settings.builder().put("index.mapping.total_fields.limit", "10000").build())
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor = randomDocumentLevelMonitor(
@@ -2218,7 +2218,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val testSourceIndex = "test_source_index"
         createIndex(testSourceIndex, Settings.EMPTY)
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor = randomDocumentLevelMonitor(
@@ -2293,9 +2293,9 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             )
         )!!
 
-        val docQuery1 = DocLevelQuery(query = "test_field_1:\"test_value_2\"", name = "1", fields = listOf())
-        val docQuery2 = DocLevelQuery(query = "test_field_1:\"test_value_1\"", name = "2", fields = listOf())
-        val docQuery3 = DocLevelQuery(query = "test_field_1:\"test_value_3\"", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"test_value_2\"", name = "1")
+        val docQuery2 = DocLevelQuery(query = "test_field_1:\"test_value_1\"", name = "2")
+        val docQuery3 = DocLevelQuery(query = "test_field_1:\"test_value_3\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1, docQuery2, docQuery3))
         val docTrigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val docCustomAlertsIndex = "custom_alerts_index"
@@ -2370,8 +2370,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute workflow with custom alerts and finding index when doc level delegate is used in chained finding`() {
-        val docQuery1 = DocLevelQuery(query = "test_field_1:\"test_value_2\"", name = "1", fields = listOf())
-        val docQuery2 = DocLevelQuery(query = "test_field_1:\"test_value_3\"", name = "2", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"test_value_2\"", name = "1")
+        val docQuery2 = DocLevelQuery(query = "test_field_1:\"test_value_3\"", name = "2")
 
         var docLevelMonitor = randomDocumentLevelMonitor(
             inputs = listOf(DocLevelMonitorInput("description", listOf(index), listOf(docQuery1, docQuery2))),
@@ -2610,7 +2610,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute workflow with custom alerts and finding index with doc level delegates`() {
-        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customAlertsIndex1 = "custom_alerts_index"
@@ -2627,7 +2627,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         )
         val monitorResponse = createMonitor(monitor1)!!
 
-        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4", fields = listOf())
+        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4")
         val docLevelInput2 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery2))
         val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customAlertsIndex2 = "custom_alerts_index_2"
@@ -2703,7 +2703,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute workflow with multiple monitors in chained monitor findings of single monitor`() {
-        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customAlertsIndex1 = "custom_alerts_index"
@@ -2721,7 +2721,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         )
         val monitorResponse = createMonitor(monitor1)!!
 
-        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4", fields = listOf())
+        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4")
         val docLevelInput2 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery2))
         val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor2 = randomDocumentLevelMonitor(
@@ -2736,7 +2736,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         )
 
         val monitorResponse2 = createMonitor(monitor2)!!
-        val docQuery3 = DocLevelQuery(query = "_id:*", name = "5", fields = listOf())
+        val docQuery3 = DocLevelQuery(query = "_id:*", name = "5")
         val docLevelInput3 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery3))
         val trigger3 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -2818,7 +2818,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute workflows with shared doc level monitor delegate`() {
-        val docQuery = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customAlertsIndex = "custom_alerts_index"
@@ -2922,7 +2922,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute workflows with shared doc level monitor delegate updating delegate datasource`() {
-        val docQuery = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -3033,7 +3033,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute workflow verify workflow metadata`() {
-        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor1 = randomDocumentLevelMonitor(
@@ -3042,7 +3042,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         )
         val monitorResponse = createMonitor(monitor1)!!
 
-        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4", fields = listOf())
+        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4")
         val docLevelInput2 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery2))
         val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor2 = randomDocumentLevelMonitor(
@@ -3104,7 +3104,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute workflow dryrun verify workflow metadata not created`() {
-        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor1 = randomDocumentLevelMonitor(
@@ -3113,7 +3113,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         )
         val monitorResponse = createMonitor(monitor1)!!
 
-        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4", fields = listOf())
+        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4")
         val docLevelInput2 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery2))
         val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor2 = randomDocumentLevelMonitor(
@@ -3199,9 +3199,9 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             )
         )!!
 
-        val docQuery1 = DocLevelQuery(query = "test_field_1:\"test_value_2\"", name = "1", fields = listOf())
-        val docQuery2 = DocLevelQuery(query = "test_field_1:\"test_value_1\"", name = "2", fields = listOf())
-        val docQuery3 = DocLevelQuery(query = "test_field_1:\"test_value_3\"", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"test_value_2\"", name = "1")
+        val docQuery2 = DocLevelQuery(query = "test_field_1:\"test_value_1\"", name = "2")
+        val docQuery3 = DocLevelQuery(query = "test_field_1:\"test_value_3\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1, docQuery2, docQuery3))
         val docTrigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val docCustomAlertsIndex = "custom_alerts_index"
@@ -3473,8 +3473,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute with custom alerts and finding index with bucket and doc monitor when doc monitor  is used in chained finding`() {
-        val docQuery1 = DocLevelQuery(query = "test_field_1:\"test_value_2\"", name = "1", fields = listOf())
-        val docQuery2 = DocLevelQuery(query = "test_field_1:\"test_value_3\"", name = "2", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"test_value_2\"", name = "1")
+        val docQuery2 = DocLevelQuery(query = "test_field_1:\"test_value_3\"", name = "2")
 
         var docLevelMonitor = randomDocumentLevelMonitor(
             inputs = listOf(DocLevelMonitorInput("description", listOf(index), listOf(docQuery1, docQuery2))),
@@ -3706,7 +3706,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test execute workflow input error`() {
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -3735,7 +3735,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test execute workflow wrong workflow id`() {
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -3927,7 +3927,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         )
         assertNotNull("The bucket monitor was not created", bucketMonitor)
 
-        val docQuery1 = DocLevelQuery(query = "test_field_1:\"a\"", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"a\"", name = "3")
         var monitor1 = randomDocumentLevelMonitor(
             inputs = listOf(DocLevelMonitorInput("description", listOf(TEST_HR_INDEX), listOf(docQuery1))),
             triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN))
@@ -3980,7 +3980,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test chained alerts for AND OR and NOT conditions with custom alerts indices`() {
-        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex1 = "custom_findings_index"
@@ -4001,7 +4001,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         )
         val monitorResponse = createMonitor(monitor1)!!
 
-        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4", fields = listOf())
+        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4")
         val docLevelInput2 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery2))
         val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex2 = "custom_findings_index_2"
@@ -4132,7 +4132,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test chained alerts for AND OR and NOT conditions`() {
-        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex1 = "custom_findings_index"
@@ -4147,7 +4147,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         )
         val monitorResponse = createMonitor(monitor1)!!
 
-        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4", fields = listOf())
+        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4")
         val docLevelInput2 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery2))
         val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex2 = "custom_findings_index_2"
@@ -4316,7 +4316,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     ) = "${workflowMetadata!!.id}-${monitorResponse.id}-metadata"
 
     fun `test create workflow success`() {
-        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery1)
         )
@@ -4387,7 +4387,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test update workflow add monitor success`() {
-        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery1)
         )
@@ -4492,7 +4492,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test update workflow change order of delegate monitors`() {
-        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery1)
         )
@@ -4578,7 +4578,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test update workflow remove monitor success`() {
-        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery1)
         )
@@ -4656,7 +4656,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test update workflow doesn't exist failure`() {
-        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery1)
         )
@@ -4696,7 +4696,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test get workflow`() {
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val monitor = randomDocumentLevelMonitor(
@@ -4754,7 +4754,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test get workflow for invalid id monitor index exists`() {
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val monitor = randomDocumentLevelMonitor(
@@ -4777,7 +4777,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test delete workflow keeping delegate monitor`() {
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -4817,7 +4817,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test delete workflow delegate monitor deleted`() {
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -4864,7 +4864,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test delete executed workflow with metadata deleted`() {
-        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor1 = randomDocumentLevelMonitor(
@@ -4873,7 +4873,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         )
         val monitorResponse = createMonitor(monitor1)!!
 
-        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4", fields = listOf())
+        val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4")
         val docLevelInput2 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery2))
         val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor2 = randomDocumentLevelMonitor(
@@ -4970,7 +4970,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test delete workflow delegate monitor part of another workflow not deleted`() {
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -5017,7 +5017,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test trying to delete monitor that is part of workflow sequence`() {
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -5068,7 +5068,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test delete workflow for invalid id monitor index exists`() {
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -5128,7 +5128,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test update workflow without delegate failure`() {
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val monitor1 = randomDocumentLevelMonitor(
@@ -5185,7 +5185,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test update workflow duplicate delegate failure`() {
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val monitor = randomDocumentLevelMonitor(
@@ -5220,7 +5220,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test create workflow delegate monitor doesn't exist failure`() {
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -5247,7 +5247,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test update workflow delegate monitor doesn't exist failure`() {
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -5303,7 +5303,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test update workflow sequence order not correct failure`() {
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -5364,7 +5364,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test create workflow query monitor chained findings monitor failure`() {
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -5394,7 +5394,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test create workflow delegate and chained finding monitor different indices failure`() {
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -5408,7 +5408,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         createTestIndex(index1)
 
         val docLevelInput1 = DocLevelMonitorInput(
-            "description", listOf(index1), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index1), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
 
         val docMonitor1 = randomDocumentLevelMonitor(
@@ -5454,7 +5454,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test update workflow chained findings monitor not in sequence failure`() {
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -5516,7 +5516,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test update workflow chained findings order not correct failure`() {
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -5554,7 +5554,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test create workflow with chained alert triggers`() {
-        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery1)
         )
@@ -5619,7 +5619,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test postIndex on workflow update with trigger deletion`() {
-        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor1 = randomDocumentLevelMonitor(
@@ -5693,7 +5693,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test postDelete on workflow deletion`() {
-        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor1 = randomDocumentLevelMonitor(
@@ -5761,7 +5761,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test get chained alerts with alertId paginating for associated alerts`() {
-        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor1 = randomDocumentLevelMonitor(
@@ -5840,7 +5840,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test existing chained alert active alert is updated on consequtive trigger condition match`() {
-        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3")
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor1 = randomDocumentLevelMonitor(

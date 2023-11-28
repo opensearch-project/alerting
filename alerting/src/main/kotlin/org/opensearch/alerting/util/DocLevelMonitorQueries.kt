@@ -365,7 +365,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 .id(it.id + "_$monitorId")
                 .source(
                     mapOf(
-                        "query" to mapOf("query_string" to mapOf("query" to query, "fields" to it.fields)),
+                        "query" to mapOf("query_string" to mapOf("query" to query)),
                         "monitor_id" to monitorId,
                         "index" to sourceIndex
                     )
