@@ -85,7 +85,7 @@ class TransportSearchMonitorAction @Inject constructor(
 
     fun resolve(searchMonitorRequest: SearchMonitorRequest, actionListener: ActionListener<SearchResponse>, user: User?) {
         if (user == null) {
-            // user header is null when: 1/ security is disabled. 2/when user is super-admin.
+            // user header is null when: 1/ security is disabled. 2/ when user is super-admin.
             search(searchMonitorRequest.searchRequest, actionListener)
         } else if (!doFilterForUser(user)) {
             // security is enabled and filterby is disabled.
