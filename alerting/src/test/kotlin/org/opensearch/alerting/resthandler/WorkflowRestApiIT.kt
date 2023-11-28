@@ -48,7 +48,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
 
     fun `test create workflow success`() {
         val index = createTestIndex()
-        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery1)
         )
@@ -79,7 +79,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
 
     fun `test create workflow with different monitor types success`() {
         val index = createTestIndex()
-        val docQuery = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery)
         )
@@ -193,7 +193,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
 
     fun `test create workflow delegate monitor doesn't exist failure`() {
         val index = createTestIndex()
-        val docQuery = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery)
         )
@@ -315,7 +315,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
         createTestIndex(index)
 
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -329,7 +329,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
         createTestIndex(index1)
 
         val docLevelInput1 = DocLevelMonitorInput(
-            "description", listOf(index1), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index1), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
 
         val docMonitor1 = randomDocumentLevelMonitor(
@@ -357,7 +357,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
     fun `test create workflow query monitor chained findings monitor failure`() {
         val index = createTestIndex()
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -409,7 +409,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
 
     fun `test update workflow add monitor success`() {
         val index = createTestIndex()
-        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery1)
         )
@@ -483,7 +483,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
 
     fun `test update workflow remove monitor success`() {
         val index = createTestIndex()
-        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery1)
         )
@@ -556,7 +556,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
 
     fun `test update workflow change order of delegate monitors`() {
         val index = createTestIndex()
-        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery1)
         )
@@ -644,7 +644,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
 
     fun `test update workflow doesn't exist failure`() {
         val index = createTestIndex()
-        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery1)
         )
@@ -681,7 +681,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
     fun `test update workflow duplicate delegate failure`() {
         val index = createTestIndex()
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val monitor = randomDocumentLevelMonitor(
@@ -718,7 +718,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
     fun `test update workflow delegate monitor doesn't exist failure`() {
         val index = createTestIndex()
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -755,7 +755,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
     fun `test update workflow sequence order not correct failure`() {
         val index = createTestIndex()
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -796,7 +796,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
     fun `test update workflow chained findings monitor not in sequence failure`() {
         val index = createTestIndex()
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -838,7 +838,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
     fun `test update workflow chained findings order not correct failure`() {
         val index = createTestIndex()
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
+            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3"))
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
@@ -1025,7 +1025,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
 
     fun `test chained alerts and audit alerts for workflows with query level monitor`() {
         val index = createTestIndex()
-        val docQuery1 = DocLevelQuery(query = "test_field:\"test_value_1\"", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field:\"test_value_1\"", name = "3")
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor1 = randomDocumentLevelMonitor(
@@ -1143,7 +1143,7 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
 
     fun `test run workflow as scheduled job success`() {
         val index = createTestIndex()
-        val docQuery1 = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput(
             "description", listOf(index), listOf(docQuery1)
         )

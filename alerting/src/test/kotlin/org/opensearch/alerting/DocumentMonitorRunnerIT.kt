@@ -41,7 +41,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val index = createTestIndex()
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
 
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
@@ -84,7 +84,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             "test_field" : "us-west-2"
         }"""
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
@@ -116,7 +116,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             "test_field" : "us-west-2"
         }"""
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
@@ -156,7 +156,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             "test_field" : "us-west-2"
         }"""
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", tags = listOf("test_tag"), fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", tags = listOf("test_tag"))
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = Script("query[tag=test_tag]"))
@@ -196,7 +196,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             "test_field" : "us-west-2"
         }"""
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", tags = listOf("test_tag"), fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", tags = listOf("test_tag"))
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
@@ -227,7 +227,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             "test_field" : "us-west-2"
         }"""
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val alertCategories = AlertCategory.values()
@@ -295,7 +295,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             "test_field" : "us-west-2"
         }"""
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val actionExecutionScope = PerExecutionActionScope()
@@ -362,7 +362,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             "test_field" : "us-west-2"
         }"""
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = testQueryName, fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = testQueryName)
         val docLevelInput = DocLevelMonitorInput("description", listOf("$testIndexPrefix*"), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = Script("query[name=$testQueryName]"))
@@ -406,7 +406,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             "test_field" : "us-west-2"
         }"""
 
-        val docQuery = DocLevelQuery(query = "NOT (test_field:\"us-west-1\")", name = testQueryName, fields = listOf())
+        val docQuery = DocLevelQuery(query = "NOT (test_field:\"us-west-1\")", name = testQueryName)
         val docLevelInput = DocLevelMonitorInput("description", listOf("$testIndexPrefix*"), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = Script("query[name=$testQueryName]"))
@@ -447,7 +447,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             "test_field" : "us-west-2"
         }"""
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf("test*"), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
@@ -532,13 +532,11 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val docQuery1 = DocLevelQuery(
             query = "(source.device.port:12345 AND test_field:12345) OR source.device.hwd.id:12345",
-            name = "4",
-            fields = listOf()
+            name = "4"
         )
         val docQuery2 = DocLevelQuery(
             query = "(source.device.port:\"12345\" AND test_field:\"12345\") OR source.device.hwd.id:\"12345\"",
-            name = "5",
-            fields = listOf()
+            name = "5"
         )
         val docLevelInput = DocLevelMonitorInput("description", listOf("test*"), listOf(docQuery1, docQuery2))
 
@@ -670,8 +668,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val docQuery = DocLevelQuery(
             query = "nested_field.test1:\"12345\"",
-            name = "5",
-            fields = listOf()
+            name = "5"
         )
         val docLevelInput = DocLevelMonitorInput("description", listOf("test*"), listOf(docQuery))
 
@@ -757,8 +754,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val docQuery = DocLevelQuery(
             query = "test_field:\"12345\" AND source.id:\"12345\"",
-            name = "5",
-            fields = listOf()
+            name = "5"
         )
         val docLevelInput = DocLevelMonitorInput("description", listOf("test*"), listOf(docQuery))
 
@@ -874,13 +870,11 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val docQuery1 = DocLevelQuery(
             query = "test_field:\"12345\"",
-            name = "4",
-            fields = listOf()
+            name = "4"
         )
         val docQuery2 = DocLevelQuery(
             query = "source.device.hwd.id:\"12345\"",
-            name = "5",
-            fields = listOf()
+            name = "5"
         )
 
         val docLevelInput = DocLevelMonitorInput("description", listOf("test*"), listOf(docQuery1, docQuery2))
@@ -927,7 +921,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             "test_field" : "us-west-2"
         }"""
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf("test*"), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
@@ -976,8 +970,8 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             "test_field" : "us-west-2"
         }"""
 
-        val docQuery1 = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
-        val docQuery2 = DocLevelQuery(query = "test_field_new:\"us-west-2\"", name = "4", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docQuery2 = DocLevelQuery(query = "test_field_new:\"us-west-2\"", name = "4")
         val docLevelInput = DocLevelMonitorInput("description", listOf("test*"), listOf(docQuery1, docQuery2))
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
@@ -1239,7 +1233,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
                 "test_field" : "us-west-2"
             }"""
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val alertCategories = AlertCategory.values()
@@ -1286,7 +1280,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val index4 = createTestIndex()
         val index5 = createTestIndex()
 
-        val docQuery = DocLevelQuery(query = "\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "\"us-west-2\"", name = "3")
         var docLevelInput = DocLevelMonitorInput("description", listOf(index1, index2, index4, index5), listOf(docQuery))
 
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
@@ -1334,7 +1328,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
                 "test_field" : "us-west-2"
             }"""
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val alertCategories = AlertCategory.values()

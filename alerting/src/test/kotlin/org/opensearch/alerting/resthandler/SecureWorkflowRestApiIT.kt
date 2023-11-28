@@ -1395,7 +1395,7 @@ class SecureWorkflowRestApiIT : AlertingRestTestCase() {
         )
         assertNotNull("The bucket monitor was not created", bucketMonitor)
 
-        val docQuery1 = DocLevelQuery(query = "test_field:\"a\"", name = "3", fields = listOf())
+        val docQuery1 = DocLevelQuery(query = "test_field:\"a\"", name = "3")
         var monitor1 = randomDocumentLevelMonitor(
             inputs = listOf(DocLevelMonitorInput("description", listOf(TEST_HR_INDEX), listOf(docQuery1))),
             triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN))

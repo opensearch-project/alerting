@@ -1,7 +1,7 @@
 {
   "dynamic": "strict",
   "_meta" : {
-    "schema_version": 4
+    "schema_version": 3
   },
   "properties": {
     "schema_version": {
@@ -46,9 +46,6 @@
               "type" : "keyword"
             }
           }
-        },
-        "fields": {
-          "type": "text"
         }
       }
     },
