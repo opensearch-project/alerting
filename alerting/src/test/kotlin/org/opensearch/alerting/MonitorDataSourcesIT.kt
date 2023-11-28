@@ -24,8 +24,6 @@ import org.opensearch.action.fieldcaps.FieldCapabilitiesRequest
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.support.WriteRequest
-import org.opensearch.alerting.action.SearchMonitorAction
-import org.opensearch.alerting.action.SearchMonitorRequest
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
@@ -47,6 +45,7 @@ import org.opensearch.commons.alerting.action.DeleteMonitorRequest
 import org.opensearch.commons.alerting.action.GetAlertsRequest
 import org.opensearch.commons.alerting.action.GetAlertsResponse
 import org.opensearch.commons.alerting.action.IndexMonitorResponse
+import org.opensearch.commons.alerting.action.SearchMonitorRequest
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.ChainedAlertTrigger
@@ -1445,12 +1444,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX)
         var searchMonitorResponse =
-            client().execute(SearchMonitorAction.INSTANCE, SearchMonitorRequest(searchRequest))
+            client().execute(AlertingActions.SEARCH_MONITORS_ACTION_TYPE, SearchMonitorRequest(searchRequest))
                 .get()
         Assert.assertEquals(searchMonitorResponse.hits.hits.size, 0)
         searchRequest.source().query(MatchQueryBuilder("monitor.owner", "security_analytics_plugin"))
         searchMonitorResponse =
-            client().execute(SearchMonitorAction.INSTANCE, SearchMonitorRequest(searchRequest))
+            client().execute(AlertingActions.SEARCH_MONITORS_ACTION_TYPE, SearchMonitorRequest(searchRequest))
                 .get()
         Assert.assertEquals(searchMonitorResponse.hits.hits.size, 1)
     }

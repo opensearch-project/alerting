@@ -11,16 +11,13 @@ import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.apache.lucene.search.join.ScoreMode
 import org.opensearch.OpenSearchStatusException
+import org.opensearch.action.ActionRequest
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.alerting.action.GetMonitorAction
-import org.opensearch.alerting.action.GetMonitorRequest
-import org.opensearch.alerting.action.GetMonitorResponse
-import org.opensearch.alerting.action.GetMonitorResponse.AssociatedWorkflow
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
@@ -34,9 +31,14 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.GetMonitorRequest
+import org.opensearch.commons.alerting.action.GetMonitorResponse
+import org.opensearch.commons.alerting.action.GetMonitorResponse.AssociatedWorkflow
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -55,8 +57,8 @@ class TransportGetMonitorAction @Inject constructor(
     val xContentRegistry: NamedXContentRegistry,
     val clusterService: ClusterService,
     settings: Settings,
-) : HandledTransportAction<GetMonitorRequest, GetMonitorResponse>(
-    GetMonitorAction.NAME,
+) : HandledTransportAction<ActionRequest, GetMonitorResponse>(
+    AlertingActions.GET_MONITOR_ACTION_NAME,
     transportService,
     actionFilters,
     ::GetMonitorRequest
@@ -70,12 +72,17 @@ class TransportGetMonitorAction @Inject constructor(
         listenFilterBySettingChange(clusterService)
     }
 
-    override fun doExecute(task: Task, getMonitorRequest: GetMonitorRequest, actionListener: ActionListener<GetMonitorResponse>) {
+    override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<GetMonitorResponse>) {
+        val transformedRequest = request as? GetMonitorRequest
+            ?: recreateObject(request) {
+                GetMonitorRequest(it)
+            }
+
         val user = readUserFromThreadContext(client)
 
-        val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, getMonitorRequest.monitorId)
-            .version(getMonitorRequest.version)
-            .fetchSourceContext(getMonitorRequest.srcContext)
+        val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, transformedRequest.monitorId)
+            .version(transformedRequest.version)
+            .fetchSourceContext(transformedRequest.srcContext)
 
         if (!validateUserBackendRoles(user, actionListener)) {
             return
@@ -115,7 +122,7 @@ class TransportGetMonitorAction @Inject constructor(
                                         monitor?.user,
                                         actionListener,
                                         "monitor",
-                                        getMonitorRequest.monitorId
+                                        transformedRequest.monitorId
                                     )
                                 ) {
                                     return
@@ -131,7 +138,6 @@ class TransportGetMonitorAction @Inject constructor(
                                         response.version,
                                         response.seqNo,
                                         response.primaryTerm,
-                                        RestStatus.OK,
                                         monitor,
                                         associatedCompositeMonitors
                                     )

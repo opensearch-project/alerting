@@ -20,9 +20,6 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.update.UpdateRequest
-import org.opensearch.alerting.action.GetMonitorAction
-import org.opensearch.alerting.action.GetMonitorRequest
-import org.opensearch.alerting.action.GetMonitorResponse
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
@@ -38,6 +35,8 @@ import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
 import org.opensearch.commons.alerting.action.AcknowledgeAlertResponse
 import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.GetMonitorRequest
+import org.opensearch.commons.alerting.action.GetMonitorResponse
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.util.optionalTimeField
@@ -94,7 +93,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                             RestRequest.Method.GET,
                             FetchSourceContext.FETCH_SOURCE
                         )
-                        execute(GetMonitorAction.INSTANCE, getMonitorRequest, it)
+                        execute(AlertingActions.GET_MONITOR_ACTION_TYPE, getMonitorRequest, it)
                     }
                 if (getMonitorResponse.monitor == null) {
                     actionListener.onFailure(
