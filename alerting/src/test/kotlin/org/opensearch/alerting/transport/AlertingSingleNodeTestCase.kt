@@ -22,8 +22,6 @@ import org.opensearch.alerting.action.ExecuteMonitorResponse
 import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.alerting.action.ExecuteWorkflowResponse
-import org.opensearch.alerting.action.GetMonitorAction
-import org.opensearch.alerting.action.GetMonitorRequest
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.WorkflowMetadata
@@ -37,6 +35,7 @@ import org.opensearch.commons.alerting.action.DeleteMonitorRequest
 import org.opensearch.commons.alerting.action.DeleteWorkflowRequest
 import org.opensearch.commons.alerting.action.GetFindingsRequest
 import org.opensearch.commons.alerting.action.GetFindingsResponse
+import org.opensearch.commons.alerting.action.GetMonitorRequest
 import org.opensearch.commons.alerting.action.GetWorkflowAlertsRequest
 import org.opensearch.commons.alerting.action.GetWorkflowAlertsResponse
 import org.opensearch.commons.alerting.action.GetWorkflowRequest
@@ -346,7 +345,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         version: Long = 1L,
         fetchSourceContext: FetchSourceContext = FetchSourceContext.FETCH_SOURCE,
     ) = client().execute(
-        GetMonitorAction.INSTANCE,
+        AlertingActions.GET_MONITOR_ACTION_TYPE,
         GetMonitorRequest(monitorId, version, RestRequest.Method.GET, fetchSourceContext)
     ).get()
 
