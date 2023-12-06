@@ -27,6 +27,9 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.alerting.MonitorMetadataService
+import org.opensearch.alerting.MonitorRunnerService.monitorCtx
+import org.opensearch.alerting.WorkflowMetadataService
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.addFilter
@@ -42,6 +45,7 @@ import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.isQueryLevelMonitor
+import org.opensearch.alerting.workflow.CompositeWorkflowRunner
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -371,6 +375,37 @@ class TransportIndexWorkflowAction @Inject constructor(
                     )
                     return
                 }
+
+                val createdWorkflow = request.workflow.copy(id = indexResponse.id)
+                val executionId = CompositeWorkflowRunner.generateExecutionId(false, createdWorkflow)
+
+                val (workflowMetadata, _) = WorkflowMetadataService.getOrCreateWorkflowMetadata(
+                    workflow = createdWorkflow,
+                    skipIndex = false,
+                    executionId = executionId
+                )
+
+                val delegates = (createdWorkflow.inputs[0] as CompositeInput).sequence.delegates.sortedBy { it.order }
+                val monitors = monitorCtx.workflowService!!.getMonitorsById(delegates.map { it.monitorId }, delegates.size)
+
+                for (monitor in monitors) {
+                    var (monitorMetadata, created) = MonitorMetadataService.getOrCreateMetadata(
+                        monitor = monitor,
+                        createWithRunContext = true,
+                        workflowMetadataId = workflowMetadata.id
+                    )
+
+                    if (created == false) {
+                        log.warn("Metadata doc id:${monitorMetadata.id} exists, but it shouldn't!")
+                    }
+
+                    if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                        val oldMonitorMetadata = MonitorMetadataService.getMetadata(monitor)
+                        monitorMetadata = monitorMetadata.copy(sourceToQueryIndexMapping = oldMonitorMetadata!!.sourceToQueryIndexMapping)
+                    }
+                    // When inserting queries in queryIndex we could update sourceToQueryIndexMapping
+                    MonitorMetadataService.upsertMetadata(monitorMetadata, updating = true)
+                }
                 actionListener.onResponse(
                     IndexWorkflowResponse(
                         indexResponse.id, indexResponse.version, indexResponse.seqNo,
@@ -497,6 +532,33 @@ class TransportIndexWorkflowAction @Inject constructor(
                         )
                     )
                     return
+                }
+
+                val updatedWorkflow = request.workflow.copy(id = indexResponse.id)
+                val executionId = CompositeWorkflowRunner.generateExecutionId(false, updatedWorkflow)
+
+                val (workflowMetadata, _) = WorkflowMetadataService.getOrCreateWorkflowMetadata(
+                    workflow = updatedWorkflow,
+                    skipIndex = false,
+                    executionId = executionId
+                )
+
+                val delegates = (updatedWorkflow.inputs[0] as CompositeInput).sequence.delegates.sortedBy { it.order }
+                val monitors = monitorCtx.workflowService!!.getMonitorsById(delegates.map { it.monitorId }, delegates.size)
+
+                for (monitor in monitors) {
+                    val (monitorMetadata, created) = MonitorMetadataService.getOrCreateMetadata(
+                        monitor = monitor,
+                        createWithRunContext = true,
+                        workflowMetadataId = workflowMetadata.id
+                    )
+
+                    if (created == false && monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                        var updatedMetadata = MonitorMetadataService.recreateRunContext(monitorMetadata, monitor)
+                        val oldMonitorMetadata = MonitorMetadataService.getMetadata(monitor)
+                        updatedMetadata = updatedMetadata.copy(sourceToQueryIndexMapping = oldMonitorMetadata!!.sourceToQueryIndexMapping)
+                        MonitorMetadataService.upsertMetadata(updatedMetadata, updating = true)
+                    }
                 }
                 actionListener.onResponse(
                     IndexWorkflowResponse(
