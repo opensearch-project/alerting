@@ -930,6 +930,11 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return index
     }
 
+    protected fun createTestIndex(index: String, mapping: String?, alias: String): String {
+        createIndex(index, Settings.EMPTY, mapping?.trimIndent(), alias)
+        return index
+    }
+
     protected fun createTestConfigIndex(index: String = "." + randomAlphaOfLength(10).lowercase(Locale.ROOT)): String {
         try {
             createIndex(
@@ -1015,6 +1020,42 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun deleteDataStream(datastream: String) {
         client().makeRequest("DELETE", "_data_stream/$datastream")
+    }
+
+    protected fun createIndexAlias(alias: String, mappings: String?) {
+        val indexPattern = "$alias*"
+        var componentTemplateMappings = "\"properties\": {" +
+            "  \"netflow.destination_transport_port\":{ \"type\": \"long\" }," +
+            "  \"netflow.destination_ipv4_address\":{ \"type\": \"ip\" }" +
+            "}"
+        if (mappings != null) {
+            componentTemplateMappings = mappings
+        }
+        createComponentTemplateWithMappings(
+            "my_alias_component_template-$alias",
+            componentTemplateMappings
+        )
+        createComposableIndexTemplate(
+            "my_index_template_alias-$alias",
+            listOf(indexPattern),
+            "my_alias_component_template-$alias",
+            mappings,
+            false,
+            0
+        )
+        createTestIndex(
+            "$alias-000001",
+            null,
+            """
+            "$alias": {
+              "is_write_index": true
+            }
+            """.trimIndent()
+        )
+    }
+
+    protected fun deleteIndexAlias(alias: String) {
+        client().makeRequest("DELETE", "$alias*/_alias/$alias")
     }
 
     protected fun createComponentTemplateWithMappings(componentTemplateName: String, mappings: String?) {
