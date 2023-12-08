@@ -119,12 +119,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         try {
             // Resolve all passed indices to concrete indices
-            val concreteIndices = IndexUtils.resolveAllIndices(
+            val allConcreteIndices = IndexUtils.resolveAllIndices(
                 docLevelMonitorInput.indices,
                 monitorCtx.clusterService!!,
                 monitorCtx.indexNameExpressionResolver!!
             )
-            if (concreteIndices.isEmpty()) {
+            if (allConcreteIndices.isEmpty()) {
                 logger.error("indices not found-${docLevelMonitorInput.indices.joinToString(",")}")
                 throw IndexNotFoundException(docLevelMonitorInput.indices.joinToString(","))
             }
@@ -140,7 +140,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             // cleanup old indices that are not monitored anymore from the same monitor
             val runContextKeys = updatedLastRunContext.keys.toMutableSet()
             for (ind in runContextKeys) {
-                if (!concreteIndices.contains(ind)) {
+                if (!allConcreteIndices.contains(ind)) {
                     updatedLastRunContext.remove(ind)
                 }
             }
@@ -149,11 +149,26 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             val matchingDocIdsPerIndex = workflowRunContext?.matchingDocIdsPerIndex
 
             docLevelMonitorInput.indices.forEach { indexName ->
-                val concreteIndices = IndexUtils.resolveAllIndices(
+                var concreteIndices = IndexUtils.resolveAllIndices(
                     listOf(indexName),
                     monitorCtx.clusterService!!,
                     monitorCtx.indexNameExpressionResolver!!
                 )
+                var lastWriteIndex: String? = null
+                if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
+                    IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
+                ) {
+                    lastWriteIndex = concreteIndices.find { lastRunContext.containsKey(it) }
+                    if (lastWriteIndex != null) {
+                        val lastWriteIndexCreationDate =
+                            IndexUtils.getCreationDateForIndex(lastWriteIndex, monitorCtx.clusterService!!.state())
+                        concreteIndices = IndexUtils.getNewestIndicesByCreationDate(
+                            concreteIndices,
+                            monitorCtx.clusterService!!.state(),
+                            lastWriteIndexCreationDate
+                        )
+                    }
+                }
                 val updatedIndexName = indexName.replace("*", "_")
                 val conflictingFields = monitorCtx.docLevelMonitorQueries!!.getAllConflictingFields(
                     monitorCtx.clusterService!!.state(),
@@ -178,7 +193,16 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                         monitorCtx,
                         concreteIndexName
                     ) as MutableMap<String, Any>
-                    updatedLastRunContext[concreteIndexName] = indexUpdatedRunContext
+                    if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
+                        IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
+                    ) {
+                        if (concreteIndexName == IndexUtils.getWriteIndex(indexName, monitorCtx.clusterService!!.state())) {
+                            updatedLastRunContext.remove(lastWriteIndex)
+                            updatedLastRunContext[concreteIndexName] = indexUpdatedRunContext
+                        }
+                    } else {
+                        updatedLastRunContext[concreteIndexName] = indexUpdatedRunContext
+                    }
 
                     val count: Int = indexLastRunContext["shards_count"] as Int
                     for (i: Int in 0 until count) {
