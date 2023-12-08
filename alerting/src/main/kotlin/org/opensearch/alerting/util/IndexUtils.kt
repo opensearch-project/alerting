@@ -13,6 +13,7 @@ import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.client.IndicesAdminClient
 import org.opensearch.cluster.ClusterState
+import org.opensearch.cluster.metadata.IndexAbstraction
 import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.service.ClusterService
@@ -150,6 +151,48 @@ class IndexUtils {
             }
 
             return result
+        }
+
+        @JvmStatic
+        fun isDataStream(name: String, clusterState: ClusterState): Boolean {
+            return clusterState.metadata().dataStreams().containsKey(name)
+        }
+
+        @JvmStatic
+        fun isAlias(name: String, clusterState: ClusterState): Boolean {
+            return clusterState.metadata().hasAlias(name)
+        }
+
+        @JvmStatic
+        fun getWriteIndex(index: String, clusterState: ClusterState): String? {
+            if (isAlias(index, clusterState) || isDataStream(index, clusterState)) {
+                val metadata = clusterState.metadata.indicesLookup[index]?.writeIndex
+                if (metadata != null) {
+                    return metadata.index.name
+                }
+            }
+            return null
+        }
+
+        @JvmStatic
+        fun getNewestIndicesByCreationDate(concreteIndices: List<String>, clusterState: ClusterState, thresholdDate: Long): List<String> {
+            val filteredIndices = mutableListOf<String>()
+            val lookup = clusterState.metadata().indicesLookup
+            concreteIndices.forEach { indexName ->
+                val index = lookup[indexName]
+                val indexMetadata = clusterState.metadata.index(indexName)
+                if (index != null && index.type == IndexAbstraction.Type.CONCRETE_INDEX) {
+                    if (indexMetadata.creationDate >= thresholdDate) {
+                        filteredIndices.add(indexName)
+                    }
+                }
+            }
+            return filteredIndices
+        }
+
+        @JvmStatic
+        fun getCreationDateForIndex(index: String, clusterState: ClusterState): Long {
+            return clusterState.metadata.index(index).creationDate
         }
     }
 }
