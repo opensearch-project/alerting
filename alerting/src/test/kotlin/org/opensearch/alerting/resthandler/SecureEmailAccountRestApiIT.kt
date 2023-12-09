@@ -9,10 +9,10 @@ import org.apache.http.HttpHeaders
 import org.apache.http.entity.ContentType
 import org.apache.http.entity.StringEntity
 import org.apache.http.message.BasicHeader
+import org.apache.lucene.tests.util.LuceneTestCase.AwaitsFix
 import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
-import org.junit.Ignore
 import org.opensearch.alerting.ALERTING_GET_EMAIL_ACCOUNT_ACCESS
 import org.opensearch.alerting.ALERTING_NO_ACCESS_ROLE
 import org.opensearch.alerting.ALERTING_SEARCH_EMAIL_ACCOUNT_ACCESS
@@ -43,7 +43,7 @@ val SEARCH_EMAIL_ACCOUNT_DSL = """
 """.trimIndent()
 
 // TODO investigate flaky nature of tests. not reproducible in local but fails in jenkins CI
-@Ignore
+@AwaitsFix(bugUrl = "")
 class SecureEmailAccountRestApiIT : AlertingRestTestCase() {
 
     companion object {
