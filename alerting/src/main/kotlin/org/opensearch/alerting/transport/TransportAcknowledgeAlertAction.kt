@@ -20,7 +20,9 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.update.UpdateRequest
+import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.use
 import org.opensearch.client.Client
@@ -66,11 +68,18 @@ class TransportAcknowledgeAlertAction @Inject constructor(
     val xContentRegistry: NamedXContentRegistry,
     val transportGetMonitorAction: TransportGetMonitorAction
 ) : HandledTransportAction<ActionRequest, AcknowledgeAlertResponse>(
-    AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_NAME, transportService, actionFilters, ::AcknowledgeAlertRequest
-) {
+    AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_NAME,
+    transportService,
+    actionFilters,
+    ::AcknowledgeAlertRequest
+),
+    SecureTransportAction {
 
     @Volatile
     private var isAlertHistoryEnabled = AlertingSettings.ALERT_HISTORY_ENABLED.get(settings)
+
+    @Volatile
+    override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERT_HISTORY_ENABLED) { isAlertHistoryEnabled = it }
@@ -83,8 +92,9 @@ class TransportAcknowledgeAlertAction @Inject constructor(
     ) {
         val request = acknowledgeAlertRequest as? AcknowledgeAlertRequest
             ?: recreateObject(acknowledgeAlertRequest) { AcknowledgeAlertRequest(it) }
-        client.threadPool().threadContext.stashContext().use {
-            scope.launch {
+        val user = readUserFromThreadContext(client)
+        scope.launch {
+            withClosableContext(InjectorContextElement(request.monitorId, settings, client.threadPool().threadContext, user?.roles)) {
                 val getMonitorResponse: GetMonitorResponse =
                     transportGetMonitorAction.client.suspendUntil {
                         val getMonitorRequest = GetMonitorRequest(
@@ -108,7 +118,9 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                         )
                     )
                 } else {
-                    AcknowledgeHandler(client, actionListener, request).start(getMonitorResponse.monitor!!)
+                    client.threadPool().threadContext.stashContext().use {
+                        AcknowledgeHandler(client, actionListener, request).start(getMonitorResponse.monitor!!)
+                    }
                 }
             }
         }
