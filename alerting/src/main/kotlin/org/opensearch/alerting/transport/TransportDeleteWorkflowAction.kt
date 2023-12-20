@@ -60,6 +60,7 @@ import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
+import java.util.Optional
 
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 /**
@@ -119,7 +120,12 @@ class TransportDeleteWorkflowAction @Inject constructor(
     ) {
         suspend fun resolveUserAndStart() {
             try {
-                val workflow = getWorkflow()
+                val optionalWorkflow = getWorkflow()
+                if (optionalWorkflow.isEmpty) {
+                    return
+                }
+
+                val workflow = optionalWorkflow.get()
 
                 val canDelete = user == null ||
                     !doFilterForUser(user) ||
@@ -296,17 +302,27 @@ class TransportDeleteWorkflowAction @Inject constructor(
             return deletableMonitors
         }
 
-        private suspend fun getWorkflow(): Workflow {
+        private suspend fun getWorkflow(): Optional<Workflow> {
             val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, workflowId)
 
             val getResponse: GetResponse = client.suspendUntil { get(getRequest, it) }
-            if (getResponse.isExists == false) {
-                actionListener.onFailure(
-                    AlertingException.wrap(
-                        OpenSearchStatusException("Workflow not found.", RestStatus.NOT_FOUND)
-                    )
-                )
+            if (!getResponse.isExists) {
+                handleWorkflowMissing()
+                return Optional.empty()
             }
+
+            return Optional.of(parseWorkflow(getResponse))
+        }
+
+        private fun handleWorkflowMissing() {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException("Workflow not found.", RestStatus.NOT_FOUND)
+                )
+            )
+        }
+
+        private fun parseWorkflow(getResponse: GetResponse): Workflow {
             val xcp = XContentHelper.createParser(
                 xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                 getResponse.sourceAsBytesRef, XContentType.JSON
