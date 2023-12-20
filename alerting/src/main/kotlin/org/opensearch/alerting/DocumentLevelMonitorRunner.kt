@@ -742,7 +742,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         }
 
         if (response.status() !== RestStatus.OK) {
-            throw IOException("Failed to search percolate index: $queryIndex. Response status is ${response.status()}")
+            throw IOException(
+                "Monitor ${monitor.id}: Failed to search percolate index: $queryIndex. Response status is ${response.status()}"
+            )
         }
         return response.hits
     }
