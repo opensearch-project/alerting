@@ -630,7 +630,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             }
 
             if (transformedDocs.isNotEmpty()) {
-                val matchedQueriesForDocs = getMatchedQueries(
+                val percolateQueryResponseHits = runPercolateQueryOnTransformedDocs(
                     monitorCtx,
                     transformedDocs.map { it.second },
                     monitor,
@@ -639,7 +639,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     concreteIndexName
                 )
 
-                matchedQueriesForDocs.forEach { hit ->
+                percolateQueryResponseHits.forEach { hit ->
                     val id = hit.id
                         .replace("_${indexName}_${monitor.id}", "")
                         .replace("_${concreteIndexName}_${monitor.id}", "")
@@ -698,7 +698,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         return response.hits
     }
 
-    private suspend fun getMatchedQueries(
+    /** Executes percolate query on the docs against the monitor's query index and return the hits from the search response*/
+    private suspend fun runPercolateQueryOnTransformedDocs(
         monitorCtx: MonitorRunnerExecutionContext,
         docs: List<BytesReference>,
         monitor: Monitor,
@@ -727,7 +728,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         val searchSourceBuilder = SearchSourceBuilder()
         searchSourceBuilder.query(boolQueryBuilder)
         searchRequest.source(searchSourceBuilder)
-
+        logger.debug("Monitor ${monitor.id}: Executing percolate query for docs from source index $index against query index $queryIndex")
         var response: SearchResponse
         try {
             response = monitorCtx.client!!.suspendUntil {
@@ -735,12 +736,13 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             }
         } catch (e: Exception) {
             throw IllegalStateException(
-                "Failed to run percolate search for sourceIndex [$index] and queryIndex [$queryIndex] for ${docs.size} document(s)", e
+                "Monitor ${monitor.id}: Failed to run percolate search for sourceIndex [$index] " +
+                    "and queryIndex [$queryIndex] for ${docs.size} document(s)", e
             )
         }
 
         if (response.status() !== RestStatus.OK) {
-            throw IOException("Failed to search percolate index: $queryIndex")
+            throw IOException("Failed to search percolate index: $queryIndex. Response status is ${response.status()}")
         }
         return response.hits
     }
