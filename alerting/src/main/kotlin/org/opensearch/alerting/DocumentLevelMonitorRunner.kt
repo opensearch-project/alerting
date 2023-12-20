@@ -596,8 +596,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         docsToQueries: MutableMap<String, MutableList<String>>,
     ) {
         val count: Int = docExecutionCtx.updatedLastRunContext["shards_count"] as Int
-        val transformedDocs = mutableListOf<Pair<String, BytesReference>>()
         for (i: Int in 0 until count) {
+            val transformedDocs = mutableListOf<Pair<String, BytesReference>>()
             val shard = i.toString()
             try {
                 val maxSeqNo: Long = docExecutionCtx.updatedLastRunContext[shard].toString().toLong()
