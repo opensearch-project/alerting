@@ -31,6 +31,33 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         assertFalse(response.findings[0].documents[0].found)
     }
 
+    fun `test find Finding where source docData is null`() {
+        val testIndex = createTestIndex()
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_field" : "us-west-2"
+        }"""
+        indexDoc(testIndex, "someId", testDoc)
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val trueMonitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+        executeMonitor(trueMonitor.id, mapOf(Pair("dryrun", "true")))
+
+        createFinding(matchingDocIds = listOf("someId"), index = testIndex)
+        val responseBeforeDelete = searchFindings()
+        assertEquals(1, responseBeforeDelete.totalFindings)
+        assertEquals(1, responseBeforeDelete.findings[0].documents.size)
+        assertTrue(responseBeforeDelete.findings[0].documents[0].found)
+
+        deleteDoc(testIndex, "someId")
+        val responseAfterDelete = searchFindings()
+        assertEquals(1, responseAfterDelete.totalFindings)
+        assertEquals(1, responseAfterDelete.findings[0].documents.size)
+        assertFalse(responseAfterDelete.findings[0].documents[0].found)
+    }
+
     fun `test find Finding where doc is retrieved`() {
         val testIndex = createTestIndex()
         val testDoc = """{
