@@ -57,6 +57,8 @@ class RestGetAlertsAction : BaseRestHandler() {
         val severityLevel = request.param("severityLevel", "ALL")
         val alertState = request.param("alertState", "ALL")
         val monitorId: String? = request.param("monitorId")
+        val findingIdsParam: String? = request.param("findingIds")
+        val findingIds: List<String> = findingIdsParam?.split(",")?.map { it.trim() } ?: listOf()
         val workflowId: String? = request.param("workflowIds")
         val workflowIds = mutableListOf<String>()
         if (workflowId.isNullOrEmpty() == false) {
@@ -73,7 +75,7 @@ class RestGetAlertsAction : BaseRestHandler() {
             searchString
         )
 
-        val getAlertsRequest = GetAlertsRequest(table, severityLevel, alertState, monitorId, null, workflowIds = workflowIds)
+        val getAlertsRequest = GetAlertsRequest(table, findingIds = findingIds, severityLevel, alertState, monitorId, null, workflowIds = workflowIds)
         return RestChannelConsumer {
                 channel ->
             client.execute(AlertingActions.GET_ALERTS_ACTION_TYPE, getAlertsRequest, RestToXContentListener(channel))

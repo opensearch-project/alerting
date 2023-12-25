@@ -121,6 +121,13 @@ class TransportGetAlertsAction @Inject constructor(
             queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getAlertsRequest.monitorIds))
             addWorkflowIdNullOrEmptyCheck(getAlertsRequest, queryBuilder)
         }
+        if (getAlertsRequest.findingIds.isNullOrEmpty() == false) {
+            queryBuilder.filter(QueryBuilders.termQuery("finding_id", getAlertsRequest.findingIds))
+            addWorkflowIdNullOrEmptyCheck(getAlertsRequest, queryBuilder)
+        } else if (getAlertsRequest.findingIds.isNullOrEmpty() == false) {
+            queryBuilder.filter(QueryBuilders.termsQuery("finding_id", getAlertsRequest.findingIds))
+            addWorkflowIdNullOrEmptyCheck(getAlertsRequest, queryBuilder)
+        }
         if (
             getAlertsRequest.workflowIds.isNullOrEmpty() == false &&
             !(getAlertsRequest.workflowIds!!.size == 1 && getAlertsRequest.workflowIds!![0] == "")
