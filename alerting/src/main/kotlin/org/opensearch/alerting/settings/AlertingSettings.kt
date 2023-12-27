@@ -24,6 +24,16 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        /** Defines the threshold of the docs accumulated in memory to query against percolate query index in document
+         * level monitor execution. The docs are being collected from searching on shards of indices mentioned in the
+         * monitor input indices field.
+         */
+        val PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT = Setting.intSetting(
+            "plugins.alerting.monitor.percolate_query_docs_size_memory_percentage_limit",
+            10,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
         val INPUT_TIMEOUT = Setting.positiveTimeSetting(
             "plugins.alerting.input_timeout",
             LegacyOpenDistroAlertingSettings.INPUT_TIMEOUT,
