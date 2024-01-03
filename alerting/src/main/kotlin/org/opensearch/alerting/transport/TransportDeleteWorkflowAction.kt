@@ -60,7 +60,6 @@ import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
-import java.util.Optional
 
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 /**
@@ -120,12 +119,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
     ) {
         suspend fun resolveUserAndStart() {
             try {
-                val optionalWorkflow = getWorkflow()
-                if (optionalWorkflow.isEmpty) {
-                    return
-                }
-
-                val workflow = optionalWorkflow.get()
+                val workflow: Workflow = getWorkflow() ?: return
 
                 val canDelete = user == null ||
                     !doFilterForUser(user) ||
@@ -302,16 +296,16 @@ class TransportDeleteWorkflowAction @Inject constructor(
             return deletableMonitors
         }
 
-        private suspend fun getWorkflow(): Optional<Workflow> {
+        private suspend fun getWorkflow(): Workflow? {
             val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, workflowId)
 
             val getResponse: GetResponse = client.suspendUntil { get(getRequest, it) }
             if (!getResponse.isExists) {
                 handleWorkflowMissing()
-                return Optional.empty()
+                return null
             }
 
-            return Optional.of(parseWorkflow(getResponse))
+            return parseWorkflow(getResponse)
         }
 
         private fun handleWorkflowMissing() {
