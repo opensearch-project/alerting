@@ -6,6 +6,7 @@
 package org.opensearch.alerting
 
 import org.junit.Before
+import org.junit.Ignore
 import org.mockito.Mockito
 import org.opensearch.Version
 import org.opensearch.alerting.alerts.AlertIndices
@@ -17,6 +18,7 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.AggregationResultBucket
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
@@ -28,6 +30,7 @@ import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.TimeUnit
 
 class AlertServiceTests : OpenSearchTestCase() {
 
@@ -39,6 +42,7 @@ class AlertServiceTests : OpenSearchTestCase() {
 
     private lateinit var alertIndices: AlertIndices
     private lateinit var alertService: AlertService
+    private lateinit var monitorRunnerService: MonitorRunnerService
 
     @Before
     fun setup() {
@@ -47,7 +51,6 @@ class AlertServiceTests : OpenSearchTestCase() {
         xContentRegistry = Mockito.mock(NamedXContentRegistry::class.java)
         threadPool = Mockito.mock(ThreadPool::class.java)
         clusterService = Mockito.mock(ClusterService::class.java)
-
         settings = Settings.builder().build()
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
@@ -214,6 +217,30 @@ class AlertServiceTests : OpenSearchTestCase() {
         assertAlertsExistForBucketKeys(listOf(listOf("a")), categorizedAlerts[AlertCategory.DEDUPED] ?: error("Deduped alerts not found"))
         assertAlertsExistForBucketKeys(emptyList(), categorizedAlerts[AlertCategory.NEW] ?: error("New alerts found"))
         assertAlertsExistForBucketKeys(emptyList(), completedAlerts)
+    }
+
+    // TODO fix the tests
+    @Ignore("The test is failing because can't mock final class MockerRunnerService.")
+    fun `test getCancelAfterTimeInterval with default value`() {
+        // Mock the cancelAfterTimeInterval to be 10 minutes
+        monitorRunnerService.monitorCtx.cancelAfterTimeInterval = TimeValue(-1, TimeUnit.MINUTES)
+
+        val result = alertService.getCancelAfterTimeInterval()
+
+        // Expect the result to be the default
+        assertEquals(-1, result)
+    }
+
+    // TODO fix the tests
+    @Ignore("The test is failing because can't mock final class MockerRunnerService.")
+    fun `test getCancelAfterTimeInterval with custom value`() {
+        // Mock the cancelAfterTimeInterval to be 10 minutes
+        monitorRunnerService.monitorCtx.cancelAfterTimeInterval = TimeValue(10, TimeUnit.MINUTES)
+
+        val result = alertService.getCancelAfterTimeInterval()
+
+        // Expect the result to be the maximum between 10 minutes and ALERTS_SEARCH_TIMEOUT.minutes
+        assertEquals(10, result)
     }
 
     private fun createCurrentAlertsFromBucketKeys(

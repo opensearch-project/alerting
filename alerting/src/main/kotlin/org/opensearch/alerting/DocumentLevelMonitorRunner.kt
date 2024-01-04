@@ -33,6 +33,7 @@ import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.routing.Preference
 import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.AlertingPluginInterface
@@ -64,7 +65,6 @@ import java.io.IOException
 import java.time.Instant
 import java.util.UUID
 import kotlin.math.max
-
 object DocumentLevelMonitorRunner : MonitorRunner() {
     private val logger = LogManager.getLogger(javaClass)
 
@@ -90,7 +90,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             logger.error("Error setting up alerts and findings indices for monitor: $id", e)
             monitorResult = monitorResult.copy(error = AlertingException.wrap(e))
         }
-
         try {
             validate(monitor)
         } catch (e: Exception) {
@@ -583,7 +582,13 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     .query(QueryBuilders.matchAllQuery())
                     .size(1)
             )
+        request.cancelAfterTimeInterval = TimeValue.timeValueMinutes(
+            MonitorRunnerService
+                .monitorCtx.alertService!!.getCancelAfterTimeInterval()
+        )
+
         val response: SearchResponse = client.suspendUntil { client.search(request, it) }
+
         if (response.status() !== RestStatus.OK) {
             throw IOException("Failed to get max seq no for shard: $shard")
         }
@@ -668,6 +673,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     .size(10000) // fixme: make this configurable.
             )
             .preference(Preference.PRIMARY_FIRST.type())
+
+        request.cancelAfterTimeInterval = TimeValue.timeValueMinutes(
+            MonitorRunnerService
+                .monitorCtx.alertService!!.getCancelAfterTimeInterval()
+        )
+
         val response: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(request, it) }
         if (response.status() !== RestStatus.OK) {
             throw IOException("Failed to search shard: $shard")
@@ -706,7 +717,13 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         searchRequest.source(searchSourceBuilder)
 
         var response: SearchResponse
+
         try {
+            searchRequest.cancelAfterTimeInterval = TimeValue.timeValueMinutes(
+                MonitorRunnerService
+                    .monitorCtx.alertService!!.getCancelAfterTimeInterval()
+            )
+
             response = monitorCtx.client!!.suspendUntil {
                 monitorCtx.client!!.execute(SearchAction.INSTANCE, searchRequest, it)
             }
