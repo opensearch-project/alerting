@@ -183,7 +183,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 }
                 concreteIndicesSeenSoFar.addAll(concreteIndices)
                 val updatedIndexName = indexName.replace("*", "_")
-//                lastUpdatedIndexName = updatedIndexName
                 val conflictingFields = monitorCtx.docLevelMonitorQueries!!.getAllConflictingFields(
                     monitorCtx.clusterService!!.state(),
                     concreteIndices
@@ -191,7 +190,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
                 concreteIndices.forEach { concreteIndexName ->
                     // Prepare lastRunContext for each index
-//                    lastConcreteIndexName = concreteIndexName
                     val indexLastRunContext = lastRunContext.getOrPut(concreteIndexName) {
                         val isIndexCreatedRecently = createdRecently(
                             monitor,
@@ -252,7 +250,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 }
             }
             /* if all indices are covered still in-memory docs size limit is not breached we would need to submit
-         the percolate query at the end*/
+               the percolate query at the end */
             if (transformedDocs.isNotEmpty()) {
                 performPercolateQueryAndResetCounters(
                     monitorCtx,
@@ -772,7 +770,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         monitorInputIndices: List<String>,
     ): SearchHits {
         val indices = docs.stream().map { it.second.indexName }.distinct().collect(Collectors.toList())
-        val boolQueryBuilder = BoolQueryBuilder().must(QueryBuilders.termsQuery("index", indices))
+        val boolQueryBuilder = BoolQueryBuilder().must(buildShouldClausesOverPerIndexMatchQueries(indices))
         val percolateQueryBuilder =
             PercolateQueryBuilderExt("query", docs.map { it.second.docSource }, XContentType.JSON)
         if (monitor.id.isNotEmpty()) {
@@ -822,6 +820,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             )
         }
         return response.hits
+    }
+    /** we cannot use terms query because `index` field's mapping is of type TEXT and not keyword. Refer doc-level-queries.json*/
+    private fun buildShouldClausesOverPerIndexMatchQueries(indices: List<String>): BoolQueryBuilder {
+        val boolQueryBuilder = QueryBuilders.boolQuery()
+        indices.forEach { boolQueryBuilder.should(QueryBuilders.matchQuery("index", it)) }
+        return boolQueryBuilder
     }
 
     /** Transform field names and index names in all the search hits to format required to run percolate search against them.
