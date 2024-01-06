@@ -87,8 +87,16 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             monitorCtx.alertIndices!!.createOrUpdateInitialFindingHistoryIndex(monitor.dataSources)
         } catch (e: Exception) {
             val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
-            logger.error("Error setting up alerts and findings indices for monitor: $id", e)
-            monitorResult = monitorResult.copy(error = AlertingException.wrap(e))
+            val unwrappedException = ExceptionsHelper.unwrapCause(e) as Exception
+            if (unwrappedException is IllegalArgumentException && unwrappedException.message?.contains("Limit of total fields") == true) {
+                val errorMessage =
+                    "Monitor [$id] can't process index [$monitor.dataSources] due to field mapping limit"
+                logger.error(errorMessage)
+                monitorResult = monitorResult.copy(error = AlertingException(errorMessage, RestStatus.INTERNAL_SERVER_ERROR, e))
+            } else {
+                logger.error("Error setting up alerts and findings indices for monitor: $id", e)
+                monitorResult = monitorResult.copy(error = AlertingException.wrap(e))
+            }
         }
 
         try {
