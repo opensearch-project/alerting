@@ -6,6 +6,8 @@
 package org.opensearch.alerting.util
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.alerting.AlertService
+import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.settings.DestinationSettings
@@ -18,6 +20,7 @@ import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.commons.alerting.model.action.ActionExecutionScope
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
+import kotlin.math.max
 
 private val logger = LogManager.getLogger("AlertingUtils")
 
@@ -161,6 +164,16 @@ inline fun <T : ThreadContext.StoredContext, R> T.use(block: (T) -> R): R {
     } finally {
         closeFinally(exception)
     }
+}
+
+fun getCancelAfterTimeInterval(): Long {
+    // The default value for the cancelAfterTimeInterval is -1 and so, in this case
+    // we should ignore processing on the value
+    val givenInterval = MonitorRunnerService.monitorCtx.cancelAfterTimeInterval!!.minutes
+    if (givenInterval == -1L) {
+        return givenInterval
+    }
+    return max(givenInterval, AlertService.ALERTS_SEARCH_TIMEOUT.minutes)
 }
 
 /**

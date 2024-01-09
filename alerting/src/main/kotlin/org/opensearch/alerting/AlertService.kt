@@ -67,7 +67,6 @@ import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
-import kotlin.math.max
 
 /** Service that handles CRUD operations for alerts */
 class AlertService(
@@ -875,16 +874,6 @@ class AlertService(
             throw (searchResponse.firstFailureOrNull()?.cause ?: RuntimeException("Unknown error loading alerts"))
         }
         return searchResponse
-    }
-
-    fun getCancelAfterTimeInterval(): Long {
-        // The default value for the cancelAfterTimeInterval is -1 and so, in this case
-        // we should ignore processing on the value
-        val givenInterval = MonitorRunnerService.monitorCtx.cancelAfterTimeInterval!!.minutes
-        if (givenInterval == -1L) {
-            return givenInterval
-        }
-        return max(givenInterval, ALERTS_SEARCH_TIMEOUT.minutes)
     }
 
     private fun List<AlertError>?.update(alertError: AlertError?): List<AlertError> {

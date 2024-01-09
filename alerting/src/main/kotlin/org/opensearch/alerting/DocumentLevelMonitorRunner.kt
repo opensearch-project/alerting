@@ -26,6 +26,7 @@ import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
+import org.opensearch.alerting.util.getCancelAfterTimeInterval
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client
 import org.opensearch.client.node.NodeClient
@@ -582,10 +583,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     .query(QueryBuilders.matchAllQuery())
                     .size(1)
             )
-        request.cancelAfterTimeInterval = TimeValue.timeValueMinutes(
-            MonitorRunnerService
-                .monitorCtx.alertService!!.getCancelAfterTimeInterval()
-        )
+        request.cancelAfterTimeInterval = TimeValue.timeValueMinutes(getCancelAfterTimeInterval())
 
         val response: SearchResponse = client.suspendUntil { client.search(request, it) }
 
@@ -675,10 +673,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             .preference(Preference.PRIMARY_FIRST.type())
 
         request.cancelAfterTimeInterval = TimeValue.timeValueMinutes(
-            MonitorRunnerService
-                .monitorCtx.alertService!!.getCancelAfterTimeInterval()
+            getCancelAfterTimeInterval()
         )
-
         val response: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(request, it) }
         if (response.status() !== RestStatus.OK) {
             throw IOException("Failed to search shard: $shard")
@@ -720,8 +716,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         try {
             searchRequest.cancelAfterTimeInterval = TimeValue.timeValueMinutes(
-                MonitorRunnerService
-                    .monitorCtx.alertService!!.getCancelAfterTimeInterval()
+                getCancelAfterTimeInterval()
             )
 
             response = monitorCtx.client!!.suspendUntil {

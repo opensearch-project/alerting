@@ -24,6 +24,7 @@ import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
+import org.opensearch.alerting.util.getCancelAfterTimeInterval
 import org.opensearch.alerting.util.getCombinedTriggerRunResult
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.common.unit.TimeValue
@@ -411,8 +412,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             sr.source().query(queryBuilder)
                         }
                     sr.cancelAfterTimeInterval = TimeValue.timeValueMinutes(
-                        MonitorRunnerService
-                            .monitorCtx.alertService!!.getCancelAfterTimeInterval()
+                        getCancelAfterTimeInterval()
                     )
                     val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(sr, it) }
                     return createFindingPerIndex(searchResponse, monitor, monitorCtx, shouldCreateFinding, executionId)
