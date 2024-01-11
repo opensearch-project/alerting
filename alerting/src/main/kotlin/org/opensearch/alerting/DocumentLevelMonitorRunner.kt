@@ -23,6 +23,7 @@ import org.opensearch.alerting.model.userErrorMessage
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings.Companion.PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT
+import org.opensearch.alerting.settings.AlertingSettings.Companion.PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
@@ -663,7 +664,10 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     e
                 )
             }
-            if (transformedDocs.isNotEmpty() && isInMemoryDocsSizeExceedingMemoryLimit(docsSizeInBytes.get(), monitorCtx)) {
+            if (
+                transformedDocs.isNotEmpty() &&
+                shouldPerformPercolateQueryAndFlushInMemoryDocs(docsSizeInBytes, transformedDocs.size, monitorCtx)
+            ) {
                 performPercolateQueryAndResetCounters(
                     monitorCtx,
                     transformedDocs,
@@ -677,6 +681,15 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 )
             }
         }
+    }
+
+    private fun shouldPerformPercolateQueryAndFlushInMemoryDocs(
+        docsSizeInBytes: AtomicLong,
+        numDocs: Int,
+        monitorCtx: MonitorRunnerExecutionContext,
+    ): Boolean {
+        return isInMemoryDocsSizeExceedingMemoryLimit(docsSizeInBytes.get(), monitorCtx) ||
+            isInMemoryNumDocsExceedingMaxDocsPerPercolateQueryLimit(numDocs, monitorCtx)
     }
 
     private suspend fun performPercolateQueryAndResetCounters(
@@ -918,13 +931,15 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
      */
     private fun isInMemoryDocsSizeExceedingMemoryLimit(docsBytesSize: Long, monitorCtx: MonitorRunnerExecutionContext): Boolean {
         var thresholdPercentage = PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT.get(monitorCtx.settings)
-        if (thresholdPercentage > 100 || thresholdPercentage < 0) {
-            thresholdPercentage = PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT.getDefault(monitorCtx.settings)
-        }
         val heapMaxBytes = monitorCtx.jvmStats!!.mem.heapMax.bytes
         val thresholdBytes = (thresholdPercentage.toDouble() / 100.0) * heapMaxBytes
 
         return docsBytesSize > thresholdBytes
+    }
+
+    private fun isInMemoryNumDocsExceedingMaxDocsPerPercolateQueryLimit(numDocs: Int, monitorCtx: MonitorRunnerExecutionContext): Boolean {
+        var maxNumDocsThreshold = PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY.get(monitorCtx.settings)
+        return numDocs >= maxNumDocsThreshold
     }
 
     /**
