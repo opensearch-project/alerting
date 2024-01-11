@@ -160,6 +160,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             val transformedDocs = mutableListOf<Pair<String, TransformedDocDto>>()
             val docsSizeInBytes = AtomicLong(0)
             val concreteIndicesSeenSoFar = mutableListOf<String>()
+            val updatedIndexNames = mutableListOf<String>()
             docLevelMonitorInput.indices.forEach { indexName ->
 
                 var concreteIndices = IndexUtils.resolveAllIndices(
@@ -184,6 +185,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 }
                 concreteIndicesSeenSoFar.addAll(concreteIndices)
                 val updatedIndexName = indexName.replace("*", "_")
+                updatedIndexNames.add(updatedIndexName)
                 val conflictingFields = monitorCtx.docLevelMonitorQueries!!.getAllConflictingFields(
                     monitorCtx.clusterService!!.state(),
                     concreteIndices
@@ -245,7 +247,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                         docsToQueries,
                         transformedDocs,
                         docsSizeInBytes,
-                        docLevelMonitorInput.indices,
+                        updatedIndexNames,
                         concreteIndicesSeenSoFar
                     )
                 }
@@ -259,7 +261,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     docsSizeInBytes,
                     monitor,
                     monitorMetadata,
-                    docLevelMonitorInput.indices,
+                    updatedIndexNames,
                     concreteIndicesSeenSoFar,
                     inputRunResults,
                     docsToQueries
