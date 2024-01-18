@@ -1,0 +1,66 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package org.opensearch.alerting.action
+
+import org.opensearch.alerting.model.destination.Destination
+import org.opensearch.core.action.ActionResponse
+import org.opensearch.core.common.io.stream.StreamInput
+import org.opensearch.core.common.io.stream.StreamOutput
+import org.opensearch.core.rest.RestStatus
+import org.opensearch.core.xcontent.ToXContent
+import org.opensearch.core.xcontent.ToXContentObject
+import org.opensearch.core.xcontent.XContentBuilder
+import java.io.IOException
+
+class GetDestinationsResponse : ActionResponse, ToXContentObject {
+    var status: RestStatus
+
+    // totalDestinations is not the same as the size of destinations because there can be 30 destinations from the request, but
+    // the request only asked for 5 destinations, so totalDestinations will be 30, but alerts will only contain 5 destinations
+    var totalDestinations: Int?
+    var destinations: List<Destination>
+
+    constructor(
+        status: RestStatus,
+        totalDestinations: Int?,
+        destinations: List<Destination>
+    ) : super() {
+        this.status = status
+        this.totalDestinations = totalDestinations
+        this.destinations = destinations
+    }
+
+    @Throws(IOException::class)
+    constructor(sin: StreamInput) {
+        this.status = sin.readEnum(RestStatus::class.java)
+        val destinations = mutableListOf<Destination>()
+        this.totalDestinations = sin.readOptionalInt()
+        var currentSize = sin.readInt()
+        for (i in 0 until currentSize) {
+            destinations.add(Destination.readFrom(sin))
+        }
+        this.destinations = destinations
+    }
+
+    @Throws(IOException::class)
+    override fun writeTo(out: StreamOutput) {
+        out.writeEnum(status)
+        out.writeOptionalInt(totalDestinations)
+        out.writeInt(destinations.size)
+        for (destination in destinations) {
+            destination.writeTo(out)
+        }
+    }
+
+    @Throws(IOException::class)
+    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+        builder.startObject()
+            .field("totalDestinations", totalDestinations)
+            .field("destinations", destinations)
+
+        return builder.endObject()
+    }
+}
