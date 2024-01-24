@@ -689,6 +689,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             .preference(Preference.PRIMARY_FIRST.type())
 
         if (DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED.get(monitorCtx.settings) && fieldsToFetch.isNotEmpty()) {
+            logger.error("PERF_DEBUG: Query field names: ${fieldsToFetch.joinToString() }}")
             request.source().fetchSource(false)
             for (field in fieldsToFetch) {
                 request.source().fetchField(field)
@@ -698,6 +699,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         if (response.status() !== RestStatus.OK) {
             throw IOException("Failed to search shard: $shard")
         }
+        logger.error("Monitor ${monitorCtx.client} PERF_DEBUG: Percolate query time taken = ")
         return response.hits
     }
 
@@ -758,7 +760,10 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         return hits.map { hit ->
             val sourceMap = if (hit.hasSource()) {
                 hit.sourceAsMap
-            } else constructSourceMapFromFieldsInHit(hit)
+            } else {
+                logger.error("PERF_DEBUG:Building percolate query source docs from relevant fields only")
+                constructSourceMapFromFieldsInHit(hit)
+            }
 
             transformDocumentFieldNames(
                 sourceMap,
