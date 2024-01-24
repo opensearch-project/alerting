@@ -22,6 +22,7 @@ import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.userErrorMessage
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
+import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
@@ -57,6 +58,7 @@ import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.percolator.PercolateQueryBuilderExt
+import org.opensearch.search.SearchHit
 import org.opensearch.search.SearchHits
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortOrder
@@ -215,6 +217,21 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                             indexLastRunContext[shard] = max(-1, (indexUpdatedRunContext[shard] as String).toInt() - 10)
                         }
                     }
+                    val fieldsToBeQueried = mutableSetOf<String>()
+
+                    for (it in queries) {
+                        if (it.queryFieldNames.isEmpty()) {
+                            fieldsToBeQueried.clear()
+                            logger.debug(
+                                "Monitor ${monitor.id} : " +
+                                    "Doc Level query ${it.id} : ${it.query} doesn't have queryFieldNames populated. " +
+                                    "Cannot optimize monitor to fetch only query-relevant fields. " +
+                                    "Querying entire doc source."
+                            )
+                            break
+                        }
+                        fieldsToBeQueried.addAll(it.queryFieldNames)
+                    }
 
                     // Prepare DocumentExecutionContext for each index
                     val docExecutionContext = DocumentExecutionContext(queries, indexLastRunContext, indexUpdatedRunContext)
@@ -226,7 +243,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                         updatedIndexName,
                         concreteIndexName,
                         conflictingFields.toList(),
-                        matchingDocIdsPerIndex?.get(concreteIndexName)
+                        matchingDocIdsPerIndex?.get(concreteIndexName),
+                        ArrayList(fieldsToBeQueried)
                     )
 
                     if (matchingDocs.isNotEmpty()) {
@@ -501,9 +519,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         try {
             publishFinding(monitor, monitorCtx, finding)
-        } catch (e: Exception) {
-            // suppress exception
-            logger.error("Optional finding callback failed", e)
+        } catch (_: Exception) {
         }
         return finding.id
     }
@@ -605,7 +621,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         index: String,
         concreteIndex: String,
         conflictingFields: List<String>,
-        docIds: List<String>? = null
+        docIds: List<String>? = null,
+        fieldsToBeQueried: List<String>
     ): List<Pair<String, BytesReference>> {
         val count: Int = docExecutionCtx.updatedLastRunContext["shards_count"] as Int
         val matchingDocs = mutableListOf<Pair<String, BytesReference>>()
@@ -622,7 +639,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     prevSeqNo,
                     maxSeqNo,
                     null,
-                    docIds
+                    docIds,
+                    fieldsToBeQueried
                 )
 
                 if (hits.hits.isNotEmpty()) {
@@ -642,7 +660,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         prevSeqNo: Long?,
         maxSeqNo: Long,
         query: String?,
-        docIds: List<String>? = null
+        docIds: List<String>? = null,
+        fieldsToFetch: List<String>,
     ): SearchHits {
         if (prevSeqNo?.equals(maxSeqNo) == true && maxSeqNo != 0L) {
             return SearchHits.empty()
@@ -668,6 +687,13 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     .size(10000) // fixme: make this configurable.
             )
             .preference(Preference.PRIMARY_FIRST.type())
+
+        if (DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED.get(monitorCtx.settings) && fieldsToFetch.isNotEmpty()) {
+            request.source().fetchSource(false)
+            for (field in fieldsToFetch) {
+                request.source().fetchField(field)
+            }
+        }
         val response: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(request, it) }
         if (response.status() !== RestStatus.OK) {
             throw IOException("Failed to search shard: $shard")
@@ -730,7 +756,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         conflictingFields: List<String>
     ): List<Pair<String, BytesReference>> {
         return hits.map { hit ->
-            val sourceMap = hit.sourceAsMap
+            val sourceMap = if (hit.hasSource()) {
+                hit.sourceAsMap
+            } else constructSourceMapFromFieldsInHit(hit)
 
             transformDocumentFieldNames(
                 sourceMap,
@@ -748,6 +776,19 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
             Pair(hit.id, sourceRef)
         }
+    }
+
+    private fun constructSourceMapFromFieldsInHit(hit: SearchHit): MutableMap<String, Any> {
+        if (hit.fields == null)
+            return mutableMapOf()
+        val sourceMap: MutableMap<String, Any> = mutableMapOf()
+        for (field in hit.fields) {
+            if (field.value.values != null && field.value.values.isNotEmpty())
+                if (field.value.values.size == 1) {
+                    sourceMap[field.key] = field.value.values[0]
+                } else sourceMap[field.key] = field.value.values
+        }
+        return sourceMap
     }
 
     /**

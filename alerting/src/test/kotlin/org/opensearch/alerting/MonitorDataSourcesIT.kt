@@ -135,7 +135,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute monitor with custom alerts index`() {
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(
+            query = "test_field:\"us-west-2\"",
+            name = "3",
+            fields = listOf(),
+            queryFieldNames = listOf("test_field", "non_existent_field_name")
+        )
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customAlertsIndex = "custom_alerts_index"

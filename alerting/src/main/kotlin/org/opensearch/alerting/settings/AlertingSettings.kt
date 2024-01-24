@@ -24,6 +24,14 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        /**
+         */
+        val DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED = Setting.boolSetting(
+            "plugins.alerting.monitor.doc_level_monitor_fetch_only_query_fields_enabled",
+            true,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
         val INPUT_TIMEOUT = Setting.positiveTimeSetting(
             "plugins.alerting.input_timeout",
             LegacyOpenDistroAlertingSettings.INPUT_TIMEOUT,
