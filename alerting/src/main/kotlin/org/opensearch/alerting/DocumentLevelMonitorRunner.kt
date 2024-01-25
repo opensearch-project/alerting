@@ -22,6 +22,7 @@ import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.userErrorMessage
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
+import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED
 import org.opensearch.alerting.settings.AlertingSettings.Companion.PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY
 import org.opensearch.alerting.util.AlertingException
@@ -230,6 +231,21 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                             indexLastRunContext[shard] = max(-1, (indexUpdatedRunContext[shard] as String).toInt() - 10)
                         }
                     }
+                    val fieldsToBeQueried = mutableSetOf<String>()
+
+                    for (it in queries) {
+                        if (it.queryFieldNames.isEmpty()) {
+                            fieldsToBeQueried.clear()
+                            logger.debug(
+                                "Monitor ${monitor.id} : " +
+                                    "Doc Level query ${it.id} : ${it.query} doesn't have queryFieldNames populated. " +
+                                    "Cannot optimize monitor to fetch only query-relevant fields. " +
+                                    "Querying entire doc source."
+                            )
+                            break
+                        }
+                        fieldsToBeQueried.addAll(it.queryFieldNames)
+                    }
 
                     // Prepare DocumentExecutionContext for each index
                     val docExecutionContext = DocumentExecutionContext(queries, indexLastRunContext, indexUpdatedRunContext)
@@ -248,7 +264,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                         transformedDocs,
                         docsSizeInBytes,
                         updatedIndexNames,
-                        concreteIndicesSeenSoFar
+                        concreteIndicesSeenSoFar,
+                        ArrayList(fieldsToBeQueried)
                     )
                 }
             }
@@ -632,6 +649,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         docsSizeInBytes: AtomicLong,
         monitorInputIndices: List<String>,
         concreteIndices: List<String>,
+        fieldsToBeQueried: List<String>
     ) {
         val count: Int = docExecutionCtx.updatedLastRunContext["shards_count"] as Int
         for (i: Int in 0 until count) {
@@ -647,7 +665,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     prevSeqNo,
                     maxSeqNo,
                     null,
-                    docIds
+                    docIds,
+                    fieldsToBeQueried
                 )
                 transformedDocs.addAll(
                     transformSearchHitsAndReconstructDocs(
@@ -742,7 +761,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         prevSeqNo: Long?,
         maxSeqNo: Long,
         query: String?,
-        docIds: List<String>? = null
+        docIds: List<String>? = null,
+        fieldsToFetch: List<String>,
     ): SearchHits {
         if (prevSeqNo?.equals(maxSeqNo) == true && maxSeqNo != 0L) {
             return SearchHits.empty()
@@ -768,6 +788,14 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     .size(10000) // fixme: use scroll to ensure all docs are covered, when number of queryable docs are greater than 10k
             )
             .preference(Preference.PRIMARY_FIRST.type())
+
+        if (DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED.get(monitorCtx.settings) && fieldsToFetch.isNotEmpty()) {
+            logger.error("PERF_DEBUG: Query field names: ${fieldsToFetch.joinToString() }}")
+            request.source().fetchSource(false)
+            for (field in fieldsToFetch) {
+                request.source().fetchField(field)
+            }
+        }
         val response: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(request, it) }
         if (response.status() !== RestStatus.OK) {
             throw IOException("Failed to search shard: [$shard] in index [$index]. Response status is ${response.status()}")
@@ -834,6 +862,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     "Response status is ${response.status()}"
             )
         }
+        logger.error("Monitor ${monitorCtx.client} PERF_DEBUG: Percolate query time taken millis = ${response.took}")
         return response.hits
     }
     /** we cannot use terms query because `index` field's mapping is of type TEXT and not keyword. Refer doc-level-queries.json*/
@@ -855,7 +884,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
     ): List<Pair<String, TransformedDocDto>> {
         return hits.mapNotNull(fun(hit: SearchHit): Pair<String, TransformedDocDto>? {
             try {
-                val sourceMap = hit.sourceAsMap
+                val sourceMap = if (hit.hasSource()) {
+                    hit.sourceAsMap
+                } else {
+                    logger.error("PERF_DEBUG:Building percolate query source docs from relevant fields only")
+                    constructSourceMapFromFieldsInHit(hit)
+                }
                 transformDocumentFieldNames(
                     sourceMap,
                     conflictingFields,
@@ -873,6 +907,19 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 return null
             }
         })
+    }
+
+    private fun constructSourceMapFromFieldsInHit(hit: SearchHit): MutableMap<String, Any> {
+        if (hit.fields == null)
+            return mutableMapOf()
+        val sourceMap: MutableMap<String, Any> = mutableMapOf()
+        for (field in hit.fields) {
+            if (field.value.values != null && field.value.values.isNotEmpty())
+                if (field.value.values.size == 1) {
+                    sourceMap[field.key] = field.value.values[0]
+                } else sourceMap[field.key] = field.value.values
+        }
+        return sourceMap
     }
 
     /**
