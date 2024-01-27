@@ -257,11 +257,19 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         when (job) {
             is Workflow -> {
                 launch {
+                    logger.debug(
+                        "PERF_DEBUG: executing workflow ${job.id} on node " +
+                            monitorCtx.clusterService!!.state().nodes().localNode.id
+                    )
                     runJob(job, periodStart, periodEnd, false)
                 }
             }
             is Monitor -> {
                 launch {
+                    logger.debug(
+                        "PERF_DEBUG: executing ${job.monitorType} ${job.id} on node " +
+                            monitorCtx.clusterService!!.state().nodes().localNode.id
+                    )
                     runJob(job, periodStart, periodEnd, false)
                 }
             }

@@ -462,11 +462,13 @@ class JobSweeper(
 
     private fun isOwningNode(shardId: ShardId, jobId: JobId): Boolean {
         val localNodeId = clusterService.localNode().id
-        val shardNodeIds = clusterService.state().routingTable.shardRoutingTable(shardId)
+        val shardRoutingTable = clusterService.state().routingTable.shardRoutingTable(shardId)
+        val shardNodeIds = shardRoutingTable
             .filter { it.active() }
             .map { it.currentNodeId() }
         val shardNodes = ShardNodes(localNodeId, shardNodeIds)
-        return shardNodes.isOwningNode(jobId)
+        val owningNode = shardNodes.isOwningNode(jobId)
+        return owningNode
     }
 }
 

@@ -395,7 +395,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             }
             bulkResponse.forEach { bulkItemResponse ->
                 if (bulkItemResponse.isFailed) {
-                    log.debug(bulkItemResponse.failureMessage)
+                    log.error("Failed to index doc level query for monitor $monitorId due to" + bulkItemResponse.failureMessage)
                 }
             }
         }

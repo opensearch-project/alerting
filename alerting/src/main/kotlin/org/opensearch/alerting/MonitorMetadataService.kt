@@ -108,6 +108,7 @@ object MonitorMetadataService :
                 primaryTerm = response.primaryTerm
             )
         } catch (e: Exception) {
+            log.error("Failed to upsert metadata", e)
             throw AlertingException.wrap(e)
         }
     }
