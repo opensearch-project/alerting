@@ -83,6 +83,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
             ?: recreateObject(request) { GetFindingsRequest(it) }
         val tableProp = getFindingsRequest.table
         val severity = getFindingsRequest.severity
+        val detectionType = getFindingsRequest.detectionType
 
         val sortBuilder = SortBuilders
             .fieldSort(tableProp.sortString)
@@ -108,6 +109,28 @@ class TransportGetFindingsSearchAction @Inject constructor(
             queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getFindingsRequest.monitorId))
         } else if (getFindingsRequest.monitorIds.isNullOrEmpty() == false) {
             queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getFindingsRequest.monitorIds))
+        }
+
+        if (!detectionType.isNullOrBlank()) {
+            val nestedQueryBuilder = QueryBuilders.nestedQuery(
+                "queries",
+                when {
+                    detectionType.equals("threat", ignoreCase = true) -> {
+                        QueryBuilders.boolQuery().filter(
+                            QueryBuilders.prefixQuery("queries.id", "threat_intel_")
+                        )
+                    }
+                    else -> {
+                        QueryBuilders.boolQuery().mustNot(
+                            QueryBuilders.prefixQuery("queries.id", "threat_intel_")
+                        )
+                    }
+                },
+                ScoreMode.None
+            )
+
+            // Add the nestedQueryBuilder to the main queryBuilder
+            queryBuilder.must(nestedQueryBuilder)
         }
 
         if (!severity.isNullOrBlank()) {
