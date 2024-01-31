@@ -27,6 +27,7 @@ import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
+import org.opensearch.core.common.io.stream.NamedWriteableRegistry
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.ExistsQueryBuilder
 import org.opensearch.index.query.MatchQueryBuilder
@@ -41,7 +42,8 @@ class TransportSearchMonitorAction @Inject constructor(
     val settings: Settings,
     val client: Client,
     clusterService: ClusterService,
-    actionFilters: ActionFilters
+    actionFilters: ActionFilters,
+    val namedWriteableRegistry: NamedWriteableRegistry
 ) : HandledTransportAction<ActionRequest, SearchResponse>(
     AlertingActions.SEARCH_MONITORS_ACTION_NAME, transportService, actionFilters, ::SearchMonitorRequest
 ),
@@ -54,7 +56,7 @@ class TransportSearchMonitorAction @Inject constructor(
 
     override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<SearchResponse>) {
         val transformedRequest = request as? SearchMonitorRequest
-            ?: recreateObject(request) {
+            ?: recreateObject(request, namedWriteableRegistry) {
                 SearchMonitorRequest(it)
             }
 

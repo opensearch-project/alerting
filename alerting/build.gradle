@@ -16,7 +16,7 @@ apply plugin: 'jacoco'
 
 def usingRemoteCluster = System.properties.containsKey('tests.rest.cluster') || System.properties.containsKey('tests.cluster')
 def usingMultiNode = project.properties.containsKey('numNodes')
-String bwcVersion = "2.10.0.0"
+String bwcVersion = "2.12.0.0"
 
 ext {
     projectSubstitutions = [:]
@@ -260,7 +260,7 @@ String baseName = "alertingBwcCluster"
     testClusters {
         "${baseName}$i" {
             testDistribution = "ARCHIVE"
-            versions = ["2.10.0-SNAPSHOT", "3.0.0-SNAPSHOT"]
+            versions = ["2.12.0-SNAPSHOT", "3.0.0-SNAPSHOT"]
             numberOfNodes = 3
             plugin(provider(new Callable<RegularFile>(){
                 @Override
