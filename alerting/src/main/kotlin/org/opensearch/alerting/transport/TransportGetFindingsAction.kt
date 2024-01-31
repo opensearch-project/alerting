@@ -82,6 +82,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
         val getFindingsRequest = request as? GetFindingsRequest
             ?: recreateObject(request) { GetFindingsRequest(it) }
         val tableProp = getFindingsRequest.table
+        val severity = getFindingsRequest.severity
 
         val sortBuilder = SortBuilders
             .fieldSort(tableProp.sortString)
@@ -107,6 +108,19 @@ class TransportGetFindingsSearchAction @Inject constructor(
             queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getFindingsRequest.monitorId))
         } else if (getFindingsRequest.monitorIds.isNullOrEmpty() == false) {
             queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getFindingsRequest.monitorIds))
+        }
+
+        if (!severity.isNullOrBlank()) {
+            queryBuilder
+                .must(
+                    QueryBuilders.nestedQuery(
+                        "queries",
+                        QueryBuilders.boolQuery().should(
+                            QueryBuilders.matchQuery("queries.tags", severity)
+                        ),
+                        ScoreMode.None
+                    )
+                )
         }
 
         if (!tableProp.searchString.isNullOrBlank()) {
