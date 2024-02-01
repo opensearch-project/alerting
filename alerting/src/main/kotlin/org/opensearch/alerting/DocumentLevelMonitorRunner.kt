@@ -24,6 +24,7 @@ import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.userErrorMessage
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
+import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDINGS_INDEXING_BATCH_SIZE
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
@@ -476,6 +477,10 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         val findingDocPairs = mutableListOf<Pair<String, String>>()
         val findings = mutableListOf<Finding>()
         val indexRequests = mutableListOf<IndexRequest>()
+        monitorCtx.findingsIndexBatchSize = FINDINGS_INDEXING_BATCH_SIZE.get(monitorCtx.settings)
+        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(FINDINGS_INDEXING_BATCH_SIZE) {
+            monitorCtx.findingsIndexBatchSize = it
+        }
 
         docsToQueries.forEach {
             val triggeredQueries = it.value.map { queryId -> idQueryMap[queryId]!! }
@@ -502,28 +507,23 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     .string()
             logger.debug("Findings: $findingStr")
 
-            if (shouldCreateFinding) {
-                indexRequests += IndexRequest(monitor.dataSources.findingsIndex)
-                    .source(findingStr, XContentType.JSON)
-                    .id(finding.id)
-                    .routing(finding.id)
-                    .opType(DocWriteRequest.OpType.INDEX)
+            if (indexRequests.size > monitorCtx.findingsIndexBatchSize) {
+                // make bulk indexing call here and flush the indexRequest object
+                bulkIndexFindings(monitor, monitorCtx, indexRequests)
+                indexRequests.clear()
+            } else {
+                if (shouldCreateFinding) {
+                    indexRequests += IndexRequest(monitor.dataSources.findingsIndex)
+                        .source(findingStr, XContentType.JSON)
+                        .id(finding.id)
+                        .routing(finding.id)
+                        .opType(DocWriteRequest.OpType.INDEX)
+                }
             }
         }
 
-        if (indexRequests.isNotEmpty()) {
-            val bulkResponse: BulkResponse = monitorCtx.client!!.suspendUntil {
-                bulk(BulkRequest().add(indexRequests).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE), it)
-            }
-            if (bulkResponse.hasFailures()) {
-                bulkResponse.items.forEach { item ->
-                    if (item.isFailed) {
-                        logger.debug("Failed indexing the finding ${item.id} of monitor [${monitor.id}]")
-                    }
-                }
-            } else {
-                logger.debug("[${bulkResponse.items.size}] All findings successfully indexed.")
-            }
+        if (indexRequests.size <= monitorCtx.findingsIndexBatchSize) {
+            bulkIndexFindings(monitor, monitorCtx, indexRequests)
         }
 
         try {
@@ -535,6 +535,27 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             logger.error("Optional finding callback failed", e)
         }
         return findingDocPairs
+    }
+
+    private suspend fun bulkIndexFindings(
+        monitor: Monitor,
+        monitorCtx: MonitorRunnerExecutionContext,
+        indexRequests: List<IndexRequest>
+    ) {
+        if (indexRequests.isNotEmpty()) {
+            val bulkResponse: BulkResponse = monitorCtx.client!!.suspendUntil {
+                bulk(BulkRequest().add(indexRequests).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE), it)
+            }
+            if (bulkResponse.hasFailures()) {
+                bulkResponse.items.forEach { item ->
+                    if (item.isFailed) {
+                        logger.error("Failed indexing the finding ${item.id} of monitor [${monitor.id}]")
+                    }
+                }
+            } else {
+                logger.debug("[${bulkResponse.items.size}] All findings successfully indexed.")
+            }
+        }
     }
 
     private fun publishFinding(
@@ -658,7 +679,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     matchingDocs.addAll(getAllDocs(hits, index, concreteIndex, monitor.id, conflictingFields))
                 }
             } catch (e: Exception) {
-                logger.warn("Failed to run for shard $shard. Error: ${e.message}")
+                logger.error("Failed to run for shard $shard. Error: ${e.message}")
             }
         }
         return matchingDocs
