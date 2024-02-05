@@ -20,6 +20,7 @@ import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.ChainedAlertTriggerRunResult
+import org.opensearch.alerting.model.ClusterMetricsTriggerRunResult
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.opensearchapi.firstFailureOrNull
 import org.opensearch.alerting.opensearchapi.retry
@@ -190,6 +191,19 @@ class AlertService(
             )
         }
 
+        // Including a list of triggered clusters for cluster metrics monitors
+        var triggeredClusters: MutableList<String>? = null
+        if (result is ClusterMetricsTriggerRunResult)
+            result.clusterTriggerResults.forEach {
+                if (it.triggered) {
+                    // Add an empty list if one isn't already present
+                    if (triggeredClusters.isNullOrEmpty()) triggeredClusters = mutableListOf()
+
+                    // Add the cluster to the list of triggered clusters
+                    triggeredClusters!!.add(it.cluster)
+                }
+            }
+
         // Merge the alert's error message to the current alert's history
         val updatedHistory = currentAlert?.errorHistory.update(alertError)
         return if (alertError == null && !result.triggered) {
@@ -199,7 +213,8 @@ class AlertService(
                 errorMessage = null,
                 errorHistory = updatedHistory,
                 actionExecutionResults = updatedActionExecutionResults,
-                schemaVersion = IndexUtils.alertIndexSchemaVersion
+                schemaVersion = IndexUtils.alertIndexSchemaVersion,
+                clusters = triggeredClusters
             )
         } else if (alertError == null && currentAlert?.isAcknowledged() == true) {
             null
@@ -212,6 +227,7 @@ class AlertService(
                 errorHistory = updatedHistory,
                 actionExecutionResults = updatedActionExecutionResults,
                 schemaVersion = IndexUtils.alertIndexSchemaVersion,
+                clusters = triggeredClusters
             )
         } else {
             val alertState = if (workflorwRunContext?.auditDelegateMonitorAlerts == true) {
@@ -223,7 +239,8 @@ class AlertService(
                 lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
                 errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
                 schemaVersion = IndexUtils.alertIndexSchemaVersion, executionId = executionId,
-                workflowId = workflorwRunContext?.workflowId ?: ""
+                workflowId = workflorwRunContext?.workflowId ?: "",
+                clusters = triggeredClusters
             )
         }
     }

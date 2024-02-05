@@ -151,6 +151,13 @@ class AlertingSettings {
             "plugins.alerting.max_actionable_alert_count",
             DEFAULT_MAX_ACTIONABLE_ALERT_COUNT,
             -1L,
+            Setting.Property.NodeScope,
+            Setting.Property.Dynamic
+        )
+
+        val REMOTE_MONITORING_ENABLED = Setting.boolSetting(
+            "plugins.alerting.remote_monitoring_enabled",
+            false,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
     }
