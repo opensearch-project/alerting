@@ -17,7 +17,7 @@ class AlertingSettings {
 
     companion object {
         const val DEFAULT_MAX_ACTIONABLE_ALERT_COUNT = 50L
-        const val DEFAULT_FINDINGS_INDEXING_BATCH_SIZE = 10000
+        const val DEFAULT_FINDINGS_INDEXING_BATCH_SIZE = 1000
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(
             "plugins.alerting.monitor.max_monitors",
@@ -158,7 +158,7 @@ class AlertingSettings {
         val FINDINGS_INDEXING_BATCH_SIZE = Setting.intSetting(
             "plugins.alerting.alert_findings_indexing_batch_size",
             DEFAULT_FINDINGS_INDEXING_BATCH_SIZE,
-            0,
+            1,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
     }

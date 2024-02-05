@@ -9,13 +9,14 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.DocWriteRequest
+import org.opensearch.action.admin.indices.refresh.RefreshAction
+import org.opensearch.action.admin.indices.refresh.RefreshRequest
 import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchAction
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.model.DocumentExecutionContext
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.InputRunResults
@@ -395,7 +396,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
         val actionCtx = triggerCtx.copy(
             triggeredDocs = triggerResult.triggeredDocs,
-            // confirm if this is right or only trigger-able findings should be present in this list
             relatedFindings = findingToDocPairs.map { it.first },
             error = monitorResult.error ?: triggerResult.error
         )
@@ -477,10 +477,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         val findingDocPairs = mutableListOf<Pair<String, String>>()
         val findings = mutableListOf<Finding>()
         val indexRequests = mutableListOf<IndexRequest>()
-        monitorCtx.findingsIndexBatchSize = FINDINGS_INDEXING_BATCH_SIZE.get(monitorCtx.settings)
-        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(FINDINGS_INDEXING_BATCH_SIZE) {
-            monitorCtx.findingsIndexBatchSize = it
-        }
 
         docsToQueries.forEach {
             val triggeredQueries = it.value.map { queryId -> idQueryMap[queryId]!! }
@@ -507,22 +503,15 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     .string()
             logger.debug("Findings: $findingStr")
 
-            if (indexRequests.size > monitorCtx.findingsIndexBatchSize) {
-                // make bulk indexing call here and flush the indexRequest object
-                bulkIndexFindings(monitor, monitorCtx, indexRequests)
-                indexRequests.clear()
-            } else {
-                if (shouldCreateFinding) {
-                    indexRequests += IndexRequest(monitor.dataSources.findingsIndex)
-                        .source(findingStr, XContentType.JSON)
-                        .id(finding.id)
-                        .routing(finding.id)
-                        .opType(DocWriteRequest.OpType.INDEX)
-                }
+            if (shouldCreateFinding) {
+                indexRequests += IndexRequest(monitor.dataSources.findingsIndex)
+                    .source(findingStr, XContentType.JSON)
+                    .id(finding.id)
+                    .opType(DocWriteRequest.OpType.CREATE)
             }
         }
 
-        if (indexRequests.size <= monitorCtx.findingsIndexBatchSize) {
+        if (indexRequests.isNotEmpty()) {
             bulkIndexFindings(monitor, monitorCtx, indexRequests)
         }
 
@@ -542,9 +531,11 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         monitorCtx: MonitorRunnerExecutionContext,
         indexRequests: List<IndexRequest>
     ) {
-        if (indexRequests.isNotEmpty()) {
+        monitorCtx.findingsIndexBatchSize = FINDINGS_INDEXING_BATCH_SIZE.get(monitorCtx.settings)
+
+        indexRequests.chunked(monitorCtx.findingsIndexBatchSize).forEach { batch ->
             val bulkResponse: BulkResponse = monitorCtx.client!!.suspendUntil {
-                bulk(BulkRequest().add(indexRequests).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE), it)
+                bulk(BulkRequest().add(indexRequests), it)
             }
             if (bulkResponse.hasFailures()) {
                 bulkResponse.items.forEach { item ->
@@ -556,6 +547,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 logger.debug("[${bulkResponse.items.size}] All findings successfully indexed.")
             }
         }
+        monitorCtx.client!!.execute(RefreshAction.INSTANCE, RefreshRequest(monitor.dataSources.findingsIndex))
     }
 
     private fun publishFinding(
