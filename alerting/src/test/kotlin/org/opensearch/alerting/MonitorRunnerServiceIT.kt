@@ -969,7 +969,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         // GIVEN
         val indices = (1..5).map { createTestIndex() }.toTypedArray()
         val pathParams = indices.joinToString(",")
-        val path = "/_cluster/health/"
+        val path = "/_cluster/health"
         val input = randomClusterMetricsInput(
             path = path,
             pathParams = pathParams
