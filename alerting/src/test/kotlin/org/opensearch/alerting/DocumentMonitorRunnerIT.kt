@@ -436,7 +436,8 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 10, findings.size)
-        val foundFindings = findings.filter { it.relatedDocIds.contains("1") || it.relatedDocIds.contains("2") || it.relatedDocIds.contains("3") }
+        val foundFindings =
+            findings.filter { it.relatedDocIds.contains("1") || it.relatedDocIds.contains("2") || it.relatedDocIds.contains("3") }
         assertEquals("Found findings for all docs", 4, foundFindings.size)
     }
 
