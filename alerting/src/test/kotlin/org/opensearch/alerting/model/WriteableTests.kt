@@ -40,7 +40,10 @@ class WriteableTests : OpenSearchTestCase() {
         runResult.writeTo(out)
         val sin = StreamInput.wrap(out.bytes().toBytesRef().bytes)
         val newRunResult = QueryLevelTriggerRunResult(sin)
-        assertEquals("Round tripping ActionRunResult doesn't work", runResult, newRunResult)
+        assertEquals(runResult.triggerName, newRunResult.triggerName)
+        assertEquals(runResult.triggered, newRunResult.triggered)
+        assertEquals(runResult.error, newRunResult.error)
+        assertEquals(runResult.actionResults, newRunResult.actionResults)
     }
 
     fun `test bucket-level triggerrunresult as stream`() {

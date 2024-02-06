@@ -5,6 +5,9 @@
 
 package org.opensearch.alerting
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
@@ -12,7 +15,9 @@ import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.TriggerAfterKey
 import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AggregationQueryRewriter
+import org.opensearch.alerting.util.CrossClusterMonitorUtils
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.executeTransportAction
 import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.toMap
@@ -43,6 +48,8 @@ import org.opensearch.script.ScriptType
 import org.opensearch.script.TemplateScript
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.time.Instant
+
+private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
 /** Service that handles the collection of input results for Monitor executions */
 class InputService(
@@ -101,8 +108,9 @@ class InputService(
                             .newInstance(searchParams)
                             .execute()
 
+                        val indexes = CrossClusterMonitorUtils.parseIndexesForRemoteSearch(input.indices, clusterService)
                         val searchRequest = SearchRequest()
-                            .indices(*input.indices.toTypedArray())
+                            .indices(*indexes.toTypedArray())
                             .preference(Preference.PRIMARY_FIRST.type())
                         XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource).use {
                             searchRequest.source(SearchSourceBuilder.fromXContent(it))
@@ -116,9 +124,36 @@ class InputService(
                         results += searchResponse.convertToMap()
                     }
                     is ClusterMetricsInput -> {
-                        logger.debug("ClusterMetricsInput clusterMetricType: ${input.clusterMetricType}")
-                        val response = executeTransportAction(input, client)
-                        results += response.toMap()
+                        logger.debug("ClusterMetricsInput clusterMetricType: {}", input.clusterMetricType)
+
+                        val remoteMonitoringEnabled = clusterService.clusterSettings.get(AlertingSettings.REMOTE_MONITORING_ENABLED)
+                        logger.debug("Remote monitoring enabled: {}", remoteMonitoringEnabled)
+
+                        val responseMap = mutableMapOf<String, Map<String, Any>>()
+                        if (remoteMonitoringEnabled && input.clusters.isNotEmpty()) {
+                            client.threadPool().threadContext.stashContext().use {
+                                scope.launch {
+                                    input.clusters.forEach { cluster ->
+                                        val targetClient = CrossClusterMonitorUtils.getClientForCluster(cluster, client, clusterService)
+                                        val response = executeTransportAction(input, targetClient)
+                                        // Not all supported API reference the cluster name in their response.
+                                        // Mapping each response to the cluster name before adding to results.
+                                        // Not adding this same logic for local-only monitors to avoid breaking existing monitors.
+                                        responseMap[cluster] = response.toMap()
+                                    }
+                                }
+                            }
+                            val inputTimeout = clusterService.clusterSettings.get(AlertingSettings.INPUT_TIMEOUT)
+                            val startTime = Instant.now().toEpochMilli()
+                            while (
+                                (Instant.now().toEpochMilli() - startTime >= inputTimeout.millis) ||
+                                (responseMap.size < input.clusters.size)
+                            ) { /* Wait for responses */ }
+                            results += responseMap
+                        } else {
+                            val response = executeTransportAction(input, client)
+                            results += response.toMap()
+                        }
                     }
                     else -> {
                         throw IllegalArgumentException("Unsupported input type: ${input.name()}.")
