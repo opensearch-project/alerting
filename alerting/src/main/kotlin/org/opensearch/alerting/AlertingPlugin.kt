@@ -353,6 +353,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.FINDING_HISTORY_INDEX_MAX_AGE,
             AlertingSettings.FINDING_HISTORY_ROLLOVER_PERIOD,
             AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD,
+            AlertingSettings.FINDINGS_INDEXING_BATCH_SIZE,
             AlertingSettings.REMOTE_MONITORING_ENABLED
         )
     }
