@@ -169,6 +169,14 @@
           "type": "text"
         }
       }
+    },
+    "clusters": {
+      "type" : "text",
+      "fields" : {
+        "keyword" : {
+          "type" : "keyword"
+        }
+      }
     }
   }
 }
