@@ -145,7 +145,10 @@ class InputService(
                             }
                             val inputTimeout = clusterService.clusterSettings.get(AlertingSettings.INPUT_TIMEOUT)
                             val startTime = Instant.now().toEpochMilli()
-                            while ((Instant.now().toEpochMilli() - startTime >= inputTimeout.millis) || (responseMap.size < input.clusters.size)) { /* Wait for responses */ }
+                            while (
+                                (Instant.now().toEpochMilli() - startTime >= inputTimeout.millis) ||
+                                (responseMap.size < input.clusters.size)
+                            ) { /* Wait for responses */ }
                             results += responseMap
                         } else {
                             val response = executeTransportAction(input, client)

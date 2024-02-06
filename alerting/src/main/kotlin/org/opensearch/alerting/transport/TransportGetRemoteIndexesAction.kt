@@ -96,7 +96,8 @@ class TransportGetRemoteIndexesAction @Inject constructor(
 
                     var resolveIndexResponse: ResolveIndexAction.Response? = null
                     try {
-                        resolveIndexResponse = getRemoteClusters(CrossClusterMonitorUtils.parseIndexesForRemoteSearch(request.indexes, clusterService))
+                        resolveIndexResponse =
+                            getRemoteClusters(CrossClusterMonitorUtils.parseIndexesForRemoteSearch(request.indexes, clusterService))
                     } catch (e: Exception) {
                         log.error("Failed to retrieve indexes for request $request", e)
                         actionListener.onFailure(AlertingException.wrap(e))
