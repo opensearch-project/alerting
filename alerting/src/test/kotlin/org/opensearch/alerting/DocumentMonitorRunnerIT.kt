@@ -393,6 +393,53 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertEquals("Didn't find findings for docs 1 and 5", 2, foundFindings.size)
     }
 
+    fun `test execute monitor for bulk index findings`() {
+        val testIndexPrefix = "test-index-${randomAlphaOfLength(10).lowercase(Locale.ROOT)}"
+        val testQueryName = "wildcard-test-query"
+        val testIndex = createTestIndex("${testIndexPrefix}1")
+        val testIndex2 = createTestIndex("${testIndexPrefix}2")
+
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = testQueryName, fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf("$testIndexPrefix*"), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = Script("query[name=$testQueryName]"))
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+        assertNotNull(monitor.id)
+
+        for (i in 0 until 9) {
+            indexDoc(testIndex, i.toString(), testDoc)
+        }
+        indexDoc(testIndex2, "3", testDoc)
+        adminClient().updateSettings("plugins.alerting.alert_findings_indexing_batch_size", 2)
+
+        val response = executeMonitor(monitor.id)
+
+        val output = entityAsMap(response)
+
+        assertEquals(monitor.name, output["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
+        assertEquals("Correct search result", 10, matchingDocsToQuery.size)
+        assertTrue("Correct search result", matchingDocsToQuery.containsAll(listOf("1|$testIndex", "2|$testIndex", "3|$testIndex2")))
+
+        val alerts = searchAlertsWithFilter(monitor)
+        assertEquals("Alert saved for test monitor", 10, alerts.size)
+
+        val findings = searchFindings(monitor)
+        assertEquals("Findings saved for test monitor", 10, findings.size)
+        val foundFindings = findings.filter { it.relatedDocIds.contains("1") || it.relatedDocIds.contains("2") || it.relatedDocIds.contains("3") }
+        assertEquals("Found findings for all docs", 4, foundFindings.size)
+    }
+
     fun `test execute monitor with wildcard index that generates alerts and findings for NOT EQUALS query operator`() {
         val testIndexPrefix = "test-index-${randomAlphaOfLength(10).lowercase(Locale.ROOT)}"
         val testQueryName = "wildcard-test-query"

@@ -25,7 +25,6 @@ import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.userErrorMessage
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
-import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDINGS_INDEXING_BATCH_SIZE
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
@@ -531,11 +530,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         monitorCtx: MonitorRunnerExecutionContext,
         indexRequests: List<IndexRequest>
     ) {
-        monitorCtx.findingsIndexBatchSize = FINDINGS_INDEXING_BATCH_SIZE.get(monitorCtx.settings)
-
         indexRequests.chunked(monitorCtx.findingsIndexBatchSize).forEach { batch ->
             val bulkResponse: BulkResponse = monitorCtx.client!!.suspendUntil {
-                bulk(BulkRequest().add(indexRequests), it)
+                bulk(BulkRequest().add(batch), it)
             }
             if (bulkResponse.hasFailures()) {
                 bulkResponse.items.forEach { item ->
