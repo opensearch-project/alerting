@@ -13,6 +13,8 @@ Compatible with OpenSearch 2.12.0
 ### Enhancements
 * Optimize doc-level monitor execution workflow for datastreams ([#1302](https://github.com/opensearch-project/alerting/pull/1302))
 * Inject namedWriteableRegistry during ser/deser of SearchMonitorAction ([#1382](https://github.com/opensearch-project/alerting/pull/1382))
+* Bulk index findings and sequentially invoke auto-correlations ([#1355](https://github.com/opensearch-project/alerting/pull/1355))
+* Implemented cross-cluster monitor support ([#1404](https://github.com/opensearch-project/alerting/pull/1404))
 
 ### Refactoring
 * Reference get monitor and search monitor action / request / responses from common-utils ([#1315](https://github.com/opensearch-project/alerting/pull/1315))
