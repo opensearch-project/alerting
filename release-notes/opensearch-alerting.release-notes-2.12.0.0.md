@@ -22,4 +22,4 @@ Compatible with OpenSearch 2.12.0
 * Upgrade to Gradle 8.5 ([#1369](https://github.com/opensearch-project/alerting/pull/1369))
 
 ### Documentation
-* Added 2.12 release notes ([#1405](https://github.com/opensearch-project/alerting/pull/1405))
+* Added 2.12 release notes ([#1408](https://github.com/opensearch-project/alerting/pull/1408))
