@@ -18,7 +18,7 @@ dependencies {
     implementation('com.google.googlejavaformat:google-java-format:1.10.0')  {
         exclude group: 'com.google.guava'
     }
-    implementation 'com.google.guava:guava:32.0.1-jre'
+    implementation 'com.google.guava:guava:32.1.2-jre'
     api "org.opensearch:common-utils:${common_utils_version}@jar"
     implementation 'commons-validator:commons-validator:1.7'
 
