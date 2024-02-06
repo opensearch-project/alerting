@@ -22,7 +22,6 @@ import org.opensearch.commons.alerting.util.IndexUtils
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
-import org.opensearch.index.IndexNotFoundException
 
 class IndexUtils {
 
@@ -140,25 +139,16 @@ class IndexUtils {
 
         @JvmStatic
         fun resolveAllIndices(indices: List<String>, clusterService: ClusterService, resolver: IndexNameExpressionResolver): List<String> {
-            return resolveAllIndices(indices, clusterService.state(), resolver)
-        }
-
-        @JvmStatic
-        fun resolveAllIndices(indices: List<String>, clusterState: ClusterState, resolver: IndexNameExpressionResolver): List<String> {
             val result = mutableListOf<String>()
 
             indices.forEach { index ->
                 val concreteIndices = resolver.concreteIndexNames(
-                    clusterState,
+                    clusterService.state(),
                     IndicesOptions.lenientExpand(),
                     true,
                     index
                 )
                 result.addAll(concreteIndices)
-            }
-
-            if (result.size == 0) {
-                throw IndexNotFoundException(indices[0])
             }
 
             return result
