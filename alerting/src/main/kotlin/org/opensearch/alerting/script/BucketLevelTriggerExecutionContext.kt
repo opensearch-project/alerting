@@ -5,12 +5,15 @@
 
 package org.opensearch.alerting.script
 
+import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
 import java.time.Instant
+
+private val logger = LogManager.getLogger(BucketLevelTriggerExecutionContext::class.java)
 
 data class BucketLevelTriggerExecutionContext(
     override val monitor: Monitor,
@@ -41,11 +44,13 @@ data class BucketLevelTriggerExecutionContext(
      * translate the context to a Map of Strings to primitive types, which can be accessed without reflection.
      */
     override fun asTemplateArg(): Map<String, Any?> {
+        logger.info("hurneyt BucketLevelTriggerExecutionContext::results = {}", results)
         val tempArg = super.asTemplateArg().toMutableMap()
         tempArg["trigger"] = trigger.asTemplateArg()
         tempArg["dedupedAlerts"] = dedupedAlerts.map { it.asTemplateArg() }
         tempArg["newAlerts"] = newAlerts.map { it.asTemplateArg() }
         tempArg["completedAlerts"] = completedAlerts.map { it.asTemplateArg() }
+        tempArg["results"] = results
         return tempArg
     }
 }
