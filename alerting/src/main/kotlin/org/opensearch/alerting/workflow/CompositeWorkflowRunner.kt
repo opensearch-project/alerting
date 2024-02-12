@@ -31,6 +31,7 @@ import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.Delegate
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.StreamingIndex
+import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
 import org.opensearch.core.xcontent.XContentParser
@@ -69,7 +70,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         var dataSources: DataSources? = null
         logger.debug("Workflow ${workflow.id} in $executionId execution is running")
         val delegates = (workflow.inputs[0] as CompositeInput).sequence.delegates.sortedBy { it.order }
-        var monitors: List<Monitor>
+        val monitors: List<Monitor>
 
         try {
             monitors = monitorCtx.workflowService!!.getMonitorsById(delegates.map { it.monitorId }, delegates.size)
@@ -84,8 +85,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         var lastErrorDelegateRun: Exception? = null
 
         for (delegate in delegates) {
-            var delegateMonitor: Monitor
-            delegateMonitor = monitorsById[delegate.monitorId]
+            val delegateMonitor: Monitor = monitorsById[delegate.monitorId]
                 ?: throw AlertingException.wrap(
                     IllegalStateException("Delegate monitor not found ${delegate.monitorId} for the workflow $workflow.id")
                 )
@@ -116,87 +116,12 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 true
             )
         }
-        val triggerResults = mutableMapOf<String, ChainedAlertTriggerRunResult>()
-        val workflowRunResult = WorkflowRunResult(
-            workflowId = workflow.id,
-            workflowName = workflow.name,
-            monitorRunResults = resultList,
-            executionStartTime = workflowExecutionStartTime,
-            executionEndTime = null,
-            executionId = executionId,
-            error = lastErrorDelegateRun,
-            triggerResults = triggerResults
-        )
-        val currentAlerts = try {
-            monitorCtx.alertIndices!!.createOrUpdateAlertIndex(dataSources!!)
-            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(dataSources)
-            monitorCtx.alertService!!.loadCurrentAlertsForWorkflow(workflow, dataSources)
-        } catch (e: Exception) {
-            logger.error("Failed to fetch current alerts for workflow", e)
-            // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
-            val id = if (workflow.id.trim().isEmpty()) "_na_" else workflow.id
-            logger.error("Error loading alerts for workflow: $id", e)
-            return workflowRunResult.copy(error = e)
-        }
-        try {
-            monitorCtx.alertIndices!!.createOrUpdateAlertIndex(dataSources)
-            val updatedAlerts = mutableListOf<Alert>()
-            val monitorIdToAlertIdsMap = fetchAlertsGeneratedInCurrentExecution(dataSources, executionId, monitorCtx, workflow)
-            for (trigger in workflow.triggers) {
-                val currentAlert = currentAlerts[trigger]
-                val caTrigger = trigger as ChainedAlertTrigger
-                val triggerCtx = ChainedAlertTriggerExecutionContext(
-                    workflow = workflow,
-                    workflowRunResult = workflowRunResult,
-                    periodStart = workflowRunResult.executionStartTime,
-                    periodEnd = workflowRunResult.executionEndTime,
-                    trigger = caTrigger,
-                    alertGeneratingMonitors = monitorIdToAlertIdsMap.keys,
-                    monitorIdToAlertIdsMap = monitorIdToAlertIdsMap,
-                    alert = currentAlert
-                )
-                runChainedAlertTrigger(
-                    monitorCtx,
-                    workflow,
-                    trigger,
-                    executionId,
-                    triggerCtx,
-                    dryRun,
-                    triggerResults,
-                    updatedAlerts
-                )
-            }
-            if (!dryRun && workflow.id != Workflow.NO_ID && updatedAlerts.isNotEmpty()) {
-                monitorCtx.retryPolicy?.let {
-                    monitorCtx.alertService!!.saveAlerts(
-                        dataSources,
-                        updatedAlerts,
-                        it,
-                        routingId = workflow.id
-                    )
-                }
-            }
-        } catch (e: Exception) {
-            // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
-            val id = if (workflow.id.trim().isEmpty()) "_na_" else workflow.id
-            logger.error("Error loading current chained alerts for workflow: $id", e)
-            return WorkflowRunResult(
-                workflowId = workflow.id,
-                workflowName = workflow.name,
-                monitorRunResults = emptyList(),
-                executionStartTime = workflowExecutionStartTime,
-                executionEndTime = Instant.now(),
-                executionId = executionId,
-                error = AlertingException.wrap(e),
-                triggerResults = emptyMap()
-            )
-        }
-        workflowRunResult.executionEndTime = Instant.now()
 
-        val sr = SearchRequest(dataSources!!.alertsIndex)
-        sr.source().query(QueryBuilders.matchAllQuery()).size(10)
-        val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(sr, it) }
-        searchResponse.hits
+        val workflowRunResult = runTriggersAndPopulateWorkflowResult(
+            workflow, monitorCtx, workflowExecutionStartTime, executionId, dryRun, dataSources, resultList, lastErrorDelegateRun
+        )
+        refreshAlertsIndex(dataSources, monitorCtx)
+
         return workflowRunResult
     }
 
@@ -305,6 +230,118 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 IllegalStateException("Unsupported monitor type ${delegateMonitor.monitorType}")
             )
         }
+    }
+
+    private suspend fun getCurrentAlerts(
+        workflow: Workflow,
+        monitorCtx: MonitorRunnerExecutionContext,
+        dataSources: DataSources
+    ): Map<Trigger, Alert?> {
+        try {
+            monitorCtx.alertIndices!!.createOrUpdateAlertIndex(dataSources)
+            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(dataSources)
+            return monitorCtx.alertService!!.loadCurrentAlertsForWorkflow(workflow, dataSources)
+        } catch (e: Exception) {
+            logger.error("Failed to fetch current alerts for workflow", e)
+            // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
+            val id = if (workflow.id.trim().isEmpty()) "_na_" else workflow.id
+            logger.error("Error loading alerts for workflow: $id", e)
+            throw e
+        }
+    }
+
+    private suspend fun runTriggersAndPopulateWorkflowResult(
+        workflow: Workflow,
+        monitorCtx: MonitorRunnerExecutionContext,
+        workflowExecutionStartTime: Instant,
+        executionId: String,
+        dryRun: Boolean,
+        dataSources: DataSources?,
+        resultList: List<MonitorRunResult<*>>,
+        lastErrorDelegateRun: Exception?
+    ): WorkflowRunResult {
+        val triggerResults = mutableMapOf<String, ChainedAlertTriggerRunResult>()
+        val workflowRunResult = buildWorkflowRunResult(
+            workflow, workflowExecutionStartTime, executionId, lastErrorDelegateRun, resultList, triggerResults
+        )
+        workflowRunResult.executionEndTime = null
+        val currentAlerts: Map<Trigger, Alert?>
+        try {
+            currentAlerts = getCurrentAlerts(workflow, monitorCtx, dataSources!!)
+        } catch (e: Exception) {
+            return buildWorkflowRunResult(workflow, workflowExecutionStartTime, executionId, e, resultList, triggerResults)
+        }
+        try {
+            runTriggers(workflow, monitorCtx, dataSources, executionId, dryRun, workflowRunResult, currentAlerts, triggerResults)
+        } catch (e: Exception) {
+            return buildWorkflowRunResult(workflow, workflowExecutionStartTime, executionId, AlertingException.wrap(e))
+        }
+
+        workflowRunResult.executionEndTime = Instant.now()
+        return workflowRunResult
+    }
+
+    private suspend fun runTriggers(
+        workflow: Workflow,
+        monitorCtx: MonitorRunnerExecutionContext,
+        dataSources: DataSources,
+        executionId: String,
+        dryRun: Boolean,
+        workflowRunResult: WorkflowRunResult,
+        currentAlerts: Map<Trigger, Alert?>,
+        triggerResults: MutableMap<String, ChainedAlertTriggerRunResult>
+    ) {
+        try {
+            monitorCtx.alertIndices!!.createOrUpdateAlertIndex(dataSources)
+            val updatedAlerts = mutableListOf<Alert>()
+            val monitorIdToAlertIdsMap = fetchAlertsGeneratedInCurrentExecution(dataSources, executionId, monitorCtx, workflow)
+            for (trigger in workflow.triggers) {
+                val currentAlert = currentAlerts[trigger]
+                val caTrigger = trigger as ChainedAlertTrigger
+                val triggerCtx = ChainedAlertTriggerExecutionContext(
+                    workflow = workflow,
+                    workflowRunResult = workflowRunResult,
+                    periodStart = workflowRunResult.executionStartTime,
+                    periodEnd = workflowRunResult.executionEndTime,
+                    trigger = caTrigger,
+                    alertGeneratingMonitors = monitorIdToAlertIdsMap.keys,
+                    monitorIdToAlertIdsMap = monitorIdToAlertIdsMap,
+                    alert = currentAlert
+                )
+                runChainedAlertTrigger(
+                    monitorCtx,
+                    workflow,
+                    trigger,
+                    executionId,
+                    triggerCtx,
+                    dryRun,
+                    triggerResults,
+                    updatedAlerts
+                )
+            }
+            if (!dryRun && workflow.id != Workflow.NO_ID && updatedAlerts.isNotEmpty()) {
+                monitorCtx.retryPolicy?.let {
+                    monitorCtx.alertService!!.saveAlerts(
+                        dataSources,
+                        updatedAlerts,
+                        it,
+                        routingId = workflow.id
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
+            val id = if (workflow.id.trim().isEmpty()) "_na_" else workflow.id
+            logger.error("Error loading current chained alerts for workflow: $id", e)
+            throw e
+        }
+    }
+
+    private suspend fun refreshAlertsIndex(dataSources: DataSources?, monitorCtx: MonitorRunnerExecutionContext) {
+        val sr = SearchRequest(dataSources!!.alertsIndex)
+        sr.source().query(QueryBuilders.matchAllQuery()).size(10)
+        val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(sr, it) }
+        searchResponse.hits
     }
 
     fun generateExecutionId(
@@ -419,7 +456,6 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         } else Alert.State.ACTIVE
     }
 
-    // TODO - most of this is copy-pasted from the runWorkflow method. Pending refactor to reduce duplication
     override suspend fun runStreamingWorkflow(
         workflow: Workflow,
         monitorCtx: MonitorRunnerExecutionContext,
@@ -431,129 +467,53 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         val executionId = generateExecutionId(isTempWorkflow, workflow)
         logger.debug("Workflow ${workflow.id} in $executionId execution is running")
 
+        var dataSources: DataSources? = null
         val delegates = (workflow.inputs[0] as CompositeInput).sequence.delegates.sortedBy { it.order }
+        val monitors: List<Monitor>
         try {
-            val monitors = getMonitors(monitorCtx, delegates)
-            var dataSources: DataSources? = null
-
-            // Validate the monitors size
-            validateMonitorSize(delegates, monitors, workflow)
-            val monitorsById = monitors.associateBy { it.id }
-            val resultList = mutableListOf<MonitorRunResult<*>>()
-            var lastErrorDelegateRun: Exception? = null
-
-            for (delegate in delegates) {
-                var delegateMonitor: Monitor
-                delegateMonitor = monitorsById[delegate.monitorId]
-                    ?: throw AlertingException.wrap(
-                        IllegalStateException("Delegate monitor not found ${delegate.monitorId} for the workflow $workflow.id")
-                    )
-
-                val workflowRunContext: WorkflowRunContext
-                try {
-                    workflowRunContext = getWorkflowRunContext(delegate, monitorCtx, workflow, monitorsById, executionId, "")
-                } catch (e: Exception) {
-                    return buildWorkflowRunResult(workflow, workflowExecutionStartTime, executionId, AlertingException.wrap(e))
-                }
-
-                try {
-                    dataSources = delegateMonitor.dataSources
-                    val delegateRunResult =
-                        runDelegateStreamingMonitor(delegateMonitor, monitorCtx, dryRun, workflowRunContext, executionId, streamingIndices)
-                    resultList.add(delegateRunResult!!)
-                } catch (ex: Exception) {
-                    logger.error("Error executing workflow delegate monitor ${delegate.monitorId}", ex)
-                    lastErrorDelegateRun = AlertingException.wrap(ex)
-                    break
-                }
-            }
-
-            logger.debug("Workflow ${workflow.id} delegate monitors in execution $executionId completed")
-            val triggerResults = mutableMapOf<String, ChainedAlertTriggerRunResult>()
-            val workflowRunResult = WorkflowRunResult(
-                workflowId = workflow.id,
-                workflowName = workflow.name,
-                monitorRunResults = resultList,
-                executionStartTime = workflowExecutionStartTime,
-                executionEndTime = null,
-                executionId = executionId,
-                error = lastErrorDelegateRun,
-                triggerResults = triggerResults
-            )
-            val currentAlerts = try {
-                monitorCtx.alertIndices!!.createOrUpdateAlertIndex(dataSources!!)
-                monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(dataSources)
-                monitorCtx.alertService!!.loadCurrentAlertsForWorkflow(workflow, dataSources)
-            } catch (e: Exception) {
-                logger.error("Failed to fetch current alerts for workflow", e)
-                // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
-                val id = if (workflow.id.trim().isEmpty()) "_na_" else workflow.id
-                logger.error("Error loading alerts for workflow: $id", e)
-                return workflowRunResult.copy(error = e)
-            }
-            try {
-                monitorCtx.alertIndices!!.createOrUpdateAlertIndex(dataSources)
-                val updatedAlerts = mutableListOf<Alert>()
-                val monitorIdToAlertIdsMap = fetchAlertsGeneratedInCurrentExecution(dataSources, executionId, monitorCtx, workflow)
-                for (trigger in workflow.triggers) {
-                    val currentAlert = currentAlerts[trigger]
-                    val caTrigger = trigger as ChainedAlertTrigger
-                    val triggerCtx = ChainedAlertTriggerExecutionContext(
-                        workflow = workflow,
-                        workflowRunResult = workflowRunResult,
-                        periodStart = workflowRunResult.executionStartTime,
-                        periodEnd = workflowRunResult.executionEndTime,
-                        trigger = caTrigger,
-                        alertGeneratingMonitors = monitorIdToAlertIdsMap.keys,
-                        monitorIdToAlertIdsMap = monitorIdToAlertIdsMap,
-                        alert = currentAlert
-                    )
-                    runChainedAlertTrigger(
-                        monitorCtx,
-                        workflow,
-                        trigger,
-                        executionId,
-                        triggerCtx,
-                        dryRun,
-                        triggerResults,
-                        updatedAlerts
-                    )
-                }
-                if (!dryRun && workflow.id != Workflow.NO_ID && updatedAlerts.isNotEmpty()) {
-                    monitorCtx.retryPolicy?.let {
-                        monitorCtx.alertService!!.saveAlerts(
-                            dataSources,
-                            updatedAlerts,
-                            it,
-                            routingId = workflow.id
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
-                val id = if (workflow.id.trim().isEmpty()) "_na_" else workflow.id
-                logger.error("Error loading current chained alerts for workflow: $id", e)
-                return WorkflowRunResult(
-                    workflowId = workflow.id,
-                    workflowName = workflow.name,
-                    monitorRunResults = emptyList(),
-                    executionStartTime = workflowExecutionStartTime,
-                    executionEndTime = Instant.now(),
-                    executionId = executionId,
-                    error = AlertingException.wrap(e),
-                    triggerResults = emptyMap()
-                )
-            }
-            workflowRunResult.executionEndTime = Instant.now()
-
-            val sr = SearchRequest(dataSources!!.alertsIndex)
-            sr.source().query(QueryBuilders.matchAllQuery()).size(10)
-            val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(sr, it) }
-            searchResponse.hits
-            return workflowRunResult
+            monitors = getMonitors(monitorCtx, delegates)
         } catch (e: Exception) {
             return buildWorkflowRunResult(workflow, workflowExecutionStartTime, executionId, AlertingException.wrap(e))
         }
+
+        // Validate the monitors size
+        validateMonitorSize(delegates, monitors, workflow)
+        val monitorsById = monitors.associateBy { it.id }
+        val resultList = mutableListOf<MonitorRunResult<*>>()
+        var lastErrorDelegateRun: Exception? = null
+
+        for (delegate in delegates) {
+            val delegateMonitor: Monitor = monitorsById[delegate.monitorId]
+                ?: throw AlertingException.wrap(
+                    IllegalStateException("Delegate monitor not found ${delegate.monitorId} for the workflow $workflow.id")
+                )
+
+            val workflowRunContext: WorkflowRunContext
+            try {
+                workflowRunContext = getWorkflowRunContext(delegate, monitorCtx, workflow, monitorsById, executionId, "")
+            } catch (e: Exception) {
+                return buildWorkflowRunResult(workflow, workflowExecutionStartTime, executionId, AlertingException.wrap(e))
+            }
+
+            try {
+                dataSources = delegateMonitor.dataSources
+                val delegateRunResult =
+                    runDelegateStreamingMonitor(delegateMonitor, monitorCtx, dryRun, workflowRunContext, executionId, streamingIndices)
+                resultList.add(delegateRunResult)
+            } catch (ex: Exception) {
+                logger.error("Error executing workflow delegate monitor ${delegate.monitorId}", ex)
+                lastErrorDelegateRun = AlertingException.wrap(ex)
+                break
+            }
+        }
+
+        logger.debug("Workflow ${workflow.id} delegate streaming monitors in execution $executionId completed")
+        val workflowRunResult = runTriggersAndPopulateWorkflowResult(
+            workflow, monitorCtx, workflowExecutionStartTime, executionId, dryRun, dataSources, resultList, lastErrorDelegateRun
+        )
+        refreshAlertsIndex(dataSources, monitorCtx)
+
+        return workflowRunResult
     }
 
     private suspend fun getMonitors(monitorCtx: MonitorRunnerExecutionContext, delegates: List<Delegate>): List<Monitor> {
@@ -573,7 +533,6 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         executionId: String,
         streamingIndices: List<StreamingIndex>
     ): MonitorRunResult<*> {
-
         if (delegateMonitor.isBucketLevelMonitor()) {
             return BucketLevelMonitorRunner.runStreamingMonitor(
                 delegateMonitor,
@@ -603,7 +562,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
             )
         } else {
             throw AlertingException.wrap(
-                IllegalStateException("Unsupported monitor type ${delegateMonitor.monitorType}")
+                IllegalStateException("Unsupported streaming monitor type ${delegateMonitor.monitorType}")
             )
         }
     }
