@@ -468,7 +468,6 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 }
             }
 
-            // TODO - can we abstract some of this out into shared logic
             logger.debug("Workflow ${workflow.id} delegate monitors in execution $executionId completed")
             val triggerResults = mutableMapOf<String, ChainedAlertTriggerRunResult>()
             val workflowRunResult = WorkflowRunResult(
