@@ -291,6 +291,12 @@ class AlertIndices(
                 alertMapping(),
                 dataSources.alertsHistoryIndex
             )
+        } else {
+            updateIndexMapping(
+                dataSources.alertsHistoryIndex ?: ALERT_HISTORY_WRITE_INDEX,
+                alertMapping(),
+                true
+            )
         }
     }
     suspend fun createOrUpdateInitialAlertHistoryIndex() {
@@ -335,6 +341,8 @@ class AlertIndices(
                 findingMapping(),
                 findingsIndex
             )
+        } else {
+            updateIndexMapping(findingsIndex, findingMapping(), true)
         }
     }
 
