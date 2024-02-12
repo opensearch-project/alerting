@@ -52,6 +52,7 @@ import org.opensearch.alerting.transport.TransportAcknowledgeChainedAlertAction
 import org.opensearch.alerting.transport.TransportDeleteMonitorAction
 import org.opensearch.alerting.transport.TransportDeleteWorkflowAction
 import org.opensearch.alerting.transport.TransportExecuteMonitorAction
+import org.opensearch.alerting.transport.TransportExecuteStreamingWorkflowAction
 import org.opensearch.alerting.transport.TransportExecuteWorkflowAction
 import org.opensearch.alerting.transport.TransportGetAlertsAction
 import org.opensearch.alerting.transport.TransportGetDestinationsAction
@@ -219,7 +220,10 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(AlertingActions.INDEX_WORKFLOW_ACTION_TYPE, TransportIndexWorkflowAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.GET_WORKFLOW_ACTION_TYPE, TransportGetWorkflowAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.DELETE_WORKFLOW_ACTION_TYPE, TransportDeleteWorkflowAction::class.java),
-            ActionPlugin.ActionHandler(ExecuteWorkflowAction.INSTANCE, TransportExecuteWorkflowAction::class.java)
+            ActionPlugin.ActionHandler(ExecuteWorkflowAction.INSTANCE, TransportExecuteWorkflowAction::class.java),
+            ActionPlugin.ActionHandler(
+                AlertingActions.EXECUTE_STREAMING_WORKFLOW_ACTION_TYPE, TransportExecuteStreamingWorkflowAction::class.java
+            )
         )
     }
 

@@ -278,8 +278,6 @@ class AlertIndices(
         val alertsIndex = dataSources.alertsIndex
         if (!clusterService.state().routingTable().hasIndex(alertsIndex)) {
             alertIndexInitialized = createIndex(alertsIndex!!, alertMapping())
-        } else {
-            updateIndexMapping(alertsIndex!!, alertMapping())
         }
     }
 
@@ -292,12 +290,6 @@ class AlertIndices(
                 dataSources.alertsHistoryIndexPattern ?: ALERT_HISTORY_INDEX_PATTERN,
                 alertMapping(),
                 dataSources.alertsHistoryIndex
-            )
-        } else {
-            updateIndexMapping(
-                dataSources.alertsHistoryIndex ?: ALERT_HISTORY_WRITE_INDEX,
-                alertMapping(),
-                true
             )
         }
     }
@@ -343,8 +335,6 @@ class AlertIndices(
                 findingMapping(),
                 findingsIndex
             )
-        } else {
-            updateIndexMapping(findingsIndex, findingMapping(), true)
         }
     }
 

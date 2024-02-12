@@ -33,6 +33,7 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.core.common.Strings
 import org.opensearch.core.common.bytes.BytesReference
 import org.opensearch.core.index.shard.ShardId
@@ -385,7 +386,7 @@ class JobSweeper(
                     return@compute currentVersion
                 }
                 if (job != null) {
-                    if (job.enabled) {
+                    if (isJobEnabled(job)) {
                         scheduler.schedule(job)
                     }
                     return@compute newVersion
@@ -393,6 +394,12 @@ class JobSweeper(
                     return@compute null
                 }
             }
+    }
+
+    private fun isJobEnabled(job: ScheduledJob): Boolean {
+        val isStreamingWorkflow = job is Workflow && job.streamingWorkflow ?: false
+
+        return job.enabled && !isStreamingWorkflow
     }
 
     /*
@@ -413,7 +420,7 @@ class JobSweeper(
         // newVersion should not be [Versions.NOT_FOUND] here since it's passed in from existing search hits
         // or successful doc delete operations
         val versionWasUnchanged = newVersion == (currentVersion ?: Versions.NOT_FOUND)
-        val jobEnabled = job?.enabled ?: false
+        val jobEnabled = if (job == null) false else isJobEnabled(job)
 
         return versionWasUnchanged && !jobCurrentlyScheduled && jobEnabled
     }

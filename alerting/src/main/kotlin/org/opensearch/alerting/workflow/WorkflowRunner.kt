@@ -26,6 +26,7 @@ import org.opensearch.alerting.util.destinationmigration.sendNotification
 import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isTestAction
 import org.opensearch.client.node.NodeClient
+import org.opensearch.commons.alerting.model.StreamingIndex
 import org.opensearch.commons.alerting.model.Table
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.model.action.Action
@@ -42,6 +43,13 @@ abstract class WorkflowRunner {
         periodStart: Instant,
         periodEnd: Instant,
         dryRun: Boolean
+    ): WorkflowRunResult
+
+    abstract suspend fun runStreamingWorkflow(
+        workflow: Workflow,
+        monitorCtx: MonitorRunnerExecutionContext,
+        dryRun: Boolean,
+        streamingIndices: List<StreamingIndex>
     ): WorkflowRunResult
 
     suspend fun runAction(

@@ -33,6 +33,7 @@ import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.model.StreamingIndex
 import org.opensearch.commons.alerting.model.action.AlertCategory
 import org.opensearch.commons.alerting.model.action.PerAlertActionScope
 import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
@@ -499,5 +500,16 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             AlertCategory.COMPLETED ->
                 ctx.copy(dedupedAlerts = emptyList(), newAlerts = emptyList(), completedAlerts = listOf(alert), error = error)
         }
+    }
+
+    override suspend fun runStreamingMonitor(
+        monitor: Monitor,
+        monitorCtx: MonitorRunnerExecutionContext,
+        dryRun: Boolean,
+        workflowRunContext: WorkflowRunContext?,
+        executionId: String,
+        streamingIndices: List<StreamingIndex>
+    ): MonitorRunResult<BucketLevelTriggerRunResult> {
+        throw UnsupportedOperationException("Streaming mode is not supported for bucket level monitors")
     }
 }
