@@ -278,8 +278,6 @@ class AlertIndices(
         val alertsIndex = dataSources.alertsIndex
         if (!clusterService.state().routingTable().hasIndex(alertsIndex)) {
             alertIndexInitialized = createIndex(alertsIndex!!, alertMapping())
-        } else {
-            updateIndexMapping(alertsIndex!!, alertMapping())
         }
     }
 
@@ -294,6 +292,7 @@ class AlertIndices(
                 dataSources.alertsHistoryIndex
             )
         } else {
+            // TODO - why do we need explicit mappings?
             updateIndexMapping(
                 dataSources.alertsHistoryIndex ?: ALERT_HISTORY_WRITE_INDEX,
                 alertMapping(),
@@ -382,7 +381,7 @@ class AlertIndices(
         }
 
         // TODO call getMapping and compare actual mappings here instead of this
-        if (targetIndex == IndexUtils.lastUpdatedAlertHistoryIndex || targetIndex == IndexUtils.lastUpdatedFindingHistoryIndex) {
+        if (IndexUtils.initializedIndices.contains(targetIndex)) {
             return
         }
 
@@ -398,6 +397,7 @@ class AlertIndices(
     }
 
     private fun setIndexUpdateFlag(index: String, targetIndex: String) {
+        IndexUtils.initializedIndices.add(targetIndex)
         when (index) {
             ALERT_INDEX -> IndexUtils.alertIndexUpdated()
             ALERT_HISTORY_WRITE_INDEX -> IndexUtils.lastUpdatedAlertHistoryIndex = targetIndex

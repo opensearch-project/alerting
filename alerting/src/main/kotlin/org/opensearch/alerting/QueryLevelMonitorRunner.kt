@@ -16,6 +16,7 @@ import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
+import org.opensearch.commons.alerting.model.StreamingIndex
 import java.time.Instant
 
 object QueryLevelMonitorRunner : MonitorRunner() {
@@ -97,5 +98,16 @@ object QueryLevelMonitorRunner : MonitorRunner() {
             }
         }
         return monitorResult.copy(triggerResults = triggerResults)
+    }
+
+    override suspend fun runStreamingMonitor(
+        monitor: Monitor,
+        monitorCtx: MonitorRunnerExecutionContext,
+        dryRun: Boolean,
+        workflowRunContext: WorkflowRunContext?,
+        executionId: String,
+        streamingIndices: List<StreamingIndex>
+    ): MonitorRunResult<QueryLevelTriggerRunResult> {
+        throw UnsupportedOperationException("Streaming mode is not supported for bucket level monitors")
     }
 }

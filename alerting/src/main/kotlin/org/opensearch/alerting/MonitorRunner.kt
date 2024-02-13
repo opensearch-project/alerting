@@ -27,6 +27,7 @@ import org.opensearch.alerting.util.isTestAction
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.node.NodeClient
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.StreamingIndex
 import org.opensearch.commons.alerting.model.Table
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
@@ -43,6 +44,15 @@ abstract class MonitorRunner {
         dryRun: Boolean,
         workflowRunContext: WorkflowRunContext? = null,
         executionId: String
+    ): MonitorRunResult<*>
+
+    abstract suspend fun runStreamingMonitor(
+        monitor: Monitor,
+        monitorCtx: MonitorRunnerExecutionContext,
+        dryRun: Boolean,
+        workflowRunContext: WorkflowRunContext?,
+        executionId: String,
+        streamingIndices: List<StreamingIndex>
     ): MonitorRunResult<*>
 
     suspend fun runAction(
