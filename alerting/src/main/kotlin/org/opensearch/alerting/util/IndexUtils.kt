@@ -47,6 +47,8 @@ class IndexUtils {
         var lastUpdatedAlertHistoryIndex: String? = null
         var lastUpdatedFindingHistoryIndex: String? = null
 
+        var initializedIndices: MutableSet<String> = mutableSetOf()
+
         init {
             scheduledJobIndexSchemaVersion = getSchemaVersion(ScheduledJobIndices.scheduledJobMappings())
             alertIndexSchemaVersion = getSchemaVersion(AlertIndices.alertMapping())
