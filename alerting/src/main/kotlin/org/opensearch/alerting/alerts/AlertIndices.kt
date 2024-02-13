@@ -359,7 +359,14 @@ class AlertIndices(
         logger.debug("index: [$index] schema mappings: [$schemaMapping]")
         val request = CreateIndexRequest(index)
             .mapping(schemaMapping)
-            .settings(Settings.builder().put("index.hidden", true).build())
+            .settings(
+                Settings
+                    .builder()
+                    .put("index.hidden", true)
+                    .put("number_of_shards", "1")
+                    .put("index.auto_expand_replicas", "0-all")
+                    .build()
+            )
 
         if (alias != null) request.alias(Alias(alias))
         return try {
