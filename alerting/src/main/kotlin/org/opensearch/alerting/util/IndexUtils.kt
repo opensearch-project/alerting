@@ -39,7 +39,7 @@ class IndexUtils {
             private set
 
         var scheduledJobIndexUpdated: Boolean = false
-            private set
+            public set
         var alertIndexUpdated: Boolean = false
             private set
         var findingIndexUpdated: Boolean = false

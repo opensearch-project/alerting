@@ -302,6 +302,16 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         fun start() {
+            /**
+             * this happens in a multi-node scenario when in 1 node
+             * IndexUtils.scheduledJobIndexUpdated is set to true but
+             * in another node where the new monitor creation request
+             * is received & the flag IndexUtils.scheduledJobIndexUpdated
+             * is set to false.
+             */
+            if (request.monitor.name == AlertingSettings.TEST_MONITOR_NAME.getDefault(settings)) {
+                IndexUtils.scheduledJobIndexUpdated = false
+            }
             if (!scheduledJobIndices.scheduledJobIndexExists()) {
                 scheduledJobIndices.initScheduledJobIndex(object : ActionListener<CreateIndexResponse> {
                     override fun onResponse(response: CreateIndexResponse) {

@@ -168,5 +168,11 @@ class AlertingSettings {
             1,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+
+        val TEST_MONITOR_NAME = Setting.simpleString(
+            "plugins.alerting.integ_test.test_monitor_name",
+            "__delete_config_index_monitor__",
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
     }
 }

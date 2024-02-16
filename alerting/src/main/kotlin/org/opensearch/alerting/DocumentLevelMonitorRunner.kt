@@ -9,6 +9,7 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.DocWriteRequest
+import org.opensearch.action.admin.indices.delete.DeleteIndexRequest
 import org.opensearch.action.admin.indices.refresh.RefreshAction
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
 import org.opensearch.action.bulk.BulkRequest
@@ -17,6 +18,7 @@ import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchAction
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
+import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.model.DocumentExecutionContext
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.InputRunResults
@@ -25,6 +27,7 @@ import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.userErrorMessage
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
@@ -309,6 +312,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     onSuccessfulMonitorRun(monitorCtx, monitor)
                 }
 
+                deleteIfTempMonitor(monitor, monitorCtx)
                 MonitorMetadataService.upsertMetadata(
                     monitorMetadata.copy(lastRunContext = updatedLastRunContext),
                     true
@@ -838,5 +842,13 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             }
         }
         jsonAsMap.putAll(tempMap)
+    }
+
+    private suspend fun deleteIfTempMonitor(monitor: Monitor, monitorCtx: MonitorRunnerExecutionContext) {
+        if (monitor.name == AlertingSettings.TEST_MONITOR_NAME.getDefault(monitorCtx.settings!!)) {
+            monitorCtx.client!!.suspendUntil<Client, AcknowledgedResponse> {
+                monitorCtx.client!!.admin().indices().delete(DeleteIndexRequest(".opendistro-alerting-config"), it)
+            }
+        }
     }
 }
