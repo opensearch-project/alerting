@@ -18,6 +18,7 @@ import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AggregationQueryRewriter
 import org.opensearch.alerting.util.CrossClusterMonitorUtils
+import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.executeTransportAction
 import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.toMap
@@ -112,6 +113,7 @@ class InputService(
                         val searchRequest = SearchRequest()
                             .indices(*indexes.toTypedArray())
                             .preference(Preference.PRIMARY_FIRST.type())
+                            .indices(*resolveIndices(monitor, input.indices).toTypedArray())
                         XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource).use {
                             searchRequest.source(SearchSourceBuilder.fromXContent(it))
                         }
@@ -232,7 +234,6 @@ class InputService(
 
             val searchRequest = SearchRequest()
                 .indices(*input.indices.toTypedArray())
-                .preference(Preference.PRIMARY_FIRST.type())
             XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource).use {
                 searchRequest.source(SearchSourceBuilder.fromXContent(it))
             }
@@ -258,5 +259,30 @@ class InputService(
             logger.info("Error collecting anomaly result inputs for monitor: ${monitor.id}", e)
             InputRunResults(emptyList(), e)
         }
+    }
+
+    /** accepts list of index names and returns back a list where :
+     * i. if it's a concrete index or an index pattern - no changes is made
+     * ii. if it's a data stream or an alias - we return the active write index
+     */
+    private fun resolveIndices(
+        monitor: Monitor,
+        indices: List<String>,
+    ): List<String> {
+        val resolvedIndices = mutableListOf<String>()
+        for (it in indices) {
+            if (IndexUtils.isAlias(it, clusterService.state()) || IndexUtils.isDataStream(it, clusterService.state())) {
+                val writeIndex = IndexUtils.getWriteIndex(it, clusterService.state())
+                if (writeIndex == null) {
+                    logger.error("Monitor $monitor.id: Write Index not found for $it")
+                    continue
+                }
+                resolvedIndices.add(writeIndex)
+                // TODO add edge case where periodStart < writeIndex's creationTime
+            } else {
+                resolvedIndices.add(it)
+            }
+        }
+        return resolvedIndices
     }
 }

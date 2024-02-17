@@ -25,6 +25,40 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        /** Defines the threshold of the docs accumulated in memory to query against percolate query index in document
+         * level monitor execution. The docs are being collected from searching on shards of indices mentioned in the
+         * monitor input indices field.
+         */
+        val PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT = Setting.intSetting(
+            "plugins.alerting.monitor.percolate_query_docs_size_memory_percentage_limit",
+            10,
+            0,
+            100,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        /** Defines the threshold of the maximum number of docs accumulated in memory to query against percolate query index in document
+         * level monitor execution. The docs are being collected from searching on shards of indices mentioned in the
+         * monitor input indices field. When the number of in-memory docs reaches or exceeds threshold we immediately perform percolate
+         * query with the current set of docs and clear the cache and repeat the process till we have queried all indices in current
+         * execution
+         */
+        val PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY = Setting.intSetting(
+            "plugins.alerting.monitor.percolate_query_max_num_docs_in_memory",
+            10000, 1000,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        /**
+         * Boolean setting to enable/disable optimizing doc level monitors by fetchign only fields mentioned in queries.
+         * Enabled by default. If disabled, will fetch entire source of documents while fetch data from shards.
+         */
+        val DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED = Setting.boolSetting(
+            "plugins.alerting.monitor.doc_level_monitor_fetch_only_query_fields_enabled",
+            true,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
         val INPUT_TIMEOUT = Setting.positiveTimeSetting(
             "plugins.alerting.input_timeout",
             LegacyOpenDistroAlertingSettings.INPUT_TIMEOUT,

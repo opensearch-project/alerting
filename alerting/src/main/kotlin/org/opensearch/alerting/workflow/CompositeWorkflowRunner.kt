@@ -60,7 +60,10 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         val isTempWorkflow = dryRun || workflow.id == Workflow.NO_ID
 
         val executionId = generateExecutionId(isTempWorkflow, workflow)
-
+        logger.debug(
+            "Workflow ${workflow.id} execution began at $workflowExecutionStartTime" +
+                " on node ${monitorCtx.clusterService!!.localNode().id}"
+        )
         val (workflowMetadata, _) = WorkflowMetadataService.getOrCreateWorkflowMetadata(
             workflow = workflow,
             skipIndex = isTempWorkflow,
@@ -227,6 +230,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
             )
         }
         workflowRunResult.executionEndTime = Instant.now()
+        logger.debug("Workflow ${workflow.id} execution completed at $workflowRunResult.executionEndTime")
         return workflowRunResult
     }
 

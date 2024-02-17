@@ -125,6 +125,7 @@ object MonitorMetadataService :
                 throw OpenSearchStatusException(failureReason, RestStatus.INTERNAL_SERVER_ERROR)
             }
         } catch (e: Exception) {
+            log.error("Failed to upsert metadata", e)
             throw AlertingException.wrap(e)
         }
     }

@@ -189,6 +189,18 @@ class TransportIndexMonitorAction @Inject constructor(
             else (it as DocLevelMonitorInput).indices
             indices.addAll(inputIndices)
         }
+        if (
+            indices.size == 1 && (
+                IndexUtils.isAlias(indices[0], clusterService.state()) ||
+                    IndexUtils.isDataStream(indices[0], clusterService.state())
+                )
+        ) {
+            val metadata = clusterService.state().metadata.indicesLookup[indices[0]]?.writeIndex
+            if (metadata != null) {
+                indices.removeAt(0)
+                indices.add(metadata.index.name)
+            }
+        }
         val searchRequest = SearchRequest().indices(*indices.toTypedArray())
             .source(SearchSourceBuilder.searchSource().size(1).query(QueryBuilders.matchAllQuery()))
         client.search(

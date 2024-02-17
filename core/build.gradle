@@ -19,7 +19,7 @@ dependencies {
         exclude group: 'com.google.guava'
     }
     implementation 'com.google.guava:guava:32.0.1-jre'
-    api "org.opensearch:common-utils:${common_utils_version}@jar"
+    api files("/Users/snistala/Documents/opensearch/common-utils/build/libs/common-utils-3.0.0.0-SNAPSHOT.jar")
     implementation 'commons-validator:commons-validator:1.7'
 
     testImplementation "org.opensearch.test:framework:${opensearch_version}"
