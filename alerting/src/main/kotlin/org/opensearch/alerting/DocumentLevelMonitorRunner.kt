@@ -9,13 +9,14 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.DocWriteRequest
+import org.opensearch.action.admin.indices.refresh.RefreshAction
+import org.opensearch.action.admin.indices.refresh.RefreshRequest
 import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchAction
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.IndexExecutionContext
 import org.opensearch.alerting.model.InputRunResults
@@ -322,7 +323,6 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
             // If there are no triggers defined, we still want to generate findings
             if (monitor.triggers.isEmpty()) {
                 if (dryrun == false && monitor.id != Monitor.NO_ID) {
-                    logger.error("PERF_DEBUG: Creating ${docsToQueries.size} findings for monitor ${monitor.id}")
                     createFindings(monitor, monitorCtx, docsToQueries, idQueryMap, true)
                 }
             } else {
@@ -517,6 +517,11 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         return triggerResult
     }
 
+    /**
+     * 1. Bulk index all findings based on shouldCreateFinding flag
+     * 2. invoke publishFinding() to kickstart auto-correlations
+     * 3. Returns a list of pairs for finding id to doc id
+     */
     private suspend fun createFindings(
         monitor: Monitor,
         monitorCtx: MonitorRunnerExecutionContext,
@@ -559,26 +564,45 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 indexRequests += IndexRequest(monitor.dataSources.findingsIndex)
                     .source(findingStr, XContentType.JSON)
                     .id(finding.id)
-                    .routing(finding.id)
                     .opType(DocWriteRequest.OpType.CREATE)
             }
         }
 
         if (indexRequests.isNotEmpty()) {
+            bulkIndexFindings(monitor, monitorCtx, indexRequests)
+        }
+
+        try {
+            findings.forEach { finding ->
+                publishFinding(monitor, monitorCtx, finding)
+            }
+        } catch (e: Exception) {
+            // suppress exception
+            logger.error("Optional finding callback failed", e)
+        }
+        return findingDocPairs
+    }
+
+    private suspend fun bulkIndexFindings(
+        monitor: Monitor,
+        monitorCtx: MonitorRunnerExecutionContext,
+        indexRequests: List<IndexRequest>
+    ) {
+        indexRequests.chunked(monitorCtx.findingsIndexBatchSize).forEach { batch ->
             val bulkResponse: BulkResponse = monitorCtx.client!!.suspendUntil {
-                bulk(BulkRequest().add(indexRequests).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE), it)
+                bulk(BulkRequest().add(batch), it)
             }
             if (bulkResponse.hasFailures()) {
                 bulkResponse.items.forEach { item ->
                     if (item.isFailed) {
-                        logger.debug("Failed indexing the finding ${item.id} of monitor [${monitor.id}]")
+                        logger.error("Failed indexing the finding ${item.id} of monitor [${monitor.id}]")
                     }
                 }
             } else {
                 logger.debug("[${bulkResponse.items.size}] All findings successfully indexed.")
             }
         }
-        return findingDocPairs
+        monitorCtx.client!!.execute(RefreshAction.INSTANCE, RefreshRequest(monitor.dataSources.findingsIndex))
     }
 
     private fun publishFinding(
