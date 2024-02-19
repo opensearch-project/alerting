@@ -18,6 +18,7 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.monitor.jvm.JvmStats
 import org.opensearch.script.ScriptService
 import org.opensearch.threadpool.ThreadPool
 
@@ -36,6 +37,7 @@ data class MonitorRunnerExecutionContext(
     var alertService: AlertService? = null,
     var docLevelMonitorQueries: DocLevelMonitorQueries? = null,
     var workflowService: WorkflowService? = null,
+    var jvmStats: JvmStats? = null,
 
     @Volatile var retryPolicy: BackoffPolicy? = null,
     @Volatile var moveAlertsRetryPolicy: BackoffPolicy? = null,

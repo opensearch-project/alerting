@@ -50,6 +50,7 @@ import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.monitor.jvm.JvmStats
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
 import org.opensearch.script.TemplateScript
@@ -131,6 +132,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
     fun registerWorkflowService(workflowService: WorkflowService): MonitorRunnerService {
         this.monitorCtx.workflowService = workflowService
+        return this
+    }
+
+    fun registerJvmStats(jvmStats: JvmStats): MonitorRunnerService {
+        this.monitorCtx.jvmStats = jvmStats
         return this
     }
 
@@ -258,11 +264,19 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         when (job) {
             is Workflow -> {
                 launch {
+                    logger.debug(
+                        "PERF_DEBUG: executing workflow ${job.id} on node " +
+                            monitorCtx.clusterService!!.state().nodes().localNode.id
+                    )
                     runJob(job, periodStart, periodEnd, false)
                 }
             }
             is Monitor -> {
                 launch {
+                    logger.debug(
+                        "PERF_DEBUG: executing ${job.monitorType} ${job.id} on node " +
+                            monitorCtx.clusterService!!.state().nodes().localNode.id
+                    )
                     runJob(job, periodStart, periodEnd, false)
                 }
             }
