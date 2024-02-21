@@ -251,7 +251,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 executionId
             )
         } else if (delegateMonitor.isDocLevelMonitor()) {
-            return DocumentLevelMonitorRunner.runMonitor(
+            return DocumentLevelMonitorRunner().runMonitor(
                 delegateMonitor,
                 monitorCtx,
                 periodStart,

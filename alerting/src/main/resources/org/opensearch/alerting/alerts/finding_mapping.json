@@ -49,6 +49,9 @@
         },
         "fields": {
           "type": "text"
+        },
+        "query_field_names": {
+          "type": "keyword"
         }
       }
     },
