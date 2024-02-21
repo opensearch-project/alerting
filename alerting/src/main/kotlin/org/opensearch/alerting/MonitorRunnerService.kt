@@ -47,6 +47,7 @@ import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
 import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.monitor.jvm.JvmStats
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
 import org.opensearch.script.TemplateScript
@@ -120,6 +121,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
     fun registerDocLevelMonitorQueries(docLevelMonitorQueries: DocLevelMonitorQueries): MonitorRunnerService {
         this.monitorCtx.docLevelMonitorQueries = docLevelMonitorQueries
+        return this
+    }
+
+    fun registerJvmStats(jvmStats: JvmStats): MonitorRunnerService {
+        this.monitorCtx.jvmStats = jvmStats
         return this
     }
 
@@ -225,11 +231,28 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     }
 
     override fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant) {
-        if (job !is Monitor) {
-            throw IllegalArgumentException("Invalid job type")
-        }
-        launch {
-            runJob(job, periodStart, periodEnd, false)
+        when (job) {
+            is Workflow -> {
+                launch {
+                    logger.debug(
+                        "PERF_DEBUG: executing workflow ${job.id} on node " +
+                            monitorCtx.clusterService!!.state().nodes().localNode.id
+                    )
+                    runJob(job, periodStart, periodEnd, false)
+                }
+            }
+            is Monitor -> {
+                launch {
+                    logger.debug(
+                        "PERF_DEBUG: executing ${job.monitorType} ${job.id} on node " +
+                            monitorCtx.clusterService!!.state().nodes().localNode.id
+                    )
+                    runJob(job, periodStart, periodEnd, false)
+                }
+            }
+            else -> {
+                throw IllegalArgumentException("Invalid job type")
+            }
         }
     }
 
@@ -255,7 +278,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         val runResult = if (monitor.isBucketLevelMonitor()) {
             BucketLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         } else if (monitor.isDocLevelMonitor()) {
-            DocumentLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
+            DocumentLevelMonitorRunner().runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun, executionId = executionId)
         } else {
             QueryLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         }
