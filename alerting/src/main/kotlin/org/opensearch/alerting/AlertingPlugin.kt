@@ -100,6 +100,7 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.env.Environment
 import org.opensearch.env.NodeEnvironment
 import org.opensearch.index.IndexModule
+import org.opensearch.monitor.jvm.JvmStats
 import org.opensearch.painless.spi.PainlessExtension
 import org.opensearch.painless.spi.Whitelist
 import org.opensearch.painless.spi.WhitelistLoader
@@ -272,6 +273,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerTriggerService(TriggerService(scriptService))
             .registerAlertService(AlertService(client, xContentRegistry, alertIndices))
             .registerDocLevelMonitorQueries(DocLevelMonitorQueries(client, clusterService))
+            .registerJvmStats(JvmStats.jvmStats())
             .registerWorkflowService(WorkflowService(client, xContentRegistry))
             .registerConsumers()
             .registerDestinationSettings()
@@ -329,6 +331,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.ALERT_HISTORY_MAX_DOCS,
             AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD,
             AlertingSettings.ALERTING_MAX_MONITORS,
+            AlertingSettings.PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT,
+            AlertingSettings.PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY,
             AlertingSettings.REQUEST_TIMEOUT,
             AlertingSettings.MAX_ACTION_THROTTLE_VALUE,
             AlertingSettings.FILTER_BY_BACKEND_ROLES,
