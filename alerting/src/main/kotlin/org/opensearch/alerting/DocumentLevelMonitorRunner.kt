@@ -21,6 +21,8 @@ import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
+import org.opensearch.alerting.settings.AlertingSettings.Companion.PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT
+import org.opensearch.alerting.settings.AlertingSettings.Companion.PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
@@ -49,17 +51,27 @@ import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.percolator.PercolateQueryBuilderExt
 import org.opensearch.rest.RestStatus
+import org.opensearch.search.SearchHit
 import org.opensearch.search.SearchHits
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortOrder
 import java.io.IOException
 import java.time.Instant
 import java.util.UUID
-import kotlin.collections.HashMap
+import java.util.stream.Collectors
 import kotlin.math.max
 
-object DocumentLevelMonitorRunner : MonitorRunner() {
+class DocumentLevelMonitorRunner : MonitorRunner() {
     private val logger = LogManager.getLogger(javaClass)
+    var nonPercolateSearchesTimeTakenStat = 0L
+    var percolateQueriesTimeTakenStat = 0L
+    var totalDocsQueriedStat = 0L
+    var docTransformTimeTakenStat = 0L
+    var totalDocsSizeInBytesStat = 0L
+    var docsSizeOfBatchInBytes = 0L
+    /* Contains list of docs source that are held in memory to submit to percolate query against query index.
+            * Docs are fetched from the source index per shard and transformed.*/
+    val transformedDocs = mutableListOf<Pair<String, TransformedDocDto>>()
 
     override suspend fun runMonitor(
         monitor: Monitor,
@@ -136,6 +148,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 }
             }
 
+            val concreteIndicesSeenSoFar = mutableListOf<String>()
+            val updatedIndexNames = mutableListOf<String>()
             docLevelMonitorInput.indices.forEach { indexName ->
                 var concreteIndices = IndexUtils.resolveAllIndices(
                     listOf(indexName),
@@ -157,7 +171,9 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                         )
                     }
                 }
+                concreteIndicesSeenSoFar.addAll(concreteIndices)
                 val updatedIndexName = indexName.replace("*", "_")
+                updatedIndexNames.add(updatedIndexName)
                 val conflictingFields = monitorCtx.docLevelMonitorQueries!!.getAllConflictingFields(
                     monitorCtx.clusterService!!.state(),
                     concreteIndices
@@ -179,7 +195,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     val indexUpdatedRunContext = updateLastRunContext(
                         indexLastRunContext.toMutableMap(),
                         monitorCtx,
-                        concreteIndexName
+                        concreteIndexName,
                     ) as MutableMap<String, Any>
                     if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
                         IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
@@ -206,39 +222,33 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     // Prepare DocumentExecutionContext for each index
                     val docExecutionContext = DocumentExecutionContext(queries, indexLastRunContext, indexUpdatedRunContext)
 
-                    val matchingDocs = getMatchingDocs(
+                    fetchShardDataAndMaybeExecutePercolateQueries(
                         monitor,
                         monitorCtx,
                         docExecutionContext,
                         updatedIndexName,
                         concreteIndexName,
                         conflictingFields.toList(),
+                        monitorMetadata,
+                        inputRunResults,
+                        docsToQueries,
+                        updatedIndexNames,
+                        concreteIndicesSeenSoFar,
                     )
-
-                    if (matchingDocs.isNotEmpty()) {
-                        val matchedQueriesForDocs = getMatchedQueries(
-                            monitorCtx,
-                            matchingDocs.map { it.second },
-                            monitor,
-                            monitorMetadata,
-                            updatedIndexName,
-                            concreteIndexName
-                        )
-
-                        matchedQueriesForDocs.forEach { hit ->
-                            val id = hit.id
-                                .replace("_${updatedIndexName}_${monitor.id}", "")
-                                .replace("_${concreteIndexName}_${monitor.id}", "")
-
-                            val docIndices = hit.field("_percolator_document_slot").values.map { it.toString().toInt() }
-                            docIndices.forEach { idx ->
-                                val docIndex = "${matchingDocs[idx].first}|$concreteIndexName"
-                                inputRunResults.getOrPut(id) { mutableSetOf() }.add(docIndex)
-                                docsToQueries.getOrPut(docIndex) { mutableListOf() }.add(id)
-                            }
-                        }
-                    }
                 }
+            }
+            /* if all indices are covered still in-memory docs size limit is not breached we would need to submit
+               the percolate query at the end */
+            if (transformedDocs.isNotEmpty()) {
+                performPercolateQueryAndResetCounters(
+                    monitorCtx,
+                    monitor,
+                    monitorMetadata,
+                    updatedIndexNames,
+                    concreteIndicesSeenSoFar,
+                    inputRunResults,
+                    docsToQueries,
+                )
             }
             monitorResult = monitorResult.copy(inputResults = InputRunResults(listOf(inputRunResults)))
         } catch (e: Exception) {
@@ -249,6 +259,22 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 e
             )
             monitorResult = monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
+        } finally {
+            logger.debug(
+                "PERF_DEBUG_STATS: Monitor ${monitor.id} " +
+                    "Time spent on fetching data from shards in millis: $nonPercolateSearchesTimeTakenStat"
+            )
+            logger.debug(
+                "PERF_DEBUG_STATS: Monitor {} Time spent on percolate queries in millis: {}",
+                monitor.id,
+                percolateQueriesTimeTakenStat
+            )
+            logger.debug(
+                "PERF_DEBUG_STATS: Monitor {} Time spent on transforming doc fields in millis: {}",
+                monitor.id,
+                docTransformTimeTakenStat
+            )
+            logger.debug("PERF_DEBUG_STATS: Monitor {} Num docs queried: {}", monitor.id, totalDocsQueriedStat)
         }
 
         /*
@@ -424,7 +450,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
     private suspend fun updateLastRunContext(
         lastRunContext: Map<String, Any>,
         monitorCtx: MonitorRunnerExecutionContext,
-        index: String
+        index: String,
     ): Map<String, Any> {
         val count: Int = getShardsCount(monitorCtx.clusterService!!, index)
         val updatedLastRunContext = lastRunContext.toMutableMap()
@@ -502,6 +528,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         if (response.status() !== RestStatus.OK) {
             throw IOException("Failed to get max seq no for shard: $shard")
         }
+        nonPercolateSearchesTimeTakenStat += response.took.millis
         if (response.hits.hits.isEmpty())
             return -1L
 
@@ -513,16 +540,25 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         return allShards.filter { it.primary() }.size
     }
 
-    private suspend fun getMatchingDocs(
+    /** 1. Fetch data per shard for given index. (only 10000 docs are fetched.
+     * needs to be converted to scroll if not performant enough)
+     *  2. Transform documents to conform to format required for percolate query
+     *  3a. Check if docs in memory are crossing threshold defined by setting.
+     *  3b. If yes, perform percolate query and update docToQueries Map with all hits from percolate queries */
+    private suspend fun fetchShardDataAndMaybeExecutePercolateQueries(
         monitor: Monitor,
         monitorCtx: MonitorRunnerExecutionContext,
         docExecutionCtx: DocumentExecutionContext,
-        index: String,
-        concreteIndex: String,
+        indexName: String,
+        concreteIndexName: String,
         conflictingFields: List<String>,
-    ): List<Pair<String, BytesReference>> {
+        monitorMetadata: MonitorMetadata,
+        inputRunResults: MutableMap<String, MutableSet<String>>,
+        docsToQueries: MutableMap<String, MutableList<String>>,
+        monitorInputIndices: List<String>,
+        concreteIndices: List<String>,
+    ) {
         val count: Int = docExecutionCtx.updatedLastRunContext["shards_count"] as Int
-        val matchingDocs = mutableListOf<Pair<String, BytesReference>>()
         for (i: Int in 0 until count) {
             val shard = i.toString()
             try {
@@ -531,30 +567,103 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
 
                 val hits: SearchHits = searchShard(
                     monitorCtx,
-                    concreteIndex,
+                    concreteIndexName,
                     shard,
                     prevSeqNo,
                     maxSeqNo,
                     null
                 )
-
-                if (hits.hits.isNotEmpty()) {
-                    matchingDocs.addAll(getAllDocs(hits, index, concreteIndex, monitor.id, conflictingFields))
-                }
+                val startTime = System.currentTimeMillis()
+                transformedDocs.addAll(
+                    transformSearchHitsAndReconstructDocs(
+                        hits,
+                        indexName,
+                        concreteIndexName,
+                        monitor.id,
+                        conflictingFields,
+                    )
+                )
+                docTransformTimeTakenStat += System.currentTimeMillis() - startTime
             } catch (e: Exception) {
-                logger.warn("Failed to run for shard $shard. Error: ${e.message}")
+                logger.error(
+                    "Monitor ${monitor.id} :" +
+                        " Failed to run fetch data from shard [$shard] of index [$concreteIndexName]. Error: ${e.message}",
+                    e
+                )
+            }
+            if (
+                transformedDocs.isNotEmpty() &&
+                shouldPerformPercolateQueryAndFlushInMemoryDocs(transformedDocs.size, monitorCtx)
+            ) {
+                performPercolateQueryAndResetCounters(
+                    monitorCtx,
+                    monitor,
+                    monitorMetadata,
+                    monitorInputIndices,
+                    concreteIndices,
+                    inputRunResults,
+                    docsToQueries,
+                )
             }
         }
-        return matchingDocs
     }
 
+    private fun shouldPerformPercolateQueryAndFlushInMemoryDocs(
+        numDocs: Int,
+        monitorCtx: MonitorRunnerExecutionContext,
+    ): Boolean {
+        return isInMemoryDocsSizeExceedingMemoryLimit(docsSizeOfBatchInBytes, monitorCtx) ||
+            isInMemoryNumDocsExceedingMaxDocsPerPercolateQueryLimit(numDocs, monitorCtx)
+    }
+
+    private suspend fun performPercolateQueryAndResetCounters(
+        monitorCtx: MonitorRunnerExecutionContext,
+        monitor: Monitor,
+        monitorMetadata: MonitorMetadata,
+        monitorInputIndices: List<String>,
+        concreteIndices: List<String>,
+        inputRunResults: MutableMap<String, MutableSet<String>>,
+        docsToQueries: MutableMap<String, MutableList<String>>,
+    ) {
+        try {
+            val percolateQueryResponseHits = runPercolateQueryOnTransformedDocs(
+                monitorCtx,
+                transformedDocs,
+                monitor,
+                monitorMetadata,
+                concreteIndices,
+                monitorInputIndices,
+            )
+
+            percolateQueryResponseHits.forEach { hit ->
+                var id = hit.id
+                concreteIndices.forEach { id = id.replace("_${it}_${monitor.id}", "") }
+                monitorInputIndices.forEach { id = id.replace("_${it}_${monitor.id}", "") }
+                val docIndices = hit.field("_percolator_document_slot").values.map { it.toString().toInt() }
+                docIndices.forEach { idx ->
+                    val docIndex = "${transformedDocs[idx].first}|${transformedDocs[idx].second.concreteIndexName}"
+                    inputRunResults.getOrPut(id) { mutableSetOf() }.add(docIndex)
+                    docsToQueries.getOrPut(docIndex) { mutableListOf() }.add(id)
+                }
+            }
+            totalDocsQueriedStat += transformedDocs.size.toLong()
+        } finally {
+            transformedDocs.clear()
+            docsSizeOfBatchInBytes = 0
+        }
+    }
+
+    /** Executes search query on given shard of given index to fetch docs with sequene number greater than prevSeqNo.
+     * This method hence fetches only docs from shard which haven't been queried before
+     */
     private suspend fun searchShard(
         monitorCtx: MonitorRunnerExecutionContext,
         index: String,
         shard: String,
         prevSeqNo: Long?,
         maxSeqNo: Long,
-        query: String?
+        query: String?,
+        docIds: List<String>? = null,
     ): SearchHits {
         if (prevSeqNo?.equals(maxSeqNo) == true && maxSeqNo != 0L) {
             return SearchHits.empty()
@@ -573,81 +682,117 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 SearchSourceBuilder()
                     .version(true)
                     .query(boolQueryBuilder)
-                    .size(10000) // fixme: make this configurable.
+                    .size(10000)
             )
         val response: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(request, it) }
         if (response.status() !== RestStatus.OK) {
-            throw IOException("Failed to search shard: $shard")
+            logger.error("Failed search shard. Response: $response")
+            throw IOException("Failed to search shard: [$shard] in index [$index]. Response status is ${response.status()}")
         }
+        nonPercolateSearchesTimeTakenStat += response.took.millis
         return response.hits
     }
 
-    private suspend fun getMatchedQueries(
+    /** Executes percolate query on the docs against the monitor's query index and return the hits from the search response*/
+    private suspend fun runPercolateQueryOnTransformedDocs(
         monitorCtx: MonitorRunnerExecutionContext,
-        docs: List<BytesReference>,
+        docs: MutableList<Pair<String, TransformedDocDto>>,
         monitor: Monitor,
         monitorMetadata: MonitorMetadata,
-        index: String,
-        concreteIndex: String
+        concreteIndices: List<String>,
+        monitorInputIndices: List<String>,
     ): SearchHits {
-        val boolQueryBuilder = BoolQueryBuilder().must(QueryBuilders.matchQuery("index", index).operator(Operator.AND))
-
-        val percolateQueryBuilder = PercolateQueryBuilderExt("query", docs, XContentType.JSON)
+        val indices = docs.stream().map { it.second.indexName }.distinct().collect(Collectors.toList())
+        val boolQueryBuilder = BoolQueryBuilder().must(buildShouldClausesOverPerIndexMatchQueries(indices))
+        val percolateQueryBuilder =
+            PercolateQueryBuilderExt("query", docs.map { it.second.docSource }, XContentType.JSON)
         if (monitor.id.isNotEmpty()) {
             boolQueryBuilder.must(QueryBuilders.matchQuery("monitor_id", monitor.id).operator(Operator.AND))
         }
         boolQueryBuilder.filter(percolateQueryBuilder)
-
-        val queryIndex = monitorMetadata.sourceToQueryIndexMapping[index + monitor.id]
-        if (queryIndex == null) {
-            val message = "Failed to resolve concrete queryIndex from sourceIndex during monitor execution!" +
-                " sourceIndex:$concreteIndex queryIndex:${monitor.dataSources.queryIndex}"
+        val queryIndices =
+            docs.map { monitorMetadata.sourceToQueryIndexMapping[it.second.indexName + monitor.id] }.distinct()
+        if (queryIndices.isEmpty()) {
+            val message =
+                "Monitor ${monitor.id}: Failed to resolve query Indices from source indices during monitor execution!" +
+                    " sourceIndices: $monitorInputIndices"
             logger.error(message)
             throw AlertingException.wrap(
                 OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR)
             )
         }
-        val searchRequest = SearchRequest(queryIndex)
+
+        val searchRequest =
+            SearchRequest().indices(*queryIndices.toTypedArray())
         val searchSourceBuilder = SearchSourceBuilder()
         searchSourceBuilder.query(boolQueryBuilder)
         searchRequest.source(searchSourceBuilder)
-
-        val response: SearchResponse = monitorCtx.client!!.suspendUntil {
-            monitorCtx.client!!.execute(SearchAction.INSTANCE, searchRequest, it)
+        logger.debug(
+            "Monitor ${monitor.id}: " +
+                "Executing percolate query for docs from source indices " +
+                "$monitorInputIndices against query index $queryIndices"
+        )
+        var response: SearchResponse
+        try {
+            response = monitorCtx.client!!.suspendUntil {
+                monitorCtx.client!!.execute(SearchAction.INSTANCE, searchRequest, it)
+            }
+        } catch (e: Exception) {
+            throw IllegalStateException(
+                "Monitor ${monitor.id}:" +
+                    " Failed to run percolate search for sourceIndex [${concreteIndices.joinToString()}] " +
+                    "and queryIndex [${queryIndices.joinToString()}] for ${docs.size} document(s)",
+                e
+            )
         }
 
         if (response.status() !== RestStatus.OK) {
-            throw IOException("Failed to search percolate index: $queryIndex")
+            throw IOException(
+                "Monitor ${monitor.id}: Failed to search percolate index: ${queryIndices.joinToString()}. " +
+                    "Response status is ${response.status()}"
+            )
         }
+        logger.debug("Monitor ${monitor.id} PERF_DEBUG: Percolate query time taken millis = ${response.took}")
+        percolateQueriesTimeTakenStat += response.took.millis
         return response.hits
     }
+    /** we cannot use terms query because `index` field's mapping is of type TEXT and not keyword. Refer doc-level-queries.json*/
+    private fun buildShouldClausesOverPerIndexMatchQueries(indices: List<String>): BoolQueryBuilder {
+        val boolQueryBuilder = QueryBuilders.boolQuery()
+        indices.forEach { boolQueryBuilder.should(QueryBuilders.matchQuery("index", it)) }
+        return boolQueryBuilder
+    }
 
-    private fun getAllDocs(
+    /** Transform field names and index names in all the search hits to format required to run percolate search against them.
+     * Hits are transformed using method transformDocumentFieldNames() */
+    private fun transformSearchHitsAndReconstructDocs(
         hits: SearchHits,
         index: String,
         concreteIndex: String,
         monitorId: String,
-        conflictingFields: List<String>
-    ): List<Pair<String, BytesReference>> {
-        return hits.map { hit ->
-            val sourceMap = hit.sourceAsMap
-
-            transformDocumentFieldNames(
-                sourceMap,
-                conflictingFields,
-                "_${index}_$monitorId",
-                "_${concreteIndex}_$monitorId",
-                ""
-            )
-
-            var xContentBuilder = XContentFactory.jsonBuilder().map(sourceMap)
-
-            val sourceRef = BytesReference.bytes(xContentBuilder)
-
-            logger.debug("Document [${hit.id}] payload after transform: ", sourceRef.utf8ToString())
-
-            Pair(hit.id, sourceRef)
-        }
+        conflictingFields: List<String>,
+    ): List<Pair<String, TransformedDocDto>> {
+        return hits.mapNotNull(fun(hit: SearchHit): Pair<String, TransformedDocDto>? {
+            try {
+                val sourceMap = hit.sourceAsMap
+                transformDocumentFieldNames(
+                    sourceMap,
+                    conflictingFields,
+                    "_${index}_$monitorId",
+                    "_${concreteIndex}_$monitorId",
+                    ""
+                )
+                var xContentBuilder = XContentFactory.jsonBuilder().map(sourceMap)
+                val sourceRef = BytesReference.bytes(xContentBuilder)
+                docsSizeOfBatchInBytes += sourceRef.ramBytesUsed()
+                totalDocsSizeInBytesStat += sourceRef.ramBytesUsed()
+                return Pair(hit.id, TransformedDocDto(index, concreteIndex, hit.id, sourceRef))
+            } catch (e: Exception) {
+                logger.error("Monitor $monitorId: Failed to transform payload $hit for percolate query", e)
+                // skip any document which we fail to transform because we anyway won't be able to run percolate queries on them.
+                return null
+            }
+        })
     }
 
     /**
@@ -700,4 +845,33 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         }
         jsonAsMap.putAll(tempMap)
     }
+
+    /**
+     * Returns true, if the docs fetched from shards thus far amount to less than threshold
+     * amount of percentage (default:10. setting is dynamic and configurable) of the total heap size or not.
+     *
+     */
+    private fun isInMemoryDocsSizeExceedingMemoryLimit(docsBytesSize: Long, monitorCtx: MonitorRunnerExecutionContext): Boolean {
+        var thresholdPercentage = PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT.get(monitorCtx.settings)
+        val heapMaxBytes = monitorCtx.jvmStats!!.mem.heapMax.bytes
+        val thresholdBytes = (thresholdPercentage.toDouble() / 100.0) * heapMaxBytes
+
+        return docsBytesSize > thresholdBytes
+    }
+
+    private fun isInMemoryNumDocsExceedingMaxDocsPerPercolateQueryLimit(numDocs: Int, monitorCtx: MonitorRunnerExecutionContext): Boolean {
+        var maxNumDocsThreshold = PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY.get(monitorCtx.settings)
+        return numDocs >= maxNumDocsThreshold
+    }
+
+    /**
+     * POJO holding information about each doc's concrete index, id, input index pattern/alias/datastream name
+     * and doc source. A list of these POJOs would be passed to percolate query execution logic.
+     */
+    data class TransformedDocDto(
+        var indexName: String,
+        var concreteIndexName: String,
+        var docId: String,
+        var docSource: BytesReference
+    )
 }

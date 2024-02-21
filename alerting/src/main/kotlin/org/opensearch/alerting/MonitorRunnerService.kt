@@ -45,6 +45,7 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
+import org.opensearch.monitor.jvm.JvmStats
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
 import org.opensearch.script.TemplateScript
@@ -118,6 +119,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
     fun registerDocLevelMonitorQueries(docLevelMonitorQueries: DocLevelMonitorQueries): MonitorRunnerService {
         this.monitorCtx.docLevelMonitorQueries = docLevelMonitorQueries
+        return this
+    }
+
+    fun registerJvmStats(jvmStats: JvmStats): MonitorRunnerService {
+        this.monitorCtx.jvmStats = jvmStats
         return this
     }
 
@@ -248,7 +254,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         val runResult = if (monitor.isBucketLevelMonitor()) {
             BucketLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         } else if (monitor.isDocLevelMonitor()) {
-            DocumentLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
+            DocumentLevelMonitorRunner().runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         } else {
             QueryLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun)
         }
