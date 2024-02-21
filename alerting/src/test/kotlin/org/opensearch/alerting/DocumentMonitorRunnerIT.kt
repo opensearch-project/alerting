@@ -406,7 +406,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             "test_field" : "us-west-2"
         }"""
 
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = testQueryName, fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = testQueryName)
         val docLevelInput = DocLevelMonitorInput("description", listOf("$testIndexPrefix*"), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = Script("query[name=$testQueryName]"))
