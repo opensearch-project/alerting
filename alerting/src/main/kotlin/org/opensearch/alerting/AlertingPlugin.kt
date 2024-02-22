@@ -349,6 +349,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             LegacyOpenDistroAlertingSettings.REQUEST_TIMEOUT,
             LegacyOpenDistroAlertingSettings.MAX_ACTION_THROTTLE_VALUE,
             LegacyOpenDistroAlertingSettings.FILTER_BY_BACKEND_ROLES,
+            AlertingSettings.DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED,
             DestinationSettings.EMAIL_USERNAME,
             DestinationSettings.EMAIL_PASSWORD,
             DestinationSettings.ALLOW_LIST,
