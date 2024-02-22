@@ -49,5 +49,9 @@ data class MonitorRunnerExecutionContext(
 
     @Volatile var maxActionableAlertCount: Long = AlertingSettings.DEFAULT_MAX_ACTIONABLE_ALERT_COUNT,
     @Volatile var indexTimeout: TimeValue? = null,
-    @Volatile var findingsIndexBatchSize: Int = AlertingSettings.DEFAULT_FINDINGS_INDEXING_BATCH_SIZE
+    @Volatile var findingsIndexBatchSize: Int = AlertingSettings.DEFAULT_FINDINGS_INDEXING_BATCH_SIZE,
+    @Volatile var fetchOnlyQueryFieldNames: Boolean = true,
+    @Volatile var percQueryMaxNumDocsInMemory: Int = AlertingSettings.DEFAULT_PERCOLATE_QUERY_NUM_DOCS_IN_MEMORY,
+    @Volatile var percQueryDocsSizeMemoryPercentageLimit: Int =
+        AlertingSettings.DEFAULT_PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT,
 )

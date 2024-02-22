@@ -26,8 +26,6 @@ import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.userErrorMessage
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
-import org.opensearch.alerting.settings.AlertingSettings.Companion.PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT
-import org.opensearch.alerting.settings.AlertingSettings.Companion.PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
@@ -228,6 +226,28 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                         }
                     }
 
+                    val fieldsToBeQueried = mutableSetOf<String>()
+                    if (monitorCtx.fetchOnlyQueryFieldNames) {
+                        for (it in queries) {
+                            if (it.queryFieldNames.isEmpty()) {
+                                fieldsToBeQueried.clear()
+                                logger.debug(
+                                    "Monitor ${monitor.id} : " +
+                                        "Doc Level query ${it.id} : ${it.query} doesn't have queryFieldNames populated. " +
+                                        "Cannot optimize monitor to fetch only query-relevant fields. " +
+                                        "Querying entire doc source."
+                                )
+                                break
+                            }
+                            fieldsToBeQueried.addAll(it.queryFieldNames)
+                        }
+                        if (fieldsToBeQueried.isNotEmpty())
+                            logger.debug(
+                                "Monitor ${monitor.id} Querying only fields " +
+                                    "${fieldsToBeQueried.joinToString()} instead of entire _source of documents"
+                            )
+                    }
+
                     // Prepare DocumentExecutionContext for each index
                     val docExecutionContext = DocumentExecutionContext(queries, indexLastRunContext, indexUpdatedRunContext)
 
@@ -243,6 +263,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                         docsToQueries,
                         updatedIndexNames,
                         concreteIndicesSeenSoFar,
+                        ArrayList(fieldsToBeQueried)
                     )
                 }
             }
@@ -652,6 +673,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         docsToQueries: MutableMap<String, MutableList<String>>,
         monitorInputIndices: List<String>,
         concreteIndices: List<String>,
+        fieldsToBeQueried: List<String>,
     ) {
         val count: Int = docExecutionCtx.updatedLastRunContext["shards_count"] as Int
         for (i: Int in 0 until count) {
@@ -666,7 +688,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                     shard,
                     prevSeqNo,
                     maxSeqNo,
-                    null
+                    fieldsToBeQueried
                 )
                 val startTime = System.currentTimeMillis()
                 transformedDocs.addAll(
@@ -757,17 +779,13 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         shard: String,
         prevSeqNo: Long?,
         maxSeqNo: Long,
-        query: String?,
+        fieldsToFetch: List<String>,
     ): SearchHits {
         if (prevSeqNo?.equals(maxSeqNo) == true && maxSeqNo != 0L) {
             return SearchHits.empty()
         }
         val boolQueryBuilder = BoolQueryBuilder()
         boolQueryBuilder.filter(QueryBuilders.rangeQuery("_seq_no").gt(prevSeqNo).lte(maxSeqNo))
-
-        if (query != null) {
-            boolQueryBuilder.must(QueryBuilders.queryStringQuery(query))
-        }
 
         val request: SearchRequest = SearchRequest()
             .indices(index)
@@ -778,6 +796,13 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                     .query(boolQueryBuilder)
                     .size(10000)
             )
+
+        if (monitorCtx.fetchOnlyQueryFieldNames && fieldsToFetch.isNotEmpty()) {
+            request.source().fetchSource(false)
+            for (field in fieldsToFetch) {
+                request.source().fetchField(field)
+            }
+        }
         val response: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(request, it) }
         if (response.status() !== RestStatus.OK) {
             logger.error("Failed search shard. Response: $response")
@@ -868,7 +893,11 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
     ): List<Pair<String, TransformedDocDto>> {
         return hits.mapNotNull(fun(hit: SearchHit): Pair<String, TransformedDocDto>? {
             try {
-                val sourceMap = hit.sourceAsMap
+                val sourceMap = if (hit.hasSource()) {
+                    hit.sourceAsMap
+                } else {
+                    constructSourceMapFromFieldsInHit(hit)
+                }
                 transformDocumentFieldNames(
                     sourceMap,
                     conflictingFields,
@@ -887,6 +916,19 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                 return null
             }
         })
+    }
+
+    private fun constructSourceMapFromFieldsInHit(hit: SearchHit): MutableMap<String, Any> {
+        if (hit.fields == null)
+            return mutableMapOf()
+        val sourceMap: MutableMap<String, Any> = mutableMapOf()
+        for (field in hit.fields) {
+            if (field.value.values != null && field.value.values.isNotEmpty())
+                if (field.value.values.size == 1) {
+                    sourceMap[field.key] = field.value.values[0]
+                } else sourceMap[field.key] = field.value.values
+        }
+        return sourceMap
     }
 
     /**
@@ -946,7 +988,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
      *
      */
     private fun isInMemoryDocsSizeExceedingMemoryLimit(docsBytesSize: Long, monitorCtx: MonitorRunnerExecutionContext): Boolean {
-        var thresholdPercentage = PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT.get(monitorCtx.settings)
+        var thresholdPercentage = monitorCtx.percQueryDocsSizeMemoryPercentageLimit
         val heapMaxBytes = monitorCtx.jvmStats!!.mem.heapMax.bytes
         val thresholdBytes = (thresholdPercentage.toDouble() / 100.0) * heapMaxBytes
 
@@ -954,7 +996,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
     }
 
     private fun isInMemoryNumDocsExceedingMaxDocsPerPercolateQueryLimit(numDocs: Int, monitorCtx: MonitorRunnerExecutionContext): Boolean {
-        var maxNumDocsThreshold = PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY.get(monitorCtx.settings)
+        var maxNumDocsThreshold = monitorCtx.percQueryMaxNumDocsInMemory
         return numDocs >= maxNumDocsThreshold
     }
 
