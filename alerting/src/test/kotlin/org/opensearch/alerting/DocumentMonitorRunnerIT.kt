@@ -10,6 +10,7 @@ import org.apache.hc.core5.http.io.entity.StringEntity
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_FINDING_INDEX_PATTERN
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
 import org.opensearch.common.xcontent.json.JsonXContent
@@ -73,6 +74,152 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val alerts = searchAlerts(monitor)
         assertEquals("Alert saved for test monitor", 0, alerts.size)
+    }
+
+    fun `test dryrun execute monitor with queryFieldNames set up with correct field`() {
+
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val index = createTestIndex()
+
+        val docQuery =
+            DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf(), queryFieldNames = listOf("test_field"))
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+
+        val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
+        )
+
+        indexDoc(index, "1", testDoc)
+
+        val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
+
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        assertEquals(1, output.objectMap("trigger_results").values.size)
+
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertEquals(1, triggerResult.objectMap("action_results").values.size)
+            for (alertActionResult in triggerResult.objectMap("action_results").values) {
+                for (actionResult in alertActionResult.values) {
+                    @Suppress("UNCHECKED_CAST") val actionOutput = (actionResult as Map<String, Map<String, String>>)["output"]
+                        as Map<String, String>
+                    assertEquals("Hello ${monitor.name}", actionOutput["subject"])
+                    assertEquals("Hello ${monitor.name}", actionOutput["message"])
+                }
+            }
+        }
+
+        val alerts = searchAlerts(monitor)
+        assertEquals("Alert saved for test monitor", 0, alerts.size)
+    }
+
+    fun `test dryrun execute monitor with queryFieldNames set up with wrong field`() {
+
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val index = createTestIndex()
+        // using wrong field name
+        val docQuery = DocLevelQuery(
+            query = "test_field:\"us-west-2\"",
+            name = "3",
+            fields = listOf(),
+            queryFieldNames = listOf("wrong_field")
+        )
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+
+        val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
+        )
+
+        indexDoc(index, "1", testDoc)
+
+        val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
+
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        assertEquals(1, output.objectMap("trigger_results").values.size)
+
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertEquals(0, triggerResult.objectMap("action_results").values.size)
+            for (alertActionResult in triggerResult.objectMap("action_results").values) {
+                for (actionResult in alertActionResult.values) {
+                    @Suppress("UNCHECKED_CAST") val actionOutput = (actionResult as Map<String, Map<String, String>>)["output"]
+                        as Map<String, String>
+                    assertEquals("Hello ${monitor.name}", actionOutput["subject"])
+                    assertEquals("Hello ${monitor.name}", actionOutput["message"])
+                }
+            }
+        }
+
+        val alerts = searchAlerts(monitor)
+        assertEquals("Alert saved for test monitor", 0, alerts.size)
+    }
+
+    fun `test fetch_query_field_names setting is disabled by configuring queryFieldNames set up with wrong field still works`() {
+        adminClient().updateSettings(AlertingSettings.DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED.key, "false")
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val index = createTestIndex()
+        // using wrong field name
+        val docQuery = DocLevelQuery(
+            query = "test_field:\"us-west-2\"",
+            name = "3",
+            fields = listOf(),
+            queryFieldNames = listOf("wrong_field")
+        )
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+
+        val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
+        )
+
+        indexDoc(index, "1", testDoc)
+
+        val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
+
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        assertEquals(1, output.objectMap("trigger_results").values.size)
+
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertEquals(1, triggerResult.objectMap("action_results").values.size)
+            for (alertActionResult in triggerResult.objectMap("action_results").values) {
+                for (actionResult in alertActionResult.values) {
+                    @Suppress("UNCHECKED_CAST") val actionOutput = (actionResult as Map<String, Map<String, String>>)["output"]
+                        as Map<String, String>
+                    assertEquals("Hello ${monitor.name}", actionOutput["subject"])
+                    assertEquals("Hello ${monitor.name}", actionOutput["message"])
+                }
+            }
+        }
+
+        val alerts = searchAlerts(monitor)
+        assertEquals("Alert saved for test monitor", 1, alerts.size)
     }
 
     fun `test execute monitor returns search result with dryrun`() {
