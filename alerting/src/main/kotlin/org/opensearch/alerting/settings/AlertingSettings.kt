@@ -18,6 +18,8 @@ class AlertingSettings {
     companion object {
         const val DEFAULT_MAX_ACTIONABLE_ALERT_COUNT = 50L
         const val DEFAULT_FINDINGS_INDEXING_BATCH_SIZE = 1000
+        const val DEFAULT_PERCOLATE_QUERY_NUM_DOCS_IN_MEMORY = 50000
+        const val DEFAULT_PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT = 10
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(
             "plugins.alerting.monitor.max_monitors",
@@ -44,7 +46,7 @@ class AlertingSettings {
          */
         val PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY = Setting.intSetting(
             "plugins.alerting.monitor.percolate_query_max_num_docs_in_memory",
-            50000, 1000,
+            DEFAULT_PERCOLATE_QUERY_NUM_DOCS_IN_MEMORY, 1000,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 

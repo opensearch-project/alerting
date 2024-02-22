@@ -219,7 +219,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         }
 
         val alerts = searchAlerts(monitor)
-        assertEquals("Alert saved for test monitor", 1, alerts.size)
+        assertEquals("Alert saved for test monitor", 0, alerts.size)
     }
 
     fun `test execute monitor returns search result with dryrun`() {

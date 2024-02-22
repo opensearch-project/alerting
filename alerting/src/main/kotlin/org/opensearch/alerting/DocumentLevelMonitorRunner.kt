@@ -25,8 +25,6 @@ import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.userErrorMessage
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
-import org.opensearch.alerting.settings.AlertingSettings.Companion.PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT
-import org.opensearch.alerting.settings.AlertingSettings.Companion.PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
@@ -237,25 +235,25 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                     }
 
                     val fieldsToBeQueried = mutableSetOf<String>()
-
-                    for (it in queries) {
-                        if (it.queryFieldNames.isEmpty()) {
-                            fieldsToBeQueried.clear()
-                            logger.debug(
-                                "Monitor ${monitor.id} : " +
-                                    "Doc Level query ${it.id} : ${it.query} doesn't have queryFieldNames populated. " +
-                                    "Cannot optimize monitor to fetch only query-relevant fields. " +
-                                    "Querying entire doc source."
-                            )
-                            break
+                        if (monitorCtx.fetchOnlyQueryFieldNames) {
+                        for (it in queries) {
+                            if (it.queryFieldNames.isEmpty()) {
+                                fieldsToBeQueried.clear()
+                                logger.debug(
+                                    "Monitor ${monitor.id} : " +
+                                        "Doc Level query ${it.id} : ${it.query} doesn't have queryFieldNames populated. " +
+                                        "Cannot optimize monitor to fetch only query-relevant fields. " +
+                                        "Querying entire doc source."
+                                )
+                                break
+                            }
+                            fieldsToBeQueried.addAll(it.queryFieldNames)
                         }
-                        fieldsToBeQueried.addAll(it.queryFieldNames)
-                    }
-                    if (monitorCtx.fetchOnlyQueryFieldNames && fieldsToBeQueried.isNotEmpty()) {
-                        logger.debug(
-                            "Monitor ${monitor.id} Querying only fields " +
-                                "${fieldsToBeQueried.joinToString()} instead of entire _source of documents"
-                        )
+                        if (fieldsToBeQueried.isNotEmpty())
+                            logger.debug(
+                                "Monitor ${monitor.id} Querying only fields " +
+                                    "${fieldsToBeQueried.joinToString()} instead of entire _source of documents"
+                            )
                     }
 
                     // Prepare DocumentExecutionContext for each index
@@ -1028,7 +1026,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
      *
      */
     private fun isInMemoryDocsSizeExceedingMemoryLimit(docsBytesSize: Long, monitorCtx: MonitorRunnerExecutionContext): Boolean {
-        var thresholdPercentage = PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT.get(monitorCtx.settings)
+        var thresholdPercentage = monitorCtx.percQueryDocsSizeMemoryPercentageLimit
         val heapMaxBytes = monitorCtx.jvmStats!!.mem.heapMax.bytes
         val thresholdBytes = (thresholdPercentage.toDouble() / 100.0) * heapMaxBytes
 
@@ -1036,7 +1034,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
     }
 
     private fun isInMemoryNumDocsExceedingMaxDocsPerPercolateQueryLimit(numDocs: Int, monitorCtx: MonitorRunnerExecutionContext): Boolean {
-        var maxNumDocsThreshold = PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY.get(monitorCtx.settings)
+        var maxNumDocsThreshold = monitorCtx.percQueryMaxNumDocsInMemory
         return numDocs >= maxNumDocsThreshold
     }
 
