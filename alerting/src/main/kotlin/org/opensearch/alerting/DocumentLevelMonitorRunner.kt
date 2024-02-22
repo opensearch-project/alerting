@@ -235,7 +235,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                     }
 
                     val fieldsToBeQueried = mutableSetOf<String>()
-                        if (monitorCtx.fetchOnlyQueryFieldNames) {
+                    if (monitorCtx.fetchOnlyQueryFieldNames) {
                         for (it in queries) {
                             if (it.queryFieldNames.isEmpty()) {
                                 fieldsToBeQueried.clear()
