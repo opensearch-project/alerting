@@ -84,6 +84,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
         val tableProp = getFindingsRequest.table
         val severity = getFindingsRequest.severity
         val detectionType = getFindingsRequest.detectionType
+        val searchString = tableProp.searchString
 
         val sortBuilder = SortBuilders
             .fieldSort(tableProp.sortString)
@@ -131,6 +132,20 @@ class TransportGetFindingsSearchAction @Inject constructor(
 
             // Add the nestedQueryBuilder to the main queryBuilder
             queryBuilder.must(nestedQueryBuilder)
+        }
+
+        if (!searchString.isNullOrBlank()) {
+            queryBuilder
+                .should(QueryBuilders.matchQuery("index", searchString))
+                .should(
+                    QueryBuilders.nestedQuery(
+                        "queries",
+                        QueryBuilders.matchQuery("queries.tags", searchString),
+                        ScoreMode.None
+                    )
+                )
+                .should(QueryBuilders.regexpQuery("monitor_name", searchString + ".*"))
+                .minimumShouldMatch(1)
         }
 
         if (!severity.isNullOrBlank()) {
