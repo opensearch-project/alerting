@@ -74,6 +74,21 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val alerts = searchAlerts(monitor)
         assertEquals("Alert saved for test monitor", 0, alerts.size)
+
+        // ensure doc level query is deleted on dry run
+        val request = """{
+            "size": 10,
+            "query": {
+                "match_all": {}
+            }
+        }"""
+        var httpResponse = adminClient().makeRequest(
+            "GET", "/${monitor.dataSources.queryIndex}/_search",
+            StringEntity(request, ContentType.APPLICATION_JSON)
+        )
+        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
+        var searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        searchResponse.hits.totalHits?.let { assertEquals("Query saved in query index", 0L, it.value) }
     }
 
     fun `test dryrun execute monitor with queryFieldNames set up with correct field`() {
