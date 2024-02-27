@@ -16,6 +16,7 @@ This document contains a list of maintainers in this repo. See [opensearch-proje
 | Thomas Hurney        | [AWSHurneyt](https://github.com/AWSHurneyt) | Amazon      |
 | Praveen Sameneni     | [praveensameneni](https://github.com/praveensameneni) | Amazon      |
 | Chase Engelbrecht    | [engechas](https://github.com/engechas) | Amazon      |
+| Riya Saxena          | [riysaxen-amzn](https://github.com/riysaxen-amzn) | Amazon    |
 
 ## Emeritus
 
