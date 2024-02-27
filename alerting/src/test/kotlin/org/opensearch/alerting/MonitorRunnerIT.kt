@@ -1006,8 +1006,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
-            (output["trigger_results"] as HashMap<String, Any>).forEach {
-                _, v ->
+            (output["trigger_results"] as HashMap<String, Any>).forEach { _, v ->
                 assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             assertEquals(monitor.name, output["monitor_name"])
@@ -1036,8 +1035,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
-            (output["trigger_results"] as HashMap<String, Any>).forEach {
-                _, v ->
+            (output["trigger_results"] as HashMap<String, Any>).forEach { _, v ->
                 assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             assertEquals(monitor.name, output["monitor_name"])
@@ -1063,8 +1061,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
-            (output["trigger_results"] as HashMap<String, Any>).forEach {
-                _, v ->
+            (output["trigger_results"] as HashMap<String, Any>).forEach { _, v ->
                 assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             @Suppress("UNCHECKED_CAST")
@@ -1092,8 +1089,7 @@ class MonitorRunnerIT : AlertingRestTestCase() {
             val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
-            (output["trigger_results"] as HashMap<String, Any>).forEach {
-                _, v ->
+            (output["trigger_results"] as HashMap<String, Any>).forEach { _, v ->
                 assertFalse((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             @Suppress("UNCHECKED_CAST")

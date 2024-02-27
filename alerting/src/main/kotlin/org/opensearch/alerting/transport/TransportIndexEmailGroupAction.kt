@@ -232,8 +232,7 @@ class TransportIndexEmailGroupAction @Inject constructor(
         private fun checkShardsFailure(response: IndexResponse): String? {
             val failureReasons = StringBuilder()
             if (response.shardInfo.failed > 0) {
-                response.shardInfo.failures.forEach {
-                    entry ->
+                response.shardInfo.failures.forEach { entry ->
                     failureReasons.append(entry.reason())
                 }
 

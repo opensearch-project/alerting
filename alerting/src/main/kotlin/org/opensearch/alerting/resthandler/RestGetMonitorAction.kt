@@ -67,8 +67,7 @@ class RestGetMonitorAction : BaseRestHandler() {
             srcContext = FetchSourceContext.DO_NOT_FETCH_SOURCE
         }
         val getMonitorRequest = GetMonitorRequest(monitorId, RestActions.parseVersion(request), request.method(), srcContext)
-        return RestChannelConsumer {
-            channel ->
+        return RestChannelConsumer { channel ->
             client.execute(GetMonitorAction.INSTANCE, getMonitorRequest, RestToXContentListener(channel))
         }
     }
