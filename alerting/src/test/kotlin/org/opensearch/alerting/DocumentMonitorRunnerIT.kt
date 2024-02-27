@@ -419,8 +419,8 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 2, findings.size)
-        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
-        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("5"))
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("5"))
+        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("1"))
     }
 
     fun `test execute monitor with tag as trigger condition generates alerts and findings`() {
@@ -459,8 +459,8 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 2, findings.size)
-        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
-        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("5"))
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("5"))
+        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("1"))
     }
 
     fun `test execute monitor input error`() {
@@ -558,8 +558,8 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 2, findings.size)
-        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
-        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("5"))
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("5"))
+        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("1"))
     }
 
     fun `test execute monitor generates alerts and findings with per trigger execution for actions`() {
@@ -621,8 +621,8 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 2, findings.size)
-        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
-        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("5"))
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("5"))
+        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("1"))
     }
 
     fun `test execute monitor with wildcard index that generates alerts and findings for EQUALS query operator`() {
