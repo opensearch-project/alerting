@@ -13,6 +13,8 @@ import org.opensearch.action.admin.indices.alias.Alias
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
 import org.opensearch.action.admin.indices.delete.DeleteIndexRequest
+import org.opensearch.action.admin.indices.exists.indices.IndicesExistsRequest
+import org.opensearch.action.admin.indices.exists.indices.IndicesExistsResponse
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.admin.indices.rollover.RolloverRequest
 import org.opensearch.action.admin.indices.rollover.RolloverResponse
@@ -38,8 +40,16 @@ import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.core.action.ActionListener
 import org.opensearch.index.mapper.MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.index.reindex.BulkByScrollResponse
+import org.opensearch.index.reindex.DeleteByQueryAction
+import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.rest.RestStatus
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
 
 private val log = LogManager.getLogger(DocLevelMonitorQueries::class.java)
 
@@ -132,6 +142,42 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             }
         }
         return true
+    }
+
+    suspend fun deleteDocLevelQueriesOnDryRun(monitorMetadata: MonitorMetadata) {
+        try {
+            monitorMetadata.sourceToQueryIndexMapping.forEach { (_, queryIndex) ->
+                val indicesExistsResponse: IndicesExistsResponse =
+                    client.suspendUntil {
+                        client.admin().indices().exists(IndicesExistsRequest(queryIndex), it)
+                    }
+                if (indicesExistsResponse.isExists == false) {
+                    return
+                }
+
+                val queryBuilder = QueryBuilders.boolQuery()
+                    .must(QueryBuilders.existsQuery("monitor_id"))
+                    .mustNot(QueryBuilders.wildcardQuery("monitor_id", "*"))
+
+                val response: BulkByScrollResponse = suspendCoroutine { cont ->
+                    DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+                        .source(queryIndex)
+                        .filter(queryBuilder)
+                        .refresh(true)
+                        .execute(
+                            object : ActionListener<BulkByScrollResponse> {
+                                override fun onResponse(response: BulkByScrollResponse) = cont.resume(response)
+                                override fun onFailure(t: Exception) = cont.resumeWithException(t)
+                            }
+                        )
+                }
+                response.bulkFailures.forEach {
+                    log.error("Failed deleting queries while removing dry run queries: [${it.id}] cause: [${it.cause}] ")
+                }
+            }
+        } catch (e: Exception) {
+            log.error("Failed to delete doc level queries on dry run", e)
+        }
     }
 
     fun docLevelQueryIndexExists(dataSources: DataSources): Boolean {
