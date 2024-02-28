@@ -44,7 +44,11 @@ dependencies {
         attributes {
             attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling, Bundling.EXTERNAL))
         }
+        exclude group: "ch.qos.logback", module: "logback-classic"
+        exclude group: "ch.qos.logback", module: "logback-core"
     }
+    add("ktlint", "ch.qos.logback:logback-core:1.2.13")
+    add("ktlint", "ch.qos.logback:logback-classic:1.2.13")
 }
 
 task ktlint(type: JavaExec, group: "verification") {
