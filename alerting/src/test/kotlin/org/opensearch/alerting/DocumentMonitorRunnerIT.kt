@@ -1950,7 +1950,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertEquals(1, output.objectMap("trigger_results").values.size)
     }
 
-    fun `test execute monitor generates alerts and findings with NOT query`() {
+    fun `test execute monitor generates alerts and findings with NOT EQUALS query and EXISTS query`() {
         val testIndex = createTestIndex()
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{

@@ -396,14 +396,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             var query = it.query
             conflictingPaths.forEach { conflictingPath ->
                 if (query.contains(conflictingPath)) {
-                    if (query.contains("_exists_")) {
-                        // 1. append the key field "field:"
-                        query = query.replace("$conflictingPath:", "${conflictingPath}_<index>_$monitorId:")
-                        // 2. append the val field "_exists_field"
-                        query = query.replace("_exists_$conflictingPath", "${conflictingPath}_<index>_$monitorId")
-                    } else {
-                        query = query.replace("$conflictingPath:", "${conflictingPath}_<index>_$monitorId:")
-                    }
+                    query = transformQuery(query, conflictingPath, "<index>", monitorId)
                     filteredConcreteIndices.addAll(conflictingPathToConcreteIndices[conflictingPath]!!)
                 }
             }
@@ -425,14 +418,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             var query = it.query
             flattenPaths.forEach { fieldPath ->
                 if (!conflictingPaths.contains(fieldPath.first)) {
-                    if (query.contains("_exists_")) {
-                        // 1. append the key field "field:"
-                        query = query.replace("${fieldPath.first}:", "${fieldPath.first}_${sourceIndex}_$monitorId:")
-                        // 2. append the val field "_exists_field"
-                        query = query.replace("_exists_${fieldPath.first}", "${fieldPath.first}_${sourceIndex}_$monitorId")
-                    } else {
-                        query = query.replace("${fieldPath.first}:", "${fieldPath.first}_${sourceIndex}_$monitorId:")
-                    }
+                    query = transformQuery(query, fieldPath.first, sourceIndex, monitorId)
                 }
             }
             val indexRequest = IndexRequest(concreteQueryIndex)
@@ -459,6 +445,18 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 }
             }
         }
+    }
+    private fun transformQuery(query: String, conflictingPath: String, indexName: String, monitorId: String): String {
+        var newQuery = query
+        if (newQuery.contains("_exists_")) {
+            // 1. append the key field "field:"
+            newQuery = newQuery.replace("$conflictingPath:", "${conflictingPath}_${indexName}_$monitorId:")
+            // 2. append the val field "_exists_field"
+            newQuery = newQuery.replace("_exists_$conflictingPath", "${conflictingPath}_${indexName}_$monitorId")
+        } else {
+            newQuery = newQuery.replace("$conflictingPath:", "${conflictingPath}_${indexName}_$monitorId:")
+        }
+        return newQuery
     }
 
     private suspend fun updateQueryIndexMappings(
