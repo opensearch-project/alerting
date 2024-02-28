@@ -101,7 +101,7 @@ dependencies {
 
     compile project(":alerting-core")
     compile project(":alerting-notification")
-    implementation "com.github.seancfoley:ipaddress:5.4.1"
+    implementation "com.github.seancfoley:ipaddress:5.4.2"
 
     testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlin_version}"
     testCompile "org.mockito:mockito-core:3.12.4"
