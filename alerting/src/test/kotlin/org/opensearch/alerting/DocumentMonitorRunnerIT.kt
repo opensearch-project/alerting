@@ -1959,7 +1959,8 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             "test_field" : "us-west-2"
         }"""
 
-        val docQuery = DocLevelQuery(query = "NOT test_field:\"us-east-1\" AND _exists_: _exists_test_field", name = "3", fields = listOf())
+        val query = "NOT test_field: \"us-east-1\" AND _exists_: test_field"
+        val docQuery = DocLevelQuery(query = query, name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
@@ -2003,7 +2004,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             """.trimIndent()
         )
 
-        val docQuery = DocLevelQuery(query = "NOT test_field:\"us-east-1\" AND _exists_: _exists_test_field", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "NOT test_field:\"us-east-1\" AND _exists_: test_field", name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf("$aliasName"), listOf(docQuery))
 
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
@@ -2054,7 +2055,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             "test_field" : "us-west-2"
         }"""
 
-        val query = "NOT test_field:\"us-west-1\" AND _exists_: _exists_test_field"
+        val query = "NOT test_field:\"us-west-1\" AND _exists_: test_field"
         val docQuery = DocLevelQuery(query = query, name = testQueryName, fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf("$testIndexPrefix*"), listOf(docQuery))
 
@@ -2158,12 +2159,12 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         }"""
 
         val docQuery1 = DocLevelQuery(
-            query = "NOT test_field:\"12345\" AND _exists_: _exists_test_field",
+            query = "NOT test_field:\"12345\" AND _exists_: test_field",
             name = "4",
             fields = listOf()
         )
         val docQuery2 = DocLevelQuery(
-            query = "NOT source.device.hwd.id:\"12345\" AND _exists_: _exists_source.device.hwd.id",
+            query = "NOT source.device.hwd.id:\"12345\" AND _exists_: source.device.hwd.id",
             name = "5",
             fields = listOf()
         )
@@ -2246,7 +2247,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         }"""
 
         val docQuery = DocLevelQuery(
-            query = "(NOT test_field:\"123456\" AND _exists_: _exists_test_field) AND source.id:\"12345\"",
+            query = "(NOT test_field:\"123456\" AND _exists_:test_field) AND source.id:\"12345\"",
             name = "5",
             fields = listOf()
         )
@@ -2269,9 +2270,9 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         // as mappings of source.id & test_field are different so, both of them expands
         val expectedQueries = listOf(
-            "(NOT test_field_test2_${monitor.id}:\"123456\" AND _exists_: test_field_test2_${monitor.id}) " +
+            "(NOT test_field_test2_${monitor.id}:\"123456\" AND _exists_:test_field_test2_${monitor.id}) " +
                 "AND source.id_test2_${monitor.id}:\"12345\"",
-            "(NOT test_field_test1_${monitor.id}:\"123456\" AND _exists_: test_field_test1_${monitor.id}) " +
+            "(NOT test_field_test1_${monitor.id}:\"123456\" AND _exists_:test_field_test1_${monitor.id}) " +
                 "AND source.id_test1_${monitor.id}:\"12345\""
         )
 

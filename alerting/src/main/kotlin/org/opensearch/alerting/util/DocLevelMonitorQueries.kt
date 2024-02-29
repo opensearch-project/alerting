@@ -396,7 +396,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             var query = it.query
             conflictingPaths.forEach { conflictingPath ->
                 if (query.contains(conflictingPath)) {
-                    query = transformQuery(query, conflictingPath, "<index>", monitorId)
+                    query = transformExistsQuery(query, conflictingPath, "<index>", monitorId)
+                    query = query.replace("$conflictingPath:", "${conflictingPath}_<index>_$monitorId:")
                     filteredConcreteIndices.addAll(conflictingPathToConcreteIndices[conflictingPath]!!)
                 }
             }
@@ -418,7 +419,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             var query = it.query
             flattenPaths.forEach { fieldPath ->
                 if (!conflictingPaths.contains(fieldPath.first)) {
-                    query = transformQuery(query, fieldPath.first, sourceIndex, monitorId)
+                    query = transformExistsQuery(query, fieldPath.first, sourceIndex, monitorId)
+                    query = query.replace("${fieldPath.first}:", "${fieldPath.first}_${sourceIndex}_$monitorId:")
                 }
             }
             val indexRequest = IndexRequest(concreteQueryIndex)
@@ -446,17 +448,25 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             }
         }
     }
-    private fun transformQuery(query: String, conflictingPath: String, indexName: String, monitorId: String): String {
-        var newQuery = query
-        if (newQuery.contains("_exists_")) {
-            // 1. append the key field "field:"
-            newQuery = newQuery.replace("$conflictingPath:", "${conflictingPath}_${indexName}_$monitorId:")
-            // 2. append the val field "_exists_field"
-            newQuery = newQuery.replace("_exists_$conflictingPath", "${conflictingPath}_${indexName}_$monitorId")
-        } else {
-            newQuery = newQuery.replace("$conflictingPath:", "${conflictingPath}_${indexName}_$monitorId:")
-        }
-        return newQuery
+
+    /**
+     * Transforms the query if it includes an _exists_ clause to append the index name and the monitor id to the field value
+     */
+    private fun transformExistsQuery(query: String, conflictingPath: String, indexName: String, monitorId: String): String {
+        return query
+            .replace("_exists_: ", "_exists_:") // remove space to read exists query as one string
+            .split("\\s+".toRegex())
+            .joinToString(separator = " ") { segment ->
+                if (segment.contains("_exists_:")) {
+                    val trimSegement = segment.trim { it == '(' || it == ')' } // remove any delimiters from ends
+                    val (_, value) = trimSegement.split(":", limit = 2) // split into key and value
+                    val newString = if (value == conflictingPath)
+                        segment.replace(conflictingPath, "${conflictingPath}_${indexName}_$monitorId") else segment
+                    newString
+                } else {
+                    segment
+                }
+            }
     }
 
     private suspend fun updateQueryIndexMappings(
