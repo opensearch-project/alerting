@@ -106,10 +106,23 @@ class TransportGetFindingsSearchAction @Inject constructor(
         if (!getFindingsRequest.findingId.isNullOrBlank())
             queryBuilder.filter(QueryBuilders.termQuery("_id", getFindingsRequest.findingId))
 
+        if (!getFindingsRequest.findingIds.isNullOrEmpty()) {
+            queryBuilder.filter(QueryBuilders.termsQuery("id", getFindingsRequest.findingIds))
+        }
+
         if (getFindingsRequest.monitorId != null) {
             queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getFindingsRequest.monitorId))
         } else if (getFindingsRequest.monitorIds.isNullOrEmpty() == false) {
             queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getFindingsRequest.monitorIds))
+        }
+
+        if (getFindingsRequest.startTime != null && getFindingsRequest.endTime != null) {
+            val startTime = getFindingsRequest.startTime!!.toEpochMilli()
+            val endTime = getFindingsRequest.endTime!!.toEpochMilli()
+            val timeRangeQuery = QueryBuilders.rangeQuery("timestamp")
+                .from(startTime) // Greater than or equal to start time
+                .to(endTime) // Less than or equal to end time
+            queryBuilder.filter(timeRangeQuery)
         }
 
         if (!detectionType.isNullOrBlank()) {
@@ -182,7 +195,6 @@ class TransportGetFindingsSearchAction @Inject constructor(
                     )
                 )
         }
-
         searchSourceBuilder.query(queryBuilder)
 
         client.threadPool().threadContext.stashContext().use {
