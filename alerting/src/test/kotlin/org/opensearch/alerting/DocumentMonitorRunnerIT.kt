@@ -137,6 +137,49 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertEquals("Alert saved for test monitor", 0, alerts.size)
     }
 
+    fun `test seq_no calculation correctness when docs are deleted`() {
+        adminClient().updateSettings(AlertingSettings.DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE.key, 2)
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val index = createTestIndex()
+
+        val docQuery =
+            DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+
+        val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
+        )
+
+        indexDoc(index, "1", testDoc)
+        indexDoc(index, "2", testDoc)
+        indexDoc(index, "3", testDoc)
+        indexDoc(index, "4", testDoc)
+        indexDoc(index, "5", testDoc)
+        indexDoc(index, "11", testDoc)
+        indexDoc(index, "21", testDoc)
+        indexDoc(index, "31", testDoc)
+        indexDoc(index, "41", testDoc)
+        indexDoc(index, "51", testDoc)
+
+        deleteDoc(index, "51")
+        val response = executeMonitor(monitor, params = mapOf("dryrun" to "false"))
+
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertEquals(9, triggerResult.objectMap("action_results").values.size)
+        }
+    }
+
     fun `test dryrun execute monitor with queryFieldNames set up with wrong field`() {
 
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
@@ -163,6 +206,10 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         )
 
         indexDoc(index, "1", testDoc)
+        indexDoc(index, "2", testDoc)
+        indexDoc(index, "3", testDoc)
+        indexDoc(index, "4", testDoc)
+        indexDoc(index, "5", testDoc)
 
         val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
 

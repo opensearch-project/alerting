@@ -701,16 +701,16 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                         fieldsToBeQueried,
                     )
                     if (hits.hits.isEmpty()) {
-                        updateLastRunContext(shard, (prevSeqNo ?: SequenceNumbers.NO_OPS_PERFORMED).toString())
+                        if (to == Long.MAX_VALUE) {
+                            updateLastRunContext(shard, (prevSeqNo ?: SequenceNumbers.NO_OPS_PERFORMED).toString()) // didn't find any docs
+                        }
                         break
                     }
                     if (to == Long.MAX_VALUE) { // max sequence number of shard needs to be computed
-
                         updateLastRunContext(shard, hits.hits[0].seqNo.toString())
-                        to = hits.hits[0].seqNo - 10000L
-                    } else {
-                        to -= 10000L
                     }
+                    val leastSeqNoFromHits = hits.hits.last().seqNo
+                    to = leastSeqNoFromHits - 1
                     val startTime = System.currentTimeMillis()
                     transformedDocs.addAll(
                         transformSearchHitsAndReconstructDocs(
@@ -841,7 +841,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                     .sort("_seq_no", SortOrder.DESC)
                     .seqNoAndPrimaryTerm(true)
                     .query(boolQueryBuilder)
-                    .size(10000)
+                    .size(monitorCtx.docLevelMonitorShardFetchSize)
             )
             .preference(Preference.PRIMARY_FIRST.type())
 
