@@ -20,6 +20,7 @@ class AlertingSettings {
         const val DEFAULT_FINDINGS_INDEXING_BATCH_SIZE = 1000
         const val DEFAULT_PERCOLATE_QUERY_NUM_DOCS_IN_MEMORY = 50000
         const val DEFAULT_PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT = 10
+        const val DEFAULT_DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE = 10000
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(
             "plugins.alerting.monitor.max_monitors",
@@ -36,6 +37,16 @@ class AlertingSettings {
             10,
             0,
             100,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        /** Purely a setting used to verify seq_no calculation
+         */
+        val DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE = Setting.intSetting(
+            "plugins.alerting.monitor.doc_level_monitor_shard_fetch_size",
+            DEFAULT_DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE,
+            1,
+            10000,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
