@@ -26,6 +26,7 @@ import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_MILLIS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED
+import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE
 import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDINGS_INDEXING_BATCH_SIZE
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTIONABLE_ALERT_COUNT
@@ -200,6 +201,13 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         monitorCtx.clusterService!!.clusterSettings
             .addSettingsUpdateConsumer(PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT) {
                 monitorCtx.percQueryDocsSizeMemoryPercentageLimit = it
+            }
+
+        monitorCtx.docLevelMonitorShardFetchSize =
+            DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE.get(monitorCtx.settings)
+        monitorCtx.clusterService!!.clusterSettings
+            .addSettingsUpdateConsumer(DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE) {
+                monitorCtx.docLevelMonitorShardFetchSize = it
             }
 
         return this
