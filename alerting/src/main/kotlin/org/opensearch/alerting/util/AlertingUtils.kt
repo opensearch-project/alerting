@@ -76,7 +76,9 @@ fun Monitor.isQueryLevelMonitor(): Boolean = this.monitorType == Monitor.Monitor
  * Since buckets can have multi-value keys, this converts the bucket key values to a string that can be used
  * as the key for a HashMap to easily retrieve [AggregationResultBucket] based on the bucket key values.
  */
-fun AggregationResultBucket.getBucketKeysHash(): String = this.bucketKeys.joinToString(separator = "#")
+fun AggregationResultBucket.getBucketKeysHash(): String = getBucketKeysHash(this.bucketKeys)
+
+fun getBucketKeysHash(bucketKeys: List<String>): String = bucketKeys.joinToString(separator = "#")
 
 fun Action.getActionExecutionPolicy(monitor: Monitor): ActionExecutionPolicy? {
     // When the ActionExecutionPolicy is null for an Action, the default is resolved at runtime

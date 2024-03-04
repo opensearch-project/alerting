@@ -44,7 +44,6 @@ data class BucketLevelTriggerExecutionContext(
      * translate the context to a Map of Strings to primitive types, which can be accessed without reflection.
      */
     override fun asTemplateArg(): Map<String, Any?> {
-        logger.info("hurneyt BucketLevelTriggerExecutionContext::results = {}", results)
         val tempArg = super.asTemplateArg().toMutableMap()
         tempArg["trigger"] = trigger.asTemplateArg()
         tempArg["dedupedAlerts"] = dedupedAlerts.map { it.asTemplateArg() }
