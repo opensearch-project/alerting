@@ -2426,6 +2426,65 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         }
     }
 
+    fun `test document-level monitor notification message includes queries`() {
+        val testIndex = createTestIndex()
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "test-query", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val alertCategories = AlertCategory.values()
+        val actionExecutionScope = PerAlertActionScope(
+            actionableAlerts = (1..randomInt(alertCategories.size)).map { alertCategories[it - 1] }.toSet()
+        )
+        val actionExecutionPolicy = ActionExecutionPolicy(actionExecutionScope)
+        val actions = (0..randomInt(10)).map {
+            randomActionWithPolicy(
+                template = randomTemplateScript("{{#ctx.alerts}}\n{{#associated_queries}}\n(name={{name}})\n{{/associated_queries}}\n{{/ctx.alerts}}"),
+                destinationId = createDestination().id,
+                actionExecutionPolicy = actionExecutionPolicy
+            )
+        }
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = actions)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex, "5", testDoc)
+
+        val response = executeMonitor(monitor.id)
+
+        val output = entityAsMap(response)
+
+        assertEquals(monitor.name, output["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
+        assertEquals("Incorrect search result", 2, matchingDocsToQuery.size)
+        assertTrue("Incorrect search result", matchingDocsToQuery.containsAll(listOf("1|$testIndex", "5|$testIndex")))
+
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertEquals(2, triggerResult.objectMap("action_results").values.size)
+            for (alertActionResult in triggerResult.objectMap("action_results").values) {
+                assertEquals(actions.size, alertActionResult.values.size)
+                for (actionResult in alertActionResult.values) {
+                    @Suppress("UNCHECKED_CAST") val actionOutput = (actionResult as Map<String, Map<String, String>>)["output"] as Map<String, String>
+                    assertTrue(
+                        "The notification message is missing the query name.",
+                        actionOutput["message"]!!.contains("(name=${docQuery.name})")
+                    )
+                }
+            }
+        }
+    }
+
     @Suppress("UNCHECKED_CAST")
     /** helper that returns a field in a json map whose values are all json objects */
     private fun Map<String, Any>.objectMap(key: String): Map<String, Map<String, Any>> {

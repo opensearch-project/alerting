@@ -42,6 +42,7 @@ import org.opensearch.commons.alerting.action.PublishFindingsRequest
 import org.opensearch.commons.alerting.action.SubscribeFindingsResponse
 import org.opensearch.commons.alerting.model.ActionExecutionResult
 import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.AlertContext
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
@@ -95,6 +96,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         logger.debug("Document-level-monitor is running ...")
         val isTempMonitor = dryrun || monitor.id == Monitor.NO_ID
         var monitorResult = MonitorRunResult<DocumentLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
+        monitorCtx.findingsToTriggeredQueries = mutableMapOf()
 
         try {
             monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor.dataSources)
@@ -456,6 +458,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         )
 
         val alerts = mutableListOf<Alert>()
+        val alertContexts = mutableListOf<AlertContext>()
         triggerFindingDocPairs.forEach {
             val alert = monitorCtx.alertService!!.composeDocLevelAlert(
                 listOf(it.first),
@@ -466,6 +469,14 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                 workflorwRunContext = workflowRunContext
             )
             alerts.add(alert)
+            alertContexts.add(
+                AlertContext(
+                    alert = alert,
+                    associatedQueries = alert.findingIds.flatMap { findingId ->
+                        monitorCtx.findingsToTriggeredQueries?.getOrDefault(findingId, emptyList()) ?: emptyList()
+                    }
+                )
+            )
         }
 
         val shouldDefaultToPerExecution = defaultToPerExecutionAction(
@@ -479,13 +490,13 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         for (action in trigger.actions) {
             val actionExecutionScope = action.getActionExecutionPolicy(monitor)!!.actionExecutionScope
             if (actionExecutionScope is PerAlertActionScope && !shouldDefaultToPerExecution) {
-                for (alert in alerts) {
+                for (alert in alertContexts) {
                     val actionResults = this.runAction(action, actionCtx.copy(alerts = listOf(alert)), monitorCtx, monitor, dryrun)
                     triggerResult.actionResultsMap.getOrPut(alert.id) { mutableMapOf() }
                     triggerResult.actionResultsMap[alert.id]?.set(action.id, actionResults)
                 }
-            } else if (alerts.isNotEmpty()) {
-                val actionResults = this.runAction(action, actionCtx.copy(alerts = alerts), monitorCtx, monitor, dryrun)
+            } else if (alertContexts.isNotEmpty()) {
+                val actionResults = this.runAction(action, actionCtx.copy(alerts = alertContexts), monitorCtx, monitor, dryrun)
                 for (alert in alerts) {
                     triggerResult.actionResultsMap.getOrPut(alert.id) { mutableMapOf() }
                     triggerResult.actionResultsMap[alert.id]?.set(action.id, actionResults)
@@ -532,6 +543,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         val findingDocPairs = mutableListOf<Pair<String, String>>()
         val findings = mutableListOf<Finding>()
         val indexRequests = mutableListOf<IndexRequest>()
+        val findingsToTriggeredQueries = mutableMapOf<String, List<DocLevelQuery>>()
 
         docsToQueries.forEach {
             val triggeredQueries = it.value.map { queryId -> idQueryMap[queryId]!! }
@@ -552,6 +564,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             )
             findingDocPairs.add(Pair(finding.id, it.key))
             findings.add(finding)
+            findingsToTriggeredQueries[finding.id] = triggeredQueries
 
             val findingStr =
                 finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS)
@@ -578,6 +591,10 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             // suppress exception
             logger.error("Optional finding callback failed", e)
         }
+
+        if (monitorCtx.findingsToTriggeredQueries == null) monitorCtx.findingsToTriggeredQueries = findingsToTriggeredQueries
+        else monitorCtx.findingsToTriggeredQueries = monitorCtx.findingsToTriggeredQueries!! + findingsToTriggeredQueries
+
         return findingDocPairs
     }
 
