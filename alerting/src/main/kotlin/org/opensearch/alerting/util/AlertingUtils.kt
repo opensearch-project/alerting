@@ -13,11 +13,14 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.util.concurrent.ThreadContext
 import org.opensearch.commons.alerting.model.AggregationResultBucket
+import org.opensearch.commons.alerting.model.AlertContext
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.commons.alerting.model.action.ActionExecutionScope
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
+import org.opensearch.script.Script
 
 private val logger = LogManager.getLogger("AlertingUtils")
 
@@ -178,4 +181,76 @@ fun ThreadContext.StoredContext.closeFinally(cause: Throwable?) = when (cause) {
     } catch (closeException: Throwable) {
         cause.addSuppressed(closeException)
     }
+}
+
+/**
+ * Checks the `message_template.source` in the [Script] for each [Action] in the [Trigger] for
+ * any instances of [AlertContext.SAMPLE_DOCS_FIELD] tags.
+ * This indicates the message is expected to print data from the sample docs, so we need to collect the samples.
+ */
+fun printsSampleDocData(trigger: Trigger): Boolean {
+    return trigger.actions.any { action ->
+        // The {{ctx}} mustache tag indicates the entire ctx object should be printed in the message string.
+        // TODO: Consider excluding `{{ctx}}` from criteria for bucket-level triggers as printing all of
+        //  their sample documents could make the notification message too large to send.
+        action.messageTemplate.idOrCode.contains("{{ctx}}") ||
+                action.messageTemplate.idOrCode.contains(AlertContext.SAMPLE_DOCS_FIELD)
+    }
+}
+
+fun printsSampleDocData(triggers: List<Trigger>): Boolean {
+    return triggers.any { trigger -> printsSampleDocData(trigger) }
+}
+
+/**
+ * Mustache template supports iterating through a list using a `{{#listVariable}}{{/listVariable}}` block.
+ * https://mustache.github.io/mustache.5.html
+ *
+ * This function looks `{{#${[AlertContext.SAMPLE_DOCS_FIELD]}}}{{/${[AlertContext.SAMPLE_DOCS_FIELD]}}}` blocks,
+ * and parses the contents for tags, which we interpret as fields within the sample document.
+ *
+ * @return a [Set] of [String]s indicating fields within a document.
+ */
+fun parseSampleDocTags(messageTemplate: Script): Set<String> {
+    val sampleBlockPrefix = "{{#${AlertContext.SAMPLE_DOCS_FIELD}}}"
+    val sampleBlockSuffix = "{{/${AlertContext.SAMPLE_DOCS_FIELD}}}"
+    val tagRegex = Regex("\\{\\{([^{}]+)}}")
+    val tags = mutableSetOf<String>()
+    try {
+        // Identify the start and end points of the sample block
+        var sampleBlockStart = messageTemplate.idOrCode.indexOf(sampleBlockPrefix)
+        var sampleBlockEnd = messageTemplate.idOrCode.indexOf(sampleBlockSuffix, sampleBlockStart)
+
+        // Sample start/end of -1 indicates there are no more complete sample blocks
+        while (sampleBlockStart != -1 && sampleBlockEnd != -1) {
+            // Isolate the sample block
+            val sampleBlock = messageTemplate.idOrCode.substring(sampleBlockStart, sampleBlockEnd)
+                // Remove the iteration wrapper tags
+                .removeSurrounding(sampleBlockPrefix, sampleBlockSuffix)
+
+            // Search for each tag
+            tagRegex.findAll(sampleBlock).forEach { match ->
+                // Parse the field name from the tag (e.g., `{{_source.timestamp}}` becomes `_source.timestamp`)
+                val docField = match.groupValues[1].trim()
+                if (docField.isNotEmpty()) tags.add(docField)
+            }
+
+            // Identify any subsequent sample blocks
+            sampleBlockStart = messageTemplate.idOrCode.indexOf(sampleBlockPrefix, sampleBlockEnd)
+            sampleBlockEnd = messageTemplate.idOrCode.indexOf(sampleBlockSuffix, sampleBlockStart)
+        }
+    } catch (e: Exception) {
+        logger.warn("Failed to parse sample document fields.", e)
+    }
+    return tags
+}
+
+fun parseSampleDocTags(actions: List<Action>): Set<String> {
+    return actions.flatMap { action -> parseSampleDocTags(action.messageTemplate) }
+        .toSet()
+}
+
+fun parseSampleDocTags(triggers: List<Trigger>): Set<String> {
+    return triggers.flatMap { trigger -> parseSampleDocTags(trigger.actions) }
+        .toSet()
 }

@@ -26,6 +26,7 @@ import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.alerting.util.getCombinedTriggerRunResult
+import org.opensearch.alerting.util.printsSampleDocData
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
@@ -234,8 +235,10 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             // Update nextAlerts so the filtered DEDUPED Alerts are reflected for PER_ALERT Action execution
             nextAlerts[trigger.id]?.set(AlertCategory.DEDUPED, dedupedAlerts)
 
+            // Only collect sample docs for triggered triggers, and only when at least 1 action prints sample doc data.
+            val isTriggered = !nextAlerts[trigger.id]?.get(AlertCategory.NEW).isNullOrEmpty()
             @Suppress("UNCHECKED_CAST")
-            if (!nextAlerts[trigger.id]?.get(AlertCategory.NEW).isNullOrEmpty()) {
+            if (isTriggered && printsSampleDocData(trigger)) {
                 val sampleDocumentsByBucket = mutableMapOf<String, List<Map<String, Any>>>()
                 try {
                     val searchRequest = monitorCtx.inputService!!.getSearchRequest(

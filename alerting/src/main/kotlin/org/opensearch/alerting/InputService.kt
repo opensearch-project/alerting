@@ -236,7 +236,7 @@ class InputService(
         }
     }
 
-    suspend fun getSearchRequest(
+    fun getSearchRequest(
         monitor: Monitor,
         searchInput: SearchInput,
         periodStart: Instant,
