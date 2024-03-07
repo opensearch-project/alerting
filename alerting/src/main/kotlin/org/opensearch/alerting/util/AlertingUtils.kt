@@ -194,7 +194,7 @@ fun printsSampleDocData(trigger: Trigger): Boolean {
         // TODO: Consider excluding `{{ctx}}` from criteria for bucket-level triggers as printing all of
         //  their sample documents could make the notification message too large to send.
         action.messageTemplate.idOrCode.contains("{{ctx}}") ||
-                action.messageTemplate.idOrCode.contains(AlertContext.SAMPLE_DOCS_FIELD)
+            action.messageTemplate.idOrCode.contains(AlertContext.SAMPLE_DOCS_FIELD)
     }
 }
 
