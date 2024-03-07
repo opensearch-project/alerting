@@ -18,6 +18,7 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.monitor.jvm.JvmStats
 import org.opensearch.script.ScriptService
 import org.opensearch.threadpool.ThreadPool
 
@@ -36,6 +37,7 @@ data class MonitorRunnerExecutionContext(
     var alertService: AlertService? = null,
     var docLevelMonitorQueries: DocLevelMonitorQueries? = null,
     var workflowService: WorkflowService? = null,
+    var jvmStats: JvmStats? = null,
 
     @Volatile var retryPolicy: BackoffPolicy? = null,
     @Volatile var moveAlertsRetryPolicy: BackoffPolicy? = null,
@@ -48,5 +50,11 @@ data class MonitorRunnerExecutionContext(
 
     @Volatile var maxActionableAlertCount: Long = AlertingSettings.DEFAULT_MAX_ACTIONABLE_ALERT_COUNT,
     @Volatile var indexTimeout: TimeValue? = null,
-    @Volatile var findingsIndexBatchSize: Int = AlertingSettings.DEFAULT_FINDINGS_INDEXING_BATCH_SIZE
+    @Volatile var findingsIndexBatchSize: Int = AlertingSettings.DEFAULT_FINDINGS_INDEXING_BATCH_SIZE,
+    @Volatile var fetchOnlyQueryFieldNames: Boolean = true,
+    @Volatile var percQueryMaxNumDocsInMemory: Int = AlertingSettings.DEFAULT_PERCOLATE_QUERY_NUM_DOCS_IN_MEMORY,
+    @Volatile var percQueryDocsSizeMemoryPercentageLimit: Int =
+        AlertingSettings.DEFAULT_PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT,
+    @Volatile var docLevelMonitorShardFetchSize: Int =
+        AlertingSettings.DEFAULT_DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE,
 )
