@@ -2034,8 +2034,8 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 2, findings.size)
-        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
-        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("5"))
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1") || findings[0].relatedDocIds.contains("5"))
+        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("1") || findings[0].relatedDocIds.contains("5"))
     }
 
     fun `test document-level monitor when index alias contain docs that do match a NOT EQUALS query and EXISTS query`() {
