@@ -10,6 +10,7 @@ import org.apache.http.entity.StringEntity
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_FINDING_INDEX_PATTERN
+import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
@@ -18,16 +19,20 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
+import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.commons.alerting.model.action.AlertCategory
 import org.opensearch.commons.alerting.model.action.PerAlertActionScope
 import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.script.Script
+import org.opensearch.test.OpenSearchTestCase
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.time.temporal.ChronoUnit.MILLIS
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
@@ -468,6 +473,86 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertEquals("Findings saved for test monitor", 2, findings.size)
         assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("5"))
         assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("1"))
+    }
+
+    fun `test monitor run generates no error alerts with versionconflictengineexception with locks`() {
+        val testIndex = createTestIndex()
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                name = "__lag-monitor-test__",
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                schedule = IntervalSchedule(interval = 1, unit = ChronoUnit.MINUTES)
+            )
+        )
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex, "5", testDoc)
+        Thread.sleep(240000)
+
+        val inputMap = HashMap<String, Any>()
+        inputMap["searchString"] = monitor.name
+
+        val responseMap = getAlerts(inputMap).asMap()
+        val alerts = (responseMap["alerts"] as ArrayList<Map<String, Any>>)
+        alerts.forEach {
+            assertTrue(it["error_message"] == null)
+        }
+    }
+
+    @AwaitsFix(bugUrl = "")
+    fun `test monitor run generate lock and monitor delete removes lock`() {
+        val testIndex = createTestIndex()
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                schedule = IntervalSchedule(interval = 1, unit = ChronoUnit.MINUTES)
+            )
+        )
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex, "5", testDoc)
+        OpenSearchTestCase.waitUntil({
+            val response = client().makeRequest("HEAD", LockService.LOCK_INDEX_NAME)
+            return@waitUntil (response.restStatus().status == 200)
+        }, 240, TimeUnit.SECONDS)
+
+        var response = client().makeRequest("GET", LockService.LOCK_INDEX_NAME + "/_search")
+        var responseMap = entityAsMap(response)
+        var noOfLocks = ((responseMap["hits"] as Map<String, Any>)["hits"] as List<Any>).size
+        assertEquals(1, noOfLocks)
+
+        deleteMonitor(monitor)
+        refreshIndex(LockService.LOCK_INDEX_NAME)
+        response = client().makeRequest("GET", LockService.LOCK_INDEX_NAME + "/_search")
+        responseMap = entityAsMap(response)
+        noOfLocks = ((responseMap["hits"] as Map<String, Any>)["hits"] as List<Any>).size
+        assertEquals(0, noOfLocks)
     }
 
     fun `test execute monitor with tag as trigger condition generates alerts and findings`() {
