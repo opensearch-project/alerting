@@ -18,10 +18,13 @@ import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertMover.Companion.moveAlerts
 import org.opensearch.alerting.core.JobRunner
 import org.opensearch.alerting.core.ScheduledJobIndices
+import org.opensearch.alerting.core.lock.LockModel
+import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.WorkflowRunResult
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.opensearchapi.retry
+import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.TriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
@@ -221,6 +224,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         return this
     }
 
+    fun registerLockService(lockService: LockService): MonitorRunnerService {
+        monitorCtx.lockService = lockService
+        return this
+    }
+
     // Updates destination settings when the reload API is called so that new keystore values are visible
     fun reloadDestinationSettings(settings: Settings) {
         monitorCtx.destinationSettings = loadDestinationSettings(settings)
@@ -292,20 +300,40 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         when (job) {
             is Workflow -> {
                 launch {
-                    logger.debug(
-                        "PERF_DEBUG: executing workflow ${job.id} on node " +
-                            monitorCtx.clusterService!!.state().nodes().localNode.id
-                    )
-                    runJob(job, periodStart, periodEnd, false)
+                    var lock: LockModel? = null
+                    try {
+                        lock = monitorCtx.client!!.suspendUntil<Client, LockModel?> {
+                            monitorCtx.lockService!!.acquireLock(job, it)
+                        } ?: return@launch
+                        logger.debug("lock ${lock!!.lockId} acquired")
+                        logger.debug(
+                            "PERF_DEBUG: executing workflow ${job.id} on node " +
+                                monitorCtx.clusterService!!.state().nodes().localNode.id
+                        )
+                        runJob(job, periodStart, periodEnd, false)
+                    } finally {
+                        monitorCtx.client!!.suspendUntil<Client, Boolean> { monitorCtx.lockService!!.release(lock, it) }
+                        logger.debug("lock ${lock!!.lockId} released")
+                    }
                 }
             }
             is Monitor -> {
                 launch {
-                    logger.debug(
-                        "PERF_DEBUG: executing ${job.monitorType} ${job.id} on node " +
-                            monitorCtx.clusterService!!.state().nodes().localNode.id
-                    )
-                    runJob(job, periodStart, periodEnd, false)
+                    var lock: LockModel? = null
+                    try {
+                        lock = monitorCtx.client!!.suspendUntil<Client, LockModel?> {
+                            monitorCtx.lockService!!.acquireLock(job, it)
+                        } ?: return@launch
+                        logger.debug("lock ${lock!!.lockId} acquired")
+                        logger.debug(
+                            "PERF_DEBUG: executing ${job.monitorType} ${job.id} on node " +
+                                monitorCtx.clusterService!!.state().nodes().localNode.id
+                        )
+                        runJob(job, periodStart, periodEnd, false)
+                    } finally {
+                        monitorCtx.client!!.suspendUntil<Client, Boolean> { monitorCtx.lockService!!.release(lock, it) }
+                        logger.debug("lock ${lock!!.lockId} released")
+                    }
                 }
             }
             else -> {
