@@ -1,0 +1,18 @@
+{
+  "dynamic": "strict",
+  "properties": {
+    "scheduled_job_id": {
+      "type": "keyword"
+    },
+    "lock_time": {
+      "type": "date",
+      "format": "epoch_second"
+    },
+    "lock_duration_seconds": {
+      "type": "long"
+    },
+    "released": {
+      "type": "boolean"
+    }
+  }
+}
