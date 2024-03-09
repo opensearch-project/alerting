@@ -7,6 +7,7 @@ package org.opensearch.alerting
 
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
@@ -60,5 +61,6 @@ data class MonitorRunnerExecutionContext(
         AlertingSettings.DEFAULT_PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT,
     @Volatile var docLevelMonitorShardFetchSize: Int =
         AlertingSettings.DEFAULT_DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE,
-    @Volatile var totalNodesFanOut: Int = AlertingSettings.DEFAULT_FAN_OUT_NODES
+    @Volatile var totalNodesFanOut: Int = AlertingSettings.DEFAULT_FAN_OUT_NODES,
+    @Volatile var lockService: LockService? = null
 )

@@ -21,6 +21,7 @@ import org.opensearch.alerting.core.JobSweeper
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsAction
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsTransportAction
+import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler
 import org.opensearch.alerting.core.schedule.JobScheduler
 import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSettings
@@ -259,6 +260,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     ): Collection<Any> {
         // Need to figure out how to use the OpenSearch DI classes rather than handwiring things here.
         val settings = environment.settings()
+        val lockService = LockService(client, clusterService)
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
         val alertService = AlertService(client, xContentRegistry, alertIndices)
         val triggerService = TriggerService(scriptService)
@@ -277,6 +279,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerDocLevelMonitorQueries(DocLevelMonitorQueries(client, clusterService))
             .registerJvmStats(JvmStats.jvmStats())
             .registerWorkflowService(WorkflowService(client, xContentRegistry))
+            .registerLockService(lockService)
             .registerConsumers()
             .registerDestinationSettings()
         scheduledJobIndices = ScheduledJobIndices(client.admin(), clusterService)
@@ -301,7 +304,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             settings
         )
 
-        DeleteMonitorService.initialize(client)
+        DeleteMonitorService.initialize(client, lockService)
 
         return listOf(
             sweeper,
@@ -311,7 +314,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             docLevelMonitorQueries,
             destinationMigrationCoordinator,
             alertService,
-            triggerService
+            triggerService,
+            lockService
         )
     }
 
