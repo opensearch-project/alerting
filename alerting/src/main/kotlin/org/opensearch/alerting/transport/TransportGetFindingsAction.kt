@@ -82,8 +82,6 @@ class TransportGetFindingsSearchAction @Inject constructor(
         val getFindingsRequest = request as? GetFindingsRequest
             ?: recreateObject(request) { GetFindingsRequest(it) }
         val tableProp = getFindingsRequest.table
-        val severity = getFindingsRequest.severity
-        val detectionType = getFindingsRequest.detectionType
         val searchString = tableProp.searchString
 
         val sortBuilder = SortBuilders
@@ -125,7 +123,8 @@ class TransportGetFindingsSearchAction @Inject constructor(
             queryBuilder.filter(timeRangeQuery)
         }
 
-        if (!detectionType.isNullOrBlank()) {
+        if (!getFindingsRequest.detectionType.isNullOrBlank()) {
+            val detectionType = getFindingsRequest.detectionType
             val nestedQueryBuilder = QueryBuilders.nestedQuery(
                 "queries",
                 when {
@@ -161,7 +160,8 @@ class TransportGetFindingsSearchAction @Inject constructor(
                 .minimumShouldMatch(1)
         }
 
-        if (!severity.isNullOrBlank()) {
+        if (!getFindingsRequest.severity.isNullOrBlank()) {
+            val severity = getFindingsRequest.severity
             queryBuilder
                 .must(
                     QueryBuilders.nestedQuery(
