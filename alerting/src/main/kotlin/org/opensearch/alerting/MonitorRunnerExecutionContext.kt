@@ -47,5 +47,6 @@ data class MonitorRunnerExecutionContext(
     @Volatile var destinationContextFactory: DestinationContextFactory? = null,
 
     @Volatile var maxActionableAlertCount: Long = AlertingSettings.DEFAULT_MAX_ACTIONABLE_ALERT_COUNT,
-    @Volatile var indexTimeout: TimeValue? = null
+    @Volatile var indexTimeout: TimeValue? = null,
+    @Volatile var findingsIndexBatchSize: Int = AlertingSettings.DEFAULT_FINDINGS_INDEXING_BATCH_SIZE
 )
