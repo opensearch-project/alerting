@@ -5,7 +5,7 @@
 
 package org.opensearch.alerting.script
 
-import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.AlertContext
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
 import java.time.Instant
@@ -16,7 +16,7 @@ data class DocumentLevelTriggerExecutionContext(
     override val results: List<Map<String, Any>>,
     override val periodStart: Instant,
     override val periodEnd: Instant,
-    val alerts: List<Alert> = listOf(),
+    val alerts: List<AlertContext> = listOf(),
     val triggeredDocs: List<String>,
     val relatedFindings: List<String>,
     override val error: Exception? = null
@@ -25,7 +25,7 @@ data class DocumentLevelTriggerExecutionContext(
     constructor(
         monitor: Monitor,
         trigger: DocumentLevelTrigger,
-        alerts: List<Alert> = listOf()
+        alerts: List<AlertContext> = listOf()
     ) : this(
         monitor, trigger, emptyList(), Instant.now(), Instant.now(),
         alerts, emptyList(), emptyList(), null

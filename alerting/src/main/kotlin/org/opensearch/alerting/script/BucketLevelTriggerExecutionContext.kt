@@ -9,6 +9,7 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.AlertContext
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
 import java.time.Instant
@@ -22,7 +23,7 @@ data class BucketLevelTriggerExecutionContext(
     override val periodStart: Instant,
     override val periodEnd: Instant,
     val dedupedAlerts: List<Alert> = listOf(),
-    val newAlerts: List<Alert> = listOf(),
+    val newAlerts: List<AlertContext> = listOf(),
     val completedAlerts: List<Alert> = listOf(),
     override val error: Exception? = null
 ) : TriggerExecutionContext(monitor, results, periodStart, periodEnd, error) {
@@ -32,7 +33,7 @@ data class BucketLevelTriggerExecutionContext(
         trigger: BucketLevelTrigger,
         monitorRunResult: MonitorRunResult<BucketLevelTriggerRunResult>,
         dedupedAlerts: List<Alert> = listOf(),
-        newAlerts: List<Alert> = listOf(),
+        newAlerts: List<AlertContext> = listOf(),
         completedAlerts: List<Alert> = listOf()
     ) : this(
         monitor, trigger, monitorRunResult.inputResults.results, monitorRunResult.periodStart, monitorRunResult.periodEnd,

@@ -25,7 +25,6 @@ import org.opensearch.commons.alerting.model.Alert.State.ACKNOWLEDGED
 import org.opensearch.commons.alerting.model.Alert.State.ACTIVE
 import org.opensearch.commons.alerting.model.Alert.State.COMPLETED
 import org.opensearch.commons.alerting.model.Alert.State.ERROR
-import org.opensearch.commons.alerting.model.AlertContext
 import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
@@ -1507,7 +1506,6 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals("Alerts not saved", 2, currentAlerts.size)
         currentAlerts.forEach { alert ->
             Assert.assertEquals("expected findings for alert", alert.findingIds.size, 1)
-            assertFalse("Alert documents should not be an AlertContext.", alert is AlertContext)
         }
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 1, findings.size)
@@ -1577,7 +1575,6 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals("Alerts not saved", 2, currentAlerts.size)
         currentAlerts.forEach { alert ->
             Assert.assertEquals("expected findings for alert", alert.findingIds.size, 1)
-            assertFalse("Alert documents should not be an AlertContext.", alert is AlertContext)
         }
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 1, findings.size)
@@ -1648,7 +1645,6 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals("Alerts not saved", 2, currentAlerts.size)
         currentAlerts.forEach { alert ->
             Assert.assertEquals("expected findings for alert", alert.findingIds.size, 0)
-            assertFalse("Alert documents should not be an AlertContext.", alert is AlertContext)
         }
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 0, findings.size)

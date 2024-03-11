@@ -516,10 +516,10 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         for (action in trigger.actions) {
             val actionExecutionScope = action.getActionExecutionPolicy(monitor)!!.actionExecutionScope
             if (actionExecutionScope is PerAlertActionScope && !shouldDefaultToPerExecution) {
-                for (alert in alertContexts) {
-                    val actionResults = this.runAction(action, actionCtx.copy(alerts = listOf(alert)), monitorCtx, monitor, dryrun)
-                    triggerResult.actionResultsMap.getOrPut(alert.id) { mutableMapOf() }
-                    triggerResult.actionResultsMap[alert.id]?.set(action.id, actionResults)
+                for (alertContext in alertContexts) {
+                    val actionResults = this.runAction(action, actionCtx.copy(alerts = listOf(alertContext)), monitorCtx, monitor, dryrun)
+                    triggerResult.actionResultsMap.getOrPut(alertContext.alert.id) { mutableMapOf() }
+                    triggerResult.actionResultsMap[alertContext.alert.id]?.set(action.id, actionResults)
                 }
             } else if (alertContexts.isNotEmpty()) {
                 val actionResults = this.runAction(action, actionCtx.copy(alerts = alertContexts), monitorCtx, monitor, dryrun)

@@ -320,7 +320,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     for (alertCategory in actionExecutionScope.actionableAlerts) {
                         val alertsToExecuteActionsFor = nextAlerts[trigger.id]?.get(alertCategory) ?: mutableListOf()
                         for (alert in alertsToExecuteActionsFor) {
-                            val alertContext = if (alertCategory != AlertCategory.NEW) alert
+                            val alertContext = if (alertCategory != AlertCategory.NEW) AlertContext(alert = alert)
                             else getAlertContext(alert = alert, alertSampleDocs = alertSampleDocs)
 
                             val actionCtx = getActionContextForAlertCategory(
@@ -550,37 +550,37 @@ object BucketLevelMonitorRunner : MonitorRunner() {
 
     private fun getActionContextForAlertCategory(
         alertCategory: AlertCategory,
-        alert: Alert,
+        alertContext: AlertContext,
         ctx: BucketLevelTriggerExecutionContext,
         error: Exception?
     ): BucketLevelTriggerExecutionContext {
         return when (alertCategory) {
             AlertCategory.DEDUPED ->
-                ctx.copy(dedupedAlerts = listOf(alert), newAlerts = emptyList(), completedAlerts = emptyList(), error = error)
+                ctx.copy(dedupedAlerts = listOf(alertContext.alert), newAlerts = emptyList(), completedAlerts = emptyList(), error = error)
             AlertCategory.NEW ->
-                ctx.copy(dedupedAlerts = emptyList(), newAlerts = listOf(alert), completedAlerts = emptyList(), error = error)
+                ctx.copy(dedupedAlerts = emptyList(), newAlerts = listOf(alertContext), completedAlerts = emptyList(), error = error)
             AlertCategory.COMPLETED ->
-                ctx.copy(dedupedAlerts = emptyList(), newAlerts = emptyList(), completedAlerts = listOf(alert), error = error)
+                ctx.copy(dedupedAlerts = emptyList(), newAlerts = emptyList(), completedAlerts = listOf(alertContext.alert), error = error)
         }
     }
 
     private fun getAlertContext(
         alert: Alert,
         alertSampleDocs: Map<String, Map<String, List<Map<String, Any>>>>
-    ): Alert {
+    ): AlertContext {
         val bucketKey = alert.aggregationResultBucket?.getBucketKeysHash()
         val sampleDocs = alertSampleDocs[alert.triggerId]?.get(bucketKey)
         return if (!bucketKey.isNullOrEmpty() && !sampleDocs.isNullOrEmpty()) {
             AlertContext(alert = alert, sampleDocs = sampleDocs)
         } else {
             logger.warn(
-                "Error retrieving sample documents for alert {} from trigger {} of monitor {} during execution {}.",
+                "Failed to retrieve sample documents for alert {} from trigger {} of monitor {} during execution {}.",
                 alert.id,
                 alert.triggerId,
                 alert.monitorId,
                 alert.executionId
             )
-            alert
+            AlertContext(alert = alert, sampleDocs = listOf())
         }
     }
 }
