@@ -18,6 +18,7 @@ import org.opensearch.search.aggregations.bucket.composite.CompositeAggregation
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
 import org.opensearch.search.aggregations.support.AggregationPath
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.search.sort.SortOrder
 
 class AggregationQueryRewriter {
@@ -62,6 +63,8 @@ class AggregationQueryRewriter {
                         if (factory is CompositeAggregationBuilder) {
                             if (returnSampleDocs) {
                                 // TODO: Returning sample documents should ideally be a toggleable option at the action level.
+                                //  For now, identify which fields to return from the doc _source for the trigger's actions.
+                                val docFieldTags = parseSampleDocTags(listOf(trigger))
                                 val sampleDocsAgg = listOf(
                                     AggregationBuilders.topHits("low_hits")
                                         .size(5)
@@ -71,6 +74,7 @@ class AggregationQueryRewriter {
                                         .sort("_score", SortOrder.DESC)
                                 )
                                 sampleDocsAgg.forEach { agg ->
+                                    if (docFieldTags.isNotEmpty()) agg.fetchSource(FetchSourceContext(true, docFieldTags.toTypedArray(), emptyArray()))
                                     if (!factory.subAggregations.contains(agg)) factory.subAggregation(agg)
                                 }
                             } else {

@@ -37,8 +37,13 @@ data class DocumentLevelTriggerExecutionContext(
      */
     override fun asTemplateArg(): Map<String, Any?> {
         val tempArg = super.asTemplateArg().toMutableMap()
-        tempArg["trigger"] = trigger.asTemplateArg()
-        tempArg["alerts"] = alerts.map { it.asTemplateArg() }
+        tempArg[TRIGGER_FIELD] = trigger.asTemplateArg()
+        tempArg[ALERTS_FIELD] = alerts.map { it.asTemplateArg() }
         return tempArg
+    }
+
+    companion object {
+        const val TRIGGER_FIELD = "trigger"
+        const val ALERTS_FIELD = "alerts"
     }
 }

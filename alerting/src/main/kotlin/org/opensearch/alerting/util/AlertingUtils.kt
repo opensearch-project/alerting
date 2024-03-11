@@ -8,12 +8,16 @@ package org.opensearch.alerting.util
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.destination.Destination
+import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
+import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.util.concurrent.ThreadContext
 import org.opensearch.commons.alerting.model.AggregationResultBucket
 import org.opensearch.commons.alerting.model.AlertContext
+import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.commons.alerting.model.action.Action
@@ -184,29 +188,10 @@ fun ThreadContext.StoredContext.closeFinally(cause: Throwable?) = when (cause) {
 }
 
 /**
- * Checks the `message_template.source` in the [Script] for each [Action] in the [Trigger] for
- * any instances of [AlertContext.SAMPLE_DOCS_FIELD] tags.
- * This indicates the message is expected to print data from the sample docs, so we need to collect the samples.
- */
-fun printsSampleDocData(trigger: Trigger): Boolean {
-    return trigger.actions.any { action ->
-        // The {{ctx}} mustache tag indicates the entire ctx object should be printed in the message string.
-        // TODO: Consider excluding `{{ctx}}` from criteria for bucket-level triggers as printing all of
-        //  their sample documents could make the notification message too large to send.
-        action.messageTemplate.idOrCode.contains("{{ctx}}") ||
-            action.messageTemplate.idOrCode.contains(AlertContext.SAMPLE_DOCS_FIELD)
-    }
-}
-
-fun printsSampleDocData(triggers: List<Trigger>): Boolean {
-    return triggers.any { trigger -> printsSampleDocData(trigger) }
-}
-
-/**
  * Mustache template supports iterating through a list using a `{{#listVariable}}{{/listVariable}}` block.
  * https://mustache.github.io/mustache.5.html
  *
- * This function looks `{{#${[AlertContext.SAMPLE_DOCS_FIELD]}}}{{/${[AlertContext.SAMPLE_DOCS_FIELD]}}}` blocks,
+ * This function looks for `{{#${[AlertContext.SAMPLE_DOCS_FIELD]}}}{{/${[AlertContext.SAMPLE_DOCS_FIELD]}}}` blocks,
  * and parses the contents for tags, which we interpret as fields within the sample document.
  *
  * @return a [Set] of [String]s indicating fields within a document.
@@ -214,30 +199,35 @@ fun printsSampleDocData(triggers: List<Trigger>): Boolean {
 fun parseSampleDocTags(messageTemplate: Script): Set<String> {
     val sampleBlockPrefix = "{{#${AlertContext.SAMPLE_DOCS_FIELD}}}"
     val sampleBlockSuffix = "{{/${AlertContext.SAMPLE_DOCS_FIELD}}}"
+    val sourcePrefix = "_source."
     val tagRegex = Regex("\\{\\{([^{}]+)}}")
     val tags = mutableSetOf<String>()
     try {
         // Identify the start and end points of the sample block
-        var sampleBlockStart = messageTemplate.idOrCode.indexOf(sampleBlockPrefix)
-        var sampleBlockEnd = messageTemplate.idOrCode.indexOf(sampleBlockSuffix, sampleBlockStart)
+        var blockStart = messageTemplate.idOrCode.indexOf(sampleBlockPrefix)
+        var blockEnd = messageTemplate.idOrCode.indexOf(sampleBlockSuffix, blockStart)
 
         // Sample start/end of -1 indicates there are no more complete sample blocks
-        while (sampleBlockStart != -1 && sampleBlockEnd != -1) {
+        while (blockStart != -1 && blockEnd != -1) {
             // Isolate the sample block
-            val sampleBlock = messageTemplate.idOrCode.substring(sampleBlockStart, sampleBlockEnd)
+            val sampleBlock = messageTemplate.idOrCode.substring(blockStart, blockEnd)
                 // Remove the iteration wrapper tags
-                .removeSurrounding(sampleBlockPrefix, sampleBlockSuffix)
+                .removePrefix(sampleBlockPrefix)
+                .removeSuffix(sampleBlockSuffix)
 
             // Search for each tag
             tagRegex.findAll(sampleBlock).forEach { match ->
-                // Parse the field name from the tag (e.g., `{{_source.timestamp}}` becomes `_source.timestamp`)
-                val docField = match.groupValues[1].trim()
-                if (docField.isNotEmpty()) tags.add(docField)
+                // Parse the field name from the tag (e.g., `{{_source.timestamp}}` becomes `timestamp`)
+                var docField = match.groupValues[1].trim()
+                if (docField.startsWith(sourcePrefix)) {
+                    docField = docField.removePrefix(sourcePrefix)
+                    if (docField.isNotEmpty()) tags.add(docField)
+                }
             }
 
             // Identify any subsequent sample blocks
-            sampleBlockStart = messageTemplate.idOrCode.indexOf(sampleBlockPrefix, sampleBlockEnd)
-            sampleBlockEnd = messageTemplate.idOrCode.indexOf(sampleBlockSuffix, sampleBlockStart)
+            blockStart = messageTemplate.idOrCode.indexOf(sampleBlockPrefix, blockEnd)
+            blockEnd = messageTemplate.idOrCode.indexOf(sampleBlockSuffix, blockStart)
         }
     } catch (e: Exception) {
         logger.warn("Failed to parse sample document fields.", e)
@@ -245,12 +235,36 @@ fun parseSampleDocTags(messageTemplate: Script): Set<String> {
     return tags
 }
 
-fun parseSampleDocTags(actions: List<Action>): Set<String> {
-    return actions.flatMap { action -> parseSampleDocTags(action.messageTemplate) }
-        .toSet()
+fun parseSampleDocTags(triggers: List<Trigger>): Set<String> {
+    return triggers.flatMap { trigger ->
+        trigger.actions.flatMap { action -> parseSampleDocTags(action.messageTemplate) }
+    }.toSet()
 }
 
-fun parseSampleDocTags(triggers: List<Trigger>): Set<String> {
-    return triggers.flatMap { trigger -> parseSampleDocTags(trigger.actions) }
-        .toSet()
+/**
+ * Checks the `message_template.source` in the [Script] for each [Action] in the [Trigger] for
+ * any instances of [AlertContext.SAMPLE_DOCS_FIELD] tags.
+ * This indicates the message is expected to print data from the sample docs, so we need to collect the samples.
+ */
+fun printsSampleDocData(trigger: Trigger): Boolean {
+    return trigger.actions.any { action ->
+        val alertsField = when (trigger) {
+            is BucketLevelTrigger -> "{{ctx.${BucketLevelTriggerExecutionContext.NEW_ALERTS_FIELD}}}"
+            is DocumentLevelTrigger -> "{{ctx.${DocumentLevelTriggerExecutionContext.ALERTS_FIELD}}}"
+            // Only bucket, and document level monitors are supported currently.
+            else -> return false
+        }
+
+        // TODO: Consider excluding the following tags from TRUE criteria (especially for bucket-level triggers) as
+        //  printing all of the sample documents could make the notification message too large to send.
+        //  1. {{ctx}} - prints entire ctx object in the message string
+        //  2. {{ctx.<alertsField>}} - prints entire alerts array in the message string, which includes the sample docs
+        //  3. {{AlertContext.SAMPLE_DOCS_FIELD}} - prints entire sample docs array in the message string
+        val validTags = listOfNotNull(
+            "{{ctx}}",
+            alertsField,
+            AlertContext.SAMPLE_DOCS_FIELD
+        )
+        validTags.any { tag -> action.messageTemplate.idOrCode.contains(tag) }
+    }
 }

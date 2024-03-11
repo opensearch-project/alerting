@@ -13,6 +13,8 @@ import org.opensearch.action.admin.indices.refresh.RefreshAction
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
 import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
+import org.opensearch.action.get.MultiGetItemResponse
+import org.opensearch.action.get.MultiGetRequest
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchAction
 import org.opensearch.action.search.SearchRequest
@@ -23,12 +25,15 @@ import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.userErrorMessage
+import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
+import org.opensearch.alerting.util.parseSampleDocTags
+import org.opensearch.alerting.util.printsSampleDocData
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.metadata.IndexMetadata
@@ -65,6 +70,7 @@ import org.opensearch.percolator.PercolateQueryBuilderExt
 import org.opensearch.search.SearchHit
 import org.opensearch.search.SearchHits
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.search.sort.SortOrder
 import java.io.IOException
 import java.time.Instant
@@ -83,6 +89,12 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
     /* Contains list of docs source that are held in memory to submit to percolate query against query index.
             * Docs are fetched from the source index per shard and transformed.*/
     val transformedDocs = mutableListOf<Pair<String, TransformedDocDto>>()
+
+    // Maps a finding ID to the concrete index name.
+    val findingIdToConcreteIndex = mutableMapOf<String, String>()
+
+    // Maps the docId to the doc source
+    val docIdToDocMap = mutableMapOf<String, MutableList<MultiGetItemResponse>>()
 
     override suspend fun runMonitor(
         monitor: Monitor,
@@ -457,6 +469,13 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             error = monitorResult.error ?: triggerResult.error
         )
 
+        if (printsSampleDocData(trigger) && triggerFindingDocPairs.isNotEmpty())
+            getDocSources(
+                findingToDocPairs = findingToDocPairs,
+                monitorCtx = monitorCtx,
+                monitor = monitor
+            )
+
         val alerts = mutableListOf<Alert>()
         val alertContexts = mutableListOf<AlertContext>()
         triggerFindingDocPairs.forEach {
@@ -469,12 +488,19 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                 workflorwRunContext = workflowRunContext
             )
             alerts.add(alert)
+
+            val docId = alert.relatedDocIds.first().split("|").first()
+            val docSource = docIdToDocMap[docId]?.find { item ->
+                findingIdToConcreteIndex[alert.findingIds.first()] == item.index
+            }?.response?.convertToMap()
+
             alertContexts.add(
                 AlertContext(
                     alert = alert,
                     associatedQueries = alert.findingIds.flatMap { findingId ->
                         monitorCtx.findingsToTriggeredQueries?.getOrDefault(findingId, emptyList()) ?: emptyList()
-                    }
+                    },
+                    sampleDocs = listOfNotNull(docSource)
                 )
             )
         }
@@ -565,6 +591,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             findingDocPairs.add(Pair(finding.id, it.key))
             findings.add(finding)
             findingsToTriggeredQueries[finding.id] = triggeredQueries
+            findingIdToConcreteIndex[finding.id] = finding.index
 
             val findingStr =
                 finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS)
@@ -1062,6 +1089,36 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
     private fun isInMemoryNumDocsExceedingMaxDocsPerPercolateQueryLimit(numDocs: Int, monitorCtx: MonitorRunnerExecutionContext): Boolean {
         var maxNumDocsThreshold = monitorCtx.percQueryMaxNumDocsInMemory
         return numDocs >= maxNumDocsThreshold
+    }
+
+    /**
+     * Performs an mGet request to retrieve the documents associated with findings.
+     *
+     * When possible, this will only retrieve the document fields that are specifically
+     * referenced for printing in the mustache template.
+     */
+    private suspend fun getDocSources(
+        findingToDocPairs: List<Pair<String, String>>,
+        monitorCtx: MonitorRunnerExecutionContext,
+        monitor: Monitor
+    ) {
+        val docFieldTags = parseSampleDocTags(monitor.triggers)
+        val request = MultiGetRequest()
+        findingToDocPairs.forEach { (_, docIdAndIndex) ->
+            val docIdAndIndexSplit = docIdAndIndex.split("|")
+            val docId = docIdAndIndexSplit[0]
+            val concreteIndex = docIdAndIndexSplit[1]
+            if (docId.isNotEmpty() && concreteIndex.isNotEmpty()) {
+                val docItem = MultiGetRequest.Item(concreteIndex, docId)
+                if (docFieldTags.isNotEmpty())
+                    docItem.fetchSourceContext(FetchSourceContext(true, docFieldTags.toTypedArray(), emptyArray()))
+                request.add(docItem)
+            }
+        }
+        val response = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.multiGet(request, it) }
+        response.responses.forEach { item ->
+            docIdToDocMap.getOrPut(item.id) { mutableListOf() }.add(item)
+        }
     }
 
     /**
