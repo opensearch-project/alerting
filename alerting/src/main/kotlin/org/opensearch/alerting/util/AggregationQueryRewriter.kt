@@ -8,6 +8,7 @@ package org.opensearch.alerting.util
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.TriggerAfterKey
+import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.search.aggregations.AggregationBuilder
@@ -16,6 +17,7 @@ import org.opensearch.search.aggregations.AggregatorFactories
 import org.opensearch.search.aggregations.bucket.SingleBucketAggregation
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregation
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
+import org.opensearch.search.aggregations.metrics.TopHitsAggregationBuilder
 import org.opensearch.search.aggregations.support.AggregationPath
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.fetch.subphase.FetchSourceContext
@@ -65,14 +67,7 @@ class AggregationQueryRewriter {
                                 // TODO: Returning sample documents should ideally be a toggleable option at the action level.
                                 //  For now, identify which fields to return from the doc _source for the trigger's actions.
                                 val docFieldTags = parseSampleDocTags(listOf(trigger))
-                                val sampleDocsAgg = listOf(
-                                    AggregationBuilders.topHits("low_hits")
-                                        .size(5)
-                                        .sort("_score", SortOrder.ASC),
-                                    AggregationBuilders.topHits("top_hits")
-                                        .size(5)
-                                        .sort("_score", SortOrder.DESC)
-                                )
+                                val sampleDocsAgg = getSampleDocAggs(factory)
                                 sampleDocsAgg.forEach { agg ->
                                     if (docFieldTags.isNotEmpty()) agg.fetchSource(FetchSourceContext(true, docFieldTags.toTypedArray(), emptyArray()))
                                     if (!factory.subAggregations.contains(agg)) factory.subAggregation(agg)
@@ -139,6 +134,26 @@ class AggregationQueryRewriter {
                 }
             }
             return bucketLevelTriggerAfterKeys
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        private fun getSampleDocAggs(factory: CompositeAggregationBuilder): List<TopHitsAggregationBuilder> {
+            var defaultSortFields = listOf("_score")
+            val aggregations = factory.subAggregations.flatMap {
+                (it.convertToMap()[it.name] as Map<String, Any>).values.flatMap { field ->
+                    field as Map<String, String>
+                    field.values
+                }
+            }
+            if (aggregations.isNotEmpty()) defaultSortFields = aggregations
+
+            val lowHitsAgg = AggregationBuilders.topHits("low_hits").size(5)
+            val topHitsAgg = AggregationBuilders.topHits("top_hits").size(5)
+            defaultSortFields.forEach {
+                lowHitsAgg.sort(it, SortOrder.ASC)
+                topHitsAgg.sort(it, SortOrder.DESC)
+            }
+            return listOf(lowHitsAgg, topHitsAgg)
         }
     }
 }
