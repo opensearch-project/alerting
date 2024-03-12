@@ -76,6 +76,8 @@ import javax.management.MBeanServerInvocationHandler
 import javax.management.ObjectName
 import javax.management.remote.JMXConnectorFactory
 import javax.management.remote.JMXServiceURL
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 
 /**
  * Superclass for tests that interact with an external test cluster using OpenSearch's RestClient
@@ -909,7 +911,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     private fun indexDoc(client: RestClient, index: String, id: String, doc: String, refresh: Boolean = true): Response {
         val requestBody = StringEntity(doc, APPLICATION_JSON)
         val params = if (refresh) mapOf("refresh" to "true") else mapOf()
-        val response = client.makeRequest("PUT", "$index/_doc/$id", params, requestBody)
+        val response = client.makeRequest("POST", "$index/_doc/$id?op_type=create", params, requestBody)
         assertTrue(
             "Unable to index doc: '${doc.take(15)}...' to index: '$index'",
             listOf(RestStatus.OK, RestStatus.CREATED).contains(response.restStatus())
@@ -942,6 +944,11 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun createTestIndex(index: String, mapping: String): String {
         createIndex(index, Settings.EMPTY, mapping.trimIndent())
+        return index
+    }
+
+    protected fun createTestIndex(index: String, mapping: String?, alias: String): String {
+        createIndex(index, Settings.EMPTY, mapping?.trimIndent(), alias)
         return index
     }
 
@@ -981,7 +988,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val indicesMap = mutableMapOf<String, Boolean>()
         val indicesJson = jsonBuilder().startObject().startArray("actions")
         indices.keys.map {
-            val indexName = createTestIndex(index = it.lowercase(Locale.ROOT), mapping = "")
+            val indexName = createTestIndex(index = it, mapping = "")
             val isWriteIndex = indices.getOrDefault(indexName, false)
             indicesMap[indexName] = isWriteIndex
             val indexMap = mapOf(
@@ -998,17 +1005,155 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return mutableMapOf(alias to indicesMap)
     }
 
+    protected fun createDataStream(datastream: String, mappings: String?, useComponentTemplate: Boolean) {
+        val indexPattern = "$datastream*"
+        var componentTemplateMappings = "\"properties\": {" +
+            "  \"netflow.destination_transport_port\":{ \"type\": \"long\" }," +
+            "  \"netflow.destination_ipv4_address\":{ \"type\": \"ip\" }" +
+            "}"
+        if (mappings != null) {
+            componentTemplateMappings = mappings
+        }
+        if (useComponentTemplate) {
+            // Setup index_template
+            createComponentTemplateWithMappings(
+                "my_ds_component_template-$datastream",
+                componentTemplateMappings
+            )
+        }
+        createComposableIndexTemplate(
+            "my_index_template_ds-$datastream",
+            listOf(indexPattern),
+            (if (useComponentTemplate) "my_ds_component_template-$datastream" else null),
+            mappings,
+            true,
+            0
+        )
+        createDataStream(datastream)
+    }
+
+    protected fun createDataStream(datastream: String? = randomAlphaOfLength(10).lowercase(Locale.ROOT)) {
+        client().makeRequest("PUT", "_data_stream/$datastream")
+    }
+
+    protected fun deleteDataStream(datastream: String) {
+        client().makeRequest("DELETE", "_data_stream/$datastream")
+    }
+
+    protected fun createIndexAlias(alias: String, mappings: String?) {
+        val indexPattern = "$alias*"
+        var componentTemplateMappings = "\"properties\": {" +
+            "  \"netflow.destination_transport_port\":{ \"type\": \"long\" }," +
+            "  \"netflow.destination_ipv4_address\":{ \"type\": \"ip\" }" +
+            "}"
+        if (mappings != null) {
+            componentTemplateMappings = mappings
+        }
+        createComponentTemplateWithMappings(
+            "my_alias_component_template-$alias",
+            componentTemplateMappings
+        )
+        createComposableIndexTemplate(
+            "my_index_template_alias-$alias",
+            listOf(indexPattern),
+            "my_alias_component_template-$alias",
+            mappings,
+            false,
+            0
+        )
+        createTestIndex(
+            "$alias-000001",
+            null,
+            """
+            "$alias": {
+              "is_write_index": true
+            }
+            """.trimIndent()
+        )
+    }
+
+    protected fun deleteIndexAlias(alias: String) {
+        client().makeRequest("DELETE", "$alias*/_alias/$alias")
+    }
+
+    protected fun createComponentTemplateWithMappings(componentTemplateName: String, mappings: String?) {
+        val body = """{"template" : {        "mappings": {$mappings}    }}"""
+        client().makeRequest(
+            "PUT",
+            "_component_template/$componentTemplateName",
+            emptyMap(),
+            StringEntity(body, ContentType.APPLICATION_JSON),
+            BasicHeader("Content-Type", "application/json")
+        )
+    }
+
+    protected fun createComposableIndexTemplate(
+        templateName: String,
+        indexPatterns: List<String>,
+        componentTemplateName: String?,
+        mappings: String?,
+        isDataStream: Boolean,
+        priority: Int
+    ) {
+        var body = "{\n"
+        if (isDataStream) {
+            body += "\"data_stream\": { },"
+        }
+        body += "\"index_patterns\": [" +
+            indexPatterns.stream().collect(
+                Collectors.joining(",", "\"", "\"")
+            ) + "],"
+        if (componentTemplateName == null) {
+            body += "\"template\": {\"mappings\": {$mappings}},"
+        }
+        if (componentTemplateName != null) {
+            body += "\"composed_of\": [\"$componentTemplateName\"],"
+        }
+        body += "\"priority\":$priority}"
+        client().makeRequest(
+            "PUT",
+            "_index_template/$templateName",
+            emptyMap(),
+            StringEntity(body, APPLICATION_JSON),
+            BasicHeader("Content-Type", "application/json")
+        )
+    }
+
+    protected fun getDatastreamWriteIndex(datastream: String): String {
+        val response = client().makeRequest("GET", "_data_stream/$datastream", emptyMap(), null)
+        var respAsMap = responseAsMap(response)
+        if (respAsMap.containsKey("data_streams")) {
+            respAsMap = (respAsMap["data_streams"] as ArrayList<HashMap<String, *>>)[0]
+            val indices = respAsMap["indices"] as List<Map<String, Any>>
+            val index = indices.last()
+            return index["index_name"] as String
+        } else {
+            respAsMap = respAsMap[datastream] as Map<String, Object>
+        }
+        val indices = respAsMap["indices"] as Array<String>
+        return indices.last()
+    }
+
+    protected fun rolloverDatastream(datastream: String) {
+        client().makeRequest(
+            "POST",
+            datastream + "/_rollover",
+            emptyMap(),
+            null
+        )
+    }
+
     protected fun randomAliasIndices(
         alias: String,
         num: Int = randomIntBetween(1, 10),
         includeWriteIndex: Boolean = true,
     ): Map<String, Boolean> {
         val indices = mutableMapOf<String, Boolean>()
-        val writeIndex = randomIntBetween(0, num)
+        val writeIndex = randomIntBetween(0, num - 1)
         for (i: Int in 0 until num) {
-            var indexName = randomAlphaOfLength(10)
+            var indexName = randomAlphaOfLength(10).lowercase(Locale.ROOT)
             while (indexName.equals(alias) || indices.containsKey(indexName))
-                indexName = randomAlphaOfLength(10)
+                indexName = randomAlphaOfLength(10).lowercase(Locale.ROOT)
             indices[indexName] = includeWriteIndex && i == writeIndex
         }
         return indices
