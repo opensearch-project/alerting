@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.util
 
+import org.opensearch.alerting.model.AlertContext
 import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomBucketLevelTrigger
 import org.opensearch.alerting.randomChainedAlertTrigger
@@ -13,7 +14,6 @@ import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.randomTemplateScript
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
-import org.opensearch.commons.alerting.model.AlertContext
 import org.opensearch.test.OpenSearchTestCase
 
 class AlertingUtilsTests : OpenSearchTestCase() {

@@ -5,7 +5,7 @@
 
 package org.opensearch.alerting.script
 
-import org.opensearch.commons.alerting.model.AlertContext
+import org.opensearch.alerting.model.AlertContext
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
 import java.time.Instant

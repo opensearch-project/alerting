@@ -6,6 +6,7 @@
 package org.opensearch.alerting.util
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.alerting.model.AlertContext
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
@@ -15,7 +16,6 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.util.concurrent.ThreadContext
 import org.opensearch.commons.alerting.model.AggregationResultBucket
-import org.opensearch.commons.alerting.model.AlertContext
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
