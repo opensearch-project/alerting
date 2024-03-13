@@ -249,7 +249,6 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                         matchingDocIdsPerIndex = null,
                         returnSampleDocs = true
                     )
-                    monitorCtx.client
                     val sampleDocumentsByBucket = getSampleDocs(
                         client = monitorCtx.client!!,
                         monitorId = monitor.id,
