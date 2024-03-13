@@ -253,7 +253,12 @@ class InputService(
 
         // Deep copying query before passing it to rewriteQuery since otherwise, the monitor.input is modified directly
         // which causes a strange bug where the rewritten query persists on the Monitor across executions
-        val rewrittenQuery = AggregationQueryRewriter.rewriteQuery(deepCopyQuery(searchInput.query), prevResult, monitor.triggers, returnSampleDocs)
+        val rewrittenQuery = AggregationQueryRewriter.rewriteQuery(
+            deepCopyQuery(searchInput.query),
+            prevResult,
+            monitor.triggers,
+            returnSampleDocs
+        )
 
         // Rewrite query to consider the doc ids per given index
         if (chainedFindingExist(matchingDocIdsPerIndex) && rewrittenQuery.query() != null) {

@@ -37,7 +37,12 @@ class AggregationQueryRewriter {
         /**
          * Optionally adds support for returning sample documents for each bucket of data returned for a bucket level monitor.
          */
-        fun rewriteQuery(query: SearchSourceBuilder, prevResult: InputRunResults?, triggers: List<Trigger>, returnSampleDocs: Boolean = false): SearchSourceBuilder {
+        fun rewriteQuery(
+            query: SearchSourceBuilder,
+            prevResult: InputRunResults?,
+            triggers: List<Trigger>,
+            returnSampleDocs: Boolean = false
+        ): SearchSourceBuilder {
             triggers.forEach { trigger ->
                 if (trigger is BucketLevelTrigger) {
                     // add bucket selector pipeline aggregation for each trigger in query
@@ -69,7 +74,13 @@ class AggregationQueryRewriter {
                                 val docFieldTags = parseSampleDocTags(listOf(trigger))
                                 val sampleDocsAgg = getSampleDocAggs(factory)
                                 sampleDocsAgg.forEach { agg ->
-                                    if (docFieldTags.isNotEmpty()) agg.fetchSource(FetchSourceContext(true, docFieldTags.toTypedArray(), emptyArray()))
+                                    if (docFieldTags.isNotEmpty()) agg.fetchSource(
+                                        FetchSourceContext(
+                                            true,
+                                            docFieldTags.toTypedArray(),
+                                            emptyArray()
+                                        )
+                                    )
                                     if (!factory.subAggregations.contains(agg)) factory.subAggregation(agg)
                                 }
                             } else {

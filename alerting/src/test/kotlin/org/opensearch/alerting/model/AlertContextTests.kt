@@ -106,7 +106,11 @@ class AlertContextTests : OpenSearchTestCase() {
             associatedQueries.size,
             (templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD] as List<DocLevelQuery>).size
         )
-        assertEquals("Template associated queries do not match", formatAssociatedQueries(alertContext), templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD])
+        assertEquals(
+            "Template associated queries do not match",
+            formatAssociatedQueries(alertContext),
+            templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD]
+        )
         assertNull("Template sample docs should be null", templateArgs[AlertContext.SAMPLE_DOCS_FIELD])
     }
 
@@ -126,7 +130,11 @@ class AlertContextTests : OpenSearchTestCase() {
             associatedQueries.size,
             (templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD] as List<DocLevelQuery>).size
         )
-        assertEquals("Template associated queries do not match", formatAssociatedQueries(alertContext), templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD])
+        assertEquals(
+            "Template associated queries do not match",
+            formatAssociatedQueries(alertContext),
+            templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD]
+        )
         assertNull("Template sample docs should be null", templateArgs[AlertContext.SAMPLE_DOCS_FIELD])
     }
 
@@ -146,7 +154,11 @@ class AlertContextTests : OpenSearchTestCase() {
             associatedQueries.size,
             (templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD] as List<DocLevelQuery>).size
         )
-        assertEquals("Template associated queries do not match", formatAssociatedQueries(alertContext), templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD])
+        assertEquals(
+            "Template associated queries do not match",
+            formatAssociatedQueries(alertContext),
+            templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD]
+        )
         assertNull("Template sample docs should be null", templateArgs[AlertContext.SAMPLE_DOCS_FIELD])
     }
 
@@ -166,7 +178,11 @@ class AlertContextTests : OpenSearchTestCase() {
             associatedQueries.size,
             (templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD] as List<DocLevelQuery>).size
         )
-        assertEquals("Template associated queries do not match", formatAssociatedQueries(alertContext), templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD])
+        assertEquals(
+            "Template associated queries do not match",
+            formatAssociatedQueries(alertContext),
+            templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD]
+        )
 
         assertEquals(
             "Template args sample docs should have size ${sampleDocs.size}",
@@ -192,7 +208,11 @@ class AlertContextTests : OpenSearchTestCase() {
             associatedQueries.size,
             (templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD] as List<DocLevelQuery>).size
         )
-        assertEquals("Template associated queries do not match", formatAssociatedQueries(alertContext), templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD])
+        assertEquals(
+            "Template associated queries do not match",
+            formatAssociatedQueries(alertContext),
+            templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD]
+        )
 
         assertEquals(
             "Template args sample docs should have size ${sampleDocs.size}",
@@ -218,7 +238,11 @@ class AlertContextTests : OpenSearchTestCase() {
             associatedQueries.size,
             (templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD] as List<DocLevelQuery>).size
         )
-        assertEquals("Template associated queries do not match", formatAssociatedQueries(alertContext), templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD])
+        assertEquals(
+            "Template associated queries do not match",
+            formatAssociatedQueries(alertContext),
+            templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD]
+        )
 
         assertEquals(
             "Template args sample docs should have size ${sampleDocs.size}",
@@ -244,7 +268,11 @@ class AlertContextTests : OpenSearchTestCase() {
             associatedQueries.size,
             (templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD] as List<DocLevelQuery>).size
         )
-        assertEquals("Template associated queries do not match", formatAssociatedQueries(alertContext), templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD])
+        assertEquals(
+            "Template associated queries do not match",
+            formatAssociatedQueries(alertContext),
+            templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD]
+        )
 
         assertEquals(
             "Template args sample docs should have size ${sampleDocs.size}",
@@ -270,7 +298,11 @@ class AlertContextTests : OpenSearchTestCase() {
             associatedQueries.size,
             (templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD] as List<DocLevelQuery>).size
         )
-        assertEquals("Template associated queries do not match", formatAssociatedQueries(alertContext), templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD])
+        assertEquals(
+            "Template associated queries do not match",
+            formatAssociatedQueries(alertContext),
+            templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD]
+        )
 
         assertEquals(
             "Template args sample docs should have size ${sampleDocs.size}",
@@ -296,7 +328,11 @@ class AlertContextTests : OpenSearchTestCase() {
             associatedQueries.size,
             (templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD] as List<DocLevelQuery>).size
         )
-        assertEquals("Template associated queries do not match", formatAssociatedQueries(alertContext), templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD])
+        assertEquals(
+            "Template associated queries do not match",
+            formatAssociatedQueries(alertContext),
+            templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD]
+        )
 
         assertEquals(
             "Template args sample docs should have size ${sampleDocs.size}",
@@ -322,7 +358,11 @@ class AlertContextTests : OpenSearchTestCase() {
             associatedQueries.size,
             (templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD] as List<DocLevelQuery>).size
         )
-        assertEquals("Template associated queries do not match", formatAssociatedQueries(alertContext), templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD])
+        assertEquals(
+            "Template associated queries do not match",
+            formatAssociatedQueries(alertContext),
+            templateArgs[AlertContext.ASSOCIATED_QUERIES_FIELD]
+        )
 
         assertEquals(
             "Template args sample docs should have size ${sampleDocs.size}",
@@ -342,7 +382,11 @@ class AlertContextTests : OpenSearchTestCase() {
         assertEquals("Template args start time does not", alertContext.alert.startTime.toEpochMilli(), templateArgs[Alert.START_TIME_FIELD])
         assertEquals("Template args last notification time does not match", templateArgs[Alert.LAST_NOTIFICATION_TIME_FIELD], null)
         assertEquals("Template args severity does not match", alertContext.alert.severity, templateArgs[Alert.SEVERITY_FIELD])
-        assertEquals("Template args clusters does not match", alertContext.alert.clusters?.joinToString(","), templateArgs[Alert.CLUSTERS_FIELD])
+        assertEquals(
+            "Template args clusters does not match",
+            alertContext.alert.clusters?.joinToString(","),
+            templateArgs[Alert.CLUSTERS_FIELD]
+        )
     }
 
     private fun formatAssociatedQueries(alertContext: AlertContext): List<Map<String, Any>>? {

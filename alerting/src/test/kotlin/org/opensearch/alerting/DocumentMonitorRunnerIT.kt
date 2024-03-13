@@ -2447,7 +2447,9 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val actionExecutionPolicy = ActionExecutionPolicy(actionExecutionScope)
         val actions = (0..randomInt(10)).map {
             randomActionWithPolicy(
-                template = randomTemplateScript("{{#ctx.alerts}}\n{{#associated_queries}}\n(name={{name}})\n{{/associated_queries}}\n{{/ctx.alerts}}"),
+                template = randomTemplateScript(
+                    "{{#ctx.alerts}}\n{{#associated_queries}}\n(name={{name}})\n{{/associated_queries}}\n{{/ctx.alerts}}"
+                ),
                 destinationId = createDestination().id,
                 actionExecutionPolicy = actionExecutionPolicy
             )
@@ -2477,7 +2479,8 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             for (alertActionResult in triggerResult.objectMap("action_results").values) {
                 assertEquals(actions.size, alertActionResult.values.size)
                 for (actionResult in alertActionResult.values) {
-                    @Suppress("UNCHECKED_CAST") val actionOutput = (actionResult as Map<String, Map<String, String>>)["output"] as Map<String, String>
+                    @Suppress("UNCHECKED_CAST")
+                    val actionOutput = (actionResult as Map<String, Map<String, String>>)["output"] as Map<String, String>
                     assertTrue(
                         "The notification message is missing the query name.",
                         actionOutput["message"]!!.contains("(name=${docQuery.name})")
