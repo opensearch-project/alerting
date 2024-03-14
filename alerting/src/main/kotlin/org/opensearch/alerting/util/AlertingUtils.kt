@@ -6,17 +6,24 @@
 package org.opensearch.alerting.util
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.alerting.model.AlertContext
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.destination.Destination
+import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
+import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.AggregationResultBucket
+import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.commons.alerting.model.action.ActionExecutionScope
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
+import org.opensearch.script.Script
 
 private val logger = LogManager.getLogger("AlertingUtils")
 
@@ -75,7 +82,9 @@ fun Monitor.isQueryLevelMonitor(): Boolean = this.monitorType == Monitor.Monitor
  * Since buckets can have multi-value keys, this converts the bucket key values to a string that can be used
  * as the key for a HashMap to easily retrieve [AggregationResultBucket] based on the bucket key values.
  */
-fun AggregationResultBucket.getBucketKeysHash(): String = this.bucketKeys.joinToString(separator = "#")
+fun AggregationResultBucket.getBucketKeysHash(): String = getBucketKeysHash(this.bucketKeys)
+
+fun getBucketKeysHash(bucketKeys: List<String>): String = bucketKeys.joinToString(separator = "#")
 
 fun Action.getActionExecutionPolicy(monitor: Monitor): ActionExecutionPolicy? {
     // When the ActionExecutionPolicy is null for an Action, the default is resolved at runtime
@@ -138,4 +147,86 @@ fun defaultToPerExecutionAction(
     }
 
     return false
+}
+
+/**
+ * Mustache template supports iterating through a list using a `{{#listVariable}}{{/listVariable}}` block.
+ * https://mustache.github.io/mustache.5.html
+ *
+ * This function looks for `{{#${[AlertContext.SAMPLE_DOCS_FIELD]}}}{{/${[AlertContext.SAMPLE_DOCS_FIELD]}}}` blocks,
+ * and parses the contents for tags, which we interpret as fields within the sample document.
+ *
+ * @return a [Set] of [String]s indicating fields within a document.
+ */
+fun parseSampleDocTags(messageTemplate: Script): Set<String> {
+    val sampleBlockPrefix = "{{#${AlertContext.SAMPLE_DOCS_FIELD}}}"
+    val sampleBlockSuffix = "{{/${AlertContext.SAMPLE_DOCS_FIELD}}}"
+    val sourcePrefix = "_source."
+    val tagRegex = Regex("\\{\\{([^{}]+)}}")
+    val tags = mutableSetOf<String>()
+    try {
+        // Identify the start and end points of the sample block
+        var blockStart = messageTemplate.idOrCode.indexOf(sampleBlockPrefix)
+        var blockEnd = messageTemplate.idOrCode.indexOf(sampleBlockSuffix, blockStart)
+
+        // Sample start/end of -1 indicates there are no more complete sample blocks
+        while (blockStart != -1 && blockEnd != -1) {
+            // Isolate the sample block
+            val sampleBlock = messageTemplate.idOrCode.substring(blockStart, blockEnd)
+                // Remove the iteration wrapper tags
+                .removePrefix(sampleBlockPrefix)
+                .removeSuffix(sampleBlockSuffix)
+
+            // Search for each tag
+            tagRegex.findAll(sampleBlock).forEach { match ->
+                // Parse the field name from the tag (e.g., `{{_source.timestamp}}` becomes `timestamp`)
+                var docField = match.groupValues[1].trim()
+                if (docField.startsWith(sourcePrefix)) {
+                    docField = docField.removePrefix(sourcePrefix)
+                    if (docField.isNotEmpty()) tags.add(docField)
+                }
+            }
+
+            // Identify any subsequent sample blocks
+            blockStart = messageTemplate.idOrCode.indexOf(sampleBlockPrefix, blockEnd)
+            blockEnd = messageTemplate.idOrCode.indexOf(sampleBlockSuffix, blockStart)
+        }
+    } catch (e: Exception) {
+        logger.warn("Failed to parse sample document fields.", e)
+    }
+    return tags
+}
+
+fun parseSampleDocTags(triggers: List<Trigger>): Set<String> {
+    return triggers.flatMap { trigger ->
+        trigger.actions.flatMap { action -> parseSampleDocTags(action.messageTemplate) }
+    }.toSet()
+}
+
+/**
+ * Checks the `message_template.source` in the [Script] for each [Action] in the [Trigger] for
+ * any instances of [AlertContext.SAMPLE_DOCS_FIELD] tags.
+ * This indicates the message is expected to print data from the sample docs, so we need to collect the samples.
+ */
+fun printsSampleDocData(trigger: Trigger): Boolean {
+    return trigger.actions.any { action ->
+        val alertsField = when (trigger) {
+            is BucketLevelTrigger -> "{{ctx.${BucketLevelTriggerExecutionContext.NEW_ALERTS_FIELD}}}"
+            is DocumentLevelTrigger -> "{{ctx.${DocumentLevelTriggerExecutionContext.ALERTS_FIELD}}}"
+            // Only bucket, and document level monitors are supported currently.
+            else -> return false
+        }
+
+        // TODO: Consider excluding the following tags from TRUE criteria (especially for bucket-level triggers) as
+        //  printing all of the sample documents could make the notification message too large to send.
+        //  1. {{ctx}} - prints entire ctx object in the message string
+        //  2. {{ctx.<alertsField>}} - prints entire alerts array in the message string, which includes the sample docs
+        //  3. {{AlertContext.SAMPLE_DOCS_FIELD}} - prints entire sample docs array in the message string
+        val validTags = listOfNotNull(
+            "{{ctx}}",
+            alertsField,
+            AlertContext.SAMPLE_DOCS_FIELD
+        )
+        validTags.any { tag -> action.messageTemplate.idOrCode.contains(tag) }
+    }
 }
