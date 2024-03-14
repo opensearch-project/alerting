@@ -224,6 +224,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     ?.addAll(monitorCtx.alertService!!.convertToCompletedAlerts(keysToAlertsMap))
         }
 
+        // The alertSampleDocs map structure is Map<TriggerId, Map<BucketKeysHash, List<Alert>>>
         val alertSampleDocs = mutableMapOf<String, Map<String, List<Map<String, Any>>>>()
         for (trigger in monitor.triggers) {
             val alertsToUpdate = mutableSetOf<Alert>()
@@ -539,7 +540,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         return if (!bucketKey.isNullOrEmpty() && !sampleDocs.isNullOrEmpty()) {
             AlertContext(alert = alert, sampleDocs = sampleDocs)
         } else {
-            logger.warn(
+            logger.error(
                 "Failed to retrieve sample documents for alert {} from trigger {} of monitor {} during execution {}.",
                 alert.id,
                 alert.triggerId,
@@ -550,6 +551,12 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         }
     }
 
+    /**
+     * Executes the monitor's query with the addition of 2 top_hits aggregations that are used to return the top 5,
+     * and bottom 5 documents for each bucket.
+     *
+     * @return Map<BucketKeysHash, List<Alert>>
+     */
     @Suppress("UNCHECKED_CAST")
     private suspend fun getSampleDocs(
         client: Client,
@@ -558,7 +565,6 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         searchRequest: SearchRequest
     ): Map<String, List<Map<String, Any>>> {
         val sampleDocumentsByBucket = mutableMapOf<String, List<Map<String, Any>>>()
-
         val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
         val aggs = searchResponse.convertToMap().getOrDefault("aggregations", mapOf<String, Any>()) as Map<String, Any>
         val compositeAgg = aggs.getOrDefault("composite_agg", mapOf<String, Any>()) as Map<String, Any>
