@@ -12,6 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
 import org.opensearch.OpenSearchSecurityException
+import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.DocWriteRequest
 import org.opensearch.action.DocWriteResponse
 import org.opensearch.action.admin.indices.get.GetIndexRequest
@@ -28,6 +29,7 @@ import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
@@ -77,35 +79,51 @@ object MonitorMetadataService :
     @Suppress("ComplexMethod", "ReturnCount")
     suspend fun upsertMetadata(metadata: MonitorMetadata, updating: Boolean): MonitorMetadata {
         try {
-            val indexRequest = IndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
-                .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-                .source(metadata.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-                .id(metadata.id)
-                .routing(metadata.monitorId)
-                .setIfSeqNo(metadata.seqNo)
-                .setIfPrimaryTerm(metadata.primaryTerm)
-                .timeout(indexTimeout)
+            if (clusterService.state().routingTable.hasIndex(ScheduledJob.SCHEDULED_JOBS_INDEX)) {
+                val indexRequest = IndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
+                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+                    .source(
+                        metadata.toXContent(
+                            XContentFactory.jsonBuilder(),
+                            ToXContent.MapParams(mapOf("with_type" to "true"))
+                        )
+                    )
+                    .id(metadata.id)
+                    .routing(metadata.monitorId)
+                    .setIfSeqNo(metadata.seqNo)
+                    .setIfPrimaryTerm(metadata.primaryTerm)
+                    .timeout(indexTimeout)
 
-            if (updating) {
-                indexRequest.id(metadata.id).setIfSeqNo(metadata.seqNo).setIfPrimaryTerm(metadata.primaryTerm)
+                if (updating) {
+                    indexRequest.id(metadata.id).setIfSeqNo(metadata.seqNo).setIfPrimaryTerm(metadata.primaryTerm)
+                } else {
+                    indexRequest.opType(DocWriteRequest.OpType.CREATE)
+                }
+                val response: IndexResponse = client.suspendUntil { index(indexRequest, it) }
+                when (response.result) {
+                    DocWriteResponse.Result.DELETED, DocWriteResponse.Result.NOOP, DocWriteResponse.Result.NOT_FOUND, null -> {
+                        val failureReason =
+                            "The upsert metadata call failed with a ${response.result?.lowercase} result"
+                        log.error(failureReason)
+                        throw AlertingException(
+                            failureReason,
+                            RestStatus.INTERNAL_SERVER_ERROR,
+                            IllegalStateException(failureReason)
+                        )
+                    }
+
+                    DocWriteResponse.Result.CREATED, DocWriteResponse.Result.UPDATED -> {
+                        log.debug("Successfully upserted MonitorMetadata:${metadata.id} ")
+                    }
+                }
+                return metadata.copy(
+                    seqNo = response.seqNo,
+                    primaryTerm = response.primaryTerm
+                )
             } else {
-                indexRequest.opType(DocWriteRequest.OpType.CREATE)
+                val failureReason = "Job index ${ScheduledJob.SCHEDULED_JOBS_INDEX} does not exist to update monitor metadata"
+                throw OpenSearchStatusException(failureReason, RestStatus.INTERNAL_SERVER_ERROR)
             }
-            val response: IndexResponse = client.suspendUntil { index(indexRequest, it) }
-            when (response.result) {
-                DocWriteResponse.Result.DELETED, DocWriteResponse.Result.NOOP, DocWriteResponse.Result.NOT_FOUND, null -> {
-                    val failureReason = "The upsert metadata call failed with a ${response.result?.lowercase} result"
-                    log.error(failureReason)
-                    throw AlertingException(failureReason, RestStatus.INTERNAL_SERVER_ERROR, IllegalStateException(failureReason))
-                }
-                DocWriteResponse.Result.CREATED, DocWriteResponse.Result.UPDATED -> {
-                    log.debug("Successfully upserted MonitorMetadata:${metadata.id} ")
-                }
-            }
-            return metadata.copy(
-                seqNo = response.seqNo,
-                primaryTerm = response.primaryTerm
-            )
         } catch (e: Exception) {
             throw AlertingException.wrap(e)
         }
@@ -216,11 +234,19 @@ object MonitorMetadataService :
         val lastRunContext = existingRunContext?.toMutableMap() ?: mutableMapOf()
         try {
             if (index == null) return mutableMapOf()
-            val getIndexRequest = GetIndexRequest().indices(index)
-            val getIndexResponse: GetIndexResponse = client.suspendUntil {
-                client.admin().indices().getIndex(getIndexRequest, it)
+
+            val indices = mutableListOf<String>()
+            if (IndexUtils.isAlias(index, clusterService.state()) ||
+                IndexUtils.isDataStream(index, clusterService.state())
+            ) {
+                IndexUtils.getWriteIndex(index, clusterService.state())?.let { indices.add(it) }
+            } else {
+                val getIndexRequest = GetIndexRequest().indices(index)
+                val getIndexResponse: GetIndexResponse = client.suspendUntil {
+                    client.admin().indices().getIndex(getIndexRequest, it)
+                }
+                indices.addAll(getIndexResponse.indices())
             }
-            val indices = getIndexResponse.indices()
 
             indices.forEach { indexName ->
                 if (!lastRunContext.containsKey(indexName)) {

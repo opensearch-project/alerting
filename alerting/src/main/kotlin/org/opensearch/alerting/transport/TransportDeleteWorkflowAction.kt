@@ -24,6 +24,8 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
+import org.opensearch.alerting.core.lock.LockModel
+import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.WorkflowMetadata
 import org.opensearch.alerting.opensearchapi.addFilter
@@ -73,6 +75,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
     val clusterService: ClusterService,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry,
+    val lockService: LockService
 ) : HandledTransportAction<ActionRequest, DeleteWorkflowResponse>(
     AlertingActions.DELETE_WORKFLOW_ACTION_NAME, transportService, actionFilters, ::DeleteWorkflowRequest
 ),
@@ -179,6 +182,12 @@ class TransportDeleteWorkflowAction @Inject constructor(
                         }
                     } catch (t: Exception) {
                         log.error("Failed to delete delegate monitor metadata. But proceeding with workflow deletion $workflowId", t)
+                    }
+                    try {
+                        // Delete the workflow lock
+                        client.suspendUntil<Client, Boolean> { lockService.deleteLock(LockModel.generateLockId(workflowId), it) }
+                    } catch (t: Exception) {
+                        log.error("Failed to delete workflow lock for $workflowId")
                     }
                     actionListener.onResponse(deleteWorkflowResponse)
                 } else {
