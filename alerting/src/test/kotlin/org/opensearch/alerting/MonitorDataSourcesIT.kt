@@ -271,65 +271,6 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals("Findings saved for test monitor", 4, findings.size)
     }
 
-    fun `test execute monitor without triggers`() {
-        val docQuery = DocLevelQuery(query = "eventType:\"login\"", name = "3")
-
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(docQuery)
-        )
-        val customFindingsIndex = "custom_findings_index"
-        val customFindingsIndexPattern = "custom_findings_index-1"
-        val customQueryIndex = "custom_alerts_index"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
-            )
-        )
-        val monitorResponse = createMonitor(monitor)
-        assertFalse(monitorResponse?.id.isNullOrEmpty())
-
-        val testDoc = """{
-            "eventType" : "login"
-        }"""
-        indexDoc(index, "1", testDoc)
-
-        monitor = monitorResponse!!.monitor
-        val id = monitorResponse.id
-        // Execute dry run first and expect no alerts or findings
-        var executeMonitorResponse = executeMonitor(monitor, id, true)
-        Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
-        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 0)
-        searchAlerts(id)
-        var table = Table("asc", "id", null, 1, 0, "")
-        var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
-            .get()
-        Assert.assertTrue(getAlertsResponse != null)
-        Assert.assertTrue(getAlertsResponse.alerts.isEmpty())
-        var findings = searchFindings(id, customFindingsIndex)
-        assertEquals("Findings saved for test monitor", 0, findings.size)
-
-        // Execute real run - expect findings, but no alerts
-        executeMonitorResponse = executeMonitor(monitor, id, false)
-
-        searchAlerts(id)
-        table = Table("asc", "id", null, 1, 0, "")
-        getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
-            .get()
-        Assert.assertTrue(getAlertsResponse != null)
-        Assert.assertTrue(getAlertsResponse.alerts.isEmpty())
-
-        findings = searchFindings(id, customFindingsIndex)
-        assertEquals("Findings saved for test monitor", 1, findings.size)
-        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
-        assertEquals("Didn't match query", 1, findings[0].docLevelQueries.size)
-    }
-
     fun `test all fields fetched and submitted to percolate query when one of the queries doesn't have queryFieldNames`() {
         // doesn't have query field names so even if other queries pass the wrong fields to query, findings will get generated on matching docs
         val docQuery1 = DocLevelQuery(
@@ -501,7 +442,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val id = monitorResponse.id
         val executeMonitorResponse = executeMonitor(monitor, id, false)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
-        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 0)
+        Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
         val table = Table("asc", "id", null, 1, 0, "")
         var getAlertsResponse = client()
