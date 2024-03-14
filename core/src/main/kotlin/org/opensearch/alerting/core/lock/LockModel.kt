@@ -5,11 +5,11 @@
 
 package org.opensearch.alerting.core.lock
 
+import org.opensearch.common.xcontent.XContentParserUtils
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.ToXContentObject
 import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.core.xcontent.XContentParser
-import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.seqno.SequenceNumbers
 import java.io.IOException
 import java.time.Instant

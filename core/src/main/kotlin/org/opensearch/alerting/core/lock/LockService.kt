@@ -2,6 +2,7 @@ package org.opensearch.alerting.core.lock
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ResourceAlreadyExistsException
+import org.opensearch.action.ActionListener
 import org.opensearch.action.DocWriteResponse
 import org.opensearch.action.admin.indices.create.CreateIndexRequest
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
@@ -20,7 +21,6 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ScheduledJob
-import org.opensearch.core.action.ActionListener
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.index.IndexNotFoundException
