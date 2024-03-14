@@ -13,10 +13,12 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.model.ActionRunResult
+import org.opensearch.alerting.model.AlertContext
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
+import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.opensearchapi.withClosableContext
@@ -25,7 +27,9 @@ import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.alerting.util.getCombinedTriggerRunResult
+import org.opensearch.alerting.util.printsSampleDocData
 import org.opensearch.alerting.workflow.WorkflowRunContext
+import org.opensearch.client.Client
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Alert
@@ -220,6 +224,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     ?.addAll(monitorCtx.alertService!!.convertToCompletedAlerts(keysToAlertsMap))
         }
 
+        // The alertSampleDocs map structure is Map<TriggerId, Map<BucketKeysHash, List<Alert>>>
+        val alertSampleDocs = mutableMapOf<String, Map<String, List<Map<String, Any>>>>()
         for (trigger in monitor.triggers) {
             val alertsToUpdate = mutableSetOf<Alert>()
             val completedAlertsToUpdate = mutableSetOf<Alert>()
@@ -230,6 +236,32 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 ?: mutableListOf()
             // Update nextAlerts so the filtered DEDUPED Alerts are reflected for PER_ALERT Action execution
             nextAlerts[trigger.id]?.set(AlertCategory.DEDUPED, dedupedAlerts)
+
+            // Only collect sample docs for triggered triggers, and only when at least 1 action prints sample doc data.
+            val isTriggered = !nextAlerts[trigger.id]?.get(AlertCategory.NEW).isNullOrEmpty()
+            if (isTriggered && printsSampleDocData(trigger)) {
+                try {
+                    val searchRequest = monitorCtx.inputService!!.getSearchRequest(
+                        monitor = monitor.copy(triggers = listOf(trigger)),
+                        searchInput = monitor.inputs[0] as SearchInput,
+                        periodStart = periodStart,
+                        periodEnd = periodEnd,
+                        prevResult = monitorResult.inputResults,
+                        matchingDocIdsPerIndex = null,
+                        returnSampleDocs = true
+                    )
+                    val sampleDocumentsByBucket = getSampleDocs(
+                        client = monitorCtx.client!!,
+                        monitorId = monitor.id,
+                        triggerId = trigger.id,
+                        searchRequest = searchRequest
+                    )
+                    alertSampleDocs[trigger.id] = sampleDocumentsByBucket
+                } catch (e: Exception) {
+                    logger.error("Error retrieving sample documents for trigger {} of monitor {}.", trigger.id, monitor.id, e)
+                }
+            }
+
             val newAlerts = nextAlerts[trigger.id]?.get(AlertCategory.NEW) ?: mutableListOf()
             val completedAlerts = nextAlerts[trigger.id]?.get(AlertCategory.COMPLETED) ?: mutableListOf()
 
@@ -255,8 +287,11 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     for (alertCategory in actionExecutionScope.actionableAlerts) {
                         val alertsToExecuteActionsFor = nextAlerts[trigger.id]?.get(alertCategory) ?: mutableListOf()
                         for (alert in alertsToExecuteActionsFor) {
+                            val alertContext = if (alertCategory != AlertCategory.NEW) AlertContext(alert = alert)
+                            else getAlertContext(alert = alert, alertSampleDocs = alertSampleDocs)
+
                             val actionCtx = getActionContextForAlertCategory(
-                                alertCategory, alert, triggerCtx, monitorOrTriggerError
+                                alertCategory, alertContext, triggerCtx, monitorOrTriggerError
                             )
                             // AggregationResultBucket should not be null here
                             val alertBucketKeysHash = alert.aggregationResultBucket!!.getBucketKeysHash()
@@ -287,7 +322,9 @@ object BucketLevelMonitorRunner : MonitorRunner() {
 
                     val actionCtx = triggerCtx.copy(
                         dedupedAlerts = dedupedAlerts,
-                        newAlerts = newAlerts,
+                        newAlerts = newAlerts.map {
+                            getAlertContext(alert = it, alertSampleDocs = alertSampleDocs)
+                        },
                         completedAlerts = completedAlerts,
                         error = monitorResult.error ?: triggerResult.error
                     )
@@ -480,17 +517,93 @@ object BucketLevelMonitorRunner : MonitorRunner() {
 
     private fun getActionContextForAlertCategory(
         alertCategory: AlertCategory,
-        alert: Alert,
+        alertContext: AlertContext,
         ctx: BucketLevelTriggerExecutionContext,
         error: Exception?
     ): BucketLevelTriggerExecutionContext {
         return when (alertCategory) {
             AlertCategory.DEDUPED ->
-                ctx.copy(dedupedAlerts = listOf(alert), newAlerts = emptyList(), completedAlerts = emptyList(), error = error)
+                ctx.copy(dedupedAlerts = listOf(alertContext.alert), newAlerts = emptyList(), completedAlerts = emptyList(), error = error)
             AlertCategory.NEW ->
-                ctx.copy(dedupedAlerts = emptyList(), newAlerts = listOf(alert), completedAlerts = emptyList(), error = error)
+                ctx.copy(dedupedAlerts = emptyList(), newAlerts = listOf(alertContext), completedAlerts = emptyList(), error = error)
             AlertCategory.COMPLETED ->
-                ctx.copy(dedupedAlerts = emptyList(), newAlerts = emptyList(), completedAlerts = listOf(alert), error = error)
+                ctx.copy(dedupedAlerts = emptyList(), newAlerts = emptyList(), completedAlerts = listOf(alertContext.alert), error = error)
         }
+    }
+
+    private fun getAlertContext(
+        alert: Alert,
+        alertSampleDocs: Map<String, Map<String, List<Map<String, Any>>>>
+    ): AlertContext {
+        val bucketKey = alert.aggregationResultBucket?.getBucketKeysHash()
+        val sampleDocs = alertSampleDocs[alert.triggerId]?.get(bucketKey)
+        return if (!bucketKey.isNullOrEmpty() && !sampleDocs.isNullOrEmpty()) {
+            AlertContext(alert = alert, sampleDocs = sampleDocs)
+        } else {
+            logger.error(
+                "Failed to retrieve sample documents for alert {} from trigger {} of monitor {} during execution {}.",
+                alert.id,
+                alert.triggerId,
+                alert.monitorId,
+                alert.executionId
+            )
+            AlertContext(alert = alert, sampleDocs = listOf())
+        }
+    }
+
+    /**
+     * Executes the monitor's query with the addition of 2 top_hits aggregations that are used to return the top 5,
+     * and bottom 5 documents for each bucket.
+     *
+     * @return Map<BucketKeysHash, List<Alert>>
+     */
+    @Suppress("UNCHECKED_CAST")
+    private suspend fun getSampleDocs(
+        client: Client,
+        monitorId: String,
+        triggerId: String,
+        searchRequest: SearchRequest
+    ): Map<String, List<Map<String, Any>>> {
+        val sampleDocumentsByBucket = mutableMapOf<String, List<Map<String, Any>>>()
+        val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
+        val aggs = searchResponse.convertToMap().getOrDefault("aggregations", mapOf<String, Any>()) as Map<String, Any>
+        val compositeAgg = aggs.getOrDefault("composite_agg", mapOf<String, Any>()) as Map<String, Any>
+        val buckets = compositeAgg.getOrDefault("buckets", emptyList<Map<String, Any>>()) as List<Map<String, Any>>
+
+        buckets.forEach { bucket ->
+            val bucketKey = getBucketKeysHash((bucket.getOrDefault("key", mapOf<String, String>()) as Map<String, String>).values.toList())
+            if (bucketKey.isEmpty()) throw IllegalStateException("Cannot format bucket keys.")
+
+            val unwrappedTopHits = (bucket.getOrDefault("top_hits", mapOf<String, Any>()) as Map<String, Any>)
+                .getOrDefault("hits", mapOf<String, Any>()) as Map<String, Any>
+            val topHits = unwrappedTopHits.getOrDefault("hits", listOf<Map<String, Any>>()) as List<Map<String, Any>>
+
+            val unwrappedLowHits = (bucket.getOrDefault("low_hits", mapOf<String, Any>()) as Map<String, Any>)
+                .getOrDefault("hits", mapOf<String, Any>()) as Map<String, Any>
+            val lowHits = unwrappedLowHits.getOrDefault("hits", listOf<Map<String, Any>>()) as List<Map<String, Any>>
+
+            // Reversing the order of lowHits so allHits will be in descending order.
+            val allHits = topHits + lowHits.reversed()
+
+            if (allHits.isEmpty()) {
+                // We expect sample documents to be available for each bucket.
+                logger.error("Sample documents not found for trigger {} of monitor {}.", triggerId, monitorId)
+            }
+
+            // Removing duplicate hits. The top_hits, and low_hits results return a max of 5 docs each.
+            // The same document could be present in both hit lists if there are fewer than 10 documents in the bucket of data.
+            val uniqueHitIds = mutableSetOf<String>()
+            val dedupedHits = mutableListOf<Map<String, Any>>()
+            allHits.forEach { hit ->
+                val hitId = hit["_id"] as String
+                if (!uniqueHitIds.contains(hitId)) {
+                    uniqueHitIds.add(hitId)
+                    dedupedHits.add(hit)
+                }
+            }
+            sampleDocumentsByBucket[bucketKey] = dedupedHits
+        }
+
+        return sampleDocumentsByBucket
     }
 }

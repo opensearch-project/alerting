@@ -8,15 +8,20 @@ package org.opensearch.alerting.util
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.TriggerAfterKey
+import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.search.aggregations.AggregationBuilder
+import org.opensearch.search.aggregations.AggregationBuilders
 import org.opensearch.search.aggregations.AggregatorFactories
 import org.opensearch.search.aggregations.bucket.SingleBucketAggregation
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregation
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
+import org.opensearch.search.aggregations.metrics.TopHitsAggregationBuilder
 import org.opensearch.search.aggregations.support.AggregationPath
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.search.fetch.subphase.FetchSourceContext
+import org.opensearch.search.sort.SortOrder
 
 class AggregationQueryRewriter {
 
@@ -26,10 +31,23 @@ class AggregationQueryRewriter {
          * for each trigger.
          */
         fun rewriteQuery(query: SearchSourceBuilder, prevResult: InputRunResults?, triggers: List<Trigger>): SearchSourceBuilder {
+            return rewriteQuery(query, prevResult, triggers, false)
+        }
+
+        /**
+         * Optionally adds support for returning sample documents for each bucket of data returned for a bucket level monitor.
+         */
+        fun rewriteQuery(
+            query: SearchSourceBuilder,
+            prevResult: InputRunResults?,
+            triggers: List<Trigger>,
+            returnSampleDocs: Boolean = false
+        ): SearchSourceBuilder {
             triggers.forEach { trigger ->
                 if (trigger is BucketLevelTrigger) {
                     // add bucket selector pipeline aggregation for each trigger in query
                     query.aggregation(trigger.bucketSelector)
+
                     // if this request is processing the subsequent pages of input query result, then add after key
                     if (prevResult?.aggTriggersAfterKey?.get(trigger.id) != null) {
                         val parentBucketPath = AggregationPath.parse(trigger.bucketSelector.parentBucketPath)
@@ -48,11 +66,29 @@ class AggregationQueryRewriter {
                                 throw IllegalArgumentException("ParentBucketPath: $parentBucketPath not found in input query results")
                             }
                         }
+
                         if (factory is CompositeAggregationBuilder) {
-                            // if the afterKey from previous result is null, what does it signify?
-                            // A) result set exhausted OR  B) first page ?
-                            val afterKey = prevResult.aggTriggersAfterKey[trigger.id]!!.afterKey
-                            factory.aggregateAfter(afterKey)
+                            if (returnSampleDocs) {
+                                // TODO: Returning sample documents should ideally be a toggleable option at the action level.
+                                //  For now, identify which fields to return from the doc _source for the trigger's actions.
+                                val docFieldTags = parseSampleDocTags(listOf(trigger))
+                                val sampleDocsAgg = getSampleDocAggs(factory)
+                                sampleDocsAgg.forEach { agg ->
+                                    if (docFieldTags.isNotEmpty()) agg.fetchSource(
+                                        FetchSourceContext(
+                                            true,
+                                            docFieldTags.toTypedArray(),
+                                            emptyArray()
+                                        )
+                                    )
+                                    if (!factory.subAggregations.contains(agg)) factory.subAggregation(agg)
+                                }
+                            } else {
+                                // if the afterKey from previous result is null, what does it signify?
+                                // A) result set exhausted OR  B) first page ?
+                                val afterKey = prevResult.aggTriggersAfterKey[trigger.id]!!.afterKey
+                                factory.aggregateAfter(afterKey)
+                            }
                         } else {
                             throw IllegalStateException("AfterKeys are not expected to be present in non CompositeAggregationBuilder")
                         }
@@ -109,6 +145,26 @@ class AggregationQueryRewriter {
                 }
             }
             return bucketLevelTriggerAfterKeys
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        private fun getSampleDocAggs(factory: CompositeAggregationBuilder): List<TopHitsAggregationBuilder> {
+            var defaultSortFields = listOf("_score")
+            val aggregations = factory.subAggregations.flatMap {
+                (it.convertToMap()[it.name] as Map<String, Any>).values.flatMap { field ->
+                    field as Map<String, String>
+                    field.values
+                }
+            }
+            if (aggregations.isNotEmpty()) defaultSortFields = aggregations
+
+            val lowHitsAgg = AggregationBuilders.topHits("low_hits").size(5)
+            val topHitsAgg = AggregationBuilders.topHits("top_hits").size(5)
+            defaultSortFields.forEach {
+                lowHitsAgg.sort(it, SortOrder.ASC)
+                topHitsAgg.sort(it, SortOrder.DESC)
+            }
+            return listOf(lowHitsAgg, topHitsAgg)
         }
     }
 }
