@@ -39,6 +39,7 @@ import org.opensearch.commons.alerting.model.FindingWithDocs
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.Strings
+import org.opensearch.core.common.io.stream.NamedWriteableRegistry
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
@@ -61,7 +62,8 @@ class TransportGetFindingsSearchAction @Inject constructor(
     clusterService: ClusterService,
     actionFilters: ActionFilters,
     val settings: Settings,
-    val xContentRegistry: NamedXContentRegistry
+    val xContentRegistry: NamedXContentRegistry,
+    val namedWriteableRegistry: NamedWriteableRegistry
 ) : HandledTransportAction<ActionRequest, GetFindingsResponse> (
     AlertingActions.GET_FINDINGS_ACTION_NAME,
     transportService,
@@ -82,11 +84,8 @@ class TransportGetFindingsSearchAction @Inject constructor(
         actionListener: ActionListener<GetFindingsResponse>
     ) {
         val getFindingsRequest = request as? GetFindingsRequest
-            ?: recreateObject(request) { GetFindingsRequest(it) }
+            ?: recreateObject(request, namedWriteableRegistry) { GetFindingsRequest(it) }
         val tableProp = getFindingsRequest.table
-        val severity = getFindingsRequest.severity
-        val detectionType = getFindingsRequest.detectionType
-        val searchString = tableProp.searchString
 
         val sortBuilder = SortBuilders
             .fieldSort(tableProp.sortString)
@@ -103,78 +102,15 @@ class TransportGetFindingsSearchAction @Inject constructor(
             .seqNoAndPrimaryTerm(true)
             .version(true)
 
-        val queryBuilder = QueryBuilders.boolQuery()
+        val queryBuilder = getFindingsRequest.boolQueryBuilder ?: QueryBuilders.boolQuery()
 
         if (!getFindingsRequest.findingId.isNullOrBlank()) {
             queryBuilder.filter(QueryBuilders.termQuery("_id", getFindingsRequest.findingId))
         }
-
-        if (!getFindingsRequest.findingIds.isNullOrEmpty()) {
-            queryBuilder.filter(QueryBuilders.termsQuery("id", getFindingsRequest.findingIds))
-        }
-
         if (getFindingsRequest.monitorId != null) {
             queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getFindingsRequest.monitorId))
         } else if (getFindingsRequest.monitorIds.isNullOrEmpty() == false) {
             queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getFindingsRequest.monitorIds))
-        }
-
-        if (getFindingsRequest.startTime != null && getFindingsRequest.endTime != null) {
-            val startTime = getFindingsRequest.startTime!!.toEpochMilli()
-            val endTime = getFindingsRequest.endTime!!.toEpochMilli()
-            val timeRangeQuery = QueryBuilders.rangeQuery("timestamp")
-                .from(startTime) // Greater than or equal to start time
-                .to(endTime) // Less than or equal to end time
-            queryBuilder.filter(timeRangeQuery)
-        }
-
-        if (!detectionType.isNullOrBlank()) {
-            val nestedQueryBuilder = QueryBuilders.nestedQuery(
-                "queries",
-                when {
-                    detectionType.equals("threat", ignoreCase = true) -> {
-                        QueryBuilders.boolQuery().filter(
-                            QueryBuilders.prefixQuery("queries.id", "threat_intel_")
-                        )
-                    }
-                    else -> {
-                        QueryBuilders.boolQuery().mustNot(
-                            QueryBuilders.prefixQuery("queries.id", "threat_intel_")
-                        )
-                    }
-                },
-                ScoreMode.None
-            )
-
-            // Add the nestedQueryBuilder to the main queryBuilder
-            queryBuilder.must(nestedQueryBuilder)
-        }
-
-        if (!searchString.isNullOrBlank()) {
-            queryBuilder
-                .should(QueryBuilders.matchQuery("index", searchString))
-                .should(
-                    QueryBuilders.nestedQuery(
-                        "queries",
-                        QueryBuilders.matchQuery("queries.tags", searchString),
-                        ScoreMode.None
-                    )
-                )
-                .should(QueryBuilders.regexpQuery("monitor_name", searchString + ".*"))
-                .minimumShouldMatch(1)
-        }
-
-        if (!severity.isNullOrBlank()) {
-            queryBuilder
-                .must(
-                    QueryBuilders.nestedQuery(
-                        "queries",
-                        QueryBuilders.boolQuery().should(
-                            QueryBuilders.matchQuery("queries.tags", severity)
-                        ),
-                        ScoreMode.None
-                    )
-                )
         }
 
         if (!tableProp.searchString.isNullOrBlank()) {
