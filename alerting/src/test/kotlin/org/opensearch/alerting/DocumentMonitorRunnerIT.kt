@@ -88,7 +88,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val index = createTestIndex()
 
         val docQuery =
-            DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf(), queryFieldNames = listOf("test_field"))
+            DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", queryFieldNames = listOf("test_field"))
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
 
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
@@ -136,7 +136,6 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val docQuery = DocLevelQuery(
             query = "test_field:\"us-west-2\"",
             name = "3",
-            fields = listOf(),
             queryFieldNames = listOf("wrong_field")
         )
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
@@ -186,7 +185,6 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val docQuery = DocLevelQuery(
             query = "test_field:\"us-west-2\"",
             name = "3",
-            fields = listOf(),
             queryFieldNames = listOf("wrong_field")
         )
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))

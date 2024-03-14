@@ -371,46 +371,39 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         // doesn't have query field names so even if other queries pass the wrong fields to query, findings will get generated on matching docs
         val docQuery1 = DocLevelQuery(
             query = "source.ip.v6.v1:12345",
-            name = "3",
-            fields = listOf()
+            name = "3"
         )
         val docQuery2 = DocLevelQuery(
             query = "source.ip.v6.v2:16645",
             name = "4",
-            fields = listOf(),
             queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1")
         )
         val docQuery3 = DocLevelQuery(
             query = "source.ip.v4.v0:120",
             name = "5",
-            fields = listOf(),
             queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1")
         )
         val docQuery4 =
             DocLevelQuery(
                 query = "alias.some.fff:\"us-west-2\"",
                 name = "6",
-                fields = listOf(),
                 queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1")
             )
         val docQuery5 = DocLevelQuery(
             query = "message:\"This is an error from IAD region\"",
             name = "7",
-            queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1"),
-            fields = listOf()
+            queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1")
         )
         val docQuery6 =
             DocLevelQuery(
                 query = "type.subtype:\"some subtype\"",
                 name = "8",
-                fields = listOf(),
                 queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1")
             )
         val docQuery7 =
             DocLevelQuery(
                 query = "supertype.type:\"some type\"",
                 name = "9",
-                fields = listOf(),
                 queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1")
             )
         val docLevelInput = DocLevelMonitorInput(
@@ -471,46 +464,39 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docQuery1 = DocLevelQuery(
             query = "source.ip.v6.v1:12345",
             name = "3",
-            fields = listOf(),
             queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1")
         )
         val docQuery2 = DocLevelQuery(
             query = "source.ip.v6.v2:16645",
             name = "4",
-            fields = listOf(),
             queryFieldNames = listOf("source.ip.v6.v2")
         )
         val docQuery3 = DocLevelQuery(
             query = "source.ip.v4.v0:120",
             name = "5",
-            fields = listOf(),
             queryFieldNames = listOf("source.ip.v6.v4")
         )
         val docQuery4 =
             DocLevelQuery(
                 query = "alias.some.fff:\"us-west-2\"",
                 name = "6",
-                fields = listOf(),
                 queryFieldNames = listOf("alias.some.fff")
             )
         val docQuery5 = DocLevelQuery(
             query = "message:\"This is an error from IAD region\"",
             name = "7",
             queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1"),
-            fields = listOf()
         )
         val docQuery6 =
             DocLevelQuery(
                 query = "type.subtype:\"some subtype\"",
                 name = "8",
-                fields = listOf(),
                 queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1")
             )
         val docQuery7 =
             DocLevelQuery(
                 query = "supertype.type:\"some type\"",
                 name = "9",
-                fields = listOf(),
                 queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1")
             )
         val docLevelInput = DocLevelMonitorInput(
