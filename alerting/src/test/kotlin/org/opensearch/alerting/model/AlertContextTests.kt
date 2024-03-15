@@ -382,7 +382,6 @@ class AlertContextTests : OpenSearchTestCase() {
         assertEquals("Template args start time does not", alertContext.alert.startTime.toEpochMilli(), templateArgs[Alert.START_TIME_FIELD])
         assertEquals("Template args last notification time does not match", templateArgs[Alert.LAST_NOTIFICATION_TIME_FIELD], null)
         assertEquals("Template args severity does not match", alertContext.alert.severity, templateArgs[Alert.SEVERITY_FIELD])
-
     }
 
     private fun formatAssociatedQueries(alertContext: AlertContext): List<Map<String, Any>>? {
