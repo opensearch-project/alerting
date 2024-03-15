@@ -9,6 +9,7 @@ import junit.framework.TestCase.assertNull
 import org.apache.http.Header
 import org.apache.http.HttpEntity
 import org.opensearch.alerting.model.ActionRunResult
+import org.opensearch.alerting.model.AlertContext
 import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.InputRunResults
@@ -793,5 +794,24 @@ fun randomChainedAlertTrigger(
         actions = if (actions.isEmpty() && destinationId.isNotBlank()) {
             (0..randomInt(10)).map { randomAction(destinationId = destinationId) }
         } else actions
+    )
+}
+
+fun randomAlertContext(
+    alert: Alert = randomAlert(),
+    associatedQueries: List<DocLevelQuery>? = (-1..2).random().takeIf { it != -1 }?.let {
+        (0..it).map { randomDocLevelQuery() }
+    },
+    sampleDocs: List<Map<String, Any?>>? = (-1..2).random().takeIf { it != -1 }?.let {
+        (0..it).map {
+            // Using 'randomFinding' to mimic documents in an index.
+            randomFinding().asTemplateArg()
+        }
+    }
+): AlertContext {
+    return AlertContext(
+        alert = alert,
+        associatedQueries = associatedQueries,
+        sampleDocs = sampleDocs
     )
 }

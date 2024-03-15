@@ -13,22 +13,28 @@ import org.opensearch.action.admin.indices.refresh.RefreshAction
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
 import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
+import org.opensearch.action.get.MultiGetItemResponse
+import org.opensearch.action.get.MultiGetRequest
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchAction
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
+import org.opensearch.alerting.model.AlertContext
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.IndexExecutionContext
 import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.userErrorMessage
+import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
+import org.opensearch.alerting.util.parseSampleDocTags
+import org.opensearch.alerting.util.printsSampleDocData
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.metadata.IndexMetadata
@@ -64,6 +70,7 @@ import org.opensearch.percolator.PercolateQueryBuilderExt
 import org.opensearch.search.SearchHit
 import org.opensearch.search.SearchHits
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.search.sort.SortOrder
 import java.io.IOException
 import java.time.Instant
@@ -83,6 +90,9 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             * Docs are fetched from the source index per shard and transformed.*/
     val transformedDocs = mutableListOf<Pair<String, TransformedDocDto>>()
 
+    // Maps a finding ID to the related document.
+    private val findingIdToDocSource = mutableMapOf<String, MultiGetItemResponse>()
+
     override suspend fun runMonitor(
         monitor: Monitor,
         monitorCtx: MonitorRunnerExecutionContext,
@@ -95,6 +105,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         logger.debug("Document-level-monitor is running ...")
         val isTempMonitor = dryrun || monitor.id == Monitor.NO_ID
         var monitorResult = MonitorRunResult<DocumentLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
+        monitorCtx.findingsToTriggeredQueries = mutableMapOf()
 
         try {
             monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor.dataSources)
@@ -455,7 +466,15 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             error = monitorResult.error ?: triggerResult.error
         )
 
+        if (printsSampleDocData(trigger) && triggerFindingDocPairs.isNotEmpty())
+            getDocSources(
+                findingToDocPairs = findingToDocPairs,
+                monitorCtx = monitorCtx,
+                monitor = monitor
+            )
+
         val alerts = mutableListOf<Alert>()
+        val alertContexts = mutableListOf<AlertContext>()
         triggerFindingDocPairs.forEach {
             val alert = monitorCtx.alertService!!.composeDocLevelAlert(
                 listOf(it.first),
@@ -466,6 +485,18 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                 workflorwRunContext = workflowRunContext
             )
             alerts.add(alert)
+
+            val docSource = findingIdToDocSource[alert.findingIds.first()]?.response?.convertToMap()
+
+            alertContexts.add(
+                AlertContext(
+                    alert = alert,
+                    associatedQueries = alert.findingIds.flatMap { findingId ->
+                        monitorCtx.findingsToTriggeredQueries?.getOrDefault(findingId, emptyList()) ?: emptyList()
+                    },
+                    sampleDocs = listOfNotNull(docSource)
+                )
+            )
         }
 
         val shouldDefaultToPerExecution = defaultToPerExecutionAction(
@@ -479,13 +510,13 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         for (action in trigger.actions) {
             val actionExecutionScope = action.getActionExecutionPolicy(monitor)!!.actionExecutionScope
             if (actionExecutionScope is PerAlertActionScope && !shouldDefaultToPerExecution) {
-                for (alert in alerts) {
-                    val actionResults = this.runAction(action, actionCtx.copy(alerts = listOf(alert)), monitorCtx, monitor, dryrun)
-                    triggerResult.actionResultsMap.getOrPut(alert.id) { mutableMapOf() }
-                    triggerResult.actionResultsMap[alert.id]?.set(action.id, actionResults)
+                for (alertContext in alertContexts) {
+                    val actionResults = this.runAction(action, actionCtx.copy(alerts = listOf(alertContext)), monitorCtx, monitor, dryrun)
+                    triggerResult.actionResultsMap.getOrPut(alertContext.alert.id) { mutableMapOf() }
+                    triggerResult.actionResultsMap[alertContext.alert.id]?.set(action.id, actionResults)
                 }
-            } else if (alerts.isNotEmpty()) {
-                val actionResults = this.runAction(action, actionCtx.copy(alerts = alerts), monitorCtx, monitor, dryrun)
+            } else if (alertContexts.isNotEmpty()) {
+                val actionResults = this.runAction(action, actionCtx.copy(alerts = alertContexts), monitorCtx, monitor, dryrun)
                 for (alert in alerts) {
                     triggerResult.actionResultsMap.getOrPut(alert.id) { mutableMapOf() }
                     triggerResult.actionResultsMap[alert.id]?.set(action.id, actionResults)
@@ -532,6 +563,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         val findingDocPairs = mutableListOf<Pair<String, String>>()
         val findings = mutableListOf<Finding>()
         val indexRequests = mutableListOf<IndexRequest>()
+        val findingsToTriggeredQueries = mutableMapOf<String, List<DocLevelQuery>>()
 
         docsToQueries.forEach {
             val triggeredQueries = it.value.map { queryId -> idQueryMap[queryId]!! }
@@ -552,6 +584,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             )
             findingDocPairs.add(Pair(finding.id, it.key))
             findings.add(finding)
+            findingsToTriggeredQueries[finding.id] = triggeredQueries
 
             val findingStr =
                 finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS)
@@ -578,6 +611,10 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             // suppress exception
             logger.error("Optional finding callback failed", e)
         }
+
+        if (monitorCtx.findingsToTriggeredQueries == null) monitorCtx.findingsToTriggeredQueries = findingsToTriggeredQueries
+        else monitorCtx.findingsToTriggeredQueries = monitorCtx.findingsToTriggeredQueries!! + findingsToTriggeredQueries
+
         return findingDocPairs
     }
 
@@ -1045,6 +1082,40 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
     private fun isInMemoryNumDocsExceedingMaxDocsPerPercolateQueryLimit(numDocs: Int, monitorCtx: MonitorRunnerExecutionContext): Boolean {
         var maxNumDocsThreshold = monitorCtx.percQueryMaxNumDocsInMemory
         return numDocs >= maxNumDocsThreshold
+    }
+
+    /**
+     * Performs an mGet request to retrieve the documents associated with findings.
+     *
+     * When possible, this will only retrieve the document fields that are specifically
+     * referenced for printing in the mustache template.
+     */
+    private suspend fun getDocSources(
+        findingToDocPairs: List<Pair<String, String>>,
+        monitorCtx: MonitorRunnerExecutionContext,
+        monitor: Monitor
+    ) {
+        val docFieldTags = parseSampleDocTags(monitor.triggers)
+        val request = MultiGetRequest()
+
+        // Perform mGet request in batches.
+        findingToDocPairs.chunked(monitorCtx.findingsIndexBatchSize).forEach { batch ->
+            batch.forEach { (findingId, docIdAndIndex) ->
+                val docIdAndIndexSplit = docIdAndIndex.split("|")
+                val docId = docIdAndIndexSplit[0]
+                val concreteIndex = docIdAndIndexSplit[1]
+                if (findingId.isNotEmpty() && docId.isNotEmpty() && concreteIndex.isNotEmpty()) {
+                    val docItem = MultiGetRequest.Item(concreteIndex, docId)
+                    if (docFieldTags.isNotEmpty())
+                        docItem.fetchSourceContext(FetchSourceContext(true, docFieldTags.toTypedArray(), emptyArray()))
+                    request.add(docItem)
+                }
+                val response = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.multiGet(request, it) }
+                response.responses.forEach { item ->
+                    findingIdToDocSource[findingId] = item
+                }
+            }
+        }
     }
 
     /**

@@ -47,6 +47,7 @@ import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
 import org.opensearch.search.aggregations.metrics.CardinalityAggregationBuilder
 import org.opensearch.search.aggregations.support.MultiTermsValuesSourceConfig
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.test.OpenSearchTestCase
 import java.net.URLEncoder
 import java.time.Instant
 import java.time.ZonedDateTime
@@ -55,6 +56,7 @@ import java.time.temporal.ChronoUnit
 import java.time.temporal.ChronoUnit.DAYS
 import java.time.temporal.ChronoUnit.MILLIS
 import java.time.temporal.ChronoUnit.MINUTES
+import java.util.concurrent.TimeUnit
 import kotlin.collections.HashMap
 
 class MonitorRunnerServiceIT : AlertingRestTestCase() {
@@ -1930,6 +1932,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 mutableMapOf(Pair(actionThrottleEnabled.id, 0), Pair(actionThrottleNotEnabled.id, 0))
             )
             assertEquals(notThrottledActionResults.size, 2)
+
             // Save the lastExecutionTimes of the actions for the Alert to be compared later against
             // the next Monitor execution run
             previousAlertExecutionTime[it.id] = mutableMapOf()
@@ -1973,6 +1976,88 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 "Last execution time of a non-throttled action was not updated for one of the Alerts",
                 throttledActionResults[actionThrottleNotEnabled.id]!!.lastExecutionTime!! > prevNotThrottledActionLastExecutionTime
             )
+        }
+    }
+
+    fun `test bucket-level monitor notification message includes sample docs per bucket`() {
+        val testIndex = createTestIndex()
+        insertSampleTimeSerializedData(
+            testIndex,
+            listOf(
+                "test_value_1",
+                "test_value_1",
+                "test_value_2"
+            )
+        )
+
+        val messageSource = "{{#ctx.newAlerts}}\n{{#sample_documents}}\n (docId={{_id}}) \n{{/sample_documents}}\n{{/ctx.newAlerts}}"
+        val bucket1DocIds = listOf("(docId=1)", "(docId=2)")
+        val bucket2DocIds = listOf("(docId=3)")
+
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil false
+        }, 200, TimeUnit.MILLISECONDS)
+
+        val query = QueryBuilders.rangeQuery("test_strict_date_time")
+            .gt("{{period_end}}||-10d")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
+        val compositeSources = listOf(
+            TermsValuesSourceBuilder("test_field").field("test_field")
+        )
+        val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
+        val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
+        val triggerScript = """
+            params.docCount > 1
+        """.trimIndent()
+
+        val action = randomAction(
+            template = randomTemplateScript(source = messageSource),
+            destinationId = createDestination().id
+        )
+        var trigger = randomBucketLevelTrigger(actions = listOf(action))
+        trigger = trigger.copy(
+            bucketSelector = BucketSelectorExtAggregationBuilder(
+                name = trigger.id,
+                bucketsPathsMap = mapOf("docCount" to "_count"),
+                script = Script(triggerScript),
+                parentBucketPath = "composite_agg",
+                filter = null
+            )
+        )
+        val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
+
+        val output = entityAsMap(executeMonitor(monitor.id))
+        // The 'events' in this case are the bucketKeys hashes representing the Alert events
+        val expectedEvents = setOf("test_value_1", "test_value_2")
+
+        assertEquals(monitor.name, output["monitor_name"])
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            for (alertEvent in triggerResult.objectMap("action_results")) {
+                assertTrue(expectedEvents.contains(alertEvent.key))
+                val actionResults = alertEvent.value.values as Collection<Map<String, Any>>
+                for (actionResult in actionResults) {
+                    val actionOutput = actionResult["output"] as Map<String, String>
+                    if (actionResult["name"] == action.name) {
+                        when (alertEvent.key) {
+                            "test_value_1" -> bucket1DocIds.forEach { docEntry ->
+                                assertTrue(
+                                    "The notification message is missing docEntry $docEntry",
+                                    !actionOutput["message"].isNullOrEmpty() && actionOutput["message"]!!.contains(docEntry)
+                                )
+                            }
+                            "test_value_2" -> bucket2DocIds.forEach { docEntry ->
+                                assertTrue(
+                                    "The notification message is missing docEntry $docEntry",
+                                    !actionOutput["message"].isNullOrEmpty() && actionOutput["message"]!!.contains(docEntry)
+                                )
+                            }
+                        }
+                    } else {
+                        fail("Unknown action: ${actionResult["name"]}")
+                    }
+                }
+            }
         }
     }
 
