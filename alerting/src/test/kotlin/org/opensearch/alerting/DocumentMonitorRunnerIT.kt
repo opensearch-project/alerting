@@ -1989,6 +1989,222 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertEquals(1, output.objectMap("trigger_results").values.size)
     }
 
+    fun `test document-level monitor notification message includes queries`() {
+        val testIndex = createTestIndex()
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "test-query")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val alertCategories = AlertCategory.values()
+        val actionExecutionScope = PerAlertActionScope(
+            actionableAlerts = (1..randomInt(alertCategories.size)).map { alertCategories[it - 1] }.toSet()
+        )
+        val actionExecutionPolicy = ActionExecutionPolicy(actionExecutionScope)
+        val actions = (0..randomInt(10)).map {
+            randomActionWithPolicy(
+                template = randomTemplateScript(
+                    "{{#ctx.alerts}}\n{{#associated_queries}}\n(name={{name}})\n{{/associated_queries}}\n{{/ctx.alerts}}"
+                ),
+                destinationId = createDestination().id,
+                actionExecutionPolicy = actionExecutionPolicy
+            )
+        }
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = actions)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex, "5", testDoc)
+
+        val response = executeMonitor(monitor.id)
+
+        val output = entityAsMap(response)
+
+        assertEquals(monitor.name, output["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
+        assertEquals("Incorrect search result", 2, matchingDocsToQuery.size)
+        assertTrue("Incorrect search result", matchingDocsToQuery.containsAll(listOf("1|$testIndex", "5|$testIndex")))
+
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertEquals(2, triggerResult.objectMap("action_results").values.size)
+            for (alertActionResult in triggerResult.objectMap("action_results").values) {
+                assertEquals(actions.size, alertActionResult.values.size)
+                for (actionResult in alertActionResult.values) {
+                    @Suppress("UNCHECKED_CAST")
+                    val actionOutput = (actionResult as Map<String, Map<String, String>>)["output"] as Map<String, String>
+                    assertTrue(
+                        "The notification message is missing the query name.",
+                        actionOutput["message"]!!.contains("(name=${docQuery.name})")
+                    )
+                }
+            }
+        }
+    }
+
+    fun `test expected document and rules print in notification message`() {
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+                "message" : "Test message",
+                "test_strict_date_time" : "$testTime",
+                "test_field" : "us-west-2"
+            }"""
+
+        val index = createTestIndex()
+
+        val docQuery = DocLevelQuery(query = "\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+
+        // Prints all fields in doc source
+        val scriptSource1 = """
+            Monitor {{ctx.monitor.name}} just entered alert status. Please investigate the issue.\n  
+            - Trigger: {{ctx.trigger.name}}\n  
+            - Severity: {{ctx.trigger.severity}}\n  
+            - Period start: {{ctx.periodStart}}\n  
+            - Period end: {{ctx.periodEnd}}\n\n  
+            - New Alerts:\n  
+                {{#ctx.alerts}}\n  
+                Document values
+                {{#sample_documents}}\n     
+                    Test field: {{_source.test_field}}\n 
+                    Message: {{_source.message}}\n     
+                    Timestamp: {{_source.test_strict_date_time}}\n
+                {{/sample_documents}}\n
+                \n
+                Matching queries\n
+                {{#associated_queries}}\n 
+                    Query ID: {{id}}\n
+                    Query name: {{name}}\n
+                {{/associated_queries}}\n  
+                {{/ctx.alerts}}
+        """.trimIndent()
+
+        // Only prints a few fields from the doc source
+        val scriptSource2 = """
+            Monitor {{ctx.monitor.name}} just entered alert status. Please investigate the issue.\n  
+            - Trigger: {{ctx.trigger.name}}\n  
+            - Severity: {{ctx.trigger.severity}}\n  
+            - Period start: {{ctx.periodStart}}\n  
+            - Period end: {{ctx.periodEnd}}\n\n  
+            - New Alerts:\n  
+                {{#ctx.alerts}}\n  
+                Document values
+                {{#sample_documents}}\n     
+                    Test field: {{_source.test_field}}\n 
+                    Message: {{_source.message}}\n     
+                {{/sample_documents}}\n
+                \n
+                Matching queries\n
+                {{#associated_queries}}\n 
+                    Query ID: {{id}}\n
+                    Query name: {{name}}\n
+                {{/associated_queries}}\n  
+                {{/ctx.alerts}}
+        """.trimIndent()
+
+        // Doesn't print any document data
+        val scriptSource3 = """
+            Monitor {{ctx.monitor.name}} just entered alert status. Please investigate the issue.\n  
+            - Trigger: {{ctx.trigger.name}}\n  
+            - Severity: {{ctx.trigger.severity}}\n  
+            - Period start: {{ctx.periodStart}}\n  
+            - Period end: {{ctx.periodEnd}}\n\n  
+            - New Alerts:\n  
+                {{#ctx.alerts}}\n
+                Matching queries\n
+                {{#associated_queries}}\n 
+                    Query ID: {{id}}\n
+                    Query name: {{name}}\n
+                {{/associated_queries}}\n  
+                {{/ctx.alerts}}
+        """.trimIndent()
+
+        // Using 'alert.copy()' here because 'randomAction()' applies the 'template' for the message subject, and message body
+        val actions = listOf(
+            randomAction(name = "action1", template = randomTemplateScript("action1 message"), destinationId = createDestination().id)
+                .copy(messageTemplate = randomTemplateScript(scriptSource1)),
+            randomAction(name = "action2", template = randomTemplateScript("action2 message"), destinationId = createDestination().id)
+                .copy(messageTemplate = randomTemplateScript(scriptSource2)),
+            randomAction(name = "action3", template = randomTemplateScript("action3 message"), destinationId = createDestination().id)
+                .copy(messageTemplate = randomTemplateScript(scriptSource3))
+        )
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = actions))
+            )
+        )
+
+        indexDoc(index, "", testDoc)
+
+        val response = executeMonitor(monitor.id)
+
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        val triggerResults = output.objectMap("trigger_results")
+        assertEquals(1, triggerResults.values.size)
+
+        val expectedMessageContents = mapOf(
+            "action1" to Pair(
+                // First item in pair is INCLUDED content
+                listOf(
+                    "Test field: us-west-2",
+                    "Message: Test message",
+                    "Timestamp: $testTime",
+                    "Query ID: ${docQuery.id}",
+                    "Query name: ${docQuery.name}",
+                ),
+                // Second item in pair is EXCLUDED content
+                listOf<String>()
+            ),
+            "action2" to Pair(
+                // First item in pair is INCLUDED content
+                listOf(
+                    "Test field: us-west-2",
+                    "Message: Test message",
+                    "Query ID: ${docQuery.id}",
+                    "Query name: ${docQuery.name}",
+                ),
+                // Second item in pair is EXCLUDED content
+                listOf("Timestamp: $testTime")
+            ),
+            "action3" to Pair(
+                // First item in pair is INCLUDED content
+                listOf(
+                    "Query ID: ${docQuery.id}",
+                    "Query name: ${docQuery.name}",
+                ),
+                // Second item in pair is EXCLUDED content
+                listOf(
+                    "Test field: us-west-2",
+                    "Message: Test message",
+                    "Timestamp: $testTime",
+                )
+            ),
+        )
+        val actionResults = triggerResults.values.first().objectMap("action_results").values.first().values
+        @Suppress("UNCHECKED_CAST")
+        actionResults.forEach { action ->
+            val messageContent = ((action as Map<String, Any>)["output"] as Map<String, Any>)["message"] as String
+            expectedMessageContents[action["name"]]!!.first.forEach {
+                assertTrue(messageContent.contains(it))
+            }
+            expectedMessageContents[action["name"]]!!.second.forEach {
+                assertFalse(messageContent.contains(it))
+            }
+        }
+    }
+
     @Suppress("UNCHECKED_CAST")
     /** helper that returns a field in a json map whose values are all json objects */
     private fun Map<String, Any>.objectMap(key: String): Map<String, Map<String, Any>> {
