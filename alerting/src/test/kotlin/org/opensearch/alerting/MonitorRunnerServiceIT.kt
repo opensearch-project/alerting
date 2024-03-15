@@ -47,6 +47,7 @@ import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
 import org.opensearch.search.aggregations.metrics.CardinalityAggregationBuilder
 import org.opensearch.search.aggregations.support.MultiTermsValuesSourceConfig
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.test.OpenSearchTestCase
 import java.net.URLEncoder
 import java.time.Instant
 import java.time.ZonedDateTime
@@ -55,6 +56,7 @@ import java.time.temporal.ChronoUnit
 import java.time.temporal.ChronoUnit.DAYS
 import java.time.temporal.ChronoUnit.MILLIS
 import java.time.temporal.ChronoUnit.MINUTES
+import java.util.concurrent.TimeUnit
 import kotlin.collections.HashMap
 
 class MonitorRunnerServiceIT : AlertingRestTestCase() {
