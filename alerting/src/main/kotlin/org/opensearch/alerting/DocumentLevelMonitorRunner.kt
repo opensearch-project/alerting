@@ -140,32 +140,29 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                 }
             }
 
-            indices.forEach { indexName ->
-                // Prepare lastRunContext for each index
-                val indexLastRunContext = lastRunContext.getOrPut(indexName) {
-                    val isIndexCreatedRecently = createdRecently(
-                        monitor,
-                        periodStart,
-                        periodEnd,
-                        monitorCtx.clusterService!!.state().metadata.index(indexName)
-                    )
-                    val updatedIndexName = indexName.replace("*", "_")
-                    val conflictingFields = monitorCtx.docLevelMonitorQueries!!.getAllConflictingFields(
-                        monitorCtx.clusterService!!.state(),
-                        concreteIndices
-                    )
+            docLevelMonitorInput.indices.forEach { indexName ->
+                val concreteIndices = IndexUtils.resolveAllIndices(
+                    listOf(indexName),
+                    monitorCtx.clusterService!!,
+                    monitorCtx.indexNameExpressionResolver!!
+                )
+                val updatedIndexName = indexName.replace("*", "_")
+                val conflictingFields = monitorCtx.docLevelMonitorQueries!!.getAllConflictingFields(
+                    monitorCtx.clusterService!!.state(),
+                    concreteIndices
+                )
 
-                    concreteIndices.forEach { concreteIndexName ->
-                        // Prepare lastRunContext for each index
-                        val indexLastRunContext = lastRunContext.getOrPut(concreteIndexName) {
-                            val isIndexCreatedRecently = createdRecently(
-                                monitor,
-                                periodStart,
-                                periodEnd,
-                                monitorCtx.clusterService!!.state().metadata.index(concreteIndexName)
-                            )
-                            MonitorMetadataService.createRunContextForIndex(concreteIndexName, isIndexCreatedRecently)
-                        }
+                concreteIndices.forEach { concreteIndexName ->
+                    // Prepare lastRunContext for each index
+                    val indexLastRunContext = lastRunContext.getOrPut(concreteIndexName) {
+                        val isIndexCreatedRecently = createdRecently(
+                            monitor,
+                            periodStart,
+                            periodEnd,
+                            monitorCtx.clusterService!!.state().metadata.index(concreteIndexName)
+                        )
+                        MonitorMetadataService.createRunContextForIndex(concreteIndexName, isIndexCreatedRecently)
+                    }
 
                     // Prepare updatedLastRunContext for each index
                     val indexUpdatedRunContext = updateLastRunContext(
@@ -189,15 +186,14 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     // Prepare DocumentExecutionContext for each index
                     val docExecutionContext = DocumentExecutionContext(queries, indexLastRunContext, indexUpdatedRunContext)
 
-                val matchingDocs = getMatchingDocs(
-                    monitor,
-                    monitorCtx,
-                    docExecutionContext,
-                    indexName,
-                    updatedIndexName,
-                    concreteIndexName,
-                    conflictingFields.toList()
-                )
+                    val matchingDocs = getMatchingDocs(
+                        monitor,
+                        monitorCtx,
+                        docExecutionContext,
+                        updatedIndexName,
+                        concreteIndexName,
+                        conflictingFields.toList()
+                    )
 
                     if (matchingDocs.isNotEmpty()) {
                         val matchedQueriesForDocs = getMatchedQueries(

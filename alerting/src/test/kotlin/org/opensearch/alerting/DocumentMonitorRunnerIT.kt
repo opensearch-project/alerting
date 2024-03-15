@@ -21,7 +21,7 @@ import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.commons.alerting.model.action.AlertCategory
 import org.opensearch.commons.alerting.model.action.PerAlertActionScope
 import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
-import org.opensearch.core.rest.RestStatus
+import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
