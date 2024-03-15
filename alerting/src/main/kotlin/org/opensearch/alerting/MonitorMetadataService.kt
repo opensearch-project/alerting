@@ -28,6 +28,7 @@ import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
@@ -206,11 +207,18 @@ object MonitorMetadataService :
         val lastRunContext = existingRunContext?.toMutableMap() ?: mutableMapOf()
         try {
             if (index == null) return mutableMapOf()
-            val getIndexRequest = GetIndexRequest().indices(index)
-            val getIndexResponse: GetIndexResponse = client.suspendUntil {
-                client.admin().indices().getIndex(getIndexRequest, it)
+            val indices = mutableListOf<String>()
+            if (IndexUtils.isAlias(index, clusterService.state()) ||
+                IndexUtils.isDataStream(index, clusterService.state())
+            ) {
+                IndexUtils.getWriteIndex(index, clusterService.state())?.let { indices.add(it) }
+            } else {
+                val getIndexRequest = GetIndexRequest().indices(index)
+                val getIndexResponse: GetIndexResponse = client.suspendUntil {
+                    client.admin().indices().getIndex(getIndexRequest, it)
+                }
+                indices.addAll(getIndexResponse.indices())
             }
-            val indices = getIndexResponse.indices()
 
             indices.forEach { indexName ->
                 if (!lastRunContext.containsKey(indexName)) {
