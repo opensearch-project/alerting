@@ -5,8 +5,8 @@
 
 package org.opensearch.alerting
 
-import org.apache.hc.core5.http.ContentType
-import org.apache.hc.core5.http.io.entity.StringEntity
+import org.apache.http.entity.ContentType
+import org.apache.http.entity.StringEntity
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_FINDING_INDEX_PATTERN
@@ -22,7 +22,7 @@ import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.commons.alerting.model.action.AlertCategory
 import org.opensearch.commons.alerting.model.action.PerAlertActionScope
 import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
-import org.opensearch.core.rest.RestStatus
+import org.opensearch.rest.RestStatus
 import org.opensearch.script.Script
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -88,7 +88,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val index = createTestIndex()
 
         val docQuery =
-            DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf(), queryFieldNames = listOf("test_field"))
+            DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", queryFieldNames = listOf("test_field"))
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
 
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
@@ -134,7 +134,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val index = createTestIndex()
 
         val docQuery =
-            DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+            DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
 
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
@@ -179,7 +179,6 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val docQuery = DocLevelQuery(
             query = "test_field:\"us-west-2\"",
             name = "3",
-            fields = listOf(),
             queryFieldNames = listOf("wrong_field")
         )
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
