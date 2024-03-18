@@ -256,7 +256,7 @@ String baseName = "alertingBwcCluster"
     testClusters {
         "${baseName}$i" {
             testDistribution = "ARCHIVE"
-            versions = ["2.3.0-SNAPSHOT", "2.5.1-SNAPSHOT"]
+            versions = ["2.3.0-SNAPSHOT", "2.7.1-SNAPSHOT"]
             numberOfNodes = 3
             plugin(provider(new Callable<RegularFile>(){
                 @Override
