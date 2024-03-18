@@ -39,6 +39,7 @@ import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
 import org.opensearch.alerting.resthandler.RestSearchMonitorAction
 import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroAlertingSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings
@@ -83,6 +84,7 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.env.Environment
 import org.opensearch.env.NodeEnvironment
 import org.opensearch.index.IndexModule
+import org.opensearch.monitor.jvm.JvmStats
 import org.opensearch.painless.spi.PainlessExtension
 import org.opensearch.painless.spi.Whitelist
 import org.opensearch.painless.spi.WhitelistLoader
@@ -237,6 +239,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerTriggerService(TriggerService(scriptService))
             .registerAlertService(AlertService(client, xContentRegistry, alertIndices))
             .registerDocLevelMonitorQueries(DocLevelMonitorQueries(client, clusterService))
+            .registerJvmStats(JvmStats.jvmStats())
             .registerConsumers()
             .registerDestinationSettings()
         scheduledJobIndices = ScheduledJobIndices(client.admin(), clusterService)
@@ -284,6 +287,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.ALERT_HISTORY_MAX_DOCS,
             AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD,
             AlertingSettings.ALERTING_MAX_MONITORS,
+            AlertingSettings.PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT,
+            DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE,
+            AlertingSettings.PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY,
             AlertingSettings.REQUEST_TIMEOUT,
             AlertingSettings.MAX_ACTION_THROTTLE_VALUE,
             AlertingSettings.FILTER_BY_BACKEND_ROLES,
@@ -304,6 +310,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             LegacyOpenDistroAlertingSettings.REQUEST_TIMEOUT,
             LegacyOpenDistroAlertingSettings.MAX_ACTION_THROTTLE_VALUE,
             LegacyOpenDistroAlertingSettings.FILTER_BY_BACKEND_ROLES,
+            AlertingSettings.DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED,
             DestinationSettings.EMAIL_USERNAME,
             DestinationSettings.EMAIL_PASSWORD,
             DestinationSettings.ALLOW_LIST,
@@ -316,7 +323,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.FINDING_HISTORY_MAX_DOCS,
             AlertingSettings.FINDING_HISTORY_INDEX_MAX_AGE,
             AlertingSettings.FINDING_HISTORY_ROLLOVER_PERIOD,
-            AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD
+            AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD,
+            AlertingSettings.FINDINGS_INDEXING_BATCH_SIZE
         )
     }
 
