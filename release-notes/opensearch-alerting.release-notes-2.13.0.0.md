@@ -20,4 +20,4 @@ Compatible with OpenSearch 2.13.0
 * add distributed locking to jobs in alerting (#[1403](https://github.com/opensearch-project/alerting/pull/1403)) (#[1458](https://github.com/opensearch-project/alerting/pull/1458))
 
 ### Documentation
-* Added 2.13 release notes 
+* Added 2.13 release notes (#[1483](https://github.com/opensearch-project/alerting/pull/1483))
