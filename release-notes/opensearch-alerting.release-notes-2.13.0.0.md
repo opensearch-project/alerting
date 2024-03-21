@@ -11,7 +11,7 @@ Compatible with OpenSearch 2.13.0
 * optimize to fetch only fields relevant to doc level queries in doc level monitor instead of entire _source for each doc #[1441](https://github.com/opensearch-project/alerting/pull/1441)
 * Add jvm aware setting and max num docs settings for batching docs for percolate queries #[1435](https://github.com/opensearch-project/alerting/pull/1435)
 * fix for MapperException[the [enabled] parameter can't be updated for the object mapping [metadata.source_to_query_index_mapping] (#[1432](https://github.com/opensearch-project/alerting/pull/1432)) (#[1434](https://github.com/opensearch-project/alerting/pull/1434))
-
+* adding tracking_total_hits in search query for findings (#[1487](https://github.com/opensearch-project/alerting/pull/1487))
 
 ### Enhancements
 * Enhance per bucket, and per document monitor notification message ctx. (#[1450](https://github.com/opensearch-project/alerting/pull/1450)) (#[1477](https://github.com/opensearch-project/alerting/pull/1477))
