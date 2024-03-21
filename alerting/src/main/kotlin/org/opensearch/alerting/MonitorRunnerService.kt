@@ -313,7 +313,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                         runJob(job, periodStart, periodEnd, false)
                     } finally {
                         monitorCtx.client!!.suspendUntil<Client, Boolean> { monitorCtx.lockService!!.release(lock, it) }
-                        logger.debug("lock ${lock!!.lockId} released")
+                        logger.debug("lock ${lock?.lockId} released")
                     }
                 }
             }
@@ -332,7 +332,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                         runJob(job, periodStart, periodEnd, false)
                     } finally {
                         monitorCtx.client!!.suspendUntil<Client, Boolean> { monitorCtx.lockService!!.release(lock, it) }
-                        logger.debug("lock ${lock!!.lockId} released")
+                        logger.debug("lock ${lock?.lockId} released")
                     }
                 }
             }
