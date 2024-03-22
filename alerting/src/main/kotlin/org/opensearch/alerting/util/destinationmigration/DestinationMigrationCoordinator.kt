@@ -45,7 +45,6 @@ class DestinationMigrationCoordinator(
     }
 
     override fun clusterChanged(event: ClusterChangedEvent) {
-        logger.info("Detected cluster change event for destination migration")
         if (DestinationMigrationUtilService.finishFlag) {
             logger.info("Reset destination migration process.")
             scheduledMigration?.cancel()
@@ -63,6 +62,7 @@ class DestinationMigrationCoordinator(
                 runningLock = false
             }
         } else if (!event.localNodeClusterManager()) {
+            logger.info("Cancelling the migration process.")
             scheduledMigration?.cancel()
         }
     }
