@@ -925,6 +925,20 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return index
     }
 
+    protected fun createTestIndex(index: String = randomAlphaOfLength(10).lowercase(Locale.ROOT), settings: Settings): String {
+        createIndex(
+            index, settings,
+            """
+                "properties" : {
+                  "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
+                  "test_field" : { "type" : "keyword" },
+                  "number" : { "type" : "keyword" }
+                }
+            """.trimIndent()
+        )
+        return index
+    }
+
     protected fun createTestIndex(index: String, mapping: String): String {
         createIndex(index, Settings.EMPTY, mapping.trimIndent())
         return index
@@ -1022,7 +1036,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client().makeRequest("DELETE", "_data_stream/$datastream")
     }
 
-    protected fun createIndexAlias(alias: String, mappings: String?) {
+    protected fun createIndexAlias(alias: String, mappings: String?, setting: String? = "") {
         val indexPattern = "$alias*"
         var componentTemplateMappings = "\"properties\": {" +
             "  \"netflow.destination_transport_port\":{ \"type\": \"long\" }," +
@@ -1031,9 +1045,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         if (mappings != null) {
             componentTemplateMappings = mappings
         }
-        createComponentTemplateWithMappings(
+        createComponentTemplateWithMappingsAndSettings(
             "my_alias_component_template-$alias",
-            componentTemplateMappings
+            componentTemplateMappings,
+            setting
         )
         createComposableIndexTemplate(
             "my_index_template_alias-$alias",
@@ -1060,6 +1075,17 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun createComponentTemplateWithMappings(componentTemplateName: String, mappings: String?) {
         val body = """{"template" : {        "mappings": {$mappings}    }}"""
+        client().makeRequest(
+            "PUT",
+            "_component_template/$componentTemplateName",
+            emptyMap(),
+            StringEntity(body, ContentType.APPLICATION_JSON),
+            BasicHeader("Content-Type", "application/json")
+        )
+    }
+
+    protected fun createComponentTemplateWithMappingsAndSettings(componentTemplateName: String, mappings: String?, setting: String?) {
+        val body = """{"template" : {        "mappings": {$mappings}, "settings": {$setting}    }}"""
         client().makeRequest(
             "PUT",
             "_component_template/$componentTemplateName",

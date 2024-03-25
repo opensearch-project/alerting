@@ -32,6 +32,7 @@ import org.opensearch.commons.alerting.model.Table
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import org.opensearch.core.common.Strings
+import org.opensearch.transport.TransportService
 import java.time.Instant
 
 abstract class MonitorRunner {
@@ -43,7 +44,8 @@ abstract class MonitorRunner {
         periodEnd: Instant,
         dryRun: Boolean,
         workflowRunContext: WorkflowRunContext? = null,
-        executionId: String
+        executionId: String,
+        transportService: TransportService?
     ): MonitorRunResult<*>
 
     suspend fun runAction(

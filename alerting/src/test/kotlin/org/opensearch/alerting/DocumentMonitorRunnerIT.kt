@@ -14,6 +14,7 @@ import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
+import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DataSources
@@ -2642,6 +2643,110 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
                 assertFalse(messageContent.contains(it))
             }
         }
+    }
+
+    fun `test execute monitor generates alerts and findings in a distributed way`() {
+        val testIndex = createTestIndex(settings = Settings.builder().put("number_of_shards", "7").build())
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", fields = listOf(), name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                enabled = true,
+                schedule = IntervalSchedule(1, ChronoUnit.MINUTES)
+            )
+        )
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex, "2", testDoc)
+        indexDoc(testIndex, "4", testDoc)
+        indexDoc(testIndex, "5", testDoc)
+        indexDoc(testIndex, "6", testDoc)
+        indexDoc(testIndex, "7", testDoc)
+
+        OpenSearchTestCase.waitUntil(
+            { searchFindings(monitor).size == 6 && searchAlertsWithFilter(monitor).size == 6 }, 2, TimeUnit.MINUTES
+        )
+
+        indexDoc(testIndex, "11", testDoc)
+        indexDoc(testIndex, "12", testDoc)
+        indexDoc(testIndex, "14", testDoc)
+        indexDoc(testIndex, "15", testDoc)
+        indexDoc(testIndex, "16", testDoc)
+        indexDoc(testIndex, "17", testDoc)
+
+        OpenSearchTestCase.waitUntil(
+            { searchFindings(monitor).size == 6 && searchAlertsWithFilter(monitor).size == 6 }, 2, TimeUnit.MINUTES
+        )
+    }
+
+    fun `test document-level monitor when aliases contain docs that do match query in a distributed way`() {
+        val aliasName = "test-alias"
+        createIndexAlias(
+            aliasName,
+            """
+                "properties" : {
+                  "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
+                  "test_field" : { "type" : "keyword" },
+                  "number" : { "type" : "keyword" }
+                }
+            """.trimIndent(),
+            "\"index.number_of_shards\": 7"
+        )
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", fields = listOf(), name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(aliasName), listOf(docQuery))
+
+        val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))),
+                enabled = true,
+                schedule = IntervalSchedule(1, ChronoUnit.MINUTES)
+            )
+        )
+
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "@timestamp": "$testTime",
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+        indexDoc(aliasName, "1", testDoc)
+        indexDoc(aliasName, "2", testDoc)
+        indexDoc(aliasName, "4", testDoc)
+        indexDoc(aliasName, "5", testDoc)
+        indexDoc(aliasName, "6", testDoc)
+        indexDoc(aliasName, "7", testDoc)
+        OpenSearchTestCase.waitUntil(
+            { searchFindings(monitor).size == 1 }, 2, TimeUnit.MINUTES
+        )
+
+        rolloverDatastream(aliasName)
+        indexDoc(aliasName, "11", testDoc)
+        indexDoc(aliasName, "12", testDoc)
+        indexDoc(aliasName, "14", testDoc)
+        indexDoc(aliasName, "15", testDoc)
+        indexDoc(aliasName, "16", testDoc)
+        indexDoc(aliasName, "17", testDoc)
+        OpenSearchTestCase.waitUntil(
+            { searchFindings(monitor).size == 2 }, 2, TimeUnit.MINUTES
+        )
+
+        deleteDataStream(aliasName)
     }
 
     @Suppress("UNCHECKED_CAST")
