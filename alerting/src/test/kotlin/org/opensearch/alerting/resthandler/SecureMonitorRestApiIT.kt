@@ -253,6 +253,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 )
             )
             val createResponse = userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+            Thread.sleep(30000)
             assertEquals("Create monitor failed", RestStatus.CREATED, createResponse?.restStatus())
             fail("Expected 403 Method FORBIDDEN response")
         } catch (e: ResponseException) {
@@ -1331,6 +1332,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         try {
             val response = executeMonitor(userClient as RestClient, modifiedMonitor, params = DRYRUN_MONITOR)
+            Thread.sleep(20000)
             val output = entityAsMap(response)
             val inputResults = output.stringMap("input_results")
             assertTrue("Missing monitor error message", (inputResults?.get("error") as String).isNotEmpty())
