@@ -73,7 +73,13 @@ class TransportExecuteWorkflowAction @Inject constructor(
                                 "dryrun: ${execWorkflowRequest.dryrun}"
                         )
                         val workflowRunResult =
-                            MonitorRunnerService.runJob(workflow, periodStart, periodEnd, execWorkflowRequest.dryrun, transportService = transportService)
+                            MonitorRunnerService.runJob(
+                                workflow,
+                                periodStart,
+                                periodEnd,
+                                execWorkflowRequest.dryrun,
+                                transportService = transportService
+                            )
                         withContext(Dispatchers.IO, {
                             actionListener.onResponse(
                                 ExecuteWorkflowResponse(

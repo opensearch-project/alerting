@@ -228,6 +228,7 @@ class TransportDocLevelMonitorFanOutAction
             val inputRunResults = mutableMapOf<String, MutableSet<String>>()
             val docsToQueries = mutableMapOf<String, MutableList<String>>()
             val indexName = shardIds.first().indexName
+            val isTempMonitor = dryrun || monitor.id == Monitor.NO_ID
 
             val lastRunContext = if (monitorMetadata.lastRunContext.isNullOrEmpty()) mutableMapOf()
             else monitorMetadata.lastRunContext.toMutableMap() as MutableMap<String, MutableMap<String, Any>>
@@ -316,17 +317,20 @@ class TransportDocLevelMonitorFanOutAction
                 }
             }
 
-            // If any error happened during trigger execution, upsert monitor error alert
-            val errorMessage = constructErrorMessageFromTriggerResults(triggerResults = triggerResults)
-            if (errorMessage.isNotEmpty()) {
-                alertService.upsertMonitorErrorAlert(
-                    monitor = monitor,
-                    errorMessage = errorMessage,
-                    executionId = executionId,
-                    workflowRunContext
-                )
-            } else {
-                onSuccessfulMonitorRun(monitor)
+            if (!isTempMonitor) {
+                // If any error happened during trigger execution, upsert monitor error alert
+                val errorMessage = constructErrorMessageFromTriggerResults(triggerResults = triggerResults)
+                log.info(errorMessage)
+                if (errorMessage.isNotEmpty()) {
+                    alertService.upsertMonitorErrorAlert(
+                        monitor = monitor,
+                        errorMessage = errorMessage,
+                        executionId = executionId,
+                        workflowRunContext
+                    )
+                } else {
+                    onSuccessfulMonitorRun(monitor)
+                }
             }
 
             listener.onResponse(
@@ -605,7 +609,14 @@ class TransportDocLevelMonitorFanOutAction
                     }
                 }
             }
-            ActionRunResult(action.id, action.name, actionOutput, false, Instant.ofEpochMilli(client.threadPool().absoluteTimeInMillis()), null)
+            ActionRunResult(
+                action.id,
+                action.name,
+                actionOutput,
+                false,
+                Instant.ofEpochMilli(client.threadPool().absoluteTimeInMillis()),
+                null
+            )
         } catch (e: Exception) {
             ActionRunResult(action.id, action.name, mapOf(), false, Instant.ofEpochMilli(client.threadPool().absoluteTimeInMillis()), e)
         }

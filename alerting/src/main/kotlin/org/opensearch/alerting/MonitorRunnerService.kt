@@ -384,11 +384,23 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         }
     }
 
-    suspend fun runJob(workflow: Workflow, periodStart: Instant, periodEnd: Instant, dryrun: Boolean, transportService: TransportService?): WorkflowRunResult {
+    suspend fun runJob(
+        workflow: Workflow,
+        periodStart: Instant,
+        periodEnd: Instant,
+        dryrun: Boolean,
+        transportService: TransportService?
+    ): WorkflowRunResult {
         return CompositeWorkflowRunner.runWorkflow(workflow, monitorCtx, periodStart, periodEnd, dryrun, transportService)
     }
 
-    suspend fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant, dryrun: Boolean, transportService: TransportService?): MonitorRunResult<*> {
+    suspend fun runJob(
+        job: ScheduledJob,
+        periodStart: Instant,
+        periodEnd: Instant,
+        dryrun: Boolean,
+        transportService: TransportService?
+    ): MonitorRunResult<*> {
         // Updating the scheduled job index at the start of monitor execution runs for when there is an upgrade the the schema mapping
         // has not been updated.
         if (!IndexUtils.scheduledJobIndexUpdated && monitorCtx.clusterService != null && monitorCtx.client != null) {

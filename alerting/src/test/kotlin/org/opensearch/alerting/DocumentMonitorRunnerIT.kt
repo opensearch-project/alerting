@@ -2732,7 +2732,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         indexDoc(aliasName, "6", testDoc)
         indexDoc(aliasName, "7", testDoc)
         OpenSearchTestCase.waitUntil(
-            { searchFindings(monitor).size == 1 }, 2, TimeUnit.MINUTES
+            { searchFindings(monitor).size == 6 }, 2, TimeUnit.MINUTES
         )
 
         rolloverDatastream(aliasName)
@@ -2743,7 +2743,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         indexDoc(aliasName, "16", testDoc)
         indexDoc(aliasName, "17", testDoc)
         OpenSearchTestCase.waitUntil(
-            { searchFindings(monitor).size == 2 }, 2, TimeUnit.MINUTES
+            { searchFindings(monitor).size == 6 }, 2, TimeUnit.MINUTES
         )
 
         deleteDataStream(aliasName)

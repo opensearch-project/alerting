@@ -137,7 +137,16 @@ object CompositeWorkflowRunner : WorkflowRunner() {
             try {
                 dataSources = delegateMonitor.dataSources
                 val delegateRunResult =
-                    runDelegateMonitor(delegateMonitor, monitorCtx, periodStart, periodEnd, dryRun, workflowRunContext, executionId, transportService)
+                    runDelegateMonitor(
+                        delegateMonitor,
+                        monitorCtx,
+                        periodStart,
+                        periodEnd,
+                        dryRun,
+                        workflowRunContext,
+                        executionId,
+                        transportService
+                    )
                 resultList.add(delegateRunResult!!)
             } catch (ex: Exception) {
                 logger.error("Error executing workflow delegate monitor ${delegate.monitorId}", ex)

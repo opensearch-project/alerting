@@ -28,7 +28,6 @@ import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.core.action.ActionListener
-import org.opensearch.core.common.bytes.BytesReference
 import org.opensearch.core.common.io.stream.Writeable
 import org.opensearch.core.index.shard.ShardId
 import org.opensearch.core.rest.RestStatus
@@ -249,38 +248,43 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                                         cont.resumeWithException(e)
                                 }
                             },
-                            nodeMap.size
+                            nodeShardAssignments.size
                         )
                         val responseReader = Writeable.Reader {
                             DocLevelMonitorFanOutResponse(it)
                         }
                         for (node in nodeMap) {
-                            val docLevelMonitorFanOutRequest = DocLevelMonitorFanOutRequest(
-                                monitor,
-                                dryrun,
-                                monitorMetadata,
-                                executionId,
-                                indexExecutionContext,
-                                nodeShardAssignments[node.key]!!.toList(),
-                                concreteIndicesSeenSoFar,
-                                workflowRunContext
-                            )
+                            if (nodeShardAssignments.containsKey(node.key)) {
+                                val docLevelMonitorFanOutRequest = DocLevelMonitorFanOutRequest(
+                                    monitor,
+                                    dryrun,
+                                    monitorMetadata,
+                                    executionId,
+                                    indexExecutionContext,
+                                    nodeShardAssignments[node.key]!!.toList(),
+                                    concreteIndicesSeenSoFar,
+                                    workflowRunContext
+                                )
 
-                            transportService.sendRequest(
-                                node.value,
-                                DocLevelMonitorFanOutAction.NAME,
-                                docLevelMonitorFanOutRequest,
-                                TransportRequestOptions.EMPTY,
-                                object : ActionListenerResponseHandler<DocLevelMonitorFanOutResponse>(listener, responseReader) {
-                                    override fun handleException(e: TransportException) {
-                                        listener.onFailure(e)
-                                    }
+                                transportService.sendRequest(
+                                    node.value,
+                                    DocLevelMonitorFanOutAction.NAME,
+                                    docLevelMonitorFanOutRequest,
+                                    TransportRequestOptions.EMPTY,
+                                    object : ActionListenerResponseHandler<DocLevelMonitorFanOutResponse>(
+                                        listener,
+                                        responseReader
+                                    ) {
+                                        override fun handleException(e: TransportException) {
+                                            listener.onFailure(e)
+                                        }
 
-                                    override fun handleResponse(response: DocLevelMonitorFanOutResponse) {
-                                        listener.onResponse(response)
+                                        override fun handleResponse(response: DocLevelMonitorFanOutResponse) {
+                                            listener.onResponse(response)
+                                        }
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                     docLevelMonitorFanOutResponses.addAll(responses)
@@ -475,15 +479,4 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         }
         return nodeShardAssignments
     }
-
-    /**
-     * POJO holding information about each doc's concrete index, id, input index pattern/alias/datastream name
-     * and doc source. A list of these POJOs would be passed to percolate query execution logic.
-     */
-    data class TransformedDocDto(
-        var indexName: String,
-        var concreteIndexName: String,
-        var docId: String,
-        var docSource: BytesReference
-    )
 }
