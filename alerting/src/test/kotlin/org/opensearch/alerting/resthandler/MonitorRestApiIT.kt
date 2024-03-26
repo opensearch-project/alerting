@@ -979,7 +979,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         if (isMultiNode) {
             assertEquals("Scheduled job index is not green", "green", alertingStats["scheduled_job_index_status"])
         } else {
-            assertEquals("Scheduled job index is not yellow", "yellow", alertingStats["scheduled_job_index_status"])
+            assertEquals("Scheduled job index is not green", "green", alertingStats["scheduled_job_index_status"])
         }
         assertEquals("Nodes are not on schedule", numberOfNodes, alertingStats["nodes_on_schedule"])
 
@@ -1043,7 +1043,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         if (isMultiNode) {
             assertEquals("Scheduled job index is not green", "green", responseMap["scheduled_job_index_status"])
         } else {
-            assertEquals("Scheduled job index is not yellow", "yellow", responseMap["scheduled_job_index_status"])
+            assertEquals("Scheduled job index is not green", "green", responseMap["scheduled_job_index_status"])
         }
         assertEquals("Nodes are not on schedule", numberOfNodes, responseMap["nodes_on_schedule"])
 
@@ -1078,7 +1078,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         if (isMultiNode) {
             assertEquals("Scheduled job index is not green", "green", responseMap["scheduled_job_index_status"])
         } else {
-            assertEquals("Scheduled job index is not yellow", "yellow", responseMap["scheduled_job_index_status"])
+            assertEquals("Scheduled job index is not green", "green", responseMap["scheduled_job_index_status"])
         }
         assertEquals("Nodes not on schedule", numberOfNodes, responseMap["nodes_on_schedule"])
 
