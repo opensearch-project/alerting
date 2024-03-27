@@ -360,7 +360,12 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                     if (false == triggerResults.contains(triggerId)) {
                         triggerResults[triggerId] = documentLevelTriggerRunResult
                         triggerErrorMap[triggerId] = if (documentLevelTriggerRunResult.error != null) {
-                            mutableListOf(documentLevelTriggerRunResult.error as AlertingException)
+                            val error = if (documentLevelTriggerRunResult.error is AlertingException) {
+                                documentLevelTriggerRunResult.error as AlertingException
+                            } else {
+                                AlertingException.wrap(documentLevelTriggerRunResult.error!!) as AlertingException
+                            }
+                            mutableListOf(error)
                         } else {
                             mutableListOf()
                         }
