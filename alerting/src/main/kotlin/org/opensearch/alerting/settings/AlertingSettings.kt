@@ -216,10 +216,6 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        /** Defines the threshold of the docs accumulated in memory to query against percolate query index in document
-         * level monitor execution. The docs are being collected from searching on shards of indices mentioned in the
-         * monitor input indices field.
-         */
         val DOC_LEVEL_MONITOR_FAN_OUT_NODES = Setting.intSetting(
             "plugins.alerting.monitor.doc_level_monitor_fan_out_nodes",
             DEFAULT_FAN_OUT_NODES,

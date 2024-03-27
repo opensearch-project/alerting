@@ -215,7 +215,6 @@ class TransportDocLevelMonitorFanOutAction
             val monitor = request.monitor
             var monitorResult = MonitorRunResult<DocumentLevelTriggerRunResult>(monitor.name, Instant.now(), Instant.now())
             val updatedIndexNames = request.indexExecutionContext.updatedIndexNames
-            val concreteIndexNames = request.indexExecutionContext.concreteIndexNames
             val monitorMetadata = request.monitorMetadata
             val shardIds = request.shardIds
             val indexExecutionContext = request.indexExecutionContext
@@ -227,7 +226,6 @@ class TransportDocLevelMonitorFanOutAction
             val queryToDocIds = mutableMapOf<DocLevelQuery, MutableSet<String>>()
             val inputRunResults = mutableMapOf<String, MutableSet<String>>()
             val docsToQueries = mutableMapOf<String, MutableList<String>>()
-            val indexName = shardIds.first().indexName
             val isTempMonitor = dryrun || monitor.id == Monitor.NO_ID
 
             val lastRunContext = if (monitorMetadata.lastRunContext.isNullOrEmpty()) mutableMapOf()
@@ -345,7 +343,7 @@ class TransportDocLevelMonitorFanOutAction
             )
         } catch (e: Exception) {
             log.error("${request.monitor.id} Failed to run fan_out on node ${clusterService.localNode().id} due to error")
-            listener.onFailure(e)
+            listener.onFailure(AlertingException.wrap(e))
         }
     }
 

@@ -66,7 +66,12 @@ class DocLevelMonitorFanOutResponse : ActionResponse, ToXContentObject {
     @Throws(IOException::class)
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         builder.startObject()
+            .field("node_id", nodeId)
+            .field("execution_id", executionId)
+            .field("monitor_id", monitorId)
             .field("last_run_contexts", lastRunContexts)
+            .field("input_results", inputResults)
+            .field("trigger_results", triggerResults)
             .endObject()
         return builder
     }

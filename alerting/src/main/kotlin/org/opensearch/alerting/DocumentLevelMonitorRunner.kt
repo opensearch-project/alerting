@@ -13,6 +13,7 @@ import org.opensearch.action.support.GroupedActionListener
 import org.opensearch.alerting.action.DocLevelMonitorFanOutAction
 import org.opensearch.alerting.action.DocLevelMonitorFanOutRequest
 import org.opensearch.alerting.action.DocLevelMonitorFanOutResponse
+import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.IndexExecutionContext
 import org.opensearch.alerting.model.InputRunResults
@@ -350,38 +351,60 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         docLevelMonitorFanOutResponses: MutableList<DocLevelMonitorFanOutResponse>,
     ): MutableMap<String, DocumentLevelTriggerRunResult> {
         val triggerResults = mutableMapOf<String, DocumentLevelTriggerRunResult>()
+        val triggerErrorMap = mutableMapOf<String, MutableList<AlertingException>>()
         for (res in docLevelMonitorFanOutResponses) {
+            logger.info("trigger results-${res.triggerResults}")
             for (triggerId in res.triggerResults.keys) {
                 val documentLevelTriggerRunResult = res.triggerResults[triggerId]
                 if (documentLevelTriggerRunResult != null) {
                     if (false == triggerResults.contains(triggerId)) {
                         triggerResults[triggerId] = documentLevelTriggerRunResult
+                        triggerErrorMap[triggerId] = if (documentLevelTriggerRunResult.error != null) {
+                            mutableListOf(documentLevelTriggerRunResult.error as AlertingException)
+                        } else {
+                            mutableListOf()
+                        }
                     } else {
                         val currVal = triggerResults[triggerId]
-                        val newTrigggeredDocs = mutableListOf<String>()
-                        newTrigggeredDocs.addAll(currVal!!.triggeredDocs)
-                        newTrigggeredDocs.addAll(documentLevelTriggerRunResult.triggeredDocs)
-                        triggerResults.put(
-                            triggerId,
-                            currVal.copy(
-                                triggeredDocs = newTrigggeredDocs,
-                                error = if (currVal.error != null) currVal.error else documentLevelTriggerRunResult.error
-                            )
+                        val newTriggeredDocs = mutableListOf<String>()
+                        newTriggeredDocs.addAll(currVal!!.triggeredDocs)
+                        newTriggeredDocs.addAll(documentLevelTriggerRunResult.triggeredDocs)
+                        val newActionResults = mutableMapOf<String, MutableMap<String, ActionRunResult>>()
+                        newActionResults.putAll(currVal.actionResultsMap)
+                        newActionResults.putAll(documentLevelTriggerRunResult.actionResultsMap)
+                        triggerResults[triggerId] = currVal.copy(
+                            triggeredDocs = newTriggeredDocs,
+                            actionResultsMap = newActionResults
                         )
+
+                        if (documentLevelTriggerRunResult.error != null) {
+                            triggerErrorMap[triggerId]!!.add(documentLevelTriggerRunResult.error as AlertingException)
+                        }
                     }
                 }
             }
         }
+
+        triggerErrorMap.forEach { triggerId, errorList ->
+            if (errorList.isNotEmpty()) {
+                triggerResults[triggerId]!!.error = AlertingException.merge(*errorList.toTypedArray())
+            }
+        }
+        logger.info("final trigger results-$triggerResults")
         return triggerResults
     }
 
     private fun buildInputRunResults(docLevelMonitorFanOutResponses: MutableList<DocLevelMonitorFanOutResponse>): InputRunResults {
         val inputRunResults = mutableMapOf<String, MutableSet<String>>()
-        var error: Exception? = null
+        val errors: MutableList<AlertingException> = mutableListOf()
         for (response in docLevelMonitorFanOutResponses) {
-            if (error == null && response.inputResults.error != null)
-                error = response.inputResults.error
-
+            if (response.inputResults.error != null) {
+                if (response.inputResults.error is AlertingException) {
+                    errors.add(response.inputResults.error)
+                } else {
+                    errors.add(AlertingException.wrap(response.inputResults.error) as AlertingException)
+                }
+            }
             val partialResult = response.inputResults.results
             for (result in partialResult) {
                 for (id in result.keys) {
@@ -389,7 +412,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                 }
             }
         }
-        return InputRunResults(listOf(inputRunResults), error)
+        return InputRunResults(listOf(inputRunResults), if (!errors.isEmpty()) AlertingException.merge(*errors.toTypedArray()) else null)
     }
 
     private fun initializeNewLastRunContext(

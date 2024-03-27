@@ -319,14 +319,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                             monitorCtx.lockService!!.acquireLock(job, it)
                         } ?: return@launch
                         logger.debug("lock ${lock!!.lockId} acquired")
-                        logger.debug(
-                            "PERF_DEBUG: executing workflow ${job.id} on node " +
-                                monitorCtx.clusterService!!.state().nodes().localNode.id
-                        )
-                        logger.debug(
-                            "PERF_DEBUG: executing workflow ${job.id} on node " +
-                                monitorCtx.clusterService!!.state().nodes().localNode.id
-                        )
 
                         monitorCtx.client!!.suspendUntil<Client, ExecuteWorkflowResponse> {
                             monitorCtx.client!!.execute(
@@ -363,7 +355,8 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                             false,
                             TimeValue(periodEnd.toEpochMilli()),
                             job.id,
-                            job
+                            job,
+                            TimeValue(periodStart.toEpochMilli())
                         )
                         monitorCtx.client!!.suspendUntil<Client, ExecuteMonitorResponse> {
                             monitorCtx.client!!.execute(
