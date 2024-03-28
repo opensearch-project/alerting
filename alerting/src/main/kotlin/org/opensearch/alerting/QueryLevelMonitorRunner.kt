@@ -17,6 +17,7 @@ import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
+import org.opensearch.transport.TransportService
 import java.time.Instant
 
 object QueryLevelMonitorRunner : MonitorRunner() {
@@ -29,7 +30,8 @@ object QueryLevelMonitorRunner : MonitorRunner() {
         periodEnd: Instant,
         dryrun: Boolean,
         workflowRunContext: WorkflowRunContext?,
-        executionId: String
+        executionId: String,
+        transportService: TransportService?
     ): MonitorRunResult<QueryLevelTriggerRunResult> {
         val roles = MonitorRunnerService.getRolesForMonitor(monitor)
         logger.debug("Running monitor: ${monitor.name} with roles: $roles Thread: ${Thread.currentThread().name}")

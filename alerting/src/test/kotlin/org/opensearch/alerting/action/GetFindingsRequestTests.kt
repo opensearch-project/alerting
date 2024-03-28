@@ -9,6 +9,7 @@ import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.commons.alerting.action.GetFindingsRequest
 import org.opensearch.commons.alerting.model.Table
 import org.opensearch.core.common.io.stream.StreamInput
+import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.test.OpenSearchTestCase
 
 class GetFindingsRequestTests : OpenSearchTestCase() {
@@ -17,7 +18,13 @@ class GetFindingsRequestTests : OpenSearchTestCase() {
 
         val table = Table("asc", "sortString", null, 1, 0, "")
 
-        val req = GetFindingsRequest("2121", table, "1", "finding_index_name")
+        val req = GetFindingsRequest(
+            "2121",
+            table,
+            "1",
+            "finding_index_name",
+            boolQueryBuilder = BoolQueryBuilder()
+        )
         assertNotNull(req)
 
         val out = BytesStreamOutput()

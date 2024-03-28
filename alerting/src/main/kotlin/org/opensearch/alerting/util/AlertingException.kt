@@ -69,5 +69,18 @@ class AlertingException(message: String, val status: RestStatus, ex: Exception) 
             // Below logic is to set friendly message to error.root_cause.reason.
             return AlertingException(friendlyMsg, status, Exception("${ex.javaClass.name}: ${ex.message}"))
         }
+
+        @JvmStatic
+        fun merge(vararg ex: AlertingException): AlertingException {
+            var friendlyMsg = ""
+            ex.forEach {
+                if (friendlyMsg != "") {
+                    friendlyMsg += ", ${it.message}"
+                } else {
+                    friendlyMsg = it.message.orEmpty()
+                }
+            }
+            return AlertingException(friendlyMsg, ex.first().status, Exception(ex.javaClass.name))
+        }
     }
 }

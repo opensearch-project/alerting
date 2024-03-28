@@ -18,17 +18,20 @@ class ExecuteMonitorRequest : ActionRequest {
     val requestEnd: TimeValue
     val monitorId: String?
     val monitor: Monitor?
+    val requestStart: TimeValue?
 
     constructor(
         dryrun: Boolean,
         requestEnd: TimeValue,
         monitorId: String?,
-        monitor: Monitor?
+        monitor: Monitor?,
+        requestStart: TimeValue? = null
     ) : super() {
         this.dryrun = dryrun
         this.requestEnd = requestEnd
         this.monitorId = monitorId
         this.monitor = monitor
+        this.requestStart = requestStart
     }
 
     @Throws(IOException::class)
@@ -38,7 +41,8 @@ class ExecuteMonitorRequest : ActionRequest {
         sin.readOptionalString(), // monitorId
         if (sin.readBoolean()) {
             Monitor.readFrom(sin) // monitor
-        } else null
+        } else null,
+        sin.readOptionalTimeValue()
     )
 
     override fun validate(): ActionRequestValidationException? {
@@ -56,5 +60,6 @@ class ExecuteMonitorRequest : ActionRequest {
         } else {
             out.writeBoolean(false)
         }
+        out.writeOptionalTimeValue(requestStart)
     }
 }

@@ -25,7 +25,7 @@ data class DocumentLevelTriggerRunResult(
         triggerName = sin.readString(),
         error = sin.readException(),
         triggeredDocs = sin.readStringList(),
-        actionResultsMap = sin.readMap() as MutableMap<String, MutableMap<String, ActionRunResult>>
+        actionResultsMap = readActionResults(sin)
     )
 
     override fun internalXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
@@ -39,7 +39,15 @@ data class DocumentLevelTriggerRunResult(
     override fun writeTo(out: StreamOutput) {
         super.writeTo(out)
         out.writeStringCollection(triggeredDocs)
-        out.writeMap(actionResultsMap as Map<String, Any>)
+        out.writeInt(actionResultsMap.size)
+        actionResultsMap.forEach { (alert, actionResults) ->
+            out.writeString(alert)
+            out.writeInt(actionResults.size)
+            actionResults.forEach { (id, result) ->
+                out.writeString(id)
+                result.writeTo(out)
+            }
+        }
     }
 
     companion object {
@@ -47,6 +55,28 @@ data class DocumentLevelTriggerRunResult(
         @Throws(IOException::class)
         fun readFrom(sin: StreamInput): TriggerRunResult {
             return DocumentLevelTriggerRunResult(sin)
+        }
+
+        @JvmStatic
+        fun readActionResults(sin: StreamInput): MutableMap<String, MutableMap<String, ActionRunResult>> {
+            val actionResultsMapReconstruct: MutableMap<String, MutableMap<String, ActionRunResult>> = mutableMapOf()
+            val size = sin.readInt()
+            var idx = 0
+            while (idx < size) {
+                val alert = sin.readString()
+                val actionResultsSize = sin.readInt()
+                val actionRunResultElem = mutableMapOf<String, ActionRunResult>()
+                var i = 0
+                while (i < actionResultsSize) {
+                    val actionId = sin.readString()
+                    val actionResult = ActionRunResult.readFrom(sin)
+                    actionRunResultElem[actionId] = actionResult
+                    ++i
+                }
+                actionResultsMapReconstruct[alert] = actionRunResultElem
+                ++idx
+            }
+            return actionResultsMapReconstruct
         }
     }
 }
