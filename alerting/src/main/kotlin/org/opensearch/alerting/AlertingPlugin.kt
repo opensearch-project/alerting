@@ -19,6 +19,7 @@ import org.opensearch.alerting.core.JobSweeper
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsAction
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsTransportAction
+import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler
 import org.opensearch.alerting.core.schedule.JobScheduler
 import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSettings
@@ -46,6 +47,7 @@ import org.opensearch.alerting.resthandler.RestSearchMonitorAction
 import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroAlertingSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings
@@ -100,6 +102,7 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.env.Environment
 import org.opensearch.env.NodeEnvironment
 import org.opensearch.index.IndexModule
+import org.opensearch.monitor.jvm.JvmStats
 import org.opensearch.painless.spi.Allowlist
 import org.opensearch.painless.spi.AllowlistLoader
 import org.opensearch.painless.spi.PainlessExtension
@@ -249,6 +252,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     ): Collection<Any> {
         // Need to figure out how to use the OpenSearch DI classes rather than handwiring things here.
         val settings = environment.settings()
+        val lockService = LockService(client, clusterService)
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
         runner = MonitorRunnerService
             .registerClusterService(clusterService)
@@ -263,7 +267,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerTriggerService(TriggerService(scriptService))
             .registerAlertService(AlertService(client, xContentRegistry, alertIndices))
             .registerDocLevelMonitorQueries(DocLevelMonitorQueries(client, clusterService))
+            .registerJvmStats(JvmStats.jvmStats())
             .registerWorkflowService(WorkflowService(client, xContentRegistry))
+            .registerLockService(lockService)
             .registerConsumers()
             .registerDestinationSettings()
         scheduledJobIndices = ScheduledJobIndices(client.admin(), clusterService)
@@ -288,9 +294,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             settings
         )
 
-        DeleteMonitorService.initialize(client)
+        DeleteMonitorService.initialize(client, lockService)
 
-        return listOf(sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator)
+        return listOf(sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator, lockService)
     }
 
     override fun getSettings(): List<Setting<*>> {
@@ -320,6 +326,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.ALERT_HISTORY_MAX_DOCS,
             AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD,
             AlertingSettings.ALERTING_MAX_MONITORS,
+            AlertingSettings.PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT,
+            DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE,
+            AlertingSettings.PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY,
             AlertingSettings.REQUEST_TIMEOUT,
             AlertingSettings.MAX_ACTION_THROTTLE_VALUE,
             AlertingSettings.FILTER_BY_BACKEND_ROLES,
@@ -340,6 +349,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             LegacyOpenDistroAlertingSettings.REQUEST_TIMEOUT,
             LegacyOpenDistroAlertingSettings.MAX_ACTION_THROTTLE_VALUE,
             LegacyOpenDistroAlertingSettings.FILTER_BY_BACKEND_ROLES,
+            AlertingSettings.DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED,
             DestinationSettings.EMAIL_USERNAME,
             DestinationSettings.EMAIL_PASSWORD,
             DestinationSettings.ALLOW_LIST,

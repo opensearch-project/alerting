@@ -40,6 +40,7 @@ import org.opensearch.commons.alerting.model.FindingWithDocs
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.Strings
+import org.opensearch.core.common.io.stream.NamedWriteableRegistry
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
@@ -62,7 +63,8 @@ class TransportGetFindingsSearchAction @Inject constructor(
     clusterService: ClusterService,
     actionFilters: ActionFilters,
     val settings: Settings,
-    val xContentRegistry: NamedXContentRegistry
+    val xContentRegistry: NamedXContentRegistry,
+    val namedWriteableRegistry: NamedWriteableRegistry
 ) : HandledTransportAction<ActionRequest, GetFindingsResponse> (
     AlertingActions.GET_FINDINGS_ACTION_NAME, transportService, actionFilters, ::GetFindingsRequest
 ),
@@ -80,7 +82,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
         actionListener: ActionListener<GetFindingsResponse>
     ) {
         val getFindingsRequest = request as? GetFindingsRequest
-            ?: recreateObject(request) { GetFindingsRequest(it) }
+            ?: recreateObject(request, namedWriteableRegistry) { GetFindingsRequest(it) }
         val tableProp = getFindingsRequest.table
 
         val sortBuilder = SortBuilders
@@ -98,11 +100,10 @@ class TransportGetFindingsSearchAction @Inject constructor(
             .seqNoAndPrimaryTerm(true)
             .version(true)
 
-        val queryBuilder = QueryBuilders.boolQuery()
+        val queryBuilder = getFindingsRequest.boolQueryBuilder ?: QueryBuilders.boolQuery()
 
         if (!getFindingsRequest.findingId.isNullOrBlank())
             queryBuilder.filter(QueryBuilders.termQuery("_id", getFindingsRequest.findingId))
-
         if (getFindingsRequest.monitorId != null) {
             queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getFindingsRequest.monitorId))
         } else if (getFindingsRequest.monitorIds.isNullOrEmpty() == false) {
@@ -130,8 +131,7 @@ class TransportGetFindingsSearchAction @Inject constructor(
                     )
                 )
         }
-
-        searchSourceBuilder.query(queryBuilder)
+        searchSourceBuilder.query(queryBuilder).trackTotalHits(true)
 
         client.threadPool().threadContext.stashContext().use {
             scope.launch {

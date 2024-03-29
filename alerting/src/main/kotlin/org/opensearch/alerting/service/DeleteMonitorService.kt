@@ -22,6 +22,8 @@ import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.MonitorMetadataService
+import org.opensearch.alerting.core.lock.LockModel
+import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_DELEGATE_PATH
@@ -49,11 +51,14 @@ object DeleteMonitorService :
     private val log = LogManager.getLogger(this.javaClass)
 
     private lateinit var client: Client
+    private lateinit var lockService: LockService
 
     fun initialize(
         client: Client,
+        lockService: LockService
     ) {
         DeleteMonitorService.client = client
+        DeleteMonitorService.lockService = lockService
     }
 
     /**
@@ -65,6 +70,7 @@ object DeleteMonitorService :
         val deleteResponse = deleteMonitor(monitor.id, refreshPolicy)
         deleteDocLevelMonitorQueriesAndIndices(monitor)
         deleteMetadata(monitor)
+        deleteLock(monitor)
         return DeleteMonitorResponse(deleteResponse.id, deleteResponse.version)
     }
 
@@ -146,6 +152,10 @@ object DeleteMonitorService :
             // we cannot retry based on this failure
             log.error("Failed to delete doc level queries from query index.", e)
         }
+    }
+
+    private suspend fun deleteLock(monitor: Monitor) {
+        client.suspendUntil<Client, Boolean> { lockService.deleteLock(LockModel.generateLockId(monitor.id), it) }
     }
 
     /**
