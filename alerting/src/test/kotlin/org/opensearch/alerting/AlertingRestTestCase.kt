@@ -903,6 +903,17 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return response
     }
 
+    public fun indexDoc(client: RestClient, index: String, doc: String, refresh: Boolean = true): Response {
+        val requestBody = StringEntity(doc, APPLICATION_JSON)
+        val params = if (refresh) mapOf("refresh" to "true") else mapOf()
+        val response = client.makeRequest("POST", "$index/_doc?op_type=create", params, requestBody)
+        assertTrue(
+            "Unable to index doc: '${doc.take(15)}...' to index: '$index'",
+            listOf(RestStatus.OK, RestStatus.CREATED).contains(response.restStatus())
+        )
+        return response
+    }
+
     protected fun deleteDoc(index: String, id: String, refresh: Boolean = true): Response {
         val params = if (refresh) mapOf("refresh" to "true") else mapOf()
         val response = client().makeRequest("DELETE", "$index/_doc/$id", params)

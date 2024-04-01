@@ -8,15 +8,27 @@ package org.opensearch.alerting.bwc
 import org.apache.hc.core5.http.ContentType.APPLICATION_JSON
 import org.apache.hc.core5.http.io.entity.StringEntity
 import org.opensearch.alerting.ALERTING_BASE_URI
+import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest
+import org.opensearch.alerting.objectMap
+import org.opensearch.alerting.randomDocumentLevelMonitor
+import org.opensearch.alerting.randomDocumentLevelTrigger
+import org.opensearch.client.Node
+import org.opensearch.client.Request
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
+import org.opensearch.commons.alerting.model.DocLevelQuery
+import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.concurrent.TimeUnit
 
 class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
@@ -86,6 +98,32 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
                         // if it hit the max time (1 minute), run verifyMonitorStats again to make sure all the tests pass
                         verifyMonitorStats("/_plugins/_alerting")
                     }
+                }
+            }
+            break
+        }
+    }
+
+    @Throws(Exception::class)
+    @Suppress("UNCHECKED_CAST")
+    fun `test backwards compatibility for doc-level monitors`() {
+        val uri = getPluginUri()
+        val responseMap = getAsMap(uri)["nodes"] as Map<String, Map<String, Any>>
+        for (response in responseMap.values) {
+            val plugins = response["plugins"] as List<Map<String, Any>>
+            val pluginNames = plugins.map { plugin -> plugin["name"] }.toSet()
+            when (CLUSTER_TYPE) {
+                ClusterType.OLD -> {
+                    assertTrue(pluginNames.contains("opensearch-alerting"))
+                    createDocLevelMonitor()
+                }
+                ClusterType.MIXED -> {
+                    assertTrue(pluginNames.contains("opensearch-alerting"))
+                    verifyMonitorExecutionSuccess()
+                }
+                ClusterType.UPGRADED -> {
+                    assertTrue(pluginNames.contains("opensearch-alerting"))
+                    verifyMonitorExecutionSuccess()
                 }
             }
             break
@@ -179,6 +217,25 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
         assertTrue("Create monitor response has incorrect version", createdVersion > 0)
     }
 
+    private fun createDocLevelMonitor(): Pair<Monitor, String> {
+        val testIndex = createTestIndex(index = "test-index", settings = Settings.builder().put("number_of_shards", "7").build())
+        val docQuery = DocLevelQuery(id = "4", query = "test_field:\"us-west-2\"", fields = listOf(), name = "4")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                name = "test-monitor",
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                enabled = true,
+                schedule = IntervalSchedule(1, ChronoUnit.MINUTES)
+            )
+        )
+        assertNotNull(monitor.id)
+        return Pair(monitor, testIndex)
+    }
+
     @Throws(Exception::class)
     @Suppress("UNCHECKED_CAST")
     private fun verifyMonitorExists(uri: String) {
@@ -193,7 +250,7 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
         val numberDocsFound = hits["total"]?.get("value")
-        assertEquals("Unexpected number of Monitors returned", 1, numberDocsFound)
+        assertEquals("Unexpected number of Monitors returned", 2, numberDocsFound)
     }
 
     @Throws(Exception::class)
@@ -218,5 +275,57 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
         assertEquals("Incorrect number of total nodes", 3, totalNodes)
         assertEquals("Some nodes in stats response failed", totalNodes, successfulNodes)
         assertEquals("Not all nodes are on schedule", totalNodes, nodesOnSchedule)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun verifyMonitorExecutionSuccess() {
+        val nodes = mutableListOf<Node>()
+        val nodesResponse = client().performRequest(Request("GET", "/_nodes")).asMap()
+        (nodesResponse["nodes"] as Map<String, Any>).forEach { nodeId, nodeInfo ->
+            val host = ((nodeInfo as Map<String, Any>)["http"] as Map<String, Any>)["publish_address"]
+            val version = nodeInfo["version"].toString()
+            if (nodes.isEmpty() && version >= "3.0.0") {
+                logger.info("use node-$nodeId")
+                client().nodes.forEach {
+                    if (it.host.toHostString().contains(host.toString())) {
+                        nodes.add(it)
+                    }
+                }
+            }
+        }
+        val client = client()
+        client.setNodes(nodes)
+        val searchResponse = searchMonitors()
+        val monitorId = searchResponse.hits.hits.filter { it.sourceAsMap["name"] == "test-monitor" }.first().id
+        val testIndex = "test-index"
+
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        indexDoc(client(), testIndex, testDoc)
+
+        var passed = false
+        OpenSearchTestCase.waitUntil({
+            try {
+                val response = executeMonitor(client, monitorId)
+                val output = entityAsMap(response)
+                assertEquals("test-monitor", output["monitor_name"])
+                @Suppress("UNCHECKED_CAST")
+                val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+                @Suppress("UNCHECKED_CAST")
+                val matchingDocsToQuery = searchResult["4"] as List<String>
+                passed = matchingDocsToQuery.isNotEmpty()
+                return@waitUntil true
+            } catch (e: AssertionError) {
+                return@waitUntil false
+            }
+        }, 1, TimeUnit.MINUTES)
+        if (!passed) {
+            assertTrue(passed)
+        }
     }
 }

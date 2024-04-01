@@ -7,6 +7,7 @@ package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
+import org.opensearch.Version
 import org.opensearch.action.ActionListenerResponseHandler
 import org.opensearch.action.get.MultiGetItemResponse
 import org.opensearch.action.support.GroupedActionListener
@@ -34,6 +35,9 @@ import org.opensearch.core.index.shard.ShardId
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.index.IndexNotFoundException
 import org.opensearch.index.seqno.SequenceNumbers
+import org.opensearch.node.NodeClosedException
+import org.opensearch.transport.ConnectTransportException
+import org.opensearch.transport.RemoteTransportException
 import org.opensearch.transport.TransportException
 import org.opensearch.transport.TransportRequestOptions
 import org.opensearch.transport.TransportService
@@ -241,7 +245,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
 
                                 override fun onFailure(e: Exception) {
                                     logger.info("Fan out failed", e)
-                                    if (e.cause is Exception) // unwrap remote transport exception
+                                    if (e.cause is Exception)
                                         cont.resumeWithException(e.cause as Exception)
                                     else
                                         cont.resumeWithException(e)
@@ -275,25 +279,33 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                                         responseReader
                                     ) {
                                         override fun handleException(e: TransportException) {
-                                            // retry in local node
-                                            transportService.sendRequest(
-                                                monitorCtx.clusterService!!.localNode(),
-                                                DocLevelMonitorFanOutAction.NAME,
-                                                docLevelMonitorFanOutRequest,
-                                                TransportRequestOptions.EMPTY,
-                                                object : ActionListenerResponseHandler<DocLevelMonitorFanOutResponse>(
-                                                    listener,
-                                                    responseReader
-                                                ) {
-                                                    override fun handleException(e: TransportException) {
-                                                        listener.onFailure(e)
-                                                    }
+                                            val cause = e.unwrapCause()
+                                            if (cause is ConnectTransportException ||
+                                                (e is RemoteTransportException && cause is NodeClosedException)
+                                            ) {
+                                                // retry in local node
+                                                transportService.sendRequest(
+                                                    monitorCtx.clusterService!!.localNode(),
+                                                    DocLevelMonitorFanOutAction.NAME,
+                                                    docLevelMonitorFanOutRequest,
+                                                    TransportRequestOptions.EMPTY,
+                                                    object :
+                                                        ActionListenerResponseHandler<DocLevelMonitorFanOutResponse>(
+                                                            listener,
+                                                            responseReader
+                                                        ) {
+                                                        override fun handleException(e: TransportException) {
+                                                            listener.onFailure(e)
+                                                        }
 
-                                                    override fun handleResponse(response: DocLevelMonitorFanOutResponse) {
-                                                        listener.onResponse(response)
+                                                        override fun handleResponse(response: DocLevelMonitorFanOutResponse) {
+                                                            listener.onResponse(response)
+                                                        }
                                                     }
-                                                }
-                                            )
+                                                )
+                                            } else {
+                                                listener.onFailure(e)
+                                            }
                                         }
 
                                         override fun handleResponse(response: DocLevelMonitorFanOutResponse) {
@@ -480,8 +492,8 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         return allShards.filter { it.primary() }.size
     }
 
-    private fun getNodes(monitorCtx: MonitorRunnerExecutionContext): MutableMap<String, DiscoveryNode> {
-        return monitorCtx.clusterService!!.state().nodes.dataNodes
+    private fun getNodes(monitorCtx: MonitorRunnerExecutionContext): Map<String, DiscoveryNode> {
+        return monitorCtx.clusterService!!.state().nodes.dataNodes.filter { it.value.version >= Version.CURRENT }
     }
 
     private fun distributeShards(

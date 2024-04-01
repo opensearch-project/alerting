@@ -802,3 +802,9 @@ fun randomAlertContext(
         sampleDocs = sampleDocs
     )
 }
+
+@Suppress("UNCHECKED_CAST")
+/** helper that returns a field in a json map whose values are all json objects */
+fun Map<String, Any>.objectMap(key: String): Map<String, Map<String, Any>> {
+    return this[key] as Map<String, Map<String, Any>>
+}
