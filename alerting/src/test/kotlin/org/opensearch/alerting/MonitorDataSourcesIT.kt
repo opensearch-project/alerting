@@ -843,7 +843,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
-        Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage == "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; ")
+        Assert.assertTrue(
+            getAlertsResponse.alerts[0].errorMessage ==
+                "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; "
+        )
         // Reopen index
         client().admin().indices().open(OpenIndexRequest(index)).get()
         // Close queryIndex
@@ -861,7 +864,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
-        Assert.assertTrue(getAlertsResponse.alerts[0].errorHistory[0].message == "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; ")
+        Assert.assertTrue(
+            getAlertsResponse.alerts[0].errorHistory[0].message ==
+                "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; "
+        )
         Assert.assertEquals(1, getAlertsResponse.alerts[0].errorHistory.size)
         Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage!!.contains("Failed to run percolate search"))
     }
@@ -950,7 +956,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertEquals(1, getAlertsResponse.alerts.size)
-        Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage == "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; ")
+        Assert.assertTrue(
+            getAlertsResponse.alerts[0].errorMessage ==
+                "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; "
+        )
         Assert.assertNull(getAlertsResponse.alerts[0].endTime)
 
         // Open index to have monitor run successfully
@@ -973,7 +982,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertEquals(1, getAlertsResponse.alerts.size)
-        Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage == "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; ")
+        Assert.assertTrue(
+            getAlertsResponse.alerts[0].errorMessage ==
+                "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; "
+        )
         Assert.assertNotNull(getAlertsResponse.alerts[0].endTime)
     }
 
@@ -1035,7 +1047,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertEquals(1 + 10, getAlertsResponse.alerts.size)
-        val newErrorAlert = getAlertsResponse.alerts.firstOrNull { it.errorMessage == "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; " }
+        val newErrorAlert = getAlertsResponse.alerts.firstOrNull {
+            it.errorMessage ==
+                "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; "
+        }
         Assert.assertNotNull(newErrorAlert)
         Assert.assertNull(newErrorAlert!!.endTime)
 
