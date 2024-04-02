@@ -9,7 +9,6 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
 import org.opensearch.Version
 import org.opensearch.action.ActionListenerResponseHandler
-import org.opensearch.action.get.MultiGetItemResponse
 import org.opensearch.action.support.GroupedActionListener
 import org.opensearch.alerting.action.DocLevelMonitorFanOutAction
 import org.opensearch.alerting.action.DocLevelMonitorFanOutRequest
@@ -50,9 +49,7 @@ import kotlin.math.max
 
 class DocumentLevelMonitorRunner : MonitorRunner() {
     private val logger = LogManager.getLogger(javaClass)
-
-    // Maps a finding ID to the related document.
-    private val findingIdToDocSource = mutableMapOf<String, MultiGetItemResponse>()
+    private var totalTimeTakenStat = 0L
 
     override suspend fun runMonitor(
         monitor: Monitor,
@@ -62,11 +59,10 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         dryrun: Boolean,
         workflowRunContext: WorkflowRunContext?,
         executionId: String,
-        transportService: TransportService?
+        transportService: TransportService
     ): MonitorRunResult<DocumentLevelTriggerRunResult> {
-        if (transportService == null)
-            throw RuntimeException("transport service should not be null")
         logger.debug("Document-level-monitor is running ...")
+        val startTime = System.currentTimeMillis()
         val isTempMonitor = dryrun || monitor.id == Monitor.NO_ID
         var monitorResult = MonitorRunResult<DocumentLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
         monitorCtx.findingsToTriggeredQueries = mutableMapOf()
@@ -244,11 +240,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                                 }
 
                                 override fun onFailure(e: Exception) {
-                                    logger.info("Fan out failed", e)
-                                    if (e.cause is Exception)
-                                        cont.resumeWithException(e.cause as Exception)
-                                    else
-                                        cont.resumeWithException(e)
+                                    cont.resumeWithException(e)
                                 }
                             },
                             nodeShardAssignments.size
@@ -304,6 +296,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                                                     }
                                                 )
                                             } else {
+                                                logger.error("Fan out failed in node ${node.key}", e)
                                                 listener.onFailure(e)
                                             }
                                         }
@@ -343,6 +336,14 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                 e
             )
             return monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
+        } finally {
+            val endTime = System.currentTimeMillis()
+            totalTimeTakenStat = endTime - startTime
+            logger.debug(
+                "Monitor {} Time spent on monitor run: {}",
+                monitor.id,
+                totalTimeTakenStat
+            )
         }
     }
 

@@ -382,7 +382,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         periodStart: Instant,
         periodEnd: Instant,
         dryrun: Boolean,
-        transportService: TransportService?
+        transportService: TransportService
     ): WorkflowRunResult {
         return CompositeWorkflowRunner.runWorkflow(workflow, monitorCtx, periodStart, periodEnd, dryrun, transportService)
     }
@@ -392,7 +392,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         periodStart: Instant,
         periodEnd: Instant,
         dryrun: Boolean,
-        transportService: TransportService?
+        transportService: TransportService
     ): MonitorRunResult<*> {
         // Updating the scheduled job index at the start of monitor execution runs for when there is an upgrade the the schema mapping
         // has not been updated.

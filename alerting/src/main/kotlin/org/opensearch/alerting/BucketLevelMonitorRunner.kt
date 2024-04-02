@@ -68,7 +68,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         dryrun: Boolean,
         workflowRunContext: WorkflowRunContext?,
         executionId: String,
-        transportService: TransportService?
+        transportService: TransportService
     ): MonitorRunResult<BucketLevelTriggerRunResult> {
         val roles = MonitorRunnerService.getRolesForMonitor(monitor)
         logger.debug("Running monitor: ${monitor.name} with roles: $roles Thread: ${Thread.currentThread().name}")

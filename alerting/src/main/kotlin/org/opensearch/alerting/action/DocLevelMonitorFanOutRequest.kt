@@ -56,12 +56,12 @@ class DocLevelMonitorFanOutRequest : ActionRequest, ToXContentObject {
         dryRun = sin.readBoolean(),
         monitorMetadata = MonitorMetadata.readFrom(sin),
         executionId = sin.readString(),
-        indexExecutionContext = IndexExecutionContext(sin),
         shardIds = sin.readList(::ShardId),
         concreteIndicesSeenSoFar = sin.readStringList(),
         workflowRunContext = if (sin.readBoolean()) {
             WorkflowRunContext(sin)
         } else null,
+        indexExecutionContext = IndexExecutionContext(sin)
     )
 
     @Throws(IOException::class)
@@ -70,11 +70,11 @@ class DocLevelMonitorFanOutRequest : ActionRequest, ToXContentObject {
         out.writeBoolean(dryRun)
         monitorMetadata.writeTo(out)
         out.writeString(executionId)
-        indexExecutionContext.writeTo(out)
         out.writeCollection(shardIds)
         out.writeStringCollection(concreteIndicesSeenSoFar)
         out.writeBoolean(workflowRunContext != null)
         workflowRunContext?.writeTo(out)
+        indexExecutionContext.writeTo(out)
     }
 
     override fun validate(): ActionRequestValidationException? {

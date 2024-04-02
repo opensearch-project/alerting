@@ -45,7 +45,7 @@ abstract class MonitorRunner {
         dryRun: Boolean,
         workflowRunContext: WorkflowRunContext? = null,
         executionId: String,
-        transportService: TransportService?
+        transportService: TransportService
     ): MonitorRunResult<*>
 
     suspend fun runAction(

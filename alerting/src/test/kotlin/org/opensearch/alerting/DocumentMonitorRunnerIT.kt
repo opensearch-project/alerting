@@ -2645,7 +2645,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test execute monitor generates alerts and findings in a distributed way`() {
+    fun `test document-level monitor fanout which generates alerts and findings`() {
         val testIndex = createTestIndex(settings = Settings.builder().put("number_of_shards", "7").build())
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -2691,7 +2691,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         )
     }
 
-    fun `test document-level monitor when aliases contain docs that do match query in a distributed way`() {
+    fun `test document-level monitor fanout when aliases contain indices with multiple shards`() {
         val aliasName = "test-alias"
         createIndexAlias(
             aliasName,

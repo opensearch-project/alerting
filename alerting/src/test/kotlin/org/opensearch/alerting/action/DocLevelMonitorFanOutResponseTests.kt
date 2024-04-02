@@ -12,8 +12,8 @@ import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.test.OpenSearchTestCase
 
 class DocLevelMonitorFanOutResponseTests : OpenSearchTestCase() {
-    fun `test dlmfor as stream`() {
-        val workflow = DocLevelMonitorFanOutResponse(
+    fun `test doc level monitor fan out response with errors as stream`() {
+        val docLevelMonitorFanOutResponse = DocLevelMonitorFanOutResponse(
             "nodeid",
             "eid",
             "monitorId",
@@ -22,18 +22,18 @@ class DocLevelMonitorFanOutResponseTests : OpenSearchTestCase() {
             mapOf("1" to randomDocumentLevelTriggerRunResult(), "2" to randomDocumentLevelTriggerRunResult())
         )
         val out = BytesStreamOutput()
-        workflow.writeTo(out)
+        docLevelMonitorFanOutResponse.writeTo(out)
         val sin = StreamInput.wrap(out.bytes().toBytesRef().bytes)
-        val newWorkflow = DocLevelMonitorFanOutResponse(sin)
-        assertEquals(workflow.nodeId, newWorkflow.nodeId)
-        assertEquals(workflow.executionId, newWorkflow.executionId)
-        assertEquals(workflow.monitorId, newWorkflow.monitorId)
-        assertEquals(workflow.lastRunContexts, newWorkflow.lastRunContexts)
-        assertEquals(workflow.inputResults, newWorkflow.inputResults)
-        assertEquals(workflow.triggerResults, newWorkflow.triggerResults)
+        val newDocLevelMonitorFanOutResponse = DocLevelMonitorFanOutResponse(sin)
+        assertEquals(docLevelMonitorFanOutResponse.nodeId, newDocLevelMonitorFanOutResponse.nodeId)
+        assertEquals(docLevelMonitorFanOutResponse.executionId, newDocLevelMonitorFanOutResponse.executionId)
+        assertEquals(docLevelMonitorFanOutResponse.monitorId, newDocLevelMonitorFanOutResponse.monitorId)
+        assertEquals(docLevelMonitorFanOutResponse.lastRunContexts, newDocLevelMonitorFanOutResponse.lastRunContexts)
+        assertEquals(docLevelMonitorFanOutResponse.inputResults, newDocLevelMonitorFanOutResponse.inputResults)
+        assertEquals(docLevelMonitorFanOutResponse.triggerResults, newDocLevelMonitorFanOutResponse.triggerResults)
     }
 
-    fun `test dlmfor1 as stream`() {
+    fun `test doc level monitor fan out response as stream`() {
         val workflow = DocLevelMonitorFanOutResponse(
             "nodeid",
             "eid",

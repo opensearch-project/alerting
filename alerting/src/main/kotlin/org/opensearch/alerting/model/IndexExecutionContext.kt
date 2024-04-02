@@ -35,7 +35,7 @@ data class IndexExecutionContext(
         updatedIndexNames = sin.readStringList(),
         concreteIndexNames = sin.readStringList(),
         conflictingFields = sin.readStringList(),
-        docIds = sin.readStringList()
+        docIds = sin.readOptionalStringList()
     )
 
     override fun writeTo(out: StreamOutput?) {

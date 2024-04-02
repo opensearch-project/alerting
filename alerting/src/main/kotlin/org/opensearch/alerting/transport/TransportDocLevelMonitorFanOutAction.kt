@@ -26,6 +26,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertService
+import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.TriggerService
 import org.opensearch.alerting.action.DocLevelMonitorFanOutAction
 import org.opensearch.alerting.action.DocLevelMonitorFanOutRequest
@@ -577,7 +578,7 @@ class TransportDocLevelMonitorFanOutAction
         dryrun: Boolean
     ): ActionRunResult {
         return try {
-            if (ctx is QueryLevelTriggerExecutionContext && !isActionActionable(action, ctx.alert)) {
+            if (ctx is QueryLevelTriggerExecutionContext && !MonitorRunnerService.isActionActionable(action, ctx.alert)) {
                 return ActionRunResult(action.id, action.name, mapOf(), true, null, null)
             }
             val actionOutput = mutableMapOf<String, String>()
@@ -1164,22 +1165,6 @@ class TransportDocLevelMonitorFanOutAction
             }
         }
         return errorMessage
-    }
-
-    internal fun isActionActionable(action: Action, alert: Alert?): Boolean {
-        if (alert != null && alert.state == Alert.State.AUDIT)
-            return false
-        if (alert == null || action.throttle == null) {
-            return true
-        }
-        if (action.throttleEnabled) {
-            val result = alert.actionExecutionResults.firstOrNull { r -> r.actionId == action.id }
-            val lastExecutionTime: Instant? = result?.lastExecutionTime
-            val throttledTimeBound = Instant.ofEpochMilli(client.threadPool().absoluteTimeInMillis())
-                .minus(action.throttle!!.value.toLong(), action.throttle!!.unit)
-            return (lastExecutionTime == null || lastExecutionTime.isBefore(throttledTimeBound))
-        }
-        return true
     }
 
     /**

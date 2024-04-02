@@ -31,7 +31,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
         dryrun: Boolean,
         workflowRunContext: WorkflowRunContext?,
         executionId: String,
-        transportService: TransportService?
+        transportService: TransportService
     ): MonitorRunResult<QueryLevelTriggerRunResult> {
         val roles = MonitorRunnerService.getRolesForMonitor(monitor)
         logger.debug("Running monitor: ${monitor.name} with roles: $roles Thread: ${Thread.currentThread().name}")

@@ -55,7 +55,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         periodStart: Instant,
         periodEnd: Instant,
         dryRun: Boolean,
-        transportService: TransportService?
+        transportService: TransportService
     ): WorkflowRunResult {
         val workflowExecutionStartTime = Instant.now()
 
@@ -249,7 +249,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         dryRun: Boolean,
         workflowRunContext: WorkflowRunContext,
         executionId: String,
-        transportService: TransportService?
+        transportService: TransportService
     ): MonitorRunResult<*>? {
 
         if (delegateMonitor.isBucketLevelMonitor()) {

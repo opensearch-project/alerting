@@ -44,7 +44,7 @@ abstract class WorkflowRunner {
         periodStart: Instant,
         periodEnd: Instant,
         dryRun: Boolean,
-        transportService: TransportService?
+        transportService: TransportService
     ): WorkflowRunResult
 
     suspend fun runAction(
