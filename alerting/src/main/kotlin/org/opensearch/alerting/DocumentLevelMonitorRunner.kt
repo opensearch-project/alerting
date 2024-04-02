@@ -240,7 +240,10 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                                 }
 
                                 override fun onFailure(e: Exception) {
-                                    cont.resumeWithException(e)
+                                    if (e.cause is Exception)
+                                        cont.resumeWithException(e.cause as Exception)
+                                    else
+                                        cont.resumeWithException(e)
                                 }
                             },
                             nodeShardAssignments.size
