@@ -36,6 +36,7 @@ import org.opensearch.core.rest.RestStatus
 import org.opensearch.index.IndexNotFoundException
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.node.NodeClosedException
+import org.opensearch.transport.ActionNotFoundTransportException
 import org.opensearch.transport.ConnectTransportException
 import org.opensearch.transport.RemoteTransportException
 import org.opensearch.transport.TransportException
@@ -281,7 +282,8 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                                                     e is RemoteTransportException &&
                                                         (
                                                             cause is NodeClosedException ||
-                                                                cause is CircuitBreakingException
+                                                                cause is CircuitBreakingException ||
+                                                                cause is ActionNotFoundTransportException
                                                             )
                                                     )
                                             ) {
