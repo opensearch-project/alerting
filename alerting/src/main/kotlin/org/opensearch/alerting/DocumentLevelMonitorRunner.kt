@@ -29,6 +29,7 @@ import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.core.action.ActionListener
+import org.opensearch.core.common.breaker.CircuitBreakingException
 import org.opensearch.core.common.io.stream.Writeable
 import org.opensearch.core.index.shard.ShardId
 import org.opensearch.core.rest.RestStatus
@@ -276,11 +277,18 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                                         override fun handleException(e: TransportException) {
                                             val cause = e.unwrapCause()
                                             if (cause is ConnectTransportException ||
-                                                (e is RemoteTransportException && cause is NodeClosedException)
+                                                (
+                                                    e is RemoteTransportException &&
+                                                        (
+                                                            cause is NodeClosedException ||
+                                                                cause is CircuitBreakingException
+                                                            )
+                                                    )
                                             ) {
+                                                val localNode = monitorCtx.clusterService!!.localNode()
                                                 // retry in local node
                                                 transportService.sendRequest(
-                                                    monitorCtx.clusterService!!.localNode(),
+                                                    localNode,
                                                     DocLevelMonitorFanOutAction.NAME,
                                                     docLevelMonitorFanOutRequest,
                                                     TransportRequestOptions.EMPTY,
@@ -290,6 +298,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                                                             responseReader
                                                         ) {
                                                         override fun handleException(e: TransportException) {
+                                                            logger.error("Fan out retry failed in node ${localNode.id}")
                                                             listener.onFailure(e)
                                                         }
 
