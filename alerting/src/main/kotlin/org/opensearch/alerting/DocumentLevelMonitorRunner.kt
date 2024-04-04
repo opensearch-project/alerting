@@ -37,6 +37,7 @@ import org.opensearch.alerting.util.getCancelAfterTimeInterval
 import org.opensearch.alerting.util.parseSampleDocTags
 import org.opensearch.alerting.util.printsSampleDocData
 import org.opensearch.alerting.workflow.WorkflowRunContext
+import org.opensearch.client.Client
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.routing.Preference
@@ -728,7 +729,6 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         return response.hits.hits[0].seqNo
     }
 
-
     private fun getShardsCount(clusterService: ClusterService, index: String): Int {
         val allShards: List<ShardRouting> = clusterService!!.state().routingTable().allShards(index)
         return allShards.filter { it.primary() }.size
@@ -912,7 +912,6 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                     .size(monitorCtx.docLevelMonitorShardFetchSize)
             )
             .preference(Preference.PRIMARY_FIRST.type())
-            
         request.cancelAfterTimeInterval = TimeValue.timeValueMinutes(
             getCancelAfterTimeInterval()
         )
