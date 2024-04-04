@@ -18,17 +18,26 @@ import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertMover.Companion.moveAlerts
 import org.opensearch.alerting.core.JobRunner
 import org.opensearch.alerting.core.ScheduledJobIndices
+import org.opensearch.alerting.core.lock.LockModel
+import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.WorkflowRunResult
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.opensearchapi.retry
+import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.TriggerExecutionContext
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_MILLIS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED
+import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE
+import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDINGS_INDEXING_BATCH_SIZE
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTIONABLE_ALERT_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MOVE_ALERTS_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MOVE_ALERTS_BACKOFF_MILLIS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT
+import org.opensearch.alerting.settings.AlertingSettings.Companion.PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.HOST_DENY_LIST
 import org.opensearch.alerting.settings.DestinationSettings.Companion.loadDestinationSettings
@@ -49,6 +58,7 @@ import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.monitor.jvm.JvmStats
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
 import org.opensearch.script.TemplateScript
@@ -133,6 +143,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         return this
     }
 
+    fun registerJvmStats(jvmStats: JvmStats): MonitorRunnerService {
+        this.monitorCtx.jvmStats = jvmStats
+        return this
+    }
+
     // Must be called after registerClusterService and registerSettings in AlertingPlugin
     fun registerConsumers(): MonitorRunnerService {
         monitorCtx.retryPolicy = BackoffPolicy.constantBackoff(
@@ -176,6 +191,35 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
         monitorCtx.indexTimeout = INDEX_TIMEOUT.get(monitorCtx.settings)
 
+        monitorCtx.findingsIndexBatchSize = FINDINGS_INDEXING_BATCH_SIZE.get(monitorCtx.settings)
+        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.FINDINGS_INDEXING_BATCH_SIZE) {
+            monitorCtx.findingsIndexBatchSize = it
+        }
+
+        monitorCtx.fetchOnlyQueryFieldNames = DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED.get(monitorCtx.settings)
+        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED) {
+            monitorCtx.fetchOnlyQueryFieldNames = it
+        }
+
+        monitorCtx.percQueryMaxNumDocsInMemory = PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY.get(monitorCtx.settings)
+        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY) {
+            monitorCtx.percQueryMaxNumDocsInMemory = it
+        }
+
+        monitorCtx.percQueryDocsSizeMemoryPercentageLimit =
+            PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT.get(monitorCtx.settings)
+        monitorCtx.clusterService!!.clusterSettings
+            .addSettingsUpdateConsumer(PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT) {
+                monitorCtx.percQueryDocsSizeMemoryPercentageLimit = it
+            }
+
+        monitorCtx.docLevelMonitorShardFetchSize =
+            DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE.get(monitorCtx.settings)
+        monitorCtx.clusterService!!.clusterSettings
+            .addSettingsUpdateConsumer(DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE) {
+                monitorCtx.docLevelMonitorShardFetchSize = it
+            }
+
         return this
     }
 
@@ -184,6 +228,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         monitorCtx.destinationSettings = loadDestinationSettings(monitorCtx.settings!!)
         monitorCtx.destinationContextFactory =
             DestinationContextFactory(monitorCtx.client!!, monitorCtx.xContentRegistry!!, monitorCtx.destinationSettings!!)
+        return this
+    }
+
+    fun registerLockService(lockService: LockService): MonitorRunnerService {
+        monitorCtx.lockService = lockService
         return this
     }
 
@@ -258,12 +307,40 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         when (job) {
             is Workflow -> {
                 launch {
-                    runJob(job, periodStart, periodEnd, false)
+                    var lock: LockModel? = null
+                    try {
+                        lock = monitorCtx.client!!.suspendUntil<Client, LockModel?> {
+                            monitorCtx.lockService!!.acquireLock(job, it)
+                        } ?: return@launch
+                        logger.debug("lock ${lock!!.lockId} acquired")
+                        logger.debug(
+                            "PERF_DEBUG: executing workflow ${job.id} on node " +
+                                monitorCtx.clusterService!!.state().nodes().localNode.id
+                        )
+                        runJob(job, periodStart, periodEnd, false)
+                    } finally {
+                        monitorCtx.client!!.suspendUntil<Client, Boolean> { monitorCtx.lockService!!.release(lock, it) }
+                        logger.debug("lock ${lock!!.lockId} released")
+                    }
                 }
             }
             is Monitor -> {
                 launch {
-                    runJob(job, periodStart, periodEnd, false)
+                    var lock: LockModel? = null
+                    try {
+                        lock = monitorCtx.client!!.suspendUntil<Client, LockModel?> {
+                            monitorCtx.lockService!!.acquireLock(job, it)
+                        } ?: return@launch
+                        logger.debug("lock ${lock!!.lockId} acquired")
+                        logger.debug(
+                            "PERF_DEBUG: executing ${job.monitorType} ${job.id} on node " +
+                                monitorCtx.clusterService!!.state().nodes().localNode.id
+                        )
+                        runJob(job, periodStart, periodEnd, false)
+                    } finally {
+                        monitorCtx.client!!.suspendUntil<Client, Boolean> { monitorCtx.lockService!!.release(lock, it) }
+                        logger.debug("lock ${lock!!.lockId} released")
+                    }
                 }
             }
             else -> {
@@ -307,7 +384,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         val runResult = if (monitor.isBucketLevelMonitor()) {
             BucketLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun, executionId = executionId)
         } else if (monitor.isDocLevelMonitor()) {
-            DocumentLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun, executionId = executionId)
+            DocumentLevelMonitorRunner().runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun, executionId = executionId)
         } else {
             QueryLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun, executionId = executionId)
         }

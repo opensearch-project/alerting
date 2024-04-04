@@ -10,6 +10,8 @@ import org.apache.hc.core5.http.io.entity.StringEntity
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_FINDING_INDEX_PATTERN
+import org.opensearch.alerting.core.lock.LockService
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
 import org.opensearch.common.xcontent.json.JsonXContent
@@ -17,16 +19,20 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
+import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.commons.alerting.model.action.AlertCategory
 import org.opensearch.commons.alerting.model.action.PerAlertActionScope
 import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.script.Script
+import org.opensearch.test.OpenSearchTestCase
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.time.temporal.ChronoUnit.MILLIS
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
@@ -42,6 +48,214 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val index = createTestIndex()
 
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+
+        val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
+        )
+
+        indexDoc(index, "1", testDoc)
+
+        val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
+
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        assertEquals(1, output.objectMap("trigger_results").values.size)
+
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertEquals(1, triggerResult.objectMap("action_results").values.size)
+            for (alertActionResult in triggerResult.objectMap("action_results").values) {
+                for (actionResult in alertActionResult.values) {
+                    @Suppress("UNCHECKED_CAST") val actionOutput = (actionResult as Map<String, Map<String, String>>)["output"]
+                        as Map<String, String>
+                    assertEquals("Hello ${monitor.name}", actionOutput["subject"])
+                    assertEquals("Hello ${monitor.name}", actionOutput["message"])
+                }
+            }
+        }
+
+        val alerts = searchAlerts(monitor)
+        assertEquals("Alert saved for test monitor", 0, alerts.size)
+
+        // ensure doc level query is deleted on dry run
+        val request = """{
+            "size": 10,
+            "query": {
+                "match_all": {}
+            }
+        }"""
+        var httpResponse = adminClient().makeRequest(
+            "GET", "/${monitor.dataSources.queryIndex}/_search",
+            StringEntity(request, ContentType.APPLICATION_JSON)
+        )
+        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
+        var searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        searchResponse.hits.totalHits?.let { assertEquals("Query saved in query index", 0L, it.value) }
+    }
+
+    fun `test dryrun execute monitor with queryFieldNames set up with correct field`() {
+
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val index = createTestIndex()
+
+        val docQuery =
+            DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf(), queryFieldNames = listOf("test_field"))
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+
+        val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
+        )
+
+        indexDoc(index, "1", testDoc)
+
+        val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
+
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        assertEquals(1, output.objectMap("trigger_results").values.size)
+
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertEquals(1, triggerResult.objectMap("action_results").values.size)
+            for (alertActionResult in triggerResult.objectMap("action_results").values) {
+                for (actionResult in alertActionResult.values) {
+                    @Suppress("UNCHECKED_CAST") val actionOutput = (actionResult as Map<String, Map<String, String>>)["output"]
+                        as Map<String, String>
+                    assertEquals("Hello ${monitor.name}", actionOutput["subject"])
+                    assertEquals("Hello ${monitor.name}", actionOutput["message"])
+                }
+            }
+        }
+
+        val alerts = searchAlerts(monitor)
+        assertEquals("Alert saved for test monitor", 0, alerts.size)
+    }
+
+    fun `test seq_no calculation correctness when docs are deleted`() {
+        adminClient().updateSettings(AlertingSettings.DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE.key, 2)
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val index = createTestIndex()
+
+        val docQuery =
+            DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+
+        val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
+        )
+
+        indexDoc(index, "1", testDoc)
+        indexDoc(index, "2", testDoc)
+        indexDoc(index, "3", testDoc)
+        indexDoc(index, "4", testDoc)
+        indexDoc(index, "5", testDoc)
+        indexDoc(index, "11", testDoc)
+        indexDoc(index, "21", testDoc)
+        indexDoc(index, "31", testDoc)
+        indexDoc(index, "41", testDoc)
+        indexDoc(index, "51", testDoc)
+
+        deleteDoc(index, "51")
+        val response = executeMonitor(monitor, params = mapOf("dryrun" to "false"))
+
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertEquals(9, triggerResult.objectMap("action_results").values.size)
+        }
+    }
+
+    fun `test dryrun execute monitor with queryFieldNames set up with wrong field`() {
+
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val index = createTestIndex()
+        // using wrong field name
+        val docQuery = DocLevelQuery(
+            query = "test_field:\"us-west-2\"",
+            name = "3",
+            fields = listOf(),
+            queryFieldNames = listOf("wrong_field")
+        )
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+
+        val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
+        )
+
+        indexDoc(index, "1", testDoc)
+        indexDoc(index, "2", testDoc)
+        indexDoc(index, "3", testDoc)
+        indexDoc(index, "4", testDoc)
+        indexDoc(index, "5", testDoc)
+
+        val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
+
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        assertEquals(1, output.objectMap("trigger_results").values.size)
+
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertEquals(0, triggerResult.objectMap("action_results").values.size)
+            for (alertActionResult in triggerResult.objectMap("action_results").values) {
+                for (actionResult in alertActionResult.values) {
+                    @Suppress("UNCHECKED_CAST") val actionOutput = (actionResult as Map<String, Map<String, String>>)["output"]
+                        as Map<String, String>
+                    assertEquals("Hello ${monitor.name}", actionOutput["subject"])
+                    assertEquals("Hello ${monitor.name}", actionOutput["message"])
+                }
+            }
+        }
+
+        val alerts = searchAlerts(monitor)
+        assertEquals("Alert saved for test monitor", 0, alerts.size)
+    }
+
+    fun `test fetch_query_field_names setting is disabled by configuring queryFieldNames set up with wrong field still works`() {
+        adminClient().updateSettings(AlertingSettings.DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED.key, "false")
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val index = createTestIndex()
+        // using wrong field name
+        val docQuery = DocLevelQuery(
+            query = "test_field:\"us-west-2\"",
+            name = "3",
+            fields = listOf(),
+            queryFieldNames = listOf("wrong_field")
+        )
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
 
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
@@ -105,6 +319,120 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertEquals("Incorrect search result", 2, matchingDocsToQuery.size)
         assertTrue("Incorrect search result", matchingDocsToQuery.contains("1|$testIndex"))
         assertTrue("Incorrect search result", matchingDocsToQuery.contains("5|$testIndex"))
+
+        // ensure doc level query is deleted on dry run
+        val request = """{
+            "size": 10,
+            "query": {
+                "match_all": {}
+            }
+        }"""
+        var httpResponse = adminClient().makeRequest(
+            "GET", "/${monitor.dataSources.queryIndex}/_search",
+            StringEntity(request, ContentType.APPLICATION_JSON)
+        )
+        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
+        var searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        searchResponse.hits.totalHits?.let { assertEquals("Query saved in query index", 0L, it.value) }
+    }
+
+    fun `test execute monitor returns search result with dryrun then without dryrun ensure dry run query not saved`() {
+        val testIndex = createTestIndex()
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger))
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex, "2", testDoc)
+
+        val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
+
+        val output = entityAsMap(response)
+
+        assertEquals(monitor.name, output["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
+        assertEquals("Incorrect search result", 2, matchingDocsToQuery.size)
+        assertTrue("Incorrect search result", matchingDocsToQuery.contains("1|$testIndex"))
+        assertTrue("Incorrect search result", matchingDocsToQuery.contains("2|$testIndex"))
+
+        // ensure doc level query is deleted on dry run
+        val request = """{
+            "size": 10,
+            "query": {
+                "match_all": {}
+            }
+        }"""
+        var httpResponse = adminClient().makeRequest(
+            "GET", "/${monitor.dataSources.queryIndex}/_search",
+            StringEntity(request, ContentType.APPLICATION_JSON)
+        )
+        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
+        var searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        searchResponse.hits.totalHits?.let { assertEquals(0L, it.value) }
+
+        // create and execute second monitor not as dryrun
+        val testIndex2 = createTestIndex("test1")
+        val testTime2 = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc2 = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime2",
+            "test_field" : "us-east-1"
+        }"""
+
+        val docQuery2 = DocLevelQuery(query = "test_field:\"us-east-1\"", name = "3", fields = listOf())
+        val docLevelInput2 = DocLevelMonitorInput("description", listOf(testIndex2), listOf(docQuery2))
+
+        val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor2 = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput2), triggers = listOf(trigger2)))
+        assertNotNull(monitor2.id)
+
+        indexDoc(testIndex2, "1", testDoc2)
+        indexDoc(testIndex2, "5", testDoc2)
+
+        val response2 = executeMonitor(monitor2.id)
+        val output2 = entityAsMap(response2)
+
+        assertEquals(monitor2.name, output2["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val searchResult2 = (output2.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        val matchingDocsToQuery2 = searchResult2[docQuery2.id] as List<String>
+        assertEquals("Incorrect search result", 2, matchingDocsToQuery2.size)
+        assertTrue("Incorrect search result", matchingDocsToQuery2.containsAll(listOf("1|$testIndex2", "5|$testIndex2")))
+
+        val alerts = searchAlertsWithFilter(monitor2)
+        assertEquals("Alert saved for test monitor", 2, alerts.size)
+
+        val findings = searchFindings(monitor2)
+        assertEquals("Findings saved for test monitor", 2, findings.size)
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("5"))
+        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("1"))
+
+        // ensure query from second monitor was saved
+        val expectedQueries = listOf("test_field_test1_${monitor2.id}:\"us-east-1\"")
+        httpResponse = adminClient().makeRequest(
+            "GET", "/${monitor.dataSources.queryIndex}/_search",
+            StringEntity(request, ContentType.APPLICATION_JSON)
+        )
+        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
+        searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        searchResponse.hits.forEach { hit ->
+            val query = ((hit.sourceAsMap["query"] as Map<String, Any>)["query_string"] as Map<String, Any>)["query"]
+            assertTrue(expectedQueries.contains(query))
+        }
+        searchResponse.hits.totalHits?.let { assertEquals("Query saved in query index", 1L, it.value) }
     }
 
     fun `test execute monitor generates alerts and findings`() {
@@ -143,8 +471,88 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 2, findings.size)
-        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
-        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("5"))
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("5"))
+        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("1"))
+    }
+
+    fun `test monitor run generates no error alerts with versionconflictengineexception with locks`() {
+        val testIndex = createTestIndex()
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                name = "__lag-monitor-test__",
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                schedule = IntervalSchedule(interval = 1, unit = ChronoUnit.MINUTES)
+            )
+        )
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex, "5", testDoc)
+        Thread.sleep(240000)
+
+        val inputMap = HashMap<String, Any>()
+        inputMap["searchString"] = monitor.name
+
+        val responseMap = getAlerts(inputMap).asMap()
+        val alerts = (responseMap["alerts"] as ArrayList<Map<String, Any>>)
+        alerts.forEach {
+            assertTrue(it["error_message"] == null)
+        }
+    }
+
+    @AwaitsFix(bugUrl = "")
+    fun `test monitor run generate lock and monitor delete removes lock`() {
+        val testIndex = createTestIndex()
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                schedule = IntervalSchedule(interval = 1, unit = ChronoUnit.MINUTES)
+            )
+        )
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex, "5", testDoc)
+        OpenSearchTestCase.waitUntil({
+            val response = client().makeRequest("HEAD", LockService.LOCK_INDEX_NAME)
+            return@waitUntil (response.restStatus().status == 200)
+        }, 240, TimeUnit.SECONDS)
+
+        var response = client().makeRequest("GET", LockService.LOCK_INDEX_NAME + "/_search")
+        var responseMap = entityAsMap(response)
+        var noOfLocks = ((responseMap["hits"] as Map<String, Any>)["hits"] as List<Any>).size
+        assertEquals(1, noOfLocks)
+
+        deleteMonitor(monitor)
+        refreshIndex(LockService.LOCK_INDEX_NAME)
+        response = client().makeRequest("GET", LockService.LOCK_INDEX_NAME + "/_search")
+        responseMap = entityAsMap(response)
+        noOfLocks = ((responseMap["hits"] as Map<String, Any>)["hits"] as List<Any>).size
+        assertEquals(0, noOfLocks)
     }
 
     fun `test execute monitor with tag as trigger condition generates alerts and findings`() {
@@ -183,8 +591,8 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 2, findings.size)
-        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
-        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("5"))
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("5"))
+        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("1"))
     }
 
     fun `test execute monitor input error`() {
@@ -282,8 +690,8 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 2, findings.size)
-        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
-        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("5"))
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("5"))
+        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("1"))
     }
 
     fun `test execute monitor generates alerts and findings with per trigger execution for actions`() {
@@ -345,8 +753,8 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val findings = searchFindings(monitor)
         assertEquals("Findings saved for test monitor", 2, findings.size)
-        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
-        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("5"))
+        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("5"))
+        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("1"))
     }
 
     fun `test execute monitor with wildcard index that generates alerts and findings for EQUALS query operator`() {
@@ -391,6 +799,54 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertEquals("Findings saved for test monitor", 2, findings.size)
         val foundFindings = findings.filter { it.relatedDocIds.contains("1") || it.relatedDocIds.contains("5") }
         assertEquals("Didn't find findings for docs 1 and 5", 2, foundFindings.size)
+    }
+
+    fun `test execute monitor for bulk index findings`() {
+        val testIndexPrefix = "test-index-${randomAlphaOfLength(10).lowercase(Locale.ROOT)}"
+        val testQueryName = "wildcard-test-query"
+        val testIndex = createTestIndex("${testIndexPrefix}1")
+        val testIndex2 = createTestIndex("${testIndexPrefix}2")
+
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = testQueryName, fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf("$testIndexPrefix*"), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = Script("query[name=$testQueryName]"))
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+        assertNotNull(monitor.id)
+
+        for (i in 0 until 9) {
+            indexDoc(testIndex, i.toString(), testDoc)
+        }
+        indexDoc(testIndex2, "3", testDoc)
+        adminClient().updateSettings("plugins.alerting.alert_findings_indexing_batch_size", 2)
+
+        val response = executeMonitor(monitor.id)
+
+        val output = entityAsMap(response)
+
+        assertEquals(monitor.name, output["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
+        assertEquals("Correct search result", 10, matchingDocsToQuery.size)
+        assertTrue("Correct search result", matchingDocsToQuery.containsAll(listOf("1|$testIndex", "2|$testIndex", "3|$testIndex2")))
+
+        val alerts = searchAlertsWithFilter(monitor)
+        assertEquals("Alert saved for test monitor", 10, alerts.size)
+
+        val findings = searchFindings(monitor)
+        assertEquals("Findings saved for test monitor", 10, findings.size)
+        val foundFindings =
+            findings.filter { it.relatedDocIds.contains("1") || it.relatedDocIds.contains("2") || it.relatedDocIds.contains("3") }
+        assertEquals("Found findings for all docs", 4, foundFindings.size)
     }
 
     fun `test execute monitor with wildcard index that generates alerts and findings for NOT EQUALS query operator`() {
@@ -1624,6 +2080,568 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         output = entityAsMap(response)
         assertEquals(1, output.objectMap("trigger_results").values.size)
+    }
+
+    fun `test execute monitor generates alerts and findings with NOT EQUALS query and EXISTS query`() {
+        val testIndex = createTestIndex()
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val query = "NOT test_field: \"us-east-1\" AND _exists_: test_field"
+        val docQuery = DocLevelQuery(query = query, name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex, "5", testDoc)
+
+        val response = executeMonitor(monitor.id)
+
+        val output = entityAsMap(response)
+
+        assertEquals(monitor.name, output["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
+        assertEquals("Incorrect search result", 2, matchingDocsToQuery.size)
+        assertTrue("Incorrect search result", matchingDocsToQuery.containsAll(listOf("1|$testIndex", "5|$testIndex")))
+
+        val alerts = searchAlertsWithFilter(monitor)
+        assertEquals("Alert saved for test monitor", 2, alerts.size)
+
+        val findings = searchFindings(monitor)
+        assertEquals("Findings saved for test monitor", 2, findings.size)
+        val findings0 = findings[0].relatedDocIds.contains("1") || findings[0].relatedDocIds.contains("5")
+        val findings1 = findings[1].relatedDocIds.contains("5") || findings[1].relatedDocIds.contains("1")
+        assertTrue("Findings saved for test monitor", findings0)
+        assertTrue("Findings saved for test monitor", findings1)
+    }
+
+    fun `test document-level monitor when index alias contain docs that do match a NOT EQUALS query and EXISTS query`() {
+        val aliasName = "test-alias"
+        createIndexAlias(
+            aliasName,
+            """
+                "properties" : {
+                  "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
+                  "test_field" : { "type" : "keyword" },
+                  "number" : { "type" : "keyword" }
+                }
+            """.trimIndent()
+        )
+
+        val docQuery = DocLevelQuery(query = "NOT test_field:\"us-east-1\" AND _exists_: test_field", name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf("$aliasName"), listOf(docQuery))
+
+        val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
+            )
+        )
+
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "@timestamp": "$testTime",
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+        indexDoc(aliasName, "1", testDoc)
+        var response = executeMonitor(monitor.id)
+        var output = entityAsMap(response)
+        var searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        var matchingDocsToQuery = searchResult[docQuery.id] as List<String>
+        assertEquals("Incorrect search result", 1, matchingDocsToQuery.size)
+
+        rolloverDatastream(aliasName)
+        indexDoc(aliasName, "2", testDoc)
+        response = executeMonitor(monitor.id)
+        output = entityAsMap(response)
+        searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        matchingDocsToQuery = searchResult[docQuery.id] as List<String>
+        assertEquals("Incorrect search result", 1, matchingDocsToQuery.size)
+
+        deleteIndexAlias(aliasName)
+    }
+
+    fun `test execute monitor with wildcard index that generates alerts and findings for NOT EQUALS and EXISTS query operator`() {
+        val testIndexPrefix = "test-index-${randomAlphaOfLength(10).lowercase(Locale.ROOT)}"
+        val testQueryName = "wildcard-test-query"
+        val testIndex = createTestIndex("${testIndexPrefix}1")
+        val testIndex2 = createTestIndex("${testIndexPrefix}2")
+
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val query = "NOT test_field:\"us-west-1\" AND _exists_: test_field"
+        val docQuery = DocLevelQuery(query = query, name = testQueryName, fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf("$testIndexPrefix*"), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = Script("query[name=$testQueryName]"))
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex2, "5", testDoc)
+
+        val response = executeMonitor(monitor.id)
+
+        val output = entityAsMap(response)
+
+        assertEquals(monitor.name, output["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
+        assertEquals("Incorrect search result", 2, matchingDocsToQuery.size)
+        assertTrue("Incorrect search result", matchingDocsToQuery.containsAll(listOf("1|$testIndex", "5|$testIndex2")))
+
+        val alerts = searchAlertsWithFilter(monitor)
+        assertEquals("Alert saved for test monitor", 2, alerts.size)
+
+        val findings = searchFindings(monitor)
+        assertEquals("Findings saved for test monitor", 2, findings.size)
+        val foundFindings = findings.filter { it.relatedDocIds.contains("1") || it.relatedDocIds.contains("5") }
+        assertEquals("Didn't find findings for docs 1 and 5", 2, foundFindings.size)
+    }
+
+    fun `test execute monitor with indices having fields with same name different field mappings in multiple indices with NOT EQUALS`() {
+        val testIndex = createTestIndex(
+            "test1",
+            """"properties": {
+                    "source": {
+                        "properties": {
+                            "device": {
+                                "properties": {
+                                    "hwd": {
+                                        "properties": {
+                                            "id": {
+                                                "type":"text",
+                                                "analyzer":"whitespace" 
+                                            }
+                                        }
+                                    } 
+                                }
+                            }
+                        }
+                    },
+                   "test_field" : {
+                        "type":"text" 
+                    }
+                }
+            """.trimIndent()
+        )
+
+        val testIndex2 = createTestIndex(
+            "test2",
+            """"properties": {
+                    "test_field" : {
+                        "type":"keyword"
+                    }
+                }
+            """.trimIndent()
+        )
+
+        val testIndex4 = createTestIndex(
+            "test4",
+            """"properties": {
+                   "source": {
+                        "properties": {
+                            "device": {
+                                "properties": {
+                                    "hwd": {
+                                        "properties": {
+                                            "id": {
+                                                "type":"text"
+                                            }
+                                        }
+                                    } 
+                                }
+                            }
+                        }
+                    },
+                   "test_field" : {
+                        "type":"text" 
+                    }
+                }
+            """.trimIndent()
+        )
+
+        val testDoc1 = """{
+            "source" : {"device" : {"hwd" : {"id" : "123456"}} },
+            "nested_field": { "test1": "some text" }
+        }"""
+        val testDoc2 = """{
+            "nested_field": { "test1": "some text" },
+            "test_field": "123456"
+        }"""
+
+        val docQuery1 = DocLevelQuery(
+            query = "NOT test_field:\"12345\" AND _exists_: test_field",
+            name = "4",
+            fields = listOf()
+        )
+        val docQuery2 = DocLevelQuery(
+            query = "NOT source.device.hwd.id:\"12345\" AND _exists_: source.device.hwd.id",
+            name = "5",
+            fields = listOf()
+        )
+
+        val docLevelInput = DocLevelMonitorInput("description", listOf("test*"), listOf(docQuery1, docQuery2))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex4, "1", testDoc1)
+        indexDoc(testIndex2, "1", testDoc2)
+        indexDoc(testIndex, "1", testDoc1)
+        indexDoc(testIndex, "2", testDoc2)
+
+        executeMonitor(monitor.id)
+
+        val alerts = searchAlertsWithFilter(monitor)
+        assertEquals("Alert saved for test monitor", 4, alerts.size)
+
+        val findings = searchFindings(monitor)
+        assertEquals("Findings saved for test monitor", 4, findings.size)
+
+        val request = """{
+            "size": 0,
+            "query": {
+                "match_all": {}
+            }
+        }"""
+        val httpResponse = adminClient().makeRequest(
+            "GET", "/${monitor.dataSources.queryIndex}/_search",
+            StringEntity(request, ContentType.APPLICATION_JSON)
+        )
+        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
+
+        val searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        searchResponse.hits.totalHits?.let { assertEquals(5L, it.value) }
+    }
+
+    fun `test execute monitor with indices having fields with same name but different field mappings with NOT EQUALS`() {
+        val testIndex = createTestIndex(
+            "test1",
+            """"properties": {
+                    "source": {
+                        "properties": {
+                            "id": {
+                                "type":"text",
+                                "analyzer":"whitespace" 
+                            }
+                        }
+                    },
+                   "test_field" : {
+                        "type":"text",
+                        "analyzer":"whitespace"
+                    }
+                }
+            """.trimIndent()
+        )
+
+        val testIndex2 = createTestIndex(
+            "test2",
+            """"properties": {
+                    "source": {
+                        "properties": {
+                            "id": {
+                                "type":"text"
+                            }
+                        }
+                    },
+                   "test_field" : {
+                        "type":"text"
+                    }
+                }
+            """.trimIndent()
+        )
+        val testDoc = """{
+            "source" : {"id" : "12345" },
+            "nested_field": { "test1": "some text" },
+            "test_field": "12345"
+        }"""
+
+        val docQuery = DocLevelQuery(
+            query = "(NOT test_field:\"123456\" AND _exists_:test_field) AND source.id:\"12345\"",
+            name = "5",
+            fields = listOf()
+        )
+        val docLevelInput = DocLevelMonitorInput("description", listOf("test*"), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex2, "1", testDoc)
+
+        executeMonitor(monitor.id)
+
+        val alerts = searchAlertsWithFilter(monitor)
+        assertEquals("Alert saved for test monitor", 2, alerts.size)
+
+        val findings = searchFindings(monitor)
+        assertEquals("Findings saved for test monitor", 2, findings.size)
+
+        // as mappings of source.id & test_field are different so, both of them expands
+        val expectedQueries = listOf(
+            "(NOT test_field_test2_${monitor.id}:\"123456\" AND _exists_:test_field_test2_${monitor.id}) " +
+                "AND source.id_test2_${monitor.id}:\"12345\"",
+            "(NOT test_field_test1_${monitor.id}:\"123456\" AND _exists_:test_field_test1_${monitor.id}) " +
+                "AND source.id_test1_${monitor.id}:\"12345\""
+        )
+
+        val request = """{
+            "size": 10,
+            "query": {
+                "match_all": {}
+            }
+        }"""
+        var httpResponse = adminClient().makeRequest(
+            "GET", "/${monitor.dataSources.queryIndex}/_search",
+            StringEntity(request, ContentType.APPLICATION_JSON)
+        )
+        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
+        var searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        searchResponse.hits.forEach { hit ->
+            val query = ((hit.sourceAsMap["query"] as Map<String, Any>)["query_string"] as Map<String, Any>)["query"]
+            assertTrue(expectedQueries.contains(query))
+        }
+    }
+
+    fun `test document-level monitor notification message includes queries`() {
+        val testIndex = createTestIndex()
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "test-query", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val alertCategories = AlertCategory.values()
+        val actionExecutionScope = PerAlertActionScope(
+            actionableAlerts = (1..randomInt(alertCategories.size)).map { alertCategories[it - 1] }.toSet()
+        )
+        val actionExecutionPolicy = ActionExecutionPolicy(actionExecutionScope)
+        val actions = (0..randomInt(10)).map {
+            randomActionWithPolicy(
+                template = randomTemplateScript(
+                    "{{#ctx.alerts}}\n{{#associated_queries}}\n(name={{name}})\n{{/associated_queries}}\n{{/ctx.alerts}}"
+                ),
+                destinationId = createDestination().id,
+                actionExecutionPolicy = actionExecutionPolicy
+            )
+        }
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = actions)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex, "5", testDoc)
+
+        val response = executeMonitor(monitor.id)
+
+        val output = entityAsMap(response)
+
+        assertEquals(monitor.name, output["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
+        assertEquals("Incorrect search result", 2, matchingDocsToQuery.size)
+        assertTrue("Incorrect search result", matchingDocsToQuery.containsAll(listOf("1|$testIndex", "5|$testIndex")))
+
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertEquals(2, triggerResult.objectMap("action_results").values.size)
+            for (alertActionResult in triggerResult.objectMap("action_results").values) {
+                assertEquals(actions.size, alertActionResult.values.size)
+                for (actionResult in alertActionResult.values) {
+                    @Suppress("UNCHECKED_CAST")
+                    val actionOutput = (actionResult as Map<String, Map<String, String>>)["output"] as Map<String, String>
+                    assertTrue(
+                        "The notification message is missing the query name.",
+                        actionOutput["message"]!!.contains("(name=${docQuery.name})")
+                    )
+                }
+            }
+        }
+    }
+
+    fun `test expected document and rules print in notification message`() {
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+                "message" : "Test message",
+                "test_strict_date_time" : "$testTime",
+                "test_field" : "us-west-2"
+            }"""
+
+        val index = createTestIndex()
+
+        val docQuery = DocLevelQuery(query = "\"us-west-2\"", fields = listOf(), name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+
+        // Prints all fields in doc source
+        val scriptSource1 = """
+            Monitor {{ctx.monitor.name}} just entered alert status. Please investigate the issue.\n  
+            - Trigger: {{ctx.trigger.name}}\n  
+            - Severity: {{ctx.trigger.severity}}\n  
+            - Period start: {{ctx.periodStart}}\n  
+            - Period end: {{ctx.periodEnd}}\n\n  
+            - New Alerts:\n  
+                {{#ctx.alerts}}\n  
+                Document values
+                {{#sample_documents}}\n     
+                    Test field: {{_source.test_field}}\n 
+                    Message: {{_source.message}}\n     
+                    Timestamp: {{_source.test_strict_date_time}}\n
+                {{/sample_documents}}\n
+                \n
+                Matching queries\n
+                {{#associated_queries}}\n 
+                    Query ID: {{id}}\n
+                    Query name: {{name}}\n
+                {{/associated_queries}}\n  
+                {{/ctx.alerts}}
+        """.trimIndent()
+
+        // Only prints a few fields from the doc source
+        val scriptSource2 = """
+            Monitor {{ctx.monitor.name}} just entered alert status. Please investigate the issue.\n  
+            - Trigger: {{ctx.trigger.name}}\n  
+            - Severity: {{ctx.trigger.severity}}\n  
+            - Period start: {{ctx.periodStart}}\n  
+            - Period end: {{ctx.periodEnd}}\n\n  
+            - New Alerts:\n  
+                {{#ctx.alerts}}\n  
+                Document values
+                {{#sample_documents}}\n     
+                    Test field: {{_source.test_field}}\n 
+                    Message: {{_source.message}}\n     
+                {{/sample_documents}}\n
+                \n
+                Matching queries\n
+                {{#associated_queries}}\n 
+                    Query ID: {{id}}\n
+                    Query name: {{name}}\n
+                {{/associated_queries}}\n  
+                {{/ctx.alerts}}
+        """.trimIndent()
+
+        // Doesn't print any document data
+        val scriptSource3 = """
+            Monitor {{ctx.monitor.name}} just entered alert status. Please investigate the issue.\n  
+            - Trigger: {{ctx.trigger.name}}\n  
+            - Severity: {{ctx.trigger.severity}}\n  
+            - Period start: {{ctx.periodStart}}\n  
+            - Period end: {{ctx.periodEnd}}\n\n  
+            - New Alerts:\n  
+                {{#ctx.alerts}}\n
+                Matching queries\n
+                {{#associated_queries}}\n 
+                    Query ID: {{id}}\n
+                    Query name: {{name}}\n
+                {{/associated_queries}}\n  
+                {{/ctx.alerts}}
+        """.trimIndent()
+
+        // Using 'alert.copy()' here because 'randomAction()' applies the 'template' for the message subject, and message body
+        val actions = listOf(
+            randomAction(name = "action1", template = randomTemplateScript("action1 message"), destinationId = createDestination().id)
+                .copy(messageTemplate = randomTemplateScript(scriptSource1)),
+            randomAction(name = "action2", template = randomTemplateScript("action2 message"), destinationId = createDestination().id)
+                .copy(messageTemplate = randomTemplateScript(scriptSource2)),
+            randomAction(name = "action3", template = randomTemplateScript("action3 message"), destinationId = createDestination().id)
+                .copy(messageTemplate = randomTemplateScript(scriptSource3))
+        )
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = actions))
+            )
+        )
+
+        indexDoc(index, "", testDoc)
+
+        val response = executeMonitor(monitor.id)
+
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        val triggerResults = output.objectMap("trigger_results")
+        assertEquals(1, triggerResults.values.size)
+
+        val expectedMessageContents = mapOf(
+            "action1" to Pair(
+                // First item in pair is INCLUDED content
+                listOf(
+                    "Test field: us-west-2",
+                    "Message: Test message",
+                    "Timestamp: $testTime",
+                    "Query ID: ${docQuery.id}",
+                    "Query name: ${docQuery.name}",
+                ),
+                // Second item in pair is EXCLUDED content
+                listOf<String>()
+            ),
+            "action2" to Pair(
+                // First item in pair is INCLUDED content
+                listOf(
+                    "Test field: us-west-2",
+                    "Message: Test message",
+                    "Query ID: ${docQuery.id}",
+                    "Query name: ${docQuery.name}",
+                ),
+                // Second item in pair is EXCLUDED content
+                listOf("Timestamp: $testTime")
+            ),
+            "action3" to Pair(
+                // First item in pair is INCLUDED content
+                listOf(
+                    "Query ID: ${docQuery.id}",
+                    "Query name: ${docQuery.name}",
+                ),
+                // Second item in pair is EXCLUDED content
+                listOf(
+                    "Test field: us-west-2",
+                    "Message: Test message",
+                    "Timestamp: $testTime",
+                )
+            ),
+        )
+        val actionResults = triggerResults.values.first().objectMap("action_results").values.first().values
+        @Suppress("UNCHECKED_CAST")
+        actionResults.forEach { action ->
+            val messageContent = ((action as Map<String, Any>)["output"] as Map<String, Any>)["message"] as String
+            expectedMessageContents[action["name"]]!!.first.forEach {
+                assertTrue(messageContent.contains(it))
+            }
+            expectedMessageContents[action["name"]]!!.second.forEach {
+                assertFalse(messageContent.contains(it))
+            }
+        }
     }
 
     @Suppress("UNCHECKED_CAST")

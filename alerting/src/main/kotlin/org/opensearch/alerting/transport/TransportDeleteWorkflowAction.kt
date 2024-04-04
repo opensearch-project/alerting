@@ -23,6 +23,8 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
+import org.opensearch.alerting.core.lock.LockModel
+import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.model.WorkflowMetadata
 import org.opensearch.alerting.opensearchapi.addFilter
@@ -73,6 +75,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
     val clusterService: ClusterService,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry,
+    val lockService: LockService
 ) : HandledTransportAction<ActionRequest, DeleteWorkflowResponse>(
     AlertingActions.DELETE_WORKFLOW_ACTION_NAME, transportService, actionFilters, ::DeleteWorkflowRequest
 ),
@@ -119,7 +122,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
     ) {
         suspend fun resolveUserAndStart() {
             try {
-                val workflow = getWorkflow()
+                val workflow: Workflow = getWorkflow() ?: return
 
                 val canDelete = user == null ||
                     !doFilterForUser(user) ||
@@ -179,6 +182,12 @@ class TransportDeleteWorkflowAction @Inject constructor(
                         }
                     } catch (t: Exception) {
                         log.error("Failed to delete delegate monitor metadata. But proceeding with workflow deletion $workflowId", t)
+                    }
+                    try {
+                        // Delete the workflow lock
+                        client.suspendUntil<Client, Boolean> { lockService.deleteLock(LockModel.generateLockId(workflowId), it) }
+                    } catch (t: Exception) {
+                        log.error("Failed to delete workflow lock for $workflowId")
                     }
                     actionListener.onResponse(deleteWorkflowResponse)
                 } else {
@@ -296,17 +305,27 @@ class TransportDeleteWorkflowAction @Inject constructor(
             return deletableMonitors
         }
 
-        private suspend fun getWorkflow(): Workflow {
+        private suspend fun getWorkflow(): Workflow? {
             val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, workflowId)
 
             val getResponse: GetResponse = client.suspendUntil { get(getRequest, it) }
-            if (getResponse.isExists == false) {
-                actionListener.onFailure(
-                    AlertingException.wrap(
-                        OpenSearchStatusException("Workflow not found.", RestStatus.NOT_FOUND)
-                    )
-                )
+            if (!getResponse.isExists) {
+                handleWorkflowMissing()
+                return null
             }
+
+            return parseWorkflow(getResponse)
+        }
+
+        private fun handleWorkflowMissing() {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException("Workflow not found.", RestStatus.NOT_FOUND)
+                )
+            )
+        }
+
+        private fun parseWorkflow(getResponse: GetResponse): Workflow {
             val xcp = XContentHelper.createParser(
                 xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                 getResponse.sourceAsBytesRef, XContentType.JSON

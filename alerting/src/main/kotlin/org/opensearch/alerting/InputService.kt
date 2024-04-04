@@ -5,6 +5,9 @@
 
 package org.opensearch.alerting
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
@@ -12,7 +15,9 @@ import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.TriggerAfterKey
 import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AggregationQueryRewriter
+import org.opensearch.alerting.util.CrossClusterMonitorUtils
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.executeTransportAction
 import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.toMap
@@ -43,6 +48,8 @@ import org.opensearch.script.ScriptType
 import org.opensearch.script.TemplateScript
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.time.Instant
+
+private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
 /** Service that handles the collection of input results for Monitor executions */
 class InputService(
@@ -75,38 +82,15 @@ class InputService(
             monitor.inputs.forEach { input ->
                 when (input) {
                     is SearchInput -> {
-                        // TODO: Figure out a way to use SearchTemplateRequest without bringing in the entire TransportClient
-                        val searchParams = mapOf(
-                            "period_start" to periodStart.toEpochMilli(),
-                            "period_end" to periodEnd.toEpochMilli()
+                        val searchRequest = getSearchRequest(
+                            monitor = monitor,
+                            searchInput = input,
+                            periodStart = periodStart,
+                            periodEnd = periodEnd,
+                            prevResult = prevResult,
+                            matchingDocIdsPerIndex = matchingDocIdsPerIndex,
+                            returnSampleDocs = false
                         )
-
-                        // Deep copying query before passing it to rewriteQuery since otherwise, the monitor.input is modified directly
-                        // which causes a strange bug where the rewritten query persists on the Monitor across executions
-                        val rewrittenQuery = AggregationQueryRewriter.rewriteQuery(deepCopyQuery(input.query), prevResult, monitor.triggers)
-
-                        // Rewrite query to consider the doc ids per given index
-                        if (chainedFindingExist(matchingDocIdsPerIndex) && rewrittenQuery.query() != null) {
-                            val updatedSourceQuery = updateInputQueryWithFindingDocIds(rewrittenQuery.query(), matchingDocIdsPerIndex!!)
-                            rewrittenQuery.query(updatedSourceQuery)
-                        }
-
-                        val searchSource = scriptService.compile(
-                            Script(
-                                ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
-                                rewrittenQuery.toString(), searchParams
-                            ),
-                            TemplateScript.CONTEXT
-                        )
-                            .newInstance(searchParams)
-                            .execute()
-
-                        val searchRequest = SearchRequest()
-                            .indices(*input.indices.toTypedArray())
-                            .preference(Preference.PRIMARY_FIRST.type())
-                        XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource).use {
-                            searchRequest.source(SearchSourceBuilder.fromXContent(it))
-                        }
                         val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
                         aggTriggerAfterKey += AggregationQueryRewriter.getAfterKeysFromSearchResponse(
                             searchResponse,
@@ -116,9 +100,36 @@ class InputService(
                         results += searchResponse.convertToMap()
                     }
                     is ClusterMetricsInput -> {
-                        logger.debug("ClusterMetricsInput clusterMetricType: ${input.clusterMetricType}")
-                        val response = executeTransportAction(input, client)
-                        results += response.toMap()
+                        logger.debug("ClusterMetricsInput clusterMetricType: {}", input.clusterMetricType)
+
+                        val remoteMonitoringEnabled = clusterService.clusterSettings.get(AlertingSettings.REMOTE_MONITORING_ENABLED)
+                        logger.debug("Remote monitoring enabled: {}", remoteMonitoringEnabled)
+
+                        val responseMap = mutableMapOf<String, Map<String, Any>>()
+                        if (remoteMonitoringEnabled && input.clusters.isNotEmpty()) {
+                            client.threadPool().threadContext.stashContext().use {
+                                scope.launch {
+                                    input.clusters.forEach { cluster ->
+                                        val targetClient = CrossClusterMonitorUtils.getClientForCluster(cluster, client, clusterService)
+                                        val response = executeTransportAction(input, targetClient)
+                                        // Not all supported API reference the cluster name in their response.
+                                        // Mapping each response to the cluster name before adding to results.
+                                        // Not adding this same logic for local-only monitors to avoid breaking existing monitors.
+                                        responseMap[cluster] = response.toMap()
+                                    }
+                                }
+                            }
+                            val inputTimeout = clusterService.clusterSettings.get(AlertingSettings.INPUT_TIMEOUT)
+                            val startTime = Instant.now().toEpochMilli()
+                            while (
+                                (Instant.now().toEpochMilli() - startTime >= inputTimeout.millis) ||
+                                (responseMap.size < input.clusters.size)
+                            ) { /* Wait for responses */ }
+                            results += responseMap
+                        } else {
+                            val response = executeTransportAction(input, client)
+                            results += response.toMap()
+                        }
                     }
                     else -> {
                         throw IllegalArgumentException("Unsupported input type: ${input.name()}.")
@@ -223,5 +234,57 @@ class InputService(
             logger.info("Error collecting anomaly result inputs for monitor: ${monitor.id}", e)
             InputRunResults(emptyList(), e)
         }
+    }
+
+    fun getSearchRequest(
+        monitor: Monitor,
+        searchInput: SearchInput,
+        periodStart: Instant,
+        periodEnd: Instant,
+        prevResult: InputRunResults?,
+        matchingDocIdsPerIndex: Map<String, List<String>>?,
+        returnSampleDocs: Boolean = false
+    ): SearchRequest {
+        // TODO: Figure out a way to use SearchTemplateRequest without bringing in the entire TransportClient
+        val searchParams = mapOf(
+            "period_start" to periodStart.toEpochMilli(),
+            "period_end" to periodEnd.toEpochMilli()
+        )
+
+        // Deep copying query before passing it to rewriteQuery since otherwise, the monitor.input is modified directly
+        // which causes a strange bug where the rewritten query persists on the Monitor across executions
+        val rewrittenQuery = AggregationQueryRewriter.rewriteQuery(
+            deepCopyQuery(searchInput.query),
+            prevResult,
+            monitor.triggers,
+            returnSampleDocs
+        )
+
+        // Rewrite query to consider the doc ids per given index
+        if (chainedFindingExist(matchingDocIdsPerIndex) && rewrittenQuery.query() != null) {
+            val updatedSourceQuery = updateInputQueryWithFindingDocIds(rewrittenQuery.query(), matchingDocIdsPerIndex!!)
+            rewrittenQuery.query(updatedSourceQuery)
+        }
+
+        val searchSource = scriptService.compile(
+            Script(
+                ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
+                rewrittenQuery.toString(), searchParams
+            ),
+            TemplateScript.CONTEXT
+        )
+            .newInstance(searchParams)
+            .execute()
+
+        val indexes = CrossClusterMonitorUtils.parseIndexesForRemoteSearch(searchInput.indices, clusterService)
+        val searchRequest = SearchRequest()
+            .indices(*indexes.toTypedArray())
+            .preference(Preference.PRIMARY_FIRST.type())
+
+        XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource).use {
+            searchRequest.source(SearchSourceBuilder.fromXContent(it))
+        }
+
+        return searchRequest
     }
 }
