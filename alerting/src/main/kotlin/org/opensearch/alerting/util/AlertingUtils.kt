@@ -26,8 +26,8 @@ import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.commons.alerting.model.action.ActionExecutionScope
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
-import kotlin.math.max
 import org.opensearch.script.Script
+import kotlin.math.max
 
 private val logger = LogManager.getLogger("AlertingUtils")
 

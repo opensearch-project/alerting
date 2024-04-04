@@ -30,8 +30,8 @@ import org.opensearch.alerting.util.getCancelAfterTimeInterval
 import org.opensearch.alerting.util.getCombinedTriggerRunResult
 import org.opensearch.alerting.util.printsSampleDocData
 import org.opensearch.alerting.workflow.WorkflowRunContext
-import org.opensearch.common.unit.TimeValue
 import org.opensearch.client.Client
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Alert

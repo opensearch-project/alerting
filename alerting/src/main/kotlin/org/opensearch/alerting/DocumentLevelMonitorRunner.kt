@@ -699,36 +699,6 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         return indexCreationDate > lastExecutionTime.toEpochMilli()
     }
 
-    /**
-     * Get the current max seq number of the shard. We find it by searching the last document
-     *  in the primary shard.
-     */
-    private suspend fun getMaxSeqNo(client: Client, index: String, shard: String): Long {
-        val request: SearchRequest = SearchRequest()
-            .indices(index)
-            .preference("_shards:$shard")
-            .source(
-                SearchSourceBuilder()
-                    .version(true)
-                    .sort("_seq_no", SortOrder.DESC)
-                    .seqNoAndPrimaryTerm(true)
-                    .query(QueryBuilders.matchAllQuery())
-                    .size(1)
-            )
-        request.cancelAfterTimeInterval = TimeValue.timeValueMinutes(getCancelAfterTimeInterval())
-
-        val response: SearchResponse = client.suspendUntil { client.search(request, it) }
-
-        if (response.status() !== RestStatus.OK) {
-            throw IOException("Failed to get max seq no for shard: $shard")
-        }
-        if (response.hits.hits.isEmpty())
-            return -1L
-
-        return response.hits.hits[0].seqNo
-    }
-
-
     private fun getShardsCount(clusterService: ClusterService, index: String): Int {
         val allShards: List<ShardRouting> = clusterService!!.state().routingTable().allShards(index)
         return allShards.filter { it.primary() }.size
@@ -912,7 +882,6 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                     .size(monitorCtx.docLevelMonitorShardFetchSize)
             )
             .preference(Preference.PRIMARY_FIRST.type())
-            
         request.cancelAfterTimeInterval = TimeValue.timeValueMinutes(
             getCancelAfterTimeInterval()
         )
