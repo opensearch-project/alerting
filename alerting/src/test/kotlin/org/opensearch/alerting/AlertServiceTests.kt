@@ -47,7 +47,6 @@ class AlertServiceTests : OpenSearchTestCase() {
         xContentRegistry = Mockito.mock(NamedXContentRegistry::class.java)
         threadPool = Mockito.mock(ThreadPool::class.java)
         clusterService = Mockito.mock(ClusterService::class.java)
-
         settings = Settings.builder().build()
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)

@@ -132,7 +132,6 @@ class TransportGetFindingsSearchAction @Inject constructor(
                 )
         }
         searchSourceBuilder.query(queryBuilder).trackTotalHits(true)
-
         client.threadPool().threadContext.stashContext().use {
             scope.launch {
                 try {

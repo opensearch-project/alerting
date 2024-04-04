@@ -33,6 +33,7 @@ import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
+import org.opensearch.alerting.util.getCancelAfterTimeInterval
 import org.opensearch.alerting.util.parseSampleDocTags
 import org.opensearch.alerting.util.printsSampleDocData
 import org.opensearch.alerting.workflow.WorkflowRunContext
@@ -41,6 +42,7 @@ import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.routing.Preference
 import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.AlertingPluginInterface
@@ -116,7 +118,6 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             logger.error("Error setting up alerts and findings indices for monitor: $id", e)
             monitorResult = monitorResult.copy(error = AlertingException.wrap(e))
         }
-
         try {
             validate(monitor)
         } catch (e: Exception) {
@@ -881,7 +882,9 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                     .size(monitorCtx.docLevelMonitorShardFetchSize)
             )
             .preference(Preference.PRIMARY_FIRST.type())
-
+        request.cancelAfterTimeInterval = TimeValue.timeValueMinutes(
+            getCancelAfterTimeInterval()
+        )
         if (monitorCtx.fetchOnlyQueryFieldNames && fieldsToFetch.isNotEmpty()) {
             request.source().fetchSource(false)
             for (field in fieldsToFetch) {
@@ -936,7 +939,12 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                 "$monitorInputIndices against query index $queryIndices"
         )
         var response: SearchResponse
+
         try {
+            searchRequest.cancelAfterTimeInterval = TimeValue.timeValueMinutes(
+                getCancelAfterTimeInterval()
+            )
+
             response = monitorCtx.client!!.suspendUntil {
                 monitorCtx.client!!.execute(SearchAction.INSTANCE, searchRequest, it)
             }
