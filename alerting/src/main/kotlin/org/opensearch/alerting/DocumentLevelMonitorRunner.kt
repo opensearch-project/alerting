@@ -37,7 +37,6 @@ import org.opensearch.alerting.util.getCancelAfterTimeInterval
 import org.opensearch.alerting.util.parseSampleDocTags
 import org.opensearch.alerting.util.printsSampleDocData
 import org.opensearch.alerting.workflow.WorkflowRunContext
-import org.opensearch.client.Client
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.routing.Preference
@@ -698,35 +697,6 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         val lastExecutionTime = if (periodStart == periodEnd) monitor.lastUpdateTime else periodStart
         val indexCreationDate = indexMetadata.settings.get("index.creation_date")?.toLong() ?: 0L
         return indexCreationDate > lastExecutionTime.toEpochMilli()
-    }
-
-    /**
-     * Get the current max seq number of the shard. We find it by searching the last document
-     *  in the primary shard.
-     */
-    private suspend fun getMaxSeqNo(client: Client, index: String, shard: String): Long {
-        val request: SearchRequest = SearchRequest()
-            .indices(index)
-            .preference("_shards:$shard")
-            .source(
-                SearchSourceBuilder()
-                    .version(true)
-                    .sort("_seq_no", SortOrder.DESC)
-                    .seqNoAndPrimaryTerm(true)
-                    .query(QueryBuilders.matchAllQuery())
-                    .size(1)
-            )
-        request.cancelAfterTimeInterval = TimeValue.timeValueMinutes(getCancelAfterTimeInterval())
-
-        val response: SearchResponse = client.suspendUntil { client.search(request, it) }
-
-        if (response.status() !== RestStatus.OK) {
-            throw IOException("Failed to get max seq no for shard: $shard")
-        }
-        if (response.hits.hits.isEmpty())
-            return -1L
-
-        return response.hits.hits[0].seqNo
     }
 
     private fun getShardsCount(clusterService: ClusterService, index: String): Int {
