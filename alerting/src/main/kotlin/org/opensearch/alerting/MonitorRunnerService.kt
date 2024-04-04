@@ -12,6 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.bulk.BackoffPolicy
+import org.opensearch.action.search.TransportSearchAction.SEARCH_CANCEL_AFTER_TIME_INTERVAL_SETTING
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertMover.Companion.moveAlerts
@@ -150,6 +151,9 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             ALERT_BACKOFF_MILLIS.get(monitorCtx.settings),
             ALERT_BACKOFF_COUNT.get(monitorCtx.settings)
         )
+
+        monitorCtx.cancelAfterTimeInterval = SEARCH_CANCEL_AFTER_TIME_INTERVAL_SETTING.get(monitorCtx.settings)
+
         monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(ALERT_BACKOFF_MILLIS, ALERT_BACKOFF_COUNT) { millis, count ->
             monitorCtx.retryPolicy = BackoffPolicy.constantBackoff(millis, count)
         }
@@ -166,6 +170,9 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             monitorCtx.moveAlertsRetryPolicy = BackoffPolicy.exponentialBackoff(millis, count)
         }
 
+        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(SEARCH_CANCEL_AFTER_TIME_INTERVAL_SETTING) {
+            monitorCtx.cancelAfterTimeInterval = it
+        }
         monitorCtx.allowList = ALLOW_LIST.get(monitorCtx.settings)
         monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(ALLOW_LIST) {
             monitorCtx.allowList = it
