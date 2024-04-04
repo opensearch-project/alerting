@@ -132,7 +132,6 @@ class TransportGetFindingsSearchAction @Inject constructor(
                 )
         }
         searchSourceBuilder.query(queryBuilder).trackTotalHits(true)
-        log.info("This is alerting: {}", searchSourceBuilder.toString())
         client.threadPool().threadContext.stashContext().use {
             scope.launch {
                 try {
