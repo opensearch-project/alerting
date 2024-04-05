@@ -49,8 +49,8 @@ class RestIndexMonitorAction : BaseRestHandler() {
 
     // allowed characters [- : , ( ) [ ] ' _]
     private val allowedChars = "-:,\\(\\)\\[\\]\'_"
-    // regex to restrict string to alphanumeric and allowed chars, must be between 1 - 256 characters
-    val regex = "[\\w\\s$allowedChars]{1,256}"
+    // regex to restrict string to alphanumeric and allowed chars, must be between 0 - 256 characters
+    val regex = "[\\w\\s$allowedChars]{0,256}"
 
     override fun getName(): String {
         return "index_monitor_action"
