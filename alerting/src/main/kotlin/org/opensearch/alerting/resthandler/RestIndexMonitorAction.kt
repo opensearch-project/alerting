@@ -16,6 +16,7 @@ import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.IndexMonitorRequest
 import org.opensearch.commons.alerting.action.IndexMonitorResponse
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
@@ -45,6 +46,11 @@ private val log = LogManager.getLogger(RestIndexMonitorAction::class.java)
  * Rest handlers to create and update monitors.
  */
 class RestIndexMonitorAction : BaseRestHandler() {
+
+    // allowed characters [- : , ( ) [ ] ' _]
+    private val allowedChars = "-:,\\(\\)\\[\\]\'_"
+    // regex to restrict string to alphanumeric and allowed chars, must be between 1 - 256 characters
+    val regex = "[\\w\\s$allowedChars]{1,256}"
 
     override fun getName(): String {
         return "index_monitor_action"
@@ -116,9 +122,11 @@ class RestIndexMonitorAction : BaseRestHandler() {
                     if (it !is DocumentLevelTrigger) {
                         throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for document level monitor")
                     }
+                    validateDocLevelQueryName(monitor)
                 }
             }
         }
+
         val seqNo = request.paramAsLong(IF_SEQ_NO, SequenceNumbers.UNASSIGNED_SEQ_NO)
         val primaryTerm = request.paramAsLong(IF_PRIMARY_TERM, SequenceNumbers.UNASSIGNED_PRIMARY_TERM)
         val refreshPolicy = if (request.hasParam(REFRESH)) {
@@ -130,6 +138,19 @@ class RestIndexMonitorAction : BaseRestHandler() {
 
         return RestChannelConsumer { channel ->
             client.execute(AlertingActions.INDEX_MONITOR_ACTION_TYPE, indexMonitorRequest, indexMonitorResponse(channel, request.method()))
+        }
+    }
+
+    private fun validateDocLevelQueryName(monitor: Monitor) {
+        monitor.inputs.filterIsInstance<DocLevelMonitorInput>().forEach { docLevelMonitorInput ->
+            docLevelMonitorInput.queries.forEach { dlq ->
+                if (!dlq.name.matches(Regex(regex))) {
+                    throw IllegalArgumentException(
+                        "Doc level query name, ${dlq.name}, may only contain alphanumeric values and " +
+                            "these special characters: ${allowedChars.replace("\\","")}"
+                    )
+                }
+            }
         }
     }
 
