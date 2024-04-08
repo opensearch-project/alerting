@@ -21,6 +21,8 @@ import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.utils.getInvalidNameChars
+import org.opensearch.commons.utils.isValidName
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentParser.Token
@@ -46,11 +48,6 @@ private val log = LogManager.getLogger(RestIndexMonitorAction::class.java)
  * Rest handlers to create and update monitors.
  */
 class RestIndexMonitorAction : BaseRestHandler() {
-
-    // allowed characters [- : , ( ) [ ] ' _]
-    private val allowedChars = "-:,\\(\\)\\[\\]\'_"
-    // regex to restrict string to alphanumeric and allowed chars, must be between 0 - 256 characters
-    val regex = "[\\w\\s$allowedChars]{0,256}"
 
     override fun getName(): String {
         return "index_monitor_action"
@@ -122,8 +119,8 @@ class RestIndexMonitorAction : BaseRestHandler() {
                     if (it !is DocumentLevelTrigger) {
                         throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for document level monitor")
                     }
-                    validateDocLevelQueryName(monitor)
                 }
+                validateDocLevelQueryName(monitor)
             }
         }
 
@@ -144,10 +141,10 @@ class RestIndexMonitorAction : BaseRestHandler() {
     private fun validateDocLevelQueryName(monitor: Monitor) {
         monitor.inputs.filterIsInstance<DocLevelMonitorInput>().forEach { docLevelMonitorInput ->
             docLevelMonitorInput.queries.forEach { dlq ->
-                if (!dlq.name.matches(Regex(regex))) {
+                if (!isValidName(dlq.name)) {
                     throw IllegalArgumentException(
-                        "Doc level query name, ${dlq.name}, may only contain alphanumeric values and " +
-                            "these special characters: ${allowedChars.replace("\\","")}"
+                        "Doc level query name may not start with [_, +, -], contain '..', or contain: " +
+                            getInvalidNameChars().replace("\\", "")
                     )
                 }
             }

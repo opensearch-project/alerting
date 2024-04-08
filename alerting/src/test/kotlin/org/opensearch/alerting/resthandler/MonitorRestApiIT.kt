@@ -50,6 +50,7 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.utils.getInvalidNameChars
 import org.opensearch.core.common.bytes.BytesReference
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent
@@ -1289,7 +1290,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test creating and updating a document monitor with invalid query name`() {
         // creating a monitor with an invalid query name
-        val invalidQueryName = "Invalid @ query ! name"
+        val invalidQueryName = "_Invalid .. query ! n>ame"
         val queries = listOf(randomDocLevelQuery(name = invalidQueryName))
         val randomDocLevelMonitorInput = randomDocLevelMonitorInput(queries = queries)
         val inputs = listOf(randomDocLevelMonitorInput)
@@ -1301,13 +1302,14 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             fail("Doc level monitor with invalid query name should be rejected")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())
-            val expectedMessage = "Doc level query name, $invalidQueryName, may only contain alphanumeric values"
+            val expectedMessage = "Doc level query name may not start with [_, +, -], contain '..', or contain: " +
+                getInvalidNameChars().replace("\\", "")
             e.message?.let { assertTrue(it.contains(expectedMessage)) }
         }
 
         // successfully creating monitor with valid query name
         val testIndex = createTestIndex()
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "valid name", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "valid (name)", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
@@ -1324,7 +1326,8 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             fail("Doc level monitor with invalid query name should be rejected")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())
-            val expectedMessage = "Doc level query name, $invalidQueryName, may only contain alphanumeric values"
+            val expectedMessage = "Doc level query name may not start with [_, +, -], contain '..', or contain: " +
+                getInvalidNameChars().replace("\\", "")
             e.message?.let { assertTrue(it.contains(expectedMessage)) }
         }
     }
