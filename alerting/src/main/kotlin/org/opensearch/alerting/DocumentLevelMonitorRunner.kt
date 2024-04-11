@@ -20,11 +20,24 @@ import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
+import org.opensearch.alerting.util.defaultToPerExecutionAction
+import org.opensearch.alerting.util.getActionExecutionPolicy
+import org.opensearch.alerting.util.getCancelAfterTimeInterval
+import org.opensearch.alerting.util.parseSampleDocTags
+import org.opensearch.alerting.util.printsSampleDocDat
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.node.DiscoveryNode
 import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
+import org.opensearch.common.unit.TimeValue
+import org.opensearch.common.xcontent.XContentFactory
+import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.AlertingPluginInterface
+import org.opensearch.commons.alerting.action.PublishFindingsRequest
+import org.opensearch.commons.alerting.action.SubscribeFindingsResponse
+import org.opensearch.commons.alerting.model.ActionExecutionResult
+import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.Monitor
@@ -75,10 +88,17 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             monitorCtx.alertIndices!!.createOrUpdateInitialFindingHistoryIndex(monitor.dataSources)
         } catch (e: Exception) {
             val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
-            logger.error("Error setting up alerts and findings indices for monitor: $id", e)
-            monitorResult = monitorResult.copy(error = AlertingException.wrap(e))
+            val unwrappedException = ExceptionsHelper.unwrapCause(e)
+            if (unwrappedException is IllegalArgumentException && unwrappedException.message?.contains("Limit of total fields") == true) {
+                val errorMessage =
+                    "Monitor [$id] can't process index [$monitor.dataSources] due to field mapping limit"
+                logger.error("Exception: ${unwrappedException.message}")
+                monitorResult = monitorResult.copy(error = AlertingException(errorMessage, RestStatus.INTERNAL_SERVER_ERROR, e))
+            } else {
+                logger.error("Error setting up alerts and findings indices for monitor: $id", e)
+                monitorResult = monitorResult.copy(error = AlertingException.wrap(e))
+            }
         }
-
         try {
             validate(monitor)
         } catch (e: Exception) {
@@ -517,7 +537,6 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         shards: List<String>,
         index: String,
     ): Map<String, MutableSet<ShardId>> {
-
         val totalShards = shards.size
         val numFanOutNodes = allNodes.size.coerceAtMost((totalShards + 1) / 2)
         val totalNodes = monitorCtx.totalNodesFanOut.coerceAtMost(numFanOutNodes)

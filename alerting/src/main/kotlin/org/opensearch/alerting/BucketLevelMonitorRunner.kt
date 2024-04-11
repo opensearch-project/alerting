@@ -26,10 +26,12 @@ import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
+import org.opensearch.alerting.util.getCancelAfterTimeInterval
 import org.opensearch.alerting.util.getCombinedTriggerRunResult
 import org.opensearch.alerting.util.printsSampleDocData
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Alert
@@ -448,6 +450,9 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             queryBuilder.filter(QueryBuilders.termsQuery(fieldName, bucketValues))
                             sr.source().query(queryBuilder)
                         }
+                    sr.cancelAfterTimeInterval = TimeValue.timeValueMinutes(
+                        getCancelAfterTimeInterval()
+                    )
                     val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(sr, it) }
                     return createFindingPerIndex(searchResponse, monitor, monitorCtx, shouldCreateFinding, executionId)
                 } else {
