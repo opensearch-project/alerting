@@ -32,7 +32,7 @@ class GetRemoteIndexesActionTests : OpenSearchTestCase() {
         // `<cluster-pattern>` character length less than 1 should return FALSE
         ":remote-index-name",
 
-        // `<cluster-pattern>` character length greater than 63 should return FALSE
+        // `<cluster-pattern>` character length greater than 255 should return FALSE
         "${randomAlphaOfLength(256)}:remote-index-name",
 
         // Invalid characters should return FALSE
