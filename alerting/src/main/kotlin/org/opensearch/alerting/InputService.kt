@@ -5,8 +5,6 @@
 
 package org.opensearch.alerting
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
@@ -49,8 +47,6 @@ import org.opensearch.script.ScriptType
 import org.opensearch.script.TemplateScript
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.time.Instant
-
-private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
 /** Service that handles the collection of input results for Monitor executions */
 class InputService(
