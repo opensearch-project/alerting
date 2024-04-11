@@ -87,6 +87,15 @@ class TransportGetRemoteIndexesAction @Inject constructor(
         val user = readUserFromThreadContext(client)
         if (!validateUserBackendRoles(user, actionListener)) return
 
+        if (!request.isValid()) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException(GetRemoteIndexesRequest.INVALID_PATTERN_MESSAGE, RestStatus.BAD_REQUEST)
+                )
+            )
+            return
+        }
+
         client.threadPool().threadContext.stashContext().use {
             scope.launch {
                 val singleThreadContext = newSingleThreadContext("GetRemoteIndexesActionThread")
@@ -96,8 +105,7 @@ class TransportGetRemoteIndexesAction @Inject constructor(
 
                     var resolveIndexResponse: ResolveIndexAction.Response? = null
                     try {
-                        resolveIndexResponse =
-                            getRemoteClusters(CrossClusterMonitorUtils.parseIndexesForRemoteSearch(request.indexes, clusterService))
+                        resolveIndexResponse = getRemoteClusters(request.indexes)
                     } catch (e: Exception) {
                         log.error("Failed to retrieve indexes for request $request", e)
                         actionListener.onFailure(AlertingException.wrap(e))
@@ -151,7 +159,7 @@ class TransportGetRemoteIndexesAction @Inject constructor(
                         clusterIndexesList.add(
                             ClusterIndexes(
                                 clusterName = clusterName,
-                                clusterHealth = clusterHealthResponse!!.status,
+                                clusterHealth = clusterHealthResponse?.status,
                                 hubCluster = clusterName == clusterService.clusterName.value(),
                                 indexes = clusterIndexList,
                                 latency = latency

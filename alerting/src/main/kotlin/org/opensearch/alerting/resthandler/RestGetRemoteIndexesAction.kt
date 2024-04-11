@@ -19,7 +19,9 @@ import org.opensearch.rest.action.RestToXContentListener
 private val log = LogManager.getLogger(RestGetRemoteIndexesAction::class.java)
 
 class RestGetRemoteIndexesAction : BaseRestHandler() {
-    val ROUTE = "${AlertingPlugin.REMOTE_BASE_URI}/indexes"
+    companion object {
+        val ROUTE = "${AlertingPlugin.REMOTE_BASE_URI}/indexes"
+    }
 
     override fun getName(): String {
         return "get_remote_indexes_action"

@@ -28,6 +28,14 @@ class IndexUtils {
     companion object {
         val VALID_INDEX_NAME_REGEX = Regex("""^(?![_\-\+])(?!.*\.\.)[^\s,\\\/\*\?"<>|#:\.]{1,255}$""")
 
+        /**
+         * This regex asserts that the string:
+         *  The index pattern can start with an optional period
+         *  The index pattern can contain lowercase letters, digits, underscores, hyphens, asterisks, and periods
+         *  The length of the index pattern must be between 1 and 255 characters
+         */
+        val INDEX_PATTERN_REGEX = Regex("""^(?=.{1,255}$)\.?[a-z0-9_\-\*\.]+$""")
+
         const val _META = "_meta"
         const val SCHEMA_VERSION = "schema_version"
 

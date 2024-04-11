@@ -42,7 +42,7 @@ class GetRemoteIndexesResponse : ActionResponse, ToXContentObject {
 
     data class ClusterIndexes(
         val clusterName: String,
-        val clusterHealth: ClusterHealthStatus,
+        val clusterHealth: ClusterHealthStatus?,
         val hubCluster: Boolean,
         val indexes: List<ClusterIndex> = listOf(),
         val latency: Long
