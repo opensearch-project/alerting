@@ -7,7 +7,8 @@ package org.opensearch.alerting
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.newSingleThreadContext
+import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
@@ -100,36 +101,7 @@ class InputService(
                         results += searchResponse.convertToMap()
                     }
                     is ClusterMetricsInput -> {
-                        logger.debug("ClusterMetricsInput clusterMetricType: {}", input.clusterMetricType)
-
-                        val remoteMonitoringEnabled = clusterService.clusterSettings.get(AlertingSettings.REMOTE_MONITORING_ENABLED)
-                        logger.debug("Remote monitoring enabled: {}", remoteMonitoringEnabled)
-
-                        val responseMap = mutableMapOf<String, Map<String, Any>>()
-                        if (remoteMonitoringEnabled && input.clusters.isNotEmpty()) {
-                            client.threadPool().threadContext.stashContext().use {
-                                scope.launch {
-                                    input.clusters.forEach { cluster ->
-                                        val targetClient = CrossClusterMonitorUtils.getClientForCluster(cluster, client, clusterService)
-                                        val response = executeTransportAction(input, targetClient)
-                                        // Not all supported API reference the cluster name in their response.
-                                        // Mapping each response to the cluster name before adding to results.
-                                        // Not adding this same logic for local-only monitors to avoid breaking existing monitors.
-                                        responseMap[cluster] = response.toMap()
-                                    }
-                                }
-                            }
-                            val inputTimeout = clusterService.clusterSettings.get(AlertingSettings.INPUT_TIMEOUT)
-                            val startTime = Instant.now().toEpochMilli()
-                            while (
-                                (Instant.now().toEpochMilli() - startTime >= inputTimeout.millis) ||
-                                (responseMap.size < input.clusters.size)
-                            ) { /* Wait for responses */ }
-                            results += responseMap
-                        } else {
-                            val response = executeTransportAction(input, client)
-                            results += response.toMap()
-                        }
+                        results += handleClusterMetricsInput(input)
                     }
                     else -> {
                         throw IllegalArgumentException("Unsupported input type: ${input.name()}.")
@@ -286,5 +258,39 @@ class InputService(
         }
 
         return searchRequest
+    }
+
+    private suspend fun handleClusterMetricsInput(input: ClusterMetricsInput): MutableList<Map<String, Any>> {
+        logger.debug("ClusterMetricsInput clusterMetricType: {}", input.clusterMetricType)
+
+        val remoteMonitoringEnabled = clusterService.clusterSettings.get(AlertingSettings.REMOTE_MONITORING_ENABLED)
+        logger.debug("Remote monitoring enabled: {}", remoteMonitoringEnabled)
+
+        val results = mutableListOf<Map<String, Any>>()
+        val responseMap = mutableMapOf<String, Map<String, Any>>()
+        if (remoteMonitoringEnabled && input.clusters.isNotEmpty()) {
+            // If remote monitoring is enabled, and the monitor is configured to execute against remote clusters,
+            // execute the API against each cluster, and compile the results.
+            client.threadPool().threadContext.stashContext().use {
+                val singleThreadContext = newSingleThreadContext("ClusterMetricsMonitorThread")
+                withContext(singleThreadContext) {
+                    it.restore()
+                    input.clusters.forEach { cluster ->
+                        val targetClient = CrossClusterMonitorUtils.getClientForCluster(cluster, client, clusterService)
+                        val response = executeTransportAction(input, targetClient)
+                        // Not all supported API reference the cluster name in their response.
+                        // Mapping each response to the cluster name before adding to results.
+                        // Not adding this same logic for local-only monitors to avoid breaking existing monitors.
+                        responseMap[cluster] = response.toMap()
+                    }
+                    results += responseMap
+                }
+            }
+        } else {
+            // Else only execute the API against the local cluster.
+            val response = executeTransportAction(input, client)
+            results += response.toMap()
+        }
+        return results
     }
 }
