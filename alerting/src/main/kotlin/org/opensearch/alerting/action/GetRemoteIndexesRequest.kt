@@ -7,7 +7,7 @@ package org.opensearch.alerting.action
 
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionRequestValidationException
-import org.opensearch.commons.alerting.util.IndexUtils.Companion.CLUSTER_PATTERN_REGEX
+import org.opensearch.commons.alerting.util.ValidationHelpers.Companion.CLUSTER_PATTERN_REGEX
 import org.opensearch.commons.alerting.util.IndexUtils.Companion.INDEX_PATTERN_REGEX
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.common.io.stream.StreamOutput
