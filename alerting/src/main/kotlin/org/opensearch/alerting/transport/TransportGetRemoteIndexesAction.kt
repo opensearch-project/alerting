@@ -27,7 +27,7 @@ import org.opensearch.alerting.action.GetRemoteIndexesResponse.ClusterIndexes
 import org.opensearch.alerting.action.GetRemoteIndexesResponse.ClusterIndexes.ClusterIndex
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.settings.AlertingSettings.Companion.REMOTE_MONITORING_ENABLED
+import org.opensearch.alerting.settings.AlertingSettings.Companion.CROSS_CLUSTER_MONITORING_ENABLED
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.CrossClusterMonitorUtils
 import org.opensearch.client.Client
@@ -62,10 +62,10 @@ class TransportGetRemoteIndexesAction @Inject constructor(
 
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
-    @Volatile private var remoteMonitoringEnabled = REMOTE_MONITORING_ENABLED.get(settings)
+    @Volatile private var remoteMonitoringEnabled = CROSS_CLUSTER_MONITORING_ENABLED.get(settings)
 
     init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(REMOTE_MONITORING_ENABLED) { remoteMonitoringEnabled = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(CROSS_CLUSTER_MONITORING_ENABLED) { remoteMonitoringEnabled = it }
         listenFilterBySettingChange(clusterService)
     }
 

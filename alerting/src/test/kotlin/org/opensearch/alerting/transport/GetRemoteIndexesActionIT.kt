@@ -15,7 +15,7 @@ import org.opensearch.alerting.action.GetRemoteIndexesResponse.ClusterIndexes.Cl
 import org.opensearch.alerting.action.GetRemoteIndexesResponse.ClusterIndexes.ClusterIndex.Companion.MAPPINGS_FIELD
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.resthandler.RestGetRemoteIndexesAction
-import org.opensearch.alerting.settings.AlertingSettings.Companion.REMOTE_MONITORING_ENABLED
+import org.opensearch.alerting.settings.AlertingSettings.Companion.CROSS_CLUSTER_MONITORING_ENABLED
 import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
 import org.opensearch.cluster.health.ClusterHealthStatus
@@ -287,7 +287,7 @@ class GetRemoteIndexesActionIT : AlertingRestTestCase() {
 
     private fun toggleRemoteMonitoring(setting: Boolean) {
         if (remoteMonitoringEnabled != setting) {
-            client().updateSettings(REMOTE_MONITORING_ENABLED.key, setting)
+            client().updateSettings(CROSS_CLUSTER_MONITORING_ENABLED.key, setting)
 
             val settings = client().getSettings()
             val updatedSetting = getEnabledSetting(settings)
@@ -310,7 +310,7 @@ class GetRemoteIndexesActionIT : AlertingRestTestCase() {
 
     private fun getEnabledSetting(settings: Map<String, Any>): Boolean {
         val persistentSettings = settings["persistent"] as Map<String, Any>
-        val updatedSetting = persistentSettings[REMOTE_MONITORING_ENABLED.key]
+        val updatedSetting = persistentSettings[CROSS_CLUSTER_MONITORING_ENABLED.key]
         assertNotNull(updatedSetting)
         return (updatedSetting as String).toBoolean()
     }

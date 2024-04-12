@@ -259,7 +259,7 @@ class InputService(
     private suspend fun handleClusterMetricsInput(input: ClusterMetricsInput): MutableList<Map<String, Any>> {
         logger.debug("ClusterMetricsInput clusterMetricType: {}", input.clusterMetricType)
 
-        val remoteMonitoringEnabled = clusterService.clusterSettings.get(AlertingSettings.REMOTE_MONITORING_ENABLED)
+        val remoteMonitoringEnabled = clusterService.clusterSettings.get(AlertingSettings.CROSS_CLUSTER_MONITORING_ENABLED)
         logger.debug("Remote monitoring enabled: {}", remoteMonitoringEnabled)
 
         val results = mutableListOf<Map<String, Any>>()
