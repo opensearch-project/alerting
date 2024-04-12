@@ -7,7 +7,8 @@ package org.opensearch.alerting.action
 
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionRequestValidationException
-import org.opensearch.alerting.util.IndexUtils.Companion.INDEX_PATTERN_REGEX
+import org.opensearch.commons.alerting.util.IndexUtils.Companion.CLUSTER_PATTERN_REGEX
+import org.opensearch.commons.alerting.util.IndexUtils.Companion.INDEX_PATTERN_REGEX
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.common.io.stream.StreamOutput
 import java.io.IOException
@@ -68,14 +69,6 @@ class GetRemoteIndexesRequest : ActionRequest {
     }
 
     companion object {
-        /**
-         * This regex asserts that the string:
-         *  Starts with a lowercase letter, digit, or asterisk
-         *  Contains a sequence of characters followed by an optional colon and another sequence of characters
-         *  The sequences of characters can include lowercase letters, uppercase letters, digits, underscores, asterisks, or hyphens
-         *  The total length of the string can range from 1 to 255 characters
-         */
-        val CLUSTER_PATTERN_REGEX = Regex("^(?=.{1,255}$)[a-z0-9*]([a-zA-Z0-9_*-]*:?[a-zA-Z0-9_*-]*)$")
         const val INVALID_PATTERN_MESSAGE = "Indexes includes an invalid pattern."
         const val INDEXES_FIELD = "indexes"
         const val INCLUDE_MAPPINGS_FIELD = "include_mappings"

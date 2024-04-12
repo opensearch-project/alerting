@@ -14,9 +14,9 @@ import org.opensearch.action.admin.indices.stats.CommonStats
 import org.opensearch.action.admin.indices.stats.IndicesStatsRequest
 import org.opensearch.action.admin.indices.stats.IndicesStatsResponse
 import org.opensearch.action.admin.indices.stats.ShardStats
-import org.opensearch.alerting.util.IndexUtils.Companion.VALID_INDEX_NAME_REGEX
 import org.opensearch.cluster.routing.UnassignedInfo
 import org.opensearch.common.unit.TimeValue
+import org.opensearch.commons.alerting.util.IndexUtils.Companion.VALID_INDEX_NAME_REGEX
 import org.opensearch.core.action.ActionResponse
 import org.opensearch.core.common.io.stream.StreamOutput
 import org.opensearch.core.common.io.stream.Writeable
