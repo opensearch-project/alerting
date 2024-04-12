@@ -7,7 +7,7 @@ buildscript {
     apply from: 'build-tools/repositories.gradle'
 
     ext {
-        opensearch_version = System.getProperty("opensearch.version", "2.10.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "2.10.1-SNAPSHOT")
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         // 2.7.0-SNAPSHOT -> 2.7.0.0-SNAPSHOT
