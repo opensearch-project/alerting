@@ -2687,7 +2687,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
             )
             fail("Expected create monitor to fail")
         } catch (e: ResponseException) {
-            assertTrue(e.message!!.contains("illegal_argument_exception"))
+            assertTrue(e.message!!.contains("alerting_exception"))
         }
     }
 }
