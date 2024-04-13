@@ -966,16 +966,17 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             num = randomIntBetween(1, 10),
             includeWriteIndex = true
         ),
+        createIndices: Boolean = true
     ): MutableMap<String, MutableMap<String, Boolean>> {
         val indicesMap = mutableMapOf<String, Boolean>()
         val indicesJson = jsonBuilder().startObject().startArray("actions")
         indices.keys.map {
-            val indexName = createTestIndex(index = it, mapping = "")
-            val isWriteIndex = indices.getOrDefault(indexName, false)
-            indicesMap[indexName] = isWriteIndex
+            if (createIndices) createTestIndex(index = it, mapping = "")
+            val isWriteIndex = indices.getOrDefault(it, false)
+            indicesMap[it] = isWriteIndex
             val indexMap = mapOf(
                 "add" to mapOf(
-                    "index" to indexName,
+                    "index" to it,
                     "alias" to alias,
                     "is_write_index" to isWriteIndex
                 )
@@ -1293,6 +1294,15 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     fun RestClient.getIndexMapping(index: String): Map<String, Any> {
         val response = this.makeRequest("GET", "$index/_mapping")
+        assertEquals(RestStatus.OK, response.restStatus())
+        return response.asMap()
+    }
+
+    fun RestClient.getSettings(): Map<String, Any> {
+        val response = this.makeRequest(
+            "GET",
+            "_cluster/settings?flat_settings=true"
+        )
         assertEquals(RestStatus.OK, response.restStatus())
         return response.asMap()
     }
