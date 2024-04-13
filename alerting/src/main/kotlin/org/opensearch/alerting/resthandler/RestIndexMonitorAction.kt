@@ -121,13 +121,13 @@ class RestIndexMonitorAction : BaseRestHandler() {
                     }
                 }
                 Monitor.MonitorType.DOC_LEVEL_MONITOR -> {
+                    validateDocLevelQueryName(monitor)
                     triggers.forEach {
                         if (it !is DocumentLevelTrigger) {
                             throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for document level monitor")
                         }
                     }
                 }
-                validateDocLevelQueryName(monitor)
             }
         } catch (e: Exception) {
             throw AlertingException.wrap(e)
