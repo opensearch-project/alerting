@@ -9,6 +9,7 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorRequest
+import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.Monitor
@@ -64,7 +65,14 @@ class RestExecuteMonitorAction : BaseRestHandler() {
             } else {
                 val xcp = request.contentParser()
                 ensureExpectedToken(START_OBJECT, xcp.nextToken(), xcp)
-                val monitor = Monitor.parse(xcp, Monitor.NO_ID, Monitor.NO_VERSION)
+
+                val monitor: Monitor
+                try {
+                    monitor = Monitor.parse(xcp, Monitor.NO_ID, Monitor.NO_VERSION)
+                } catch (e: Exception) {
+                    throw AlertingException.wrap(e)
+                }
+
                 val execMonitorRequest = ExecuteMonitorRequest(dryrun, requestEnd, null, monitor)
                 client.execute(ExecuteMonitorAction.INSTANCE, execMonitorRequest, RestToXContentListener(channel))
             }

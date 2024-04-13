@@ -71,7 +71,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                     monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger, triggerCtx)
                 Monitor.MonitorType.CLUSTER_METRICS_MONITOR -> {
                     val remoteMonitoringEnabled =
-                        monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.REMOTE_MONITORING_ENABLED)
+                        monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.CROSS_CLUSTER_MONITORING_ENABLED)
                     logger.debug("Remote monitoring enabled: {}", remoteMonitoringEnabled)
                     if (remoteMonitoringEnabled)
                         monitorCtx.triggerService!!.runClusterMetricsTrigger(monitor, trigger, triggerCtx, monitorCtx.clusterService!!)
