@@ -42,7 +42,7 @@ class GetRemoteIndexesResponse : ActionResponse, ToXContentObject {
 
     data class ClusterIndexes(
         val clusterName: String,
-        val clusterHealth: ClusterHealthStatus,
+        val clusterHealth: ClusterHealthStatus?,
         val hubCluster: Boolean,
         val indexes: List<ClusterIndex> = listOf(),
         val latency: Long
@@ -51,7 +51,7 @@ class GetRemoteIndexesResponse : ActionResponse, ToXContentObject {
         @Throws(IOException::class)
         constructor(sin: StreamInput) : this(
             clusterName = sin.readString(),
-            clusterHealth = sin.readEnum(ClusterHealthStatus::class.java),
+            clusterHealth = sin.readOptionalWriteable(ClusterHealthStatus::readFrom),
             hubCluster = sin.readBoolean(),
             indexes = sin.readList((ClusterIndex.Companion)::readFrom),
             latency = sin.readLong()
@@ -72,7 +72,7 @@ class GetRemoteIndexesResponse : ActionResponse, ToXContentObject {
 
         override fun writeTo(out: StreamOutput) {
             out.writeString(clusterName)
-            out.writeEnum(clusterHealth)
+            if (clusterHealth != null) out.writeEnum(clusterHealth)
             indexes.forEach { it.writeTo(out) }
             out.writeLong(latency)
         }
@@ -100,7 +100,7 @@ class GetRemoteIndexesResponse : ActionResponse, ToXContentObject {
             @Throws(IOException::class)
             constructor(sin: StreamInput) : this(
                 indexName = sin.readString(),
-                indexHealth = sin.readEnum(ClusterHealthStatus::class.java),
+                indexHealth = sin.readOptionalWriteable(ClusterHealthStatus::readFrom),
                 mappings = sin.readOptionalWriteable(::MappingMetadata)
             )
 
@@ -115,7 +115,7 @@ class GetRemoteIndexesResponse : ActionResponse, ToXContentObject {
 
             override fun writeTo(out: StreamOutput) {
                 out.writeString(indexName)
-                out.writeEnum(indexHealth)
+                if (indexHealth != null) out.writeEnum(indexHealth)
                 if (mappings != null) out.writeMap(mappings.sourceAsMap)
             }
 
