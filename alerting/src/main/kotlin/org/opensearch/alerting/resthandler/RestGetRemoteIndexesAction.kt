@@ -19,7 +19,9 @@ import org.opensearch.rest.action.RestToXContentListener
 private val log = LogManager.getLogger(RestGetRemoteIndexesAction::class.java)
 
 class RestGetRemoteIndexesAction : BaseRestHandler() {
-    val ROUTE = "${AlertingPlugin.REMOTE_BASE_URI}/indexes"
+    companion object {
+        val ROUTE = "${AlertingPlugin.REMOTE_BASE_URI}/indexes"
+    }
 
     override fun getName(): String {
         return "get_remote_indexes_action"
@@ -32,7 +34,7 @@ class RestGetRemoteIndexesAction : BaseRestHandler() {
     }
 
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        log.debug("${request.method()} $ROUTE")
+        log.info("${request.method()} $ROUTE")
         val indexes = Strings.splitStringByCommaToArray(request.param(GetRemoteIndexesRequest.INDEXES_FIELD, ""))
         val includeMappings = request.paramAsBoolean(GetRemoteIndexesRequest.INCLUDE_MAPPINGS_FIELD, false)
         return RestChannelConsumer {

@@ -8,6 +8,7 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IF_PRIMARY_TERM
 import org.opensearch.alerting.util.IF_SEQ_NO
 import org.opensearch.alerting.util.REFRESH
@@ -16,10 +17,13 @@ import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.IndexMonitorRequest
 import org.opensearch.commons.alerting.action.IndexMonitorResponse
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.utils.getInvalidNameChars
+import org.opensearch.commons.utils.isValidName
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentParser.Token
@@ -77,48 +81,58 @@ class RestIndexMonitorAction : BaseRestHandler() {
 
         val id = request.param("monitorID", Monitor.NO_ID)
         if (request.method() == PUT && Monitor.NO_ID == id) {
-            throw IllegalArgumentException("Missing monitor ID")
+            throw AlertingException.wrap(IllegalArgumentException("Missing monitor ID"))
         }
 
         // Validate request by parsing JSON to Monitor
         val xcp = request.contentParser()
         ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
-        val monitor = Monitor.parse(xcp, id).copy(lastUpdateTime = Instant.now())
-        val rbacRoles = request.contentParser().map()["rbac_roles"] as List<String>?
 
-        validateDataSources(monitor)
-        val monitorType = monitor.monitorType
-        val triggers = monitor.triggers
-        when (monitorType) {
-            Monitor.MonitorType.QUERY_LEVEL_MONITOR -> {
-                triggers.forEach {
-                    if (it !is QueryLevelTrigger) {
-                        throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for query level monitor")
+        val monitor: Monitor
+        val rbacRoles: List<String>?
+        try {
+            monitor = Monitor.parse(xcp, id).copy(lastUpdateTime = Instant.now())
+
+            rbacRoles = request.contentParser().map()["rbac_roles"] as List<String>?
+
+            validateDataSources(monitor)
+            val monitorType = monitor.monitorType
+            val triggers = monitor.triggers
+            when (monitorType) {
+                Monitor.MonitorType.QUERY_LEVEL_MONITOR -> {
+                    triggers.forEach {
+                        if (it !is QueryLevelTrigger) {
+                            throw (IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for query level monitor"))
+                        }
+                    }
+                }
+                Monitor.MonitorType.BUCKET_LEVEL_MONITOR -> {
+                    triggers.forEach {
+                        if (it !is BucketLevelTrigger) {
+                            throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for bucket level monitor")
+                        }
+                    }
+                }
+                Monitor.MonitorType.CLUSTER_METRICS_MONITOR -> {
+                    triggers.forEach {
+                        if (it !is QueryLevelTrigger) {
+                            throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for cluster metrics monitor")
+                        }
+                    }
+                }
+                Monitor.MonitorType.DOC_LEVEL_MONITOR -> {
+                    validateDocLevelQueryName(monitor)
+                    triggers.forEach {
+                        if (it !is DocumentLevelTrigger) {
+                            throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for document level monitor")
+                        }
                     }
                 }
             }
-            Monitor.MonitorType.BUCKET_LEVEL_MONITOR -> {
-                triggers.forEach {
-                    if (it !is BucketLevelTrigger) {
-                        throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for bucket level monitor")
-                    }
-                }
-            }
-            Monitor.MonitorType.CLUSTER_METRICS_MONITOR -> {
-                triggers.forEach {
-                    if (it !is QueryLevelTrigger) {
-                        throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for cluster metrics monitor")
-                    }
-                }
-            }
-            Monitor.MonitorType.DOC_LEVEL_MONITOR -> {
-                triggers.forEach {
-                    if (it !is DocumentLevelTrigger) {
-                        throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for document level monitor")
-                    }
-                }
-            }
+        } catch (e: Exception) {
+            throw AlertingException.wrap(e)
         }
+
         val seqNo = request.paramAsLong(IF_SEQ_NO, SequenceNumbers.UNASSIGNED_SEQ_NO)
         val primaryTerm = request.paramAsLong(IF_PRIMARY_TERM, SequenceNumbers.UNASSIGNED_PRIMARY_TERM)
         val refreshPolicy = if (request.hasParam(REFRESH)) {
@@ -130,6 +144,19 @@ class RestIndexMonitorAction : BaseRestHandler() {
 
         return RestChannelConsumer { channel ->
             client.execute(AlertingActions.INDEX_MONITOR_ACTION_TYPE, indexMonitorRequest, indexMonitorResponse(channel, request.method()))
+        }
+    }
+
+    private fun validateDocLevelQueryName(monitor: Monitor) {
+        monitor.inputs.filterIsInstance<DocLevelMonitorInput>().forEach { docLevelMonitorInput ->
+            docLevelMonitorInput.queries.forEach { dlq ->
+                if (!isValidName(dlq.name)) {
+                    throw IllegalArgumentException(
+                        "Doc level query name may not start with [_, +, -], contain '..', or contain: " +
+                            getInvalidNameChars().replace("\\", "")
+                    )
+                }
+            }
         }
     }
 
