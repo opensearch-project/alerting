@@ -52,7 +52,7 @@ jobs:
           cp ./alerting/build/distributions/*.zip alerting-artifacts
       # This step uses the codecov-action Github action: https://github.com/codecov/codecov-action
       - name: Upload Coverage Report
-        uses: codecov/codecov-action@v1
+        uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
       # This step uses the upload-artifact Github action: https://github.com/actions/upload-artifact
