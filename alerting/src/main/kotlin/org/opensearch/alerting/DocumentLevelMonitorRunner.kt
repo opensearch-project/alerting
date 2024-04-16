@@ -349,6 +349,11 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                     docLevelMonitorFanOutResponses.addAll(responses)
                 }
             }
+
+            val isFanOutSuccessful = checkAndThrowExceptionIfAllFanOutsFailed(docLevelMonitorFanOutResponses)
+            if (isFanOutSuccessful != null) {
+                throw isFanOutSuccessful
+            }
             updateLastRunContextFromFanOutResponses(docLevelMonitorFanOutResponses, updatedLastRunContext)
             val triggerResults = buildTriggerResults(docLevelMonitorFanOutResponses)
             val inputRunResults = buildInputRunResults(docLevelMonitorFanOutResponses)
@@ -413,6 +418,20 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                 }
             }
         }
+    }
+
+    private fun checkAndThrowExceptionIfAllFanOutsFailed(
+        docLevelMonitorFanOutResponses: MutableList<DocLevelMonitorFanOutResponse>
+    ): AlertingException? {
+        val exceptions = mutableListOf<AlertingException>()
+        for (res in docLevelMonitorFanOutResponses) {
+            if (res.exception == null) {
+                return null
+            } else {
+                exceptions.add(res.exception)
+            }
+        }
+        return AlertingException.merge(*exceptions.toTypedArray())
     }
 
     private fun buildTriggerResults(
