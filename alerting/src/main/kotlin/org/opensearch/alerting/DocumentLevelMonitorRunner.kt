@@ -20,24 +20,11 @@ import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
-import org.opensearch.alerting.util.defaultToPerExecutionAction
-import org.opensearch.alerting.util.getActionExecutionPolicy
-import org.opensearch.alerting.util.getCancelAfterTimeInterval
-import org.opensearch.alerting.util.parseSampleDocTags
-import org.opensearch.alerting.util.printsSampleDocDat
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.node.DiscoveryNode
 import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
-import org.opensearch.common.unit.TimeValue
-import org.opensearch.common.xcontent.XContentFactory
-import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.alerting.AlertingPluginInterface
-import org.opensearch.commons.alerting.action.PublishFindingsRequest
-import org.opensearch.commons.alerting.action.SubscribeFindingsResponse
-import org.opensearch.commons.alerting.model.ActionExecutionResult
-import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.Monitor
@@ -321,7 +308,15 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                                                         ) {
                                                         override fun handleException(e: TransportException) {
                                                             logger.error("Fan out retry failed in node ${localNode.id}")
-                                                            listener.onFailure(e)
+                                                            listener.onResponse(
+                                                                DocLevelMonitorFanOutResponse(
+                                                                    "",
+                                                                    "",
+                                                                    "",
+                                                                    mutableMapOf(),
+                                                                    exception = AlertingException.wrap(e) as AlertingException
+                                                                )
+                                                            )
                                                         }
 
                                                         override fun handleResponse(response: DocLevelMonitorFanOutResponse) {
@@ -331,7 +326,15 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                                                 )
                                             } else {
                                                 logger.error("Fan out failed in node ${node.key}", e)
-                                                listener.onFailure(e)
+                                                listener.onResponse(
+                                                    DocLevelMonitorFanOutResponse(
+                                                        "",
+                                                        "",
+                                                        "",
+                                                        mutableMapOf(),
+                                                        exception = AlertingException.wrap(e) as AlertingException
+                                                    )
+                                                )
                                             }
                                         }
 
@@ -389,20 +392,22 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         // Prepare updatedLastRunContext for each index
         for (indexName in updatedLastRunContext.keys) {
             for (fanOutResponse in docLevelMonitorFanOutResponses) {
-                // fanOutResponse.lastRunContexts //updatedContexts for relevant shards
-                val indexLastRunContext = updatedLastRunContext[indexName] as MutableMap<String, Any>
+                if (fanOutResponse.exception == null) {
+                    // fanOutResponse.lastRunContexts //updatedContexts for relevant shards
+                    val indexLastRunContext = updatedLastRunContext[indexName] as MutableMap<String, Any>
 
-                if (fanOutResponse.lastRunContexts.contains("index") && fanOutResponse.lastRunContexts["index"] == indexName) {
-                    fanOutResponse.lastRunContexts.keys.forEach {
+                    if (fanOutResponse.lastRunContexts.contains("index") && fanOutResponse.lastRunContexts["index"] == indexName) {
+                        fanOutResponse.lastRunContexts.keys.forEach {
 
-                        val seq_no = fanOutResponse.lastRunContexts[it].toString().toIntOrNull()
-                        if (
-                            it != "shards_count" &&
-                            it != "index" &&
-                            seq_no != null &&
-                            seq_no >= 0
-                        ) {
-                            indexLastRunContext[it] = seq_no
+                            val seq_no = fanOutResponse.lastRunContexts[it].toString().toIntOrNull()
+                            if (
+                                it != "shards_count" &&
+                                it != "index" &&
+                                seq_no != null &&
+                                seq_no >= 0
+                            ) {
+                                indexLastRunContext[it] = seq_no
+                            }
                         }
                     }
                 }
@@ -416,36 +421,38 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         val triggerResults = mutableMapOf<String, DocumentLevelTriggerRunResult>()
         val triggerErrorMap = mutableMapOf<String, MutableList<AlertingException>>()
         for (res in docLevelMonitorFanOutResponses) {
-            for (triggerId in res.triggerResults.keys) {
-                val documentLevelTriggerRunResult = res.triggerResults[triggerId]
-                if (documentLevelTriggerRunResult != null) {
-                    if (false == triggerResults.contains(triggerId)) {
-                        triggerResults[triggerId] = documentLevelTriggerRunResult
-                        triggerErrorMap[triggerId] = if (documentLevelTriggerRunResult.error != null) {
-                            val error = if (documentLevelTriggerRunResult.error is AlertingException) {
-                                documentLevelTriggerRunResult.error as AlertingException
+            if (res.exception == null) {
+                for (triggerId in res.triggerResults.keys) {
+                    val documentLevelTriggerRunResult = res.triggerResults[triggerId]
+                    if (documentLevelTriggerRunResult != null) {
+                        if (false == triggerResults.contains(triggerId)) {
+                            triggerResults[triggerId] = documentLevelTriggerRunResult
+                            triggerErrorMap[triggerId] = if (documentLevelTriggerRunResult.error != null) {
+                                val error = if (documentLevelTriggerRunResult.error is AlertingException) {
+                                    documentLevelTriggerRunResult.error as AlertingException
+                                } else {
+                                    AlertingException.wrap(documentLevelTriggerRunResult.error!!) as AlertingException
+                                }
+                                mutableListOf(error)
                             } else {
-                                AlertingException.wrap(documentLevelTriggerRunResult.error!!) as AlertingException
+                                mutableListOf()
                             }
-                            mutableListOf(error)
                         } else {
-                            mutableListOf()
-                        }
-                    } else {
-                        val currVal = triggerResults[triggerId]
-                        val newTriggeredDocs = mutableListOf<String>()
-                        newTriggeredDocs.addAll(currVal!!.triggeredDocs)
-                        newTriggeredDocs.addAll(documentLevelTriggerRunResult.triggeredDocs)
-                        val newActionResults = mutableMapOf<String, MutableMap<String, ActionRunResult>>()
-                        newActionResults.putAll(currVal.actionResultsMap)
-                        newActionResults.putAll(documentLevelTriggerRunResult.actionResultsMap)
-                        triggerResults[triggerId] = currVal.copy(
-                            triggeredDocs = newTriggeredDocs,
-                            actionResultsMap = newActionResults
-                        )
+                            val currVal = triggerResults[triggerId]
+                            val newTriggeredDocs = mutableListOf<String>()
+                            newTriggeredDocs.addAll(currVal!!.triggeredDocs)
+                            newTriggeredDocs.addAll(documentLevelTriggerRunResult.triggeredDocs)
+                            val newActionResults = mutableMapOf<String, MutableMap<String, ActionRunResult>>()
+                            newActionResults.putAll(currVal.actionResultsMap)
+                            newActionResults.putAll(documentLevelTriggerRunResult.actionResultsMap)
+                            triggerResults[triggerId] = currVal.copy(
+                                triggeredDocs = newTriggeredDocs,
+                                actionResultsMap = newActionResults
+                            )
 
-                        if (documentLevelTriggerRunResult.error != null) {
-                            triggerErrorMap[triggerId]!!.add(documentLevelTriggerRunResult.error as AlertingException)
+                            if (documentLevelTriggerRunResult.error != null) {
+                                triggerErrorMap[triggerId]!!.add(documentLevelTriggerRunResult.error as AlertingException)
+                            }
                         }
                     }
                 }
@@ -464,17 +471,19 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         val inputRunResults = mutableMapOf<String, MutableSet<String>>()
         val errors: MutableList<AlertingException> = mutableListOf()
         for (response in docLevelMonitorFanOutResponses) {
-            if (response.inputResults.error != null) {
-                if (response.inputResults.error is AlertingException) {
-                    errors.add(response.inputResults.error)
-                } else {
-                    errors.add(AlertingException.wrap(response.inputResults.error) as AlertingException)
+            if (response.exception == null) {
+                if (response.inputResults.error != null) {
+                    if (response.inputResults.error is AlertingException) {
+                        errors.add(response.inputResults.error)
+                    } else {
+                        errors.add(AlertingException.wrap(response.inputResults.error) as AlertingException)
+                    }
                 }
-            }
-            val partialResult = response.inputResults.results
-            for (result in partialResult) {
-                for (id in result.keys) {
-                    inputRunResults.getOrPut(id) { mutableSetOf() }.addAll(result[id] as Collection<String>)
+                val partialResult = response.inputResults.results
+                for (result in partialResult) {
+                    for (id in result.keys) {
+                        inputRunResults.getOrPut(id) { mutableSetOf() }.addAll(result[id] as Collection<String>)
+                    }
                 }
             }
         }

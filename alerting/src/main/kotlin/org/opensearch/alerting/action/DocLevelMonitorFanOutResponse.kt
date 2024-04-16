@@ -7,6 +7,7 @@ package org.opensearch.alerting.action
 
 import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.alerting.model.InputRunResults
+import org.opensearch.alerting.util.AlertingException
 import org.opensearch.core.action.ActionResponse
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.common.io.stream.StreamOutput
@@ -22,6 +23,7 @@ class DocLevelMonitorFanOutResponse : ActionResponse, ToXContentObject {
     val lastRunContexts: MutableMap<String, Any>
     val inputResults: InputRunResults
     val triggerResults: Map<String, DocumentLevelTriggerRunResult>
+    val exception: AlertingException?
 
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
@@ -30,7 +32,8 @@ class DocLevelMonitorFanOutResponse : ActionResponse, ToXContentObject {
         monitorId = sin.readString(),
         lastRunContexts = sin.readMap()!! as MutableMap<String, Any>,
         inputResults = InputRunResults.readFrom(sin),
-        triggerResults = suppressWarning(sin.readMap(StreamInput::readString, DocumentLevelTriggerRunResult::readFrom))
+        triggerResults = suppressWarning(sin.readMap(StreamInput::readString, DocumentLevelTriggerRunResult::readFrom)),
+        exception = sin.readException()
     )
 
     constructor(
@@ -40,6 +43,7 @@ class DocLevelMonitorFanOutResponse : ActionResponse, ToXContentObject {
         lastRunContexts: MutableMap<String, Any>,
         inputResults: InputRunResults = InputRunResults(), // partial,
         triggerResults: Map<String, DocumentLevelTriggerRunResult> = mapOf(),
+        exception: AlertingException? = null
     ) : super() {
         this.nodeId = nodeId
         this.executionId = executionId
@@ -47,6 +51,7 @@ class DocLevelMonitorFanOutResponse : ActionResponse, ToXContentObject {
         this.lastRunContexts = lastRunContexts
         this.inputResults = inputResults
         this.triggerResults = triggerResults
+        this.exception = exception
     }
 
     @Throws(IOException::class)
@@ -61,6 +66,7 @@ class DocLevelMonitorFanOutResponse : ActionResponse, ToXContentObject {
             StreamOutput::writeString,
             { stream, stats -> stats.writeTo(stream) }
         )
+        out.writeException(exception)
     }
 
     @Throws(IOException::class)
@@ -72,6 +78,7 @@ class DocLevelMonitorFanOutResponse : ActionResponse, ToXContentObject {
             .field("last_run_contexts", lastRunContexts)
             .field("input_results", inputResults)
             .field("trigger_results", triggerResults)
+            .field("exception", exception)
             .endObject()
         return builder
     }
