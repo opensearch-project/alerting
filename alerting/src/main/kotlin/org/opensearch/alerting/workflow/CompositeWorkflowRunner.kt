@@ -39,6 +39,7 @@ import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.query.QueryBuilders.boolQuery
 import org.opensearch.index.query.QueryBuilders.existsQuery
 import org.opensearch.index.query.QueryBuilders.termsQuery
+import org.opensearch.transport.TransportService
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -54,6 +55,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         periodStart: Instant,
         periodEnd: Instant,
         dryRun: Boolean,
+        transportService: TransportService
     ): WorkflowRunResult {
         val workflowExecutionStartTime = Instant.now()
 
@@ -135,7 +137,16 @@ object CompositeWorkflowRunner : WorkflowRunner() {
             try {
                 dataSources = delegateMonitor.dataSources
                 val delegateRunResult =
-                    runDelegateMonitor(delegateMonitor, monitorCtx, periodStart, periodEnd, dryRun, workflowRunContext, executionId)
+                    runDelegateMonitor(
+                        delegateMonitor,
+                        monitorCtx,
+                        periodStart,
+                        periodEnd,
+                        dryRun,
+                        workflowRunContext,
+                        executionId,
+                        transportService
+                    )
                 resultList.add(delegateRunResult!!)
             } catch (ex: Exception) {
                 logger.error("Error executing workflow delegate monitor ${delegate.monitorId}", ex)
@@ -238,6 +249,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         dryRun: Boolean,
         workflowRunContext: WorkflowRunContext,
         executionId: String,
+        transportService: TransportService
     ): MonitorRunResult<*>? {
 
         if (delegateMonitor.isBucketLevelMonitor()) {
@@ -248,7 +260,8 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 periodEnd,
                 dryRun,
                 workflowRunContext,
-                executionId
+                executionId,
+                transportService
             )
         } else if (delegateMonitor.isDocLevelMonitor()) {
             return DocumentLevelMonitorRunner().runMonitor(
@@ -258,7 +271,8 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 periodEnd,
                 dryRun,
                 workflowRunContext,
-                executionId
+                executionId,
+                transportService
             )
         } else if (delegateMonitor.isQueryLevelMonitor()) {
             return QueryLevelMonitorRunner.runMonitor(
@@ -268,7 +282,8 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 periodEnd,
                 dryRun,
                 workflowRunContext,
-                executionId
+                executionId,
+                transportService
             )
         } else {
             throw AlertingException.wrap(

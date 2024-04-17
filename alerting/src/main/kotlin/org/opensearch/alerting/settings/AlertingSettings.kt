@@ -21,6 +21,7 @@ class AlertingSettings {
         const val DEFAULT_PERCOLATE_QUERY_NUM_DOCS_IN_MEMORY = 50000
         const val DEFAULT_PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT = 10
         const val DEFAULT_DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE = 10000
+        const val DEFAULT_FAN_OUT_NODES = 1000
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(
             "plugins.alerting.monitor.max_monitors",
@@ -212,6 +213,14 @@ class AlertingSettings {
             "plugins.alerting.alert_findings_indexing_batch_size",
             DEFAULT_FINDINGS_INDEXING_BATCH_SIZE,
             1,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val DOC_LEVEL_MONITOR_FAN_OUT_NODES = Setting.intSetting(
+            "plugins.alerting.monitor.doc_level_monitor_fan_out_nodes",
+            DEFAULT_FAN_OUT_NODES,
+            1,
+            Int.MAX_VALUE,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
     }

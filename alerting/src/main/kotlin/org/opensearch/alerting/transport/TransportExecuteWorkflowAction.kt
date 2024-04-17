@@ -39,7 +39,7 @@ import java.time.Instant
 private val log = LogManager.getLogger(TransportExecuteWorkflowAction::class.java)
 
 class TransportExecuteWorkflowAction @Inject constructor(
-    transportService: TransportService,
+    private val transportService: TransportService,
     private val client: Client,
     private val runner: MonitorRunnerService,
     actionFilters: ActionFilters,
@@ -59,15 +59,27 @@ class TransportExecuteWorkflowAction @Inject constructor(
         client.threadPool().threadContext.stashContext().use {
             val executeWorkflow = fun(workflow: Workflow) {
                 runner.launch {
-                    val (periodStart, periodEnd) =
+                    val (periodStart, periodEnd) = if (execWorkflowRequest.requestStart != null) {
+                        Pair(
+                            Instant.ofEpochMilli(execWorkflowRequest.requestStart.millis),
+                            Instant.ofEpochMilli(execWorkflowRequest.requestEnd.millis)
+                        )
+                    } else {
                         workflow.schedule.getPeriodEndingAt(Instant.ofEpochMilli(execWorkflowRequest.requestEnd.millis))
+                    }
                     try {
                         log.info(
                             "Executing workflow from API - id: ${workflow.id}, periodStart: $periodStart, periodEnd: $periodEnd, " +
                                 "dryrun: ${execWorkflowRequest.dryrun}"
                         )
                         val workflowRunResult =
-                            MonitorRunnerService.runJob(workflow, periodStart, periodEnd, execWorkflowRequest.dryrun)
+                            MonitorRunnerService.runJob(
+                                workflow,
+                                periodStart,
+                                periodEnd,
+                                execWorkflowRequest.dryrun,
+                                transportService = transportService
+                            )
                         withContext(Dispatchers.IO, {
                             actionListener.onResponse(
                                 ExecuteWorkflowResponse(
