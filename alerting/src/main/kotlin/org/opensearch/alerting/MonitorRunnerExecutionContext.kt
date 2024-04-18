@@ -60,5 +60,6 @@ data class MonitorRunnerExecutionContext(
         AlertingSettings.DEFAULT_PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT,
     @Volatile var docLevelMonitorShardFetchSize: Int =
         AlertingSettings.DEFAULT_DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE,
+    @Volatile var totalNodesFanOut: Int = AlertingSettings.DEFAULT_FAN_OUT_NODES,
     @Volatile var lockService: LockService? = null
 )
