@@ -402,9 +402,9 @@ object CompositeWorkflowRunner : WorkflowRunner() {
 
     fun getDelegateMonitorAlertState(
         workflow: Workflow,
-    ): Alert.State {
+    ): String {
         return if (workflow.triggers.isNotEmpty()) {
-            Alert.State.AUDIT
-        } else Alert.State.ACTIVE
+            Alert.State.AUDIT.name
+        } else Alert.State.ACTIVE.name
     }
 }
