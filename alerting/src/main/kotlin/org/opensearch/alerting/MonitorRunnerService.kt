@@ -14,6 +14,12 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.action.search.TransportSearchAction.SEARCH_CANCEL_AFTER_TIME_INTERVAL_SETTING
 import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.alerting.action.ExecuteMonitorAction
+import org.opensearch.alerting.action.ExecuteMonitorRequest
+import org.opensearch.alerting.action.ExecuteMonitorResponse
+import org.opensearch.alerting.action.ExecuteWorkflowAction
+import org.opensearch.alerting.action.ExecuteWorkflowRequest
+import org.opensearch.alerting.action.ExecuteWorkflowResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertMover.Companion.moveAlerts
 import org.opensearch.alerting.core.JobRunner
@@ -22,6 +28,7 @@ import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.WorkflowRunResult
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.opensearchapi.retry
+import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.TriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
@@ -47,6 +54,7 @@ import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.lifecycle.AbstractLifecycleComponent
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
@@ -60,6 +68,7 @@ import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
 import org.opensearch.script.TemplateScript
 import org.opensearch.threadpool.ThreadPool
+import org.opensearch.transport.TransportService
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -217,6 +226,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 monitorCtx.docLevelMonitorShardFetchSize = it
             }
 
+        monitorCtx.totalNodesFanOut = AlertingSettings.DOC_LEVEL_MONITOR_FAN_OUT_NODES.get(monitorCtx.settings)
+        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.DOC_LEVEL_MONITOR_FAN_OUT_NODES) {
+            monitorCtx.totalNodesFanOut = it
+        }
+
         return this
     }
 
@@ -299,20 +313,37 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         when (job) {
             is Workflow -> {
                 launch {
-                    logger.debug(
-                        "PERF_DEBUG: executing workflow ${job.id} on node " +
-                            monitorCtx.clusterService!!.state().nodes().localNode.id
-                    )
-                    runJob(job, periodStart, periodEnd, false)
+                    monitorCtx.client!!.suspendUntil<Client, ExecuteWorkflowResponse> {
+                        monitorCtx.client!!.execute(
+                            ExecuteWorkflowAction.INSTANCE,
+                            ExecuteWorkflowRequest(
+                                false,
+                                TimeValue(periodEnd.toEpochMilli()),
+                                job.id,
+                                job,
+                                TimeValue(periodStart.toEpochMilli())
+                            ),
+                            it
+                        )
+                    }
                 }
             }
             is Monitor -> {
                 launch {
-                    logger.debug(
-                        "PERF_DEBUG: executing ${job.monitorType} ${job.id} on node " +
-                            monitorCtx.clusterService!!.state().nodes().localNode.id
+                    val executeMonitorRequest = ExecuteMonitorRequest(
+                        false,
+                        TimeValue(periodEnd.toEpochMilli()),
+                        job.id,
+                        job,
+                        TimeValue(periodStart.toEpochMilli())
                     )
-                    runJob(job, periodStart, periodEnd, false)
+                    monitorCtx.client!!.suspendUntil<Client, ExecuteMonitorResponse> {
+                        monitorCtx.client!!.execute(
+                            ExecuteMonitorAction.INSTANCE,
+                            executeMonitorRequest,
+                            it
+                        )
+                    }
                 }
             }
             else -> {
@@ -321,11 +352,23 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         }
     }
 
-    suspend fun runJob(workflow: Workflow, periodStart: Instant, periodEnd: Instant, dryrun: Boolean): WorkflowRunResult {
-        return CompositeWorkflowRunner.runWorkflow(workflow, monitorCtx, periodStart, periodEnd, dryrun)
+    suspend fun runJob(
+        workflow: Workflow,
+        periodStart: Instant,
+        periodEnd: Instant,
+        dryrun: Boolean,
+        transportService: TransportService
+    ): WorkflowRunResult {
+        return CompositeWorkflowRunner.runWorkflow(workflow, monitorCtx, periodStart, periodEnd, dryrun, transportService)
     }
 
-    suspend fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant, dryrun: Boolean): MonitorRunResult<*> {
+    suspend fun runJob(
+        job: ScheduledJob,
+        periodStart: Instant,
+        periodEnd: Instant,
+        dryrun: Boolean,
+        transportService: TransportService
+    ): MonitorRunResult<*> {
         // Updating the scheduled job index at the start of monitor execution runs for when there is an upgrade the the schema mapping
         // has not been updated.
         if (!IndexUtils.scheduledJobIndexUpdated && monitorCtx.clusterService != null && monitorCtx.client != null) {
@@ -345,7 +388,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
         if (job is Workflow) {
             logger.info("Executing scheduled workflow - id: ${job.id}, periodStart: $periodStart, periodEnd: $periodEnd, dryrun: $dryrun")
-            CompositeWorkflowRunner.runWorkflow(workflow = job, monitorCtx, periodStart, periodEnd, dryrun)
+            CompositeWorkflowRunner.runWorkflow(workflow = job, monitorCtx, periodStart, periodEnd, dryrun, transportService)
         }
         val monitor = job as Monitor
         val executionId = "${monitor.id}_${LocalDateTime.now(ZoneOffset.UTC)}_${UUID.randomUUID()}"
@@ -354,11 +397,35 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 "periodEnd: $periodEnd, dryrun: $dryrun, executionId: $executionId"
         )
         val runResult = if (monitor.isBucketLevelMonitor()) {
-            BucketLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun, executionId = executionId)
+            BucketLevelMonitorRunner.runMonitor(
+                monitor,
+                monitorCtx,
+                periodStart,
+                periodEnd,
+                dryrun,
+                executionId = executionId,
+                transportService = transportService
+            )
         } else if (monitor.isDocLevelMonitor()) {
-            DocumentLevelMonitorRunner().runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun, executionId = executionId)
+            DocumentLevelMonitorRunner().runMonitor(
+                monitor,
+                monitorCtx,
+                periodStart,
+                periodEnd,
+                dryrun,
+                executionId = executionId,
+                transportService = transportService
+            )
         } else {
-            QueryLevelMonitorRunner.runMonitor(monitor, monitorCtx, periodStart, periodEnd, dryrun, executionId = executionId)
+            QueryLevelMonitorRunner.runMonitor(
+                monitor,
+                monitorCtx,
+                periodStart,
+                periodEnd,
+                dryrun,
+                executionId = executionId,
+                transportService = transportService
+            )
         }
         return runResult
     }

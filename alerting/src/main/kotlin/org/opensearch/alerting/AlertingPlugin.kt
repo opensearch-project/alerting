@@ -6,6 +6,7 @@
 package org.opensearch.alerting
 
 import org.opensearch.action.ActionRequest
+import org.opensearch.alerting.action.DocLevelMonitorFanOutAction
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.GetDestinationsAction
@@ -54,6 +55,7 @@ import org.opensearch.alerting.transport.TransportAcknowledgeAlertAction
 import org.opensearch.alerting.transport.TransportAcknowledgeChainedAlertAction
 import org.opensearch.alerting.transport.TransportDeleteMonitorAction
 import org.opensearch.alerting.transport.TransportDeleteWorkflowAction
+import org.opensearch.alerting.transport.TransportDocLevelMonitorFanOutAction
 import org.opensearch.alerting.transport.TransportExecuteMonitorAction
 import org.opensearch.alerting.transport.TransportExecuteWorkflowAction
 import org.opensearch.alerting.transport.TransportGetAlertsAction
@@ -223,7 +225,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(AlertingActions.INDEX_WORKFLOW_ACTION_TYPE, TransportIndexWorkflowAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.GET_WORKFLOW_ACTION_TYPE, TransportGetWorkflowAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.DELETE_WORKFLOW_ACTION_TYPE, TransportDeleteWorkflowAction::class.java),
-            ActionPlugin.ActionHandler(ExecuteWorkflowAction.INSTANCE, TransportExecuteWorkflowAction::class.java)
+            ActionPlugin.ActionHandler(ExecuteWorkflowAction.INSTANCE, TransportExecuteWorkflowAction::class.java),
+            ActionPlugin.ActionHandler(DocLevelMonitorFanOutAction.INSTANCE, TransportDocLevelMonitorFanOutAction::class.java)
         )
     }
 
@@ -257,6 +260,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         // Need to figure out how to use the OpenSearch DI classes rather than handwiring things here.
         val settings = environment.settings()
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
+        val alertService = AlertService(client, xContentRegistry, alertIndices)
+        val triggerService = TriggerService(scriptService)
         runner = MonitorRunnerService
             .registerClusterService(clusterService)
             .registerClient(client)
@@ -267,8 +272,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerThreadPool(threadPool)
             .registerAlertIndices(alertIndices)
             .registerInputService(InputService(client, scriptService, namedWriteableRegistry, xContentRegistry, clusterService, settings))
-            .registerTriggerService(TriggerService(scriptService))
-            .registerAlertService(AlertService(client, xContentRegistry, alertIndices))
+            .registerTriggerService(triggerService)
+            .registerAlertService(alertService)
             .registerDocLevelMonitorQueries(DocLevelMonitorQueries(client, clusterService))
             .registerJvmStats(JvmStats.jvmStats())
             .registerWorkflowService(WorkflowService(client, xContentRegistry))
@@ -298,7 +303,16 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
 
         DeleteMonitorService.initialize(client)
 
-        return listOf(sweeper, scheduler, runner, scheduledJobIndices, docLevelMonitorQueries, destinationMigrationCoordinator)
+        return listOf(
+            sweeper,
+            scheduler,
+            runner,
+            scheduledJobIndices,
+            docLevelMonitorQueries,
+            destinationMigrationCoordinator,
+            alertService,
+            triggerService
+        )
     }
 
     override fun getSettings(): List<Setting<*>> {
@@ -329,6 +343,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD,
             AlertingSettings.ALERTING_MAX_MONITORS,
             AlertingSettings.PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT,
+            AlertingSettings.DOC_LEVEL_MONITOR_FAN_OUT_NODES,
             DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE,
             AlertingSettings.PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY,
             AlertingSettings.REQUEST_TIMEOUT,

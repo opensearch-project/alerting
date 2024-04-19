@@ -20,7 +20,7 @@ private val log = LogManager.getLogger(AlertingException::class.java)
 /**
  * Converts into a user friendly message.
  */
-class AlertingException(message: String, val status: RestStatus, ex: Exception) : OpenSearchException(message, ex) {
+class AlertingException(message: String, val status: RestStatus, val ex: Exception) : OpenSearchException(message, ex) {
 
     override fun status(): RestStatus {
         return status
@@ -68,6 +68,22 @@ class AlertingException(message: String, val status: RestStatus, ex: Exception) 
             // Currently, alerting-kibana is using `error.root_cause.reason` as text in the toast message.
             // Below logic is to set friendly message to error.root_cause.reason.
             return AlertingException(friendlyMsg, status, Exception("${ex.javaClass.name}: ${ex.message}"))
+        }
+
+        @JvmStatic
+        fun merge(vararg ex: AlertingException): AlertingException {
+            var friendlyMsg = ""
+            var unwrappedExceptionMsg = ""
+            ex.forEach {
+                if (friendlyMsg != "") {
+                    friendlyMsg += ", ${it.message}"
+                    unwrappedExceptionMsg += ", ${it.ex.message}"
+                } else {
+                    friendlyMsg = it.message.orEmpty()
+                    unwrappedExceptionMsg = "${it.ex.message}"
+                }
+            }
+            return AlertingException(friendlyMsg, ex.first().status, Exception(unwrappedExceptionMsg))
         }
     }
 }

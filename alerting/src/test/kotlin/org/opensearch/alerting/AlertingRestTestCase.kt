@@ -919,6 +919,17 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return response
     }
 
+    public fun indexDoc(client: RestClient, index: String, doc: String, refresh: Boolean = true): Response {
+        val requestBody = StringEntity(doc, APPLICATION_JSON)
+        val params = if (refresh) mapOf("refresh" to "true") else mapOf()
+        val response = client.makeRequest("POST", "$index/_doc?op_type=create", params, requestBody)
+        assertTrue(
+            "Unable to index doc: '${doc.take(15)}...' to index: '$index'",
+            listOf(RestStatus.OK, RestStatus.CREATED).contains(response.restStatus())
+        )
+        return response
+    }
+
     protected fun deleteDoc(index: String, id: String, refresh: Boolean = true): Response {
         val params = if (refresh) mapOf("refresh" to "true") else mapOf()
         val response = client().makeRequest("DELETE", "$index/_doc/$id", params)
@@ -931,6 +942,20 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         createIndex(
             index,
             Settings.EMPTY,
+            """
+                "properties" : {
+                  "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
+                  "test_field" : { "type" : "keyword" },
+                  "number" : { "type" : "keyword" }
+                }
+            """.trimIndent()
+        )
+        return index
+    }
+
+    protected fun createTestIndex(index: String = randomAlphaOfLength(10).lowercase(Locale.ROOT), settings: Settings): String {
+        createIndex(
+            index, settings,
             """
                 "properties" : {
                   "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
@@ -1040,7 +1065,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client().makeRequest("DELETE", "_data_stream/$datastream")
     }
 
-    protected fun createIndexAlias(alias: String, mappings: String?) {
+    protected fun createIndexAlias(alias: String, mappings: String?, setting: String? = "") {
         val indexPattern = "$alias*"
         var componentTemplateMappings = "\"properties\": {" +
             "  \"netflow.destination_transport_port\":{ \"type\": \"long\" }," +
@@ -1049,9 +1074,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         if (mappings != null) {
             componentTemplateMappings = mappings
         }
-        createComponentTemplateWithMappings(
+        createComponentTemplateWithMappingsAndSettings(
             "my_alias_component_template-$alias",
-            componentTemplateMappings
+            componentTemplateMappings,
+            setting
         )
         createComposableIndexTemplate(
             "my_index_template_alias-$alias",
@@ -1078,6 +1104,17 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun createComponentTemplateWithMappings(componentTemplateName: String, mappings: String?) {
         val body = """{"template" : {        "mappings": {$mappings}    }}"""
+        client().makeRequest(
+            "PUT",
+            "_component_template/$componentTemplateName",
+            emptyMap(),
+            StringEntity(body, ContentType.APPLICATION_JSON),
+            BasicHeader("Content-Type", "application/json")
+        )
+    }
+
+    protected fun createComponentTemplateWithMappingsAndSettings(componentTemplateName: String, mappings: String?, setting: String?) {
+        val body = """{"template" : {        "mappings": {$mappings}, "settings": {$setting}    }}"""
         client().makeRequest(
             "PUT",
             "_component_template/$componentTemplateName",
