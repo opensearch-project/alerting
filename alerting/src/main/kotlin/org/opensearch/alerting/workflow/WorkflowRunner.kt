@@ -33,6 +33,7 @@ import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import org.opensearch.core.common.Strings
 import org.opensearch.script.Script
 import org.opensearch.script.TemplateScript
+import org.opensearch.transport.TransportService
 import java.time.Instant
 
 abstract class WorkflowRunner {
@@ -41,7 +42,8 @@ abstract class WorkflowRunner {
         monitorCtx: MonitorRunnerExecutionContext,
         periodStart: Instant,
         periodEnd: Instant,
-        dryRun: Boolean
+        dryRun: Boolean,
+        transportService: TransportService
     ): WorkflowRunResult
 
     suspend fun runAction(
