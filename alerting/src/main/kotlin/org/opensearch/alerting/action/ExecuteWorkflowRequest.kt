@@ -22,15 +22,18 @@ class ExecuteWorkflowRequest : ActionRequest {
     val requestEnd: TimeValue
     val workflowId: String?
     val workflow: Workflow?
+    val requestStart: TimeValue?
 
     constructor(
         dryrun: Boolean,
         requestEnd: TimeValue,
         workflowId: String?,
         workflow: Workflow?,
+        requestStart: TimeValue? = null,
     ) : super() {
         this.dryrun = dryrun
         this.requestEnd = requestEnd
+        this.requestStart = requestStart
         this.workflowId = workflowId
         this.workflow = workflow
     }
@@ -42,7 +45,8 @@ class ExecuteWorkflowRequest : ActionRequest {
         sin.readOptionalString(),
         if (sin.readBoolean()) {
             Workflow.readFrom(sin)
-        } else null
+        } else null,
+        sin.readOptionalTimeValue()
     )
 
     override fun validate(): ActionRequestValidationException? {
@@ -59,6 +63,7 @@ class ExecuteWorkflowRequest : ActionRequest {
     override fun writeTo(out: StreamOutput) {
         out.writeBoolean(dryrun)
         out.writeTimeValue(requestEnd)
+        out.writeOptionalTimeValue(requestStart)
         out.writeOptionalString(workflowId)
         if (workflow != null) {
             out.writeBoolean(true)

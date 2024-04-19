@@ -46,7 +46,7 @@ private val log = LogManager.getLogger(TransportExecuteMonitorAction::class.java
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
 class TransportExecuteMonitorAction @Inject constructor(
-    transportService: TransportService,
+    private val transportService: TransportService,
     private val client: Client,
     private val clusterService: ClusterService,
     private val runner: MonitorRunnerService,
@@ -73,14 +73,20 @@ class TransportExecuteMonitorAction @Inject constructor(
                 // stored on the threadContext set by the security plugin when using the Alerting plugin with the Security plugin.
                 // runner.launch(ElasticThreadContextElement(client.threadPool().threadContext)) {
                 runner.launch {
-                    val (periodStart, periodEnd) =
+                    val (periodStart, periodEnd) = if (execMonitorRequest.requestStart != null) {
+                        Pair(
+                            Instant.ofEpochMilli(execMonitorRequest.requestStart.millis),
+                            Instant.ofEpochMilli(execMonitorRequest.requestEnd.millis)
+                        )
+                    } else {
                         monitor.schedule.getPeriodEndingAt(Instant.ofEpochMilli(execMonitorRequest.requestEnd.millis))
+                    }
                     try {
                         log.info(
                             "Executing monitor from API - id: ${monitor.id}, type: ${monitor.monitorType.name}, " +
                                 "periodStart: $periodStart, periodEnd: $periodEnd, dryrun: ${execMonitorRequest.dryrun}"
                         )
-                        val monitorRunResult = runner.runJob(monitor, periodStart, periodEnd, execMonitorRequest.dryrun)
+                        val monitorRunResult = runner.runJob(monitor, periodStart, periodEnd, execMonitorRequest.dryrun, transportService)
                         withContext(Dispatchers.IO) {
                             actionListener.onResponse(ExecuteMonitorResponse(monitorRunResult))
                         }
