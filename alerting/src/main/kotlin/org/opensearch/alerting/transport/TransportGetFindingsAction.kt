@@ -218,8 +218,9 @@ class TransportGetFindingsSearchAction @Inject constructor(
         val documents: MutableMap<String, FindingDocument> = mutableMapOf()
         response.responses.forEach {
             val key = "${it.index}|${it.id}"
-            val docData = if (it.isFailed) "" else it.response.sourceAsString
-            val findingDocument = FindingDocument(it.index, it.id, !it.isFailed, docData)
+            val isDocFound = !(it.isFailed || it.response.sourceAsString == null)
+            val docData = if (isDocFound) it.response.sourceAsString else ""
+            val findingDocument = FindingDocument(it.index, it.id, isDocFound, docData)
             documents[key] = findingDocument
         }
 
