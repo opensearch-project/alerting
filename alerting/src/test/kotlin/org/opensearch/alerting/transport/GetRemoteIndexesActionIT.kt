@@ -201,7 +201,8 @@ class GetRemoteIndexesActionIT : AlertingRestTestCase() {
 
             assertNotNull(clusterDetails[ClusterIndexes.INDEXES_FIELD])
             val indexes = clusterDetails[ClusterIndexes.INDEXES_FIELD] as Map<String, Map<String, Any>>
-            assertEquals(expectedNames.size, indexes.keys.size)
+            // Skipping this assert when security is enabled as it doesn't consider the existence of system indexes.
+            if (!securityEnabled()) assertEquals(expectedNames.size, indexes.keys.size)
 
             // Validate index-level response details
             expectedNames.forEach { indexName ->
