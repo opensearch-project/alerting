@@ -22,4 +22,4 @@ Compatible with OpenSearch 2.14.0
 
 ### Documentation
 * Dev guide update to include building/using local os-min distro. ([#757](https://github.com/opensearch-project/alerting/pull/757))
-* Added 2.14 release notes. ([#]())
+* Added 2.14 release notes. ([#1534](https://github.com/opensearch-project/alerting/pull/1534))
