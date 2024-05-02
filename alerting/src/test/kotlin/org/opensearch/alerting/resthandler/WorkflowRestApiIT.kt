@@ -37,6 +37,8 @@ import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.junit.annotations.TestLogging
 import java.time.Instant
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Collections
 import java.util.Locale
@@ -1184,5 +1186,46 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
 
         val findings = searchFindings(monitor.copy(id = monitorResponse.id))
         assertEquals("Findings saved for test monitor", 1, findings.size)
+    }
+
+    fun `test workflow run generates no error alerts with versionconflictengineexception with locks`() {
+        val testIndex = createTestIndex()
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                name = "__lag-monitor-test__",
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                enabled = false,
+                schedule = IntervalSchedule(interval = 1, unit = ChronoUnit.MINUTES)
+            )
+        )
+        assertNotNull(monitor.id)
+        createWorkflow(
+            randomWorkflow(
+                monitorIds = listOf(monitor.id),
+                enabled = true,
+                schedule = IntervalSchedule(1, ChronoUnit.MINUTES)
+            )
+        )
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex, "5", testDoc)
+        Thread.sleep(240000)
+
+        val alerts = searchAlerts(monitor)
+        alerts.forEach {
+            assertTrue(it.errorMessage == null)
+        }
     }
 }

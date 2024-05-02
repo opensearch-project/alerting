@@ -24,6 +24,8 @@ import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertMover.Companion.moveAlerts
 import org.opensearch.alerting.core.JobRunner
 import org.opensearch.alerting.core.ScheduledJobIndices
+import org.opensearch.alerting.core.lock.LockModel
+import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.WorkflowRunResult
 import org.opensearch.alerting.model.destination.DestinationContextFactory
@@ -242,6 +244,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         return this
     }
 
+    fun registerLockService(lockService: LockService): MonitorRunnerService {
+        monitorCtx.lockService = lockService
+        return this
+    }
+
     // Updates destination settings when the reload API is called so that new keystore values are visible
     fun reloadDestinationSettings(settings: Settings) {
         monitorCtx.destinationSettings = loadDestinationSettings(settings)
@@ -313,36 +320,64 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         when (job) {
             is Workflow -> {
                 launch {
-                    monitorCtx.client!!.suspendUntil<Client, ExecuteWorkflowResponse> {
-                        monitorCtx.client!!.execute(
-                            ExecuteWorkflowAction.INSTANCE,
-                            ExecuteWorkflowRequest(
-                                false,
-                                TimeValue(periodEnd.toEpochMilli()),
-                                job.id,
-                                job,
-                                TimeValue(periodStart.toEpochMilli())
-                            ),
-                            it
+                    var lock: LockModel? = null
+                    try {
+                        lock = monitorCtx.client!!.suspendUntil<Client, LockModel?> {
+                            monitorCtx.lockService!!.acquireLock(job, it)
+                        } ?: return@launch
+                        logger.debug("lock ${lock!!.lockId} acquired")
+                        logger.debug(
+                            "PERF_DEBUG: executing workflow ${job.id} on node " +
+                                monitorCtx.clusterService!!.state().nodes().localNode.id
                         )
+                        monitorCtx.client!!.suspendUntil<Client, ExecuteWorkflowResponse> {
+                            monitorCtx.client!!.execute(
+                                ExecuteWorkflowAction.INSTANCE,
+                                ExecuteWorkflowRequest(
+                                    false,
+                                    TimeValue(periodEnd.toEpochMilli()),
+                                    job.id,
+                                    job,
+                                    TimeValue(periodStart.toEpochMilli())
+                                ),
+                                it
+                            )
+                        }
+                    } finally {
+                        monitorCtx.client!!.suspendUntil<Client, Boolean> { monitorCtx.lockService!!.release(lock, it) }
+                        logger.debug("lock ${lock!!.lockId} released")
                     }
                 }
             }
             is Monitor -> {
                 launch {
-                    val executeMonitorRequest = ExecuteMonitorRequest(
-                        false,
-                        TimeValue(periodEnd.toEpochMilli()),
-                        job.id,
-                        job,
-                        TimeValue(periodStart.toEpochMilli())
-                    )
-                    monitorCtx.client!!.suspendUntil<Client, ExecuteMonitorResponse> {
-                        monitorCtx.client!!.execute(
-                            ExecuteMonitorAction.INSTANCE,
-                            executeMonitorRequest,
-                            it
+                    var lock: LockModel? = null
+                    try {
+                        lock = monitorCtx.client!!.suspendUntil<Client, LockModel?> {
+                            monitorCtx.lockService!!.acquireLock(job, it)
+                        } ?: return@launch
+                        logger.debug("lock ${lock!!.lockId} acquired")
+                        logger.debug(
+                            "PERF_DEBUG: executing ${job.monitorType} ${job.id} on node " +
+                                monitorCtx.clusterService!!.state().nodes().localNode.id
                         )
+                        val executeMonitorRequest = ExecuteMonitorRequest(
+                            false,
+                            TimeValue(periodEnd.toEpochMilli()),
+                            job.id,
+                            job,
+                            TimeValue(periodStart.toEpochMilli())
+                        )
+                        monitorCtx.client!!.suspendUntil<Client, ExecuteMonitorResponse> {
+                            monitorCtx.client!!.execute(
+                                ExecuteMonitorAction.INSTANCE,
+                                executeMonitorRequest,
+                                it
+                            )
+                        }
+                    } finally {
+                        monitorCtx.client!!.suspendUntil<Client, Boolean> { monitorCtx.lockService!!.release(lock, it) }
+                        logger.debug("lock ${lock!!.lockId} released")
                     }
                 }
             }
