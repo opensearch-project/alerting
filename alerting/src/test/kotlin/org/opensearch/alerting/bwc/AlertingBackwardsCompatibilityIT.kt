@@ -16,6 +16,8 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.test.OpenSearchTestCase
+import java.util.concurrent.TimeUnit
 
 class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
 
@@ -69,8 +71,21 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
                     //  the test execution by a lot (might have to wait for Job Scheduler plugin integration first)
                     // Waiting a minute to ensure the Monitor ran again at least once before checking if the job is running
                     // on time
-                    Thread.sleep(60000)
-                    verifyMonitorStats("/_plugins/_alerting")
+                    var passed = false
+                    OpenSearchTestCase.waitUntil({
+                        try {
+                            // Run verifyMonitorStats until all assertion test passes
+                            verifyMonitorStats("/_plugins/_alerting")
+                            passed = true
+                            return@waitUntil true
+                        } catch (e: AssertionError) {
+                            return@waitUntil false
+                        }
+                    }, 1, TimeUnit.MINUTES)
+                    if (!passed) {
+                        // if it hit the max time (1 minute), run verifyMonitorStats again to make sure all the tests pass
+                        verifyMonitorStats("/_plugins/_alerting")
+                    }
                 }
             }
             break
