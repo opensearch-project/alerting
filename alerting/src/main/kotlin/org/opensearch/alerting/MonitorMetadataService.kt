@@ -41,6 +41,7 @@ import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.util.isMonitorOfStandardType
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.ToXContent
@@ -48,6 +49,7 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.transport.RemoteTransportException
+import java.util.*
 
 private val log = LogManager.getLogger(MonitorMetadataService::class.java)
 
@@ -185,10 +187,16 @@ object MonitorMetadataService :
 
     suspend fun recreateRunContext(metadata: MonitorMetadata, monitor: Monitor): MonitorMetadata {
         try {
-            val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR)
+            val monitorIndex = if (
+                monitor.isMonitorOfStandardType() &&
+                Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
+            )
                 (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
             else null
-            val runContext = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR)
+            val runContext = if (
+                monitor.isMonitorOfStandardType() &&
+                Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
+            )
                 createFullRunContext(monitorIndex, metadata.lastRunContext as MutableMap<String, MutableMap<String, Any>>)
             else null
             return if (runContext != null) {
@@ -208,10 +216,16 @@ object MonitorMetadataService :
         createWithRunContext: Boolean,
         workflowMetadataId: String? = null,
     ): MonitorMetadata {
-        val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR)
+        val monitorIndex = if (
+            monitor.isMonitorOfStandardType() &&
+            Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
+        )
             (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
         else null
-        val runContext = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR && createWithRunContext)
+        val runContext = if (
+            monitor.isMonitorOfStandardType() &&
+            Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR && createWithRunContext
+        )
             createFullRunContext(monitorIndex)
         else emptyMap()
         return MonitorMetadata(

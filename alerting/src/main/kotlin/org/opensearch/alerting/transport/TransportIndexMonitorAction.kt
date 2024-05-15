@@ -65,6 +65,7 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.util.isMonitorOfStandardType
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
@@ -82,6 +83,7 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import java.io.IOException
 import java.time.Duration
+import java.util.Locale
 
 private val log = LogManager.getLogger(TransportIndexMonitorAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
@@ -525,7 +527,10 @@ class TransportIndexMonitorAction @Inject constructor(
                     throw t
                 }
                 try {
-                    if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                    if (
+                        request.monitor.isMonitorOfStandardType() &&
+                        Monitor.MonitorType.valueOf(request.monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
+                    ) {
                         indexDocLevelMonitorQueries(request.monitor, indexResponse.id, metadata, request.refreshPolicy)
                     }
                     // When inserting queries in queryIndex we could update sourceToQueryIndexMapping
@@ -683,7 +688,10 @@ class TransportIndexMonitorAction @Inject constructor(
                 val (metadata, created) = MonitorMetadataService.getOrCreateMetadata(request.monitor)
                 // Recreate runContext if metadata exists
                 // Delete and insert all queries from/to queryIndex
-                if (created == false && currentMonitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                if (!created &&
+                    currentMonitor.isMonitorOfStandardType() &&
+                    Monitor.MonitorType.valueOf(currentMonitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
+                ) {
                     updatedMetadata = MonitorMetadataService.recreateRunContext(metadata, currentMonitor)
                     client.suspendUntil<Client, BulkByScrollResponse> {
                         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
