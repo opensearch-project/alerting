@@ -38,6 +38,7 @@ import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
+import org.opensearch.core.common.io.stream.NamedWriteableRegistry
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
@@ -61,6 +62,7 @@ class TransportGetAlertsAction @Inject constructor(
     actionFilters: ActionFilters,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry,
+    val namedWriteableRegistry: NamedWriteableRegistry
 ) : HandledTransportAction<ActionRequest, GetAlertsResponse>(
     AlertingActions.GET_ALERTS_ACTION_NAME,
     transportService,
@@ -82,7 +84,7 @@ class TransportGetAlertsAction @Inject constructor(
         actionListener: ActionListener<GetAlertsResponse>,
     ) {
         val getAlertsRequest = request as? GetAlertsRequest
-            ?: recreateObject(request) { GetAlertsRequest(it) }
+            ?: recreateObject(request, namedWriteableRegistry) { GetAlertsRequest(it) }
         val user = readUserFromThreadContext(client)
 
         val tableProp = getAlertsRequest.table
@@ -93,7 +95,7 @@ class TransportGetAlertsAction @Inject constructor(
             sortBuilder.missing(tableProp.missing)
         }
 
-        val queryBuilder = QueryBuilders.boolQuery()
+        val queryBuilder = getAlertsRequest.boolQueryBuilder ?: QueryBuilders.boolQuery()
 
         if (getAlertsRequest.severityLevel != "ALL") {
             queryBuilder.filter(QueryBuilders.termQuery("severity", getAlertsRequest.severityLevel))
