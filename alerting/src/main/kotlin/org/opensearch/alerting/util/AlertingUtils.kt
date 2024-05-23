@@ -27,6 +27,7 @@ import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.commons.alerting.model.action.ActionExecutionScope
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
 import org.opensearch.script.Script
+import java.util.*
 import kotlin.math.max
 
 private val logger = LogManager.getLogger("AlertingUtils")
@@ -78,9 +79,9 @@ fun Destination.isAllowed(allowList: List<String>): Boolean = allowList.contains
 
 fun Destination.isTestAction(): Boolean = this.type == DestinationType.TEST_ACTION
 
-fun Monitor.isDocLevelMonitor(): Boolean = this.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR
+fun Monitor.isDocLevelMonitor(): Boolean = Monitor.MonitorType.valueOf(this.monitorType.toString().uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
 
-fun Monitor.isQueryLevelMonitor(): Boolean = this.monitorType == Monitor.MonitorType.QUERY_LEVEL_MONITOR
+fun Monitor.isQueryLevelMonitor(): Boolean = Monitor.MonitorType.valueOf(this.monitorType.toString().uppercase(Locale.ROOT)) == Monitor.MonitorType.QUERY_LEVEL_MONITOR
 
 /**
  * Since buckets can have multi-value keys, this converts the bucket key values to a string that can be used

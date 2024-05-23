@@ -79,7 +79,7 @@ import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
-import java.util.UUID
+import java.util.*
 import java.util.stream.Collectors
 
 private val log = LogManager.getLogger(TransportIndexWorkflowAction::class.java)
@@ -400,7 +400,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                         log.warn("Metadata doc id:${monitorMetadata.id} exists, but it shouldn't!")
                     }
 
-                    if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                    if (Monitor.MonitorType.valueOf(monitor.monitorType.toString().uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
                         val oldMonitorMetadata = MonitorMetadataService.getMetadata(monitor)
                         monitorMetadata = monitorMetadata.copy(sourceToQueryIndexMapping = oldMonitorMetadata!!.sourceToQueryIndexMapping)
                     }
@@ -554,7 +554,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                         workflowMetadataId = workflowMetadata.id
                     )
 
-                    if (created == false && monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                    if (!created && Monitor.MonitorType.valueOf(monitor.monitorType.toString().uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
                         var updatedMetadata = MonitorMetadataService.recreateRunContext(monitorMetadata, monitor)
                         val oldMonitorMetadata = MonitorMetadataService.getMetadata(monitor)
                         updatedMetadata = updatedMetadata.copy(sourceToQueryIndexMapping = oldMonitorMetadata!!.sourceToQueryIndexMapping)
@@ -632,7 +632,7 @@ class TransportIndexWorkflowAction @Inject constructor(
      * Returns list of indices for the given monitor depending on it's type
      */
     private fun getMonitorIndices(monitor: Monitor): List<String> {
-        return when (monitor.monitorType) {
+        return when (Monitor.MonitorType.valueOf(monitor.monitorType.toString().uppercase(Locale.ROOT))) {
             Monitor.MonitorType.DOC_LEVEL_MONITOR -> (monitor.inputs[0] as DocLevelMonitorInput).indices
             Monitor.MonitorType.BUCKET_LEVEL_MONITOR -> monitor.inputs.flatMap { s -> (s as SearchInput).indices }
             Monitor.MonitorType.QUERY_LEVEL_MONITOR -> {

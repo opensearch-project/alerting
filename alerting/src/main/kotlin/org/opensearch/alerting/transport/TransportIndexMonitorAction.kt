@@ -82,6 +82,7 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import java.io.IOException
 import java.time.Duration
+import java.util.*
 
 private val log = LogManager.getLogger(TransportIndexMonitorAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
@@ -525,7 +526,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     throw t
                 }
                 try {
-                    if (request.monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                    if (Monitor.MonitorType.valueOf(request.monitor.monitorType.toString().uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
                         indexDocLevelMonitorQueries(request.monitor, indexResponse.id, metadata, request.refreshPolicy)
                     }
                     // When inserting queries in queryIndex we could update sourceToQueryIndexMapping
@@ -683,7 +684,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 val (metadata, created) = MonitorMetadataService.getOrCreateMetadata(request.monitor)
                 // Recreate runContext if metadata exists
                 // Delete and insert all queries from/to queryIndex
-                if (created == false && currentMonitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                if (!created && Monitor.MonitorType.valueOf(currentMonitor.monitorType.toString().uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
                     updatedMetadata = MonitorMetadataService.recreateRunContext(metadata, currentMonitor)
                     client.suspendUntil<Client, BulkByScrollResponse> {
                         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
