@@ -135,7 +135,7 @@ class TransportExecuteMonitorAction @Inject constructor(
                     false -> (execMonitorRequest.monitor as Monitor).copy(user = user)
                 }
 
-                if (Monitor.MonitorType.valueOf(monitor.monitorType.toString().uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                if (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
                     try {
                         scope.launch {
                             if (!docLevelMonitorQueries.docLevelQueryIndexExists(monitor.dataSources)) {

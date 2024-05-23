@@ -62,6 +62,7 @@ import org.opensearch.commons.alerting.action.IndexMonitorResponse
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput.Companion.DOC_LEVEL_INPUT_FIELD
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.Monitor.MonitorType
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.model.SearchInput
@@ -526,7 +527,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     throw t
                 }
                 try {
-                    if (Monitor.MonitorType.valueOf(request.monitor.monitorType.toString().uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                    if (MonitorType.valueOf(request.monitor.monitorType.uppercase(Locale.ROOT)) == MonitorType.DOC_LEVEL_MONITOR) {
                         indexDocLevelMonitorQueries(request.monitor, indexResponse.id, metadata, request.refreshPolicy)
                     }
                     // When inserting queries in queryIndex we could update sourceToQueryIndexMapping
@@ -684,7 +685,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 val (metadata, created) = MonitorMetadataService.getOrCreateMetadata(request.monitor)
                 // Recreate runContext if metadata exists
                 // Delete and insert all queries from/to queryIndex
-                if (!created && Monitor.MonitorType.valueOf(currentMonitor.monitorType.toString().uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                if (!created && MonitorType.valueOf(currentMonitor.monitorType.uppercase(Locale.ROOT)) == MonitorType.DOC_LEVEL_MONITOR) {
                     updatedMetadata = MonitorMetadataService.recreateRunContext(metadata, currentMonitor)
                     client.suspendUntil<Client, BulkByScrollResponse> {
                         DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)

@@ -40,6 +40,7 @@ import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.Monitor.MonitorType
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -187,10 +188,10 @@ object MonitorMetadataService :
 
     suspend fun recreateRunContext(metadata: MonitorMetadata, monitor: Monitor): MonitorMetadata {
         try {
-            val monitorIndex = if (Monitor.MonitorType.valueOf(monitor.monitorType.toString().uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR)
+            val monitorIndex = if (MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == MonitorType.DOC_LEVEL_MONITOR)
                 (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
             else null
-            val runContext = if (Monitor.MonitorType.valueOf(monitor.monitorType.toString().uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR)
+            val runContext = if (MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == MonitorType.DOC_LEVEL_MONITOR)
                 createFullRunContext(monitorIndex, metadata.lastRunContext as MutableMap<String, MutableMap<String, Any>>)
             else null
             return if (runContext != null) {
@@ -210,12 +211,13 @@ object MonitorMetadataService :
         createWithRunContext: Boolean,
         workflowMetadataId: String? = null,
     ): MonitorMetadata {
-        val monitorIndex = if (Monitor.MonitorType.valueOf(monitor.monitorType.toString().uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR)
+        val monitorIndex = if (MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == MonitorType.DOC_LEVEL_MONITOR)
             (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
         else null
-        val runContext = if (Monitor.MonitorType.valueOf(monitor.monitorType.toString().uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR && createWithRunContext)
-            createFullRunContext(monitorIndex)
-        else emptyMap()
+        val runContext =
+            if (MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == MonitorType.DOC_LEVEL_MONITOR && createWithRunContext)
+                createFullRunContext(monitorIndex)
+            else emptyMap()
         return MonitorMetadata(
             id = MonitorMetadata.getId(monitor, workflowMetadataId),
             seqNo = SequenceNumbers.UNASSIGNED_SEQ_NO,

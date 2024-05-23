@@ -69,7 +69,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
         for (trigger in monitor.triggers) {
             val currentAlert = currentAlerts[trigger]
             val triggerCtx = QueryLevelTriggerExecutionContext(monitor, trigger as QueryLevelTrigger, monitorResult, currentAlert)
-            val triggerResult = when (Monitor.MonitorType.valueOf(monitor.monitorType.toString().uppercase(Locale.ROOT))) {
+            val triggerResult = when (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT))) {
                 Monitor.MonitorType.QUERY_LEVEL_MONITOR ->
                     monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger, triggerCtx)
                 Monitor.MonitorType.CLUSTER_METRICS_MONITOR -> {
