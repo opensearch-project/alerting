@@ -79,7 +79,8 @@ import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
-import java.util.*
+import java.util.Locale
+import java.util.UUID
 import java.util.stream.Collectors
 
 private val log = LogManager.getLogger(TransportIndexWorkflowAction::class.java)

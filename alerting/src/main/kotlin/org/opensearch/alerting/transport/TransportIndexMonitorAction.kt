@@ -83,7 +83,7 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import java.io.IOException
 import java.time.Duration
-import java.util.*
+import java.util.Locale
 
 private val log = LogManager.getLogger(TransportIndexMonitorAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)

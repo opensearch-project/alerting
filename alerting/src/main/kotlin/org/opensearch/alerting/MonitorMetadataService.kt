@@ -49,7 +49,7 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.transport.RemoteTransportException
-import java.util.*
+import java.util.Locale
 import kotlin.collections.HashMap
 
 private val log = LogManager.getLogger(MonitorMetadataService::class.java)

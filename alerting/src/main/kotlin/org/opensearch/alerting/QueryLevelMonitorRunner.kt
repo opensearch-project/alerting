@@ -19,7 +19,7 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.transport.TransportService
 import java.time.Instant
-import java.util.*
+import java.util.Locale
 
 object QueryLevelMonitorRunner : MonitorRunner() {
     private val logger = LogManager.getLogger(javaClass)
