@@ -6,18 +6,19 @@
 package org.opensearch.alerting.action
 
 import org.opensearch.alerting.ALWAYS_RUN
-import org.opensearch.alerting.model.ActionExecutionTime
-import org.opensearch.alerting.model.IndexExecutionContext
-import org.opensearch.alerting.model.MonitorMetadata
 import org.opensearch.alerting.randomDocumentLevelMonitor
 import org.opensearch.alerting.randomDocumentLevelTrigger
-import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.common.io.stream.BytesStreamOutput
+import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutRequest
+import org.opensearch.commons.alerting.model.ActionExecutionTime
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
+import org.opensearch.commons.alerting.model.IndexExecutionContext
 import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.MonitorMetadata
 import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.commons.alerting.model.WorkflowRunContext
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.index.shard.ShardId
 import org.opensearch.index.seqno.SequenceNumbers

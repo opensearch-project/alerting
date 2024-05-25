@@ -18,6 +18,12 @@ import org.opensearch.alerting.randomQueryLevelMonitorRunResult
 import org.opensearch.alerting.randomQueryLevelTriggerRunResult
 import org.opensearch.common.UUIDs
 import org.opensearch.common.io.stream.BytesStreamOutput
+import org.opensearch.commons.alerting.model.ActionRunResult
+import org.opensearch.commons.alerting.model.BucketLevelTriggerRunResult
+import org.opensearch.commons.alerting.model.DocumentLevelTriggerRunResult
+import org.opensearch.commons.alerting.model.InputRunResults
+import org.opensearch.commons.alerting.model.MonitorRunResult
+import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.search.builder.SearchSourceBuilder

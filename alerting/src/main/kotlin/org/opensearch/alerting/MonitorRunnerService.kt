@@ -27,14 +27,10 @@ import org.opensearch.alerting.core.JobRunner
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.lock.LockModel
 import org.opensearch.alerting.core.lock.LockService
-import org.opensearch.alerting.model.ActionRunResult
-import org.opensearch.alerting.model.InputRunResults
-import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.model.RemoteMonitorTriggerRunResult
-import org.opensearch.alerting.model.WorkflowRunResult
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.remote.monitors.RemoteDocumentLevelMonitorRunner
 import org.opensearch.alerting.remote.monitors.RemoteMonitorRegistry
 import org.opensearch.alerting.script.TriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings
@@ -64,8 +60,11 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.MonitorRunResult
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.TriggerRunResult
 import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.commons.alerting.model.WorkflowRunResult
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
 import org.opensearch.commons.alerting.util.isMonitorOfStandardType
@@ -435,9 +434,9 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             CompositeWorkflowRunner.runWorkflow(workflow = job, monitorCtx, periodStart, periodEnd, dryrun, transportService)
         }
         val monitor = job as Monitor
+        val executionId = "${monitor.id}_${LocalDateTime.now(ZoneOffset.UTC)}_${UUID.randomUUID()}"
 
         if (monitor.isMonitorOfStandardType()) {
-            val executionId = "${monitor.id}_${LocalDateTime.now(ZoneOffset.UTC)}_${UUID.randomUUID()}"
             logger.info(
                 "Executing scheduled monitor - id: ${monitor.id}, type: ${monitor.monitorType}, periodStart: $periodStart, " +
                     "periodEnd: $periodEnd, dryrun: $dryrun, executionId: $executionId"
@@ -476,40 +475,28 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             return runResult
         } else {
             if (monitorCtx.remoteMonitors.containsKey(monitor.monitorType)) {
-                val remoteRunResult = monitorCtx.remoteMonitors[monitor.monitorType]!!.monitorRunner.runMonitor(
-                    monitor,
-                    periodStart,
-                    periodEnd,
-                    dryrun,
-                    transportService
-                )
-                return MonitorRunResult(
-                    monitor.name,
-                    periodStart,
-                    periodEnd,
-                    remoteRunResult.error,
-                    InputRunResults(remoteRunResult.results, remoteRunResult.error),
-                    remoteRunResult.triggerResults.map { triggerResult ->
-                        triggerResult.key to RemoteMonitorTriggerRunResult(
-                            triggerResult.value.triggerName,
-                            triggerResult.value.error,
-                            triggerResult.value.actionResultsMap.map { actionResult ->
-                                actionResult.key to actionResult.value.map {
-                                    it.key to ActionRunResult(
-                                        it.value.actionId,
-                                        it.value.actionName,
-                                        it.value.output,
-                                        it.value.throttled,
-                                        it.value.executionTime,
-                                        it.value.error
-                                    )
-                                }.associate { it.first to it.second }.toMutableMap()
-                            }.associate { it.first to it.second }.toMutableMap()
-                        )
-                    }.associate { it.first to it.second }
-                )
+                if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value)) {
+                    return RemoteDocumentLevelMonitorRunner().runMonitor(
+                        monitor,
+                        monitorCtx,
+                        periodStart,
+                        periodEnd,
+                        dryrun,
+                        executionId = executionId,
+                        transportService = transportService
+                    )
+                } else {
+                    return monitorCtx.remoteMonitors[monitor.monitorType]!!.monitorRunner.runMonitor(
+                        monitor,
+                        periodStart,
+                        periodEnd,
+                        dryrun,
+                        executionId,
+                        transportService
+                    )
+                }
             } else {
-                return MonitorRunResult<RemoteMonitorTriggerRunResult>(
+                return MonitorRunResult<TriggerRunResult>(
                     monitor.name,
                     periodStart,
                     periodEnd,

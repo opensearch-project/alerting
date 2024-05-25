@@ -5,10 +5,10 @@
 
 package org.opensearch.alerting.script
 
-import org.opensearch.alerting.model.WorkflowRunResult
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.ChainedAlertTrigger
 import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.commons.alerting.model.WorkflowRunResult
 import java.time.Instant
 
 data class ChainedAlertTriggerExecutionContext(

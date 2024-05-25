@@ -18,7 +18,6 @@ import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.alerting.action.ExecuteWorkflowResponse
-import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.use
 import org.opensearch.client.Client
 import org.opensearch.common.inject.Inject
@@ -28,6 +27,7 @@ import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.authuser.User
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus

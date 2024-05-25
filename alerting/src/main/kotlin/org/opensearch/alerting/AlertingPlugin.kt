@@ -6,7 +6,6 @@
 package org.opensearch.alerting
 
 import org.opensearch.action.ActionRequest
-import org.opensearch.alerting.action.DocLevelMonitorFanOutAction
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.GetDestinationsAction
@@ -87,6 +86,7 @@ import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.settings.SettingsFilter
 import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutAction
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.ChainedAlertTrigger
@@ -417,12 +417,16 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
 
     override fun loadExtensions(loader: ExtensiblePlugin.ExtensionLoader) {
         for (monitorExtension in loader.loadExtensions(RemoteMonitorRunnerExtension::class.java)) {
-            val monitorType = monitorExtension.getMonitorType()
-            val monitorRunner = monitorExtension.getMonitorRunner()
+            val monitorTypesToMonitorRunners = monitorExtension.getMonitorTypesToMonitorRunners()
 
-            if (!this.monitorTypeToMonitorRunners.containsKey(monitorType)) {
-                val monitorRegistry = RemoteMonitorRegistry(monitorType, monitorRunner)
-                this.monitorTypeToMonitorRunners[monitorType] = monitorRegistry
+            for (monitorTypeToMonitorRunner in monitorTypesToMonitorRunners) {
+                val monitorType = monitorTypeToMonitorRunner.key
+                val monitorRunner = monitorTypeToMonitorRunner.value
+
+                if (!this.monitorTypeToMonitorRunners.containsKey(monitorType)) {
+                    val monitorRegistry = RemoteMonitorRegistry(monitorType, monitorRunner)
+                    this.monitorTypeToMonitorRunners[monitorType] = monitorRegistry
+                }
             }
         }
     }

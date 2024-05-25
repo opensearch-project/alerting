@@ -17,6 +17,7 @@ import org.opensearch.alerting.toJsonString
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.commons.alerting.model.ActionExecutionResult
 import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.MonitorMetadata
 import org.opensearch.commons.alerting.util.string
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.test.OpenSearchTestCase

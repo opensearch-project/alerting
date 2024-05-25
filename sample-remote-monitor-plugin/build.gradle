@@ -107,12 +107,12 @@ integTest {
         jvmArgs '-agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=8000'
     }
 }
-//project.getTasks().getByName('bundlePlugin').dependsOn(rootProject.project(":alerting").tasks.getByName('build'))
+project.getTasks().getByName('bundlePlugin').dependsOn(rootProject.project(":alerting").tasks.getByName('build'))
 Zip bundle = (Zip) project.getTasks().getByName("bundlePlugin");
-//Zip rootBundle = (Zip) rootProject.project(":alerting").getTasks().getByName("bundlePlugin");
+Zip rootBundle = (Zip) rootProject.project(":alerting").getTasks().getByName("bundlePlugin");
 integTest.dependsOn(bundle)
 integTest.getClusters().forEach{c -> {
-//    c.plugin(rootProject.project(":alerting").getObjects().fileProperty().value(rootBundle.getArchiveFile()))
+    c.plugin(rootProject.project(":alerting").getObjects().fileProperty().value(rootBundle.getArchiveFile()))
     c.plugin(project.getObjects().fileProperty().value(bundle.getArchiveFile()))
 }}
 
@@ -132,22 +132,6 @@ testClusters.integTest {
         }
     }
     setting 'path.repo', repo.absolutePath
-    plugin(provider({
-        new RegularFile() {
-            @Override
-            File getAsFile() {
-                return configurations.zipArchive.asFileTree.matching {
-                    include '**/alerting*'
-                }.singleFile
-            }
-        }
-    }))
-    nodes.each { node ->
-        def plugins = node.plugins
-        def firstPlugin = plugins.get(0)
-        plugins.remove(0)
-        plugins.add(firstPlugin)
-    }
 }
 
 run {

@@ -5,9 +5,10 @@
 
 package org.opensearch.alerting.action
 
-import org.opensearch.alerting.model.InputRunResults
 import org.opensearch.alerting.randomDocumentLevelTriggerRunResult
 import org.opensearch.common.io.stream.BytesStreamOutput
+import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutResponse
+import org.opensearch.commons.alerting.model.InputRunResults
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.test.OpenSearchTestCase
 
