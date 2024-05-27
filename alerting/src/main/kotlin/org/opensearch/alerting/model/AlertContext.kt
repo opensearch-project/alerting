@@ -30,7 +30,8 @@ data class AlertContext(
 
         val notesContext = notes?.map {
             mapOf(
-                Note.NOTE_TIME_FIELD to it.time,
+                Note.NOTE_CREATED_TIME_FIELD to it.createdTime,
+                Note.NOTE_LAST_UPDATED_TIME_FIELD to it.lastUpdatedTime,
                 Note.NOTE_CONTENT_FIELD to it.content,
                 Note.NOTE_USER_FIELD to it.user
             )

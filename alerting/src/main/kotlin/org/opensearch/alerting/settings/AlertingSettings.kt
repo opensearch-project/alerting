@@ -255,6 +255,20 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        val NOTES_MAX_CONTENT_SIZE = Setting.longSetting(
+            "plugins.notes.max_content_size",
+            2000L,
+            0L,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val MAX_NOTES_PER_ALERT = Setting.longSetting(
+            "plugins.alerting.notes.max_notes_per_alert",
+            500L,
+            0L,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
         val MAX_NOTES_PER_NOTIFICATION = Setting.intSetting(
             "plugins.alerting.notes.max_notes_per_notification",
             3,

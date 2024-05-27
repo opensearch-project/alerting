@@ -484,7 +484,7 @@ class AlertService(
      */
     suspend fun getNotesForAlertNotification(alertId: String, maxNotes: Int): List<Note> {
         val allNotes = NotesUtils.getNotesByAlertIDs(client, listOf(alertId))
-        val sortedNotes = allNotes.sortedByDescending { it.time }
+        val sortedNotes = allNotes.sortedByDescending { it.createdTime }
         if (sortedNotes.size <= maxNotes) {
             return sortedNotes
         }

@@ -84,5 +84,7 @@ class NotesUtils {
             val notes = getNotesByAlertIDs(client, alertIDs)
             return notes.map { it.id }
         }
+
+        // TODO: make getNotesByAlertID and getNoteIDsByAlertID
     }
 }

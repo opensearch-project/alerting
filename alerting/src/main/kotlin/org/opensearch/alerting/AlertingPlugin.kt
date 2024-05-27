@@ -402,6 +402,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.NOTES_HISTORY_INDEX_MAX_AGE,
             AlertingSettings.NOTES_HISTORY_ROLLOVER_PERIOD,
             AlertingSettings.NOTES_HISTORY_RETENTION_PERIOD,
+            AlertingSettings.NOTES_MAX_CONTENT_SIZE,
+            AlertingSettings.MAX_NOTES_PER_ALERT,
             AlertingSettings.MAX_NOTES_PER_NOTIFICATION
         )
     }

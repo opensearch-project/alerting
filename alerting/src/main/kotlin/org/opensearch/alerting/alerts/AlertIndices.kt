@@ -641,25 +641,5 @@ class AlertIndices(
         }
 
         return alertIDs.distinct()
-
-        // TODO: could using aggregation search be better? if so figure out how to do it
-//        val queryBuilder = QueryBuilders.matchAllQuery()
-//        val searchSourceBuilder = SearchSourceBuilder()
-//            .size(0)
-//            .query(queryBuilder)
-//            .aggregation(
-//                TermsAggregationBuilder("alert_ids").field("_id").size(10000) // TODO: set to max docs setting
-//            )
-//            .version(true)
-//            .seqNoAndPrimaryTerm(true)
-//
-//        val searchRequest = SearchRequest()
-//            .indices(indexName)
-//            .source(searchSourceBuilder)
-//
-//        val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
-//        val alertIDs = searchResponse.aggregations.asMap()["alert_ids"] // how to continue?
-//
-//        return notes
     }
 }
