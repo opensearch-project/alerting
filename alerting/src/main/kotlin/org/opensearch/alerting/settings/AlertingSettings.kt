@@ -223,5 +223,43 @@ class AlertingSettings {
             Int.MAX_VALUE,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+
+        val NOTES_HISTORY_ENABLED = Setting.boolSetting(
+            "plugins.notes_history_enabled",
+            true,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val NOTES_HISTORY_MAX_DOCS = Setting.longSetting(
+            "plugins.notes_history_max_docs",
+            1000L,
+            0L,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val NOTES_HISTORY_INDEX_MAX_AGE = Setting.positiveTimeSetting(
+            "plugins.notes_history_max_age",
+            TimeValue(30, TimeUnit.DAYS),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val NOTES_HISTORY_ROLLOVER_PERIOD = Setting.positiveTimeSetting(
+            "plugins.notes_history_rollover_period",
+            TimeValue(12, TimeUnit.HOURS),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val NOTES_HISTORY_RETENTION_PERIOD = Setting.positiveTimeSetting(
+            "plugins.notes_history_retention_period",
+            TimeValue(60, TimeUnit.DAYS),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val MAX_NOTES_PER_NOTIFICATION = Setting.intSetting(
+            "plugins.alerting.notes.max_notes_per_notification",
+            3,
+            0,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
     }
 }

@@ -23,6 +23,7 @@ import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
@@ -273,6 +274,9 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             // to alertsToUpdate to ensure the Alert doc is updated at the end in either case
             completedAlertsToUpdate.addAll(completedAlerts)
 
+            // retrieve max Notes per Alert notification setting
+            val maxNotes = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.MAX_NOTES_PER_NOTIFICATION)
+
             // All trigger contexts and results should be available at this point since all triggers were evaluated in the main do-while loop
             val triggerCtx = triggerContexts[trigger.id]!!
             val triggerResult = triggerResults[trigger.id]!!
@@ -291,8 +295,13 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     for (alertCategory in actionExecutionScope.actionableAlerts) {
                         val alertsToExecuteActionsFor = nextAlerts[trigger.id]?.get(alertCategory) ?: mutableListOf()
                         for (alert in alertsToExecuteActionsFor) {
-                            val alertContext = if (alertCategory != AlertCategory.NEW) AlertContext(alert = alert)
-                            else getAlertContext(alert = alert, alertSampleDocs = alertSampleDocs)
+
+                            val alertContext = if (alertCategory != AlertCategory.NEW) {
+                                val alertNotes = monitorCtx.alertService!!.getNotesForAlertNotification(alert.id, maxNotes)
+                                AlertContext(alert = alert, notes = alertNotes)
+                            } else {
+                                getAlertContext(alert = alert, alertSampleDocs = alertSampleDocs)
+                            }
 
                             val actionCtx = getActionContextForAlertCategory(
                                 alertCategory, alertContext, triggerCtx, monitorOrTriggerError
@@ -325,11 +334,17 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                         continue
 
                     val actionCtx = triggerCtx.copy(
-                        dedupedAlerts = dedupedAlerts,
+                        dedupedAlerts = dedupedAlerts.map {
+                            val dedupedAlertsNotes = monitorCtx.alertService!!.getNotesForAlertNotification(it.id, maxNotes)
+                            AlertContext(alert = it, notes = dedupedAlertsNotes)
+                        },
                         newAlerts = newAlerts.map {
                             getAlertContext(alert = it, alertSampleDocs = alertSampleDocs)
                         },
-                        completedAlerts = completedAlerts,
+                        completedAlerts = completedAlerts.map {
+                            val completedAlertsNotes = monitorCtx.alertService!!.getNotesForAlertNotification(it.id, maxNotes)
+                            AlertContext(alert = it, notes = completedAlertsNotes)
+                        },
                         error = monitorResult.error ?: triggerResult.error
                     )
                     val actionResult = this.runAction(action, actionCtx, monitorCtx, monitor, dryrun)
@@ -530,11 +545,11 @@ object BucketLevelMonitorRunner : MonitorRunner() {
     ): BucketLevelTriggerExecutionContext {
         return when (alertCategory) {
             AlertCategory.DEDUPED ->
-                ctx.copy(dedupedAlerts = listOf(alertContext.alert), newAlerts = emptyList(), completedAlerts = emptyList(), error = error)
+                ctx.copy(dedupedAlerts = listOf(alertContext), newAlerts = emptyList(), completedAlerts = emptyList(), error = error)
             AlertCategory.NEW ->
                 ctx.copy(dedupedAlerts = emptyList(), newAlerts = listOf(alertContext), completedAlerts = emptyList(), error = error)
             AlertCategory.COMPLETED ->
-                ctx.copy(dedupedAlerts = emptyList(), newAlerts = emptyList(), completedAlerts = listOf(alertContext.alert), error = error)
+                ctx.copy(dedupedAlerts = emptyList(), newAlerts = emptyList(), completedAlerts = listOf(alertContext), error = error)
         }
     }
 

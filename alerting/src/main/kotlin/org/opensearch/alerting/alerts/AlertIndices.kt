@@ -5,6 +5,9 @@
 
 package org.opensearch.alerting.alerts
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
 import org.opensearch.ResourceAlreadyExistsException
@@ -19,6 +22,8 @@ import org.opensearch.action.admin.indices.exists.indices.IndicesExistsResponse
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.admin.indices.rollover.RolloverRequest
 import org.opensearch.action.admin.indices.rollover.RolloverResponse
+import org.opensearch.action.search.SearchRequest
+import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_HISTORY_WRITE_INDEX
@@ -38,6 +43,7 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDING_HISTO
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
+import org.opensearch.alerting.util.NotesUtils
 import org.opensearch.client.Client
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
@@ -45,12 +51,22 @@ import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
+import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.core.action.ActionListener
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.XContentParser
+import org.opensearch.core.xcontent.XContentParserUtils
+import org.opensearch.index.query.QueryBuilders
+import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.threadpool.Scheduler.Cancellable
 import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
+
+private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
 /**
  * Class to manage the creation and rollover of alert indices and alert history indices.  In progress alerts are stored
@@ -186,8 +202,7 @@ class AlertIndices(
         } catch (e: Exception) {
             // This should be run on cluster startup
             logger.error(
-                "Error creating alert/finding indices. " +
-                    "Alerts/Findings can't be recorded until master node is restarted.",
+                "Error creating alert/finding indices. Alerts/Findings can't be recorded until master node is restarted.",
                 e
             )
         }
@@ -382,7 +397,9 @@ class AlertIndices(
         }
 
         // TODO call getMapping and compare actual mappings here instead of this
-        if (targetIndex == IndexUtils.lastUpdatedAlertHistoryIndex || targetIndex == IndexUtils.lastUpdatedFindingHistoryIndex) {
+        if (targetIndex == IndexUtils.lastUpdatedAlertHistoryIndex ||
+            targetIndex == IndexUtils.lastUpdatedFindingHistoryIndex
+        ) {
             return
         }
 
@@ -477,7 +494,6 @@ class AlertIndices(
     }
 
     private fun deleteOldIndices(tag: String, indices: String) {
-        logger.info("info deleteOldIndices")
         val clusterStateRequest = ClusterStateRequest()
             .clear()
             .indices(indices)
@@ -489,9 +505,14 @@ class AlertIndices(
             object : ActionListener<ClusterStateResponse> {
                 override fun onResponse(clusterStateResponse: ClusterStateResponse) {
                     if (clusterStateResponse.state.metadata.indices.isNotEmpty()) {
-                        val indicesToDelete = getIndicesToDelete(clusterStateResponse)
-                        logger.info("Deleting old $tag indices viz $indicesToDelete")
-                        deleteAllOldHistoryIndices(indicesToDelete)
+                        scope.launch {
+                            val indicesToDelete = getIndicesToDelete(clusterStateResponse)
+                            logger.info("Deleting old $tag indices viz $indicesToDelete")
+                            if (indices == ALERT_HISTORY_ALL) {
+                                deleteAlertNotes(indicesToDelete)
+                            }
+                            deleteAllOldHistoryIndices(indicesToDelete)
+                        }
                     } else {
                         logger.info("No Old $tag Indices to delete")
                     }
@@ -503,7 +524,7 @@ class AlertIndices(
         )
     }
 
-    private fun getIndicesToDelete(clusterStateResponse: ClusterStateResponse): List<String> {
+    private suspend fun getIndicesToDelete(clusterStateResponse: ClusterStateResponse): List<String> {
         val indicesToDelete = mutableListOf<String>()
         for (entry in clusterStateResponse.state.metadata.indices) {
             val indexMetaData = entry.value
@@ -551,7 +572,8 @@ class AlertIndices(
                     override fun onResponse(deleteIndicesResponse: AcknowledgedResponse) {
                         if (!deleteIndicesResponse.isAcknowledged) {
                             logger.error(
-                                "Could not delete one or more Alerting/Finding history indices: $indicesToDelete. Retrying one by one."
+                                "Could not delete one or more Alerting/Finding history indices: $indicesToDelete." +
+                                    "Retrying one by one."
                             )
                             deleteOldHistoryIndex(indicesToDelete)
                         }
@@ -584,5 +606,60 @@ class AlertIndices(
                 }
             )
         }
+    }
+
+    private suspend fun deleteAlertNotes(alertHistoryIndicesToDelete: List<String>) {
+        alertHistoryIndicesToDelete.forEach { alertHistoryIndex ->
+            val alertIDs = getAlertIDsFromAlertHistoryIndex(alertHistoryIndex)
+            val notesToDeleteIDs = NotesUtils.getNoteIDsByAlertIDs(client, alertIDs)
+            NotesUtils.deleteNotes(client, notesToDeleteIDs)
+        }
+    }
+
+    private suspend fun getAlertIDsFromAlertHistoryIndex(indexName: String): List<String> {
+        val queryBuilder = QueryBuilders.matchAllQuery()
+        val searchSourceBuilder = SearchSourceBuilder()
+            .query(queryBuilder)
+            .version(true)
+            .seqNoAndPrimaryTerm(true)
+
+        val searchRequest = SearchRequest()
+            .indices(indexName)
+            .source(searchSourceBuilder)
+
+        val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
+        val alertIDs = searchResponse.hits.map { hit ->
+            val xcp = XContentHelper.createParser(
+                NamedXContentRegistry.EMPTY,
+                LoggingDeprecationHandler.INSTANCE,
+                hit.sourceRef,
+                XContentType.JSON
+            )
+            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+            val alert = Alert.parse(xcp, hit.id, hit.version)
+            alert.id
+        }
+
+        return alertIDs.distinct()
+
+        // TODO: could using aggregation search be better? if so figure out how to do it
+//        val queryBuilder = QueryBuilders.matchAllQuery()
+//        val searchSourceBuilder = SearchSourceBuilder()
+//            .size(0)
+//            .query(queryBuilder)
+//            .aggregation(
+//                TermsAggregationBuilder("alert_ids").field("_id").size(10000) // TODO: set to max docs setting
+//            )
+//            .version(true)
+//            .seqNoAndPrimaryTerm(true)
+//
+//        val searchRequest = SearchRequest()
+//            .indices(indexName)
+//            .source(searchSourceBuilder)
+//
+//        val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
+//        val alertIDs = searchResponse.aggregations.asMap()["alert_ids"] // how to continue?
+//
+//        return notes
     }
 }

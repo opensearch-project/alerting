@@ -30,6 +30,7 @@ import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.MAX_SEARCH_SIZE
+import org.opensearch.alerting.util.NotesUtils
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client
@@ -46,6 +47,7 @@ import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.NoOpTrigger
+import org.opensearch.commons.alerting.model.Note
 import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.model.action.AlertCategory
@@ -474,6 +476,21 @@ class AlertService(
         } ?: listOf()
     }
 
+    /**
+     * Performs a Search request to retrieve the Notes associated with the
+     * Alert with the given ID.
+     *
+     * Searches for the n most recently created Notes based on maxNotes
+     */
+    suspend fun getNotesForAlertNotification(alertId: String, maxNotes: Int): List<Note> {
+        val allNotes = NotesUtils.getNotesByAlertIDs(client, listOf(alertId))
+        val sortedNotes = allNotes.sortedByDescending { it.time }
+        if (sortedNotes.size <= maxNotes) {
+            return sortedNotes
+        }
+        return sortedNotes.slice(0 until maxNotes)
+    }
+
     suspend fun upsertMonitorErrorAlert(
         monitor: Monitor,
         errorMessage: String,
@@ -684,6 +701,8 @@ class AlertService(
         val alertsIndex = dataSources.alertsIndex
         val alertsHistoryIndex = dataSources.alertsHistoryIndex
 
+        val notesToDeleteIDs = mutableListOf<String>()
+
         var requestsToRetry = alerts.flatMap { alert ->
             // We don't want to set the version when saving alerts because the MonitorRunner has first priority when writing alerts.
             // In the rare event that a user acknowledges an alert between when it's read and when it's written
@@ -727,16 +746,39 @@ class AlertService(
                     throw IllegalStateException("Unexpected attempt to save ${alert.state} alert: $alert")
                 }
                 Alert.State.COMPLETED -> {
+//                    val requestsList = mutableListOf<DocWriteRequest<*>>(
+//                        DeleteRequest(alertsIndex, alert.id)
+//                            .routing(routingId)
+//                    )
+//                    // Only add completed alert to respective history indices if history is enabled
+//                    if (alertIndices.isAlertHistoryEnabled()) {
+//                        requestsList.add(
+//                            IndexRequest(alertsHistoryIndex)
+//                                .routing(routingId)
+//                                .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
+//                                .id(alert.id)
+//                        )
+//                    } else {
+//                        // Prepare Alert's Notes for deletion as well
+//                        val notes = NotesUtils.searchNotesByAlertID(client, listOf(alert.id))
+//                        notes.forEach { notesToDeleteIDs.add(it.id) }
+//                    }
+//                    Collections.unmodifiableList(requestsList)
                     listOfNotNull<DocWriteRequest<*>>(
                         DeleteRequest(alertsIndex, alert.id)
                             .routing(routingId),
-                        // Only add completed alert to history index if history is enabled
                         if (alertIndices.isAlertHistoryEnabled()) {
+                            // Only add completed alert to history index if history is enabled
                             IndexRequest(alertsHistoryIndex)
                                 .routing(routingId)
                                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                                 .id(alert.id)
-                        } else null
+                        } else {
+                            // Otherwise, prepare the Alert's Notes for deletion, and don't include
+                            // a request to index the Alert to an Alert history index
+                            notesToDeleteIDs.addAll(NotesUtils.getNoteIDsByAlertIDs(client, listOf(alert.id)))
+                            null
+                        }
                     )
                 }
             }
@@ -756,6 +798,9 @@ class AlertService(
                 throw ExceptionsHelper.convertToOpenSearchException(retryCause)
             }
         }
+
+        // delete all the Notes of any Alerts that were deleted
+        NotesUtils.deleteNotes(client, notesToDeleteIDs)
     }
 
     /**

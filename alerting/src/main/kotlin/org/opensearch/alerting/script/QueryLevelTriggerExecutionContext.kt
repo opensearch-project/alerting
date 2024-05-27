@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.script
 
+import org.opensearch.alerting.model.AlertContext
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.Alert
@@ -19,6 +20,7 @@ data class QueryLevelTriggerExecutionContext(
     override val periodStart: Instant,
     override val periodEnd: Instant,
     val alert: Alert? = null,
+    val alertContext: AlertContext? = null,
     override val error: Exception? = null
 ) : TriggerExecutionContext(monitor, results, periodStart, periodEnd, error) {
 
@@ -26,10 +28,11 @@ data class QueryLevelTriggerExecutionContext(
         monitor: Monitor,
         trigger: QueryLevelTrigger,
         monitorRunResult: MonitorRunResult<QueryLevelTriggerRunResult>,
-        alert: Alert? = null
+        alert: Alert? = null,
+        alertContext: AlertContext? = null
     ) : this(
         monitor, trigger, monitorRunResult.inputResults.results, monitorRunResult.periodStart, monitorRunResult.periodEnd,
-        alert, monitorRunResult.scriptContextError(trigger)
+        alert, alertContext, monitorRunResult.scriptContextError(trigger)
     )
 
     /**
@@ -39,7 +42,7 @@ data class QueryLevelTriggerExecutionContext(
     override fun asTemplateArg(): Map<String, Any?> {
         val tempArg = super.asTemplateArg().toMutableMap()
         tempArg["trigger"] = trigger.asTemplateArg()
-        tempArg["alert"] = alert?.asTemplateArg()
+        tempArg["alert"] = alertContext?.asTemplateArg() // map "alert" templateArg field to alertContext wrapper instead of alert
         return tempArg
     }
 }
