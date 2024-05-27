@@ -17,7 +17,6 @@ import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
-import org.opensearch.commons.alerting.model.Note
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.transport.TransportService
 import java.time.Instant
@@ -69,7 +68,12 @@ object QueryLevelMonitorRunner : MonitorRunner() {
         val triggerResults = mutableMapOf<String, QueryLevelTriggerRunResult>()
         for (trigger in monitor.triggers) {
             val currentAlert = currentAlerts[trigger]
-            val triggerCtx = QueryLevelTriggerExecutionContext(monitor, trigger as QueryLevelTrigger, monitorResult, currentAlert)
+            val currentAlertContext = currentAlert?.let {
+                val maxNotes = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.MAX_NOTES_PER_NOTIFICATION)
+                val currentAlertNotes = monitorCtx.alertService!!.getNotesForAlertNotification(currentAlert.id, maxNotes)
+                AlertContext(alert = currentAlert, notes = currentAlertNotes.ifEmpty { null })
+            }
+            val triggerCtx = QueryLevelTriggerExecutionContext(monitor, trigger as QueryLevelTrigger, monitorResult, currentAlertContext)
             val triggerResult = when (monitor.monitorType) {
                 Monitor.MonitorType.QUERY_LEVEL_MONITOR ->
                     monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger, triggerCtx)
@@ -88,25 +92,32 @@ object QueryLevelMonitorRunner : MonitorRunner() {
             triggerResults[trigger.id] = triggerResult
 
             if (monitorCtx.triggerService!!.isQueryLevelTriggerActionable(triggerCtx, triggerResult, workflowRunContext)) {
-                var actionCtx: QueryLevelTriggerExecutionContext
+                val actionCtx = triggerCtx.copy(error = monitorResult.error ?: triggerResult.error)
                 for (action in trigger.actions) {
-                    var currentAlertNotes: List<Note>?
-                    if (currentAlert != null) {
-                        // only if an Alert was already active before could it possibly have Notes
-                        val maxNotes = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.MAX_NOTES_PER_NOTIFICATION)
-                        currentAlertNotes = monitorCtx.alertService!!.getNotesForAlertNotification(currentAlert.id, maxNotes)
-                        actionCtx = triggerCtx.copy(
-                            error = monitorResult.error ?: triggerResult.error,
-                            alertContext = AlertContext(alert = currentAlert, notes = currentAlertNotes)
-                        )
-                    } else {
-                        actionCtx = triggerCtx.copy(
-                            error = monitorResult.error ?: triggerResult.error
-                        )
-                    }
                     triggerResult.actionResults[action.id] = this.runAction(action, actionCtx, monitorCtx, monitor, dryrun)
                 }
             }
+
+//            if (monitorCtx.triggerService!!.isQueryLevelTriggerActionable(triggerCtx, triggerResult, workflowRunContext)) {
+//                var actionCtx: QueryLevelTriggerExecutionContext
+//                for (action in trigger.actions) {
+//                    var currentAlertNotes: List<Note>?
+//                    if (currentAlert != null) {
+//                        // only if an Alert was already active before could it possibly have Notes
+//                        val maxNotes = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.MAX_NOTES_PER_NOTIFICATION)
+//                        currentAlertNotes = monitorCtx.alertService!!.getNotesForAlertNotification(currentAlert.id, maxNotes)
+//                        actionCtx = triggerCtx.copy(
+//                            error = monitorResult.error ?: triggerResult.error,
+//                            alertContext = AlertContext(alert = currentAlert, notes = currentAlertNotes)
+//                        )
+//                    } else {
+//                        actionCtx = triggerCtx.copy(
+//                            error = monitorResult.error ?: triggerResult.error
+//                        )
+//                    }
+//                    triggerResult.actionResults[action.id] = this.runAction(action, actionCtx, monitorCtx, monitor, dryrun)
+//                }
+//            }
 
             val updatedAlert = monitorCtx.alertService!!.composeQueryLevelAlert(
                 triggerCtx,

@@ -159,7 +159,7 @@ class AlertService(
         workflorwRunContext: WorkflowRunContext?
     ): Alert? {
         val currentTime = Instant.now()
-        val currentAlert = ctx.alert
+        val currentAlert = ctx.alertContext?.alert
 
         val updatedActionExecutionResults = mutableListOf<ActionExecutionResult>()
         val currentActionIds = mutableSetOf<String>()
