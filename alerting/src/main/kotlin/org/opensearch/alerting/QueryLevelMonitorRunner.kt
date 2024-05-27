@@ -98,27 +98,6 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                 }
             }
 
-//            if (monitorCtx.triggerService!!.isQueryLevelTriggerActionable(triggerCtx, triggerResult, workflowRunContext)) {
-//                var actionCtx: QueryLevelTriggerExecutionContext
-//                for (action in trigger.actions) {
-//                    var currentAlertNotes: List<Note>?
-//                    if (currentAlert != null) {
-//                        // only if an Alert was already active before could it possibly have Notes
-//                        val maxNotes = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.MAX_NOTES_PER_NOTIFICATION)
-//                        currentAlertNotes = monitorCtx.alertService!!.getNotesForAlertNotification(currentAlert.id, maxNotes)
-//                        actionCtx = triggerCtx.copy(
-//                            error = monitorResult.error ?: triggerResult.error,
-//                            alertContext = AlertContext(alert = currentAlert, notes = currentAlertNotes)
-//                        )
-//                    } else {
-//                        actionCtx = triggerCtx.copy(
-//                            error = monitorResult.error ?: triggerResult.error
-//                        )
-//                    }
-//                    triggerResult.actionResults[action.id] = this.runAction(action, actionCtx, monitorCtx, monitor, dryrun)
-//                }
-//            }
-
             val updatedAlert = monitorCtx.alertService!!.composeQueryLevelAlert(
                 triggerCtx,
                 triggerResult,

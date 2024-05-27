@@ -164,7 +164,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     lateinit var scheduler: JobScheduler
     lateinit var sweeper: JobSweeper
     lateinit var scheduledJobIndices: ScheduledJobIndices
-    lateinit var alertingNotesIndices: NotesIndices
+    lateinit var notesIndices: NotesIndices
     lateinit var docLevelMonitorQueries: DocLevelMonitorQueries
     lateinit var threadPool: ThreadPool
     lateinit var alertIndices: AlertIndices
@@ -292,7 +292,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerConsumers()
             .registerDestinationSettings()
         scheduledJobIndices = ScheduledJobIndices(client.admin(), clusterService)
-        alertingNotesIndices = NotesIndices(environment.settings(), client, threadPool, clusterService)
+        notesIndices = NotesIndices(environment.settings(), client, threadPool, clusterService)
         docLevelMonitorQueries = DocLevelMonitorQueries(client, clusterService)
         scheduler = JobScheduler(threadPool, runner)
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
@@ -321,7 +321,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             scheduler,
             runner,
             scheduledJobIndices,
-            alertingNotesIndices,
+            notesIndices,
             docLevelMonitorQueries,
             destinationMigrationCoordinator,
             lockService,

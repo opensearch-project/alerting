@@ -746,24 +746,6 @@ class AlertService(
                     throw IllegalStateException("Unexpected attempt to save ${alert.state} alert: $alert")
                 }
                 Alert.State.COMPLETED -> {
-//                    val requestsList = mutableListOf<DocWriteRequest<*>>(
-//                        DeleteRequest(alertsIndex, alert.id)
-//                            .routing(routingId)
-//                    )
-//                    // Only add completed alert to respective history indices if history is enabled
-//                    if (alertIndices.isAlertHistoryEnabled()) {
-//                        requestsList.add(
-//                            IndexRequest(alertsHistoryIndex)
-//                                .routing(routingId)
-//                                .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
-//                                .id(alert.id)
-//                        )
-//                    } else {
-//                        // Prepare Alert's Notes for deletion as well
-//                        val notes = NotesUtils.searchNotesByAlertID(client, listOf(alert.id))
-//                        notes.forEach { notesToDeleteIDs.add(it.id) }
-//                    }
-//                    Collections.unmodifiableList(requestsList)
                     listOfNotNull<DocWriteRequest<*>>(
                         DeleteRequest(alertsIndex, alert.id)
                             .routing(routingId),

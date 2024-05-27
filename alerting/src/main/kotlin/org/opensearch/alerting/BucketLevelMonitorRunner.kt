@@ -59,6 +59,7 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.transport.TransportService
 import java.time.Instant
 import java.util.UUID
+import org.opensearch.commons.alerting.model.Note
 
 object BucketLevelMonitorRunner : MonitorRunner() {
     private val logger = LogManager.getLogger(javaClass)
@@ -295,12 +296,11 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     for (alertCategory in actionExecutionScope.actionableAlerts) {
                         val alertsToExecuteActionsFor = nextAlerts[trigger.id]?.get(alertCategory) ?: mutableListOf()
                         for (alert in alertsToExecuteActionsFor) {
-
+                            val alertNotes = monitorCtx.alertService!!.getNotesForAlertNotification(alert.id, maxNotes)
                             val alertContext = if (alertCategory != AlertCategory.NEW) {
-                                val alertNotes = monitorCtx.alertService!!.getNotesForAlertNotification(alert.id, maxNotes)
                                 AlertContext(alert = alert, notes = alertNotes)
                             } else {
-                                getAlertContext(alert = alert, alertSampleDocs = alertSampleDocs)
+                                getAlertContext(alert = alert, alertSampleDocs = alertSampleDocs, alertNotes)
                             }
 
                             val actionCtx = getActionContextForAlertCategory(
@@ -339,7 +339,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             AlertContext(alert = it, notes = dedupedAlertsNotes)
                         },
                         newAlerts = newAlerts.map {
-                            getAlertContext(alert = it, alertSampleDocs = alertSampleDocs)
+                            val newAlertsNotes = monitorCtx.alertService!!.getNotesForAlertNotification(it.id, maxNotes)
+                            getAlertContext(alert = it, alertSampleDocs = alertSampleDocs, alertNotes = newAlertsNotes)
                         },
                         completedAlerts = completedAlerts.map {
                             val completedAlertsNotes = monitorCtx.alertService!!.getNotesForAlertNotification(it.id, maxNotes)
@@ -555,7 +556,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
 
     private fun getAlertContext(
         alert: Alert,
-        alertSampleDocs: Map<String, Map<String, List<Map<String, Any>>>>
+        alertSampleDocs: Map<String, Map<String, List<Map<String, Any>>>>,
+        alertNotes: List<Note>
     ): AlertContext {
         val bucketKey = alert.aggregationResultBucket?.getBucketKeysHash()
         val sampleDocs = alertSampleDocs[alert.triggerId]?.get(bucketKey)
@@ -569,7 +571,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 alert.monitorId,
                 alert.executionId
             )
-            AlertContext(alert = alert, sampleDocs = listOf())
+            AlertContext(alert = alert, sampleDocs = listOf(), notes = alertNotes)
         }
     }
 
