@@ -34,11 +34,34 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.alerting.action.*
+import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
+import org.opensearch.commons.alerting.action.AcknowledgeAlertResponse
+import org.opensearch.commons.alerting.action.AcknowledgeChainedAlertRequest
+import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.DeleteMonitorRequest
+import org.opensearch.commons.alerting.action.GetAlertsRequest
+import org.opensearch.commons.alerting.action.GetAlertsResponse
+import org.opensearch.commons.alerting.action.IndexMonitorResponse
+import org.opensearch.commons.alerting.action.SearchMonitorRequest
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
-import org.opensearch.commons.alerting.model.*
+import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.ChainedAlertTrigger
+import org.opensearch.commons.alerting.model.ChainedMonitorFindings
+import org.opensearch.commons.alerting.model.CompositeInput
+import org.opensearch.commons.alerting.model.DataSources
+import org.opensearch.commons.alerting.model.Delegate
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
+import org.opensearch.commons.alerting.model.DocLevelQuery
+import org.opensearch.commons.alerting.model.DocumentLevelTriggerRunResult
+import org.opensearch.commons.alerting.model.IntervalSchedule
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.DOC_LEVEL_QUERIES_INDEX
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
+import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.model.Table
+import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.commons.alerting.model.WorkflowMetadata
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.XContentParser
@@ -58,8 +81,9 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.time.temporal.ChronoUnit.MILLIS
-import java.util.*
+import java.util.Collections
 import java.util.Map
+import java.util.UUID
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.stream.Collectors
@@ -1574,6 +1598,26 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         """.trimIndent()
         val monitorId = "abc"
         indexDoc(SCHEDULED_JOBS_INDEX, monitorId, monitorStringWithoutName)
+
+        val monitorMetadata = """
+            {
+                    "metadata": {
+                        "monitor_id": "$monitorId",
+                        "last_action_execution_times": [],
+                        "last_run_context": {
+                            "$index": {
+                                "0": -1,
+                                "index": "$index",
+                                "shards_count": 1
+                            }
+                        },
+                        "source_to_query_index_mapping": {
+                            "$index$monitorId": ".opensearch-alerting-queries-000001"
+                        }
+                    }
+                }
+        """.trimIndent()
+        indexDoc(SCHEDULED_JOBS_INDEX, "$monitorId-metadata", monitorMetadata)
         val getMonitorResponse = getMonitorResponse(monitorId)
         Assert.assertNotNull(getMonitorResponse)
         Assert.assertNotNull(getMonitorResponse.monitor)
@@ -1690,6 +1734,26 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         """.trimIndent()
         val monitorId = "abc"
         indexDoc(SCHEDULED_JOBS_INDEX, monitorId, monitorStringWithoutName)
+
+        val monitorMetadata = """
+            {
+                    "metadata": {
+                        "monitor_id": "$monitorId",
+                        "last_action_execution_times": [],
+                        "last_run_context": {
+                            "$index": {
+                                "0": -1,
+                                "index": "$index",
+                                "shards_count": 1
+                            }
+                        },
+                        "source_to_query_index_mapping": {
+                            "$index$monitorId": ".opensearch-alerting-queries-000001"
+                        }
+                    }
+                }
+        """.trimIndent()
+        indexDoc(SCHEDULED_JOBS_INDEX, "$monitorId-metadata", monitorMetadata)
         val getMonitorResponse = getMonitorResponse(monitorId)
         Assert.assertNotNull(getMonitorResponse)
         Assert.assertNotNull(getMonitorResponse.monitor)

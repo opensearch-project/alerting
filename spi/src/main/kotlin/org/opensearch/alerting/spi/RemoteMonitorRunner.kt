@@ -19,7 +19,12 @@ import org.opensearch.core.common.breaker.CircuitBreakingException
 import org.opensearch.core.common.io.stream.Writeable
 import org.opensearch.core.index.shard.ShardId
 import org.opensearch.node.NodeClosedException
-import org.opensearch.transport.*
+import org.opensearch.transport.ActionNotFoundTransportException
+import org.opensearch.transport.ConnectTransportException
+import org.opensearch.transport.RemoteTransportException
+import org.opensearch.transport.TransportException
+import org.opensearch.transport.TransportRequestOptions
+import org.opensearch.transport.TransportService
 import java.time.Instant
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException

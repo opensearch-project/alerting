@@ -43,7 +43,7 @@ import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import java.time.Instant
-import java.util.*
+import java.util.Locale
 
 private val log = LogManager.getLogger(TransportExecuteMonitorAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
