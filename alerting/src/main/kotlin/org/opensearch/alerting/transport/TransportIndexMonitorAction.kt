@@ -529,7 +529,8 @@ class TransportIndexMonitorAction @Inject constructor(
                 try {
                     if (
                         request.monitor.isMonitorOfStandardType() &&
-                        Monitor.MonitorType.valueOf(request.monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
+                        Monitor.MonitorType.valueOf(request.monitor.monitorType.uppercase(Locale.ROOT)) ==
+                        Monitor.MonitorType.DOC_LEVEL_MONITOR
                     ) {
                         indexDocLevelMonitorQueries(request.monitor, indexResponse.id, metadata, request.refreshPolicy)
                     }
