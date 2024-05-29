@@ -202,7 +202,8 @@ class AlertIndices(
         } catch (e: Exception) {
             // This should be run on cluster startup
             logger.error(
-                "Error creating alert/finding indices. Alerts/Findings can't be recorded until master node is restarted.",
+                "Error creating alert/finding indices. " +
+                    "Alerts/Findings can't be recorded until master node is restarted.",
                 e
             )
         }
@@ -397,9 +398,7 @@ class AlertIndices(
         }
 
         // TODO call getMapping and compare actual mappings here instead of this
-        if (targetIndex == IndexUtils.lastUpdatedAlertHistoryIndex ||
-            targetIndex == IndexUtils.lastUpdatedFindingHistoryIndex
-        ) {
+        if (targetIndex == IndexUtils.lastUpdatedAlertHistoryIndex || targetIndex == IndexUtils.lastUpdatedFindingHistoryIndex) {
             return
         }
 
@@ -494,6 +493,7 @@ class AlertIndices(
     }
 
     private fun deleteOldIndices(tag: String, indices: String) {
+        logger.info("info deleteOldIndices")
         val clusterStateRequest = ClusterStateRequest()
             .clear()
             .indices(indices)
@@ -572,8 +572,7 @@ class AlertIndices(
                     override fun onResponse(deleteIndicesResponse: AcknowledgedResponse) {
                         if (!deleteIndicesResponse.isAcknowledged) {
                             logger.error(
-                                "Could not delete one or more Alerting/Finding history indices: $indicesToDelete." +
-                                    "Retrying one by one."
+                                "Could not delete one or more Alerting/Finding history indices: $indicesToDelete. Retrying one by one."
                             )
                             deleteOldHistoryIndex(indicesToDelete)
                         }
@@ -621,7 +620,6 @@ class AlertIndices(
         val searchSourceBuilder = SearchSourceBuilder()
             .query(queryBuilder)
             .version(true)
-            .seqNoAndPrimaryTerm(true)
 
         val searchRequest = SearchRequest()
             .indices(indexName)

@@ -476,21 +476,6 @@ class AlertService(
         } ?: listOf()
     }
 
-    /**
-     * Performs a Search request to retrieve the Notes associated with the
-     * Alert with the given ID.
-     *
-     * Searches for the n most recently created Notes based on maxNotes
-     */
-    suspend fun getNotesForAlertNotification(alertId: String, maxNotes: Int): List<Note> {
-        val allNotes = NotesUtils.getNotesByAlertIDs(client, listOf(alertId))
-        val sortedNotes = allNotes.sortedByDescending { it.createdTime }
-        if (sortedNotes.size <= maxNotes) {
-            return sortedNotes
-        }
-        return sortedNotes.slice(0 until maxNotes)
-    }
-
     suspend fun upsertMonitorErrorAlert(
         monitor: Monitor,
         errorMessage: String,
@@ -928,5 +913,18 @@ class AlertService(
             this != null && alertError != null -> (listOf(alertError) + this).take(10)
             else -> throw IllegalStateException("Unreachable code reached!")
         }
+    }
+
+    /**
+     * Performs a Search request to retrieve the top maxNotes most recent Notes associated with the
+     * given Alert, where maxNotes is a cluster setting.
+     */
+    suspend fun getNotesForAlertNotification(alertId: String, maxNotes: Int): List<Note> {
+        val allNotes = NotesUtils.getNotesByAlertIDs(client, listOf(alertId))
+        val sortedNotes = allNotes.sortedByDescending { it.createdTime }
+        if (sortedNotes.size <= maxNotes) {
+            return sortedNotes
+        }
+        return sortedNotes.slice(0 until maxNotes)
     }
 }

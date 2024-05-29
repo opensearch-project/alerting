@@ -1,3 +1,10 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package org.opensearch.alerting.resthandler
 
-class SecureAlertingNotesRestApiIT
+import org.opensearch.alerting.AlertingRestTestCase
+
+class SecureAlertingNotesRestApiIT : AlertingRestTestCase()

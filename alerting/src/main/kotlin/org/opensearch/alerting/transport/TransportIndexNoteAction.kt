@@ -287,15 +287,6 @@ constructor(
             // retains everything from the original note except content and lastUpdatedTime
             val requestNote = currentNote.copy(content = request.content, lastUpdatedTime = Instant.now())
 
-//            val requestNote =
-//                Note(
-//                    id = currentNote.id,
-//                    alertId = currentNote.alertId,
-//                    content = request.content,
-//                    time = Instant.now(),
-//                    user = currentNote.user,
-//                )
-
             val indexRequest =
                 IndexRequest(NOTES_HISTORY_WRITE_INDEX)
                     .source(requestNote.toXContentWithUser(XContentFactory.jsonBuilder()))

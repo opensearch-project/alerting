@@ -298,9 +298,9 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                         for (alert in alertsToExecuteActionsFor) {
                             val alertNotes = monitorCtx.alertService!!.getNotesForAlertNotification(alert.id, maxNotes)
                             val alertContext = if (alertCategory != AlertCategory.NEW) {
-                                AlertContext(alert = alert, notes = alertNotes)
+                                AlertContext(alert = alert, notes = alertNotes.ifEmpty { null })
                             } else {
-                                getAlertContext(alert = alert, alertSampleDocs = alertSampleDocs, alertNotes)
+                                getAlertContext(alert = alert, alertSampleDocs = alertSampleDocs, alertNotes.ifEmpty { null })
                             }
 
                             val actionCtx = getActionContextForAlertCategory(
@@ -336,15 +336,15 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     val actionCtx = triggerCtx.copy(
                         dedupedAlerts = dedupedAlerts.map {
                             val dedupedAlertsNotes = monitorCtx.alertService!!.getNotesForAlertNotification(it.id, maxNotes)
-                            AlertContext(alert = it, notes = dedupedAlertsNotes)
+                            AlertContext(alert = it, notes = dedupedAlertsNotes.ifEmpty { null })
                         },
                         newAlerts = newAlerts.map {
                             val newAlertsNotes = monitorCtx.alertService!!.getNotesForAlertNotification(it.id, maxNotes)
-                            getAlertContext(alert = it, alertSampleDocs = alertSampleDocs, alertNotes = newAlertsNotes)
+                            getAlertContext(alert = it, alertSampleDocs = alertSampleDocs, alertNotes = newAlertsNotes.ifEmpty { null })
                         },
                         completedAlerts = completedAlerts.map {
                             val completedAlertsNotes = monitorCtx.alertService!!.getNotesForAlertNotification(it.id, maxNotes)
-                            AlertContext(alert = it, notes = completedAlertsNotes)
+                            AlertContext(alert = it, notes = completedAlertsNotes.ifEmpty { null })
                         },
                         error = monitorResult.error ?: triggerResult.error
                     )
@@ -557,7 +557,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
     private fun getAlertContext(
         alert: Alert,
         alertSampleDocs: Map<String, Map<String, List<Map<String, Any>>>>,
-        alertNotes: List<Note>
+        alertNotes: List<Note>?
     ): AlertContext {
         val bucketKey = alert.aggregationResultBucket?.getBucketKeysHash()
         val sampleDocs = alertSampleDocs[alert.triggerId]?.get(bucketKey)

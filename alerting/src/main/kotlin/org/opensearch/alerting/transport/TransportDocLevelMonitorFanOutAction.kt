@@ -1051,9 +1051,6 @@ class TransportDocLevelMonitorFanOutAction
         val docFieldTags = parseSampleDocTags(monitor.triggers)
         val request = MultiGetRequest()
 
-        // TODO: model after this code, notifs r only resent for active alerts, which means
-        // TODO: ull only ever need to query the one index of active notes, which means u hav a
-        // TODO: concrete, which means u can copy this and use mget
         // Perform mGet request in batches.
         findingToDocPairs.chunked(findingsIndexBatchSize).forEach { batch ->
             batch.forEach { (findingId, docIdAndIndex) ->

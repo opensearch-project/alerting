@@ -1,3 +1,8 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package org.opensearch.alerting.resthandler
 
 import org.apache.hc.core5.http.ContentType
@@ -131,6 +136,9 @@ class AlertingNotesRestApiIT : AlertingRestTestCase() {
 
     // TODO: test list
     /*
+    create note with empty content should fail
+    create without alert id should fail
+    update without note id should fail
     search notes across multiple alerts
     (belongs in NotesIT) create note thats too large based on cluster setting should fail
     create note on alert that alrdy has max notes based on cluster setting should fail

@@ -1,3 +1,8 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package org.opensearch.alerting.transport
 
 import kotlinx.coroutines.CoroutineScope
@@ -7,7 +12,6 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.delete.DeleteRequest
-import org.opensearch.action.delete.DeleteResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
@@ -120,7 +124,8 @@ class TransportDeleteNoteAction @Inject constructor(
                 val deleteRequest = DeleteRequest(sourceIndex, noteId)
 
                 if (canDelete) {
-                    val deleteResponse = deleteNote(deleteRequest)
+                    log.debug("Deleting the note with id ${deleteRequest.id()}")
+                    val deleteResponse = client.suspendUntil { delete(deleteRequest, it) }
                     actionListener.onResponse(DeleteNoteResponse(deleteResponse.id))
                 } else {
                     actionListener.onFailure(
@@ -169,10 +174,5 @@ class TransportDeleteNoteAction @Inject constructor(
 
             return notes[0] // we searched on Note ID, there should only be one Note in the List
         }
-    }
-
-    private suspend fun deleteNote(deleteRequest: DeleteRequest): DeleteResponse {
-        log.debug("Deleting the note with id ${deleteRequest.id()}")
-        return client.suspendUntil { delete(deleteRequest, it) }
     }
 }

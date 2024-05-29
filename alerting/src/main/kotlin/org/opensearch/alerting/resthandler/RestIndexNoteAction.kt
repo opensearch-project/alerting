@@ -22,11 +22,8 @@ import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BytesRestResponse
 import org.opensearch.rest.RestChannel
-import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
-import org.opensearch.rest.RestRequest.Method.POST
-import org.opensearch.rest.RestRequest.Method.PUT
 import org.opensearch.rest.RestResponse
 import org.opensearch.rest.action.RestResponseListener
 import java.io.IOException
@@ -43,22 +40,14 @@ class RestIndexNoteAction : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf()
-    }
-
-    override fun replacedRoutes(): MutableList<ReplacedRoute> {
-        return mutableListOf(
-            ReplacedRoute(
-                POST,
-                "${AlertingPlugin.MONITOR_BASE_URI}/alerts/{alertID}/notes",
-                POST,
-                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/alerts/{alertID}/notes",
+        return listOf(
+            Route(
+                RestRequest.Method.POST,
+                "${AlertingPlugin.MONITOR_BASE_URI}/alerts/{alertID}/notes"
             ),
-            ReplacedRoute(
-                PUT,
-                "${AlertingPlugin.MONITOR_BASE_URI}/alerts/notes/{noteID}",
-                PUT,
-                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/alerts/notes/{noteID}",
+            Route(
+                RestRequest.Method.PUT,
+                "${AlertingPlugin.MONITOR_BASE_URI}/alerts/notes/{noteID}"
             )
         )
     }
@@ -69,15 +58,16 @@ class RestIndexNoteAction : BaseRestHandler() {
 
         val alertId = request.param("alertID", Alert.NO_ID)
         val noteId = request.param("noteID", Note.NO_ID)
-        if (request.method() == POST && Alert.NO_ID == alertId) {
+        if (request.method() == RestRequest.Method.POST && Alert.NO_ID == alertId) {
             throw AlertingException.wrap(IllegalArgumentException("Missing alert ID"))
-        } else if (request.method() == PUT && Note.NO_ID == noteId) {
+        } else if (request.method() == RestRequest.Method.PUT && Note.NO_ID == noteId) {
             throw AlertingException.wrap(IllegalArgumentException("Missing note ID"))
         }
 
-        // TODO: validation for empty string?
         val content = request.contentParser().map()["content"] as String?
-            ?: throw AlertingException.wrap(IllegalArgumentException("Missing note content"))
+        if (content.isNullOrEmpty()) {
+            throw AlertingException.wrap(IllegalArgumentException("Missing note content"))
+        }
         val seqNo = request.paramAsLong(IF_SEQ_NO, SequenceNumbers.UNASSIGNED_SEQ_NO)
         val primaryTerm = request.paramAsLong(IF_PRIMARY_TERM, SequenceNumbers.UNASSIGNED_PRIMARY_TERM)
 
@@ -87,22 +77,23 @@ class RestIndexNoteAction : BaseRestHandler() {
             client.execute(AlertingActions.INDEX_NOTE_ACTION_TYPE, indexNoteRequest, indexNoteResponse(channel, request.method()))
         }
     }
-}
-private fun indexNoteResponse(channel: RestChannel, restMethod: RestRequest.Method):
-    RestResponseListener<IndexNoteResponse> {
-    return object : RestResponseListener<IndexNoteResponse>(channel) {
-        @Throws(Exception::class)
-        override fun buildResponse(response: IndexNoteResponse): RestResponse {
-            var returnStatus = RestStatus.CREATED
-            if (restMethod == RestRequest.Method.PUT)
-                returnStatus = RestStatus.OK
 
-            val restResponse = BytesRestResponse(returnStatus, response.toXContent(channel.newBuilder(), ToXContent.EMPTY_PARAMS))
-//            if (returnStatus == RestStatus.CREATED) {
-//                val location = "${AlertingPlugin.MONITOR_BASE_URI}/alerts/notes/${response.id}"
-//                restResponse.addHeader("Location", location)
-//            }
-            return restResponse
+    private fun indexNoteResponse(channel: RestChannel, restMethod: RestRequest.Method):
+        RestResponseListener<IndexNoteResponse> {
+        return object : RestResponseListener<IndexNoteResponse>(channel) {
+            @Throws(Exception::class)
+            override fun buildResponse(response: IndexNoteResponse): RestResponse {
+                var returnStatus = RestStatus.CREATED
+                if (restMethod == RestRequest.Method.PUT)
+                    returnStatus = RestStatus.OK
+
+                val restResponse = BytesRestResponse(returnStatus, response.toXContent(channel.newBuilder(), ToXContent.EMPTY_PARAMS))
+                if (returnStatus == RestStatus.CREATED) {
+                    val location = "${AlertingPlugin.MONITOR_BASE_URI}/alerts/notes/${response.id}"
+                    restResponse.addHeader("Location", location)
+                }
+                return restResponse
+            }
         }
     }
 }

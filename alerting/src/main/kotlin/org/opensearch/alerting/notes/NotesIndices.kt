@@ -198,6 +198,8 @@ class NotesIndices(
 
     // TODO: Everything below here are util functions straight from AlertIndices.kt
     // TODO: might need to reuse their code or refactor
+    // TODO: may merge into AlertIndices.kt if we decide to make notes indices
+    // TODO: component-specific instead of universal and component-agnostic
 
     private fun getIndicesToDelete(clusterStateResponse: ClusterStateResponse): List<String> {
         val indicesToDelete = mutableListOf<String>()
@@ -300,7 +302,7 @@ class NotesIndices(
             if (ExceptionsHelper.unwrapCause(t) is ResourceAlreadyExistsException) {
                 true
             } else {
-                throw t // TODO: wrap in some kind of NotesException?
+                throw t
             }
         }
     }
@@ -312,7 +314,6 @@ class NotesIndices(
             targetIndex = IndexUtils.getIndexNameWithAlias(clusterState, index)
         }
 
-        // TODO call getMapping and compare actual mappings here instead of this
         if (targetIndex == IndexUtils.lastUpdatedNotesHistoryIndex
         ) {
             return

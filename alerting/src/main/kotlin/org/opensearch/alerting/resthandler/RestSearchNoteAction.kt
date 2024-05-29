@@ -24,7 +24,6 @@ import org.opensearch.core.xcontent.ToXContent.EMPTY_PARAMS
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BytesRestResponse
 import org.opensearch.rest.RestChannel
-import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestResponse
@@ -44,16 +43,10 @@ class RestSearchNoteAction() : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return listOf()
-    }
-
-    override fun replacedRoutes(): MutableList<ReplacedRoute> {
-        return mutableListOf(
-            ReplacedRoute(
+        return listOf(
+            Route(
                 RestRequest.Method.GET,
-                "${AlertingPlugin.MONITOR_BASE_URI}/alerts/notes/_search",
-                RestRequest.Method.GET,
-                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/alerts/notes/_search",
+                "${AlertingPlugin.MONITOR_BASE_URI}/alerts/notes/_search"
             )
         )
     }
@@ -92,18 +85,8 @@ class RestSearchNoteAction() : BaseRestHandler() {
                             LoggingDeprecationHandler.INSTANCE,
                             hit.sourceAsString
                         ).use { hitsParser ->
-                            log.info("hit sourceAsString: ${hit.sourceAsString}")
-                            // at parser's initialization, it points at null,
-                            // need to call nextToken() to get it to point to
-                            // the beginning of the hit object
-                            // TODO: bring this up with team, currently SearchMonitorRestHandler
-                            // doesn't do this, causing the parse to fail, causing search response
-                            // to show objects as is, which bypasses Monitor's toXContent which
-                            // doesn't show User, meaning the Search response shows the whole User
-                            // object, which would be exposure of sensitive information
                             hitsParser.nextToken()
                             val note = Note.parse(hitsParser, hit.id)
-                            log.info("note: $note")
                             val xcb = note.toXContent(jsonBuilder(), EMPTY_PARAMS)
                             hit.sourceRef(BytesReference.bytes(xcb))
                         }
