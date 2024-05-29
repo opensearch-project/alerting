@@ -24,6 +24,7 @@ import org.opensearch.alerting.notes.NotesIndices
 import org.opensearch.alerting.notes.NotesIndices.Companion.NOTES_HISTORY_WRITE_INDEX
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_NOTES_ENABLED
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_NOTES_PER_ALERT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.NOTES_MAX_CONTENT_SIZE
@@ -80,6 +81,7 @@ constructor(
 ),
     SecureTransportAction {
 
+    @Volatile private var alertingNotesEnabled = ALERTING_NOTES_ENABLED.get(settings)
     @Volatile private var notesMaxContentSize = NOTES_MAX_CONTENT_SIZE.get(settings)
     @Volatile private var maxNotesPerAlert = MAX_NOTES_PER_ALERT.get(settings)
     @Volatile private var indexTimeout = INDEX_TIMEOUT.get(settings)
@@ -87,6 +89,7 @@ constructor(
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_NOTES_ENABLED) { alertingNotesEnabled = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(NOTES_MAX_CONTENT_SIZE) { notesMaxContentSize = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_NOTES_PER_ALERT) { maxNotesPerAlert = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(INDEX_TIMEOUT) { indexTimeout = it }
@@ -98,6 +101,16 @@ constructor(
         request: ActionRequest,
         actionListener: ActionListener<IndexNoteResponse>,
     ) {
+        // validate feature flag enabled
+        if (!alertingNotesEnabled) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException("Notes for Alerting is currently disabled", RestStatus.FORBIDDEN),
+                )
+            )
+            return
+        }
+
         val transformedRequest =
             request as? IndexNoteRequest
                 ?: recreateObject(request, namedWriteableRegistry) {
@@ -143,7 +156,7 @@ constructor(
             // Also need to check if user has permissions to add a Note to the passed in Alert. To do this,
             // we retrieve the Alert to get its associated monitor user, and use that to
             // check if they have permissions to the Monitor that generated the Alert
-            val queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.termsQuery("_id", listOf(request.alertId)))
+            val queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.termsQuery("_id", listOf(request.entityId)))
             val searchSourceBuilder =
                 SearchSourceBuilder()
                     .version(true)
@@ -173,7 +186,7 @@ constructor(
             if (alerts.isEmpty()) {
                 actionListener.onFailure(
                     AlertingException.wrap(
-                        OpenSearchStatusException("Alert with ID ${request.alertId} is not found", RestStatus.NOT_FOUND),
+                        OpenSearchStatusException("Alert with ID ${request.entityId} is not found", RestStatus.NOT_FOUND),
                     )
                 )
                 return
@@ -197,7 +210,7 @@ constructor(
             log.info("checking user permissions in index note")
             checkUserPermissionsWithResource(user, alert.monitorUser, actionListener, "monitor", alert.monitorId)
 
-            val note = Note(alertId = request.alertId, content = request.content, createdTime = Instant.now(), user = user)
+            val note = Note(entityId = request.entityId, content = request.content, createdTime = Instant.now(), user = user)
 
             val indexRequest =
                 IndexRequest(NOTES_HISTORY_WRITE_INDEX)

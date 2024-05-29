@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
+import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
@@ -34,6 +35,7 @@ import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
@@ -59,13 +61,24 @@ class TransportSearchNoteAction @Inject constructor(
 ),
     SecureTransportAction {
 
-    @Volatile
-    override var filterByEnabled: Boolean = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile private var alertingNotesEnabled = AlertingSettings.ALERTING_NOTES_ENABLED.get(settings)
+    @Volatile override var filterByEnabled: Boolean = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
     init {
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERTING_NOTES_ENABLED) { alertingNotesEnabled = it }
         listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<SearchResponse>) {
+        // validate feature flag enabled
+        if (!alertingNotesEnabled) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException("Notes for Alerting is currently disabled", RestStatus.FORBIDDEN),
+                )
+            )
+            return
+        }
+
         val transformedRequest = request as? SearchNoteRequest
             ?: recreateObject(request, namedWriteableRegistry) {
                 SearchNoteRequest(it)
@@ -108,7 +121,7 @@ class TransportSearchNoteAction @Inject constructor(
                 val queryBuilder = searchNoteRequest.searchRequest.source().query() as BoolQueryBuilder
                 searchNoteRequest.searchRequest.source().query(
                     queryBuilder.filter(
-                        QueryBuilders.termsQuery(Note.ALERT_ID_FIELD, alertIDs)
+                        QueryBuilders.termsQuery(Note.ENTITY_ID_FIELD, alertIDs)
                     )
                 )
 

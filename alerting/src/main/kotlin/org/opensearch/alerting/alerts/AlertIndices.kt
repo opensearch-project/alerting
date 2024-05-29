@@ -524,7 +524,7 @@ class AlertIndices(
         )
     }
 
-    private suspend fun getIndicesToDelete(clusterStateResponse: ClusterStateResponse): List<String> {
+    private fun getIndicesToDelete(clusterStateResponse: ClusterStateResponse): List<String> {
         val indicesToDelete = mutableListOf<String>()
         for (entry in clusterStateResponse.state.metadata.indices) {
             val indexMetaData = entry.value

@@ -63,8 +63,6 @@ class NotesIndices(
     }
 
     companion object {
-//        const val NOTES_INDEX = ".opensearch-alerting-notes"
-
         /** The alias of the index in which to write notes finding */
         const val NOTES_HISTORY_WRITE_INDEX = ".opensearch-alerting-notes-history-write"
 
@@ -109,14 +107,6 @@ class NotesIndices(
      *
      * @param actionListener A callback listener for the index creation call. Generally in the form of onSuccess, onFailure
      */
-//    fun initNotesIndex(actionListener: ActionListener<CreateIndexResponse>) {
-//        if (!notesIndexExists()) {
-//            var indexRequest = CreateIndexRequest(NOTES_INDEX)
-//                .mapping(notesMapping())
-//                .settings(Settings.builder().put("index.hidden", true).build())
-//            client.indices().create(indexRequest, actionListener)
-//        }
-//    }
 
     fun onMaster() {
         try {
@@ -175,24 +165,6 @@ class NotesIndices(
         return notesHistoryEnabled
     }
 
-//    suspend fun createOrUpdateInitialNotesHistoryIndex(dataSources: DataSources) {
-//        if (dataSources.notesIndex == NotesIndices.NOTES_INDEX) {
-//            return createOrUpdateInitialNotesHistoryIndex()
-//        }
-//        if (!clusterService.state().metadata.hasAlias(dataSources.notesHistoryIndex)) {
-//            createIndex(
-//                dataSources.notesHistoryIndexPattern ?: NOTES_HISTORY_INDEX_PATTERN,
-//                notesMapping(),
-//                dataSources.notesHistoryIndex
-//            )
-//        } else {
-//            updateIndexMapping(
-//                dataSources.notesHistoryIndex ?: NOTES_HISTORY_WRITE_INDEX,
-//                notesMapping(),
-//                true
-//            )
-//        }
-//    }
     suspend fun createOrUpdateInitialNotesHistoryIndex() {
         if (!isNotesHistoryInitialized()) {
             notesHistoryIndexInitialized = createIndex(NOTES_HISTORY_INDEX_PATTERN, notesMapping(), NOTES_HISTORY_WRITE_INDEX)

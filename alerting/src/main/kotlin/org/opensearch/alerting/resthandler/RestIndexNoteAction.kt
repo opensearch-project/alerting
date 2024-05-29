@@ -98,10 +98,10 @@ private fun indexNoteResponse(channel: RestChannel, restMethod: RestRequest.Meth
                 returnStatus = RestStatus.OK
 
             val restResponse = BytesRestResponse(returnStatus, response.toXContent(channel.newBuilder(), ToXContent.EMPTY_PARAMS))
-            if (returnStatus == RestStatus.CREATED) {
-                val location = "${AlertingPlugin.MONITOR_BASE_URI}/alerts/notes/${response.id}"
-                restResponse.addHeader("Location", location)
-            }
+//            if (returnStatus == RestStatus.CREATED) {
+//                val location = "${AlertingPlugin.MONITOR_BASE_URI}/alerts/notes/${response.id}"
+//                restResponse.addHeader("Location", location)
+//            }
             return restResponse
         }
     }

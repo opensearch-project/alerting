@@ -120,10 +120,6 @@ class RestSearchMonitorAction(
                             channel.request().xContentRegistry,
                             LoggingDeprecationHandler.INSTANCE, hit.sourceAsString
                         ).use { hitsParser ->
-                            log.info("monitor hit sourceAsString: ${hit.sourceAsString}")
-                            log.info("monitor parser curr token: ${hitsParser.currentToken()}")
-                            hitsParser.nextToken()
-                            log.info("monitor parser next token: ${hitsParser.currentToken()}")
                             val monitor = ScheduledJob.parse(hitsParser, hit.id, hit.version)
                             val xcb = monitor.toXContent(jsonBuilder(), EMPTY_PARAMS)
                             hit.sourceRef(BytesReference.bytes(xcb))

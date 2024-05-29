@@ -224,39 +224,45 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        val ALERTING_NOTES_ENABLED = Setting.boolSetting(
+            "plugins.alerting.notes_enabled",
+            false,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
         val NOTES_HISTORY_ENABLED = Setting.boolSetting(
-            "plugins.notes_history_enabled",
+            "plugins.alerting.notes_history_enabled",
             true,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         val NOTES_HISTORY_MAX_DOCS = Setting.longSetting(
-            "plugins.notes_history_max_docs",
+            "plugins.alerting.notes_history_max_docs",
             1000L,
             0L,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         val NOTES_HISTORY_INDEX_MAX_AGE = Setting.positiveTimeSetting(
-            "plugins.notes_history_max_age",
+            "plugins.alerting.notes_history_max_age",
             TimeValue(30, TimeUnit.DAYS),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         val NOTES_HISTORY_ROLLOVER_PERIOD = Setting.positiveTimeSetting(
-            "plugins.notes_history_rollover_period",
+            "plugins.alerting.notes_history_rollover_period",
             TimeValue(12, TimeUnit.HOURS),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         val NOTES_HISTORY_RETENTION_PERIOD = Setting.positiveTimeSetting(
-            "plugins.notes_history_retention_period",
+            "plugins.alerting.notes_history_retention_period",
             TimeValue(60, TimeUnit.DAYS),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         val NOTES_MAX_CONTENT_SIZE = Setting.longSetting(
-            "plugins.notes.max_content_size",
+            "plugins.alerting.notes.max_content_size",
             2000L,
             0L,
             Setting.Property.NodeScope, Setting.Property.Dynamic

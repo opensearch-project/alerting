@@ -51,11 +51,13 @@ import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.FindingWithDocs
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.Note
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.util.string
+import org.opensearch.commons.authuser.User
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.ToXContent
@@ -519,6 +521,37 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
         assertNull(alertJson["monitor_user"])
         return alert.copy(id = alertJson["_id"] as String, version = (alertJson["_version"] as Int).toLong())
+    }
+
+    protected fun createAlertNote(alertId: String, content: String): Note {
+        val createRequestBody = jsonBuilder()
+            .startObject()
+            .field(Note.NOTE_CONTENT_FIELD, content)
+            .endObject()
+            .string()
+
+        val createResponse = client().makeRequest(
+            "POST",
+            "$ALERTING_BASE_URI/alerts/$alertId/notes",
+            StringEntity(createRequestBody, APPLICATION_JSON)
+        )
+
+        assertEquals("Unable to create a new alert", RestStatus.CREATED, createResponse.restStatus())
+
+        val responseBody = createResponse.asMap()
+        val noteId = responseBody["_id"] as String
+        assertNotEquals("response is missing Id", Note.NO_ID, noteId)
+
+        val note = responseBody["note"] as Map<*, *>
+
+        return Note(
+            id = noteId,
+            entityId = note["entity_id"] as String,
+            content = note["content"] as String,
+            createdTime = Instant.ofEpochMilli(note["created_time"] as Long),
+            lastUpdatedTime = if (note["last_updated_time"] != null) Instant.ofEpochMilli(note["last_updated_time"] as Long) else null,
+            user = note["user"]?.let { User(it as String, emptyList(), emptyList(), emptyList()) }
+        )
     }
 
     protected fun createRandomMonitor(refresh: Boolean = false, withMetadata: Boolean = false): Monitor {

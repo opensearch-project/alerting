@@ -1147,8 +1147,11 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+        logger.info("hits: $hits")
         val numberDocsFound = hits["total"]?.get("value")
         assertEquals("Destination objects are also returned by /_search.", 1, numberDocsFound)
+
+        assertEquals("fdsafds", false, true)
 
         val searchHits = hits["hits"] as List<Any>
         val hit = searchHits[0] as Map<String, Any>

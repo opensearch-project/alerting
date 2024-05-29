@@ -39,6 +39,7 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.Note
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.action.AlertCategory
 import org.opensearch.commons.alerting.model.action.PerAlertActionScope
@@ -59,7 +60,6 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.transport.TransportService
 import java.time.Instant
 import java.util.UUID
-import org.opensearch.commons.alerting.model.Note
 
 object BucketLevelMonitorRunner : MonitorRunner() {
     private val logger = LogManager.getLogger(javaClass)

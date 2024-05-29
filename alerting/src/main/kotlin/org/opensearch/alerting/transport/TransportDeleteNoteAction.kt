@@ -54,18 +54,29 @@ class TransportDeleteNoteAction @Inject constructor(
 ),
     SecureTransportAction {
 
+    @Volatile private var alertingNotesEnabled = AlertingSettings.ALERTING_NOTES_ENABLED.get(settings)
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERTING_NOTES_ENABLED) { alertingNotesEnabled = it }
         listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<DeleteNoteResponse>) {
+        // validate feature flag enabled
+        if (!alertingNotesEnabled) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException("Notes for Alerting is currently disabled", RestStatus.FORBIDDEN),
+                )
+            )
+            return
+        }
+
         val transformedRequest = request as? DeleteNoteRequest
             ?: recreateObject(request) { DeleteNoteRequest(it) }
 
         val user = readUserFromThreadContext(client)
-//        val deleteRequest = DeleteRequest(ALL_NOTES_INDEX_PATTERN, transformedRequest.noteId)
 
         if (!validateUserBackendRoles(user, actionListener)) {
             return
