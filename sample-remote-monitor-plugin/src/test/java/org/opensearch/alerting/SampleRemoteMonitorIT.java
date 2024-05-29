@@ -9,6 +9,7 @@ import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.http.io.entity.StringEntity;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.opensearch.alerting.monitor.runners.SampleRemoteDocLevelMonitorRunner;
 import org.opensearch.alerting.monitor.runners.SampleRemoteMonitorRunner1;
@@ -21,11 +22,20 @@ import org.opensearch.client.WarningsHandler;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.xcontent.LoggingDeprecationHandler;
 import org.opensearch.common.xcontent.json.JsonXContent;
+import org.opensearch.core.common.Strings;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.test.rest.OpenSearchRestTestCase;
 
+import javax.management.MBeanServerInvocationHandler;
+import javax.management.MalformedObjectNameException;
+import javax.management.ObjectName;
+import javax.management.remote.JMXConnector;
+import javax.management.remote.JMXConnectorFactory;
+import javax.management.remote.JMXServiceURL;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -182,5 +192,35 @@ public class SampleRemoteMonitorIT extends OpenSearchRestTestCase {
             request.setEntity(entity);
         }
         return client.performRequest(request);
+    }
+
+    @AfterClass
+    public static void dumpCoverage() throws IOException, MalformedObjectNameException {
+        // jacoco.dir is set in esplugin-coverage.gradle, if it doesn't exist we don't
+        // want to collect coverage so we can return early
+        String jacocoBuildPath = System.getProperty("jacoco.dir");
+        if (Strings.isNullOrEmpty(jacocoBuildPath)) {
+            return;
+        }
+
+        String serverUrl = "service:jmx:rmi:///jndi/rmi://127.0.0.1:7777/jmxrmi";
+        try (JMXConnector connector = JMXConnectorFactory.connect(new JMXServiceURL(serverUrl))) {
+            IProxy proxy = MBeanServerInvocationHandler.newProxyInstance(
+                    connector.getMBeanServerConnection(), new ObjectName("org.jacoco:type=Runtime"), IProxy.class,
+                    false);
+
+            Path path = org.opensearch.common.io.PathUtils.get(jacocoBuildPath + "/integTestRunner.exec");
+            Files.write(path, proxy.getExecutionData(false));
+        } catch (Exception ex) {
+            throw new RuntimeException("Failed to dump coverage: " + ex);
+        }
+    }
+
+    public interface IProxy {
+        byte[] getExecutionData(boolean reset);
+
+        void dump(boolean reset);
+
+        void reset();
     }
 }
