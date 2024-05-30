@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting.monitor.triggers;
+package org.opensearch.alerting.monitor.trigger.results;
 
 import org.opensearch.commons.alerting.model.ActionRunResult;
 import org.opensearch.commons.alerting.model.TriggerRunResult;

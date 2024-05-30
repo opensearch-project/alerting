@@ -36,6 +36,7 @@ import javax.management.remote.JMXServiceURL;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -68,7 +69,9 @@ public class SampleRemoteMonitorIT extends OpenSearchRestTestCase {
                                 LoggingDeprecationHandler.INSTANCE,
                                 searchResponse.getEntity().getContent()
                         ).map();
-                        found.set(Integer.parseInt((((Map<String, Object>) ((Map<String, Object>) searchResponseJson.get("hits")).get("total")).get("value")).toString()) == 1);
+                        found.set(Integer.parseInt((((Map<String, Object>) ((Map<String, Object>) searchResponseJson.get("hits")).get("total")).get("value")).toString()) == 1 &&
+                                ((Map<String, Object>) ((List<Map<String, Object>>) ((Map<String, Object>) searchResponseJson.get("hits")).get("hits")).get(0).get("_source")).containsKey("hello") &&
+                                ((Map<String, Object>) ((List<Map<String, Object>>) ((Map<String, Object>) searchResponseJson.get("hits")).get("hits")).get(0).get("_source")).get("hello").toString().equals("1"));
                         return found.get();
                     } catch (IOException ex) {
                         return false;
@@ -126,12 +129,14 @@ public class SampleRemoteMonitorIT extends OpenSearchRestTestCase {
                                 LoggingDeprecationHandler.INSTANCE,
                                 searchResponse.getEntity().getContent()
                         ).map();
-                        found.set(Integer.parseInt((((Map<String, Object>) ((Map<String, Object>) searchResponseJson.get("hits")).get("total")).get("value")).toString()) == 1);
+                        found.set(Integer.parseInt((((Map<String, Object>) ((Map<String, Object>) searchResponseJson.get("hits")).get("total")).get("value")).toString()) == 1 &&
+                                ((Map<String, Object>) ((List<Map<String, Object>>) ((Map<String, Object>) searchResponseJson.get("hits")).get("hits")).get(0).get("_source")).containsKey("doc_level_input") &&
+                                ((Map<String, Object>) ((List<Map<String, Object>>) ((Map<String, Object>) searchResponseJson.get("hits")).get("hits")).get(0).get("_source")).get("doc_level_input").toString().equals("test:1"));
                         return found.get();
                     } catch (IOException ex) {
                         return false;
                     }
-                }, 1, TimeUnit.SECONDS);
+                }, 10, TimeUnit.SECONDS);
         Assert.assertTrue(found.get());
     }
 

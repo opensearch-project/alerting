@@ -6,17 +6,26 @@
 package org.opensearch.alerting;
 
 import org.opensearch.action.support.WriteRequest;
-import org.opensearch.alerting.monitor.runners.SampleRemoteDocLevelMonitorRunner;
+import org.opensearch.alerting.monitor.inputs.SampleRemoteMonitorInput1;
+import org.opensearch.alerting.monitor.inputs.SampleRemoteMonitorInput2;
+import org.opensearch.alerting.monitor.triggers.SampleRemoteMonitorTrigger1;
 import org.opensearch.client.node.NodeClient;
+import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.common.xcontent.json.JsonXContent;
 import org.opensearch.commons.alerting.action.AlertingActions;
 import org.opensearch.commons.alerting.action.IndexMonitorRequest;
 import org.opensearch.commons.alerting.action.IndexMonitorResponse;
 import org.opensearch.commons.alerting.model.DataSources;
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput;
+import org.opensearch.commons.alerting.model.DocLevelQuery;
 import org.opensearch.commons.alerting.model.IntervalSchedule;
 import org.opensearch.commons.alerting.model.Monitor;
+import org.opensearch.commons.alerting.model.action.Action;
+import org.opensearch.commons.alerting.model.action.Throttle;
+import org.opensearch.commons.alerting.model.remote.monitors.RemoteMonitorInput;
+import org.opensearch.commons.alerting.model.remote.monitors.RemoteMonitorTrigger;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.common.bytes.BytesReference;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.ToXContent;
 import org.opensearch.index.seqno.SequenceNumbers;
@@ -24,6 +33,8 @@ import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.rest.RestResponse;
+import org.opensearch.script.Script;
+import org.opensearch.script.ScriptType;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -52,6 +63,17 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
     @Override
     protected RestChannelConsumer prepareRequest(RestRequest restRequest, NodeClient client) throws IOException {
         String runMonitorParam = restRequest.param("run_monitor");
+
+        SampleRemoteMonitorInput1 input1 = new SampleRemoteMonitorInput1("hello", Map.of("test", 1.0f), 1);
+        BytesStreamOutput out = new BytesStreamOutput();
+        input1.writeTo(out);
+        BytesReference input1Serialized = out.bytes();
+
+        SampleRemoteMonitorTrigger1 trigger1 = new SampleRemoteMonitorTrigger1("hello", Map.of("test", 1.0f), 1);
+        BytesStreamOutput outTrigger = new BytesStreamOutput();
+        trigger1.writeTo(outTrigger);
+        BytesReference trigger1Serialized = outTrigger.bytes();
+
         Monitor monitor1 = new Monitor(
                 Monitor.NO_ID,
                 Monitor.NO_VERSION,
@@ -63,8 +85,11 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
                 SampleRemoteMonitorPlugin.SAMPLE_REMOTE_MONITOR1,
                 null,
                 0,
-                List.of(),
-                List.of(),
+                List.of(new RemoteMonitorInput(input1Serialized)),
+                List.of(new RemoteMonitorTrigger("id", "name", "1",
+                        List.of(new Action("name", "destinationId", new Script(ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG, "Hello World", Map.of()),
+                                new Script(ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG, "Hello World", Map.of()), false, new Throttle(60, ChronoUnit.MINUTES),
+                                "id", null)), trigger1Serialized)),
                 Map.of(),
                 new DataSources(),
                 "sample-remote-monitor-plugin"
@@ -106,6 +131,12 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
                 );
             };
         } else if (runMonitorParam.equals("multiple")) {
+            SampleRemoteMonitorInput2 input2 = new SampleRemoteMonitorInput2("hello",
+                    new DocLevelMonitorInput("test", List.of("test"), List.of(new DocLevelQuery("query", "query", List.of(), "test:1", List.of()))));
+            BytesStreamOutput out1 = new BytesStreamOutput();
+            input2.writeTo(out1);
+            BytesReference input1Serialized1 = out1.bytes();
+
             Monitor monitor2 = new Monitor(
                     Monitor.NO_ID,
                     Monitor.NO_VERSION,
@@ -117,7 +148,7 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
                     SampleRemoteMonitorPlugin.SAMPLE_REMOTE_MONITOR2,
                     null,
                     0,
-                    List.of(),
+                    List.of(new RemoteMonitorInput(input1Serialized1)),
                     List.of(),
                     Map.of(),
                     new DataSources(),
