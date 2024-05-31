@@ -5,13 +5,22 @@
 
 package org.opensearch.alerting
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.action.search.TransportSearchAction.SEARCH_CANCEL_AFTER_TIME_INTERVAL_SETTING
 import org.opensearch.action.support.master.AcknowledgedResponse
-import org.opensearch.alerting.action.*
+import org.opensearch.alerting.action.ExecuteMonitorAction
+import org.opensearch.alerting.action.ExecuteMonitorRequest
+import org.opensearch.alerting.action.ExecuteMonitorResponse
+import org.opensearch.alerting.action.ExecuteWorkflowAction
+import org.opensearch.alerting.action.ExecuteWorkflowRequest
+import org.opensearch.alerting.action.ExecuteWorkflowResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertMover.Companion.moveAlerts
 import org.opensearch.alerting.core.JobRunner
@@ -49,7 +58,13 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.lifecycle.AbstractLifecycleComponent
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
-import org.opensearch.commons.alerting.model.*
+import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.MonitorRunResult
+import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.TriggerRunResult
+import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.commons.alerting.model.WorkflowRunResult
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
 import org.opensearch.commons.alerting.util.isMonitorOfStandardType
@@ -65,7 +80,7 @@ import org.opensearch.transport.TransportService
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
-import java.util.*
+import java.util.UUID
 import kotlin.coroutines.CoroutineContext
 
 object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
@@ -352,7 +367,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                         logger.debug("lock ${lock!!.lockId} acquired")
                         logger.debug(
                             "PERF_DEBUG: executing ${job.monitorType} ${job.id} on node " +
-                                    monitorCtx.clusterService!!.state().nodes().localNode.id
+                                monitorCtx.clusterService!!.state().nodes().localNode.id
                         )
                         val executeMonitorRequest = ExecuteMonitorRequest(
                             false,
@@ -424,7 +439,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         if (monitor.isMonitorOfStandardType()) {
             logger.info(
                 "Executing scheduled monitor - id: ${monitor.id}, type: ${monitor.monitorType}, periodStart: $periodStart, " +
-                        "periodEnd: $periodEnd, dryrun: $dryrun, executionId: $executionId"
+                    "periodEnd: $periodEnd, dryrun: $dryrun, executionId: $executionId"
             )
             val runResult = if (monitor.isBucketLevelMonitor()) {
                 BucketLevelMonitorRunner.runMonitor(
