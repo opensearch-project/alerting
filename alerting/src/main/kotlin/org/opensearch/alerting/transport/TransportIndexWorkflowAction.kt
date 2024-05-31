@@ -41,7 +41,6 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTION_THROTTLE_VALUE
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
-import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.isQueryLevelMonitor
@@ -66,6 +65,8 @@ import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.commons.alerting.util.AlertingException
+import org.opensearch.commons.alerting.util.isMonitorOfStandardType
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
@@ -401,7 +402,9 @@ class TransportIndexWorkflowAction @Inject constructor(
                         log.warn("Metadata doc id:${monitorMetadata.id} exists, but it shouldn't!")
                     }
 
-                    if (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR) {
+                    if (
+                        Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
+                    ) {
                         val oldMonitorMetadata = MonitorMetadataService.getMetadata(monitor)
                         monitorMetadata = monitorMetadata.copy(sourceToQueryIndexMapping = oldMonitorMetadata!!.sourceToQueryIndexMapping)
                     }
@@ -555,8 +558,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                         workflowMetadataId = workflowMetadata.id
                     )
 
-                    if (
-                        !created &&
+                    if (!created &&
                         Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
                     ) {
                         var updatedMetadata = MonitorMetadataService.recreateRunContext(monitorMetadata, monitor)
@@ -636,24 +638,28 @@ class TransportIndexWorkflowAction @Inject constructor(
      * Returns list of indices for the given monitor depending on it's type
      */
     private fun getMonitorIndices(monitor: Monitor): List<String> {
-        return when (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT))) {
-            Monitor.MonitorType.DOC_LEVEL_MONITOR -> (monitor.inputs[0] as DocLevelMonitorInput).indices
-            Monitor.MonitorType.BUCKET_LEVEL_MONITOR -> monitor.inputs.flatMap { s -> (s as SearchInput).indices }
-            Monitor.MonitorType.QUERY_LEVEL_MONITOR -> {
-                if (isADMonitor(monitor)) monitor.inputs.flatMap { s -> (s as SearchInput).indices }
-                else {
-                    val indices = mutableListOf<String>()
-                    for (input in monitor.inputs) {
-                        when (input) {
-                            is SearchInput -> indices.addAll(input.indices)
-                            else -> indices
+        if (monitor.isMonitorOfStandardType()) {
+            return when (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT))) {
+                Monitor.MonitorType.DOC_LEVEL_MONITOR -> (monitor.inputs[0] as DocLevelMonitorInput).indices
+                Monitor.MonitorType.BUCKET_LEVEL_MONITOR -> monitor.inputs.flatMap { s -> (s as SearchInput).indices }
+                Monitor.MonitorType.QUERY_LEVEL_MONITOR -> {
+                    if (isADMonitor(monitor)) monitor.inputs.flatMap { s -> (s as SearchInput).indices }
+                    else {
+                        val indices = mutableListOf<String>()
+                        for (input in monitor.inputs) {
+                            when (input) {
+                                is SearchInput -> indices.addAll(input.indices)
+                                else -> indices
+                            }
                         }
+                        indices
                     }
-                    indices
                 }
-            }
 
-            else -> emptyList()
+                else -> emptyList()
+            }
+        } else {
+            return emptyList()
         }
     }
 

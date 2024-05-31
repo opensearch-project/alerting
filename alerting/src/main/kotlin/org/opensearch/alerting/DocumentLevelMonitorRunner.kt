@@ -10,24 +10,24 @@ import org.opensearch.ExceptionsHelper
 import org.opensearch.Version
 import org.opensearch.action.ActionListenerResponseHandler
 import org.opensearch.action.support.GroupedActionListener
-import org.opensearch.alerting.action.DocLevelMonitorFanOutAction
-import org.opensearch.alerting.action.DocLevelMonitorFanOutRequest
-import org.opensearch.alerting.action.DocLevelMonitorFanOutResponse
-import org.opensearch.alerting.model.ActionRunResult
-import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
-import org.opensearch.alerting.model.IndexExecutionContext
-import org.opensearch.alerting.model.InputRunResults
-import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
-import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.node.DiscoveryNode
 import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
+import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutAction
+import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutRequest
+import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutResponse
+import org.opensearch.commons.alerting.model.ActionRunResult
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
+import org.opensearch.commons.alerting.model.DocumentLevelTriggerRunResult
+import org.opensearch.commons.alerting.model.IndexExecutionContext
+import org.opensearch.commons.alerting.model.InputRunResults
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.MonitorRunResult
+import org.opensearch.commons.alerting.model.WorkflowRunContext
+import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.breaker.CircuitBreakingException
 import org.opensearch.core.common.io.stream.Writeable
@@ -436,7 +436,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             if (res.exception == null) {
                 return null
             } else {
-                exceptions.add(res.exception)
+                exceptions.add(res.exception!!)
             }
         }
         return AlertingException.merge(*exceptions.toTypedArray())
@@ -501,9 +501,9 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             if (response.exception == null) {
                 if (response.inputResults.error != null) {
                     if (response.inputResults.error is AlertingException) {
-                        errors.add(response.inputResults.error)
+                        errors.add(response.inputResults.error as AlertingException)
                     } else {
-                        errors.add(AlertingException.wrap(response.inputResults.error) as AlertingException)
+                        errors.add(AlertingException.wrap(response.inputResults.error as Exception) as AlertingException)
                     }
                 }
                 val partialResult = response.inputResults.results

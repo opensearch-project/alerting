@@ -1,0 +1,16 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+apply plugin: 'java'
+apply plugin: 'opensearch.java-rest-test'
+apply plugin: 'org.jetbrains.kotlin.jvm'
+apply plugin: 'jacoco'
+apply plugin: 'com.github.johnrengelman.shadow'
+
+dependencies {
+    compileOnly "org.opensearch:opensearch:${opensearch_version}"
+    compileOnly "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
+    compileOnly "org.opensearch:common-utils:${common_utils_version}@jar"
+}

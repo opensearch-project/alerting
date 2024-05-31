@@ -6,17 +6,17 @@
 package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.isADMonitor
-import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.MonitorRunResult
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
+import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
+import org.opensearch.commons.alerting.model.WorkflowRunContext
 import org.opensearch.transport.TransportService
 import java.time.Instant
 import java.util.Locale

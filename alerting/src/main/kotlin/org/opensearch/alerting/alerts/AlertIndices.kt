@@ -36,7 +36,6 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDING_HISTO
 import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDING_HISTORY_RETENTION_PERIOD
 import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDING_HISTORY_ROLLOVER_PERIOD
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
-import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.client.Client
 import org.opensearch.cluster.ClusterChangedEvent
@@ -47,6 +46,7 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.DataSources
+import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.action.ActionListener
 import org.opensearch.threadpool.Scheduler.Cancellable
 import org.opensearch.threadpool.ThreadPool
