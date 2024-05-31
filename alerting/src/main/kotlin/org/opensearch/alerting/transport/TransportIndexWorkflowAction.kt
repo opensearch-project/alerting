@@ -57,14 +57,8 @@ import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.IndexWorkflowRequest
 import org.opensearch.commons.alerting.action.IndexWorkflowResponse
-import org.opensearch.commons.alerting.model.CompositeInput
-import org.opensearch.commons.alerting.model.Delegate
-import org.opensearch.commons.alerting.model.DocLevelMonitorInput
-import org.opensearch.commons.alerting.model.Monitor
-import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.*
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
-import org.opensearch.commons.alerting.model.SearchInput
-import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.alerting.util.isMonitorOfStandardType
 import org.opensearch.commons.authuser.User
@@ -80,8 +74,7 @@ import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
-import java.util.Locale
-import java.util.UUID
+import java.util.*
 import java.util.stream.Collectors
 
 private val log = LogManager.getLogger(TransportIndexWorkflowAction::class.java)
@@ -148,7 +141,7 @@ class TransportIndexWorkflowAction @Inject constructor(
             if (transformedRequest.rbacRoles?.stream()?.anyMatch { !user.backendRoles.contains(it) } == true) {
                 log.error(
                     "User specified backend roles, ${transformedRequest.rbacRoles}, " +
-                        "that they don' have access to. User backend roles: ${user.backendRoles}"
+                            "that they don' have access to. User backend roles: ${user.backendRoles}"
                 )
                 actionListener.onFailure(
                     AlertingException.wrap(
@@ -162,7 +155,7 @@ class TransportIndexWorkflowAction @Inject constructor(
             } else if (transformedRequest.rbacRoles?.isEmpty() == true) {
                 log.error(
                     "Non-admin user are not allowed to specify an empty set of backend roles. " +
-                        "Please don't pass in the parameter or pass in at least one backend role."
+                            "Please don't pass in the parameter or pass in at least one backend role."
                 )
                 actionListener.onFailure(
                     AlertingException.wrap(
@@ -625,7 +618,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                         throw AlertingException.wrap(
                             IllegalArgumentException(
                                 "Delegate monitor indices ${delegateMonitorIndices.joinToString()} " +
-                                    "doesn't query all of chained findings monitor's indices ${chainedMonitorIndices.joinToString()}}"
+                                        "doesn't query all of chained findings monitor's indices ${chainedMonitorIndices.joinToString()}}"
                             )
                         )
                     }

@@ -43,7 +43,7 @@ import org.opensearch.rest.RestResponse
 import org.opensearch.rest.action.RestResponseListener
 import java.io.IOException
 import java.time.Instant
-import java.util.Locale
+import java.util.*
 
 private val log = LogManager.getLogger(RestIndexMonitorAction::class.java)
 
