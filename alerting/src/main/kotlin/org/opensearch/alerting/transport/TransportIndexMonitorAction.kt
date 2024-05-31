@@ -689,6 +689,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 val (metadata, created) = MonitorMetadataService.getOrCreateMetadata(request.monitor)
                 // Recreate runContext if metadata exists
                 // Delete and insert all queries from/to queryIndex
+
                 if (!created &&
                     currentMonitor.isMonitorOfStandardType() &&
                     Monitor.MonitorType.valueOf(currentMonitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR

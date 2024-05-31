@@ -367,7 +367,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                         logger.debug("lock ${lock!!.lockId} acquired")
                         logger.debug(
                             "PERF_DEBUG: executing ${job.monitorType} ${job.id} on node " +
-                                monitorCtx.clusterService!!.state().nodes().localNode.id
+                                    monitorCtx.clusterService!!.state().nodes().localNode.id
                         )
                         val executeMonitorRequest = ExecuteMonitorRequest(
                             false,
@@ -439,7 +439,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         if (monitor.isMonitorOfStandardType()) {
             logger.info(
                 "Executing scheduled monitor - id: ${monitor.id}, type: ${monitor.monitorType}, periodStart: $periodStart, " +
-                    "periodEnd: $periodEnd, dryrun: $dryrun, executionId: $executionId"
+                        "periodEnd: $periodEnd, dryrun: $dryrun, executionId: $executionId"
             )
             val runResult = if (monitor.isBucketLevelMonitor()) {
                 BucketLevelMonitorRunner.runMonitor(

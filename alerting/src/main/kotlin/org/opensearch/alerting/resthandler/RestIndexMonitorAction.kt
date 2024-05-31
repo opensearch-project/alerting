@@ -100,6 +100,7 @@ class RestIndexMonitorAction : BaseRestHandler() {
             validateDataSources(monitor)
             val monitorType = monitor.monitorType
             val triggers = monitor.triggers
+
             if (monitor.isMonitorOfStandardType()) {
                 when (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT))) {
                     Monitor.MonitorType.QUERY_LEVEL_MONITOR -> {
