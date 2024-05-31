@@ -107,7 +107,7 @@ integTest {
         jvmArgs '-agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=8000'
     }
 }
-project.getTasks().getByName('bundlePlugin').dependsOn(rootProject.project(":alerting").tasks.getByName('build'))
+project.getTasks().getByName('bundlePlugin').dependsOn(rootProject.project(":alerting").tasks.getByName('assemble'))
 Zip bundle = (Zip) project.getTasks().getByName("bundlePlugin");
 Zip rootBundle = (Zip) rootProject.project(":alerting").getTasks().getByName("bundlePlugin");
 integTest.dependsOn(bundle)
