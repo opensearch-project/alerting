@@ -9,6 +9,20 @@ apply plugin: 'org.jetbrains.kotlin.jvm'
 apply plugin: 'jacoco'
 apply plugin: 'com.github.johnrengelman.shadow'
 
+jacoco {
+    toolVersion = '0.8.7'
+    reportsDirectory = file("$buildDir/JacocoReport")
+}
+
+jacocoTestReport {
+    reports {
+        xml.required = false
+        csv.required = false
+        html.destination file("${buildDir}/jacoco/")
+    }
+}
+check.dependsOn jacocoTestReport
+
 dependencies {
     compileOnly "org.opensearch:opensearch:${opensearch_version}"
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
