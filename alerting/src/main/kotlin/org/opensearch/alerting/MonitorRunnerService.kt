@@ -425,7 +425,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         val monitor = job as Monitor
         val executionId = "${monitor.id}_${LocalDateTime.now(ZoneOffset.UTC)}_${UUID.randomUUID()}"
         logger.info(
-            "Executing scheduled monitor - id: ${monitor.id}, type: ${monitor.monitorType.name}, periodStart: $periodStart, " +
+            "Executing scheduled monitor - id: ${monitor.id}, type: ${monitor.monitorType}, periodStart: $periodStart, " +
                 "periodEnd: $periodEnd, dryrun: $dryrun, executionId: $executionId"
         )
         val runResult = if (monitor.isBucketLevelMonitor()) {
