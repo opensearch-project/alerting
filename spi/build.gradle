@@ -78,9 +78,8 @@ publishing {
                 }
                 developers {
                     developer {
-                        id = "amazonwebservices"
-                        organization = "Amazon Web Services"
-                        organizationUrl = "https://aws.amazon.com"
+                        name = "OpenSearch"
+                        url = "https://github.com/opensearch-project/alerting"
                     }
                 }
             }
