@@ -3,14 +3,89 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+apply plugin: 'maven-publish'
 apply plugin: 'java'
 apply plugin: 'opensearch.java-rest-test'
 apply plugin: 'org.jetbrains.kotlin.jvm'
 apply plugin: 'jacoco'
 apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 'opensearch.repositories'
 
 dependencies {
     compileOnly "org.opensearch:opensearch:${opensearch_version}"
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
     compileOnly "org.opensearch:common-utils:${common_utils_version}@jar"
+}
+
+shadowJar {
+    archiveClassifier = null
+}
+
+task sourcesJar(type: Jar) {
+    archiveClassifier = 'sources'
+    from sourceSets.main.allJava
+}
+
+task javadocJar(type: Jar) {
+    archiveClassifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+publishing {
+    repositories {
+        maven {
+            name = 'staging'
+            url = "${rootProject.buildDir}/local-staging-repo"
+        }
+        maven {
+            name = "Snapshots"
+            url = "https://aws.oss.sonatype.org/content/repositories/snapshots"
+            credentials {
+                username "$System.env.SONATYPE_USERNAME"
+                password "$System.env.SONATYPE_PASSWORD"
+            }
+        }
+    }
+    publications {
+        shadow(MavenPublication) {
+            project.shadow.component(it)
+            groupId = 'org.opensearch.alerting'
+            artifactId = 'alerting-spi'
+
+            artifact sourcesJar
+            artifact javadocJar
+
+            pom {
+                name = "OpenSearch Alerting spi"
+                packaging = "jar"
+                url = "https://github.com/opensearch-project/alerting"
+                description = "OpenSearch Alerting spi"
+                scm {
+                    connection = "scm:git@github.com:opensearch-project/alerting.git"
+                    developerConnection = "scm:git@github.com:opensearch-project/alerting.git"
+                    url = "git@github.com:opensearch-project/alerting.git"
+                }
+                licenses {
+                    license {
+                        name = "The Apache License, Version 2.0"
+                        url = "http://www.apache.org/licenses/LICENSE-2.0.txt"
+                    }
+                }
+                developers {
+                    developer {
+                        name = "OpenSearch"
+                        url = "https://github.com/opensearch-project/alerting"
+                    }
+                }
+            }
+        }
+    }
+
+    gradle.startParameter.setShowStacktrace(ShowStacktrace.ALWAYS)
+    gradle.startParameter.setLogLevel(LogLevel.DEBUG)
 }
