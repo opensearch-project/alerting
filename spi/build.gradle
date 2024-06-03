@@ -63,7 +63,7 @@ publishing {
             pom {
                 name = "OpenSearch Alerting spi"
                 packaging = "jar"
-                url = "https://github.com/opensearch-project/alerting-spi"
+                url = "https://github.com/opensearch-project/alerting"
                 description = "OpenSearch Alerting spi"
                 scm {
                     connection = "scm:git@github.com:opensearch-project/alerting.git"
