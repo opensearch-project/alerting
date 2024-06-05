@@ -42,8 +42,8 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDING_HISTO
 import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDING_HISTORY_ROLLOVER_PERIOD
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.util.AlertingException
+import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.alerting.util.IndexUtils
-import org.opensearch.alerting.util.NotesUtils
 import org.opensearch.client.Client
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
@@ -509,7 +509,7 @@ class AlertIndices(
                             val indicesToDelete = getIndicesToDelete(clusterStateResponse)
                             logger.info("Deleting old $tag indices viz $indicesToDelete")
                             if (indices == ALERT_HISTORY_ALL) {
-                                deleteAlertNotes(indicesToDelete)
+                                deleteAlertComments(indicesToDelete)
                             }
                             deleteAllOldHistoryIndices(indicesToDelete)
                         }
@@ -607,11 +607,11 @@ class AlertIndices(
         }
     }
 
-    private suspend fun deleteAlertNotes(alertHistoryIndicesToDelete: List<String>) {
+    private suspend fun deleteAlertComments(alertHistoryIndicesToDelete: List<String>) {
         alertHistoryIndicesToDelete.forEach { alertHistoryIndex ->
             val alertIDs = getAlertIDsFromAlertHistoryIndex(alertHistoryIndex)
-            val notesToDeleteIDs = NotesUtils.getNoteIDsByAlertIDs(client, alertIDs)
-            NotesUtils.deleteNotes(client, notesToDeleteIDs)
+            val commentsToDeleteIDs = CommentsUtils.getCommentIDsByAlertIDs(client, alertIDs)
+            CommentsUtils.deleteComments(client, commentsToDeleteIDs)
         }
     }
 

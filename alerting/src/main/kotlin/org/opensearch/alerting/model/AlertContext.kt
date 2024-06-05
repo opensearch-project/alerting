@@ -6,8 +6,8 @@
 package org.opensearch.alerting.model
 
 import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.Comment
 import org.opensearch.commons.alerting.model.DocLevelQuery
-import org.opensearch.commons.alerting.model.Note
 
 /**
  * This model is a wrapper for [Alert] that should only be used to create a more
@@ -17,7 +17,7 @@ data class AlertContext(
     val alert: Alert,
     val associatedQueries: List<DocLevelQuery>? = null,
     val sampleDocs: List<Map<String, Any?>>? = null,
-    val notes: List<Note>? = null
+    val comments: List<Comment>? = null
 ) {
     fun asTemplateArg(): Map<String, Any?> {
         val queriesContext = associatedQueries?.map {
@@ -28,12 +28,12 @@ data class AlertContext(
             )
         }
 
-        val notesContext = notes?.map {
+        val commentsContext = comments?.map {
             mapOf(
-                Note.NOTE_CREATED_TIME_FIELD to it.createdTime,
-                Note.NOTE_LAST_UPDATED_TIME_FIELD to it.lastUpdatedTime,
-                Note.NOTE_CONTENT_FIELD to it.content,
-                Note.NOTE_USER_FIELD to it.user
+                Comment.COMMENT_CREATED_TIME_FIELD to it.createdTime,
+                Comment.COMMENT_LAST_UPDATED_TIME_FIELD to it.lastUpdatedTime,
+                Comment.COMMENT_CONTENT_FIELD to it.content,
+                Comment.COMMENT_USER_FIELD to it.user
             )
         }
 
@@ -41,7 +41,7 @@ data class AlertContext(
         val customContextFields = mapOf(
             ASSOCIATED_QUERIES_FIELD to queriesContext,
             SAMPLE_DOCS_FIELD to sampleDocs,
-            NOTES_FIELD to notesContext
+            COMMENTS_FIELD to commentsContext
         )
 
         // Get the alert template args
@@ -57,6 +57,6 @@ data class AlertContext(
     companion object {
         const val ASSOCIATED_QUERIES_FIELD = "associated_queries"
         const val SAMPLE_DOCS_FIELD = "sample_documents"
-        const val NOTES_FIELD = "notes"
+        const val COMMENTS_FIELD = "comments"
     }
 }

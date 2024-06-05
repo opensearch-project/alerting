@@ -224,59 +224,59 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val ALERTING_NOTES_ENABLED = Setting.boolSetting(
-            "plugins.alerting.notes_enabled",
+        val ALERTING_COMMENTS_ENABLED = Setting.boolSetting(
+            "plugins.alerting.comments_enabled",
             false,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val NOTES_HISTORY_ENABLED = Setting.boolSetting(
-            "plugins.alerting.notes_history_enabled",
+        val COMMENTS_HISTORY_ENABLED = Setting.boolSetting(
+            "plugins.alerting.comments_history_enabled",
             true,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val NOTES_HISTORY_MAX_DOCS = Setting.longSetting(
-            "plugins.alerting.notes_history_max_docs",
+        val COMMENTS_HISTORY_MAX_DOCS = Setting.longSetting(
+            "plugins.alerting.comments_history_max_docs",
             1000L,
             0L,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val NOTES_HISTORY_INDEX_MAX_AGE = Setting.positiveTimeSetting(
-            "plugins.alerting.notes_history_max_age",
+        val COMMENTS_HISTORY_INDEX_MAX_AGE = Setting.positiveTimeSetting(
+            "plugins.alerting.comments_history_max_age",
             TimeValue(30, TimeUnit.DAYS),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val NOTES_HISTORY_ROLLOVER_PERIOD = Setting.positiveTimeSetting(
-            "plugins.alerting.notes_history_rollover_period",
+        val COMMENTS_HISTORY_ROLLOVER_PERIOD = Setting.positiveTimeSetting(
+            "plugins.alerting.comments_history_rollover_period",
             TimeValue(12, TimeUnit.HOURS),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val NOTES_HISTORY_RETENTION_PERIOD = Setting.positiveTimeSetting(
-            "plugins.alerting.notes_history_retention_period",
+        val COMMENTS_HISTORY_RETENTION_PERIOD = Setting.positiveTimeSetting(
+            "plugins.alerting.comments_history_retention_period",
             TimeValue(60, TimeUnit.DAYS),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val NOTES_MAX_CONTENT_SIZE = Setting.longSetting(
-            "plugins.alerting.notes.max_content_size",
+        val COMMENTS_MAX_CONTENT_SIZE = Setting.longSetting(
+            "plugins.alerting.comments.max_content_size",
             2000L,
             0L,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val MAX_NOTES_PER_ALERT = Setting.longSetting(
-            "plugins.alerting.notes.max_notes_per_alert",
+        val MAX_COMMENTS_PER_ALERT = Setting.longSetting(
+            "plugins.alerting.comments.max_comments_per_alert",
             500L,
             0L,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val MAX_NOTES_PER_NOTIFICATION = Setting.intSetting(
-            "plugins.alerting.notes.max_notes_per_notification",
+        val MAX_COMMENTS_PER_NOTIFICATION = Setting.intSetting(
+            "plugins.alerting.comments.max_comments_per_notification",
             3,
             0,
             Setting.Property.NodeScope, Setting.Property.Dynamic

@@ -8,13 +8,13 @@ package org.opensearch.alerting.util
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.alerting.notes.NotesIndices.Companion.ALL_NOTES_INDEX_PATTERN
+import org.opensearch.alerting.comments.CommentsIndices.Companion.ALL_COMMENTS_INDEX_PATTERN
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.client.Client
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.alerting.model.Note
+import org.opensearch.commons.alerting.model.Comment
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
@@ -28,17 +28,17 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
-private val log = LogManager.getLogger(NotesUtils::class.java)
+private val log = LogManager.getLogger(CommentsUtils::class.java)
 
-class NotesUtils {
+class CommentsUtils {
     companion object {
-        // Deletes all Notes given by the list of Notes IDs
-        suspend fun deleteNotes(client: Client, noteIDs: List<String>) {
-            if (noteIDs.isEmpty()) return
+        // Deletes all Comments given by the list of Comments IDs
+        suspend fun deleteComments(client: Client, commentIDs: List<String>) {
+            if (commentIDs.isEmpty()) return
             val deleteResponse: BulkByScrollResponse = suspendCoroutine { cont ->
                 DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-                    .source(ALL_NOTES_INDEX_PATTERN)
-                    .filter(QueryBuilders.boolQuery().must(QueryBuilders.termsQuery("_id", noteIDs)))
+                    .source(ALL_COMMENTS_INDEX_PATTERN)
+                    .filter(QueryBuilders.boolQuery().must(QueryBuilders.termsQuery("_id", commentIDs)))
                     .refresh(true)
                     .execute(
                         object : ActionListener<BulkByScrollResponse> {
@@ -48,14 +48,14 @@ class NotesUtils {
                     )
             }
             deleteResponse.bulkFailures.forEach {
-                log.error("Failed to delete Note. Note ID: [${it.id}] cause: [${it.cause}] ")
+                log.error("Failed to delete Comment. Comment ID: [${it.id}] cause: [${it.cause}] ")
             }
         }
 
-        // Searches through all Notes history indices and returns a list of all Notes associated
+        // Searches through all Comments history indices and returns a list of all Comments associated
         // with the Entities given by the list of Entity IDs
         // TODO: change this to EntityIDs
-        suspend fun getNotesByAlertIDs(client: Client, alertIDs: List<String>): List<Note> {
+        suspend fun getCommentsByAlertIDs(client: Client, alertIDs: List<String>): List<Comment> {
             val queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.termsQuery("alert_id", alertIDs))
             val searchSourceBuilder =
                 SearchSourceBuilder()
@@ -65,11 +65,11 @@ class NotesUtils {
 
             val searchRequest =
                 SearchRequest()
-                    .indices(ALL_NOTES_INDEX_PATTERN)
+                    .indices(ALL_COMMENTS_INDEX_PATTERN)
                     .source(searchSourceBuilder)
 
             val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
-            val notes = searchResponse.hits.map { hit ->
+            val comments = searchResponse.hits.map { hit ->
                 val xcp = XContentHelper.createParser(
                     NamedXContentRegistry.EMPTY,
                     LoggingDeprecationHandler.INSTANCE,
@@ -77,19 +77,19 @@ class NotesUtils {
                     XContentType.JSON
                 )
                 XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                val note = Note.parse(xcp, hit.id)
-                note
+                val comment = Comment.parse(xcp, hit.id)
+                comment
             }
 
-            return notes
+            return comments
         }
 
-        // Identical to getNotesByAlertIDs, just returns list of Note IDs instead of list of Note objects
-        suspend fun getNoteIDsByAlertIDs(client: Client, alertIDs: List<String>): List<String> {
-            val notes = getNotesByAlertIDs(client, alertIDs)
-            return notes.map { it.id }
+        // Identical to getCommentsByAlertIDs, just returns list of Comment IDs instead of list of Comment objects
+        suspend fun getCommentIDsByAlertIDs(client: Client, alertIDs: List<String>): List<String> {
+            val comments = getCommentsByAlertIDs(client, alertIDs)
+            return comments.map { it.id }
         }
 
-        // TODO: make getNotesByAlertID and getNoteIDsByAlertID
+        // TODO: make getCommentsByAlertID and getCommentIDsByAlertID
     }
 }

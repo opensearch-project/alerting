@@ -45,13 +45,13 @@ import org.opensearch.commons.alerting.action.GetFindingsResponse
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.ChainedAlertTrigger
+import org.opensearch.commons.alerting.model.Comment
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.FindingWithDocs
 import org.opensearch.commons.alerting.model.Monitor
-import org.opensearch.commons.alerting.model.Note
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.SearchInput
@@ -523,34 +523,36 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return alert.copy(id = alertJson["_id"] as String, version = (alertJson["_version"] as Int).toLong())
     }
 
-    protected fun createAlertNote(alertId: String, content: String): Note {
+    protected fun createAlertComment(alertId: String, content: String): Comment {
         val createRequestBody = jsonBuilder()
             .startObject()
-            .field(Note.NOTE_CONTENT_FIELD, content)
+            .field(Comment.COMMENT_CONTENT_FIELD, content)
             .endObject()
             .string()
 
         val createResponse = client().makeRequest(
             "POST",
-            "$ALERTING_BASE_URI/alerts/$alertId/notes",
+            "$ALERTING_BASE_URI/alerts/$alertId/comments",
             StringEntity(createRequestBody, APPLICATION_JSON)
         )
 
         assertEquals("Unable to create a new alert", RestStatus.CREATED, createResponse.restStatus())
 
         val responseBody = createResponse.asMap()
-        val noteId = responseBody["_id"] as String
-        assertNotEquals("response is missing Id", Note.NO_ID, noteId)
+        val commentId = responseBody["_id"] as String
+        assertNotEquals("response is missing Id", Comment.NO_ID, commentId)
 
-        val note = responseBody["note"] as Map<*, *>
+        val comment = responseBody["comment"] as Map<*, *>
 
-        return Note(
-            id = noteId,
-            entityId = note["entity_id"] as String,
-            content = note["content"] as String,
-            createdTime = Instant.ofEpochMilli(note["created_time"] as Long),
-            lastUpdatedTime = if (note["last_updated_time"] != null) Instant.ofEpochMilli(note["last_updated_time"] as Long) else null,
-            user = note["user"]?.let { User(it as String, emptyList(), emptyList(), emptyList()) }
+        return Comment(
+            id = commentId,
+            entityId = comment["entity_id"] as String,
+            content = comment["content"] as String,
+            createdTime = Instant.ofEpochMilli(comment["created_time"] as Long),
+            lastUpdatedTime = if (comment["last_updated_time"] != null) {
+                Instant.ofEpochMilli(comment["last_updated_time"] as Long)
+            } else null,
+            user = comment["user"]?.let { User(it as String, emptyList(), emptyList(), emptyList()) }
         )
     }
 

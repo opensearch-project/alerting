@@ -16,7 +16,7 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.alerting.notes.NotesIndices.Companion.ALL_NOTES_INDEX_PATTERN
+import org.opensearch.alerting.comments.CommentsIndices.Companion.ALL_COMMENTS_INDEX_PATTERN
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AlertingException
@@ -28,9 +28,9 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AlertingActions
-import org.opensearch.commons.alerting.action.DeleteNoteRequest
-import org.opensearch.commons.alerting.action.DeleteNoteResponse
-import org.opensearch.commons.alerting.model.Note
+import org.opensearch.commons.alerting.action.DeleteCommentRequest
+import org.opensearch.commons.alerting.action.DeleteCommentResponse
+import org.opensearch.commons.alerting.model.Comment
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
@@ -44,41 +44,43 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
-private val log = LogManager.getLogger(TransportDeleteNoteAction::class.java)
+private val log = LogManager.getLogger(TransportDeleteAlertingCommentAction::class.java)
 
-class TransportDeleteNoteAction @Inject constructor(
+class TransportDeleteAlertingCommentAction @Inject constructor(
     transportService: TransportService,
     val client: Client,
     actionFilters: ActionFilters,
     val clusterService: ClusterService,
     settings: Settings,
     val xContentRegistry: NamedXContentRegistry
-) : HandledTransportAction<ActionRequest, DeleteNoteResponse>(
-    AlertingActions.DELETE_NOTES_ACTION_NAME, transportService, actionFilters, ::DeleteNoteRequest
+) : HandledTransportAction<ActionRequest, DeleteCommentResponse>(
+    AlertingActions.DELETE_COMMENT_ACTION_NAME, transportService, actionFilters, ::DeleteCommentRequest
 ),
     SecureTransportAction {
 
-    @Volatile private var alertingNotesEnabled = AlertingSettings.ALERTING_NOTES_ENABLED.get(settings)
+    @Volatile private var alertingCommentsEnabled = AlertingSettings.ALERTING_COMMENTS_ENABLED.get(settings)
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERTING_NOTES_ENABLED) { alertingNotesEnabled = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERTING_COMMENTS_ENABLED) {
+            alertingCommentsEnabled = it
+        }
         listenFilterBySettingChange(clusterService)
     }
 
-    override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<DeleteNoteResponse>) {
+    override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<DeleteCommentResponse>) {
         // validate feature flag enabled
-        if (!alertingNotesEnabled) {
+        if (!alertingCommentsEnabled) {
             actionListener.onFailure(
                 AlertingException.wrap(
-                    OpenSearchStatusException("Notes for Alerting is currently disabled", RestStatus.FORBIDDEN),
+                    OpenSearchStatusException("Comments for Alerting is currently disabled", RestStatus.FORBIDDEN),
                 )
             )
             return
         }
 
-        val transformedRequest = request as? DeleteNoteRequest
-            ?: recreateObject(request) { DeleteNoteRequest(it) }
+        val transformedRequest = request as? DeleteCommentRequest
+            ?: recreateObject(request) { DeleteCommentRequest(it) }
 
         val user = readUserFromThreadContext(client)
 
@@ -86,62 +88,62 @@ class TransportDeleteNoteAction @Inject constructor(
             return
         }
         scope.launch {
-            DeleteNoteHandler(
+            DeleteCommentHandler(
                 client,
                 actionListener,
                 user,
-                transformedRequest.noteId
+                transformedRequest.commentId
             ).resolveUserAndStart()
         }
     }
 
-    inner class DeleteNoteHandler(
+    inner class DeleteCommentHandler(
         private val client: Client,
-        private val actionListener: ActionListener<DeleteNoteResponse>,
+        private val actionListener: ActionListener<DeleteCommentResponse>,
         private val user: User?,
-        private val noteId: String
+        private val commentId: String
     ) {
 
         private var sourceIndex: String? = null
         suspend fun resolveUserAndStart() {
             try {
-                val note = getNote()
+                val comment = getComment()
 
                 if (sourceIndex == null) {
                     actionListener.onFailure(
                         AlertingException(
-                            "Could not resolve the index the given Note came from",
+                            "Could not resolve the index the given Comment came from",
                             RestStatus.INTERNAL_SERVER_ERROR,
                             IllegalStateException()
                         )
                     )
                 }
 
-                // if user is null because security plugin is not installed, anyone can delete any note
-                // otherwise, only allow note deletion if the deletion requester is the same as the note's author
-                val canDelete = user == null || user.name == note.user?.name || isAdmin(user)
+                // if user is null because security plugin is not installed, anyone can delete any comment
+                // otherwise, only allow comment deletion if the deletion requester is the same as the comment's author
+                val canDelete = user == null || user.name == comment.user?.name || isAdmin(user)
 
-                val deleteRequest = DeleteRequest(sourceIndex, noteId)
+                val deleteRequest = DeleteRequest(sourceIndex, commentId)
 
                 if (canDelete) {
-                    log.debug("Deleting the note with id ${deleteRequest.id()}")
+                    log.debug("Deleting the comment with id ${deleteRequest.id()}")
                     val deleteResponse = client.suspendUntil { delete(deleteRequest, it) }
-                    actionListener.onResponse(DeleteNoteResponse(deleteResponse.id))
+                    actionListener.onResponse(DeleteCommentResponse(deleteResponse.id))
                 } else {
                     actionListener.onFailure(
-                        AlertingException("Not allowed to delete this note!", RestStatus.FORBIDDEN, IllegalStateException())
+                        AlertingException("Not allowed to delete this comment!", RestStatus.FORBIDDEN, IllegalStateException())
                     )
                 }
             } catch (t: Exception) {
-                log.error("Failed to delete note $noteId", t)
+                log.error("Failed to delete comment $commentId", t)
                 actionListener.onFailure(AlertingException.wrap(t))
             }
         }
 
-        private suspend fun getNote(): Note {
+        private suspend fun getComment(): Comment {
             val queryBuilder = QueryBuilders
                 .boolQuery()
-                .must(QueryBuilders.termsQuery("_id", noteId))
+                .must(QueryBuilders.termsQuery("_id", commentId))
             val searchSourceBuilder =
                 SearchSourceBuilder()
                     .version(true)
@@ -149,17 +151,17 @@ class TransportDeleteNoteAction @Inject constructor(
                     .query(queryBuilder)
             val searchRequest = SearchRequest()
                 .source(searchSourceBuilder)
-                .indices(ALL_NOTES_INDEX_PATTERN)
+                .indices(ALL_COMMENTS_INDEX_PATTERN)
 
             val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
             if (searchResponse.hits.totalHits.value == 0L) {
                 actionListener.onFailure(
                     AlertingException.wrap(
-                        OpenSearchStatusException("Note with $noteId is not found", RestStatus.NOT_FOUND)
+                        OpenSearchStatusException("Comment with $commentId is not found", RestStatus.NOT_FOUND)
                     )
                 )
             }
-            val notes = searchResponse.hits.map { hit ->
+            val comments = searchResponse.hits.map { hit ->
                 val xcp = XContentHelper.createParser(
                     NamedXContentRegistry.EMPTY,
                     LoggingDeprecationHandler.INSTANCE,
@@ -167,12 +169,12 @@ class TransportDeleteNoteAction @Inject constructor(
                     XContentType.JSON
                 )
                 XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                val note = Note.parse(xcp, hit.id)
+                val comment = Comment.parse(xcp, hit.id)
                 sourceIndex = hit.index
-                note
+                comment
             }
 
-            return notes[0] // we searched on Note ID, there should only be one Note in the List
+            return comments[0] // we searched on Comment ID, there should only be one Comment in the List
         }
     }
 }

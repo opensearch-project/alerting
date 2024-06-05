@@ -69,9 +69,9 @@ object QueryLevelMonitorRunner : MonitorRunner() {
         for (trigger in monitor.triggers) {
             val currentAlert = currentAlerts[trigger]
             val currentAlertContext = currentAlert?.let {
-                val maxNotes = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.MAX_NOTES_PER_NOTIFICATION)
-                val currentAlertNotes = monitorCtx.alertService!!.getNotesForAlertNotification(currentAlert.id, maxNotes)
-                AlertContext(alert = currentAlert, notes = currentAlertNotes.ifEmpty { null })
+                val maxComments = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION)
+                val currentAlertComments = monitorCtx.alertService!!.getCommentsForAlertNotification(currentAlert.id, maxComments)
+                AlertContext(alert = currentAlert, comments = currentAlertComments.ifEmpty { null })
             }
             val triggerCtx = QueryLevelTriggerExecutionContext(monitor, trigger as QueryLevelTrigger, monitorResult, currentAlertContext)
             val triggerResult = when (monitor.monitorType) {

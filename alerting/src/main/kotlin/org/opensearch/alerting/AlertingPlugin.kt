@@ -16,6 +16,7 @@ import org.opensearch.alerting.action.GetRemoteIndexesAction
 import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
 import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.comments.CommentsIndices
 import org.opensearch.alerting.core.JobSweeper
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsAction
@@ -25,11 +26,10 @@ import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler
 import org.opensearch.alerting.core.schedule.JobScheduler
 import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSettings
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
-import org.opensearch.alerting.notes.NotesIndices
 import org.opensearch.alerting.resthandler.RestAcknowledgeAlertAction
 import org.opensearch.alerting.resthandler.RestAcknowledgeChainedAlertAction
+import org.opensearch.alerting.resthandler.RestDeleteAlertingCommentAction
 import org.opensearch.alerting.resthandler.RestDeleteMonitorAction
-import org.opensearch.alerting.resthandler.RestDeleteNoteAction
 import org.opensearch.alerting.resthandler.RestDeleteWorkflowAction
 import org.opensearch.alerting.resthandler.RestExecuteMonitorAction
 import org.opensearch.alerting.resthandler.RestExecuteWorkflowAction
@@ -42,13 +42,13 @@ import org.opensearch.alerting.resthandler.RestGetMonitorAction
 import org.opensearch.alerting.resthandler.RestGetRemoteIndexesAction
 import org.opensearch.alerting.resthandler.RestGetWorkflowAction
 import org.opensearch.alerting.resthandler.RestGetWorkflowAlertsAction
+import org.opensearch.alerting.resthandler.RestIndexAlertingCommentAction
 import org.opensearch.alerting.resthandler.RestIndexMonitorAction
-import org.opensearch.alerting.resthandler.RestIndexNoteAction
 import org.opensearch.alerting.resthandler.RestIndexWorkflowAction
+import org.opensearch.alerting.resthandler.RestSearchAlertingCommentAction
 import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
 import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
 import org.opensearch.alerting.resthandler.RestSearchMonitorAction
-import org.opensearch.alerting.resthandler.RestSearchNoteAction
 import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings
@@ -58,8 +58,8 @@ import org.opensearch.alerting.settings.LegacyOpenDistroAlertingSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings
 import org.opensearch.alerting.transport.TransportAcknowledgeAlertAction
 import org.opensearch.alerting.transport.TransportAcknowledgeChainedAlertAction
+import org.opensearch.alerting.transport.TransportDeleteAlertingCommentAction
 import org.opensearch.alerting.transport.TransportDeleteMonitorAction
-import org.opensearch.alerting.transport.TransportDeleteNoteAction
 import org.opensearch.alerting.transport.TransportDeleteWorkflowAction
 import org.opensearch.alerting.transport.TransportDocLevelMonitorFanOutAction
 import org.opensearch.alerting.transport.TransportExecuteMonitorAction
@@ -73,13 +73,13 @@ import org.opensearch.alerting.transport.TransportGetMonitorAction
 import org.opensearch.alerting.transport.TransportGetRemoteIndexesAction
 import org.opensearch.alerting.transport.TransportGetWorkflowAction
 import org.opensearch.alerting.transport.TransportGetWorkflowAlertsAction
+import org.opensearch.alerting.transport.TransportIndexAlertingCommentAction
 import org.opensearch.alerting.transport.TransportIndexMonitorAction
-import org.opensearch.alerting.transport.TransportIndexNoteAction
 import org.opensearch.alerting.transport.TransportIndexWorkflowAction
+import org.opensearch.alerting.transport.TransportSearchAlertingCommentAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
-import org.opensearch.alerting.transport.TransportSearchNoteAction
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
 import org.opensearch.client.Client
@@ -164,7 +164,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     lateinit var scheduler: JobScheduler
     lateinit var sweeper: JobSweeper
     lateinit var scheduledJobIndices: ScheduledJobIndices
-    lateinit var notesIndices: NotesIndices
+    lateinit var commentsIndices: CommentsIndices
     lateinit var docLevelMonitorQueries: DocLevelMonitorQueries
     lateinit var threadPool: ThreadPool
     lateinit var alertIndices: AlertIndices
@@ -202,9 +202,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestGetWorkflowAction(),
             RestDeleteWorkflowAction(),
             RestGetRemoteIndexesAction(),
-            RestIndexNoteAction(),
-            RestSearchNoteAction(),
-            RestDeleteNoteAction(),
+            RestIndexAlertingCommentAction(),
+            RestSearchAlertingCommentAction(),
+            RestDeleteAlertingCommentAction(),
         )
     }
 
@@ -231,9 +231,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(AlertingActions.INDEX_WORKFLOW_ACTION_TYPE, TransportIndexWorkflowAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.GET_WORKFLOW_ACTION_TYPE, TransportGetWorkflowAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.DELETE_WORKFLOW_ACTION_TYPE, TransportDeleteWorkflowAction::class.java),
-            ActionPlugin.ActionHandler(AlertingActions.INDEX_NOTE_ACTION_TYPE, TransportIndexNoteAction::class.java),
-            ActionPlugin.ActionHandler(AlertingActions.SEARCH_NOTES_ACTION_TYPE, TransportSearchNoteAction::class.java),
-            ActionPlugin.ActionHandler(AlertingActions.DELETE_NOTES_ACTION_TYPE, TransportDeleteNoteAction::class.java),
+            ActionPlugin.ActionHandler(AlertingActions.INDEX_COMMENT_ACTION_TYPE, TransportIndexAlertingCommentAction::class.java),
+            ActionPlugin.ActionHandler(AlertingActions.SEARCH_COMMENTS_ACTION_TYPE, TransportSearchAlertingCommentAction::class.java),
+            ActionPlugin.ActionHandler(AlertingActions.DELETE_COMMENT_ACTION_TYPE, TransportDeleteAlertingCommentAction::class.java),
             ActionPlugin.ActionHandler(ExecuteWorkflowAction.INSTANCE, TransportExecuteWorkflowAction::class.java),
             ActionPlugin.ActionHandler(GetRemoteIndexesAction.INSTANCE, TransportGetRemoteIndexesAction::class.java),
             ActionPlugin.ActionHandler(DocLevelMonitorFanOutAction.INSTANCE, TransportDocLevelMonitorFanOutAction::class.java)
@@ -292,7 +292,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerConsumers()
             .registerDestinationSettings()
         scheduledJobIndices = ScheduledJobIndices(client.admin(), clusterService)
-        notesIndices = NotesIndices(environment.settings(), client, threadPool, clusterService)
+        commentsIndices = CommentsIndices(environment.settings(), client, threadPool, clusterService)
         docLevelMonitorQueries = DocLevelMonitorQueries(client, clusterService)
         scheduler = JobScheduler(threadPool, runner)
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
@@ -321,7 +321,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             scheduler,
             runner,
             scheduledJobIndices,
-            notesIndices,
+            commentsIndices,
             docLevelMonitorQueries,
             destinationMigrationCoordinator,
             lockService,
@@ -397,15 +397,15 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD,
             AlertingSettings.FINDINGS_INDEXING_BATCH_SIZE,
             AlertingSettings.CROSS_CLUSTER_MONITORING_ENABLED,
-            AlertingSettings.ALERTING_NOTES_ENABLED,
-            AlertingSettings.NOTES_HISTORY_ENABLED,
-            AlertingSettings.NOTES_HISTORY_MAX_DOCS,
-            AlertingSettings.NOTES_HISTORY_INDEX_MAX_AGE,
-            AlertingSettings.NOTES_HISTORY_ROLLOVER_PERIOD,
-            AlertingSettings.NOTES_HISTORY_RETENTION_PERIOD,
-            AlertingSettings.NOTES_MAX_CONTENT_SIZE,
-            AlertingSettings.MAX_NOTES_PER_ALERT,
-            AlertingSettings.MAX_NOTES_PER_NOTIFICATION
+            AlertingSettings.ALERTING_COMMENTS_ENABLED,
+            AlertingSettings.COMMENTS_HISTORY_ENABLED,
+            AlertingSettings.COMMENTS_HISTORY_MAX_DOCS,
+            AlertingSettings.COMMENTS_HISTORY_INDEX_MAX_AGE,
+            AlertingSettings.COMMENTS_HISTORY_ROLLOVER_PERIOD,
+            AlertingSettings.COMMENTS_HISTORY_RETENTION_PERIOD,
+            AlertingSettings.COMMENTS_MAX_CONTENT_SIZE,
+            AlertingSettings.MAX_COMMENTS_PER_ALERT,
+            AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION
         )
     }
 

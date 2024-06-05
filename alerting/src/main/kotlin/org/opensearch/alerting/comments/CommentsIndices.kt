@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting.notes
+package org.opensearch.alerting.comments
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
@@ -39,10 +39,10 @@ import org.opensearch.threadpool.ThreadPool
 import java.time.Instant
 
 /**
- * Initialize the OpenSearch components required to run Notes.
+ * Initialize the OpenSearch components required to run comments.
  *
  */
-class NotesIndices(
+class CommentsIndices(
     settings: Settings,
     private val client: Client,
     private val threadPool: ThreadPool,
@@ -50,59 +50,61 @@ class NotesIndices(
 ) : ClusterStateListener {
 
     init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.NOTES_HISTORY_ENABLED) { notesHistoryEnabled = it }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.NOTES_HISTORY_MAX_DOCS) { notesHistoryMaxDocs = it }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.NOTES_HISTORY_INDEX_MAX_AGE) { notesHistoryMaxAge = it }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.NOTES_HISTORY_ROLLOVER_PERIOD) {
-            notesHistoryRolloverPeriod = it
-            rescheduleNotesRollover()
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.COMMENTS_HISTORY_ENABLED) { commentsHistoryEnabled = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.COMMENTS_HISTORY_MAX_DOCS) { commentsHistoryMaxDocs = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.COMMENTS_HISTORY_INDEX_MAX_AGE) {
+            commentsHistoryMaxAge = it
         }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.NOTES_HISTORY_RETENTION_PERIOD) {
-            notesHistoryRetentionPeriod = it
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.COMMENTS_HISTORY_ROLLOVER_PERIOD) {
+            commentsHistoryRolloverPeriod = it
+            rescheduleCommentsRollover()
+        }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.COMMENTS_HISTORY_RETENTION_PERIOD) {
+            commentsHistoryRetentionPeriod = it
         }
     }
 
     companion object {
-        /** The alias of the index in which to write notes finding */
-        const val NOTES_HISTORY_WRITE_INDEX = ".opensearch-alerting-notes-history-write"
+        /** The alias of the index in which to write comments finding */
+        const val COMMENTS_HISTORY_WRITE_INDEX = ".opensearch-alerting-comments-history-write"
 
-        /** The index name pattern referring to all notes history indices */
-        const val NOTES_HISTORY_ALL = ".opensearch-alerting-notes-history*"
+        /** The index name pattern referring to all comments history indices */
+        const val COMMENTS_HISTORY_ALL = ".opensearch-alerting-comments-history*"
 
-        /** The index name pattern to create notes history indices */
-        const val NOTES_HISTORY_INDEX_PATTERN = "<.opensearch-alerting-notes-history-{now/d}-1>"
+        /** The index name pattern to create comments history indices */
+        const val COMMENTS_HISTORY_INDEX_PATTERN = "<.opensearch-alerting-comments-history-{now/d}-1>"
 
-        /** The index name pattern to query all notes, history and current notes. */
-        const val ALL_NOTES_INDEX_PATTERN = ".opensearch-alerting-notes*"
+        /** The index name pattern to query all comments, history and current comments. */
+        const val ALL_COMMENTS_INDEX_PATTERN = ".opensearch-alerting-comments*"
 
         @JvmStatic
-        fun notesMapping() =
-            NotesIndices::class.java.getResource("alerting_notes.json").readText()
+        fun commentsMapping() =
+            CommentsIndices::class.java.getResource("alerting_comments.json").readText()
 
         private val logger = LogManager.getLogger(AlertIndices::class.java)
     }
 
-    @Volatile private var notesHistoryEnabled = AlertingSettings.NOTES_HISTORY_ENABLED.get(settings)
+    @Volatile private var commentsHistoryEnabled = AlertingSettings.COMMENTS_HISTORY_ENABLED.get(settings)
 
-    @Volatile private var notesHistoryMaxDocs = AlertingSettings.NOTES_HISTORY_MAX_DOCS.get(settings)
+    @Volatile private var commentsHistoryMaxDocs = AlertingSettings.COMMENTS_HISTORY_MAX_DOCS.get(settings)
 
-    @Volatile private var notesHistoryMaxAge = AlertingSettings.NOTES_HISTORY_INDEX_MAX_AGE.get(settings)
+    @Volatile private var commentsHistoryMaxAge = AlertingSettings.COMMENTS_HISTORY_INDEX_MAX_AGE.get(settings)
 
-    @Volatile private var notesHistoryRolloverPeriod = AlertingSettings.NOTES_HISTORY_ROLLOVER_PERIOD.get(settings)
+    @Volatile private var commentsHistoryRolloverPeriod = AlertingSettings.COMMENTS_HISTORY_ROLLOVER_PERIOD.get(settings)
 
-    @Volatile private var notesHistoryRetentionPeriod = AlertingSettings.NOTES_HISTORY_RETENTION_PERIOD.get(settings)
+    @Volatile private var commentsHistoryRetentionPeriod = AlertingSettings.COMMENTS_HISTORY_RETENTION_PERIOD.get(settings)
 
     @Volatile private var isClusterManager = false
 
     // for JobsMonitor to report
     var lastRolloverTime: TimeValue? = null
 
-    private var notesHistoryIndexInitialized: Boolean = false
+    private var commentsHistoryIndexInitialized: Boolean = false
 
-    private var scheduledNotesRollover: Scheduler.Cancellable? = null
+    private var scheduledCommentsRollover: Scheduler.Cancellable? = null
 
     /**
-     * Initialize the indices required for Alerting Notes.
+     * Initialize the indices required for Alerting comments.
      * First check if the index exists, and if not create the index with the provided callback listeners.
      *
      * @param actionListener A callback listener for the index creation call. Generally in the form of onSuccess, onFailure
@@ -111,21 +113,21 @@ class NotesIndices(
     fun onMaster() {
         try {
             // try to rollover immediately as we might be restarting the cluster
-            rolloverNotesHistoryIndex()
+            rolloverCommentsHistoryIndex()
             // schedule the next rollover for approx MAX_AGE later
-            scheduledNotesRollover = threadPool
-                .scheduleWithFixedDelay({ rolloverAndDeleteNotesHistoryIndices() }, notesHistoryRolloverPeriod, executorName())
+            scheduledCommentsRollover = threadPool
+                .scheduleWithFixedDelay({ rolloverAndDeleteCommentsHistoryIndices() }, commentsHistoryRolloverPeriod, executorName())
         } catch (e: Exception) {
             // This should be run on cluster startup
             logger.error(
-                "Error creating notes indices. Notes can't be recorded until master node is restarted.",
+                "Error creating comments indices. Comments can't be recorded until master node is restarted.",
                 e
             )
         }
     }
 
     fun offMaster() {
-        scheduledNotesRollover?.cancel()
+        scheduledCommentsRollover?.cancel()
     }
 
     private fun executorName(): String {
@@ -146,66 +148,66 @@ class NotesIndices(
         }
 
         // if the indexes have been deleted they need to be reinitialized
-        notesHistoryIndexInitialized = event.state().metadata().hasAlias(NOTES_HISTORY_WRITE_INDEX)
+        commentsHistoryIndexInitialized = event.state().metadata().hasAlias(COMMENTS_HISTORY_WRITE_INDEX)
     }
 
-    private fun rescheduleNotesRollover() {
+    private fun rescheduleCommentsRollover() {
         if (clusterService.state().nodes.isLocalNodeElectedMaster) {
-            scheduledNotesRollover?.cancel()
-            scheduledNotesRollover = threadPool
-                .scheduleWithFixedDelay({ rolloverAndDeleteNotesHistoryIndices() }, notesHistoryRolloverPeriod, executorName())
+            scheduledCommentsRollover?.cancel()
+            scheduledCommentsRollover = threadPool
+                .scheduleWithFixedDelay({ rolloverAndDeleteCommentsHistoryIndices() }, commentsHistoryRolloverPeriod, executorName())
         }
     }
 
-    fun isNotesHistoryInitialized(): Boolean {
-        return clusterService.state().metadata.hasAlias(NOTES_HISTORY_WRITE_INDEX)
+    fun isCommentsHistoryInitialized(): Boolean {
+        return clusterService.state().metadata.hasAlias(COMMENTS_HISTORY_WRITE_INDEX)
     }
 
-    fun isNotesHistoryEnabled(): Boolean {
-        return notesHistoryEnabled
+    fun isCommentsHistoryEnabled(): Boolean {
+        return commentsHistoryEnabled
     }
 
-    suspend fun createOrUpdateInitialNotesHistoryIndex() {
-        if (!isNotesHistoryInitialized()) {
-            notesHistoryIndexInitialized = createIndex(NOTES_HISTORY_INDEX_PATTERN, notesMapping(), NOTES_HISTORY_WRITE_INDEX)
-            if (notesHistoryIndexInitialized)
-                IndexUtils.lastUpdatedNotesHistoryIndex = IndexUtils.getIndexNameWithAlias(
+    suspend fun createOrUpdateInitialCommentsHistoryIndex() {
+        if (!isCommentsHistoryInitialized()) {
+            commentsHistoryIndexInitialized = createIndex(COMMENTS_HISTORY_INDEX_PATTERN, commentsMapping(), COMMENTS_HISTORY_WRITE_INDEX)
+            if (commentsHistoryIndexInitialized)
+                IndexUtils.lastUpdatedCommentsHistoryIndex = IndexUtils.getIndexNameWithAlias(
                     clusterService.state(),
-                    NOTES_HISTORY_WRITE_INDEX
+                    COMMENTS_HISTORY_WRITE_INDEX
                 )
         } else {
-            updateIndexMapping(NOTES_HISTORY_WRITE_INDEX, notesMapping(), true)
+            updateIndexMapping(COMMENTS_HISTORY_WRITE_INDEX, commentsMapping(), true)
         }
-        notesHistoryIndexInitialized
+        commentsHistoryIndexInitialized
     }
 
-    private fun rolloverAndDeleteNotesHistoryIndices() {
-        rolloverNotesHistoryIndex()
-        deleteOldIndices("Notes", NOTES_HISTORY_ALL)
+    private fun rolloverAndDeleteCommentsHistoryIndices() {
+        rolloverCommentsHistoryIndex()
+        deleteOldIndices("comments", COMMENTS_HISTORY_ALL)
     }
 
-    private fun rolloverNotesHistoryIndex() {
+    private fun rolloverCommentsHistoryIndex() {
         rolloverIndex(
-            notesHistoryIndexInitialized,
-            NOTES_HISTORY_WRITE_INDEX,
-            NOTES_HISTORY_INDEX_PATTERN,
-            notesMapping(),
-            notesHistoryMaxDocs,
-            notesHistoryMaxAge,
-            NOTES_HISTORY_WRITE_INDEX
+            commentsHistoryIndexInitialized,
+            COMMENTS_HISTORY_WRITE_INDEX,
+            COMMENTS_HISTORY_INDEX_PATTERN,
+            commentsMapping(),
+            commentsHistoryMaxDocs,
+            commentsHistoryMaxAge,
+            COMMENTS_HISTORY_WRITE_INDEX
         )
     }
 
     // TODO: Everything below here are util functions straight from AlertIndices.kt
     // TODO: might need to reuse their code or refactor
-    // TODO: may merge into AlertIndices.kt if we decide to make notes indices
+    // TODO: may merge into AlertIndices.kt if we decide to make comments indices
     // TODO: component-specific instead of universal and component-agnostic
 
     private fun getIndicesToDelete(clusterStateResponse: ClusterStateResponse): List<String> {
         val indicesToDelete = mutableListOf<String>()
         for (entry in clusterStateResponse.state.metadata.indices) {
             val indexMetaData = entry.value
-            getHistoryIndexToDelete(indexMetaData, notesHistoryRetentionPeriod.millis, NOTES_HISTORY_WRITE_INDEX, true)
+            getHistoryIndexToDelete(indexMetaData, commentsHistoryRetentionPeriod.millis, COMMENTS_HISTORY_WRITE_INDEX, true)
                 ?.let { indicesToDelete.add(it) }
         }
         return indicesToDelete
@@ -224,9 +226,9 @@ class NotesIndices(
                 if (historyEnabled) {
                     // If the index has the write alias and history is enabled, don't delete the index
                     return null
-                } else if (writeIndex == NOTES_HISTORY_WRITE_INDEX) {
-                    // Otherwise reset notesHistoryIndexInitialized since index will be deleted
-                    notesHistoryIndexInitialized = false
+                } else if (writeIndex == COMMENTS_HISTORY_WRITE_INDEX) {
+                    // Otherwise reset commentsHistoryIndexInitialized since index will be deleted
+                    commentsHistoryIndexInitialized = false
                 }
             }
 
@@ -244,14 +246,14 @@ class NotesIndices(
                     override fun onResponse(deleteIndicesResponse: AcknowledgedResponse) {
                         if (!deleteIndicesResponse.isAcknowledged) {
                             logger.error(
-                                "Could not delete one or more Notes history indices: $indicesToDelete." +
+                                "Could not delete one or more comments history indices: $indicesToDelete." +
                                     "Retrying one by one."
                             )
                             deleteOldHistoryIndex(indicesToDelete)
                         }
                     }
                     override fun onFailure(e: Exception) {
-                        logger.error("Delete for Notes History Indices $indicesToDelete Failed. Retrying one By one.")
+                        logger.error("Delete for comments History Indices $indicesToDelete Failed. Retrying one By one.")
                         deleteOldHistoryIndex(indicesToDelete)
                     }
                 }
@@ -268,7 +270,7 @@ class NotesIndices(
                     override fun onResponse(acknowledgedResponse: AcknowledgedResponse?) {
                         if (acknowledgedResponse != null) {
                             if (!acknowledgedResponse.isAcknowledged) {
-                                logger.error("Could not delete one or more Notes history indices: $index")
+                                logger.error("Could not delete one or more comments history indices: $index")
                             }
                         }
                     }
@@ -314,7 +316,7 @@ class NotesIndices(
             targetIndex = IndexUtils.getIndexNameWithAlias(clusterState, index)
         }
 
-        if (targetIndex == IndexUtils.lastUpdatedNotesHistoryIndex
+        if (targetIndex == IndexUtils.lastUpdatedCommentsHistoryIndex
         ) {
             return
         }
@@ -332,7 +334,7 @@ class NotesIndices(
 
     private fun setIndexUpdateFlag(index: String, targetIndex: String) {
         when (index) {
-            NOTES_HISTORY_WRITE_INDEX -> IndexUtils.lastUpdatedNotesHistoryIndex = targetIndex
+            COMMENTS_HISTORY_WRITE_INDEX -> IndexUtils.lastUpdatedCommentsHistoryIndex = targetIndex
         }
     }
 

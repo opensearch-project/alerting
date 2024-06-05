@@ -20,16 +20,16 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.notes.NotesIndices
-import org.opensearch.alerting.notes.NotesIndices.Companion.NOTES_HISTORY_WRITE_INDEX
+import org.opensearch.alerting.comments.CommentsIndices
+import org.opensearch.alerting.comments.CommentsIndices.Companion.COMMENTS_HISTORY_WRITE_INDEX
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_NOTES_ENABLED
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_COMMENTS_ENABLED
+import org.opensearch.alerting.settings.AlertingSettings.Companion.COMMENTS_MAX_CONTENT_SIZE
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
-import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_NOTES_PER_ALERT
-import org.opensearch.alerting.settings.AlertingSettings.Companion.NOTES_MAX_CONTENT_SIZE
+import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_COMMENTS_PER_ALERT
 import org.opensearch.alerting.util.AlertingException
-import org.opensearch.alerting.util.NotesUtils
+import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -39,10 +39,10 @@ import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AlertingActions
-import org.opensearch.commons.alerting.action.IndexNoteRequest
-import org.opensearch.commons.alerting.action.IndexNoteResponse
+import org.opensearch.commons.alerting.action.IndexCommentRequest
+import org.opensearch.commons.alerting.action.IndexCommentResponse
 import org.opensearch.commons.alerting.model.Alert
-import org.opensearch.commons.alerting.model.Note
+import org.opensearch.commons.alerting.model.Comment
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
@@ -62,36 +62,36 @@ import java.time.Instant
 private val log = LogManager.getLogger(TransportIndexMonitorAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
-class TransportIndexNoteAction
+class TransportIndexAlertingCommentAction
 @Inject
 constructor(
     transportService: TransportService,
     val client: Client,
     actionFilters: ActionFilters,
-    val notesIndices: NotesIndices,
+    val commentsIndices: CommentsIndices,
     val clusterService: ClusterService,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry,
     val namedWriteableRegistry: NamedWriteableRegistry,
-) : HandledTransportAction<ActionRequest, IndexNoteResponse>(
-    AlertingActions.INDEX_NOTE_ACTION_NAME,
+) : HandledTransportAction<ActionRequest, IndexCommentResponse>(
+    AlertingActions.INDEX_COMMENT_ACTION_NAME,
     transportService,
     actionFilters,
-    ::IndexNoteRequest,
+    ::IndexCommentRequest,
 ),
     SecureTransportAction {
 
-    @Volatile private var alertingNotesEnabled = ALERTING_NOTES_ENABLED.get(settings)
-    @Volatile private var notesMaxContentSize = NOTES_MAX_CONTENT_SIZE.get(settings)
-    @Volatile private var maxNotesPerAlert = MAX_NOTES_PER_ALERT.get(settings)
+    @Volatile private var alertingCommentsEnabled = ALERTING_COMMENTS_ENABLED.get(settings)
+    @Volatile private var commentsMaxContentSize = COMMENTS_MAX_CONTENT_SIZE.get(settings)
+    @Volatile private var maxCommentsPerAlert = MAX_COMMENTS_PER_ALERT.get(settings)
     @Volatile private var indexTimeout = INDEX_TIMEOUT.get(settings)
 
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_NOTES_ENABLED) { alertingNotesEnabled = it }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(NOTES_MAX_CONTENT_SIZE) { notesMaxContentSize = it }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_NOTES_PER_ALERT) { maxNotesPerAlert = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_COMMENTS_ENABLED) { alertingCommentsEnabled = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(COMMENTS_MAX_CONTENT_SIZE) { commentsMaxContentSize = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_COMMENTS_PER_ALERT) { maxCommentsPerAlert = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(INDEX_TIMEOUT) { indexTimeout = it }
         listenFilterBySettingChange(clusterService)
     }
@@ -99,29 +99,29 @@ constructor(
     override fun doExecute(
         task: Task,
         request: ActionRequest,
-        actionListener: ActionListener<IndexNoteResponse>,
+        actionListener: ActionListener<IndexCommentResponse>,
     ) {
         // validate feature flag enabled
-        if (!alertingNotesEnabled) {
+        if (!alertingCommentsEnabled) {
             actionListener.onFailure(
                 AlertingException.wrap(
-                    OpenSearchStatusException("Notes for Alerting is currently disabled", RestStatus.FORBIDDEN),
+                    OpenSearchStatusException("Comments for Alerting is currently disabled", RestStatus.FORBIDDEN),
                 )
             )
             return
         }
 
         val transformedRequest =
-            request as? IndexNoteRequest
+            request as? IndexCommentRequest
                 ?: recreateObject(request, namedWriteableRegistry) {
-                    IndexNoteRequest(it)
+                    IndexCommentRequest(it)
                 }
 
-        // validate note content size
-        if (transformedRequest.content.length > notesMaxContentSize) {
+        // validate comment content size
+        if (transformedRequest.content.length > commentsMaxContentSize) {
             actionListener.onFailure(
                 AlertingException.wrap(
-                    IllegalArgumentException("Note content exceeds max length of $notesMaxContentSize characters"),
+                    IllegalArgumentException("Comment content exceeds max length of $commentsMaxContentSize characters"),
                 )
             )
             return
@@ -131,29 +131,29 @@ constructor(
 
         client.threadPool().threadContext.stashContext().use {
             scope.launch {
-                IndexNoteHandler(client, actionListener, transformedRequest, user).start()
+                IndexCommentHandler(client, actionListener, transformedRequest, user).start()
             }
         }
     }
 
-    inner class IndexNoteHandler(
+    inner class IndexCommentHandler(
         private val client: Client,
-        private val actionListener: ActionListener<IndexNoteResponse>,
-        private val request: IndexNoteRequest,
+        private val actionListener: ActionListener<IndexCommentResponse>,
+        private val request: IndexCommentRequest,
         private val user: User?,
     ) {
         suspend fun start() {
-            notesIndices.createOrUpdateInitialNotesHistoryIndex()
+            commentsIndices.createOrUpdateInitialCommentsHistoryIndex()
             if (request.method == RestRequest.Method.PUT) {
-                updateNote()
+                updateComment()
             } else {
-                indexNote()
+                indexComment()
             }
         }
 
-        private suspend fun indexNote() {
-            // need to validate the existence of the Alert that user is trying to add Note to.
-            // Also need to check if user has permissions to add a Note to the passed in Alert. To do this,
+        private suspend fun indexComment() {
+            // need to validate the existence of the Alert that user is trying to add Comment to.
+            // Also need to check if user has permissions to add a Comment to the passed in Alert. To do this,
             // we retrieve the Alert to get its associated monitor user, and use that to
             // check if they have permissions to the Monitor that generated the Alert
             val queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.termsQuery("_id", listOf(request.entityId)))
@@ -163,7 +163,7 @@ constructor(
                     .seqNoAndPrimaryTerm(true)
                     .query(queryBuilder)
 
-            // search all alerts, since user might want to create a note
+            // search all alerts, since user might want to create a comment
             // on a completed alert
             val searchRequest =
                 SearchRequest()
@@ -194,32 +194,32 @@ constructor(
 
             val alert = alerts[0] // there should only be 1 Alert that matched the request alert ID
 
-            val numNotesOnThisAlert = NotesUtils.getNoteIDsByAlertIDs(client, listOf(alert.id)).size
-            if (numNotesOnThisAlert >= maxNotesPerAlert) {
+            val numCommentsOnThisAlert = CommentsUtils.getCommentIDsByAlertIDs(client, listOf(alert.id)).size
+            if (numCommentsOnThisAlert >= maxCommentsPerAlert) {
                 actionListener.onFailure(
                     AlertingException.wrap(
                         IllegalArgumentException(
-                            "This request would create more than the allowed number of Notes" +
-                                "for this Alert: $maxNotesPerAlert"
+                            "This request would create more than the allowed number of Comments" +
+                                "for this Alert: $maxCommentsPerAlert"
                         )
                     )
                 )
                 return
             }
 
-            log.info("checking user permissions in index note")
+            log.info("checking user permissions in index comment")
             checkUserPermissionsWithResource(user, alert.monitorUser, actionListener, "monitor", alert.monitorId)
 
-            val note = Note(entityId = request.entityId, content = request.content, createdTime = Instant.now(), user = user)
+            val comment = Comment(entityId = request.entityId, content = request.content, createdTime = Instant.now(), user = user)
 
             val indexRequest =
-                IndexRequest(NOTES_HISTORY_WRITE_INDEX)
-                    .source(note.toXContentWithUser(XContentFactory.jsonBuilder()))
+                IndexRequest(COMMENTS_HISTORY_WRITE_INDEX)
+                    .source(comment.toXContentWithUser(XContentFactory.jsonBuilder()))
                     .setIfSeqNo(request.seqNo)
                     .setIfPrimaryTerm(request.primaryTerm)
                     .timeout(indexTimeout)
 
-            log.info("Creating new note: ${note.toXContentWithUser(XContentFactory.jsonBuilder())}")
+            log.info("Creating new comment: ${comment.toXContentWithUser(XContentFactory.jsonBuilder())}")
 
             try {
                 val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
@@ -232,21 +232,21 @@ constructor(
                 }
 
                 actionListener.onResponse(
-                    IndexNoteResponse(indexResponse.id, indexResponse.seqNo, indexResponse.primaryTerm, note)
+                    IndexCommentResponse(indexResponse.id, indexResponse.seqNo, indexResponse.primaryTerm, comment)
                 )
             } catch (t: Exception) {
                 actionListener.onFailure(AlertingException.wrap(t))
             }
         }
 
-        private suspend fun updateNote() {
-            val getRequest = GetRequest(NOTES_HISTORY_WRITE_INDEX, request.noteId)
+        private suspend fun updateComment() {
+            val getRequest = GetRequest(COMMENTS_HISTORY_WRITE_INDEX, request.commentId)
             try {
                 val getResponse: GetResponse = client.suspendUntil { client.get(getRequest, it) }
                 if (!getResponse.isExists) {
                     actionListener.onFailure(
                         AlertingException.wrap(
-                            OpenSearchStatusException("Note with ${request.noteId} is not found", RestStatus.NOT_FOUND),
+                            OpenSearchStatusException("Comment with ${request.commentId} is not found", RestStatus.NOT_FOUND),
                         ),
                     )
                     return
@@ -259,24 +259,24 @@ constructor(
                         XContentType.JSON,
                     )
                 xcp.nextToken()
-                val note = Note.parse(xcp, getResponse.id)
-                log.info("note to be updated: $note")
-                onGetNoteResponse(note)
+                val comment = Comment.parse(xcp, getResponse.id)
+                log.info("comment to be updated: $comment")
+                onGetCommentResponse(comment)
             } catch (t: Exception) {
                 actionListener.onFailure(AlertingException.wrap(t))
             }
         }
 
-        private suspend fun onGetNoteResponse(currentNote: Note) {
-            // check that the user has permissions to edit the note. user can edit note if
+        private suspend fun onGetCommentResponse(currentComment: Comment) {
+            // check that the user has permissions to edit the comment. user can edit comment if
             // - user is Admin
-            // - user is the author of the note
-            if (user != null && !isAdmin(user) && user.name != currentNote.user?.name) {
+            // - user is the author of the comment
+            if (user != null && !isAdmin(user) && user.name != currentComment.user?.name) {
                 actionListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException(
-                            "Note ${request.noteId} created by ${currentNote.user} " +
-                                "can only be edited by Admin or ${currentNote.user} ",
+                            "Comment ${request.commentId} created by ${currentComment.user} " +
+                                "can only be edited by Admin or ${currentComment.user} ",
                             RestStatus.FORBIDDEN,
                         ),
                     ),
@@ -284,21 +284,21 @@ constructor(
                 return
             }
 
-            // retains everything from the original note except content and lastUpdatedTime
-            val requestNote = currentNote.copy(content = request.content, lastUpdatedTime = Instant.now())
+            // retains everything from the original comment except content and lastUpdatedTime
+            val requestComment = currentComment.copy(content = request.content, lastUpdatedTime = Instant.now())
 
             val indexRequest =
-                IndexRequest(NOTES_HISTORY_WRITE_INDEX)
-                    .source(requestNote.toXContentWithUser(XContentFactory.jsonBuilder()))
-                    .id(requestNote.id)
+                IndexRequest(COMMENTS_HISTORY_WRITE_INDEX)
+                    .source(requestComment.toXContentWithUser(XContentFactory.jsonBuilder()))
+                    .id(requestComment.id)
                     .setIfSeqNo(request.seqNo)
                     .setIfPrimaryTerm(request.primaryTerm)
                     .timeout(indexTimeout)
 
             log.info(
-                "Updating note, ${currentNote.id}, from: " +
-                    "${currentNote.content} to: " +
-                    requestNote.content,
+                "Updating comment, ${currentComment.id}, from: " +
+                    "${currentComment.content} to: " +
+                    requestComment.content,
             )
 
             try {
@@ -312,11 +312,11 @@ constructor(
                 }
 
                 actionListener.onResponse(
-                    IndexNoteResponse(
+                    IndexCommentResponse(
                         indexResponse.id,
                         indexResponse.seqNo,
                         indexResponse.primaryTerm,
-                        requestNote,
+                        requestComment,
                     ),
                 )
             } catch (t: Exception) {

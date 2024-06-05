@@ -37,9 +37,9 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.Comment
 import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.Monitor
-import org.opensearch.commons.alerting.model.Note
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.action.AlertCategory
 import org.opensearch.commons.alerting.model.action.PerAlertActionScope
@@ -194,7 +194,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                  * The new Alerts have to be returned and saved back with their indexed doc ID to prevent duplicate documents
                  * when the Alerts are updated again after Action execution.
                  *
-                 * Note: Index operations can fail for various reasons (such as write blocks on cluster), in such a case, the Actions
+                 * Comment: Index operations can fail for various reasons (such as write blocks on cluster), in such a case, the Actions
                  * will still execute with the Alert information in the ctx but the Alerts may not be visible.
                  */
                 if (!dryrun && monitor.id != Monitor.NO_ID) {
@@ -275,8 +275,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             // to alertsToUpdate to ensure the Alert doc is updated at the end in either case
             completedAlertsToUpdate.addAll(completedAlerts)
 
-            // retrieve max Notes per Alert notification setting
-            val maxNotes = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.MAX_NOTES_PER_NOTIFICATION)
+            // retrieve max Comments per Alert notification setting
+            val maxComments = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION)
 
             // All trigger contexts and results should be available at this point since all triggers were evaluated in the main do-while loop
             val triggerCtx = triggerContexts[trigger.id]!!
@@ -296,11 +296,11 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     for (alertCategory in actionExecutionScope.actionableAlerts) {
                         val alertsToExecuteActionsFor = nextAlerts[trigger.id]?.get(alertCategory) ?: mutableListOf()
                         for (alert in alertsToExecuteActionsFor) {
-                            val alertNotes = monitorCtx.alertService!!.getNotesForAlertNotification(alert.id, maxNotes)
+                            val alertComments = monitorCtx.alertService!!.getCommentsForAlertNotification(alert.id, maxComments)
                             val alertContext = if (alertCategory != AlertCategory.NEW) {
-                                AlertContext(alert = alert, notes = alertNotes.ifEmpty { null })
+                                AlertContext(alert = alert, comments = alertComments.ifEmpty { null })
                             } else {
-                                getAlertContext(alert = alert, alertSampleDocs = alertSampleDocs, alertNotes.ifEmpty { null })
+                                getAlertContext(alert = alert, alertSampleDocs = alertSampleDocs, alertComments.ifEmpty { null })
                             }
 
                             val actionCtx = getActionContextForAlertCategory(
@@ -335,16 +335,20 @@ object BucketLevelMonitorRunner : MonitorRunner() {
 
                     val actionCtx = triggerCtx.copy(
                         dedupedAlerts = dedupedAlerts.map {
-                            val dedupedAlertsNotes = monitorCtx.alertService!!.getNotesForAlertNotification(it.id, maxNotes)
-                            AlertContext(alert = it, notes = dedupedAlertsNotes.ifEmpty { null })
+                            val dedupedAlertsComments = monitorCtx.alertService!!.getCommentsForAlertNotification(it.id, maxComments)
+                            AlertContext(alert = it, comments = dedupedAlertsComments.ifEmpty { null })
                         },
                         newAlerts = newAlerts.map {
-                            val newAlertsNotes = monitorCtx.alertService!!.getNotesForAlertNotification(it.id, maxNotes)
-                            getAlertContext(alert = it, alertSampleDocs = alertSampleDocs, alertNotes = newAlertsNotes.ifEmpty { null })
+                            val newAlertsComments = monitorCtx.alertService!!.getCommentsForAlertNotification(it.id, maxComments)
+                            getAlertContext(
+                                alert = it,
+                                alertSampleDocs = alertSampleDocs,
+                                alertComments = newAlertsComments.ifEmpty { null }
+                            )
                         },
                         completedAlerts = completedAlerts.map {
-                            val completedAlertsNotes = monitorCtx.alertService!!.getNotesForAlertNotification(it.id, maxNotes)
-                            AlertContext(alert = it, notes = completedAlertsNotes.ifEmpty { null })
+                            val completedAlertsComments = monitorCtx.alertService!!.getCommentsForAlertNotification(it.id, maxComments)
+                            AlertContext(alert = it, comments = completedAlertsComments.ifEmpty { null })
                         },
                         error = monitorResult.error ?: triggerResult.error
                     )
@@ -557,7 +561,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
     private fun getAlertContext(
         alert: Alert,
         alertSampleDocs: Map<String, Map<String, List<Map<String, Any>>>>,
-        alertNotes: List<Note>?
+        alertComments: List<Comment>?
     ): AlertContext {
         val bucketKey = alert.aggregationResultBucket?.getBucketKeysHash()
         val sampleDocs = alertSampleDocs[alert.triggerId]?.get(bucketKey)
@@ -571,7 +575,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 alert.monitorId,
                 alert.executionId
             )
-            AlertContext(alert = alert, sampleDocs = listOf(), notes = alertNotes)
+            AlertContext(alert = alert, sampleDocs = listOf(), comments = alertComments)
         }
     }
 

@@ -28,9 +28,9 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AlertingActions
-import org.opensearch.commons.alerting.action.SearchNoteRequest
+import org.opensearch.commons.alerting.action.SearchCommentRequest
 import org.opensearch.commons.alerting.model.Alert
-import org.opensearch.commons.alerting.model.Note
+import org.opensearch.commons.alerting.model.Comment
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
@@ -46,10 +46,10 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import java.io.IOException
 
-private val log = LogManager.getLogger(TransportSearchMonitorAction::class.java)
+private val log = LogManager.getLogger(TransportSearchAlertingCommentAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
-class TransportSearchNoteAction @Inject constructor(
+class TransportSearchAlertingCommentAction @Inject constructor(
     transportService: TransportService,
     val settings: Settings,
     val client: Client,
@@ -57,31 +57,33 @@ class TransportSearchNoteAction @Inject constructor(
     actionFilters: ActionFilters,
     val namedWriteableRegistry: NamedWriteableRegistry
 ) : HandledTransportAction<ActionRequest, SearchResponse>(
-    AlertingActions.SEARCH_NOTES_ACTION_NAME, transportService, actionFilters, ::SearchRequest
+    AlertingActions.SEARCH_COMMENTS_ACTION_NAME, transportService, actionFilters, ::SearchRequest
 ),
     SecureTransportAction {
 
-    @Volatile private var alertingNotesEnabled = AlertingSettings.ALERTING_NOTES_ENABLED.get(settings)
+    @Volatile private var alertingCommentsEnabled = AlertingSettings.ALERTING_COMMENTS_ENABLED.get(settings)
     @Volatile override var filterByEnabled: Boolean = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
     init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERTING_NOTES_ENABLED) { alertingNotesEnabled = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERTING_COMMENTS_ENABLED) {
+            alertingCommentsEnabled = it
+        }
         listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<SearchResponse>) {
         // validate feature flag enabled
-        if (!alertingNotesEnabled) {
+        if (!alertingCommentsEnabled) {
             actionListener.onFailure(
                 AlertingException.wrap(
-                    OpenSearchStatusException("Notes for Alerting is currently disabled", RestStatus.FORBIDDEN),
+                    OpenSearchStatusException("Comments for Alerting is currently disabled", RestStatus.FORBIDDEN),
                 )
             )
             return
         }
 
-        val transformedRequest = request as? SearchNoteRequest
+        val transformedRequest = request as? SearchCommentRequest
             ?: recreateObject(request, namedWriteableRegistry) {
-                SearchNoteRequest(it)
+                SearchCommentRequest(it)
             }
 
         val searchSourceBuilder = transformedRequest.searchRequest.source()
@@ -102,13 +104,13 @@ class TransportSearchNoteAction @Inject constructor(
         }
     }
 
-    suspend fun resolve(searchNoteRequest: SearchNoteRequest, actionListener: ActionListener<SearchResponse>, user: User?) {
+    suspend fun resolve(searchCommentRequest: SearchCommentRequest, actionListener: ActionListener<SearchResponse>, user: User?) {
         if (user == null) {
             // user is null when: 1/ security is disabled. 2/when user is super-admin.
-            search(searchNoteRequest.searchRequest, actionListener)
+            search(searchCommentRequest.searchRequest, actionListener)
         } else if (!doFilterForUser(user)) {
             // security is enabled and filterby is disabled.
-            search(searchNoteRequest.searchRequest, actionListener)
+            search(searchCommentRequest.searchRequest, actionListener)
         } else {
             // security is enabled and filterby is enabled.
             try {
@@ -117,15 +119,15 @@ class TransportSearchNoteAction @Inject constructor(
                 // first retrieve all Alert IDs current User can see after filtering by backend roles
                 val alertIDs = getFilteredAlertIDs(user)
 
-                // then filter the returned Notes based on the Alert IDs they're allowed to see
-                val queryBuilder = searchNoteRequest.searchRequest.source().query() as BoolQueryBuilder
-                searchNoteRequest.searchRequest.source().query(
+                // then filter the returned Comments based on the Alert IDs they're allowed to see
+                val queryBuilder = searchCommentRequest.searchRequest.source().query() as BoolQueryBuilder
+                searchCommentRequest.searchRequest.source().query(
                     queryBuilder.filter(
-                        QueryBuilders.termsQuery(Note.ENTITY_ID_FIELD, alertIDs)
+                        QueryBuilders.termsQuery(Comment.ENTITY_ID_FIELD, alertIDs)
                     )
                 )
 
-                search(searchNoteRequest.searchRequest, actionListener)
+                search(searchCommentRequest.searchRequest, actionListener)
             } catch (ex: IOException) {
                 actionListener.onFailure(AlertingException.wrap(ex))
             }

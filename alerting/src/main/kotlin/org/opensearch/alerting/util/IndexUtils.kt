@@ -9,8 +9,8 @@ import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.comments.CommentsIndices
 import org.opensearch.alerting.core.ScheduledJobIndices
-import org.opensearch.alerting.notes.NotesIndices
 import org.opensearch.client.IndicesAdminClient
 import org.opensearch.cluster.ClusterState
 import org.opensearch.cluster.metadata.IndexAbstraction
@@ -36,7 +36,7 @@ class IndexUtils {
             private set
         var findingIndexSchemaVersion: Int
             private set
-        var alertingNoteIndexSchemaVersion: Int
+        var alertingCommentIndexSchemaVersion: Int
             private set
 
         var scheduledJobIndexUpdated: Boolean = false
@@ -45,17 +45,17 @@ class IndexUtils {
             private set
         var findingIndexUpdated: Boolean = false
             private set
-        var notesIndexUpdated: Boolean = false
+        var commentsIndexUpdated: Boolean = false
             private set
         var lastUpdatedAlertHistoryIndex: String? = null
         var lastUpdatedFindingHistoryIndex: String? = null
-        var lastUpdatedNotesHistoryIndex: String? = null
+        var lastUpdatedCommentsHistoryIndex: String? = null
 
         init {
             scheduledJobIndexSchemaVersion = getSchemaVersion(ScheduledJobIndices.scheduledJobMappings())
             alertIndexSchemaVersion = getSchemaVersion(AlertIndices.alertMapping())
             findingIndexSchemaVersion = getSchemaVersion(AlertIndices.findingMapping())
-            alertingNoteIndexSchemaVersion = getSchemaVersion(NotesIndices.notesMapping())
+            alertingCommentIndexSchemaVersion = getSchemaVersion(CommentsIndices.commentsMapping())
         }
 
         @JvmStatic
@@ -74,8 +74,8 @@ class IndexUtils {
         }
 
         @JvmStatic
-        fun notesIndexUpdated() {
-            notesIndexUpdated = true
+        fun commentsIndexUpdated() {
+            commentsIndexUpdated = true
         }
 
         @JvmStatic

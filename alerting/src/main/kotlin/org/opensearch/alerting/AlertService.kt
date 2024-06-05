@@ -28,9 +28,9 @@ import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.ChainedAlertTriggerExecutionContext
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
+import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.MAX_SEARCH_SIZE
-import org.opensearch.alerting.util.NotesUtils
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client
@@ -44,10 +44,10 @@ import org.opensearch.commons.alerting.model.ActionExecutionResult
 import org.opensearch.commons.alerting.model.AggregationResultBucket
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.Comment
 import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.NoOpTrigger
-import org.opensearch.commons.alerting.model.Note
 import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.model.action.AlertCategory
@@ -686,7 +686,7 @@ class AlertService(
         val alertsIndex = dataSources.alertsIndex
         val alertsHistoryIndex = dataSources.alertsHistoryIndex
 
-        val notesToDeleteIDs = mutableListOf<String>()
+        val commentsToDeleteIDs = mutableListOf<String>()
 
         var requestsToRetry = alerts.flatMap { alert ->
             // We don't want to set the version when saving alerts because the MonitorRunner has first priority when writing alerts.
@@ -741,9 +741,9 @@ class AlertService(
                                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                                 .id(alert.id)
                         } else {
-                            // Otherwise, prepare the Alert's Notes for deletion, and don't include
+                            // Otherwise, prepare the Alert's comments for deletion, and don't include
                             // a request to index the Alert to an Alert history index
-                            notesToDeleteIDs.addAll(NotesUtils.getNoteIDsByAlertIDs(client, listOf(alert.id)))
+                            commentsToDeleteIDs.addAll(CommentsUtils.getCommentIDsByAlertIDs(client, listOf(alert.id)))
                             null
                         }
                     )
@@ -766,8 +766,8 @@ class AlertService(
             }
         }
 
-        // delete all the Notes of any Alerts that were deleted
-        NotesUtils.deleteNotes(client, notesToDeleteIDs)
+        // delete all the comments of any Alerts that were deleted
+        CommentsUtils.deleteComments(client, commentsToDeleteIDs)
     }
 
     /**
@@ -916,15 +916,15 @@ class AlertService(
     }
 
     /**
-     * Performs a Search request to retrieve the top maxNotes most recent Notes associated with the
-     * given Alert, where maxNotes is a cluster setting.
+     * Performs a Search request to retrieve the top maxComments most recent comments associated with the
+     * given Alert, where maxComments is a cluster setting.
      */
-    suspend fun getNotesForAlertNotification(alertId: String, maxNotes: Int): List<Note> {
-        val allNotes = NotesUtils.getNotesByAlertIDs(client, listOf(alertId))
-        val sortedNotes = allNotes.sortedByDescending { it.createdTime }
-        if (sortedNotes.size <= maxNotes) {
-            return sortedNotes
+    suspend fun getCommentsForAlertNotification(alertId: String, maxComments: Int): List<Comment> {
+        val allcomments = CommentsUtils.getCommentsByAlertIDs(client, listOf(alertId))
+        val sortedcomments = allcomments.sortedByDescending { it.createdTime }
+        if (sortedcomments.size <= maxComments) {
+            return sortedcomments
         }
-        return sortedNotes.slice(0 until maxNotes)
+        return sortedcomments.slice(0 until maxComments)
     }
 }

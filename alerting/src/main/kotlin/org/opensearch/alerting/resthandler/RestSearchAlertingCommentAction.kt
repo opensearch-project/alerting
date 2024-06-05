@@ -9,15 +9,15 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.alerting.notes.NotesIndices.Companion.ALL_NOTES_INDEX_PATTERN
+import org.opensearch.alerting.comments.CommentsIndices.Companion.ALL_COMMENTS_INDEX_PATTERN
 import org.opensearch.alerting.util.context
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AlertingActions
-import org.opensearch.commons.alerting.action.SearchNoteRequest
-import org.opensearch.commons.alerting.model.Note
+import org.opensearch.commons.alerting.action.SearchCommentRequest
+import org.opensearch.commons.alerting.model.Comment
 import org.opensearch.core.common.bytes.BytesReference
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent.EMPTY_PARAMS
@@ -34,26 +34,26 @@ import java.io.IOException
 private val log = LogManager.getLogger(RestIndexMonitorAction::class.java)
 
 /**
- * Rest handler to search notes.
+ * Rest handler to search alerting comments.
  */
-class RestSearchNoteAction() : BaseRestHandler() {
+class RestSearchAlertingCommentAction() : BaseRestHandler() {
 
     override fun getName(): String {
-        return "search_notes_action"
+        return "search_alerting_comments_action"
     }
 
     override fun routes(): List<Route> {
         return listOf(
             Route(
                 RestRequest.Method.GET,
-                "${AlertingPlugin.MONITOR_BASE_URI}/alerts/notes/_search"
+                "${AlertingPlugin.MONITOR_BASE_URI}/alerts/comments/_search"
             )
         )
     }
 
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/alerts/notes/_search")
+        log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/alerts/comments/_search")
 
         val searchSourceBuilder = SearchSourceBuilder()
         searchSourceBuilder.parseXContent(request.contentOrSourceParamParser())
@@ -61,15 +61,15 @@ class RestSearchNoteAction() : BaseRestHandler() {
 
         val searchRequest = SearchRequest()
             .source(searchSourceBuilder)
-            .indices(ALL_NOTES_INDEX_PATTERN)
+            .indices(ALL_COMMENTS_INDEX_PATTERN)
 
-        val searchNoteRequest = SearchNoteRequest(searchRequest)
+        val searchCommentRequest = SearchCommentRequest(searchRequest)
         return RestChannelConsumer { channel ->
-            client.execute(AlertingActions.SEARCH_NOTES_ACTION_TYPE, searchNoteRequest, searchNoteResponse(channel))
+            client.execute(AlertingActions.SEARCH_COMMENTS_ACTION_TYPE, searchCommentRequest, searchCommentResponse(channel))
         }
     }
 
-    private fun searchNoteResponse(channel: RestChannel): RestResponseListener<SearchResponse> {
+    private fun searchCommentResponse(channel: RestChannel): RestResponseListener<SearchResponse> {
         return object : RestResponseListener<SearchResponse>(channel) {
             @Throws(Exception::class)
             override fun buildResponse(response: SearchResponse): RestResponse {
@@ -86,13 +86,13 @@ class RestSearchNoteAction() : BaseRestHandler() {
                             hit.sourceAsString
                         ).use { hitsParser ->
                             hitsParser.nextToken()
-                            val note = Note.parse(hitsParser, hit.id)
-                            val xcb = note.toXContent(jsonBuilder(), EMPTY_PARAMS)
+                            val comment = Comment.parse(hitsParser, hit.id)
+                            val xcb = comment.toXContent(jsonBuilder(), EMPTY_PARAMS)
                             hit.sourceRef(BytesReference.bytes(xcb))
                         }
                     }
                 } catch (e: Exception) {
-                    log.info("The note parsing failed. Will return response as is.")
+                    log.info("The comment parsing failed. Will return response as is.")
                 }
                 return BytesRestResponse(RestStatus.OK, response.toXContent(channel.newBuilder(), EMPTY_PARAMS))
             }

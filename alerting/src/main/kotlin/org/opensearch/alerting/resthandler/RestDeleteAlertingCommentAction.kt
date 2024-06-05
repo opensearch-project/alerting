@@ -10,7 +10,7 @@ import org.apache.logging.log4j.Logger
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.client.node.NodeClient
 import org.opensearch.commons.alerting.action.AlertingActions
-import org.opensearch.commons.alerting.action.DeleteNoteRequest
+import org.opensearch.commons.alerting.action.DeleteCommentRequest
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
@@ -20,30 +20,30 @@ import java.io.IOException
 private val log: Logger = LogManager.getLogger(RestDeleteMonitorAction::class.java)
 
 /**
- * Rest handlers to create and update notes.
+ * Rest handlers to create and update comments.
  */
-class RestDeleteNoteAction : BaseRestHandler() {
+class RestDeleteAlertingCommentAction : BaseRestHandler() {
 
     override fun getName(): String {
-        return "delete_note_action"
+        return "delete_alerting_comment_action"
     }
 
     override fun routes(): List<Route> {
         return listOf(
             Route(
                 RestRequest.Method.DELETE,
-                "${AlertingPlugin.MONITOR_BASE_URI}/alerts/notes/{noteID}"
+                "${AlertingPlugin.MONITOR_BASE_URI}/alerts/comments/{commentID}"
             )
         )
     }
 
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/alerts/notes/{noteID}")
-        val noteId = request.param("noteID")
-        val deleteMonitorRequest = DeleteNoteRequest(noteId)
+        log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/alerts/comments/{commentID}")
+        val commentId = request.param("commentID")
+        val deleteMonitorRequest = DeleteCommentRequest(commentId)
         return RestChannelConsumer { channel ->
-            client.execute(AlertingActions.DELETE_NOTES_ACTION_TYPE, deleteMonitorRequest, RestToXContentListener(channel))
+            client.execute(AlertingActions.DELETE_COMMENT_ACTION_TYPE, deleteMonitorRequest, RestToXContentListener(channel))
         }
     }
 }
