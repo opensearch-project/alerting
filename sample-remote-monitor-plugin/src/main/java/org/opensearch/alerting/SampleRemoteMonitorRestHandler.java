@@ -6,6 +6,7 @@
 package org.opensearch.alerting;
 
 import org.opensearch.action.support.WriteRequest;
+import org.opensearch.alerting.monitor.inputs.SampleRemoteDocLevelMonitorInput;
 import org.opensearch.alerting.monitor.inputs.SampleRemoteMonitorInput1;
 import org.opensearch.alerting.monitor.inputs.SampleRemoteMonitorInput2;
 import org.opensearch.alerting.monitor.triggers.SampleRemoteMonitorTrigger1;
@@ -22,6 +23,7 @@ import org.opensearch.commons.alerting.model.IntervalSchedule;
 import org.opensearch.commons.alerting.model.Monitor;
 import org.opensearch.commons.alerting.model.action.Action;
 import org.opensearch.commons.alerting.model.action.Throttle;
+import org.opensearch.commons.alerting.model.remote.monitors.RemoteDocLevelMonitorInput;
 import org.opensearch.commons.alerting.model.remote.monitors.RemoteMonitorInput;
 import org.opensearch.commons.alerting.model.remote.monitors.RemoteMonitorTrigger;
 import org.opensearch.core.action.ActionListener;
@@ -206,6 +208,15 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
                 );
             };
         } else {
+            SampleRemoteDocLevelMonitorInput sampleRemoteDocLevelMonitorInput =
+                    new SampleRemoteDocLevelMonitorInput("hello", Map.of("world", 1), 2);
+            BytesStreamOutput out2 = new BytesStreamOutput();
+            sampleRemoteDocLevelMonitorInput.writeTo(out2);
+            BytesReference sampleRemoteDocLevelMonitorInputSerialized = out2.bytes();
+
+            DocLevelMonitorInput docLevelMonitorInput = new DocLevelMonitorInput("description", List.of("index"), emptyList());
+            RemoteDocLevelMonitorInput remoteDocLevelMonitorInput = new RemoteDocLevelMonitorInput(sampleRemoteDocLevelMonitorInputSerialized, docLevelMonitorInput);
+
             Monitor remoteDocLevelMonitor = new Monitor(
                     Monitor.NO_ID,
                     Monitor.NO_VERSION,
@@ -217,7 +228,7 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
                     SampleRemoteMonitorPlugin.SAMPLE_REMOTE_DOC_LEVEL_MONITOR,
                     null,
                     0,
-                    List.of(new DocLevelMonitorInput("description", List.of("index"), emptyList())),
+                    List.of(remoteDocLevelMonitorInput),
                     List.of(),
                     Map.of(),
                     new DataSources(),
