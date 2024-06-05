@@ -40,6 +40,7 @@ import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorMetadata
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.remote.monitors.RemoteDocLevelMonitorInput
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -187,8 +188,10 @@ object MonitorMetadataService :
 
     suspend fun recreateRunContext(metadata: MonitorMetadata, monitor: Monitor): MonitorMetadata {
         try {
-            val monitorIndex = if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
+            val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR.value)
                 (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
+            else if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
+                (monitor.inputs[0] as RemoteDocLevelMonitorInput).docLevelMonitorInput.indices[0]
             else null
             val runContext = if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
                 createFullRunContext(monitorIndex, metadata.lastRunContext as MutableMap<String, MutableMap<String, Any>>)
@@ -210,8 +213,10 @@ object MonitorMetadataService :
         createWithRunContext: Boolean,
         workflowMetadataId: String? = null,
     ): MonitorMetadata {
-        val monitorIndex = if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
+        val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR.value)
             (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
+        else if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
+            (monitor.inputs[0] as RemoteDocLevelMonitorInput).docLevelMonitorInput.indices[0]
         else null
         val runContext = if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
             createFullRunContext(monitorIndex)

@@ -63,6 +63,8 @@ import org.opensearch.commons.alerting.model.MonitorMetadata
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.model.remote.monitors.RemoteDocLevelMonitorInput
+import org.opensearch.commons.alerting.model.remote.monitors.RemoteDocLevelMonitorInput.Companion.REMOTE_DOC_LEVEL_MONITOR_INPUT_FIELD
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.alerting.util.isMonitorOfStandardType
 import org.opensearch.commons.authuser.User
@@ -194,10 +196,15 @@ class TransportIndexMonitorAction @Inject constructor(
     ) {
         val indices = mutableListOf<String>()
         // todo: for doc level alerting: check if index is present before monitor is created.
-        val searchInputs = request.monitor.inputs.filter { it.name() == SearchInput.SEARCH_FIELD || it.name() == DOC_LEVEL_INPUT_FIELD }
+        val searchInputs = request.monitor.inputs.filter {
+            it.name() == SearchInput.SEARCH_FIELD ||
+                it.name() == DOC_LEVEL_INPUT_FIELD ||
+                it.name() == REMOTE_DOC_LEVEL_MONITOR_INPUT_FIELD
+        }
         searchInputs.forEach {
             val inputIndices = if (it.name() == SearchInput.SEARCH_FIELD) (it as SearchInput).indices
-            else (it as DocLevelMonitorInput).indices
+            else if (it.name() == DOC_LEVEL_INPUT_FIELD) (it as DocLevelMonitorInput).indices
+            else (it as RemoteDocLevelMonitorInput).docLevelMonitorInput.indices
             indices.addAll(inputIndices)
         }
         val updatedIndices = indices.map { index ->
