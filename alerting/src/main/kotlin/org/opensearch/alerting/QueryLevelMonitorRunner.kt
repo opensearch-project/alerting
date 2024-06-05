@@ -14,12 +14,15 @@ import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.isADMonitor
-import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.MonitorRunResult
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
+import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
+import org.opensearch.commons.alerting.model.WorkflowRunContext
 import org.opensearch.transport.TransportService
 import java.time.Instant
+import java.util.Locale
 
 object QueryLevelMonitorRunner : MonitorRunner() {
     private val logger = LogManager.getLogger(javaClass)
@@ -74,7 +77,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                 AlertContext(alert = currentAlert, comments = currentAlertComments.ifEmpty { null })
             }
             val triggerCtx = QueryLevelTriggerExecutionContext(monitor, trigger as QueryLevelTrigger, monitorResult, currentAlertContext)
-            val triggerResult = when (monitor.monitorType) {
+            val triggerResult = when (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT))) {
                 Monitor.MonitorType.QUERY_LEVEL_MONITOR ->
                     monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger, triggerCtx)
                 Monitor.MonitorType.CLUSTER_METRICS_MONITOR -> {
@@ -86,7 +89,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                     else monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger, triggerCtx)
                 }
                 else ->
-                    throw IllegalArgumentException("Unsupported monitor type: ${monitor.monitorType.name}.")
+                    throw IllegalArgumentException("Unsupported monitor type: ${monitor.monitorType}.")
             }
 
             triggerResults[trigger.id] = triggerResult

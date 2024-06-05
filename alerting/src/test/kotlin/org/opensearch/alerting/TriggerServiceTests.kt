@@ -7,11 +7,11 @@ package org.opensearch.alerting
 
 import org.junit.Before
 import org.mockito.Mockito
-import org.opensearch.alerting.model.BucketLevelTriggerRunResult
-import org.opensearch.alerting.model.InputRunResults
-import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.BucketLevelTriggerRunResult
+import org.opensearch.commons.alerting.model.InputRunResults
+import org.opensearch.commons.alerting.model.MonitorRunResult
 import org.opensearch.core.xcontent.DeprecationHandler
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.script.ScriptService
