@@ -168,8 +168,8 @@ public class SampleRemoteMonitorIT extends OpenSearchRestTestCase {
                                 searchResponse.getEntity().getContent()
                         ).map();
                         found.set(Integer.parseInt((((Map<String, Object>) ((Map<String, Object>) searchResponseJson.get("hits")).get("total")).get("value")).toString()) == 1 &&
-                                ((Map<String, Object>) ((List<Map<String, Object>>) ((Map<String, Object>) searchResponseJson.get("hits")).get("hits")).get(0).get("_source")).containsKey("world") &&
-                                ((Map<String, Object>) ((List<Map<String, Object>>) ((Map<String, Object>) searchResponseJson.get("hits")).get("hits")).get(0).get("_source")).get("world").toString().equals("1"));
+                                ((Map<String, Object>) ((List<Map<String, Object>>) ((Map<String, Object>) searchResponseJson.get("hits")).get("hits")).get(0).get("_source")).containsKey("hello") &&
+                                ((Map<String, Object>) ((List<Map<String, Object>>) ((Map<String, Object>) searchResponseJson.get("hits")).get("hits")).get(0).get("_source")).get("hello").toString().equals("hello"));
                         return found.get();
                     } catch (IOException ex) {
                         return false;

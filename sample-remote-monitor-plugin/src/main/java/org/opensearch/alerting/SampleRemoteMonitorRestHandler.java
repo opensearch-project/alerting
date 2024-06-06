@@ -229,7 +229,10 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
                     null,
                     0,
                     List.of(remoteDocLevelMonitorInput),
-                    List.of(),
+                    List.of(new RemoteMonitorTrigger("id", "name", "1",
+                            List.of(new Action("name", "destinationId", new Script(ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG, "Hello World", Map.of()),
+                                    new Script(ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG, "Hello World", Map.of()), false, new Throttle(60, ChronoUnit.MINUTES),
+                                    "id", null)), trigger1Serialized)),
                     Map.of(),
                     new DataSources(),
                     "sample-remote-monitor-plugin"
