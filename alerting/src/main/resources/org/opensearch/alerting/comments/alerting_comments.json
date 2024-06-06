@@ -1,13 +1,17 @@
 {
   "dynamic": "false",
   "properties": {
-    "alert_id": {
+    "entity_id": {
       "type": "keyword"
     },
     "content": {
       "type": "text"
     },
-    "time": {
+    "created_time": {
+      "type": "date",
+      "format": "strict_date_time||epoch_millis"
+    },
+    "last_updated_time": {
       "type": "date",
       "format": "strict_date_time||epoch_millis"
     },

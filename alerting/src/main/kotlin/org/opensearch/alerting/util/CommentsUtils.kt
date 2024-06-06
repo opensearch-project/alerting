@@ -56,7 +56,7 @@ class CommentsUtils {
         // with the Entities given by the list of Entity IDs
         // TODO: change this to EntityIDs
         suspend fun getCommentsByAlertIDs(client: Client, alertIDs: List<String>): List<Comment> {
-            val queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.termsQuery("alert_id", alertIDs))
+            val queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.termsQuery("entity_id", alertIDs))
             val searchSourceBuilder =
                 SearchSourceBuilder()
                     .version(true)
@@ -88,6 +88,19 @@ class CommentsUtils {
         suspend fun getCommentIDsByAlertIDs(client: Client, alertIDs: List<String>): List<String> {
             val comments = getCommentsByAlertIDs(client, alertIDs)
             return comments.map { it.id }
+        }
+
+        /**
+         * Performs a Search request to retrieve the top maxComments most recent comments associated with the
+         * given Alert, where maxComments is a cluster setting.
+         */
+        suspend fun getCommentsForAlertNotification(client: Client, alertId: String, maxComments: Int): List<Comment> {
+            val allComments = CommentsUtils.getCommentsByAlertIDs(client, listOf(alertId))
+            val sortedComments = allComments.sortedByDescending { it.createdTime }
+            if (sortedComments.size <= maxComments) {
+                return sortedComments
+            }
+            return sortedComments.slice(0 until maxComments)
         }
 
         // TODO: make getCommentsByAlertID and getCommentIDsByAlertID

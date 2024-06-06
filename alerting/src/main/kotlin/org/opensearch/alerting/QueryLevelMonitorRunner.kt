@@ -11,6 +11,7 @@ import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
@@ -71,7 +72,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
             val currentAlert = currentAlerts[trigger]
             val currentAlertContext = currentAlert?.let {
                 val maxComments = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION)
-                val currentAlertComments = monitorCtx.alertService!!.getCommentsForAlertNotification(currentAlert.id, maxComments)
+                val currentAlertComments = CommentsUtils.getCommentsForAlertNotification(monitorCtx.client!!, currentAlert.id, maxComments)
                 AlertContext(alert = currentAlert, comments = currentAlertComments.ifEmpty { null })
             }
             val triggerCtx = QueryLevelTriggerExecutionContext(monitor, trigger as QueryLevelTrigger, monitorResult, currentAlertContext)

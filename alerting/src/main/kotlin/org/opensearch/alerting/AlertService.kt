@@ -42,7 +42,6 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.ChainedAlertTriggerRunResult
 import org.opensearch.commons.alerting.model.ClusterMetricsTriggerRunResult
-import org.opensearch.commons.alerting.model.Comment
 import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.NoOpTrigger
@@ -913,18 +912,5 @@ class AlertService(
             this != null && alertError != null -> (listOf(alertError) + this).take(10)
             else -> throw IllegalStateException("Unreachable code reached!")
         }
-    }
-
-    /**
-     * Performs a Search request to retrieve the top maxComments most recent comments associated with the
-     * given Alert, where maxComments is a cluster setting.
-     */
-    suspend fun getCommentsForAlertNotification(alertId: String, maxComments: Int): List<Comment> {
-        val allcomments = CommentsUtils.getCommentsByAlertIDs(client, listOf(alertId))
-        val sortedcomments = allcomments.sortedByDescending { it.createdTime }
-        if (sortedcomments.size <= maxComments) {
-            return sortedcomments
-        }
-        return sortedcomments.slice(0 until maxComments)
     }
 }

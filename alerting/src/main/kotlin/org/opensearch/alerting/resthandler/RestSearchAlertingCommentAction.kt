@@ -47,6 +47,10 @@ class RestSearchAlertingCommentAction() : BaseRestHandler() {
             Route(
                 RestRequest.Method.GET,
                 "${AlertingPlugin.COMMENTS_BASE_URI}/_search"
+            ),
+            Route(
+                RestRequest.Method.POST,
+                "${AlertingPlugin.COMMENTS_BASE_URI}/_search"
             )
         )
     }

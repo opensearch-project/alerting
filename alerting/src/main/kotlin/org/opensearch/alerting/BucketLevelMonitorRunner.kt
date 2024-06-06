@@ -20,6 +20,7 @@ import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
@@ -296,7 +297,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     for (alertCategory in actionExecutionScope.actionableAlerts) {
                         val alertsToExecuteActionsFor = nextAlerts[trigger.id]?.get(alertCategory) ?: mutableListOf()
                         for (alert in alertsToExecuteActionsFor) {
-                            val alertComments = monitorCtx.alertService!!.getCommentsForAlertNotification(alert.id, maxComments)
+                            val alertComments = CommentsUtils.getCommentsForAlertNotification(monitorCtx.client!!, alert.id, maxComments)
                             val alertContext = if (alertCategory != AlertCategory.NEW) {
                                 AlertContext(alert = alert, comments = alertComments.ifEmpty { null })
                             } else {
@@ -335,11 +336,19 @@ object BucketLevelMonitorRunner : MonitorRunner() {
 
                     val actionCtx = triggerCtx.copy(
                         dedupedAlerts = dedupedAlerts.map {
-                            val dedupedAlertsComments = monitorCtx.alertService!!.getCommentsForAlertNotification(it.id, maxComments)
+                            val dedupedAlertsComments = CommentsUtils.getCommentsForAlertNotification(
+                                monitorCtx.client!!,
+                                it.id,
+                                maxComments
+                            )
                             AlertContext(alert = it, comments = dedupedAlertsComments.ifEmpty { null })
                         },
                         newAlerts = newAlerts.map {
-                            val newAlertsComments = monitorCtx.alertService!!.getCommentsForAlertNotification(it.id, maxComments)
+                            val newAlertsComments = CommentsUtils.getCommentsForAlertNotification(
+                                monitorCtx.client!!,
+                                it.id,
+                                maxComments
+                            )
                             getAlertContext(
                                 alert = it,
                                 alertSampleDocs = alertSampleDocs,
@@ -347,7 +356,11 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             )
                         },
                         completedAlerts = completedAlerts.map {
-                            val completedAlertsComments = monitorCtx.alertService!!.getCommentsForAlertNotification(it.id, maxComments)
+                            val completedAlertsComments = CommentsUtils.getCommentsForAlertNotification(
+                                monitorCtx.client!!,
+                                it.id,
+                                maxComments
+                            )
                             AlertContext(alert = it, comments = completedAlertsComments.ifEmpty { null })
                         },
                         error = monitorResult.error ?: triggerResult.error

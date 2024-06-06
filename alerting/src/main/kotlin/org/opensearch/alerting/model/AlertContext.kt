@@ -33,7 +33,7 @@ data class AlertContext(
                 Comment.COMMENT_CREATED_TIME_FIELD to it.createdTime,
                 Comment.COMMENT_LAST_UPDATED_TIME_FIELD to it.lastUpdatedTime,
                 Comment.COMMENT_CONTENT_FIELD to it.content,
-                Comment.COMMENT_USER_FIELD to it.user
+                Comment.COMMENT_USER_FIELD to it.user?.name
             )
         }
 
