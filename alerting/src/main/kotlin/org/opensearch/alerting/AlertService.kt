@@ -741,7 +741,11 @@ class AlertService(
                                 .id(alert.id)
                         } else {
                             // Otherwise, prepare the Alert's comments for deletion, and don't include
-                            // a request to index the Alert to an Alert history index
+                            // a request to index the Alert to an Alert history index.
+                            // The delete request can't be added to the list of DocWriteRequests because
+                            // Comments are stored in aliased history indices, not a concrete Comments
+                            // index like Alerts. A DeleteBy request will be used to delete Comments, instead
+                            // of a regular Delete request
                             commentsToDeleteIDs.addAll(CommentsUtils.getCommentIDsByAlertIDs(client, listOf(alert.id)))
                             null
                         }

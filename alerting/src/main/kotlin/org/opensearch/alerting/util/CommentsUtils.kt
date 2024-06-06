@@ -54,7 +54,6 @@ class CommentsUtils {
 
         // Searches through all Comments history indices and returns a list of all Comments associated
         // with the Entities given by the list of Entity IDs
-        // TODO: change this to EntityIDs
         suspend fun getCommentsByAlertIDs(client: Client, alertIDs: List<String>): List<Comment> {
             val queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.termsQuery("entity_id", alertIDs))
             val searchSourceBuilder =

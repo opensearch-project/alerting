@@ -195,7 +195,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                  * The new Alerts have to be returned and saved back with their indexed doc ID to prevent duplicate documents
                  * when the Alerts are updated again after Action execution.
                  *
-                 * Comment: Index operations can fail for various reasons (such as write blocks on cluster), in such a case, the Actions
+                 * Note: Index operations can fail for various reasons (such as write blocks on cluster), in such a case, the Actions
                  * will still execute with the Alert information in the ctx but the Alerts may not be visible.
                  */
                 if (!dryrun && monitor.id != Monitor.NO_ID) {
