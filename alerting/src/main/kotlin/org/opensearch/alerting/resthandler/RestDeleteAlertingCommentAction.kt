@@ -32,15 +32,15 @@ class RestDeleteAlertingCommentAction : BaseRestHandler() {
         return listOf(
             Route(
                 RestRequest.Method.DELETE,
-                "${AlertingPlugin.COMMENTS_BASE_URI}/{commentID}"
+                "${AlertingPlugin.COMMENTS_BASE_URI}/{id}"
             )
         )
     }
 
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        log.debug("${request.method()} ${AlertingPlugin.COMMENTS_BASE_URI}/{commentID}")
-        val commentId = request.param("commentID")
+        log.debug("${request.method()} ${AlertingPlugin.COMMENTS_BASE_URI}/{id}")
+        val commentId = request.param("id")
         val deleteMonitorRequest = DeleteCommentRequest(commentId)
         return RestChannelConsumer { channel ->
             client.execute(AlertingActions.DELETE_COMMENT_ACTION_TYPE, deleteMonitorRequest, RestToXContentListener(channel))

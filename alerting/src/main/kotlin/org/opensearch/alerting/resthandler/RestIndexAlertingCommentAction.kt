@@ -43,11 +43,11 @@ class RestIndexAlertingCommentAction : BaseRestHandler() {
         return listOf(
             Route(
                 RestRequest.Method.POST,
-                "${AlertingPlugin.COMMENTS_BASE_URI}/{alertID}"
+                "${AlertingPlugin.COMMENTS_BASE_URI}/{id}"
             ),
             Route(
                 RestRequest.Method.PUT,
-                "${AlertingPlugin.COMMENTS_BASE_URI}/{commentID}"
+                "${AlertingPlugin.COMMENTS_BASE_URI}/{id}"
             )
         )
     }
@@ -56,13 +56,18 @@ class RestIndexAlertingCommentAction : BaseRestHandler() {
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
         log.debug("${request.method()} ${AlertingPlugin.COMMENTS_BASE_URI}")
 
-        val alertId = request.param("alertID", Alert.NO_ID)
-        val commentId = request.param("commentID", Comment.NO_ID)
-        if (request.method() == RestRequest.Method.POST && Alert.NO_ID == alertId) {
+        val id = request.param(
+            "id",
+            if (request.method() == RestRequest.Method.POST) Alert.NO_ID else Comment.NO_ID
+        )
+        if (request.method() == RestRequest.Method.POST && Alert.NO_ID == id) {
             throw AlertingException.wrap(IllegalArgumentException("Missing alert ID"))
-        } else if (request.method() == RestRequest.Method.PUT && Comment.NO_ID == commentId) {
+        } else if (request.method() == RestRequest.Method.PUT && Comment.NO_ID == id) {
             throw AlertingException.wrap(IllegalArgumentException("Missing comment ID"))
         }
+
+        val alertId = if (request.method() == RestRequest.Method.POST) id else Alert.NO_ID
+        val commentId = if (request.method() == RestRequest.Method.PUT) id else Comment.NO_ID
 
         val content = request.contentParser().map()["content"] as String?
         if (content.isNullOrEmpty()) {
