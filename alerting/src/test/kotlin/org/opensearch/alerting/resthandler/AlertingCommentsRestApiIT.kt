@@ -7,7 +7,7 @@ package org.opensearch.alerting.resthandler
 
 import org.apache.hc.core5.http.ContentType
 import org.apache.hc.core5.http.io.entity.StringEntity
-import org.opensearch.alerting.ALERTING_BASE_URI
+import org.opensearch.alerting.AlertingPlugin.Companion.COMMENTS_BASE_URI
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.randomAlert
@@ -61,7 +61,7 @@ class AlertingCommentsRestApiIT : AlertingRestTestCase() {
 
         val updateResponse = client().makeRequest(
             "PUT",
-            "$ALERTING_BASE_URI/alerts/comments/$commentId",
+            "$COMMENTS_BASE_URI/$commentId",
             StringEntity(updateRequestBody, ContentType.APPLICATION_JSON)
         )
 
@@ -91,7 +91,7 @@ class AlertingCommentsRestApiIT : AlertingRestTestCase() {
         val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
         val searchResponse = client().makeRequest(
             "GET",
-            "$ALERTING_BASE_URI/alerts/comments/_search",
+            "$COMMENTS_BASE_URI/_search",
             StringEntity(search, ContentType.APPLICATION_JSON)
         )
 
@@ -123,7 +123,7 @@ class AlertingCommentsRestApiIT : AlertingRestTestCase() {
 
         val deleteResponse = client().makeRequest(
             "DELETE",
-            "$ALERTING_BASE_URI/alerts/comments/$commentId"
+            "$COMMENTS_BASE_URI/$commentId"
         )
 
         assertEquals("Delete comment failed", RestStatus.OK, deleteResponse.restStatus())

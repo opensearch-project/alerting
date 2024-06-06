@@ -14,6 +14,7 @@ import org.apache.hc.core5.http.message.BasicHeader
 import org.junit.AfterClass
 import org.junit.rules.DisableOnDebug
 import org.opensearch.action.search.SearchResponse
+import org.opensearch.alerting.AlertingPlugin.Companion.COMMENTS_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
 import org.opensearch.alerting.alerts.AlertIndices
@@ -532,7 +533,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
         val createResponse = client().makeRequest(
             "POST",
-            "$ALERTING_BASE_URI/alerts/$alertId/comments",
+            "$COMMENTS_BASE_URI/$alertId",
             StringEntity(createRequestBody, APPLICATION_JSON)
         )
 

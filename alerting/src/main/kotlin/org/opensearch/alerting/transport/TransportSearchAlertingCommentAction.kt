@@ -18,7 +18,6 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.use
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
@@ -31,6 +30,7 @@ import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.SearchCommentRequest
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Comment
+import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener

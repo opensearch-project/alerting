@@ -7,7 +7,6 @@ package org.opensearch.alerting.resthandler
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IF_PRIMARY_TERM
 import org.opensearch.alerting.util.IF_SEQ_NO
 import org.opensearch.client.node.NodeClient
@@ -16,6 +15,7 @@ import org.opensearch.commons.alerting.action.IndexCommentRequest
 import org.opensearch.commons.alerting.action.IndexCommentResponse
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Comment
+import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.index.seqno.SequenceNumbers
@@ -43,18 +43,18 @@ class RestIndexAlertingCommentAction : BaseRestHandler() {
         return listOf(
             Route(
                 RestRequest.Method.POST,
-                "${AlertingPlugin.MONITOR_BASE_URI}/alerts/{alertID}/comments"
+                "${AlertingPlugin.COMMENTS_BASE_URI}/{alertID}"
             ),
             Route(
                 RestRequest.Method.PUT,
-                "${AlertingPlugin.MONITOR_BASE_URI}/alerts/comments/{commentID}"
+                "${AlertingPlugin.COMMENTS_BASE_URI}/{commentID}"
             )
         )
     }
 
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/alerts/comments")
+        log.debug("${request.method()} ${AlertingPlugin.COMMENTS_BASE_URI}")
 
         val alertId = request.param("alertID", Alert.NO_ID)
         val commentId = request.param("commentID", Comment.NO_ID)
