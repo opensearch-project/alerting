@@ -198,10 +198,13 @@ class CommentsIndices(
         )
     }
 
-    // TODO: Everything below here are util functions straight from AlertIndices.kt
-    // TODO: might need to reuse their code or refactor
-    // TODO: may merge into AlertIndices.kt if we decide to make comments indices
-    // TODO: component-specific instead of universal and component-agnostic
+    // TODO: Everything below is boilerplate util functions straight from AlertIndices.kt
+    /*
+    Depending on whether comments system indices will be component-specific or
+    component-agnostic, may need to either merge CommentsIndices.kt into AlertIndices.kt,
+    or factor these out into IndexUtils.kt for both AlertIndices.kt and CommentsIndices.kt
+    to use
+     */
 
     private fun getIndicesToDelete(clusterStateResponse: ClusterStateResponse): List<String> {
         val indicesToDelete = mutableListOf<String>()
