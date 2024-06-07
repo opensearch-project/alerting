@@ -19,6 +19,7 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.comments.CommentsIndices
 import org.opensearch.alerting.comments.CommentsIndices.Companion.COMMENTS_HISTORY_WRITE_INDEX
@@ -58,7 +59,6 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import java.lang.IllegalArgumentException
 import java.time.Instant
-import org.opensearch.action.support.WriteRequest
 
 private val log = LogManager.getLogger(TransportIndexMonitorAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
@@ -153,38 +153,8 @@ constructor(
         }
 
         private suspend fun indexComment() {
-            // need to validate the existence of the Alert that user is trying to add Comment to.
-            // Also need to check if user has permissions to add a Comment to the passed in Alert. To do this,
-            // we retrieve the Alert to get its associated monitor user, and use that to
-            // check if they have permissions to the Monitor that generated the Alert
-            val queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.termsQuery("_id", listOf(request.entityId)))
-            val searchSourceBuilder =
-                SearchSourceBuilder()
-                    .version(true)
-                    .seqNoAndPrimaryTerm(true)
-                    .query(queryBuilder)
-
-            // search all alerts, since user might want to create a comment
-            // on a completed alert
-            val searchRequest =
-                SearchRequest()
-                    .indices(AlertIndices.ALL_ALERT_INDEX_PATTERN)
-                    .source(searchSourceBuilder)
-
-            val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
-            val alerts = searchResponse.hits.map { hit ->
-                val xcp = XContentHelper.createParser(
-                    NamedXContentRegistry.EMPTY,
-                    LoggingDeprecationHandler.INSTANCE,
-                    hit.sourceRef,
-                    XContentType.JSON
-                )
-                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                val alert = Alert.parse(xcp, hit.id, hit.version)
-                alert
-            }
-
-            if (alerts.isEmpty()) {
+            val alert = getAlert()
+            if (alert == null) {
                 actionListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException("Alert with ID ${request.entityId} is not found", RestStatus.NOT_FOUND),
@@ -192,8 +162,6 @@ constructor(
                 )
                 return
             }
-
-            val alert = alerts[0] // there should only be 1 Alert that matched the request alert ID
 
             val numCommentsOnThisAlert = CommentsUtils.getCommentIDsByAlertIDs(client, listOf(alert.id)).size
             if (numCommentsOnThisAlert >= maxCommentsPerAlert) {
@@ -243,34 +211,16 @@ constructor(
         }
 
         private suspend fun updateComment() {
-            val getRequest = GetRequest(COMMENTS_HISTORY_WRITE_INDEX, request.commentId)
-            try {
-                val getResponse: GetResponse = client.suspendUntil { client.get(getRequest, it) }
-                if (!getResponse.isExists) {
-                    actionListener.onFailure(
-                        AlertingException.wrap(
-                            OpenSearchStatusException("Comment with ${request.commentId} is not found", RestStatus.NOT_FOUND),
-                        ),
-                    )
-                    return
-                }
-                val xcp =
-                    XContentHelper.createParser(
-                        xContentRegistry,
-                        LoggingDeprecationHandler.INSTANCE,
-                        getResponse.sourceAsBytesRef,
-                        XContentType.JSON,
-                    )
-                xcp.nextToken()
-                val comment = Comment.parse(xcp, getResponse.id)
-                log.info("comment to be updated: $comment")
-                onGetCommentResponse(comment)
-            } catch (t: Exception) {
-                actionListener.onFailure(AlertingException.wrap(t))
+            val currentComment = getComment()
+            if (currentComment == null) {
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException("Comment with ID ${request.commentId} is not found", RestStatus.NOT_FOUND),
+                    ),
+                )
+                return
             }
-        }
 
-        private suspend fun onGetCommentResponse(currentComment: Comment) {
             // check that the user has permissions to edit the comment. user can edit comment if
             // - user is Admin
             // - user is the author of the comment
@@ -326,6 +276,65 @@ constructor(
                 )
             } catch (t: Exception) {
                 actionListener.onFailure(AlertingException.wrap(t))
+            }
+        }
+
+        private suspend fun getAlert(): Alert? {
+            // need to validate the existence of the Alert that user is trying to add Comment to.
+            // Also need to check if user has permissions to add a Comment to the passed in Alert. To do this,
+            // we retrieve the Alert to get its associated monitor user, and use that to
+            // check if they have permissions to the Monitor that generated the Alert
+            val queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.termsQuery("_id", listOf(request.entityId)))
+            val searchSourceBuilder =
+                SearchSourceBuilder()
+                    .version(true)
+                    .seqNoAndPrimaryTerm(true)
+                    .query(queryBuilder)
+
+            // search all alerts, since user might want to create a comment
+            // on a completed alert
+            val searchRequest =
+                SearchRequest()
+                    .indices(AlertIndices.ALL_ALERT_INDEX_PATTERN)
+                    .source(searchSourceBuilder)
+
+            val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
+            val alerts = searchResponse.hits.map { hit ->
+                val xcp = XContentHelper.createParser(
+                    NamedXContentRegistry.EMPTY,
+                    LoggingDeprecationHandler.INSTANCE,
+                    hit.sourceRef,
+                    XContentType.JSON
+                )
+                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                val alert = Alert.parse(xcp, hit.id, hit.version)
+                alert
+            }
+
+            if (alerts.isEmpty()) return null
+
+            return alerts[0] // there should only be 1 Alert that matched the request alert ID
+        }
+
+        private suspend fun getComment(): Comment? {
+            val getRequest = GetRequest(COMMENTS_HISTORY_WRITE_INDEX, request.commentId)
+            try {
+                val getResponse: GetResponse = client.suspendUntil { client.get(getRequest, it) }
+                if (!getResponse.isExists) return null
+                val xcp =
+                    XContentHelper.createParser(
+                        xContentRegistry,
+                        LoggingDeprecationHandler.INSTANCE,
+                        getResponse.sourceAsBytesRef,
+                        XContentType.JSON,
+                    )
+                xcp.nextToken()
+                val comment = Comment.parse(xcp, getResponse.id)
+                log.info("comment to be updated: $comment")
+                return comment
+            } catch (t: Exception) {
+                actionListener.onFailure(AlertingException.wrap(t))
+                return null
             }
         }
 

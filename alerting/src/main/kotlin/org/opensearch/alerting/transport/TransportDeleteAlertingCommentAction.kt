@@ -159,7 +159,7 @@ class TransportDeleteAlertingCommentAction @Inject constructor(
             if (searchResponse.hits.totalHits.value == 0L) {
                 actionListener.onFailure(
                     AlertingException.wrap(
-                        OpenSearchStatusException("Comment with $commentId is not found", RestStatus.NOT_FOUND)
+                        OpenSearchStatusException("Comment with ID $commentId is not found", RestStatus.NOT_FOUND)
                     )
                 )
             }
