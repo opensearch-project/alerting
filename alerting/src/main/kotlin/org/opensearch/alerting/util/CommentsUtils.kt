@@ -32,26 +32,6 @@ private val log = LogManager.getLogger(CommentsUtils::class.java)
 
 class CommentsUtils {
     companion object {
-        // Deletes all Comments given by the list of Comments IDs
-        suspend fun deleteComments(client: Client, commentIDs: List<String>) {
-            if (commentIDs.isEmpty()) return
-            val deleteResponse: BulkByScrollResponse = suspendCoroutine { cont ->
-                DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-                    .source(ALL_COMMENTS_INDEX_PATTERN)
-                    .filter(QueryBuilders.boolQuery().must(QueryBuilders.termsQuery("_id", commentIDs)))
-                    .refresh(true)
-                    .execute(
-                        object : ActionListener<BulkByScrollResponse> {
-                            override fun onResponse(response: BulkByScrollResponse) = cont.resume(response)
-                            override fun onFailure(t: Exception) = cont.resumeWithException(t)
-                        }
-                    )
-            }
-            deleteResponse.bulkFailures.forEach {
-                log.error("Failed to delete Comment. Comment ID: [${it.id}] cause: [${it.cause}] ")
-            }
-        }
-
         // Searches through all Comments history indices and returns a list of all Comments associated
         // with the Entities given by the list of Entity IDs
         suspend fun getCommentsByAlertIDs(client: Client, alertIDs: List<String>): List<Comment> {
@@ -94,12 +74,32 @@ class CommentsUtils {
          * given Alert, where maxComments is a cluster setting.
          */
         suspend fun getCommentsForAlertNotification(client: Client, alertId: String, maxComments: Int): List<Comment> {
-            val allComments = CommentsUtils.getCommentsByAlertIDs(client, listOf(alertId))
+            val allComments = getCommentsByAlertIDs(client, listOf(alertId))
             val sortedComments = allComments.sortedByDescending { it.createdTime }
             if (sortedComments.size <= maxComments) {
                 return sortedComments
             }
             return sortedComments.slice(0 until maxComments)
+        }
+
+        // Deletes all Comments given by the list of Comments IDs
+        suspend fun deleteComments(client: Client, commentIDs: List<String>) {
+            if (commentIDs.isEmpty()) return
+            val deleteResponse: BulkByScrollResponse = suspendCoroutine { cont ->
+                DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+                    .source(ALL_COMMENTS_INDEX_PATTERN)
+                    .filter(QueryBuilders.boolQuery().must(QueryBuilders.termsQuery("_id", commentIDs)))
+                    .refresh(true)
+                    .execute(
+                        object : ActionListener<BulkByScrollResponse> {
+                            override fun onResponse(response: BulkByScrollResponse) = cont.resume(response)
+                            override fun onFailure(t: Exception) = cont.resumeWithException(t)
+                        }
+                    )
+            }
+            deleteResponse.bulkFailures.forEach {
+                log.error("Failed to delete Comment. Comment ID: [${it.id}] cause: [${it.cause}] ")
+            }
         }
 
         // TODO: make getCommentsByAlertID and getCommentIDsByAlertID

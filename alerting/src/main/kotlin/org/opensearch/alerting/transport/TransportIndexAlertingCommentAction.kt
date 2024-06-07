@@ -58,6 +58,7 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import java.lang.IllegalArgumentException
 import java.time.Instant
+import org.opensearch.action.support.WriteRequest
 
 private val log = LogManager.getLogger(TransportIndexMonitorAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
@@ -218,6 +219,8 @@ constructor(
                     .setIfSeqNo(request.seqNo)
                     .setIfPrimaryTerm(request.primaryTerm)
                     .timeout(indexTimeout)
+                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+//                    .setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL)
 
             log.info("Creating new comment: ${comment.toXContentWithUser(XContentFactory.jsonBuilder())}")
 
@@ -294,6 +297,8 @@ constructor(
                     .setIfSeqNo(request.seqNo)
                     .setIfPrimaryTerm(request.primaryTerm)
                     .timeout(indexTimeout)
+                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+//                    .setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL)
 
             log.info(
                 "Updating comment, ${currentComment.id}, from: " +

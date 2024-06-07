@@ -105,6 +105,7 @@ class TransportDeleteAlertingCommentAction @Inject constructor(
     ) {
 
         private var sourceIndex: String? = null
+
         suspend fun resolveUserAndStart() {
             try {
                 val comment = getComment()
@@ -121,6 +122,7 @@ class TransportDeleteAlertingCommentAction @Inject constructor(
 
                 // if user is null because security plugin is not installed, anyone can delete any comment
                 // otherwise, only allow comment deletion if the deletion requester is the same as the comment's author
+                // or if the user is Admin
                 val canDelete = user == null || user.name == comment.user?.name || isAdmin(user)
 
                 val deleteRequest = DeleteRequest(sourceIndex, commentId)

@@ -94,7 +94,7 @@ class RestIndexAlertingCommentAction : BaseRestHandler() {
 
                 val restResponse = BytesRestResponse(returnStatus, response.toXContent(channel.newBuilder(), ToXContent.EMPTY_PARAMS))
                 if (returnStatus == RestStatus.CREATED) {
-                    val location = "${AlertingPlugin.MONITOR_BASE_URI}/alerts/comments/${response.id}"
+                    val location = "${AlertingPlugin.COMMENTS_BASE_URI}/${response.id}"
                     restResponse.addHeader("Location", location)
                 }
                 return restResponse

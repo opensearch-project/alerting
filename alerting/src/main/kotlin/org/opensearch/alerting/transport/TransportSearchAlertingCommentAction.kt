@@ -163,6 +163,7 @@ class TransportSearchAlertingCommentAction @Inject constructor(
         val searchRequest = SearchRequest()
             .source(searchSourceBuilder)
             .indices(ALL_ALERT_INDEX_PATTERN)
+            // .preference(Preference.PRIMARY_FIRST.type()) // expensive, be careful
 
         val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
         val alertIDs = searchResponse.hits.map { hit ->
