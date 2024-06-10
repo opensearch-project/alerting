@@ -54,7 +54,7 @@ class RestIndexAlertingCommentAction : BaseRestHandler() {
 
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        log.debug("${request.method()} ${AlertingPlugin.COMMENTS_BASE_URI}")
+        log.info("${request.method()} ${AlertingPlugin.COMMENTS_BASE_URI}")
 
         val id = request.param(
             "id",
@@ -69,7 +69,7 @@ class RestIndexAlertingCommentAction : BaseRestHandler() {
         val alertId = if (request.method() == RestRequest.Method.POST) id else Alert.NO_ID
         val commentId = if (request.method() == RestRequest.Method.PUT) id else Comment.NO_ID
 
-        val content = request.contentParser().map()["content"] as String?
+        val content = request.contentParser().map()[Comment.COMMENT_CONTENT_FIELD] as String?
         if (content.isNullOrEmpty()) {
             throw AlertingException.wrap(IllegalArgumentException("Missing comment content"))
         }

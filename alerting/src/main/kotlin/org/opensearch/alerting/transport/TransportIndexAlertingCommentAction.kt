@@ -11,8 +11,6 @@ import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionRequest
-import org.opensearch.action.get.GetRequest
-import org.opensearch.action.get.GetResponse
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.search.SearchRequest
@@ -157,7 +155,7 @@ constructor(
             if (alert == null) {
                 actionListener.onFailure(
                     AlertingException.wrap(
-                        OpenSearchStatusException("Alert with ID ${request.entityId} is not found", RestStatus.NOT_FOUND),
+                        OpenSearchStatusException("Alert not found", RestStatus.NOT_FOUND),
                     )
                 )
                 return
@@ -176,7 +174,7 @@ constructor(
                 return
             }
 
-            log.info("checking user permissions in index comment")
+            log.debug("checking user permissions in index comment")
             checkUserPermissionsWithResource(user, alert.monitorUser, actionListener, "monitor", alert.monitorId)
 
             val comment = Comment(entityId = request.entityId, content = request.content, createdTime = Instant.now(), user = user)
@@ -190,7 +188,7 @@ constructor(
                     .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
 //                    .setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL)
 
-            log.info("Creating new comment: ${comment.toXContentWithUser(XContentFactory.jsonBuilder())}")
+            log.debug("Creating new comment: ${comment.toXContentWithUser(XContentFactory.jsonBuilder())}")
 
             try {
                 val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
@@ -215,7 +213,7 @@ constructor(
             if (currentComment == null) {
                 actionListener.onFailure(
                     AlertingException.wrap(
-                        OpenSearchStatusException("Comment with ID ${request.commentId} is not found", RestStatus.NOT_FOUND),
+                        OpenSearchStatusException("Comment not found", RestStatus.NOT_FOUND),
                     ),
                 )
                 return
@@ -228,8 +226,7 @@ constructor(
                 actionListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException(
-                            "Comment ${request.commentId} created by ${currentComment.user} " +
-                                "can only be edited by Admin or ${currentComment.user} ",
+                            "Comment can only be edited by Admin or author of comment",
                             RestStatus.FORBIDDEN,
                         ),
                     ),
@@ -250,7 +247,7 @@ constructor(
                     .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
 //                    .setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL)
 
-            log.info(
+            log.debug(
                 "Updating comment, ${currentComment.id}, from: " +
                     "${currentComment.content} to: " +
                     requestComment.content,
@@ -312,30 +309,57 @@ constructor(
             }
 
             if (alerts.isEmpty()) return null
+            if (alerts.size > 1) {
+                actionListener.onFailure(
+                    AlertingException.wrap(IllegalStateException("Multiple alerts were found with the same ID")),
+                )
+                return null
+            }
 
-            return alerts[0] // there should only be 1 Alert that matched the request alert ID
+            return alerts[0]
         }
 
         private suspend fun getComment(): Comment? {
-            val getRequest = GetRequest(COMMENTS_HISTORY_WRITE_INDEX, request.commentId)
-            try {
-                val getResponse: GetResponse = client.suspendUntil { client.get(getRequest, it) }
-                if (!getResponse.isExists) return null
-                val xcp =
-                    XContentHelper.createParser(
-                        xContentRegistry,
-                        LoggingDeprecationHandler.INSTANCE,
-                        getResponse.sourceAsBytesRef,
-                        XContentType.JSON,
-                    )
-                xcp.nextToken()
-                val comment = Comment.parse(xcp, getResponse.id)
-                log.info("comment to be updated: $comment")
-                return comment
-            } catch (t: Exception) {
-                actionListener.onFailure(AlertingException.wrap(t))
+            // need to validate the existence of the Alert that user is trying to add Comment to.
+            // Also need to check if user has permissions to add a Comment to the passed in Alert. To do this,
+            // we retrieve the Alert to get its associated monitor user, and use that to
+            // check if they have permissions to the Monitor that generated the Alert
+            val queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.termsQuery("_id", listOf(request.commentId)))
+            val searchSourceBuilder =
+                SearchSourceBuilder()
+                    .version(true)
+                    .seqNoAndPrimaryTerm(true)
+                    .query(queryBuilder)
+
+            // search all alerts, since user might want to create a comment
+            // on a completed alert
+            val searchRequest =
+                SearchRequest()
+                    .indices(CommentsIndices.ALL_COMMENTS_INDEX_PATTERN)
+                    .source(searchSourceBuilder)
+
+            val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
+            val comments = searchResponse.hits.map { hit ->
+                val xcp = XContentHelper.createParser(
+                    NamedXContentRegistry.EMPTY,
+                    LoggingDeprecationHandler.INSTANCE,
+                    hit.sourceRef,
+                    XContentType.JSON
+                )
+                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                val comment = Comment.parse(xcp, hit.id)
+                comment
+            }
+
+            if (comments.isEmpty()) return null
+            if (comments.size > 1) {
+                actionListener.onFailure(
+                    AlertingException.wrap(IllegalStateException("Multiple comments were found with the same ID")),
+                )
                 return null
             }
+
+            return comments[0]
         }
 
         private fun checkShardsFailure(response: IndexResponse): String? {

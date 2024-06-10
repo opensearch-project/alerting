@@ -73,13 +73,23 @@ class CommentsUtils {
          * Performs a Search request to retrieve the top maxComments most recent comments associated with the
          * given Alert, where maxComments is a cluster setting.
          */
-        suspend fun getCommentsForAlertNotification(client: Client, alertId: String, maxComments: Int): List<Comment> {
-            val allComments = getCommentsByAlertIDs(client, listOf(alertId))
+        suspend fun getCommentsForAlertNotification(
+            client: Client,
+            alertIds: List<String>,
+            maxComments: Int
+        ): Map<String, List<Comment>> {
+            val allComments = getCommentsByAlertIDs(client, alertIds)
             val sortedComments = allComments.sortedByDescending { it.createdTime }
-            if (sortedComments.size <= maxComments) {
-                return sortedComments
+            val alertIdToComments = mutableMapOf<String, MutableList<Comment>>()
+            for (comment in sortedComments) {
+                if (!alertIdToComments.containsKey(comment.entityId)) {
+                    alertIdToComments[comment.entityId] = mutableListOf()
+                } else if (alertIdToComments[comment.entityId]!!.size >= maxComments) {
+                    continue
+                }
+                alertIdToComments[comment.entityId]!!.add(comment)
             }
-            return sortedComments.slice(0 until maxComments)
+            return alertIdToComments.mapValues { it.value.toList() }
         }
 
         // Deletes all Comments given by the list of Comments IDs

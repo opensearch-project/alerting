@@ -39,7 +39,7 @@ class RestDeleteAlertingCommentAction : BaseRestHandler() {
 
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        log.debug("${request.method()} ${AlertingPlugin.COMMENTS_BASE_URI}/{id}")
+        log.info("${request.method()} ${AlertingPlugin.COMMENTS_BASE_URI}/{id}")
         val commentId = request.param("id")
         val deleteMonitorRequest = DeleteCommentRequest(commentId)
         return RestChannelConsumer { channel ->

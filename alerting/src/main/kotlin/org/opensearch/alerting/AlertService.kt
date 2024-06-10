@@ -685,7 +685,7 @@ class AlertService(
         val alertsIndex = dataSources.alertsIndex
         val alertsHistoryIndex = dataSources.alertsHistoryIndex
 
-        val commentsToDeleteIDs = mutableListOf<String>()
+        val commentIDsToDelete = mutableListOf<String>()
 
         var requestsToRetry = alerts.flatMap { alert ->
             // We don't want to set the version when saving alerts because the MonitorRunner has first priority when writing alerts.
@@ -746,7 +746,7 @@ class AlertService(
                             // Comments are stored in aliased history indices, not a concrete Comments
                             // index like Alerts. A DeleteBy request will be used to delete Comments, instead
                             // of a regular Delete request
-                            commentsToDeleteIDs.addAll(CommentsUtils.getCommentIDsByAlertIDs(client, listOf(alert.id)))
+                            commentIDsToDelete.addAll(CommentsUtils.getCommentIDsByAlertIDs(client, listOf(alert.id)))
                             null
                         }
                     )
@@ -770,7 +770,7 @@ class AlertService(
         }
 
         // delete all the comments of any Alerts that were deleted
-        CommentsUtils.deleteComments(client, commentsToDeleteIDs)
+        CommentsUtils.deleteComments(client, commentIDsToDelete)
     }
 
     /**

@@ -114,7 +114,7 @@ class TransportSearchAlertingCommentAction @Inject constructor(
         } else {
             // security is enabled and filterby is enabled.
             try {
-                log.info("Filtering result by: ${user.backendRoles}")
+                log.debug("Filtering result by: {}", user.backendRoles)
 
                 // first retrieve all Alert IDs current User can see after filtering by backend roles
                 val alertIDs = getFilteredAlertIDs(user)

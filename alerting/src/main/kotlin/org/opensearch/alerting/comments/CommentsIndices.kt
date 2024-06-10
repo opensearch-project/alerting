@@ -110,7 +110,7 @@ class CommentsIndices(
      * @param actionListener A callback listener for the index creation call. Generally in the form of onSuccess, onFailure
      */
 
-    fun onMaster() {
+    fun onManager() {
         try {
             // try to rollover immediately as we might be restarting the cluster
             rolloverCommentsHistoryIndex()
@@ -126,7 +126,7 @@ class CommentsIndices(
         }
     }
 
-    fun offMaster() {
+    fun offManager() {
         scheduledCommentsRollover?.cancel()
     }
 
@@ -141,9 +141,9 @@ class CommentsIndices(
         if (this.isClusterManager != event.localNodeClusterManager()) {
             this.isClusterManager = event.localNodeClusterManager()
             if (this.isClusterManager) {
-                onMaster()
+                onManager()
             } else {
-                offMaster()
+                offManager()
             }
         }
 

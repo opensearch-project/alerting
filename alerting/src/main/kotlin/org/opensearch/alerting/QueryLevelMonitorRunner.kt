@@ -68,12 +68,18 @@ object QueryLevelMonitorRunner : MonitorRunner() {
 
         val updatedAlerts = mutableListOf<Alert>()
         val triggerResults = mutableMapOf<String, QueryLevelTriggerRunResult>()
+
+        val maxComments = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION)
+        val alertsToExecuteActionsForIds = currentAlerts.mapNotNull { it.value }.map { it.id }
+        val allAlertsComments = CommentsUtils.getCommentsForAlertNotification(
+            monitorCtx.client!!,
+            alertsToExecuteActionsForIds,
+            maxComments
+        )
         for (trigger in monitor.triggers) {
             val currentAlert = currentAlerts[trigger]
             val currentAlertContext = currentAlert?.let {
-                val maxComments = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION)
-                val currentAlertComments = CommentsUtils.getCommentsForAlertNotification(monitorCtx.client!!, currentAlert.id, maxComments)
-                AlertContext(alert = currentAlert, comments = currentAlertComments.ifEmpty { null })
+                AlertContext(alert = currentAlert, comments = allAlertsComments[currentAlert.id])
             }
             val triggerCtx = QueryLevelTriggerExecutionContext(monitor, trigger as QueryLevelTrigger, monitorResult, currentAlertContext)
             val triggerResult = when (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT))) {

@@ -296,12 +296,17 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 if (actionExecutionScope is PerAlertActionScope && !shouldDefaultToPerExecution) {
                     for (alertCategory in actionExecutionScope.actionableAlerts) {
                         val alertsToExecuteActionsFor = nextAlerts[trigger.id]?.get(alertCategory) ?: mutableListOf()
+                        val alertsToExecuteActionsForIds = alertsToExecuteActionsFor.map { it.id }
+                        val allAlertsComments = CommentsUtils.getCommentsForAlertNotification(
+                            monitorCtx.client!!,
+                            alertsToExecuteActionsForIds,
+                            maxComments
+                        )
                         for (alert in alertsToExecuteActionsFor) {
-                            val alertComments = CommentsUtils.getCommentsForAlertNotification(monitorCtx.client!!, alert.id, maxComments)
                             val alertContext = if (alertCategory != AlertCategory.NEW) {
-                                AlertContext(alert = alert, comments = alertComments.ifEmpty { null })
+                                AlertContext(alert = alert, comments = allAlertsComments[alert.id])
                             } else {
-                                getAlertContext(alert = alert, alertSampleDocs = alertSampleDocs, alertComments.ifEmpty { null })
+                                getAlertContext(alert = alert, alertSampleDocs = alertSampleDocs, allAlertsComments[alert.id])
                             }
 
                             val actionCtx = getActionContextForAlertCategory(
@@ -334,34 +339,27 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     if (monitorOrTriggerError == null && dedupedAlerts.isEmpty() && newAlerts.isEmpty() && completedAlerts.isEmpty())
                         continue
 
+                    val alertsToExecuteActionsForIds = dedupedAlerts.map { it.id }
+                        .plus(newAlerts.map { it.id })
+                        .plus(completedAlerts.map { it.id })
+                    val allAlertsComments = CommentsUtils.getCommentsForAlertNotification(
+                        monitorCtx.client!!,
+                        alertsToExecuteActionsForIds,
+                        maxComments
+                    )
                     val actionCtx = triggerCtx.copy(
                         dedupedAlerts = dedupedAlerts.map {
-                            val dedupedAlertsComments = CommentsUtils.getCommentsForAlertNotification(
-                                monitorCtx.client!!,
-                                it.id,
-                                maxComments
-                            )
-                            AlertContext(alert = it, comments = dedupedAlertsComments.ifEmpty { null })
+                            AlertContext(alert = it, comments = allAlertsComments[it.id])
                         },
                         newAlerts = newAlerts.map {
-                            val newAlertsComments = CommentsUtils.getCommentsForAlertNotification(
-                                monitorCtx.client!!,
-                                it.id,
-                                maxComments
-                            )
                             getAlertContext(
                                 alert = it,
                                 alertSampleDocs = alertSampleDocs,
-                                alertComments = newAlertsComments.ifEmpty { null }
+                                alertComments = allAlertsComments[it.id]
                             )
                         },
                         completedAlerts = completedAlerts.map {
-                            val completedAlertsComments = CommentsUtils.getCommentsForAlertNotification(
-                                monitorCtx.client!!,
-                                it.id,
-                                maxComments
-                            )
-                            AlertContext(alert = it, comments = completedAlertsComments.ifEmpty { null })
+                            AlertContext(alert = it, comments = allAlertsComments[it.id])
                         },
                         error = monitorResult.error ?: triggerResult.error
                     )

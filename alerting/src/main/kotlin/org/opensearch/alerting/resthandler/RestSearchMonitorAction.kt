@@ -126,7 +126,7 @@ class RestSearchMonitorAction(
                         }
                     }
                 } catch (e: Exception) {
-                    log.info("The monitor parsing failed. Will return response as is.")
+                    log.debug("The monitor parsing failed. Will return response as is. Parsing error: $e")
                 }
                 return BytesRestResponse(RestStatus.OK, response.toXContent(channel.newBuilder(), EMPTY_PARAMS))
             }

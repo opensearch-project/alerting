@@ -57,7 +57,7 @@ class RestSearchAlertingCommentAction() : BaseRestHandler() {
 
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        log.debug("${request.method()} ${AlertingPlugin.COMMENTS_BASE_URI}/_search")
+        log.info("${request.method()} ${AlertingPlugin.COMMENTS_BASE_URI}/_search")
 
         val searchSourceBuilder = SearchSourceBuilder()
         searchSourceBuilder.parseXContent(request.contentOrSourceParamParser())

@@ -610,8 +610,8 @@ class AlertIndices(
     private suspend fun deleteAlertComments(alertHistoryIndicesToDelete: List<String>) {
         alertHistoryIndicesToDelete.forEach { alertHistoryIndex ->
             val alertIDs = getAlertIDsFromAlertHistoryIndex(alertHistoryIndex)
-            val commentsToDeleteIDs = CommentsUtils.getCommentIDsByAlertIDs(client, alertIDs)
-            CommentsUtils.deleteComments(client, commentsToDeleteIDs)
+            val commentIDsToDelete = CommentsUtils.getCommentIDsByAlertIDs(client, alertIDs)
+            CommentsUtils.deleteComments(client, commentIDsToDelete)
         }
     }
 
