@@ -76,7 +76,15 @@ class RestIndexAlertingCommentAction : BaseRestHandler() {
         val seqNo = request.paramAsLong(IF_SEQ_NO, SequenceNumbers.UNASSIGNED_SEQ_NO)
         val primaryTerm = request.paramAsLong(IF_PRIMARY_TERM, SequenceNumbers.UNASSIGNED_PRIMARY_TERM)
 
-        val indexCommentRequest = IndexCommentRequest(alertId, commentId, seqNo, primaryTerm, request.method(), content)
+        val indexCommentRequest = IndexCommentRequest(
+            alertId,
+            Comment.EntityType.ALERT.value,
+            commentId,
+            seqNo,
+            primaryTerm,
+            request.method(),
+            content
+        )
 
         return RestChannelConsumer { channel ->
             client.execute(AlertingActions.INDEX_COMMENT_ACTION_TYPE, indexCommentRequest, indexCommentResponse(channel, request.method()))

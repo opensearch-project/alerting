@@ -177,7 +177,13 @@ constructor(
             log.debug("checking user permissions in index comment")
             checkUserPermissionsWithResource(user, alert.monitorUser, actionListener, "monitor", alert.monitorId)
 
-            val comment = Comment(entityId = request.entityId, content = request.content, createdTime = Instant.now(), user = user)
+            val comment = Comment(
+                entityId = request.entityId,
+                entityType = request.entityType,
+                content = request.content,
+                createdTime = Instant.now(),
+                user = user
+            )
 
             val indexRequest =
                 IndexRequest(COMMENTS_HISTORY_WRITE_INDEX)
