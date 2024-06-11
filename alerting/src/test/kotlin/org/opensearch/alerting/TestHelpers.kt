@@ -402,7 +402,6 @@ val WORKFLOW_ALERTING_BASE_URI = "/_plugins/_alerting/workflows"
 val DESTINATION_BASE_URI = "/_plugins/_alerting/destinations"
 val LEGACY_OPENDISTRO_ALERTING_BASE_URI = "/_opendistro/_alerting/monitors"
 val LEGACY_OPENDISTRO_DESTINATION_BASE_URI = "/_opendistro/_alerting/destinations"
-val ALERTING_NOTES_BASE_URI = ""
 val ALWAYS_RUN = Script("return true")
 val NEVER_RUN = Script("return false")
 val DRYRUN_MONITOR = mapOf("dryrun" to "true")

@@ -117,8 +117,6 @@ abstract class MonitorRunner {
             )
         }
 
-        // TODO: inspect actionResponseContent when message is super large see if an error is thrown somehow
-        // TODO: (spam {{ctx}} in notification content)
         var actionResponseContent = ""
         actionResponseContent = config.channel
             ?.sendNotification(
