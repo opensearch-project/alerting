@@ -108,7 +108,7 @@ class TransportDeleteAlertingCommentAction @Inject constructor(
 
         suspend fun resolveUserAndStart() {
             try {
-                val comment = getComment()
+                val comment = getComment() ?: return
 
                 if (sourceIndex == null) {
                     actionListener.onFailure(
@@ -142,7 +142,7 @@ class TransportDeleteAlertingCommentAction @Inject constructor(
             }
         }
 
-        private suspend fun getComment(): Comment {
+        private suspend fun getComment(): Comment? {
             val queryBuilder = QueryBuilders
                 .boolQuery()
                 .must(QueryBuilders.termsQuery("_id", commentId))
@@ -156,13 +156,6 @@ class TransportDeleteAlertingCommentAction @Inject constructor(
                 .indices(ALL_COMMENTS_INDEX_PATTERN)
 
             val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
-            if (searchResponse.hits.totalHits.value == 0L) {
-                actionListener.onFailure(
-                    AlertingException.wrap(
-                        OpenSearchStatusException("Comment not found", RestStatus.NOT_FOUND)
-                    )
-                )
-            }
             val comments = searchResponse.hits.map { hit ->
                 val xcp = XContentHelper.createParser(
                     NamedXContentRegistry.EMPTY,
@@ -176,7 +169,21 @@ class TransportDeleteAlertingCommentAction @Inject constructor(
                 comment
             }
 
-            return comments[0] // we searched on Comment ID, there should only be one Comment in the List
+            if (comments.isEmpty()) {
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException("Comment not found", RestStatus.NOT_FOUND),
+                    ),
+                )
+                return null
+            } else if (comments.size > 1) {
+                actionListener.onFailure(
+                    AlertingException.wrap(IllegalStateException("Multiple comments were found with the same ID")),
+                )
+                return null
+            }
+
+            return comments[0]
         }
     }
 }

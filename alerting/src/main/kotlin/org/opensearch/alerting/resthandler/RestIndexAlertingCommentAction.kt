@@ -78,7 +78,7 @@ class RestIndexAlertingCommentAction : BaseRestHandler() {
 
         val indexCommentRequest = IndexCommentRequest(
             alertId,
-            Comment.EntityType.ALERT.value,
+            "alert",
             commentId,
             seqNo,
             primaryTerm,

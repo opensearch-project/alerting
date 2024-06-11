@@ -126,6 +126,18 @@ constructor(
             return
         }
 
+        // validate the request is for the correct entity type
+        if (transformedRequest.entityType != "alert") {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    IllegalArgumentException(
+                        "Index comment request is for wrong entity type, expected alert, got ${transformedRequest.entityType}"
+                    )
+                )
+            )
+            return
+        }
+
         val user = readUserFromThreadContext(client)
 
         client.threadPool().threadContext.stashContext().use {
@@ -151,15 +163,7 @@ constructor(
         }
 
         private suspend fun indexComment() {
-            val alert = getAlert()
-            if (alert == null) {
-                actionListener.onFailure(
-                    AlertingException.wrap(
-                        OpenSearchStatusException("Alert not found", RestStatus.NOT_FOUND),
-                    )
-                )
-                return
-            }
+            val alert = getAlert() ?: return
 
             val numCommentsOnThisAlert = CommentsUtils.getCommentIDsByAlertIDs(client, listOf(alert.id)).size
             if (numCommentsOnThisAlert >= maxCommentsPerAlert) {
@@ -192,7 +196,6 @@ constructor(
                     .setIfPrimaryTerm(request.primaryTerm)
                     .timeout(indexTimeout)
                     .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-//                    .setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL)
 
             log.debug("Creating new comment: ${comment.toXContentWithUser(XContentFactory.jsonBuilder())}")
 
@@ -215,15 +218,7 @@ constructor(
         }
 
         private suspend fun updateComment() {
-            val currentComment = getComment()
-            if (currentComment == null) {
-                actionListener.onFailure(
-                    AlertingException.wrap(
-                        OpenSearchStatusException("Comment not found", RestStatus.NOT_FOUND),
-                    ),
-                )
-                return
-            }
+            val currentComment = getComment() ?: return
 
             // check that the user has permissions to edit the comment. user can edit comment if
             // - user is Admin
@@ -251,7 +246,6 @@ constructor(
                     .setIfPrimaryTerm(request.primaryTerm)
                     .timeout(indexTimeout)
                     .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-//                    .setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL)
 
             log.debug(
                 "Updating comment, ${currentComment.id}, from: " +
@@ -314,8 +308,14 @@ constructor(
                 alert
             }
 
-            if (alerts.isEmpty()) return null
-            if (alerts.size > 1) {
+            if (alerts.isEmpty()) {
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException("Alert not found", RestStatus.NOT_FOUND),
+                    )
+                )
+                return null
+            } else if (alerts.size > 1) {
                 actionListener.onFailure(
                     AlertingException.wrap(IllegalStateException("Multiple alerts were found with the same ID")),
                 )
@@ -357,8 +357,14 @@ constructor(
                 comment
             }
 
-            if (comments.isEmpty()) return null
-            if (comments.size > 1) {
+            if (comments.isEmpty()) {
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException("Comment not found", RestStatus.NOT_FOUND),
+                    ),
+                )
+                return null
+            } else if (comments.size > 1) {
                 actionListener.onFailure(
                     AlertingException.wrap(IllegalStateException("Multiple comments were found with the same ID")),
                 )

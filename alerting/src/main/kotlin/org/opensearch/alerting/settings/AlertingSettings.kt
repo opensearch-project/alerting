@@ -262,21 +262,21 @@ class AlertingSettings {
         )
 
         val COMMENTS_MAX_CONTENT_SIZE = Setting.longSetting(
-            "plugins.alerting.comments.max_content_size",
+            "plugins.alerting.max_comment_character_length",
             2000L,
             0L,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         val MAX_COMMENTS_PER_ALERT = Setting.longSetting(
-            "plugins.alerting.comments.max_comments_per_alert",
+            "plugins.alerting.max_comments_per_alert",
             500L,
             0L,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         val MAX_COMMENTS_PER_NOTIFICATION = Setting.intSetting(
-            "plugins.alerting.comments.max_comments_per_notification",
+            "plugins.alerting.max_comments_per_notification",
             3,
             0,
             Setting.Property.NodeScope, Setting.Property.Dynamic
