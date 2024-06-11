@@ -10,6 +10,7 @@ Compatible with OpenSearch 2.15.0
 
 ### Enhancements
 * Add start_time and end_time to GetAlertsRequest. ([#1551](https://github.com/opensearch-project/alerting/pull/1551))
+* Add Alerting Comments experimental feature ([#1561](https://github.com/opensearch-project/alerting/pull/1561))
 
 ### Documentation
 * Added 2.15 release notes. ([#1569](https://github.com/opensearch-project/alerting/pull/1569))
