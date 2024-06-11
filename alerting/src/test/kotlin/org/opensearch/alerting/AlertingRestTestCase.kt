@@ -548,6 +548,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return Comment(
             id = commentId,
             entityId = comment["entity_id"] as String,
+            entityType = comment["entity_type"] as String,
             content = comment["content"] as String,
             createdTime = Instant.ofEpochMilli(comment["created_time"] as Long),
             lastUpdatedTime = if (comment["last_updated_time"] != null) {
