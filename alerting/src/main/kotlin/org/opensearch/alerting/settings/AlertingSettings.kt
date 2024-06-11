@@ -230,12 +230,6 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val COMMENTS_HISTORY_ENABLED = Setting.boolSetting(
-            "plugins.alerting.comments_history_enabled",
-            true,
-            Setting.Property.NodeScope, Setting.Property.Dynamic
-        )
-
         val COMMENTS_HISTORY_MAX_DOCS = Setting.longSetting(
             "plugins.alerting.comments_history_max_docs",
             1000L,

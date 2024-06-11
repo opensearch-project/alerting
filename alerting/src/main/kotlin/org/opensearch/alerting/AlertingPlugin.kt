@@ -406,7 +406,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.FINDINGS_INDEXING_BATCH_SIZE,
             AlertingSettings.CROSS_CLUSTER_MONITORING_ENABLED,
             AlertingSettings.ALERTING_COMMENTS_ENABLED,
-            AlertingSettings.COMMENTS_HISTORY_ENABLED,
             AlertingSettings.COMMENTS_HISTORY_MAX_DOCS,
             AlertingSettings.COMMENTS_HISTORY_INDEX_MAX_AGE,
             AlertingSettings.COMMENTS_HISTORY_ROLLOVER_PERIOD,

@@ -50,7 +50,6 @@ class CommentsIndices(
 ) : ClusterStateListener {
 
     init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.COMMENTS_HISTORY_ENABLED) { commentsHistoryEnabled = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.COMMENTS_HISTORY_MAX_DOCS) { commentsHistoryMaxDocs = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.COMMENTS_HISTORY_INDEX_MAX_AGE) {
             commentsHistoryMaxAge = it
@@ -83,8 +82,6 @@ class CommentsIndices(
 
         private val logger = LogManager.getLogger(AlertIndices::class.java)
     }
-
-    @Volatile private var commentsHistoryEnabled = AlertingSettings.COMMENTS_HISTORY_ENABLED.get(settings)
 
     @Volatile private var commentsHistoryMaxDocs = AlertingSettings.COMMENTS_HISTORY_MAX_DOCS.get(settings)
 
@@ -161,10 +158,6 @@ class CommentsIndices(
 
     fun isCommentsHistoryInitialized(): Boolean {
         return clusterService.state().metadata.hasAlias(COMMENTS_HISTORY_WRITE_INDEX)
-    }
-
-    fun isCommentsHistoryEnabled(): Boolean {
-        return commentsHistoryEnabled
     }
 
     suspend fun createOrUpdateInitialCommentsHistoryIndex() {
