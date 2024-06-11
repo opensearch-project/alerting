@@ -23,6 +23,7 @@ import org.opensearch.commons.alerting.model.InputRunResults
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorRunResult
 import org.opensearch.commons.alerting.model.WorkflowRunContext
+import org.opensearch.commons.alerting.model.remote.monitors.RemoteDocLevelMonitorInput
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.index.shard.ShardId
 import org.opensearch.core.rest.RestStatus
@@ -64,7 +65,8 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
         val lastRunContext = if (monitorMetadata.lastRunContext.isNullOrEmpty()) mutableMapOf()
         else monitorMetadata.lastRunContext.toMutableMap() as MutableMap<String, MutableMap<String, Any>>
 
-        val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
+        val remoteDocLevelMonitorInput = monitor.inputs[0] as RemoteDocLevelMonitorInput
+        val docLevelMonitorInput = remoteDocLevelMonitorInput.docLevelMonitorInput
         var shards: Set<String> = mutableSetOf()
         var concreteIndices = listOf<String>()
 
