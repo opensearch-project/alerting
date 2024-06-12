@@ -23,6 +23,8 @@ import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
+import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
@@ -36,6 +38,7 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.Comment
 import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput
@@ -274,6 +277,9 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             // to alertsToUpdate to ensure the Alert doc is updated at the end in either case
             completedAlertsToUpdate.addAll(completedAlerts)
 
+            // retrieve max Comments per Alert notification setting
+            val maxComments = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION)
+
             // All trigger contexts and results should be available at this point since all triggers were evaluated in the main do-while loop
             val triggerCtx = triggerContexts[trigger.id]!!
             val triggerResult = triggerResults[trigger.id]!!
@@ -291,9 +297,18 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 if (actionExecutionScope is PerAlertActionScope && !shouldDefaultToPerExecution) {
                     for (alertCategory in actionExecutionScope.actionableAlerts) {
                         val alertsToExecuteActionsFor = nextAlerts[trigger.id]?.get(alertCategory) ?: mutableListOf()
+                        val alertsToExecuteActionsForIds = alertsToExecuteActionsFor.map { it.id }
+                        val allAlertsComments = CommentsUtils.getCommentsForAlertNotification(
+                            monitorCtx.client!!,
+                            alertsToExecuteActionsForIds,
+                            maxComments
+                        )
                         for (alert in alertsToExecuteActionsFor) {
-                            val alertContext = if (alertCategory != AlertCategory.NEW) AlertContext(alert = alert)
-                            else getAlertContext(alert = alert, alertSampleDocs = alertSampleDocs)
+                            val alertContext = if (alertCategory != AlertCategory.NEW) {
+                                AlertContext(alert = alert, comments = allAlertsComments[alert.id])
+                            } else {
+                                getAlertContext(alert = alert, alertSampleDocs = alertSampleDocs, allAlertsComments[alert.id])
+                            }
 
                             val actionCtx = getActionContextForAlertCategory(
                                 alertCategory,
@@ -329,12 +344,28 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                         continue
                     }
 
+                    val alertsToExecuteActionsForIds = dedupedAlerts.map { it.id }
+                        .plus(newAlerts.map { it.id })
+                        .plus(completedAlerts.map { it.id })
+                    val allAlertsComments = CommentsUtils.getCommentsForAlertNotification(
+                        monitorCtx.client!!,
+                        alertsToExecuteActionsForIds,
+                        maxComments
+                    )
                     val actionCtx = triggerCtx.copy(
-                        dedupedAlerts = dedupedAlerts,
-                        newAlerts = newAlerts.map {
-                            getAlertContext(alert = it, alertSampleDocs = alertSampleDocs)
+                        dedupedAlerts = dedupedAlerts.map {
+                            AlertContext(alert = it, comments = allAlertsComments[it.id])
                         },
-                        completedAlerts = completedAlerts,
+                        newAlerts = newAlerts.map {
+                            getAlertContext(
+                                alert = it,
+                                alertSampleDocs = alertSampleDocs,
+                                alertComments = allAlertsComments[it.id]
+                            )
+                        },
+                        completedAlerts = completedAlerts.map {
+                            AlertContext(alert = it, comments = allAlertsComments[it.id])
+                        },
                         error = monitorResult.error ?: triggerResult.error
                     )
                     val actionResult = this.runAction(action, actionCtx, monitorCtx, monitor, dryrun)
@@ -537,17 +568,18 @@ object BucketLevelMonitorRunner : MonitorRunner() {
     ): BucketLevelTriggerExecutionContext {
         return when (alertCategory) {
             AlertCategory.DEDUPED ->
-                ctx.copy(dedupedAlerts = listOf(alertContext.alert), newAlerts = emptyList(), completedAlerts = emptyList(), error = error)
+                ctx.copy(dedupedAlerts = listOf(alertContext), newAlerts = emptyList(), completedAlerts = emptyList(), error = error)
             AlertCategory.NEW ->
                 ctx.copy(dedupedAlerts = emptyList(), newAlerts = listOf(alertContext), completedAlerts = emptyList(), error = error)
             AlertCategory.COMPLETED ->
-                ctx.copy(dedupedAlerts = emptyList(), newAlerts = emptyList(), completedAlerts = listOf(alertContext.alert), error = error)
+                ctx.copy(dedupedAlerts = emptyList(), newAlerts = emptyList(), completedAlerts = listOf(alertContext), error = error)
         }
     }
 
     private fun getAlertContext(
         alert: Alert,
-        alertSampleDocs: Map<String, Map<String, List<Map<String, Any>>>>
+        alertSampleDocs: Map<String, Map<String, List<Map<String, Any>>>>,
+        alertComments: List<Comment>?
     ): AlertContext {
         val bucketKey = alert.aggregationResultBucket?.getBucketKeysHash()
         val sampleDocs = alertSampleDocs[alert.triggerId]?.get(bucketKey)
@@ -561,7 +593,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 alert.monitorId,
                 alert.executionId
             )
-            AlertContext(alert = alert, sampleDocs = listOf())
+            AlertContext(alert = alert, sampleDocs = listOf(), comments = alertComments)
         }
     }
 
