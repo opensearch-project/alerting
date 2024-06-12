@@ -18,7 +18,7 @@ data class QueryLevelTriggerExecutionContext(
     override val results: List<Map<String, Any>>,
     override val periodStart: Instant,
     override val periodEnd: Instant,
-    val alertContext: AlertContext? = null,
+    val alert: AlertContext? = null,
     override val error: Exception? = null
 ) : TriggerExecutionContext(monitor, results, periodStart, periodEnd, error) {
 
@@ -39,7 +39,7 @@ data class QueryLevelTriggerExecutionContext(
     override fun asTemplateArg(): Map<String, Any?> {
         val tempArg = super.asTemplateArg().toMutableMap()
         tempArg["trigger"] = trigger.asTemplateArg()
-        tempArg["alert"] = alertContext?.asTemplateArg() // map "alert" templateArg field to AlertContext wrapper instead of Alert object
+        tempArg["alert"] = alert?.asTemplateArg() // map "alert" templateArg field to AlertContext wrapper instead of Alert object
         return tempArg
     }
 }

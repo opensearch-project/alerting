@@ -27,7 +27,7 @@ class org.opensearch.alerting.script.QueryLevelTriggerExecutionContext {
     List getResults()
     java.time.Instant getPeriodStart()
     java.time.Instant getPeriodEnd()
-    AlertContext getAlertContext()
+    AlertContext getAlert()
     Exception getError()
 }
 
