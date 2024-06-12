@@ -96,7 +96,7 @@ class RestSearchAlertingCommentAction() : BaseRestHandler() {
                         }
                     }
                 } catch (e: Exception) {
-                    log.info("The comment parsing failed. Will return response as is.")
+                    log.error("The comment parsing failed. Will return response as is.")
                 }
                 return BytesRestResponse(RestStatus.OK, response.toXContent(channel.newBuilder(), EMPTY_PARAMS))
             }
