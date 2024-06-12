@@ -53,7 +53,7 @@ class TriggerService(val scriptService: ScriptService) {
     ): Boolean {
         if (workflowRunContext?.auditDelegateMonitorAlerts == true) return false
         // Suppress actions if the current alert is acknowledged and there are no errors.
-        val suppress = ctx.alertContext?.alert?.state == Alert.State.ACKNOWLEDGED && result.error == null && ctx.error == null
+        val suppress = ctx.alert?.alert?.state == Alert.State.ACKNOWLEDGED && result.error == null && ctx.error == null
         return result.triggered && !suppress
     }
 
