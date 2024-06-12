@@ -28,6 +28,7 @@ import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.ChainedAlertTriggerExecutionContext
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
+import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.MAX_SEARCH_SIZE
 import org.opensearch.alerting.util.getBucketKeysHash
@@ -157,7 +158,7 @@ class AlertService(
         workflorwRunContext: WorkflowRunContext?
     ): Alert? {
         val currentTime = Instant.now()
-        val currentAlert = ctx.alert
+        val currentAlert = ctx.alertContext?.alert
 
         val updatedActionExecutionResults = mutableListOf<ActionExecutionResult>()
         val currentActionIds = mutableSetOf<String>()
@@ -686,6 +687,8 @@ class AlertService(
         val alertsIndex = dataSources.alertsIndex
         val alertsHistoryIndex = dataSources.alertsHistoryIndex
 
+        val commentIdsToDelete = mutableListOf<String>()
+
         var requestsToRetry = alerts.flatMap { alert ->
             // We don't want to set the version when saving alerts because the MonitorRunner has first priority when writing alerts.
             // In the rare event that a user acknowledges an alert between when it's read and when it's written
@@ -732,13 +735,22 @@ class AlertService(
                     listOfNotNull<DocWriteRequest<*>>(
                         DeleteRequest(alertsIndex, alert.id)
                             .routing(routingId),
-                        // Only add completed alert to history index if history is enabled
                         if (alertIndices.isAlertHistoryEnabled()) {
+                            // Only add completed alert to history index if history is enabled
                             IndexRequest(alertsHistoryIndex)
                                 .routing(routingId)
                                 .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                                 .id(alert.id)
-                        } else null
+                        } else {
+                            // Otherwise, prepare the Alert's comments for deletion, and don't include
+                            // a request to index the Alert to an Alert history index.
+                            // The delete request can't be added to the list of DocWriteRequests because
+                            // Comments are stored in aliased history indices, not a concrete Comments
+                            // index like Alerts. A DeleteBy request will be used to delete Comments, instead
+                            // of a regular Delete request
+                            commentIdsToDelete.addAll(CommentsUtils.getCommentIDsByAlertIDs(client, listOf(alert.id)))
+                            null
+                        }
                     )
                 }
             }
@@ -758,6 +770,9 @@ class AlertService(
                 throw ExceptionsHelper.convertToOpenSearchException(retryCause)
             }
         }
+
+        // delete all the comments of any Alerts that were deleted
+        CommentsUtils.deleteComments(client, commentIdsToDelete)
     }
 
     /**

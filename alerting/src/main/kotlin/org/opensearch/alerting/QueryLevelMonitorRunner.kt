@@ -6,12 +6,14 @@
 package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.alerting.model.AlertContext
 import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.commons.alerting.model.Alert
@@ -65,9 +67,20 @@ object QueryLevelMonitorRunner : MonitorRunner() {
 
         val updatedAlerts = mutableListOf<Alert>()
         val triggerResults = mutableMapOf<String, QueryLevelTriggerRunResult>()
+
+        val maxComments = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION)
+        val alertsToExecuteActionsForIds = currentAlerts.mapNotNull { it.value }.map { it.id }
+        val allAlertsComments = CommentsUtils.getCommentsForAlertNotification(
+            monitorCtx.client!!,
+            alertsToExecuteActionsForIds,
+            maxComments
+        )
         for (trigger in monitor.triggers) {
             val currentAlert = currentAlerts[trigger]
-            val triggerCtx = QueryLevelTriggerExecutionContext(monitor, trigger as QueryLevelTrigger, monitorResult, currentAlert)
+            val currentAlertContext = currentAlert?.let {
+                AlertContext(alert = currentAlert, comments = allAlertsComments[currentAlert.id])
+            }
+            val triggerCtx = QueryLevelTriggerExecutionContext(monitor, trigger as QueryLevelTrigger, monitorResult, currentAlertContext)
             val triggerResult = when (monitor.monitorType) {
                 Monitor.MonitorType.QUERY_LEVEL_MONITOR ->
                     monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger, triggerCtx)
@@ -80,7 +93,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                     else monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger, triggerCtx)
                 }
                 else ->
-                    throw IllegalArgumentException("Unsupported monitor type: ${monitor.monitorType.name}.")
+                    throw IllegalArgumentException("Unsupported monitor type: ${monitor.monitorType}.")
             }
 
             triggerResults[trigger.id] = triggerResult
