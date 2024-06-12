@@ -16,6 +16,7 @@ import org.opensearch.alerting.action.GetRemoteIndexesAction
 import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
 import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.comments.CommentsIndices
 import org.opensearch.alerting.core.JobSweeper
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsAction
@@ -27,6 +28,7 @@ import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSetting
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.resthandler.RestAcknowledgeAlertAction
 import org.opensearch.alerting.resthandler.RestAcknowledgeChainedAlertAction
+import org.opensearch.alerting.resthandler.RestDeleteAlertingCommentAction
 import org.opensearch.alerting.resthandler.RestDeleteMonitorAction
 import org.opensearch.alerting.resthandler.RestDeleteWorkflowAction
 import org.opensearch.alerting.resthandler.RestExecuteMonitorAction
@@ -40,8 +42,10 @@ import org.opensearch.alerting.resthandler.RestGetMonitorAction
 import org.opensearch.alerting.resthandler.RestGetRemoteIndexesAction
 import org.opensearch.alerting.resthandler.RestGetWorkflowAction
 import org.opensearch.alerting.resthandler.RestGetWorkflowAlertsAction
+import org.opensearch.alerting.resthandler.RestIndexAlertingCommentAction
 import org.opensearch.alerting.resthandler.RestIndexMonitorAction
 import org.opensearch.alerting.resthandler.RestIndexWorkflowAction
+import org.opensearch.alerting.resthandler.RestSearchAlertingCommentAction
 import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
 import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
 import org.opensearch.alerting.resthandler.RestSearchMonitorAction
@@ -54,6 +58,7 @@ import org.opensearch.alerting.settings.LegacyOpenDistroAlertingSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings
 import org.opensearch.alerting.transport.TransportAcknowledgeAlertAction
 import org.opensearch.alerting.transport.TransportAcknowledgeChainedAlertAction
+import org.opensearch.alerting.transport.TransportDeleteAlertingCommentAction
 import org.opensearch.alerting.transport.TransportDeleteMonitorAction
 import org.opensearch.alerting.transport.TransportDeleteWorkflowAction
 import org.opensearch.alerting.transport.TransportDocLevelMonitorFanOutAction
@@ -68,8 +73,10 @@ import org.opensearch.alerting.transport.TransportGetMonitorAction
 import org.opensearch.alerting.transport.TransportGetRemoteIndexesAction
 import org.opensearch.alerting.transport.TransportGetWorkflowAction
 import org.opensearch.alerting.transport.TransportGetWorkflowAlertsAction
+import org.opensearch.alerting.transport.TransportIndexAlertingCommentAction
 import org.opensearch.alerting.transport.TransportIndexMonitorAction
 import org.opensearch.alerting.transport.TransportIndexWorkflowAction
+import org.opensearch.alerting.transport.TransportSearchAlertingCommentAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
@@ -158,6 +165,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         @JvmField val LEGACY_OPENDISTRO_EMAIL_GROUP_BASE_URI = "$LEGACY_OPENDISTRO_DESTINATION_BASE_URI/email_groups"
 
         @JvmField val FINDING_BASE_URI = "/_plugins/_alerting/findings"
+        @JvmField val COMMENTS_BASE_URI = "/_plugins/_alerting/comments"
 
         @JvmField val ALERTING_JOB_TYPES = listOf("monitor", "workflow")
     }
@@ -166,6 +174,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     lateinit var scheduler: JobScheduler
     lateinit var sweeper: JobSweeper
     lateinit var scheduledJobIndices: ScheduledJobIndices
+    lateinit var commentsIndices: CommentsIndices
     lateinit var docLevelMonitorQueries: DocLevelMonitorQueries
     lateinit var threadPool: ThreadPool
     lateinit var alertIndices: AlertIndices
@@ -203,6 +212,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestGetWorkflowAction(),
             RestDeleteWorkflowAction(),
             RestGetRemoteIndexesAction(),
+            RestIndexAlertingCommentAction(),
+            RestSearchAlertingCommentAction(),
+            RestDeleteAlertingCommentAction(),
         )
     }
 
@@ -229,6 +241,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(AlertingActions.INDEX_WORKFLOW_ACTION_TYPE, TransportIndexWorkflowAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.GET_WORKFLOW_ACTION_TYPE, TransportGetWorkflowAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.DELETE_WORKFLOW_ACTION_TYPE, TransportDeleteWorkflowAction::class.java),
+            ActionPlugin.ActionHandler(AlertingActions.INDEX_COMMENT_ACTION_TYPE, TransportIndexAlertingCommentAction::class.java),
+            ActionPlugin.ActionHandler(AlertingActions.SEARCH_COMMENTS_ACTION_TYPE, TransportSearchAlertingCommentAction::class.java),
+            ActionPlugin.ActionHandler(AlertingActions.DELETE_COMMENT_ACTION_TYPE, TransportDeleteAlertingCommentAction::class.java),
             ActionPlugin.ActionHandler(ExecuteWorkflowAction.INSTANCE, TransportExecuteWorkflowAction::class.java),
             ActionPlugin.ActionHandler(GetRemoteIndexesAction.INSTANCE, TransportGetRemoteIndexesAction::class.java),
             ActionPlugin.ActionHandler(DocLevelMonitorFanOutAction.INSTANCE, TransportDocLevelMonitorFanOutAction::class.java)
@@ -287,6 +302,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerConsumers()
             .registerDestinationSettings()
         scheduledJobIndices = ScheduledJobIndices(client.admin(), clusterService)
+        commentsIndices = CommentsIndices(environment.settings(), client, threadPool, clusterService)
         docLevelMonitorQueries = DocLevelMonitorQueries(client, clusterService)
         scheduler = JobScheduler(threadPool, runner)
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
@@ -315,6 +331,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             scheduler,
             runner,
             scheduledJobIndices,
+            commentsIndices,
             docLevelMonitorQueries,
             destinationMigrationCoordinator,
             lockService,
@@ -389,7 +406,15 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.FINDING_HISTORY_ROLLOVER_PERIOD,
             AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD,
             AlertingSettings.FINDINGS_INDEXING_BATCH_SIZE,
-            AlertingSettings.CROSS_CLUSTER_MONITORING_ENABLED
+            AlertingSettings.CROSS_CLUSTER_MONITORING_ENABLED,
+            AlertingSettings.ALERTING_COMMENTS_ENABLED,
+            AlertingSettings.COMMENTS_HISTORY_MAX_DOCS,
+            AlertingSettings.COMMENTS_HISTORY_INDEX_MAX_AGE,
+            AlertingSettings.COMMENTS_HISTORY_ROLLOVER_PERIOD,
+            AlertingSettings.COMMENTS_HISTORY_RETENTION_PERIOD,
+            AlertingSettings.COMMENTS_MAX_CONTENT_SIZE,
+            AlertingSettings.MAX_COMMENTS_PER_ALERT,
+            AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION
         )
     }
 

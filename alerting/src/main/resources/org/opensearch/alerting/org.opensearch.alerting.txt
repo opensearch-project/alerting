@@ -27,7 +27,7 @@ class org.opensearch.alerting.script.QueryLevelTriggerExecutionContext {
     List getResults()
     java.time.Instant getPeriodStart()
     java.time.Instant getPeriodEnd()
-    Alert getAlert()
+    AlertContext getAlertContext()
     Exception getError()
 }
 
@@ -43,6 +43,10 @@ class org.opensearch.commons.alerting.model.QueryLevelTrigger {
     String getName()
     String getSeverity()
     List getActions()
+}
+
+class org.opensearch.alerting.model.AlertContext {
+    Alert getAlert()
 }
 
 class org.opensearch.commons.alerting.model.Alert {
