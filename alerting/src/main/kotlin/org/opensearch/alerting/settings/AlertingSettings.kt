@@ -223,5 +223,57 @@ class AlertingSettings {
             Int.MAX_VALUE,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+
+        val ALERTING_COMMENTS_ENABLED = Setting.boolSetting(
+            "plugins.alerting.comments_enabled",
+            false,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val COMMENTS_HISTORY_MAX_DOCS = Setting.longSetting(
+            "plugins.alerting.comments_history_max_docs",
+            1000L,
+            0L,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val COMMENTS_HISTORY_INDEX_MAX_AGE = Setting.positiveTimeSetting(
+            "plugins.alerting.comments_history_max_age",
+            TimeValue(30, TimeUnit.DAYS),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val COMMENTS_HISTORY_ROLLOVER_PERIOD = Setting.positiveTimeSetting(
+            "plugins.alerting.comments_history_rollover_period",
+            TimeValue(12, TimeUnit.HOURS),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val COMMENTS_HISTORY_RETENTION_PERIOD = Setting.positiveTimeSetting(
+            "plugins.alerting.comments_history_retention_period",
+            TimeValue(60, TimeUnit.DAYS),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val COMMENTS_MAX_CONTENT_SIZE = Setting.longSetting(
+            "plugins.alerting.max_comment_character_length",
+            2000L,
+            0L,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val MAX_COMMENTS_PER_ALERT = Setting.longSetting(
+            "plugins.alerting.max_comments_per_alert",
+            500L,
+            0L,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val MAX_COMMENTS_PER_NOTIFICATION = Setting.intSetting(
+            "plugins.alerting.max_comments_per_notification",
+            3,
+            0,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
     }
 }
