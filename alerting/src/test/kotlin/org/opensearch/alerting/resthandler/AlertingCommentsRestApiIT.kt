@@ -5,8 +5,8 @@
 
 package org.opensearch.alerting.resthandler
 
-import org.apache.hc.core5.http.ContentType
-import org.apache.hc.core5.http.io.entity.StringEntity
+import org.apache.http.entity.ContentType
+import org.apache.http.entity.StringEntity
 import org.opensearch.alerting.AlertingPlugin.Companion.COMMENTS_BASE_URI
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest
