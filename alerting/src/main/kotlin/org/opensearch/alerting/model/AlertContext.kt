@@ -6,6 +6,7 @@
 package org.opensearch.alerting.model
 
 import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.Comment
 import org.opensearch.commons.alerting.model.DocLevelQuery
 
 /**
@@ -15,7 +16,8 @@ import org.opensearch.commons.alerting.model.DocLevelQuery
 data class AlertContext(
     val alert: Alert,
     val associatedQueries: List<DocLevelQuery>? = null,
-    val sampleDocs: List<Map<String, Any?>>? = null
+    val sampleDocs: List<Map<String, Any?>>? = null,
+    val comments: List<Comment>? = null
 ) {
     fun asTemplateArg(): Map<String, Any?> {
         val queriesContext = associatedQueries?.map {
@@ -26,10 +28,20 @@ data class AlertContext(
             )
         }
 
+        val commentsContext = comments?.map {
+            mapOf(
+                Comment.COMMENT_CREATED_TIME_FIELD to it.createdTime,
+                Comment.COMMENT_LAST_UPDATED_TIME_FIELD to it.lastUpdatedTime,
+                Comment.COMMENT_CONTENT_FIELD to it.content,
+                Comment.COMMENT_USER_FIELD to it.user?.name
+            )
+        }
+
         // Compile the custom context fields.
         val customContextFields = mapOf(
             ASSOCIATED_QUERIES_FIELD to queriesContext,
-            SAMPLE_DOCS_FIELD to sampleDocs
+            SAMPLE_DOCS_FIELD to sampleDocs,
+            COMMENTS_FIELD to commentsContext
         )
 
         // Get the alert template args
@@ -45,5 +57,6 @@ data class AlertContext(
     companion object {
         const val ASSOCIATED_QUERIES_FIELD = "associated_queries"
         const val SAMPLE_DOCS_FIELD = "sample_documents"
+        const val COMMENTS_FIELD = "comments"
     }
 }
