@@ -102,7 +102,6 @@ class GetRemoteIndexesActionIT : AlertingRestTestCase() {
             assertNotNull(clusterDetails[ClusterIndexes.INDEXES_FIELD])
             val indexes = clusterDetails[ClusterIndexes.INDEXES_FIELD] as Map<String, Map<String, Any>>
 
-
             // Validate index-level response details
             expectedNames.forEach { indexName ->
                 assertNotNull(indexes[indexName])
@@ -149,7 +148,6 @@ class GetRemoteIndexesActionIT : AlertingRestTestCase() {
 
             assertNotNull(clusterDetails[ClusterIndexes.INDEXES_FIELD])
             val indexes = clusterDetails[ClusterIndexes.INDEXES_FIELD] as Map<String, Map<String, Any>>
-
 
             // Validate index-level response details
             expectedNames.forEach { indexName ->
