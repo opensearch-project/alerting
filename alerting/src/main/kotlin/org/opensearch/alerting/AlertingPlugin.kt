@@ -122,7 +122,12 @@ import org.opensearch.painless.spi.Allowlist
 import org.opensearch.painless.spi.AllowlistLoader
 import org.opensearch.painless.spi.PainlessExtension
 import org.opensearch.percolator.PercolatorPluginExt
-import org.opensearch.plugins.*
+import org.opensearch.plugins.ActionPlugin
+import org.opensearch.plugins.ExtensiblePlugin
+import org.opensearch.plugins.ReloadablePlugin
+import org.opensearch.plugins.ScriptPlugin
+import org.opensearch.plugins.SearchPlugin
+import org.opensearch.plugins.SystemIndexPlugin
 import org.opensearch.repositories.RepositoriesService
 import org.opensearch.rest.RestController
 import org.opensearch.rest.RestHandler
