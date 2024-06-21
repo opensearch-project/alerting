@@ -430,7 +430,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         return listOf(TriggerScript.CONTEXT)
     }
 
-    override fun getSystemIndexDescriptors(settings : Settings): Collection<SystemIndexDescriptor> {
+    override fun getSystemIndexDescriptors(settings: Settings): Collection<SystemIndexDescriptor> {
         return listOf(
             SystemIndexDescriptor(ALL_ALERT_INDEX_PATTERN, "Alerting Plugin system index pattern"),
             SystemIndexDescriptor(ALERT_CONFIG_INDEX, "Alerting Plugin Configuration index")
