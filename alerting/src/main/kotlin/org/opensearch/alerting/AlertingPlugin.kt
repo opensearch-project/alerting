@@ -15,7 +15,6 @@ import org.opensearch.alerting.action.GetRemoteIndexesAction
 import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_CONFIG_INDEX
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.comments.CommentsIndices
 import org.opensearch.alerting.core.JobSweeper
