@@ -117,8 +117,6 @@ class AlertIndices(
         /** The in progress alert history index. */
         const val ALERT_INDEX = ".opendistro-alerting-alerts"
 
-        const val ALERT_CONFIG_INDEX = ".opendistro-alerting-config"
-
         /** The alias of the index in which to write alert history */
         const val ALERT_HISTORY_WRITE_INDEX = ".opendistro-alerting-alert-history-write"
 

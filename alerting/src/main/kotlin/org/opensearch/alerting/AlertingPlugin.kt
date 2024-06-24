@@ -105,6 +105,7 @@ import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.model.remote.monitors.RemoteMonitorTrigger
@@ -434,7 +435,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     override fun getSystemIndexDescriptors(settings: Settings): Collection<SystemIndexDescriptor> {
         return listOf(
             SystemIndexDescriptor(ALL_ALERT_INDEX_PATTERN, "Alerting Plugin system index pattern"),
-            SystemIndexDescriptor(ALERT_CONFIG_INDEX, "Alerting Plugin Configuration index")
+            SystemIndexDescriptor(SCHEDULED_JOBS_INDEX, "Alerting Plugin Configuration index")
         )
     }
 
