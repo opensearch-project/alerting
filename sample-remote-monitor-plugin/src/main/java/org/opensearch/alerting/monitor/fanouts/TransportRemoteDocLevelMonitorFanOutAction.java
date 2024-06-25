@@ -83,7 +83,12 @@ public class TransportRemoteDocLevelMonitorFanOutAction extends HandledTransport
             SampleRemoteMonitorTrigger1 remoteMonitorTrigger = new SampleRemoteMonitorTrigger1(triggerSin);
 
 
-            ((Map<String, Object>) lastRunContext.get(index)).put("0", 0);
+            if (lastRunContext.containsKey(index)) {
+                ((Map<String, Object>) lastRunContext.get(index)).put("2", 0);
+            }
+            if (docLevelMonitorInput.getIndices().size() > 1 && lastRunContext.containsKey(docLevelMonitorInput.getIndices().get(1))) {
+                ((Map<String, Object>) lastRunContext.get(docLevelMonitorInput.getIndices().get(1))).put("4", 0);
+            }
             IndexRequest indexRequest = new IndexRequest(SampleRemoteDocLevelMonitorRunner.SAMPLE_REMOTE_DOC_LEVEL_MONITOR_RUNNER_INDEX)
                     .source(Map.of(sampleRemoteDocLevelMonitorInput.getA(), remoteMonitorTrigger.getA())).setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL);
             this.client.index(indexRequest, new ActionListener<>() {
