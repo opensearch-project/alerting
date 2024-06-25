@@ -12,6 +12,7 @@ import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.MonitorRunner
 import org.opensearch.alerting.MonitorRunnerExecutionContext
 import org.opensearch.alerting.util.IndexUtils
+import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.node.DiscoveryNode
 import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
@@ -27,6 +28,7 @@ import org.opensearch.commons.alerting.model.remote.monitors.RemoteDocLevelMonit
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.index.shard.ShardId
 import org.opensearch.core.rest.RestStatus
+import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.transport.TransportService
 import java.io.IOException
 import java.time.Instant
@@ -64,11 +66,26 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
         logger.info(monitorMetadata.lastRunContext.toMutableMap().toString())
         val lastRunContext = if (monitorMetadata.lastRunContext.isNullOrEmpty()) mutableMapOf()
         else monitorMetadata.lastRunContext.toMutableMap() as MutableMap<String, MutableMap<String, Any>>
+        val updatedLastRunContext = lastRunContext.toMutableMap()
 
         val remoteDocLevelMonitorInput = monitor.inputs[0] as RemoteDocLevelMonitorInput
         val docLevelMonitorInput = remoteDocLevelMonitorInput.docLevelMonitorInput
         var shards: Set<String> = mutableSetOf()
         var concreteIndices = listOf<String>()
+
+        // Resolve all passed indices to concrete indices
+        val allConcreteIndices = IndexUtils.resolveAllIndices(
+            docLevelMonitorInput.indices,
+            monitorCtx.clusterService!!,
+            monitorCtx.indexNameExpressionResolver!!
+        )
+        // cleanup old indices that are not monitored anymore from the same monitor
+        val runContextKeys = updatedLastRunContext.keys.toMutableSet()
+        for (ind in runContextKeys) {
+            if (!allConcreteIndices.contains(ind)) {
+                updatedLastRunContext.remove(ind)
+            }
+        }
 
         try {
             docLevelMonitorInput.indices.forEach { indexName ->
@@ -93,6 +110,39 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
                     }
                 }
 
+                concreteIndices.forEach { concreteIndexName ->
+                    // Prepare lastRunContext for each index
+                    val indexLastRunContext = lastRunContext.getOrPut(concreteIndexName) {
+                        val isIndexCreatedRecently = createdRecently(
+                            monitor,
+                            periodStart,
+                            periodEnd,
+                            monitorCtx.clusterService!!.state().metadata.index(concreteIndexName)
+                        )
+                        MonitorMetadataService.createRunContextForIndex(concreteIndexName, isIndexCreatedRecently)
+                    }
+
+                    val indexUpdatedRunContext = initializeNewLastRunContext(
+                        indexLastRunContext.toMutableMap(),
+                        monitorCtx,
+                        concreteIndexName
+                    ) as MutableMap<String, Any>
+                    if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
+                        IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
+                    ) {
+                        if (concreteIndexName == IndexUtils.getWriteIndex(
+                                indexName,
+                                monitorCtx.clusterService!!.state()
+                            )
+                        ) {
+                            updatedLastRunContext.remove(lastWriteIndex)
+                            updatedLastRunContext[concreteIndexName] = indexUpdatedRunContext
+                        }
+                    } else {
+                        updatedLastRunContext[concreteIndexName] = indexUpdatedRunContext
+                    }
+                }
+
                 concreteIndices.forEach {
                     val shardCount = getShardsCount(monitorCtx.clusterService!!, it)
                     for (i in 0 until shardCount) {
@@ -111,7 +161,7 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
             val docLevelMonitorFanOutResponses = monitorCtx.remoteMonitors[monitor.monitorType]!!.monitorRunner.doFanOut(
                 monitorCtx.clusterService!!,
                 monitor,
-                monitorMetadata,
+                monitorMetadata.copy(lastRunContext = updatedLastRunContext),
                 executionId,
                 concreteIndices,
                 workflowRunContext,
@@ -120,12 +170,12 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
                 nodeMap,
                 nodeShardAssignments
             )
-            updateLastRunContextFromFanOutResponses(docLevelMonitorFanOutResponses, lastRunContext)
+            updateLastRunContextFromFanOutResponses(docLevelMonitorFanOutResponses, updatedLastRunContext)
             val triggerResults = buildTriggerResults(docLevelMonitorFanOutResponses)
             val inputRunResults = buildInputRunResults(docLevelMonitorFanOutResponses)
             if (!isTempMonitor) {
                 MonitorMetadataService.upsertMetadata(
-                    monitorMetadata.copy(lastRunContext = lastRunContext),
+                    monitorMetadata.copy(lastRunContext = updatedLastRunContext),
                     true
                 )
             }
@@ -216,17 +266,17 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
                     // fanOutResponse.lastRunContexts //updatedContexts for relevant shards
                     val indexLastRunContext = updatedLastRunContext[indexName] as MutableMap<String, Any>
 
-                    if (fanOutResponse.lastRunContexts.contains("index") && fanOutResponse.lastRunContexts["index"] == indexName) {
-                        fanOutResponse.lastRunContexts.keys.forEach {
+                    if (fanOutResponse.lastRunContexts.contains(indexName)) {
+                        (fanOutResponse.lastRunContexts[indexName] as Map<String, Any>).forEach {
 
-                            val seq_no = fanOutResponse.lastRunContexts[it].toString().toIntOrNull()
+                            val seq_no = it.value.toString().toIntOrNull()
                             if (
-                                it != "shards_count" &&
-                                it != "index" &&
+                                it.key != "shards_count" &&
+                                it.key != "index" &&
                                 seq_no != null &&
                                 seq_no >= 0
                             ) {
-                                indexLastRunContext[it] = seq_no
+                                indexLastRunContext[it.key] = seq_no
                             }
                         }
                     }
@@ -308,5 +358,30 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
             }
         }
         return InputRunResults(listOf(inputRunResults), if (!errors.isEmpty()) AlertingException.merge(*errors.toTypedArray()) else null)
+    }
+
+    private fun createdRecently(
+        monitor: Monitor,
+        periodStart: Instant,
+        periodEnd: Instant,
+        indexMetadata: IndexMetadata
+    ): Boolean {
+        val lastExecutionTime = if (periodStart == periodEnd) monitor.lastUpdateTime else periodStart
+        val indexCreationDate = indexMetadata.settings.get("index.creation_date")?.toLong() ?: 0L
+        return indexCreationDate > lastExecutionTime.toEpochMilli()
+    }
+
+    private fun initializeNewLastRunContext(
+        lastRunContext: Map<String, Any>,
+        monitorCtx: MonitorRunnerExecutionContext,
+        index: String,
+    ): Map<String, Any> {
+        val count: Int = getShardsCount(monitorCtx.clusterService!!, index)
+        val updatedLastRunContext = lastRunContext.toMutableMap()
+        for (i: Int in 0 until count) {
+            val shard = i.toString()
+            updatedLastRunContext[shard] = SequenceNumbers.UNASSIGNED_SEQ_NO
+        }
+        return updatedLastRunContext
     }
 }

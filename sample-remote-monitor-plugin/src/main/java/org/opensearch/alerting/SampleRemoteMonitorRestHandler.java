@@ -208,13 +208,15 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
                 );
             };
         } else {
+            String indices = restRequest.param("index", "index");
+            List<String> index = List.of(indices.split(","));
             SampleRemoteDocLevelMonitorInput sampleRemoteDocLevelMonitorInput =
                     new SampleRemoteDocLevelMonitorInput("hello", Map.of("world", 1), 2);
             BytesStreamOutput out2 = new BytesStreamOutput();
             sampleRemoteDocLevelMonitorInput.writeTo(out2);
             BytesReference sampleRemoteDocLevelMonitorInputSerialized = out2.bytes();
 
-            DocLevelMonitorInput docLevelMonitorInput = new DocLevelMonitorInput("description", List.of("index"), emptyList());
+            DocLevelMonitorInput docLevelMonitorInput = new DocLevelMonitorInput("description", index, emptyList());
             RemoteDocLevelMonitorInput remoteDocLevelMonitorInput = new RemoteDocLevelMonitorInput(sampleRemoteDocLevelMonitorInputSerialized, docLevelMonitorInput);
 
             Monitor remoteDocLevelMonitor = new Monitor(

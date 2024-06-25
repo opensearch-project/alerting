@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -167,7 +168,112 @@ public class SampleRemoteMonitorIT extends OpenSearchRestTestCase {
                                 LoggingDeprecationHandler.INSTANCE,
                                 searchResponse.getEntity().getContent()
                         ).map();
-                        found.set(Integer.parseInt((((Map<String, Object>) ((Map<String, Object>) searchResponseJson.get("hits")).get("total")).get("value")).toString()) == 1 &&
+                        found.set(Integer.parseInt((((Map<String, Object>) ((Map<String, Object>) searchResponseJson.get("hits")).get("total")).get("value")).toString()) > 0 &&
+                                ((Map<String, Object>) ((List<Map<String, Object>>) ((Map<String, Object>) searchResponseJson.get("hits")).get("hits")).get(0).get("_source")).containsKey("hello") &&
+                                ((Map<String, Object>) ((List<Map<String, Object>>) ((Map<String, Object>) searchResponseJson.get("hits")).get("hits")).get(0).get("_source")).get("hello").toString().equals("hello"));
+                        return found.get();
+                    } catch (IOException ex) {
+                        return false;
+                    }
+                }, 10, TimeUnit.SECONDS);
+        Assert.assertTrue(found.get());
+    }
+
+    @SuppressWarnings("unchecked")
+    public void testSampleRemoteDocLevelMonitorWithDynamicMetadataUpdate() throws IOException, InterruptedException {
+        createIndex("index1", Settings.builder().put("number_of_shards", "7").build());
+        Response response = makeRequest(client(), "POST", "_plugins/_sample_remote_monitor/monitor",
+                Map.of("run_monitor", "doc_level", "index", "index1"), null);
+        Assert.assertEquals("Unable to create remote monitor", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+
+        Map<String, Object> responseJson = JsonXContent.jsonXContent.createParser(
+                NamedXContentRegistry.EMPTY,
+                LoggingDeprecationHandler.INSTANCE,
+                response.getEntity().getContent()
+        ).map();
+        String monitorId = responseJson.get("_id").toString();
+
+        response = makeRequest(client(), "POST", "/_plugins/_alerting/monitors/" + monitorId + "/_execute", Map.of(), null);
+        Assert.assertEquals("Unable to execute remote monitor", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+
+        createIndex("index2", Settings.builder().put("number_of_shards", "7").build());
+        String updatedMonitor = String.format(Locale.ROOT, "{\"type\":\"monitor\",\"name\":\"remote_doc_level_monitor\",\"monitor_type\":\"remote_doc_level_monitor\"," +
+                        "\"user\":{\"name\":\"\",\"backend_roles\":[],\"roles\":[],\"custom_attribute_names\":[],\"user_requested_tenant\":null},\"enabled\":true,\"schedule\":{\"period\":{\"interval\":5,\"unit\":\"MINUTES\"}}," +
+                        "\"inputs\":[{\"remote_doc_level_monitor_input\":{\"size\":24,\"input\":\"BWhlbGxvCgEFd29ybGQBAAAAAQAAAAIA\",\"doc_level_input\":" +
+                        "{\"doc_level_input\":{\"description\":\"description\",\"indices\":[%s],\"queries\":[]}}}}],\"" +
+                        "triggers\":[{\"remote_monitor_trigger\":{\"id\":\"id\",\"name\":\"name\",\"severity\":\"1\"," +
+                        "\"actions\":[{\"id\":\"id\",\"name\":\"name\",\"destination_id\":\"destinationId\",\"message_template\":{\"source\":\"Hello World\"," +
+                        "\"lang\":\"mustache\"},\"throttle_enabled\":false,\"subject_template\":{\"source\":\"Hello World\",\"lang\":\"mustache\"}," +
+                        "\"throttle\":{\"value\":60,\"unit\":\"MINUTES\"}}],\"size\":24,\"trigger\":\"BWhlbGxvCgEEdGVzdAM/gAAAAAAAAQAA\"}}]," +
+                        "\"owner\":\"sample-remote-monitor-plugin\"}", "\"index1\", \"index2\"");
+        makeRequest(client(), "PUT", "/_plugins/_alerting/monitors/" + monitorId, Map.of(), new StringEntity(updatedMonitor, ContentType.APPLICATION_JSON));
+
+        response = makeRequest(client(), "POST", "/_plugins/_alerting/monitors/" + monitorId + "/_execute", Map.of(), null);
+        Assert.assertEquals("Unable to execute remote monitor", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+
+        makeRequest(client(), "DELETE", "/index1", Map.of(), null);
+
+        response = makeRequest(client(), "POST", "/_plugins/_alerting/monitors/" + monitorId + "/_execute", Map.of(), null);
+        Assert.assertEquals("Unable to execute remote monitor", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+
+        AtomicBoolean found = new AtomicBoolean(false);
+        OpenSearchRestTestCase.waitUntil(
+                () -> {
+                    try {
+                        Response searchResponse = makeRequest(client(), "POST", SampleRemoteDocLevelMonitorRunner.SAMPLE_REMOTE_DOC_LEVEL_MONITOR_RUNNER_INDEX + "/_search", Map.of(),
+                                new StringEntity("{\"query\":{\"match_all\":{}}}", ContentType.APPLICATION_JSON));
+                        Map<String, Object> searchResponseJson = JsonXContent.jsonXContent.createParser(
+                                NamedXContentRegistry.EMPTY,
+                                LoggingDeprecationHandler.INSTANCE,
+                                searchResponse.getEntity().getContent()
+                        ).map();
+                        found.set(Integer.parseInt((((Map<String, Object>) ((Map<String, Object>) searchResponseJson.get("hits")).get("total")).get("value")).toString()) > 0 &&
+                                ((Map<String, Object>) ((List<Map<String, Object>>) ((Map<String, Object>) searchResponseJson.get("hits")).get("hits")).get(0).get("_source")).containsKey("hello") &&
+                                ((Map<String, Object>) ((List<Map<String, Object>>) ((Map<String, Object>) searchResponseJson.get("hits")).get("hits")).get(0).get("_source")).get("hello").toString().equals("hello"));
+                        return found.get();
+                    } catch (IOException ex) {
+                        return false;
+                    }
+                }, 10, TimeUnit.SECONDS);
+        Assert.assertTrue(found.get());
+    }
+
+    @SuppressWarnings("unchecked")
+    public void testSampleRemoteDocLevelMonitorWithAlias() throws IOException, InterruptedException {
+        String indexAlias = "test_alias";
+        createIndex("index-000001", Settings.EMPTY);
+        makeRequest(client(), "POST", "_aliases", Map.of(),
+                new StringEntity(String.format(Locale.ROOT, "{\"actions\":[{\"add\":{\"index\":\"index-000001\",\"alias\":\"%s\",\"is_write_index\":true}}]}", indexAlias), ContentType.APPLICATION_JSON));
+        Response response = makeRequest(client(), "POST", "_plugins/_sample_remote_monitor/monitor", Map.of("run_monitor", "doc_level", "index", indexAlias), null);
+        Assert.assertEquals("Unable to create remote monitor", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+
+        Map<String, Object> responseJson = JsonXContent.jsonXContent.createParser(
+                NamedXContentRegistry.EMPTY,
+                LoggingDeprecationHandler.INSTANCE,
+                response.getEntity().getContent()
+        ).map();
+        String monitorId = responseJson.get("_id").toString();
+
+        response = makeRequest(client(), "POST", "/_plugins/_alerting/monitors/" + monitorId + "/_execute", Map.of(), null);
+        Assert.assertEquals("Unable to execute remote monitor", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+
+        makeRequest(client(), "POST", String.format(Locale.ROOT,  "%s/_rollover", indexAlias), Map.of(),
+                new StringEntity("", ContentType.APPLICATION_JSON));
+
+        response = makeRequest(client(), "POST", "/_plugins/_alerting/monitors/" + monitorId + "/_execute", Map.of(), null);
+        Assert.assertEquals("Unable to execute remote monitor", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+        AtomicBoolean found = new AtomicBoolean(false);
+        OpenSearchRestTestCase.waitUntil(
+                () -> {
+                    try {
+                        Response searchResponse = makeRequest(client(), "POST", SampleRemoteDocLevelMonitorRunner.SAMPLE_REMOTE_DOC_LEVEL_MONITOR_RUNNER_INDEX + "/_search", Map.of(),
+                                new StringEntity("{\"query\":{\"match_all\":{}}}", ContentType.APPLICATION_JSON));
+                        Map<String, Object> searchResponseJson = JsonXContent.jsonXContent.createParser(
+                                NamedXContentRegistry.EMPTY,
+                                LoggingDeprecationHandler.INSTANCE,
+                                searchResponse.getEntity().getContent()
+                        ).map();
+                        found.set(Integer.parseInt((((Map<String, Object>) ((Map<String, Object>) searchResponseJson.get("hits")).get("total")).get("value")).toString()) > 0 &&
                                 ((Map<String, Object>) ((List<Map<String, Object>>) ((Map<String, Object>) searchResponseJson.get("hits")).get("hits")).get(0).get("_source")).containsKey("hello") &&
                                 ((Map<String, Object>) ((List<Map<String, Object>>) ((Map<String, Object>) searchResponseJson.get("hits")).get("hits")).get(0).get("_source")).get("hello").toString().equals("hello"));
                         return found.get();
