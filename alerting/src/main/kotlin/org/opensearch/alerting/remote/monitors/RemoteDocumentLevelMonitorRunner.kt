@@ -199,7 +199,7 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
             throw IOException("Only one input is supported with remote document-level-monitor.")
         }
 
-        if (monitor.inputs[0].name() != DocLevelMonitorInput.DOC_LEVEL_INPUT_FIELD) {
+        if (monitor.inputs[0].name() != RemoteDocLevelMonitorInput.REMOTE_DOC_LEVEL_MONITOR_INPUT_FIELD) {
             throw IOException("Invalid input with remote document-level-monitor.")
         }
 
