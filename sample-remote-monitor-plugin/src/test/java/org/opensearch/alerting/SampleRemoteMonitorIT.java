@@ -262,6 +262,9 @@ public class SampleRemoteMonitorIT extends OpenSearchRestTestCase {
 
         response = makeRequest(client(), "POST", "/_plugins/_alerting/monitors/" + monitorId + "/_execute", Map.of(), null);
         Assert.assertEquals("Unable to execute remote monitor", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+
+        response = makeRequest(client(), "POST", "/_plugins/_alerting/monitors/" + monitorId + "/_execute", Map.of(), null);
+        Assert.assertEquals("Unable to execute remote monitor", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
         AtomicBoolean found = new AtomicBoolean(false);
         OpenSearchRestTestCase.waitUntil(
                 () -> {
