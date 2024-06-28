@@ -84,6 +84,7 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
         for (ind in runContextKeys) {
             if (!allConcreteIndices.contains(ind)) {
                 updatedLastRunContext.remove(ind)
+                lastRunContext.remove(ind)
             }
         }
 
@@ -161,7 +162,7 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
             val docLevelMonitorFanOutResponses = monitorCtx.remoteMonitors[monitor.monitorType]!!.monitorRunner.doFanOut(
                 monitorCtx.clusterService!!,
                 monitor,
-                monitorMetadata.copy(lastRunContext = updatedLastRunContext),
+                monitorMetadata.copy(lastRunContext = lastRunContext),
                 executionId,
                 concreteIndices,
                 workflowRunContext,
