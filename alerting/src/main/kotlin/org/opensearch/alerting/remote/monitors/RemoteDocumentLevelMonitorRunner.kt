@@ -18,7 +18,6 @@ import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutResponse
 import org.opensearch.commons.alerting.model.ActionRunResult
-import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.InputRunResults
 import org.opensearch.commons.alerting.model.Monitor
@@ -53,6 +52,7 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
         try {
             validate(monitor)
         } catch (e: Exception) {
+            e.printStackTrace()
             logger.error("Failed to start Document-level-monitor. Error: ${e.message}")
             monitorResult = monitorResult.copy(error = AlertingException.wrap(e))
         }
@@ -182,6 +182,7 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
             }
             return monitorResult.copy(triggerResults = triggerResults, inputResults = inputRunResults)
         } catch (e: Exception) {
+            e.printStackTrace()
             logger.error("Failed running Document-level-monitor ${monitor.name}", e)
             val errorMessage = ExceptionsHelper.detailedMessage(e)
             monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor, errorMessage, executionId, workflowRunContext)
@@ -201,10 +202,6 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
 
         if (monitor.inputs[0].name() != RemoteDocLevelMonitorInput.REMOTE_DOC_LEVEL_MONITOR_INPUT_FIELD) {
             throw IOException("Invalid input with remote document-level-monitor.")
-        }
-
-        if ((monitor.inputs[0] as DocLevelMonitorInput).indices.isEmpty()) {
-            throw IllegalArgumentException("DocLevelMonitorInput has no indices")
         }
     }
 
