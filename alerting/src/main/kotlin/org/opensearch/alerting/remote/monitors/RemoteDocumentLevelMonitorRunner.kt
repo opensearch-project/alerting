@@ -52,7 +52,7 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
         try {
             validate(monitor)
         } catch (e: Exception) {
-            logger.error("Failed to start Document-level-monitor. Error: ${e.message}")
+            logger.error("Failed to start Document-level-monitor. Error: $e")
             monitorResult = monitorResult.copy(error = AlertingException.wrap(e))
         }
 
