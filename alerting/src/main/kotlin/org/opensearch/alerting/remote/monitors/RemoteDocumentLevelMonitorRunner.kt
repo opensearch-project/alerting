@@ -52,7 +52,6 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
         try {
             validate(monitor)
         } catch (e: Exception) {
-            e.printStackTrace()
             logger.error("Failed to start Document-level-monitor. Error: ${e.message}")
             monitorResult = monitorResult.copy(error = AlertingException.wrap(e))
         }
@@ -182,7 +181,6 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
             }
             return monitorResult.copy(triggerResults = triggerResults, inputResults = inputRunResults)
         } catch (e: Exception) {
-            e.printStackTrace()
             logger.error("Failed running Document-level-monitor ${monitor.name}", e)
             val errorMessage = ExceptionsHelper.detailedMessage(e)
             monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor, errorMessage, executionId, workflowRunContext)
@@ -202,6 +200,10 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
 
         if (monitor.inputs[0].name() != RemoteDocLevelMonitorInput.REMOTE_DOC_LEVEL_MONITOR_INPUT_FIELD) {
             throw IOException("Invalid input with remote document-level-monitor.")
+        }
+
+        if ((monitor.inputs[0] as RemoteDocLevelMonitorInput).docLevelMonitorInput.indices.isEmpty()) {
+            throw IllegalArgumentException("DocLevelMonitorInput has no indices")
         }
     }
 
