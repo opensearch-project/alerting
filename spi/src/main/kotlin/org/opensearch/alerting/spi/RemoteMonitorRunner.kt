@@ -12,7 +12,12 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutAction
 import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutRequest
 import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutResponse
-import org.opensearch.commons.alerting.model.*
+import org.opensearch.commons.alerting.model.IndexExecutionContext
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.MonitorMetadata
+import org.opensearch.commons.alerting.model.MonitorRunResult
+import org.opensearch.commons.alerting.model.TriggerRunResult
+import org.opensearch.commons.alerting.model.WorkflowRunContext
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.breaker.CircuitBreakingException
@@ -85,7 +90,16 @@ open class RemoteMonitorRunner {
                         dryrun,
                         monitorMetadata,
                         executionId,
-                        indexExecutionContext = null,
+                        indexExecutionContext = IndexExecutionContext(
+                            listOf(),
+                            mutableMapOf(),
+                            mutableMapOf(),
+                            "",
+                            "",
+                            listOf(),
+                            listOf(),
+                            listOf()
+                        ),
                         nodeShardAssignments[node.key]!!.toList(),
                         concreteIndices,
                         workflowRunContext
