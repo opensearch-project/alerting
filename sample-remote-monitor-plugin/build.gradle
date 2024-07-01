@@ -44,8 +44,6 @@ dependencies {
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
     compileOnly 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.1.1'
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlin_version}"
-    // Needed for integ tests
-    zipArchive group: 'org.opensearch.plugin', name:'alerting', version: "${opensearch_build}"
 }
 
 def es_tmp_dir = rootProject.file('build/private/es_tmp').absoluteFile
