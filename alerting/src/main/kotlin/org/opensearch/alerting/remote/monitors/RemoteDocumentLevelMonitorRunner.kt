@@ -18,7 +18,6 @@ import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutResponse
 import org.opensearch.commons.alerting.model.ActionRunResult
-import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.InputRunResults
 import org.opensearch.commons.alerting.model.Monitor
@@ -53,7 +52,7 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
         try {
             validate(monitor)
         } catch (e: Exception) {
-            logger.error("Failed to start Document-level-monitor. Error: ${e.message}")
+            logger.error("Failed to start Document-level-monitor. Error: $e")
             monitorResult = monitorResult.copy(error = AlertingException.wrap(e))
         }
 
@@ -199,11 +198,11 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
             throw IOException("Only one input is supported with remote document-level-monitor.")
         }
 
-        if (monitor.inputs[0].name() != DocLevelMonitorInput.DOC_LEVEL_INPUT_FIELD) {
+        if (monitor.inputs[0].name() != RemoteDocLevelMonitorInput.REMOTE_DOC_LEVEL_MONITOR_INPUT_FIELD) {
             throw IOException("Invalid input with remote document-level-monitor.")
         }
 
-        if ((monitor.inputs[0] as DocLevelMonitorInput).indices.isEmpty()) {
+        if ((monitor.inputs[0] as RemoteDocLevelMonitorInput).docLevelMonitorInput.indices.isEmpty()) {
             throw IllegalArgumentException("DocLevelMonitorInput has no indices")
         }
     }
