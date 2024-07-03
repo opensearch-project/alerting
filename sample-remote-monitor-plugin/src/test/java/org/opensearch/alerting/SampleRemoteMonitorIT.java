@@ -204,8 +204,8 @@ public class SampleRemoteMonitorIT extends OpenSearchRestTestCase {
                         "triggers\":[{\"remote_monitor_trigger\":{\"id\":\"id\",\"name\":\"name\",\"severity\":\"1\"," +
                         "\"actions\":[{\"id\":\"id\",\"name\":\"name\",\"destination_id\":\"destinationId\",\"message_template\":{\"source\":\"Hello World\"," +
                         "\"lang\":\"mustache\"},\"throttle_enabled\":false,\"subject_template\":{\"source\":\"Hello World\",\"lang\":\"mustache\"}," +
-                        "\"throttle\":{\"value\":60,\"unit\":\"MINUTES\"}}],\"size\":24,\"trigger\":\"BWhlbGxvCgEEdGVzdAM/gAAAAAAAAQAA\"}}]," +
-                        "\"owner\":\"sample-remote-monitor-plugin\"}", "\"index1\", \"index2\"");
+                        "\"throttle\":{\"value\":60,\"unit\":\"MINUTES\"}}],\"size\":24,\"trigger\":\"BWhlbGxvCgEEdGVzdAM/gAAAAAAAAQAA\"}}]" +
+                        "}", "\"index1\", \"index2\"");
         makeRequest(client(), "PUT", "/_plugins/_alerting/monitors/" + monitorId, Map.of(), new StringEntity(updatedMonitor, ContentType.APPLICATION_JSON));
 
         response = makeRequest(client(), "POST", "/_plugins/_alerting/monitors/" + monitorId + "/_execute", Map.of(), null);
