@@ -19,7 +19,6 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.comments.CommentsIndices.Companion.ALL_COMMENTS_INDEX_PATTERN
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -31,6 +30,7 @@ import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.DeleteCommentRequest
 import org.opensearch.commons.alerting.action.DeleteCommentResponse
 import org.opensearch.commons.alerting.model.Comment
+import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener

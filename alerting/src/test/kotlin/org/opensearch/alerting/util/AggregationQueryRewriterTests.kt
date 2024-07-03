@@ -7,15 +7,15 @@ package org.opensearch.alerting.util
 
 import org.junit.Assert
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.alerting.model.InputRunResults
-import org.opensearch.alerting.model.TriggerAfterKey
 import org.opensearch.alerting.randomBucketLevelTrigger
 import org.opensearch.alerting.randomBucketSelectorExtAggregationBuilder
 import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.cluster.ClusterModule
 import org.opensearch.common.CheckedFunction
 import org.opensearch.common.xcontent.json.JsonXContent
+import org.opensearch.commons.alerting.model.InputRunResults
 import org.opensearch.commons.alerting.model.Trigger
+import org.opensearch.commons.alerting.model.TriggerAfterKey
 import org.opensearch.core.ParseField
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser

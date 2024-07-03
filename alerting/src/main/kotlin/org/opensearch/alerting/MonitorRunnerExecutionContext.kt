@@ -9,6 +9,7 @@ import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.model.destination.DestinationContextFactory
+import org.opensearch.alerting.remote.monitors.RemoteMonitorRegistry
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings
@@ -41,6 +42,7 @@ data class MonitorRunnerExecutionContext(
     var workflowService: WorkflowService? = null,
     var jvmStats: JvmStats? = null,
     var findingsToTriggeredQueries: Map<String, List<DocLevelQuery>>? = null,
+    var remoteMonitors: Map<String, RemoteMonitorRegistry> = mapOf(),
 
     @Volatile var retryPolicy: BackoffPolicy? = null,
     @Volatile var moveAlertsRetryPolicy: BackoffPolicy? = null,

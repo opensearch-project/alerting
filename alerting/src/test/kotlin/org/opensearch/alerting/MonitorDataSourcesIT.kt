@@ -26,10 +26,7 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.ScheduledJobIndices
-import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
-import org.opensearch.alerting.model.WorkflowMetadata
 import org.opensearch.alerting.transport.AlertingSingleNodeTestCase
-import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.DocLevelMonitorQueries.Companion.INDEX_PATTERN_SUFFIX
 import org.opensearch.alerting.workflow.CompositeWorkflowRunner
@@ -55,6 +52,7 @@ import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.Delegate
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
+import org.opensearch.commons.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
@@ -63,6 +61,8 @@ import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JO
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.Table
 import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.commons.alerting.model.WorkflowMetadata
+import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
@@ -1599,6 +1599,26 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         """.trimIndent()
         val monitorId = "abc"
         indexDoc(SCHEDULED_JOBS_INDEX, monitorId, monitorStringWithoutName)
+
+        val monitorMetadata = """
+            {
+                    "metadata": {
+                        "monitor_id": "$monitorId",
+                        "last_action_execution_times": [],
+                        "last_run_context": {
+                            "$index": {
+                                "0": -1,
+                                "index": "$index",
+                                "shards_count": 1
+                            }
+                        },
+                        "source_to_query_index_mapping": {
+                            "$index$monitorId": ".opensearch-alerting-queries-000001"
+                        }
+                    }
+                }
+        """.trimIndent()
+        indexDoc(SCHEDULED_JOBS_INDEX, "$monitorId-metadata", monitorMetadata)
         val getMonitorResponse = getMonitorResponse(monitorId)
         Assert.assertNotNull(getMonitorResponse)
         Assert.assertNotNull(getMonitorResponse.monitor)
@@ -1716,6 +1736,26 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         """.trimIndent()
         val monitorId = "abc"
         indexDoc(SCHEDULED_JOBS_INDEX, monitorId, monitorStringWithoutName)
+
+        val monitorMetadata = """
+            {
+                    "metadata": {
+                        "monitor_id": "$monitorId",
+                        "last_action_execution_times": [],
+                        "last_run_context": {
+                            "$index": {
+                                "0": -1,
+                                "index": "$index",
+                                "shards_count": 1
+                            }
+                        },
+                        "source_to_query_index_mapping": {
+                            "$index$monitorId": ".opensearch-alerting-queries-000001"
+                        }
+                    }
+                }
+        """.trimIndent()
+        indexDoc(SCHEDULED_JOBS_INDEX, "$monitorId-metadata", monitorMetadata)
         val getMonitorResponse = getMonitorResponse(monitorId)
         Assert.assertNotNull(getMonitorResponse)
         Assert.assertNotNull(getMonitorResponse.monitor)

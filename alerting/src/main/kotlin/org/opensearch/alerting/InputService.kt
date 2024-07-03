@@ -10,8 +10,6 @@ import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.alerting.model.InputRunResults
-import org.opensearch.alerting.model.TriggerAfterKey
 import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
@@ -21,7 +19,6 @@ import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.executeTransportAction
 import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.toMap
 import org.opensearch.alerting.util.getRoleFilterEnabled
-import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client
 import org.opensearch.cluster.routing.Preference
 import org.opensearch.cluster.service.ClusterService
@@ -30,8 +27,11 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
+import org.opensearch.commons.alerting.model.InputRunResults
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.model.TriggerAfterKey
+import org.opensearch.commons.alerting.model.WorkflowRunContext
 import org.opensearch.core.common.io.stream.NamedWriteableAwareStreamInput
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry
 import org.opensearch.core.xcontent.NamedXContentRegistry
