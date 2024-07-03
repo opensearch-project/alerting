@@ -16,6 +16,7 @@ import org.opensearch.alerting.action.GetRemoteIndexesAction
 import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
 import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.comments.CommentsIndices
 import org.opensearch.alerting.core.JobSweeper
 import org.opensearch.alerting.core.ScheduledJobIndices
@@ -101,6 +102,7 @@ import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.core.action.ActionResponse
@@ -111,6 +113,7 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.env.Environment
 import org.opensearch.env.NodeEnvironment
 import org.opensearch.index.IndexModule
+import org.opensearch.indices.SystemIndexDescriptor
 import org.opensearch.monitor.jvm.JvmStats
 import org.opensearch.painless.spi.PainlessExtension
 import org.opensearch.painless.spi.Whitelist
@@ -120,6 +123,7 @@ import org.opensearch.plugins.ActionPlugin
 import org.opensearch.plugins.ReloadablePlugin
 import org.opensearch.plugins.ScriptPlugin
 import org.opensearch.plugins.SearchPlugin
+import org.opensearch.plugins.SystemIndexPlugin
 import org.opensearch.repositories.RepositoriesService
 import org.opensearch.rest.RestController
 import org.opensearch.rest.RestHandler
@@ -135,7 +139,8 @@ import java.util.function.Supplier
  * It also adds [Monitor.XCONTENT_REGISTRY], [SearchInput.XCONTENT_REGISTRY], [QueryLevelTrigger.XCONTENT_REGISTRY],
  * [BucketLevelTrigger.XCONTENT_REGISTRY], [ClusterMetricsInput.XCONTENT_REGISTRY] to the [NamedXContentRegistry] so that we are able to deserialize the custom named objects.
  */
-internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, ReloadablePlugin, SearchPlugin, PercolatorPluginExt() {
+internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, ReloadablePlugin,
+    SearchPlugin, SystemIndexPlugin, PercolatorPluginExt() {
 
     override fun getContextWhitelists(): Map<ScriptContext<*>, List<Whitelist>> {
         val whitelist = WhitelistLoader.loadFromResourceFiles(javaClass, "org.opensearch.alerting.txt")
@@ -426,6 +431,13 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
 
     override fun getContexts(): List<ScriptContext<*>> {
         return listOf(TriggerScript.CONTEXT)
+    }
+
+    override fun getSystemIndexDescriptors(settings: Settings): Collection<SystemIndexDescriptor> {
+        return listOf(
+            SystemIndexDescriptor(ALL_ALERT_INDEX_PATTERN, "Alerting Plugin system index pattern"),
+            SystemIndexDescriptor(SCHEDULED_JOBS_INDEX, "Alerting Plugin Configuration index")
+        )
     }
 
     override fun reload(settings: Settings) {
