@@ -9,10 +9,10 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorRequest
-import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.xcontent.XContentParser.Token.START_OBJECT
 import org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken
 import org.opensearch.rest.BaseRestHandler

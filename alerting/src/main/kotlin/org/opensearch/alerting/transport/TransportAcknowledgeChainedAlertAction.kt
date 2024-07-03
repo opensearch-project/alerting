@@ -26,7 +26,6 @@ import org.opensearch.action.support.WriteRequest
 import org.opensearch.action.update.UpdateRequest
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.ScheduledJobUtils
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
@@ -44,6 +43,7 @@ import org.opensearch.commons.alerting.model.CompositeInput
 import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.alerting.util.optionalTimeField
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener

@@ -14,10 +14,6 @@ dependencies {
     api "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlin_version}"
     implementation "com.cronutils:cron-utils:9.1.7"
     api "org.opensearch.client:opensearch-rest-client:${opensearch_version}"
-    implementation('com.google.googlejavaformat:google-java-format:1.10.0')  {
-        exclude group: 'com.google.guava'
-    }
-    implementation 'com.google.guava:guava:32.0.1-jre'
     api "org.opensearch:common-utils:${common_utils_version}@jar"
     implementation 'commons-validator:commons-validator:1.7'
 
