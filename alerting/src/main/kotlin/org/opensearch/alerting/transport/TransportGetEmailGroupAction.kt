@@ -16,7 +16,6 @@ import org.opensearch.alerting.action.GetEmailGroupRequest
 import org.opensearch.alerting.action.GetEmailGroupResponse
 import org.opensearch.alerting.model.destination.email.EmailGroup
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
-import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
@@ -26,6 +25,7 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
+import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry

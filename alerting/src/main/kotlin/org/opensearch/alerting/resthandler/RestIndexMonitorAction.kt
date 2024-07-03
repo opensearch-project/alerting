@@ -8,7 +8,6 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.IF_PRIMARY_TERM
 import org.opensearch.alerting.util.IF_SEQ_NO
 import org.opensearch.alerting.util.REFRESH
@@ -22,6 +21,8 @@ import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.util.AlertingException
+import org.opensearch.commons.alerting.util.isMonitorOfStandardType
 import org.opensearch.commons.utils.getInvalidNameChars
 import org.opensearch.commons.utils.isValidName
 import org.opensearch.core.rest.RestStatus
@@ -42,6 +43,7 @@ import org.opensearch.rest.RestResponse
 import org.opensearch.rest.action.RestResponseListener
 import java.io.IOException
 import java.time.Instant
+import java.util.Locale
 
 private val log = LogManager.getLogger(RestIndexMonitorAction::class.java)
 
@@ -101,33 +103,38 @@ class RestIndexMonitorAction : BaseRestHandler() {
             val monitorType = monitor.monitorType
             val triggers = monitor.triggers
 
-            when (monitorType) {
-                Monitor.MonitorType.QUERY_LEVEL_MONITOR -> {
-                    triggers.forEach {
-                        if (it !is QueryLevelTrigger) {
-                            throw (IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for query level monitor"))
+            if (monitor.isMonitorOfStandardType()) {
+                when (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT))) {
+                    Monitor.MonitorType.QUERY_LEVEL_MONITOR -> {
+                        triggers.forEach {
+                            if (it !is QueryLevelTrigger) {
+                                throw (IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for query level monitor"))
+                            }
                         }
                     }
-                }
-                Monitor.MonitorType.BUCKET_LEVEL_MONITOR -> {
-                    triggers.forEach {
-                        if (it !is BucketLevelTrigger) {
-                            throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for bucket level monitor")
+
+                    Monitor.MonitorType.BUCKET_LEVEL_MONITOR -> {
+                        triggers.forEach {
+                            if (it !is BucketLevelTrigger) {
+                                throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for bucket level monitor")
+                            }
                         }
                     }
-                }
-                Monitor.MonitorType.CLUSTER_METRICS_MONITOR -> {
-                    triggers.forEach {
-                        if (it !is QueryLevelTrigger) {
-                            throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for cluster metrics monitor")
+
+                    Monitor.MonitorType.CLUSTER_METRICS_MONITOR -> {
+                        triggers.forEach {
+                            if (it !is QueryLevelTrigger) {
+                                throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for cluster metrics monitor")
+                            }
                         }
                     }
-                }
-                Monitor.MonitorType.DOC_LEVEL_MONITOR -> {
-                    validateDocLevelQueryName(monitor)
-                    triggers.forEach {
-                        if (it !is DocumentLevelTrigger) {
-                            throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for document level monitor")
+
+                    Monitor.MonitorType.DOC_LEVEL_MONITOR -> {
+                        validateDocLevelQueryName(monitor)
+                        triggers.forEach {
+                            if (it !is DocumentLevelTrigger) {
+                                throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for document level monitor")
+                            }
                         }
                     }
                 }

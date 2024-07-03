@@ -6,11 +6,11 @@
 package org.opensearch.alerting.util
 
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.alerting.model.InputRunResults
-import org.opensearch.alerting.model.TriggerAfterKey
 import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.InputRunResults
 import org.opensearch.commons.alerting.model.Trigger
+import org.opensearch.commons.alerting.model.TriggerAfterKey
 import org.opensearch.search.aggregations.AggregationBuilder
 import org.opensearch.search.aggregations.AggregationBuilders
 import org.opensearch.search.aggregations.AggregatorFactories
@@ -86,7 +86,7 @@ class AggregationQueryRewriter {
                             } else {
                                 // if the afterKey from previous result is null, what does it signify?
                                 // A) result set exhausted OR  B) first page ?
-                                val afterKey = prevResult.aggTriggersAfterKey[trigger.id]!!.afterKey
+                                val afterKey = prevResult.aggTriggersAfterKey!![trigger.id]!!.afterKey
                                 factory.aggregateAfter(afterKey)
                             }
                         } else {

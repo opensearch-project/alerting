@@ -23,8 +23,6 @@ import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.alerting.action.ExecuteWorkflowResponse
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.model.MonitorMetadata
-import org.opensearch.alerting.model.WorkflowMetadata
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentFactory
@@ -47,9 +45,11 @@ import org.opensearch.commons.alerting.action.IndexWorkflowResponse
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.MonitorMetadata
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.Table
 import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.commons.alerting.model.WorkflowMetadata
 import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.index.IndexService

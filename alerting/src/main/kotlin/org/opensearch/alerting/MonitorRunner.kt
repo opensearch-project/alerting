@@ -9,8 +9,6 @@ import org.opensearch.OpenSearchSecurityException
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetDestinationsRequest
 import org.opensearch.alerting.action.GetDestinationsResponse
-import org.opensearch.alerting.model.ActionRunResult
-import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -24,10 +22,12 @@ import org.opensearch.alerting.util.destinationmigration.publishLegacyNotificati
 import org.opensearch.alerting.util.destinationmigration.sendNotification
 import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isTestAction
-import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.node.NodeClient
+import org.opensearch.commons.alerting.model.ActionRunResult
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.MonitorRunResult
 import org.opensearch.commons.alerting.model.Table
+import org.opensearch.commons.alerting.model.WorkflowRunContext
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import org.opensearch.core.common.Strings

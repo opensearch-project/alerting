@@ -14,7 +14,6 @@ import org.opensearch.alerting.randomAlert
 import org.opensearch.alerting.randomEmailAccount
 import org.opensearch.alerting.randomEmailGroup
 import org.opensearch.alerting.toJsonString
-import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.commons.alerting.model.ActionExecutionResult
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.util.string
@@ -77,18 +76,5 @@ class XContentTests : OpenSearchTestCase() {
         val emailGroupString = emailGroup.toJsonString()
         val parsedEmailGroup = EmailGroup.parse(parser(emailGroupString))
         assertEquals("Round tripping EmailGroup doesn't work", emailGroup, parsedEmailGroup)
-    }
-
-    fun `test MonitorMetadata`() {
-        val monitorMetadata = MonitorMetadata(
-            id = "monitorId-metadata",
-            monitorId = "monitorId",
-            lastActionExecutionTimes = emptyList(),
-            lastRunContext = emptyMap(),
-            sourceToQueryIndexMapping = mutableMapOf()
-        )
-        val monitorMetadataString = monitorMetadata.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS).string()
-        val parsedMonitorMetadata = MonitorMetadata.parse(parser(monitorMetadataString))
-        assertEquals("Round tripping MonitorMetadata doesn't work", monitorMetadata, parsedMonitorMetadata)
     }
 }

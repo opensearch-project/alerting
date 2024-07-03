@@ -7,18 +7,18 @@ package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.model.AlertContext
-import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.alerting.util.isADMonitor
-import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.MonitorRunResult
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
+import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
+import org.opensearch.commons.alerting.model.WorkflowRunContext
 import org.opensearch.transport.TransportService
 import java.time.Instant
 
@@ -82,9 +82,9 @@ object QueryLevelMonitorRunner : MonitorRunner() {
             }
             val triggerCtx = QueryLevelTriggerExecutionContext(monitor, trigger as QueryLevelTrigger, monitorResult, currentAlertContext)
             val triggerResult = when (monitor.monitorType) {
-                Monitor.MonitorType.QUERY_LEVEL_MONITOR ->
+                Monitor.MonitorType.QUERY_LEVEL_MONITOR.value ->
                     monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger, triggerCtx)
-                Monitor.MonitorType.CLUSTER_METRICS_MONITOR -> {
+                Monitor.MonitorType.CLUSTER_METRICS_MONITOR.value -> {
                     val remoteMonitoringEnabled =
                         monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.CROSS_CLUSTER_MONITORING_ENABLED)
                     logger.debug("Remote monitoring enabled: {}", remoteMonitoringEnabled)
