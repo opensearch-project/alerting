@@ -9,7 +9,6 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertService
 import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.model.AlertContext
-import org.opensearch.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
@@ -18,6 +17,7 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.AggregationResultBucket
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.Trigger
@@ -25,7 +25,9 @@ import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.commons.alerting.model.action.ActionExecutionScope
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
+import org.opensearch.commons.alerting.util.isMonitorOfStandardType
 import org.opensearch.script.Script
+import java.util.Locale
 import kotlin.math.max
 
 private val logger = LogManager.getLogger("AlertingUtils")
@@ -77,9 +79,13 @@ fun Destination.isAllowed(allowList: List<String>): Boolean = allowList.contains
 
 fun Destination.isTestAction(): Boolean = this.type == DestinationType.TEST_ACTION
 
-fun Monitor.isDocLevelMonitor(): Boolean = this.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR
+fun Monitor.isDocLevelMonitor(): Boolean =
+    this.isMonitorOfStandardType() &&
+        Monitor.MonitorType.valueOf(this.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
 
-fun Monitor.isQueryLevelMonitor(): Boolean = this.monitorType == Monitor.MonitorType.QUERY_LEVEL_MONITOR
+fun Monitor.isQueryLevelMonitor(): Boolean =
+    this.isMonitorOfStandardType() &&
+        Monitor.MonitorType.valueOf(this.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.QUERY_LEVEL_MONITOR
 
 /**
  * Since buckets can have multi-value keys, this converts the bucket key values to a string that can be used

@@ -27,7 +27,6 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_COMM
 import org.opensearch.alerting.settings.AlertingSettings.Companion.COMMENTS_MAX_CONTENT_SIZE
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_COMMENTS_PER_ALERT
-import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
@@ -42,6 +41,7 @@ import org.opensearch.commons.alerting.action.IndexCommentRequest
 import org.opensearch.commons.alerting.action.IndexCommentResponse
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Comment
+import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
