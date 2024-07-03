@@ -6,5 +6,11 @@
 rootProject.name = 'opensearch-alerting'
 include 'alerting'
 include 'core'
+include 'spi'
 
 project(":core").name = 'alerting-core'
+project(":spi").name = 'alerting-spi'
+
+include 'sample-remote-monitor-plugin'
+project(":sample-remote-monitor-plugin").name = "alerting-sample-remote-monitor-plugin"
+startParameter.excludedTaskNames=["publishPluginZipPublicationToMavenLocal", "publishPluginZipPublicationToZipStagingRepository"]

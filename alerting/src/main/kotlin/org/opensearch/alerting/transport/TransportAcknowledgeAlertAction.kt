@@ -22,7 +22,6 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.update.UpdateRequest
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -38,6 +37,7 @@ import org.opensearch.commons.alerting.action.GetMonitorRequest
 import org.opensearch.commons.alerting.action.GetMonitorResponse
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.alerting.util.optionalTimeField
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener

@@ -494,7 +494,7 @@ fun randomADMonitor(
     withMetadata: Boolean = false
 ): Monitor {
     return Monitor(
-        name = name, monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR, enabled = enabled, inputs = inputs,
+        name = name, monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR.value, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime,
         user = user, uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf()
     )

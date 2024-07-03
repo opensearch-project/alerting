@@ -6,10 +6,10 @@
 package org.opensearch.alerting.script
 
 import org.opensearch.alerting.model.AlertContext
-import org.opensearch.alerting.model.MonitorRunResult
-import org.opensearch.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.MonitorRunResult
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
+import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
 import java.time.Instant
 
 data class QueryLevelTriggerExecutionContext(

@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import com.github.jengelman.gradle.plugins.shadow.ShadowPlugin
 import java.util.concurrent.Callable
 import org.opensearch.gradle.test.RestIntegTestTask
 import org.opensearch.gradle.testclusters.StandaloneRestIntegTestTask
@@ -109,6 +110,7 @@ dependencies {
 
     api project(":alerting-core")
     implementation "com.github.seancfoley:ipaddress:5.4.1"
+    implementation project(path: ":alerting-spi", configuration: 'shadow')
 
     testImplementation "org.antlr:antlr4-runtime:${versions.antlr4}"
     testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlin_version}"

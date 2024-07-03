@@ -5,7 +5,7 @@
 
 package org.opensearch.alerting.action
 
-import org.opensearch.alerting.model.MonitorRunResult
+import org.opensearch.commons.alerting.model.MonitorRunResult
 import org.opensearch.core.action.ActionResponse
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.common.io.stream.StreamOutput

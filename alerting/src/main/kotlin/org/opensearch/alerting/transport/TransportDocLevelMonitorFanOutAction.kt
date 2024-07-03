@@ -28,22 +28,12 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertService
 import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.TriggerService
-import org.opensearch.alerting.action.DocLevelMonitorFanOutAction
-import org.opensearch.alerting.action.DocLevelMonitorFanOutRequest
-import org.opensearch.alerting.action.DocLevelMonitorFanOutResponse
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetDestinationsRequest
 import org.opensearch.alerting.action.GetDestinationsResponse
-import org.opensearch.alerting.model.ActionRunResult
 import org.opensearch.alerting.model.AlertContext
-import org.opensearch.alerting.model.DocumentLevelTriggerRunResult
-import org.opensearch.alerting.model.IndexExecutionContext
-import org.opensearch.alerting.model.InputRunResults
-import org.opensearch.alerting.model.MonitorMetadata
-import org.opensearch.alerting.model.MonitorRunResult
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.DestinationContextFactory
-import org.opensearch.alerting.model.userErrorMessage
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -61,7 +51,6 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTIONABL
 import org.opensearch.alerting.settings.AlertingSettings.Companion.PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY
 import org.opensearch.alerting.settings.DestinationSettings
-import org.opensearch.alerting.util.AlertingException
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.destinationmigration.NotificationActionConfigs
 import org.opensearch.alerting.util.destinationmigration.NotificationApiUtils
@@ -73,7 +62,6 @@ import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isTestAction
 import org.opensearch.alerting.util.parseSampleDocTags
 import org.opensearch.alerting.util.printsSampleDocData
-import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.Client
 import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.routing.Preference
@@ -83,18 +71,30 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.AlertingPluginInterface
+import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutAction
+import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutRequest
+import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutResponse
 import org.opensearch.commons.alerting.action.PublishFindingsRequest
 import org.opensearch.commons.alerting.action.SubscribeFindingsResponse
 import org.opensearch.commons.alerting.model.ActionExecutionResult
+import org.opensearch.commons.alerting.model.ActionRunResult
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
+import org.opensearch.commons.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.Finding
+import org.opensearch.commons.alerting.model.IndexExecutionContext
+import org.opensearch.commons.alerting.model.InputRunResults
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.MonitorMetadata
+import org.opensearch.commons.alerting.model.MonitorRunResult
 import org.opensearch.commons.alerting.model.Table
+import org.opensearch.commons.alerting.model.WorkflowRunContext
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.alerting.model.action.PerAlertActionScope
+import org.opensearch.commons.alerting.model.userErrorMessage
+import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.alerting.util.string
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import org.opensearch.core.action.ActionListener
@@ -208,7 +208,7 @@ class TransportDocLevelMonitorFanOutAction
         try {
             val monitor = request.monitor
             var monitorResult = MonitorRunResult<DocumentLevelTriggerRunResult>(monitor.name, Instant.now(), Instant.now())
-            val updatedIndexNames = request.indexExecutionContext.updatedIndexNames
+            val updatedIndexNames = request.indexExecutionContext!!.updatedIndexNames
             val monitorMetadata = request.monitorMetadata
             val shardIds = request.shardIds
             val indexExecutionContext = request.indexExecutionContext
@@ -251,7 +251,7 @@ class TransportDocLevelMonitorFanOutAction
 
             fetchShardDataAndMaybeExecutePercolateQueries(
                 monitor,
-                indexExecutionContext,
+                indexExecutionContext!!,
                 monitorMetadata,
                 inputRunResults,
                 docsToQueries,

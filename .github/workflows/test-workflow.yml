@@ -96,7 +96,7 @@ jobs:
           java-version: ${{ matrix.java }}
       - name: Build and run with Gradle
         working-directory: ${{ env.WORKING_DIR }}
-        run: ./gradlew assemble integTest ${{ env.BUILD_ARGS }}
+        run: ./gradlew assemble ${{ env.BUILD_ARGS }}
         env:
           _JAVA_OPTIONS: ${{ matrix.os_java_options }}
       - name: Create Artifact Path

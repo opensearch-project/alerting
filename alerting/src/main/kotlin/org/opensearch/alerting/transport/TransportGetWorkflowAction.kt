@@ -12,7 +12,6 @@ import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.util.AlertingException
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -25,6 +24,7 @@ import org.opensearch.commons.alerting.action.GetWorkflowRequest
 import org.opensearch.commons.alerting.action.GetWorkflowResponse
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
