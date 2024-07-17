@@ -64,15 +64,12 @@ fi
 [[ "$SNAPSHOT" == "true" ]] && VERSION=$VERSION-SNAPSHOT
 [ -z "$OUTPUT" ] && OUTPUT=artifacts
 
-mkdir -p $OUTPUT/plugins
 
 ./gradlew assemble --no-daemon --refresh-dependencies -DskipTests=true -Dopensearch.version=$VERSION -Dbuild.version_qualifier=$QUALIFIER -Dbuild.snapshot=$SNAPSHOT
 
-zipPath=$(find . -path \*build/distributions/*.zip)
-distributions="$(dirname "${zipPath}")"
-
-echo "COPY ${distributions}/*.zip"
-cp ${distributions}/*.zip ./$OUTPUT/plugins
+[ -z "$OUTPUT" ] && OUTPUT=artifacts
+mkdir -p $OUTPUT/plugins
+cp ./alerting/build/distributions/*.zip $OUTPUT/plugins
 
 ./gradlew publishToMavenLocal -Dopensearch.version=$VERSION -Dbuild.snapshot=$SNAPSHOT -Dbuild.version_qualifier=$QUALIFIER
 ./gradlew publishPluginZipPublicationToZipStagingRepository -Dopensearch.version=$VERSION -Dbuild.snapshot=$SNAPSHOT -Dbuild.version_qualifier=$QUALIFIER
