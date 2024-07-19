@@ -26,7 +26,7 @@ import java.util.*
 
 @Suppress("UNCHECKED_CAST")
 class GetRemoteIndexesActionIT : AlertingRestTestCase() {
-    private var remoteMonitoringEnabled = false
+    private var remoteMonitoringEnabled = true
     private var remoteClusters = listOf<String>()
 
     private val mappingFieldToTypePairs1 = listOf(
