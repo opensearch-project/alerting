@@ -205,7 +205,7 @@ class AlertingSettings {
 
         val CROSS_CLUSTER_MONITORING_ENABLED = Setting.boolSetting(
             "plugins.alerting.cross_cluster_monitoring_enabled",
-            false,
+            true,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
