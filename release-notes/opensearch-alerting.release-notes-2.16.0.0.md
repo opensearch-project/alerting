@@ -15,4 +15,4 @@ Compatible with OpenSearch 2.16.0
 
 
 ### Documentation
-* Added 2.16 release notes. ([#1610](https://github.com/opensearch-project/alerting/pull/1610))
+* Added 2.16 release notes. ([#1619](https://github.com/opensearch-project/alerting/pull/1619))
