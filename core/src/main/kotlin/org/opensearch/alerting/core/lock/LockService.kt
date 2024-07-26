@@ -16,6 +16,7 @@ import org.opensearch.action.update.UpdateResponse
 import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
@@ -29,6 +30,7 @@ import org.opensearch.index.engine.VersionConflictEngineException
 import org.opensearch.index.seqno.SequenceNumbers
 import java.io.IOException
 import java.time.Instant
+import java.util.concurrent.TimeUnit
 
 private val log = LogManager.getLogger(LockService::class.java)
 
@@ -37,6 +39,7 @@ class LockService(private val client: Client, private val clusterService: Cluste
 
     companion object {
         const val LOCK_INDEX_NAME = ".opensearch-alerting-config-lock"
+        val LOCK_EXPIRED_SECONDS = TimeValue(5, TimeUnit.MINUTES)
 
         @JvmStatic
         fun lockMapping(): String? {
@@ -72,13 +75,23 @@ class LockService(private val client: Client, private val clusterService: Cluste
                                 object : ActionListener<LockModel> {
                                     override fun onResponse(existingLock: LockModel?) {
                                         if (existingLock != null) {
+                                            val currentTimestamp = getNow()
                                             if (isLockReleased(existingLock)) {
                                                 log.debug("lock is released or expired: {}", existingLock)
                                                 val updateLock = LockModel(existingLock, getNow(), false)
                                                 updateLock(updateLock, listener)
                                             } else {
-                                                log.debug("Lock is NOT released or expired. {}", existingLock)
-                                                listener.onResponse(null)
+                                                log.debug("Lock is NOT released. {}", existingLock)
+                                                if (existingLock.lockTime.epochSecond + LOCK_EXPIRED_SECONDS.seconds
+                                                    < currentTimestamp.epochSecond
+                                                ) {
+                                                    log.debug("Lock is expired. Renewing Lock {}", existingLock)
+                                                    val updateLock = LockModel(existingLock, getNow(), false)
+                                                    updateLock(updateLock, listener)
+                                                } else {
+                                                    log.debug("Lock is NOT expired. {}", existingLock)
+                                                    listener.onResponse(null)
+                                                }
                                             }
                                         } else {
                                             val tempLock = LockModel(scheduledJobId, getNow(), false)
