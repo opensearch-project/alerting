@@ -39,7 +39,7 @@ class LockService(private val client: Client, private val clusterService: Cluste
 
     companion object {
         const val LOCK_INDEX_NAME = ".opensearch-alerting-config-lock"
-        val LOCK_EXPIRED_SECONDS = TimeValue(5, TimeUnit.MINUTES)
+        val LOCK_EXPIRED_MINUTES = TimeValue(5, TimeUnit.MINUTES)
 
         @JvmStatic
         fun lockMapping(): String? {
@@ -82,14 +82,14 @@ class LockService(private val client: Client, private val clusterService: Cluste
                                                 updateLock(updateLock, listener)
                                             } else {
                                                 log.debug("Lock is NOT released. {}", existingLock)
-                                                if (existingLock.lockTime.epochSecond + LOCK_EXPIRED_SECONDS.seconds
+                                                if (existingLock.lockTime.epochSecond + LOCK_EXPIRED_MINUTES.seconds
                                                     < currentTimestamp.epochSecond
                                                 ) {
                                                     log.debug("Lock is expired. Renewing Lock {}", existingLock)
                                                     val updateLock = LockModel(existingLock, getNow(), false)
                                                     updateLock(updateLock, listener)
                                                 } else {
-                                                    log.debug("Lock is NOT expired. {}", existingLock)
+                                                    log.debug("Lock is NOT expired. Not running monitor {}", existingLock)
                                                     listener.onResponse(null)
                                                 }
                                             }
@@ -233,7 +233,7 @@ class LockService(private val client: Client, private val clusterService: Cluste
         listener: ActionListener<Boolean>
     ) {
         if (lock == null) {
-            log.debug("Lock is null. Nothing to release.")
+            log.error("Lock is null. Nothing to release.")
             listener.onResponse(false)
         } else {
             log.debug("Releasing lock: {}", lock)

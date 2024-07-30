@@ -351,6 +351,8 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                                 it
                             )
                         }
+                    } catch (e: Exception) {
+                        logger.error("Workflow run failed for workflow with id ${job.id}", e)
                     } finally {
                         monitorCtx.client!!.suspendUntil<Client, Boolean> { monitorCtx.lockService!!.release(workflowLock, it) }
                         logger.debug("lock ${workflowLock?.lockId} released")
@@ -383,6 +385,8 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                                 it
                             )
                         }
+                    } catch (e: Exception) {
+                        logger.error("Monitor run failed for monitor with id ${job.id}", e)
                     } finally {
                         monitorCtx.client!!.suspendUntil<Client, Boolean> { monitorCtx.lockService!!.release(monitorLock, it) }
                         logger.debug("lock ${monitorLock?.lockId} released")
