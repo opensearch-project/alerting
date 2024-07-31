@@ -320,15 +320,15 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         when (job) {
             is Workflow -> {
                 launch {
-                    var lock: LockModel? = null
+                    var workflowLock: LockModel? = null
                     try {
-                        lock = monitorCtx.client!!.suspendUntil<Client, LockModel?> {
+                        workflowLock = monitorCtx.client!!.suspendUntil<Client, LockModel?> {
                             monitorCtx.lockService!!.acquireLock(job, it)
                         } ?: return@launch
-                        logger.debug("lock ${lock!!.lockId} acquired")
+                        logger.debug("lock ${workflowLock.lockId} acquired")
                         logger.debug(
                             "PERF_DEBUG: executing workflow ${job.id} on node " +
-                                monitorCtx.clusterService!!.state().nodes().localNode.id
+                                    monitorCtx.clusterService!!.state().nodes().localNode.id
                         )
                         monitorCtx.client!!.suspendUntil<Client, ExecuteWorkflowResponse> {
                             monitorCtx.client!!.execute(
@@ -343,20 +343,22 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                                 it
                             )
                         }
+                    } catch (e: Exception) {
+                        logger.error("Workflow run failed for workflow with id ${job.id}", e)
                     } finally {
-                        monitorCtx.client!!.suspendUntil<Client, Boolean> { monitorCtx.lockService!!.release(lock, it) }
-                        logger.debug("lock ${lock!!.lockId} released")
+                        monitorCtx.client!!.suspendUntil<Client, Boolean> { monitorCtx.lockService!!.release(workflowLock, it) }
+                        logger.debug("lock ${workflowLock?.lockId} released")
                     }
                 }
             }
             is Monitor -> {
                 launch {
-                    var lock: LockModel? = null
+                    var monitorLock: LockModel? = null
                     try {
-                        lock = monitorCtx.client!!.suspendUntil<Client, LockModel?> {
+                        monitorLock = monitorCtx.client!!.suspendUntil<Client, LockModel?> {
                             monitorCtx.lockService!!.acquireLock(job, it)
                         } ?: return@launch
-                        logger.debug("lock ${lock!!.lockId} acquired")
+                        logger.debug("lock ${monitorLock.lockId} acquired")
                         logger.debug(
                             "PERF_DEBUG: executing ${job.monitorType} ${job.id} on node " +
                                 monitorCtx.clusterService!!.state().nodes().localNode.id
@@ -375,9 +377,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                                 it
                             )
                         }
+                    } catch (e: Exception) {
+                        logger.error("Monitor run failed for monitor with id ${job.id}", e)
                     } finally {
-                        monitorCtx.client!!.suspendUntil<Client, Boolean> { monitorCtx.lockService!!.release(lock, it) }
-                        logger.debug("lock ${lock!!.lockId} released")
+                        monitorCtx.client!!.suspendUntil<Client, Boolean> { monitorCtx.lockService!!.release(monitorLock, it) }
+                        logger.debug("lock ${monitorLock?.lockId} released")
                     }
                 }
             }

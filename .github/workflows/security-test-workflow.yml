@@ -59,6 +59,7 @@ jobs:
           if docker pull opensearchstaging/opensearch:$docker_version
           then
             echo "FROM opensearchstaging/opensearch:$docker_version" >> Dockerfile
+            echo "RUN if [ -d /usr/share/opensearch/plugins/opensearch-security-analytics ]; then /usr/share/opensearch/bin/opensearch-plugin remove opensearch-security-analytics; fi" >> Dockerfile
             echo "RUN if [ -d /usr/share/opensearch/plugins/opensearch-alerting ]; then /usr/share/opensearch/bin/opensearch-plugin remove opensearch-alerting; fi" >> Dockerfile
             echo "ADD alerting/build/distributions/$plugin /tmp/" >> Dockerfile
             echo "RUN /usr/share/opensearch/bin/opensearch-plugin install --batch file:/tmp/$plugin" >> Dockerfile
