@@ -34,6 +34,7 @@ import java.time.temporal.ChronoUnit
 import java.time.temporal.ChronoUnit.MILLIS
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
@@ -2434,5 +2435,122 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         } catch (e: ResponseException) {
             assertTrue(e.message!!.contains("illegal_argument_exception"))
         }
+    }
+
+    fun `test execute monitor generates alerts and findings with renewable locks`() {
+        val testIndex = createTestIndex()
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                name = "__lag-monitor-test__",
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                schedule = IntervalSchedule(interval = 1, unit = ChronoUnit.MINUTES),
+                enabled = true
+            )
+        )
+        assertNotNull(monitor.id)
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex, "2", testDoc)
+
+        var found = AtomicBoolean(false)
+        OpenSearchTestCase.waitUntil(
+            {
+                val res = (searchFindings(monitor).size == 2)
+                found.set(res)
+                found.get()
+            }, 2, TimeUnit.MINUTES
+        )
+        assertEquals(found.get(), true)
+
+        updateMonitor(monitor.copy(enabled = false, enabledTime = null))
+
+        val currTimeStampMinusTenMinutes = System.currentTimeMillis() - 600000L
+        val lock = "{\"scheduled_job_id\":\"${monitor.id}\",\"lock_time\":${currTimeStampMinusTenMinutes / 1000},\"released\":false}"
+        updateDoc(client(), LockService.LOCK_INDEX_NAME, "${monitor.id}-lock", lock)
+
+        updateMonitor(monitor.copy(enabled = true), true)
+
+        indexDoc(testIndex, "4", testDoc)
+        indexDoc(testIndex, "5", testDoc)
+
+        found = AtomicBoolean(false)
+        OpenSearchTestCase.waitUntil(
+            {
+                val res = (searchFindings(monitor).size == 4)
+                found.set(res)
+                found.get()
+            }, 2, TimeUnit.MINUTES
+        )
+        assertEquals(found.get(), true)
+        assertTrue(true)
+    }
+
+    fun `test execute monitor generates alerts and findings with non renewable locks`() {
+        val testIndex = createTestIndex()
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                name = "__lag-monitor-test__",
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                schedule = IntervalSchedule(interval = 1, unit = ChronoUnit.MINUTES),
+                enabled = true
+            )
+        )
+        assertNotNull(monitor.id)
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex, "2", testDoc)
+
+        var found = AtomicBoolean(false)
+        OpenSearchTestCase.waitUntil(
+            {
+                val res = (searchFindings(monitor).size == 2)
+                found.set(res)
+                found.get()
+            }, 2, TimeUnit.MINUTES
+        )
+        assertEquals(found.get(), true)
+
+        val currTimeStamp = System.currentTimeMillis()
+        val lock = "{\"scheduled_job_id\":\"${monitor.id}\",\"lock_time\":$currTimeStamp,\"released\":false}"
+        updateDoc(client(), LockService.LOCK_INDEX_NAME, "${monitor.id}-lock", lock)
+
+        indexDoc(testIndex, "4", testDoc)
+        indexDoc(testIndex, "5", testDoc)
+
+        found = AtomicBoolean(false)
+        OpenSearchTestCase.waitUntil(
+            {
+                val res = (searchFindings(monitor).size == 4)
+                found.set(res)
+                found.get()
+            }, 2, TimeUnit.MINUTES
+        )
+        assertEquals(found.get(), false)
     }
 }
