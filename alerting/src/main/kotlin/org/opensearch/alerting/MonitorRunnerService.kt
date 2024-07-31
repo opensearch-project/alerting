@@ -328,7 +328,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                         logger.debug("lock ${workflowLock.lockId} acquired")
                         logger.debug(
                             "PERF_DEBUG: executing workflow ${job.id} on node " +
-                                    monitorCtx.clusterService!!.state().nodes().localNode.id
+                                monitorCtx.clusterService!!.state().nodes().localNode.id
                         )
                         monitorCtx.client!!.suspendUntil<Client, ExecuteWorkflowResponse> {
                             monitorCtx.client!!.execute(
