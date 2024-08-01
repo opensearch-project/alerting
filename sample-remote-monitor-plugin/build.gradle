@@ -70,7 +70,11 @@ task integTest(type: RestIntegTestTask) {
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
 
-    if (System.getProperty("https") != null || System.getProperty("https") != "false") {
+    if (System.getProperty("https") == null || System.getProperty("https") == "false") {
+        filter {
+            includeTestsMatching '**/*IT.class'
+        }
+    } else {
         filter {
             excludeTestsMatching "org.opensearch.alerting.SampleRemoteMonitorIT"
         }
