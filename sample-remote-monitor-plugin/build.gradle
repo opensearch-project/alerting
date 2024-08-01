@@ -72,11 +72,7 @@ task integTest(type: RestIntegTestTask) {
 
     if (System.getProperty("https") == null || System.getProperty("https") == "false") {
         filter {
-            includeTestsMatching '**/*IT.class'
-        }
-    } else {
-        filter {
-            excludeTestsMatching "org.opensearch.alerting.SampleRemoteMonitorIT"
+            includeTestsMatching "org.opensearch.alerting.SampleRemoteMonitorIT"
         }
     }
 }
