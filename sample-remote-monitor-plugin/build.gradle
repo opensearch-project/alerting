@@ -69,6 +69,12 @@ task integTest(type: RestIntegTestTask) {
     description = "Run tests against a cluster"
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
+
+    if (System.getProperty("https") != null || System.getProperty("https") != "false") {
+        filter {
+            excludeTestsMatching "org.opensearch.alerting.SampleRemoteMonitorIT"
+        }
+    }
 }
 tasks.named("check").configure { dependsOn(integTest) }
 
