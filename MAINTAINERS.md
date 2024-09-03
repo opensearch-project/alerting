@@ -19,7 +19,7 @@ This document contains a list of maintainers in this repo. See [opensearch-proje
 | Riya Saxena           | [riysaxen-amzn](https://github.com/riysaxen-amzn)   | Amazon    |
 | Joanne Wang           | [jowg-amazon](https://github.com/jowg-amazon)       | Amazon    |
 | Amardeepsingh Siglani | [amsiglan](https://github.com/amsiglan)             | Amazon    | 
-| Riya Saxena           | [riysaxen-amzn](https://github.com/riysaxen-amzn)   | Amazon    | 
+| Megha Goyal           | [goyamegh](https://github.com/goyamegh)   | Amazon    | 
 
 ## Emeritus
 
