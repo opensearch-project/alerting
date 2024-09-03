@@ -7,7 +7,6 @@ This document contains a list of maintainers in this repo. See [opensearch-proje
 | Maintainer            | GitHub ID                                         | Affiliation |
 |-----------------------|---------------------------------------------------|-------------|
 | Ashish Agrawal        | [lezzago](https://github.com/lezzago)             | Amazon      |
-| Mohammad Qureshi      | [qreshi](https://github.com/qreshi)               | Amazon      |
 | Bowen Lan             | [bowenlan-amzn](https://github.com/bowenlan-amzn) | Amazon      |
 | Saurabh Singh         | [getsaurabh02](https://github.com/getsaurabh02)   | Amazon      |
 | Rishabh Maurya        | [rishabhmaurya](https://github.com/rishabhmaurya) | Amazon      |
@@ -27,3 +26,4 @@ This document contains a list of maintainers in this repo. See [opensearch-proje
 |-------------------|-------------------------------------------------------|-------------|
 | Sriram Kosuri     | [skkosuri-amzn](https://github.com/skkosuri-amzn)     | Amazon      |
 | Tianli Feng       | [tlfeng](https://github.com/tlfeng)                   | Amazon      |
+| Mohammad Qureshi      | [qreshi](https://github.com/qreshi)               | Amazon      |
