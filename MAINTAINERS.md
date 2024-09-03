@@ -14,6 +14,7 @@ This document contains a list of maintainers in this repo. See [opensearch-proje
 | Subhobrata DEY        | [sbcd90](https://github.com/sbcd90)               | Amazon      |
 | Surya Sashank Nistala | [eirsep](https://github.com/eirsep)               | Amazon      |
 | Thomas Hurney         | [AWSHurneyt](https://github.com/AWSHurneyt)       | Amazon      |
+| Praveen Sameneni  | [praveensameneni](https://github.com/praveensameneni) | Amazon      |
 | Chase Engelbrecht     | [engechas](https://github.com/engechas)           | Amazon      |
 | Riya Saxena           | [riysaxen-amzn](https://github.com/riysaxen-amzn) | Amazon      |
 | Joanne Wang           | [jowg-amazon](https://github.com/jowg-amazon)     | Amazon      |
@@ -26,4 +27,3 @@ This document contains a list of maintainers in this repo. See [opensearch-proje
 |-------------------|-------------------------------------------------------|-------------|
 | Sriram Kosuri     | [skkosuri-amzn](https://github.com/skkosuri-amzn)     | Amazon      |
 | Tianli Feng       | [tlfeng](https://github.com/tlfeng)                   | Amazon      |
-| Praveen Sameneni  | [praveensameneni](https://github.com/praveensameneni) | Amazon      |
