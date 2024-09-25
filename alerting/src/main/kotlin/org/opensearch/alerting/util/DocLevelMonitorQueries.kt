@@ -490,7 +490,12 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         updatedProperties: MutableMap<String, Any>
     ): Pair<AcknowledgedResponse, String> {
         var targetQueryIndex = monitorMetadata.sourceToQueryIndexMapping[sourceIndex + monitor.id]
-        if (targetQueryIndex == null) {
+        if (
+            targetQueryIndex == null || (
+                targetQueryIndex != monitor.dataSources.queryIndex &&
+                    monitor.deleteQueryIndexInEveryRun == true
+                )
+        ) {
             // queryIndex is alias which will always have only 1 backing index which is writeIndex
             // This is due to a fact that that _rollover API would maintain only single index under alias
             // if you don't add is_write_index setting when creating index initially
