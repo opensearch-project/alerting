@@ -375,12 +375,6 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                 monitorCtx.docLevelMonitorQueries!!.deleteDocLevelQueriesOnDryRun(monitorMetadata)
             }
 
-            if (monitor.dataSources.queryIndex.contains("optimized")) {
-                val ack = monitorCtx.docLevelMonitorQueries!!.deleteDocLevelQueryIndex(monitor.dataSources)
-                if (!ack) {
-                    logger.error("Deletion of concrete queryIndex:${monitor.dataSources.queryIndex} is not ack'd!")
-                }
-            }
             // TODO: Update the Document as part of the Trigger and return back the trigger action result
             return monitorResult.copy(triggerResults = triggerResults, inputResults = inputRunResults)
         } catch (e: Exception) {
@@ -392,16 +386,16 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                 RestStatus.INTERNAL_SERVER_ERROR,
                 e
             )
-            if (monitor.dataSources.queryIndex.contains("optimized") &&
+            return monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
+        } finally {
+            if (monitor.deleteQueryIndexInEveryRun == true &&
                 monitorCtx.docLevelMonitorQueries!!.docLevelQueryIndexExists(monitor.dataSources)
             ) {
                 val ack = monitorCtx.docLevelMonitorQueries!!.deleteDocLevelQueryIndex(monitor.dataSources)
                 if (!ack) {
-                    logger.error("Retry deletion of concrete queryIndex:${monitor.dataSources.queryIndex} is not ack'd!")
+                    logger.error("Deletion of concrete queryIndex:${monitor.dataSources.queryIndex} is not ack'd! for monitor ${monitor.id}")
                 }
             }
-            return monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
-        } finally {
             val endTime = System.currentTimeMillis()
             totalTimeTakenStat = endTime - startTime
             logger.debug(

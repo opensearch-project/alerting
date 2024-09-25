@@ -95,7 +95,7 @@ object DeleteMonitorService :
 
     private suspend fun deleteDocLevelMonitorQueriesAndIndices(monitor: Monitor) {
         try {
-            if (monitor.owner == "alerting") {
+            if (monitor.deleteQueryIndexInEveryRun == false) {
                 val metadata = MonitorMetadataService.getMetadata(monitor)
                 metadata?.sourceToQueryIndexMapping?.forEach { (_, queryIndex) ->
 

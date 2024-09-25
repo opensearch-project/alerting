@@ -445,6 +445,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     )
                 )
             indexRequests.add(indexRequest)
+            log.debug("query $query added for execution of monitor $monitorId on index $sourceIndex")
         }
         log.debug("bulk inserting percolate [${queries.size}] queries")
         if (indexRequests.isNotEmpty()) {
