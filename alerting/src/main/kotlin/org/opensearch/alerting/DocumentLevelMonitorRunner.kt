@@ -393,7 +393,10 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             ) {
                 val ack = monitorCtx.docLevelMonitorQueries!!.deleteDocLevelQueryIndex(monitor.dataSources)
                 if (!ack) {
-                    logger.error("Deletion of concrete queryIndex:${monitor.dataSources.queryIndex} is not ack'd! for monitor ${monitor.id}")
+                    logger.error(
+                        "Deletion of concrete queryIndex:${monitor.dataSources.queryIndex} is not ack'd! " +
+                            "for monitor ${monitor.id}"
+                    )
                 }
             }
             val endTime = System.currentTimeMillis()
