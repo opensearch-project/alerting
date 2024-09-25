@@ -11,6 +11,7 @@ import org.opensearch.commons.alerting.action.AlertingActions
 val ALL_ACCESS_ROLE = "all_access"
 val READALL_AND_MONITOR_ROLE = "readall_and_monitor"
 val ALERTING_FULL_ACCESS_ROLE = "alerting_full_access"
+val ALERTING_ACK_ALERTS_ROLE = "alerting_ack_alerts"
 val ALERTING_READ_ONLY_ACCESS = "alerting_read_access"
 val ALERTING_NO_ACCESS_ROLE = "no_access"
 val ALERTING_GET_EMAIL_ACCOUNT_ACCESS = "alerting_get_email_account_access"
