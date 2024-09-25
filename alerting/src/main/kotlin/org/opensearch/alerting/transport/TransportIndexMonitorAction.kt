@@ -537,7 +537,8 @@ class TransportIndexMonitorAction @Inject constructor(
                     if (
                         request.monitor.isMonitorOfStandardType() &&
                         Monitor.MonitorType.valueOf(request.monitor.monitorType.uppercase(Locale.ROOT)) ==
-                        Monitor.MonitorType.DOC_LEVEL_MONITOR
+                        Monitor.MonitorType.DOC_LEVEL_MONITOR &&
+                        request.monitor.owner == "alerting"
                     ) {
                         indexDocLevelMonitorQueries(request.monitor, indexResponse.id, metadata, request.refreshPolicy)
                     }
@@ -702,13 +703,22 @@ class TransportIndexMonitorAction @Inject constructor(
                     Monitor.MonitorType.valueOf(currentMonitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
                 ) {
                     updatedMetadata = MonitorMetadataService.recreateRunContext(metadata, currentMonitor)
-                    client.suspendUntil<Client, BulkByScrollResponse> {
-                        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-                            .source(currentMonitor.dataSources.queryIndex)
-                            .filter(QueryBuilders.matchQuery("monitor_id", currentMonitor.id))
-                            .execute(it)
+                    if (docLevelMonitorQueries.docLevelQueryIndexExists(currentMonitor.dataSources)) {
+                        client.suspendUntil<Client, BulkByScrollResponse> {
+                            DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+                                .source(currentMonitor.dataSources.queryIndex)
+                                .filter(QueryBuilders.matchQuery("monitor_id", currentMonitor.id))
+                                .execute(it)
+                        }
                     }
-                    indexDocLevelMonitorQueries(request.monitor, currentMonitor.id, updatedMetadata, request.refreshPolicy)
+                    if (currentMonitor.owner == "alerting") {
+                        indexDocLevelMonitorQueries(
+                            request.monitor,
+                            currentMonitor.id,
+                            updatedMetadata,
+                            request.refreshPolicy
+                        )
+                    }
                     MonitorMetadataService.upsertMetadata(updatedMetadata, updating = true)
                 }
                 actionListener.onResponse(

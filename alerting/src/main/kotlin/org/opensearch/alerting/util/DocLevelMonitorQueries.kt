@@ -24,6 +24,7 @@ import org.opensearch.action.admin.indices.settings.put.UpdateSettingsRequest
 import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.index.IndexRequest
+import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.MonitorRunnerService.monitorCtx
@@ -179,6 +180,16 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         } catch (e: Exception) {
             log.error("Failed to delete doc level queries on dry run", e)
         }
+    }
+
+    suspend fun deleteDocLevelQueryIndex(dataSources: DataSources): Boolean {
+        val ack: AcknowledgedResponse = client.suspendUntil {
+            client.admin().indices().delete(
+                DeleteIndexRequest(dataSources.queryIndex).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN),
+                it
+            )
+        }
+        return ack.isAcknowledged
     }
 
     fun docLevelQueryIndexExists(dataSources: DataSources): Boolean {
