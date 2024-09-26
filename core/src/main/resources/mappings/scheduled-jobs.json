@@ -293,6 +293,9 @@
             }
           }
         },
+        "delete_query_index_in_every_run": {
+          "type": "boolean"
+        },
         "ui_metadata": {
           "type": "object",
           "enabled": false
