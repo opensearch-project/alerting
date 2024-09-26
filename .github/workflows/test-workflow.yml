@@ -59,7 +59,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
       # This step uses the upload-artifact Github action: https://github.com/actions/upload-artifact
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v3
         with:
           name: alerting-plugin-${{ matrix.os }}
           path: alerting-artifacts
@@ -107,7 +107,7 @@ jobs:
           cp ./alerting/build/distributions/*.zip alerting-artifacts
       # This step uses the upload-artifact Github action: https://github.com/actions/upload-artifact
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v3
         with:
           name: alerting-plugin-${{ matrix.os }}
           path: alerting-artifacts
