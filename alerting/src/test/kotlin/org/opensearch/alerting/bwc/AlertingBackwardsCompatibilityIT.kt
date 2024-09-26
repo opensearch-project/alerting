@@ -113,6 +113,7 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
         val indexName = "test_bwc_index"
         val bwcMonitorString = """
             {
+              "owner": "alerting",
               "type": "monitor",
               "name": "test_bwc_monitor",
               "enabled": true,

@@ -374,6 +374,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                 // Clean up any queries created by the dry run monitor
                 monitorCtx.docLevelMonitorQueries!!.deleteDocLevelQueriesOnDryRun(monitorMetadata)
             }
+
             // TODO: Update the Document as part of the Trigger and return back the trigger action result
             return monitorResult.copy(triggerResults = triggerResults, inputResults = inputRunResults)
         } catch (e: Exception) {
@@ -387,6 +388,17 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             )
             return monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
         } finally {
+            if (monitor.deleteQueryIndexInEveryRun == true &&
+                monitorCtx.docLevelMonitorQueries!!.docLevelQueryIndexExists(monitor.dataSources)
+            ) {
+                val ack = monitorCtx.docLevelMonitorQueries!!.deleteDocLevelQueryIndex(monitor.dataSources)
+                if (!ack) {
+                    logger.error(
+                        "Deletion of concrete queryIndex:${monitor.dataSources.queryIndex} is not ack'd! " +
+                            "for monitor ${monitor.id}"
+                    )
+                }
+            }
             val endTime = System.currentTimeMillis()
             totalTimeTakenStat = endTime - startTime
             logger.debug(

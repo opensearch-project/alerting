@@ -1196,7 +1196,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             dataSources = DataSources(
                 queryIndex = customQueryIndex,
                 queryIndexMappingsByType = mapOf(Pair("text", mapOf(Pair("analyzer", analyzer)))),
-            )
+            ),
+            owner = "alerting"
         )
         try {
             createMonitor(monitor)
@@ -2381,7 +2382,9 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         var monitor = randomDocumentLevelMonitor(
             inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
+            triggers = listOf(trigger),
+            dataSources = DataSources(),
+            owner = "alerting"
         )
         // This doc should create close to 10000 (limit) fields in index mapping. It's easier to add mappings like this then via api
         val docPayload: StringBuilder = StringBuilder(100000)

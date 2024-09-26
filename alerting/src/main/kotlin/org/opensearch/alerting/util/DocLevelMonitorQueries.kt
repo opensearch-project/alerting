@@ -24,6 +24,7 @@ import org.opensearch.action.admin.indices.settings.put.UpdateSettingsRequest
 import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.index.IndexRequest
+import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.MonitorRunnerService.monitorCtx
@@ -179,6 +180,16 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         } catch (e: Exception) {
             log.error("Failed to delete doc level queries on dry run", e)
         }
+    }
+
+    suspend fun deleteDocLevelQueryIndex(dataSources: DataSources): Boolean {
+        val ack: AcknowledgedResponse = client.suspendUntil {
+            client.admin().indices().delete(
+                DeleteIndexRequest(dataSources.queryIndex).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN),
+                it
+            )
+        }
+        return ack.isAcknowledged
     }
 
     fun docLevelQueryIndexExists(dataSources: DataSources): Boolean {
@@ -434,6 +445,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     )
                 )
             indexRequests.add(indexRequest)
+            log.debug("query $query added for execution of monitor $monitorId on index $sourceIndex")
         }
         log.debug("bulk inserting percolate [${queries.size}] queries")
         if (indexRequests.isNotEmpty()) {
@@ -479,7 +491,12 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         updatedProperties: MutableMap<String, Any>
     ): Pair<AcknowledgedResponse, String> {
         var targetQueryIndex = monitorMetadata.sourceToQueryIndexMapping[sourceIndex + monitor.id]
-        if (targetQueryIndex == null) {
+        if (
+            targetQueryIndex == null || (
+                targetQueryIndex != monitor.dataSources.queryIndex &&
+                    monitor.deleteQueryIndexInEveryRun == true
+                )
+        ) {
             // queryIndex is alias which will always have only 1 backing index which is writeIndex
             // This is due to a fact that that _rollover API would maintain only single index under alias
             // if you don't add is_write_index setting when creating index initially
