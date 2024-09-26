@@ -548,8 +548,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     if (
                         request.monitor.isMonitorOfStandardType() &&
                         Monitor.MonitorType.valueOf(request.monitor.monitorType.uppercase(Locale.ROOT)) ==
-                        Monitor.MonitorType.DOC_LEVEL_MONITOR &&
-                        request.monitor.deleteQueryIndexInEveryRun == false
+                        Monitor.MonitorType.DOC_LEVEL_MONITOR
                     ) {
                         indexDocLevelMonitorQueries(request.monitor, indexResponse.id, metadata, request.refreshPolicy)
                     }
@@ -728,14 +727,12 @@ class TransportIndexMonitorAction @Inject constructor(
                                 .execute(it)
                         }
                     }
-                    if (currentMonitor.deleteQueryIndexInEveryRun == false) {
-                        indexDocLevelMonitorQueries(
-                            request.monitor,
-                            currentMonitor.id,
-                            updatedMetadata,
-                            request.refreshPolicy
-                        )
-                    }
+                    indexDocLevelMonitorQueries(
+                        request.monitor,
+                        currentMonitor.id,
+                        updatedMetadata,
+                        request.refreshPolicy
+                    )
                     MonitorMetadataService.upsertMetadata(updatedMetadata, updating = true)
                 }
                 actionListener.onResponse(
