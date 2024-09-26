@@ -5,8 +5,6 @@
 
 package org.opensearch.alerting.resthandler
 
-import org.apache.hc.core5.http.ContentType.APPLICATION_JSON
-import org.apache.hc.core5.http.io.entity.StringEntity
 import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
@@ -14,12 +12,10 @@ import org.opensearch.alerting.ALERTING_ACK_ALERTS_ROLE
 import org.opensearch.alerting.ALERTING_FULL_ACCESS_ROLE
 import org.opensearch.alerting.ALERTING_READ_ONLY_ACCESS
 import org.opensearch.alerting.AlertingRestTestCase
-import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.randomAlert
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_COMMENTS_ENABLED
 import org.opensearch.client.ResponseException
 import org.opensearch.client.RestClient
-import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.rest.SecureRestClientBuilder
 import org.opensearch.core.rest.RestStatus
