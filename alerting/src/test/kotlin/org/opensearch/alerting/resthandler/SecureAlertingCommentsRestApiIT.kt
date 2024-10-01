@@ -359,6 +359,27 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    fun `test admin can edit someone else's comment`() {
+        createUserWithRoles(
+            userA,
+            listOf(ALERTING_FULL_ACCESS_ROLE),
+            listOf(),
+            false
+        )
+
+        val monitor = createRandomMonitor(refresh = true)
+        val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
+        val alertId = alert.id
+        val commentContent = "test comment"
+
+        val commentId = createAlertComment(alertId, commentContent, userAClient!!).id
+
+        val updatedContent = "updated comment"
+        updateAlertComment(commentId, updatedContent, client())
+
+        deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
+    }
+
     // TODO: this will cause security ITs to fail because the getSystemIndexDescriptors() change
     // introduced will not yet be consumed by Security plugin to allow this test to pass.
     // Will uncomment this in a later PR once Security plugin has consumed the getSystemIndexDescriptors()
