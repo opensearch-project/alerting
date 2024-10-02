@@ -556,7 +556,10 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 // retry with deleting query index
                 if (monitor.deleteQueryIndexInEveryRun == true && docLevelQueryIndexExists(monitor.dataSources)) {
                     try {
-                        log.info("unknown exception during PUT mapping on queryIndex: $targetQueryIndex, retrying with deletion of query index")
+                        log.info(
+                            "unknown exception during PUT mapping on queryIndex: $targetQueryIndex, " +
+                                "retrying with deletion of query index"
+                        )
                         val ack = monitorCtx.docLevelMonitorQueries!!.deleteDocLevelQueryIndex(monitor.dataSources)
                         if (!ack) {
                             log.error(
