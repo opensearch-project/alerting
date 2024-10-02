@@ -480,6 +480,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         } else {
             if (monitorCtx.remoteMonitors.containsKey(monitor.monitorType)) {
                 if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value)) {
+                    logger.info("Executing remote document monitor of type ${monitor.monitorType} id ${monitor.id}")
                     return RemoteDocumentLevelMonitorRunner().runMonitor(
                         monitor,
                         monitorCtx,
@@ -490,6 +491,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                         transportService = transportService
                     )
                 } else {
+                    logger.info("Executing remote monitor of type ${monitor.monitorType} id ${monitor.id}")
                     return monitorCtx.remoteMonitors[monitor.monitorType]!!.monitorRunner.runMonitor(
                         monitor,
                         periodStart,
