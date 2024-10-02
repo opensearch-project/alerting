@@ -358,7 +358,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 monitorMetadata,
                 updatedIndexName,
                 sourceIndexFieldLimit,
-                updatedProperties
+                updatedProperties,
+                indexTimeout
             )
 
             if (updateMappingResponse.isAcknowledged) {
@@ -487,7 +488,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         monitorMetadata: MonitorMetadata,
         sourceIndex: String,
         sourceIndexFieldLimit: Long,
-        updatedProperties: MutableMap<String, Any>
+        updatedProperties: MutableMap<String, Any>,
+        indexTimeout: TimeValue
     ): Pair<AcknowledgedResponse, String> {
         var targetQueryIndex = monitorMetadata.sourceToQueryIndexMapping[sourceIndex + monitor.id]
         if (
@@ -551,9 +553,48 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     }
                 }
             } else {
-                log.debug("unknown exception during PUT mapping on queryIndex: $targetQueryIndex")
-                val unwrappedException = ExceptionsHelper.unwrapCause(e) as Exception
-                throw AlertingException.wrap(unwrappedException)
+                // retry with deleting query index
+                if (monitor.deleteQueryIndexInEveryRun == true) {
+                    try {
+                        log.error(
+                            "unknown exception during PUT mapping on queryIndex: $targetQueryIndex, " +
+                                "retrying with deletion of query index",
+                            e
+                        )
+                        if (docLevelQueryIndexExists(monitor.dataSources)) {
+                            val ack = monitorCtx.docLevelMonitorQueries!!.deleteDocLevelQueryIndex(monitor.dataSources)
+                            if (!ack) {
+                                log.error(
+                                    "Deletion of concrete queryIndex:${monitor.dataSources.queryIndex} is not ack'd! " +
+                                        "for monitor ${monitor.id}"
+                                )
+                            }
+                        }
+                        initDocLevelQueryIndex(monitor.dataSources)
+                        indexDocLevelQueries(
+                            monitor = monitor,
+                            monitorId = monitor.id,
+                            monitorMetadata,
+                            indexTimeout = indexTimeout
+                        )
+                    } catch (e: Exception) {
+                        log.error(
+                            "Doc level monitor ${monitor.id}: unknown exception during " +
+                                "PUT mapping on queryIndex: $targetQueryIndex",
+                            e
+                        )
+                        val unwrappedException = ExceptionsHelper.unwrapCause(e) as Exception
+                        throw AlertingException.wrap(unwrappedException)
+                    }
+                } else {
+                    log.error(
+                        "Doc level monitor ${monitor.id}: unknown exception during " +
+                            "PUT mapping on queryIndex: $targetQueryIndex",
+                        e
+                    )
+                    val unwrappedException = ExceptionsHelper.unwrapCause(e) as Exception
+                    throw AlertingException.wrap(unwrappedException)
+                }
             }
         }
         // We did rollover, so try to apply mappings again on new targetQueryIndex
