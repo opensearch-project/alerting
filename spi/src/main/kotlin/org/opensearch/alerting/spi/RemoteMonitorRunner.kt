@@ -49,7 +49,7 @@ open class RemoteMonitorRunner {
     }
 
     open fun getFanOutAction(): String {
-        return DocLevelMonitorFanOutAction.NAME
+        throw UnsupportedOperationException("Fan out action needs to be implemented by remote monitor.");
     }
 
     open suspend fun doFanOut(
