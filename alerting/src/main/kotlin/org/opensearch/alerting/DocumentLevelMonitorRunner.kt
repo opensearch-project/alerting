@@ -378,7 +378,6 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             // TODO: Update the Document as part of the Trigger and return back the trigger action result
             return monitorResult.copy(triggerResults = triggerResults, inputResults = inputRunResults)
         } catch (e: Exception) {
-            e.printStackTrace()
             val errorMessage = ExceptionsHelper.detailedMessage(e)
             monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor, errorMessage, executionId, workflowRunContext)
             logger.error("Failed running Document-level-monitor ${monitor.name}", e)
