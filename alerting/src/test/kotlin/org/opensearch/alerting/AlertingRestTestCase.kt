@@ -47,6 +47,7 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.ChainedAlertTrigger
 import org.opensearch.commons.alerting.model.Comment
+import org.opensearch.commons.alerting.model.Comment.Companion.COMMENT_CONTENT_FIELD
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
@@ -66,6 +67,7 @@ import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.search.SearchModule
+import org.opensearch.search.builder.SearchSourceBuilder
 import java.net.URLEncoder
 import java.nio.file.Files
 import java.time.Instant
@@ -522,40 +524,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
         assertNull(alertJson["monitor_user"])
         return alert.copy(id = alertJson["_id"] as String, version = (alertJson["_version"] as Int).toLong())
-    }
-
-    protected fun createAlertComment(alertId: String, content: String): Comment {
-        val createRequestBody = jsonBuilder()
-            .startObject()
-            .field(Comment.COMMENT_CONTENT_FIELD, content)
-            .endObject()
-            .string()
-
-        val createResponse = client().makeRequest(
-            "POST",
-            "$COMMENTS_BASE_URI/$alertId",
-            StringEntity(createRequestBody, APPLICATION_JSON)
-        )
-
-        assertEquals("Unable to create a new alert", RestStatus.CREATED, createResponse.restStatus())
-
-        val responseBody = createResponse.asMap()
-        val commentId = responseBody["_id"] as String
-        assertNotEquals("response is missing Id", Comment.NO_ID, commentId)
-
-        val comment = responseBody["comment"] as Map<*, *>
-
-        return Comment(
-            id = commentId,
-            entityId = comment["entity_id"] as String,
-            entityType = comment["entity_type"] as String,
-            content = comment["content"] as String,
-            createdTime = Instant.ofEpochMilli(comment["created_time"] as Long),
-            lastUpdatedTime = if (comment["last_updated_time"] != null) {
-                Instant.ofEpochMilli(comment["last_updated_time"] as Long)
-            } else null,
-            user = comment["user"]?.let { User(it as String, emptyList(), emptyList(), emptyList()) }
-        )
     }
 
     protected fun createRandomMonitor(refresh: Boolean = false, withMetadata: Boolean = false): Monitor {
@@ -1889,4 +1857,97 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun Workflow.relativeUrl() = "$WORKFLOW_ALERTING_BASE_URI/$id"
+
+    protected fun createAlertComment(alertId: String, content: String, client: RestClient): Comment {
+        val createRequestBody = jsonBuilder()
+            .startObject()
+            .field(COMMENT_CONTENT_FIELD, content)
+            .endObject()
+            .string()
+
+        val createResponse = client.makeRequest(
+            "POST",
+            "$COMMENTS_BASE_URI/$alertId",
+            StringEntity(createRequestBody, APPLICATION_JSON)
+        )
+
+        assertEquals("Unable to create a new comment", RestStatus.CREATED, createResponse.restStatus())
+
+        val responseBody = createResponse.asMap()
+        val commentId = responseBody["_id"] as String
+        assertNotEquals("response is missing Id", Comment.NO_ID, commentId)
+
+        val comment = responseBody["comment"] as Map<*, *>
+
+        return Comment(
+            id = commentId,
+            entityId = comment["entity_id"] as String,
+            entityType = comment["entity_type"] as String,
+            content = comment["content"] as String,
+            createdTime = Instant.ofEpochMilli(comment["created_time"] as Long),
+            lastUpdatedTime = if (comment["last_updated_time"] != null) {
+                Instant.ofEpochMilli(comment["last_updated_time"] as Long)
+            } else null,
+            user = comment["user"]?.let { User(it as String, emptyList(), emptyList(), emptyList()) }
+        )
+    }
+
+    protected fun updateAlertComment(commentId: String, content: String, client: RestClient): Comment {
+        val updateRequestBody = jsonBuilder()
+            .startObject()
+            .field(COMMENT_CONTENT_FIELD, content)
+            .endObject()
+            .string()
+
+        val updateResponse = client.makeRequest(
+            "PUT",
+            "$COMMENTS_BASE_URI/$commentId",
+            StringEntity(updateRequestBody, APPLICATION_JSON)
+        )
+
+        assertEquals("Update comment failed", RestStatus.OK, updateResponse.restStatus())
+
+        val updateResponseBody = updateResponse.asMap()
+
+        val comment = updateResponseBody["comment"] as Map<*, *>
+
+        return Comment(
+            id = commentId,
+            entityId = comment["entity_id"] as String,
+            entityType = comment["entity_type"] as String,
+            content = comment["content"] as String,
+            createdTime = Instant.ofEpochMilli(comment["created_time"] as Long),
+            lastUpdatedTime = if (comment["last_updated_time"] != null) {
+                Instant.ofEpochMilli(comment["last_updated_time"] as Long)
+            } else null,
+            user = comment["user"]?.let { User(it as String, emptyList(), emptyList(), emptyList()) }
+        )
+    }
+
+    protected fun searchAlertComments(query: SearchSourceBuilder, client: RestClient): XContentParser {
+        val searchResponse = client.makeRequest(
+            "GET",
+            "$COMMENTS_BASE_URI/_search",
+            StringEntity(query.toString(), APPLICATION_JSON)
+        )
+
+        val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
+
+        return xcp
+    }
+
+    // returns the ID of the delete comment
+    protected fun deleteAlertComment(commentId: String, client: RestClient): String {
+        val deleteResponse = client.makeRequest(
+            "DELETE",
+            "$COMMENTS_BASE_URI/$commentId"
+        )
+
+        assertEquals("Delete comment failed", RestStatus.OK, deleteResponse.restStatus())
+
+        val deleteResponseBody = deleteResponse.asMap()
+        val deletedCommentId = deleteResponseBody["_id"] as String
+
+        return deletedCommentId
+    }
 }

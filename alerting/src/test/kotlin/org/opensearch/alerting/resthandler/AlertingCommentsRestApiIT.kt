@@ -5,24 +5,13 @@
 
 package org.opensearch.alerting.resthandler
 
-import org.apache.hc.core5.http.ContentType
-import org.apache.hc.core5.http.io.entity.StringEntity
-import org.opensearch.alerting.AlertingPlugin.Companion.COMMENTS_BASE_URI
 import org.opensearch.alerting.AlertingRestTestCase
-import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.randomAlert
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_COMMENTS_ENABLED
-import org.opensearch.common.xcontent.XContentFactory
-import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Alert
-import org.opensearch.commons.alerting.model.Comment.Companion.COMMENT_CONTENT_FIELD
-import org.opensearch.commons.alerting.util.string
-import org.opensearch.core.rest.RestStatus
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
-import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.test.junit.annotations.TestLogging
-import java.util.concurrent.TimeUnit
 
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
@@ -36,7 +25,7 @@ class AlertingCommentsRestApiIT : AlertingRestTestCase() {
         val alertId = alert.id
         val commentContent = "test comment"
 
-        val comment = createAlertComment(alertId, commentContent)
+        val comment = createAlertComment(alertId, commentContent, client())
 
         assertEquals("Comment does not have correct content", commentContent, comment.content)
         assertEquals("Comment does not have correct alert ID", alertId, comment.entityId)
@@ -50,27 +39,11 @@ class AlertingCommentsRestApiIT : AlertingRestTestCase() {
         val alertId = alert.id
         val commentContent = "test comment"
 
-        val commentId = createAlertComment(alertId, commentContent).id
+        val commentId = createAlertComment(alertId, commentContent, client()).id
 
         val updateContent = "updated comment"
-        val updateRequestBody = XContentFactory.jsonBuilder()
-            .startObject()
-            .field(COMMENT_CONTENT_FIELD, updateContent)
-            .endObject()
-            .string()
+        val actualContent = updateAlertComment(commentId, updateContent, client()).content
 
-        val updateResponse = client().makeRequest(
-            "PUT",
-            "$COMMENTS_BASE_URI/$commentId",
-            StringEntity(updateRequestBody, ContentType.APPLICATION_JSON)
-        )
-
-        assertEquals("Update comment failed", RestStatus.OK, updateResponse.restStatus())
-
-        val updateResponseBody = updateResponse.asMap()
-
-        val comment = updateResponseBody["comment"] as Map<*, *>
-        val actualContent = comment["content"] as String
         assertEquals("Comment does not have correct content after update", updateContent, actualContent)
     }
 
@@ -82,20 +55,11 @@ class AlertingCommentsRestApiIT : AlertingRestTestCase() {
         val alertId = alert.id
         val commentContent = "test comment"
 
-        createAlertComment(alertId, commentContent)
+        createAlertComment(alertId, commentContent, client())
 
-        OpenSearchTestCase.waitUntil({
-            return@waitUntil false
-        }, 3, TimeUnit.SECONDS)
+        val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+        val xcp = searchAlertComments(search, client())
 
-        val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
-        val searchResponse = client().makeRequest(
-            "GET",
-            "$COMMENTS_BASE_URI/_search",
-            StringEntity(search, ContentType.APPLICATION_JSON)
-        )
-
-        val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
         logger.info("hits: $hits")
         val numberDocsFound = hits["total"]?.get("value")
@@ -116,21 +80,10 @@ class AlertingCommentsRestApiIT : AlertingRestTestCase() {
         val alertId = alert.id
         val commentContent = "test comment"
 
-        val commentId = createAlertComment(alertId, commentContent).id
-        OpenSearchTestCase.waitUntil({
-            return@waitUntil false
-        }, 3, TimeUnit.SECONDS)
+        val commentId = createAlertComment(alertId, commentContent, client()).id
 
-        val deleteResponse = client().makeRequest(
-            "DELETE",
-            "$COMMENTS_BASE_URI/$commentId"
-        )
+        val deletedCommentId = deleteAlertComment(commentId, client())
 
-        assertEquals("Delete comment failed", RestStatus.OK, deleteResponse.restStatus())
-
-        val deleteResponseBody = deleteResponse.asMap()
-
-        val deletedCommentId = deleteResponseBody["_id"] as String
         assertEquals("Deleted Comment ID does not match Comment ID in delete request", commentId, deletedCommentId)
     }
 
