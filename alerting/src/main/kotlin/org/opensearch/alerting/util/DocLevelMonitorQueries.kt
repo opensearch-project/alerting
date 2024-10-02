@@ -554,18 +554,21 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 }
             } else {
                 // retry with deleting query index
-                if (monitor.deleteQueryIndexInEveryRun == true && docLevelQueryIndexExists(monitor.dataSources)) {
+                if (monitor.deleteQueryIndexInEveryRun == true) {
                     try {
-                        log.info(
+                        log.error(
                             "unknown exception during PUT mapping on queryIndex: $targetQueryIndex, " +
-                                "retrying with deletion of query index"
+                                "retrying with deletion of query index",
+                            e
                         )
-                        val ack = monitorCtx.docLevelMonitorQueries!!.deleteDocLevelQueryIndex(monitor.dataSources)
-                        if (!ack) {
-                            log.error(
-                                "Deletion of concrete queryIndex:${monitor.dataSources.queryIndex} is not ack'd! " +
-                                    "for monitor ${monitor.id}"
-                            )
+                        if (docLevelQueryIndexExists(monitor.dataSources)) {
+                            val ack = monitorCtx.docLevelMonitorQueries!!.deleteDocLevelQueryIndex(monitor.dataSources)
+                            if (!ack) {
+                                log.error(
+                                    "Deletion of concrete queryIndex:${monitor.dataSources.queryIndex} is not ack'd! " +
+                                        "for monitor ${monitor.id}"
+                                )
+                            }
                         }
                         initDocLevelQueryIndex(monitor.dataSources)
                         indexDocLevelQueries(
@@ -575,12 +578,20 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                             indexTimeout = indexTimeout
                         )
                     } catch (e: Exception) {
-                        log.debug("unknown exception during PUT mapping on queryIndex: $targetQueryIndex")
+                        log.error(
+                            "Doc level monitor ${monitor.id}: unknown exception during " +
+                                "PUT mapping on queryIndex: $targetQueryIndex",
+                            e
+                        )
                         val unwrappedException = ExceptionsHelper.unwrapCause(e) as Exception
                         throw AlertingException.wrap(unwrappedException)
                     }
                 } else {
-                    log.debug("unknown exception during PUT mapping on queryIndex: $targetQueryIndex")
+                    log.error(
+                        "Doc level monitor ${monitor.id}: unknown exception during " +
+                            "PUT mapping on queryIndex: $targetQueryIndex",
+                        e
+                    )
                     val unwrappedException = ExceptionsHelper.unwrapCause(e) as Exception
                     throw AlertingException.wrap(unwrappedException)
                 }
