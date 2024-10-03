@@ -94,7 +94,7 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
                                 "id", null)), trigger1Serialized)),
                 Map.of(),
                 new DataSources(),
-                true,
+                false,
                 "sample-remote-monitor-plugin"
         );
         IndexMonitorRequest indexMonitorRequest1 = new IndexMonitorRequest(
@@ -155,7 +155,7 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
                     List.of(),
                     Map.of(),
                     new DataSources(),
-                    true,
+                    false,
                     "sample-remote-monitor-plugin"
             );
             IndexMonitorRequest indexMonitorRequest2 = new IndexMonitorRequest(
@@ -239,7 +239,7 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
                                     "id", null)), trigger1Serialized)),
                     Map.of(),
                     new DataSources(),
-                    true,
+                    false,
                     "sample-remote-monitor-plugin"
             );
             IndexMonitorRequest indexDocLevelMonitorRequest = new IndexMonitorRequest(
