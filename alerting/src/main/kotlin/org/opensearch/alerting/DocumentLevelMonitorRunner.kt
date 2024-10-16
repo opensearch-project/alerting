@@ -374,6 +374,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                 // Clean up any queries created by the dry run monitor
                 monitorCtx.docLevelMonitorQueries!!.deleteDocLevelQueriesOnDryRun(monitorMetadata)
             }
+
             // TODO: Update the Document as part of the Trigger and return back the trigger action result
             return monitorResult.copy(triggerResults = triggerResults, inputResults = inputRunResults)
         } catch (e: Exception) {

@@ -719,13 +719,20 @@ class TransportIndexMonitorAction @Inject constructor(
                     Monitor.MonitorType.valueOf(currentMonitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
                 ) {
                     updatedMetadata = MonitorMetadataService.recreateRunContext(metadata, currentMonitor)
-                    client.suspendUntil<Client, BulkByScrollResponse> {
-                        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-                            .source(currentMonitor.dataSources.queryIndex)
-                            .filter(QueryBuilders.matchQuery("monitor_id", currentMonitor.id))
-                            .execute(it)
+                    if (docLevelMonitorQueries.docLevelQueryIndexExists(currentMonitor.dataSources)) {
+                        client.suspendUntil<Client, BulkByScrollResponse> {
+                            DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+                                .source(currentMonitor.dataSources.queryIndex)
+                                .filter(QueryBuilders.matchQuery("monitor_id", currentMonitor.id))
+                                .execute(it)
+                        }
                     }
-                    indexDocLevelMonitorQueries(request.monitor, currentMonitor.id, updatedMetadata, request.refreshPolicy)
+                    indexDocLevelMonitorQueries(
+                        request.monitor,
+                        currentMonitor.id,
+                        updatedMetadata,
+                        request.refreshPolicy
+                    )
                     MonitorMetadataService.upsertMetadata(updatedMetadata, updating = true)
                 }
                 actionListener.onResponse(
