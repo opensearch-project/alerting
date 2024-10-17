@@ -129,7 +129,11 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 .mapping(docLevelQueriesMappings())
                 .alias(Alias(alias))
                 .settings(
-                    Settings.builder().put("index.hidden", true)
+                    Settings
+                        .builder()
+                        .put("index.hidden", true)
+                        .put("number_of_shards", "1")
+                        .put("index.auto_expand_replicas", "0-all")
                         .build()
                 )
             return try {

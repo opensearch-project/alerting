@@ -5,6 +5,8 @@
         "limit": 10000
       }
     },
-    "hidden": true
-  }
+    "hidden": true,
+    "auto_expand_replicas": "0-all"
+  },
+  "number_of_shards": 1
 }
