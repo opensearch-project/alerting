@@ -227,5 +227,10 @@ class CrossClusterMonitorUtils {
             return if (clusterName.isNotEmpty()) "$clusterName:$indexName"
             else indexName
         }
+
+        fun isRemoteClusterIndex(index: String, clusterService: ClusterService): Boolean {
+            val clusterName = parseClusterName(index)
+            return clusterName.isNotEmpty() && clusterService.clusterName.value() != clusterName
+        }
     }
 }
