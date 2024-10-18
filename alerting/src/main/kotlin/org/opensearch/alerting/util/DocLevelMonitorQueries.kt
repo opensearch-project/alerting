@@ -31,6 +31,7 @@ import org.opensearch.alerting.MonitorRunnerService.monitorCtx
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.client.Client
 import org.opensearch.cluster.ClusterState
+import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
@@ -130,6 +131,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 .alias(Alias(alias))
                 .settings(
                     Settings.builder().put("index.hidden", true)
+                        .put(IndexMetadata.SETTING_NUMBER_OF_SHARDS, 1)
+                        .put(IndexMetadata.SETTING_AUTO_EXPAND_REPLICAS, "0-1")
                         .build()
                 )
             return try {
