@@ -1002,17 +1002,31 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun createTestAlias(
         alias: String = randomAlphaOfLength(10).lowercase(Locale.ROOT),
+        numOfAliasIndices: Int = randomIntBetween(1, 10),
+        includeWriteIndex: Boolean = true,
+        indicesMapping: String,
+    ): MutableMap<String, MutableMap<String, Boolean>> {
+        return createTestAlias(
+            alias = alias,
+            indices = randomAliasIndices(alias, numOfAliasIndices, includeWriteIndex),
+            indicesMapping = indicesMapping
+        )
+    }
+
+    protected fun createTestAlias(
+        alias: String = randomAlphaOfLength(10).lowercase(Locale.ROOT),
         indices: Map<String, Boolean> = randomAliasIndices(
             alias = alias,
             num = randomIntBetween(1, 10),
             includeWriteIndex = true
         ),
-        createIndices: Boolean = true
+        createIndices: Boolean = true,
+        indicesMapping: String = ""
     ): MutableMap<String, MutableMap<String, Boolean>> {
         val indicesMap = mutableMapOf<String, Boolean>()
         val indicesJson = jsonBuilder().startObject().startArray("actions")
         indices.keys.map {
-            if (createIndices) createTestIndex(index = it, mapping = "")
+            if (createIndices) createTestIndex(index = it, indicesMapping)
             val isWriteIndex = indices.getOrDefault(it, false)
             indicesMap[it] = isWriteIndex
             val indexMap = mapOf(
