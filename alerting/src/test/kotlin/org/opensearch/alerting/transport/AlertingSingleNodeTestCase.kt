@@ -13,6 +13,8 @@ import org.opensearch.action.admin.indices.get.GetIndexRequestBuilder
 import org.opensearch.action.admin.indices.get.GetIndexResponse
 import org.opensearch.action.admin.indices.refresh.RefreshAction
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
+import org.opensearch.action.admin.indices.settings.get.GetSettingsRequest
+import org.opensearch.action.admin.indices.settings.get.GetSettingsResponse
 import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
@@ -491,6 +493,11 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     protected fun executeWorkflow(workflow: Workflow? = null, id: String? = null, dryRun: Boolean = true): ExecuteWorkflowResponse? {
         val request = ExecuteWorkflowRequest(dryRun, TimeValue(Instant.now().toEpochMilli()), id, workflow)
         return client().execute(ExecuteWorkflowAction.INSTANCE, request).get()
+    }
+
+    protected fun getIndexSettings(index: String): GetSettingsResponse? {
+        val request = GetSettingsRequest().indices(index)
+        return client().admin().indices().getSettings(request).get()
     }
 
     override fun nodeSettings(): Settings {
