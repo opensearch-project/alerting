@@ -23,7 +23,7 @@ buildscript {
         }
         opensearch_no_snapshot = opensearch_version.replace("-SNAPSHOT","")
         common_utils_version = System.getProperty("common_utils.version", opensearch_build)
-        kotlin_version = '1.8.21'
+        kotlin_version = '1.9.25'
     }
 
     repositories {
@@ -86,11 +86,12 @@ allprojects {
 
     apply from: "$rootDir/build-tools/repositories.gradle"
 
-    plugins.withId('java') {
-        sourceCompatibility = targetCompatibility = JavaVersion.VERSION_11
+    tasks.withType(JavaCompile) {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
     plugins.withId('org.jetbrains.kotlin.jvm') {
-        compileKotlin.kotlinOptions.jvmTarget = compileTestKotlin.kotlinOptions.jvmTarget = JavaVersion.VERSION_11
+        compileKotlin.kotlinOptions.jvmTarget = compileTestKotlin.kotlinOptions.jvmTarget = JavaVersion.VERSION_21
         compileKotlin.dependsOn ktlint
     }
     tasks.withType(AbstractArchiveTask).configureEach {

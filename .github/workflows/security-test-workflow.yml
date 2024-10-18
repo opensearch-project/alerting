@@ -12,7 +12,7 @@ jobs:
   build:
     strategy:
       matrix:
-        java: [ 21 ]
+        java: [ 21, 23 ]
     # Job name
     name: Build and test Alerting
     # This job runs on Linux
