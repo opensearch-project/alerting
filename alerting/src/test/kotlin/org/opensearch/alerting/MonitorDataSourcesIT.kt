@@ -18,6 +18,7 @@ import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.admin.indices.open.OpenIndexRequest
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
+import org.opensearch.action.admin.indices.settings.get.GetSettingsResponse
 import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.fieldcaps.FieldCapabilitiesRequest
@@ -30,6 +31,7 @@ import org.opensearch.alerting.transport.AlertingSingleNodeTestCase
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.DocLevelMonitorQueries.Companion.INDEX_PATTERN_SUFFIX
 import org.opensearch.alerting.workflow.CompositeWorkflowRunner
+import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
@@ -6175,5 +6177,62 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(completedAlert1.alerts.size == 1)
         Assert.assertEquals(completedAlert1.alerts[0].state, Alert.State.COMPLETED)
         Assert.assertTrue(completedAlert1.alerts[0].endTime!! > acknowledgedAlert.alerts[0].lastNotificationTime!!)
+    }
+
+    fun `test query index created with single primary and single replica shard`() {
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(queryIndex = ".opensearch-alerting-custom-queries")
+        )
+        val monitorResponse = createMonitor(monitor)
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+        monitor = monitorResponse!!.monitor
+        indexDoc(index, "1", testDoc)
+        val id = monitorResponse.id
+        executeMonitor(monitor, id, false)
+
+        var response: GetSettingsResponse? = getIndexSettings(".opensearch-alerting-custom-queries-000001")
+        assertEquals(
+            "1",
+            response!!.getSetting(
+                ".opensearch-alerting-custom-queries-000001",
+                IndexMetadata.SETTING_NUMBER_OF_SHARDS
+            )
+        )
+        assertEquals(
+            "0",
+            response.getSetting(
+                ".opensearch-alerting-custom-queries-000001",
+                IndexMetadata.SETTING_NUMBER_OF_REPLICAS
+            )
+        )
+
+        executeMonitor(monitor, id, false)
+
+        response = getIndexSettings(".opensearch-alerting-custom-queries-000001")
+        assertEquals(
+            "1",
+            response!!.getSetting(
+                ".opensearch-alerting-custom-queries-000001",
+                IndexMetadata.SETTING_NUMBER_OF_SHARDS
+            )
+        )
+        assertEquals(
+            "0",
+            response.getSetting(
+                ".opensearch-alerting-custom-queries-000001",
+                IndexMetadata.SETTING_NUMBER_OF_REPLICAS
+            )
+        )
     }
 }
