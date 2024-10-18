@@ -369,6 +369,7 @@ class InputService(
             val (amount, unit) = matchResult?.destructured?.let { (a, u) -> a to u }
                 ?: throw IllegalArgumentException("Invalid timeframe format: $timeframeString")
             val duration = when (unit) {
+                "s" -> Duration.ofSeconds(amount.toLong())
                 "m" -> Duration.ofMinutes(amount.toLong())
                 "h" -> Duration.ofHours(amount.toLong())
                 "d" -> Duration.ofDays(amount.toLong())
