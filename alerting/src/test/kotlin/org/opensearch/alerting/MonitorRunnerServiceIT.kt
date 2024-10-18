@@ -13,6 +13,7 @@ import org.opensearch.alerting.model.destination.email.Email
 import org.opensearch.alerting.model.destination.email.Recipient
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.alerting.util.getBucketKeysHash
+import org.opensearch.client.Request
 import org.opensearch.client.ResponseException
 import org.opensearch.client.WarningFailureException
 import org.opensearch.common.settings.Settings
@@ -1190,7 +1191,16 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals("Incorrect search result", 2, buckets.size)
     }
 
-    fun `test execute bucket-level monitor with alias`() {
+    fun `test execute bucket-level monitor with alias optimization - indices not skipped`() {
+        val testIndex = createTestIndex()
+        insertSampleTimeSerializedDataCurrentTime(
+            testIndex,
+            listOf(
+                "test_value_3",
+                "test_value_4", // adding duplicate to verify aggregation
+                "test_value_5"
+            )
+        )
         val indexMapping = """
                 "properties" : {
                   "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
@@ -1200,7 +1210,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         """.trimIndent()
         val alias = createTestAlias(randomAlphaOfLength(10), 10, true, indexMapping)
         val aliasName = alias.keys.first()
-        insertSampleTimeSerializedData(
+        insertSampleTimeSerializedDataCurrentTime(
             aliasName,
             listOf(
                 "test_value_1",
@@ -1208,9 +1218,9 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 "test_value_2"
             )
         )
-
+        addIndexToAlias(testIndex, aliasName)
         val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
+            .gt("{{period_end}}||-10s")
             .lte("{{period_end}}")
             .format("epoch_millis")
         val compositeSources = listOf(
@@ -1241,7 +1251,71 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
         @Suppress("UNCHECKED_CAST")
         val buckets = searchResult.stringMap("aggregations")?.stringMap("composite_agg")?.get("buckets") as List<Map<String, Any>>
-        assertEquals("Incorrect search result", 2, buckets.size)
+        assertEquals("Incorrect search result", 5, buckets.size)
+    }
+
+    fun `test execute bucket-level monitor with alias optimization - indices skipped from query`() {
+        val testIndex = createTestIndex()
+        insertSampleTimeSerializedDataCurrentTime(
+            testIndex,
+            listOf(
+                "test_value_1",
+                "test_value_1", // adding duplicate to verify aggregation
+                "test_value_2"
+            )
+        )
+        Thread.sleep(10000)
+        val indexMapping = """
+                "properties" : {
+                  "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
+                  "test_field" : { "type" : "keyword" },
+                  "number" : { "type" : "keyword" }
+                }
+        """.trimIndent()
+        val alias = createTestAlias(randomAlphaOfLength(10), 10, true, indexMapping)
+        val aliasName = alias.keys.first()
+        insertSampleTimeSerializedDataCurrentTime(
+            aliasName,
+            listOf(
+                "test_value_1",
+                "test_value_1", // adding duplicate to verify aggregation
+                "test_value_2"
+            )
+        )
+        addIndexToAlias(testIndex, aliasName)
+        val query = QueryBuilders.rangeQuery("test_strict_date_time")
+            .gt("{{period_end}}||-10s")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
+        val compositeSources = listOf(
+            TermsValuesSourceBuilder("test_field").field("test_field")
+        )
+        val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
+        val input = SearchInput(indices = listOf(aliasName), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
+        val triggerScript = """
+            params.docCount > 0
+        """.trimIndent()
+
+        var trigger = randomBucketLevelTrigger()
+        trigger = trigger.copy(
+            bucketSelector = BucketSelectorExtAggregationBuilder(
+                name = trigger.id,
+                bucketsPathsMap = mapOf("docCount" to "_count"),
+                script = Script(triggerScript),
+                parentBucketPath = "composite_agg",
+                filter = null
+            )
+        )
+        val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
+        val response = executeMonitor(monitor.id, params = DRYRUN_MONITOR)
+        val output = entityAsMap(response)
+
+        assertEquals(monitor.name, output["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        val buckets = searchResult.stringMap("aggregations")?.stringMap("composite_agg")?.get("buckets") as List<Map<String, Any>>
+        Assert.assertTrue(buckets.size <= 2)
     }
 
     fun `test execute bucket-level monitor returns search result with multi term agg`() {
@@ -2239,5 +2313,22 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     /** helper that returns a field in a json map whose values are all json objects */
     private fun Map<String, Any>.objectMap(key: String): Map<String, Map<String, Any>> {
         return this[key] as Map<String, Map<String, Any>>
+    }
+
+    fun addIndexToAlias(index: String, alias: String) {
+        val request = Request("POST", "/_aliases")
+        request.setJsonEntity(
+            """{"actions": [{"add": {"index": "$index","alias": "$alias"}} ]}""".trimIndent()
+        )
+
+        try {
+            val response = client().performRequest(request)
+            if (response.statusLine.statusCode != RestStatus.OK.status) {
+                throw ResponseException(response)
+            }
+        } catch (e: Exception) {
+            // Handle the exception appropriately, e.g., log it or rethrow
+            throw RuntimeException("Failed to add index to alias", e)
+        }
     }
 }
