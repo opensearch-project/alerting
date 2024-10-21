@@ -1002,17 +1002,31 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun createTestAlias(
         alias: String = randomAlphaOfLength(10).lowercase(Locale.ROOT),
+        numOfAliasIndices: Int = randomIntBetween(1, 10),
+        includeWriteIndex: Boolean = true,
+        indicesMapping: String,
+    ): MutableMap<String, MutableMap<String, Boolean>> {
+        return createTestAlias(
+            alias = alias,
+            indices = randomAliasIndices(alias, numOfAliasIndices, includeWriteIndex),
+            indicesMapping = indicesMapping
+        )
+    }
+
+    protected fun createTestAlias(
+        alias: String = randomAlphaOfLength(10).lowercase(Locale.ROOT),
         indices: Map<String, Boolean> = randomAliasIndices(
             alias = alias,
             num = randomIntBetween(1, 10),
             includeWriteIndex = true
         ),
-        createIndices: Boolean = true
+        createIndices: Boolean = true,
+        indicesMapping: String = ""
     ): MutableMap<String, MutableMap<String, Boolean>> {
         val indicesMap = mutableMapOf<String, Boolean>()
         val indicesJson = jsonBuilder().startObject().startArray("actions")
         indices.keys.map {
-            if (createIndices) createTestIndex(index = it, mapping = "")
+            if (createIndices) createTestIndex(index = it, indicesMapping)
             val isWriteIndex = indices.getOrDefault(it, false)
             indicesMap[it] = isWriteIndex
             val indexMap = mapOf(
@@ -1199,6 +1213,41 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         data.forEachIndexed { i, value ->
             val twoMinsAgo = ZonedDateTime.now().minus(2, ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MILLIS)
             val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(twoMinsAgo)
+            val testDoc = """
+                {
+                  "test_strict_date_time": "$testTime",
+                  "test_field": "$value",
+                   "number": "$i"
+                }
+            """.trimIndent()
+            // Indexing documents with deterministic doc id to allow for easy selected deletion during testing
+            indexDoc(index, (i + 1).toString(), testDoc)
+        }
+    }
+
+    protected fun insertSampleTimeSerializedDataCurrentTime(index: String, data: List<String>) {
+        data.forEachIndexed { i, value ->
+            val time = ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS)
+            val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(time)
+            val testDoc = """
+                {
+                  "test_strict_date_time": "$testTime",
+                  "test_field": "$value",
+                   "number": "$i"
+                }
+            """.trimIndent()
+            // Indexing documents with deterministic doc id to allow for easy selected deletion during testing
+            indexDoc(index, (i + 1).toString(), testDoc)
+        }
+    }
+
+    protected fun insertSampleTimeSerializedDataWithTime(
+        index: String,
+        data: List<String>,
+        time: ZonedDateTime? = ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS),
+    ) {
+        data.forEachIndexed { i, value ->
+            val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(time)
             val testDoc = """
                 {
                   "test_strict_date_time": "$testTime",
