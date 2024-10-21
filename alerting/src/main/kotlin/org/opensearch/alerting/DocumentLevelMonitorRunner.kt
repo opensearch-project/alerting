@@ -121,6 +121,17 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                 throw IndexNotFoundException(docLevelMonitorInput.indices.joinToString(","))
             }
 
+            if (monitor.deleteQueryIndexInEveryRun == true &&
+                monitorCtx.docLevelMonitorQueries!!.docLevelQueryIndexExists(monitor.dataSources)
+            ) {
+                val ack = monitorCtx.docLevelMonitorQueries!!.deleteDocLevelQueryIndex(monitor.dataSources)
+                if (!ack) {
+                    logger.error(
+                        "Deletion of concrete queryIndex:${monitor.dataSources.queryIndex} is not ack'd! " +
+                            "for monitor ${monitor.id}"
+                    )
+                }
+            }
             monitorCtx.docLevelMonitorQueries!!.initDocLevelQueryIndex(monitor.dataSources)
             monitorCtx.docLevelMonitorQueries!!.indexDocLevelQueries(
                 monitor = monitor,
