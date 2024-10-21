@@ -250,7 +250,17 @@ class InputService(
             .execute()
 
         val indexes = CrossClusterMonitorUtils.parseIndexesForRemoteSearch(searchInput.indices, clusterService)
-        val resolvedIndexes = resolveOnlyQueryableIndicesFromLocalClusterAliases(monitor, periodEnd, searchInput.query.query(), indexes)
+
+        val resolvedIndexes = if (searchInput.query.query() == null) indexes else {
+            val query = searchInput.query.query()
+            resolveOnlyQueryableIndicesFromLocalClusterAliases(
+                monitor,
+                periodEnd,
+                query,
+                indexes
+            )
+        }
+
         val searchRequest = SearchRequest()
             .indices(*resolvedIndexes.toTypedArray())
             .preference(Preference.PRIMARY_FIRST.type())
