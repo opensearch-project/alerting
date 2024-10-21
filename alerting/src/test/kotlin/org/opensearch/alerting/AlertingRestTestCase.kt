@@ -1241,6 +1241,25 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         }
     }
 
+    protected fun insertSampleTimeSerializedDataWithTime(
+        index: String,
+        data: List<String>,
+        time: ZonedDateTime? = ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS),
+    ) {
+        data.forEachIndexed { i, value ->
+            val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(time)
+            val testDoc = """
+                {
+                  "test_strict_date_time": "$testTime",
+                  "test_field": "$value",
+                   "number": "$i"
+                }
+            """.trimIndent()
+            // Indexing documents with deterministic doc id to allow for easy selected deletion during testing
+            indexDoc(index, (i + 1).toString(), testDoc)
+        }
+    }
+
     protected fun deleteDataWithDocIds(index: String, docIds: List<String>) {
         docIds.forEach {
             deleteDoc(index, it)

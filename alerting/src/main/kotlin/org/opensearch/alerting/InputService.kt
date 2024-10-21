@@ -306,8 +306,10 @@ class InputService(
                                 resolvedIndexes.add(indexMetadata.index.name)
                                 includePrevious = false // No need to include previous anymore
                             } else if (
-                                includePrevious && i > 0 && sortedIndices[i - 1].creationDate <
-                                resolveStartTimeOfQueryTimeRange.toEpochMilli()
+                                includePrevious && (
+                                    i == sortedIndices.lastIndex ||
+                                        sortedIndices[i + 1].creationDate >= resolveStartTimeOfQueryTimeRange.toEpochMilli()
+                                    )
                             ) {
                                 // Include the index immediately before the timestamp
                                 resolvedIndexes.add(indexMetadata.index.name)
@@ -315,6 +317,7 @@ class InputService(
                             }
                         }
                     } else {
+                        // add alias without optimizing for resolve indices
                         resolvedIndexes.add(it)
                     }
                 } else {
