@@ -15,11 +15,13 @@ import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.AggregationQueryRewriter
 import org.opensearch.alerting.util.CrossClusterMonitorUtils
+import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.executeTransportAction
 import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.toMap
 import org.opensearch.alerting.util.getRoleFilterEnabled
 import org.opensearch.client.Client
+import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.routing.Preference
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.io.stream.BytesStreamOutput
@@ -39,12 +41,14 @@ import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.MatchQueryBuilder
 import org.opensearch.index.query.QueryBuilder
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.index.query.RangeQueryBuilder
 import org.opensearch.index.query.TermsQueryBuilder
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
 import org.opensearch.script.ScriptType
 import org.opensearch.script.TemplateScript
 import org.opensearch.search.builder.SearchSourceBuilder
+import java.time.Duration
 import java.time.Instant
 
 /** Service that handles the collection of input results for Monitor executions */
@@ -54,7 +58,8 @@ class InputService(
     val namedWriteableRegistry: NamedWriteableRegistry,
     val xContentRegistry: NamedXContentRegistry,
     val clusterService: ClusterService,
-    val settings: Settings
+    val settings: Settings,
+    val indexNameExpressionResolver: IndexNameExpressionResolver
 ) {
 
     private val logger = LogManager.getLogger(InputService::class.java)
@@ -244,8 +249,9 @@ class InputService(
             .execute()
 
         val indexes = CrossClusterMonitorUtils.parseIndexesForRemoteSearch(searchInput.indices, clusterService)
+        val resolvedIndexes = resolveOnlyQueryableIndicesFromLocalClusterAliases(monitor, periodEnd, searchInput.query.query(), indexes)
         val searchRequest = SearchRequest()
-            .indices(*indexes.toTypedArray())
+            .indices(*resolvedIndexes.toTypedArray())
             .preference(Preference.PRIMARY_FIRST.type())
 
         XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource).use {
@@ -253,6 +259,72 @@ class InputService(
         }
 
         return searchRequest
+    }
+
+    /**
+     * Resolves concrete indices from aliases based on a time range query and availability in the local cluster.
+     *
+     * <p>If an index passed to OpenSearch is an alias, this method will only select those indices
+     * resolved from the alias that meet the following criteria:
+     *
+     * <ol>
+     *     <li>The index's creation date falls within the time range specified in the query's timestamp field.</li>
+     *     <li>The index immediately preceding the time range in terms of creation date is also included.</li>
+     * </ol>
+     *
+     * <p>This ensures that queries targeting aliases consider relevant indices based on their creation time,
+     * including the one immediately before the specified range to account for potential data at the boundary.
+     */
+    private fun resolveOnlyQueryableIndicesFromLocalClusterAliases(
+        monitor: Monitor,
+        periodEnd: Instant,
+        query: QueryBuilder,
+        indexes: List<String>,
+    ): List<String> {
+        val resolvedIndexes = ArrayList<String>()
+        indexes.forEach {
+            // we don't optimize for remote cluster aliases. we directly pass them to search request
+            if (CrossClusterMonitorUtils.isRemoteClusterIndex(it, clusterService))
+                resolvedIndexes.add(it)
+            else {
+                val state = clusterService.state()
+                if (IndexUtils.isAlias(it, state)) {
+                    val resolveStartTimeOfQueryTimeRange = resolveStartTimeofQueryTimeRange(monitor, query, periodEnd)
+                    if (resolveStartTimeOfQueryTimeRange != null) {
+                        val indices = IndexUtils.resolveAllIndices(listOf(it), clusterService, indexNameExpressionResolver)
+                        val sortedIndices = indices
+                            .mapNotNull { state.metadata().index(it) } // Get IndexMetadata for each index
+                            .sortedBy { it.creationDate } // Sort by creation date
+
+                        var includePrevious = true
+                        for (i in sortedIndices.indices) {
+                            val indexMetadata = sortedIndices[i]
+                            val creationDate = indexMetadata.creationDate
+
+                            if (creationDate >= resolveStartTimeOfQueryTimeRange.toEpochMilli()) {
+                                resolvedIndexes.add(indexMetadata.index.name)
+                                includePrevious = false // No need to include previous anymore
+                            } else if (
+                                includePrevious && (
+                                    i == sortedIndices.lastIndex ||
+                                        sortedIndices[i + 1].creationDate >= resolveStartTimeOfQueryTimeRange.toEpochMilli()
+                                    )
+                            ) {
+                                // Include the index immediately before the timestamp
+                                resolvedIndexes.add(indexMetadata.index.name)
+                                includePrevious = false
+                            }
+                        }
+                    } else {
+                        // add alias without optimizing for resolve indices
+                        resolvedIndexes.add(it)
+                    }
+                } else {
+                    resolvedIndexes.add(it)
+                }
+            }
+        }
+        return resolvedIndexes
     }
 
     private suspend fun handleClusterMetricsInput(input: ClusterMetricsInput): MutableList<Map<String, Any>> {
@@ -287,5 +359,54 @@ class InputService(
             results += response.toMap()
         }
         return results
+    }
+
+    fun resolveStartTimeofQueryTimeRange(monitor: Monitor, query: QueryBuilder, periodEnd: Instant): Instant? {
+        try {
+            val rangeQuery = findRangeQuery(query) ?: return null
+            val searchParameter = rangeQuery.from().toString() // we are looking for 'timeframe' variable {{period_end}}||-<timeframe>
+
+            val timeframeString = searchParameter.substringAfter("||-")
+            val timeframeRegex = Regex("(\\d+)([a-zA-Z]+)")
+            val matchResult = timeframeRegex.find(timeframeString)
+            val (amount, unit) = matchResult?.destructured?.let { (a, u) -> a to u }
+                ?: throw IllegalArgumentException("Invalid timeframe format: $timeframeString")
+            val duration = when (unit) {
+                "s" -> Duration.ofSeconds(amount.toLong())
+                "m" -> Duration.ofMinutes(amount.toLong())
+                "h" -> Duration.ofHours(amount.toLong())
+                "d" -> Duration.ofDays(amount.toLong())
+                else -> throw IllegalArgumentException("Invalid time unit: $unit")
+            }
+
+            return periodEnd.minus(duration)
+        } catch (e: Exception) {
+            logger.error(
+                "Monitor ${monitor.id}:" +
+                    " Failed to resolve time frame of search query while optimizing to query only on few of alias' concrete indices",
+                e
+            )
+            return null // won't do optimization as we failed to resolve the timeframe due to unexpected error
+        }
+    }
+
+    private fun findRangeQuery(queryBuilder: QueryBuilder?): RangeQueryBuilder? {
+        if (queryBuilder == null) return null
+        if (queryBuilder is RangeQueryBuilder) return queryBuilder
+
+        if (queryBuilder is BoolQueryBuilder) {
+            for (clause in queryBuilder.must()) {
+                val rangeQuery = findRangeQuery(clause)
+                if (rangeQuery != null) return rangeQuery
+            }
+            for (clause in queryBuilder.should()) {
+                val rangeQuery = findRangeQuery(clause)
+                if (rangeQuery != null) return rangeQuery
+            }
+            // You can also check queryBuilder.filter() and queryBuilder.mustNot() if needed
+        }
+
+        // Add handling for other query types if necessary (e.g., NestedQueryBuilder, etc.)
+        return null
     }
 }
