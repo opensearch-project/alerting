@@ -365,7 +365,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 indexTimeout
             )
 
-            if (updateMappingResponse.isAcknowledged) {
+            if (concreteIndices.isNotEmpty() && updateMappingResponse.isAcknowledged) {
                 doIndexAllQueries(
                     concreteQueryIndex,
                     updatedIndexName,
