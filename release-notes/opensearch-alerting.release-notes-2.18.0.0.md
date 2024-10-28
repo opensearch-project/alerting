@@ -18,4 +18,4 @@ Compatible with OpenSearch 2.17.0
 * fix number of shards of query index to 0 and auto expand replicas to 0-1 ([#1702](https://github.com/opensearch-project/alerting/pull/1702))
 
 ### Documentation
-* Added 2.18.0 release notes. ([#]())
+* Added 2.18.0 release notes. ([#1718](https://github.com/opensearch-project/alerting/pull/1718))
