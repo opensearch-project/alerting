@@ -1,5 +1,5 @@
-## Version 2.17.0.0 2024-09-04
-Compatible with OpenSearch 2.17.0
+## Version 2.18.0.0 2024-10-28
+Compatible with OpenSearch 2.18.0
 
 ### Maintenance
 * Increment version to 2.18.0-SNAPSHOT. ([#1653](https://github.com/opensearch-project/alerting/pull/1653))
