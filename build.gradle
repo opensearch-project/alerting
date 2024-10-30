@@ -93,6 +93,7 @@ allprojects {
     plugins.withId('org.jetbrains.kotlin.jvm') {
         compileKotlin.kotlinOptions.jvmTarget = compileTestKotlin.kotlinOptions.jvmTarget = JavaVersion.VERSION_21
         compileKotlin.dependsOn ktlint
+
     }
     tasks.withType(AbstractArchiveTask).configureEach {
         preserveFileTimestamps = false
