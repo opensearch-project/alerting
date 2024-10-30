@@ -92,6 +92,12 @@ allprojects {
     }
     plugins.withId('org.jetbrains.kotlin.jvm') {
         compileKotlin.kotlinOptions.jvmTarget = compileTestKotlin.kotlinOptions.jvmTarget = JavaVersion.VERSION_21
+        compileJava.sourceCompatibility = JavaVersion.VERSION_21
+        compileJava.targetCompatibility = JavaVersion.VERSION_21
+        compileTestJava.sourceCompatibility = JavaVersion.VERSION_21
+        compileTestJava.targetCompatibility = JavaVersion.VERSION_21
+        compileKotlin.kotlinOptions.jvmTarget = "21"
+        compileTestKotlin.kotlinOptions.jvmTarget = "21"
         compileKotlin.dependsOn ktlint
     }
     tasks.withType(AbstractArchiveTask).configureEach {
