@@ -91,7 +91,6 @@ allprojects {
         targetCompatibility = JavaVersion.VERSION_21
     }
     plugins.withId('org.jetbrains.kotlin.jvm') {
-        compileKotlin.kotlinOptions.jvmTarget = compileTestKotlin.kotlinOptions.jvmTarget = JavaVersion.VERSION_21
         compileJava.sourceCompatibility = JavaVersion.VERSION_21
         compileJava.targetCompatibility = JavaVersion.VERSION_21
         compileTestJava.sourceCompatibility = JavaVersion.VERSION_21
