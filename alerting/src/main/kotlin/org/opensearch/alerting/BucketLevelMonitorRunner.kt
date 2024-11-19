@@ -58,6 +58,7 @@ import org.opensearch.search.aggregations.AggregatorFactories
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
 import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.search.sort.SortOrder
 import org.opensearch.transport.TransportService
 import java.time.Instant
 import java.util.UUID
@@ -479,7 +480,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             val queryBuilder = if (input.query.query() == null) BoolQueryBuilder()
                             else QueryBuilders.boolQuery().must(source.query())
                             queryBuilder.filter(QueryBuilders.termsQuery(fieldName, bucketValues))
-                            sr.source().query(queryBuilder)
+                            sr.source().query(queryBuilder).sort("_seq_no", SortOrder.DESC)
                         }
                     sr.cancelAfterTimeInterval = TimeValue.timeValueMinutes(
                         getCancelAfterTimeInterval()
