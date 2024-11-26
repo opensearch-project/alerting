@@ -297,7 +297,11 @@ class TransportDocLevelMonitorFanOutAction
                     createFindings(monitor, docsToQueries, idQueryMap, true)
                 }
             } else {
-                if (monitor.ignoreFindingsAndAlerts == null || monitor.ignoreFindingsAndAlerts == false) {
+                /**
+                 * if should_persist_findings_and_alerts flag is not set, doc-level trigger generates alerts else doc-level trigger
+                 * generates a single alert with multiple findings.
+                 */
+                if (monitor.shouldPersistFindingsAndAlerts == null || monitor.shouldPersistFindingsAndAlerts == false) {
                     monitor.triggers.forEach {
                         triggerResults[it.id] = runForEachDocTrigger(
                             monitorResult,
@@ -312,9 +316,9 @@ class TransportDocLevelMonitorFanOutAction
                             workflowRunContext = workflowRunContext
                         )
                     }
-                } else if (monitor.ignoreFindingsAndAlerts == true) {
+                } else if (monitor.shouldPersistFindingsAndAlerts == true) {
                     monitor.triggers.forEach {
-                        triggerResults[it.id] = runForEachDocTriggerIgnoringFindingsAndAlerts(
+                        triggerResults[it.id] = runForEachDocTriggerWithoutPersistFindingsAndAlerts(
                             monitorResult,
                             it as DocumentLevelTrigger,
                             monitor,
@@ -363,7 +367,10 @@ class TransportDocLevelMonitorFanOutAction
         }
     }
 
-    private suspend fun runForEachDocTriggerIgnoringFindingsAndAlerts(
+    /**
+     * run doc-level triggers ignoring findings and alerts and generating a single alert.
+     */
+    private suspend fun runForEachDocTriggerWithoutPersistFindingsAndAlerts(
         monitorResult: MonitorRunResult<DocumentLevelTriggerRunResult>,
         trigger: DocumentLevelTrigger,
         monitor: Monitor,
@@ -374,9 +381,14 @@ class TransportDocLevelMonitorFanOutAction
     ): DocumentLevelTriggerRunResult {
         val triggerResult = triggerService.runDocLevelTrigger(monitor, trigger, queryToDocIds)
         if (triggerResult.triggeredDocs.isNotEmpty()) {
+            val findingIds = if (workflowRunContext?.matchingDocIdsPerIndex?.second != null) {
+                workflowRunContext.matchingDocIdsPerIndex.second
+            } else {
+                listOf()
+            }
             val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger)
             val alert = alertService.composeDocLevelAlert(
-                listOf(),
+                findingIds,
                 triggerResult.triggeredDocs,
                 triggerCtx,
                 monitorResult.alertError() ?: triggerResult.alertError(),
@@ -570,7 +582,7 @@ class TransportDocLevelMonitorFanOutAction
                     .string()
             log.debug("Findings: $findingStr")
 
-            if (shouldCreateFinding and (monitor.ignoreFindingsAndAlerts == null || monitor.ignoreFindingsAndAlerts == false)) {
+            if (shouldCreateFinding and (monitor.shouldPersistFindingsAndAlerts == null || monitor.shouldPersistFindingsAndAlerts == false)) {
                 indexRequests += IndexRequest(monitor.dataSources.findingsIndex)
                     .source(findingStr, XContentType.JSON)
                     .id(finding.id)
@@ -582,7 +594,7 @@ class TransportDocLevelMonitorFanOutAction
             bulkIndexFindings(monitor, indexRequests)
         }
 
-        if (monitor.ignoreFindingsAndAlerts == null || monitor.ignoreFindingsAndAlerts == false) {
+        if (monitor.shouldPersistFindingsAndAlerts == null || monitor.shouldPersistFindingsAndAlerts == false) {
             try {
                 findings.forEach { finding ->
                     publishFinding(monitor, finding)
@@ -945,11 +957,11 @@ class TransportDocLevelMonitorFanOutAction
         val boolQueryBuilder = BoolQueryBuilder()
         boolQueryBuilder.filter(QueryBuilders.rangeQuery("_seq_no").gt(prevSeqNo).lte(maxSeqNo))
 
-        if (monitor.ignoreFindingsAndAlerts == null || monitor.ignoreFindingsAndAlerts == false) {
+        if (monitor.shouldPersistFindingsAndAlerts == null || monitor.shouldPersistFindingsAndAlerts == false) {
             if (!docIds.isNullOrEmpty()) {
                 boolQueryBuilder.filter(QueryBuilders.termsQuery("_id", docIds))
             }
-        } else if (monitor.ignoreFindingsAndAlerts == true) {
+        } else if (monitor.shouldPersistFindingsAndAlerts == true) {
             val docIdsParam = mutableListOf<String>()
             if (docIds != null) {
                 docIdsParam.addAll(docIds)
