@@ -143,7 +143,7 @@ class BucketSelectorExtAggregator : SiblingPipelineAggregator {
     private fun isAccepted(obj: Any, filter: IncludeExclude?): Boolean {
         return when (obj.javaClass) {
             String::class.java -> {
-                val stringFilter = filter!!.convertToStringFilter(DocValueFormat.RAW)
+                val stringFilter = filter!!.convertToStringFilter(DocValueFormat.RAW, null)
                 stringFilter.accept(BytesRef(obj as String))
             }
             java.lang.Long::class.java, Long::class.java -> {
