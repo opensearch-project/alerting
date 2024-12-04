@@ -63,6 +63,7 @@ jobs:
         with:
           name: alerting-plugin-${{ matrix.os }}
           path: alerting-artifacts
+          overwrite: true
 
   build:
     needs: Get-CI-Image-Tag
@@ -111,3 +112,4 @@ jobs:
         with:
           name: alerting-plugin-${{ matrix.os }}
           path: alerting-artifacts
+          overwrite: true
