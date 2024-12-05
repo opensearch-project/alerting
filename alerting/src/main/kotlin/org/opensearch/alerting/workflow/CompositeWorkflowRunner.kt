@@ -95,7 +95,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         var lastErrorDelegateRun: Exception? = null
 
         for (delegate in delegates) {
-            var indexToDocIds = mapOf<String, List<String>>()
+            var indexToDocIdsWithFindings: Pair<Map<String, List<String>>, List<String>>? = Pair(mapOf(), listOf())
             var delegateMonitor: Monitor
             delegateMonitor = monitorsById[delegate.monitorId]
                 ?: throw AlertingException.wrap(
@@ -118,7 +118,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 }
 
                 try {
-                    indexToDocIds = monitorCtx.workflowService!!.getFindingDocIdsByExecutionId(chainedMonitors, executionId)
+                    indexToDocIdsWithFindings = monitorCtx.workflowService!!.getFindingDocIdsByExecutionId(chainedMonitors, executionId)
                 } catch (e: Exception) {
                     logger.error("Failed to execute workflow due to failure in chained findings.  Error: ${e.message}", e)
                     return WorkflowRunResult(
@@ -131,7 +131,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 workflowId = workflowMetadata.workflowId,
                 workflowMetadataId = workflowMetadata.id,
                 chainedMonitorId = delegate.chainedMonitorFindings?.monitorId,
-                matchingDocIdsPerIndex = indexToDocIds,
+                matchingDocIdsPerIndex = indexToDocIdsWithFindings!!,
                 auditDelegateMonitorAlerts = if (workflow.auditDelegateMonitorAlerts == null) true
                 else workflow.auditDelegateMonitorAlerts!!
             )

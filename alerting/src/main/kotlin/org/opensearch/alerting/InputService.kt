@@ -90,7 +90,7 @@ class InputService(
                             periodStart = periodStart,
                             periodEnd = periodEnd,
                             prevResult = prevResult,
-                            matchingDocIdsPerIndex = matchingDocIdsPerIndex,
+                            matchingDocIdsPerIndex = matchingDocIdsPerIndex?.first,
                             returnSampleDocs = false
                         )
                         val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
