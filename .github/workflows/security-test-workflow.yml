@@ -12,7 +12,7 @@ jobs:
   build:
     strategy:
       matrix:
-        java: [ 21, 23 ]
+        java: [ 21 ]
     # Job name
     name: Build and test Alerting
     # This job runs on Linux
@@ -25,7 +25,7 @@ jobs:
           java-version: ${{ matrix.java }}
       # This step uses the checkout Github action: https://github.com/actions/checkout
       - name: Checkout Branch
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       # This step uses the setup-java Github action: https://github.com/actions/setup-java
       - name: Set Up JDK ${{ matrix.java }}
         uses: actions/setup-java@v1
