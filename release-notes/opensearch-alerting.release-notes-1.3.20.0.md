@@ -9,4 +9,4 @@ Compatible with OpenSearch 1.3.20
 * Fix compilation error bug due to osd-core ([#1736](https://github.com/opensearch-project/alerting/pull/1736))
 
 ### Documentation
-* Added 1.3.20 release notes. ([#1737](https://github.com/opensearch-project/alerting/pull/1737))
+* Added 1.3.20 release notes. ([#1742](https://github.com/opensearch-project/alerting/pull/1742))
