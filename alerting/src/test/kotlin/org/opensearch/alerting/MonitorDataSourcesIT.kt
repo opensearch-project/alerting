@@ -6234,7 +6234,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         )
     }
 
-    fun `test execute workflow with custom alerts and finding index when bucket monitor is used in chained finding of ignored doc monitor`() {
+    fun `test execute workflow when bucket monitor is used in chained finding of ignored doc monitor`() {
         val query = QueryBuilders.rangeQuery("test_strict_date_time")
             .gt("{{period_end}}||-10d")
             .lte("{{period_end}}")
