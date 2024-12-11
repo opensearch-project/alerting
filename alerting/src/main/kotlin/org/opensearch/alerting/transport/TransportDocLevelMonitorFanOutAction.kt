@@ -301,7 +301,7 @@ class TransportDocLevelMonitorFanOutAction
                  * if should_persist_findings_and_alerts flag is not set, doc-level trigger generates alerts else doc-level trigger
                  * generates a single alert with multiple findings.
                  */
-                if (monitor.shouldPersistFindingsAndAlerts == null || monitor.shouldPersistFindingsAndAlerts == false) {
+                if (monitor.shouldCreateSingleAlertForFindings == null || monitor.shouldCreateSingleAlertForFindings == false) {
                     monitor.triggers.forEach {
                         triggerResults[it.id] = runForEachDocTrigger(
                             monitorResult,
@@ -316,9 +316,9 @@ class TransportDocLevelMonitorFanOutAction
                             workflowRunContext = workflowRunContext
                         )
                     }
-                } else if (monitor.shouldPersistFindingsAndAlerts == true) {
+                } else if (monitor.shouldCreateSingleAlertForFindings == true) {
                     monitor.triggers.forEach {
-                        triggerResults[it.id] = runForEachDocTriggerWithoutPersistFindingsAndAlerts(
+                        triggerResults[it.id] = runForEachDocTriggerCreateSingleGroupedAlert(
                             monitorResult,
                             it as DocumentLevelTrigger,
                             monitor,
@@ -370,7 +370,7 @@ class TransportDocLevelMonitorFanOutAction
     /**
      * run doc-level triggers ignoring findings and alerts and generating a single alert.
      */
-    private suspend fun runForEachDocTriggerWithoutPersistFindingsAndAlerts(
+    private suspend fun runForEachDocTriggerCreateSingleGroupedAlert(
         monitorResult: MonitorRunResult<DocumentLevelTriggerRunResult>,
         trigger: DocumentLevelTrigger,
         monitor: Monitor,
@@ -381,14 +381,14 @@ class TransportDocLevelMonitorFanOutAction
     ): DocumentLevelTriggerRunResult {
         val triggerResult = triggerService.runDocLevelTrigger(monitor, trigger, queryToDocIds)
         if (triggerResult.triggeredDocs.isNotEmpty()) {
-            val findingIds = if (workflowRunContext?.matchingDocIdsPerIndex?.second != null) {
-                workflowRunContext.matchingDocIdsPerIndex.second
+            val findingIds = if (workflowRunContext?.findingIds != null) {
+                workflowRunContext.findingIds
             } else {
                 listOf()
             }
             val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger)
             val alert = alertService.composeDocLevelAlert(
-                findingIds,
+                findingIds!!,
                 triggerResult.triggeredDocs,
                 triggerCtx,
                 monitorResult.alertError() ?: triggerResult.alertError(),
@@ -582,7 +582,11 @@ class TransportDocLevelMonitorFanOutAction
                     .string()
             log.debug("Findings: $findingStr")
 
-            if (shouldCreateFinding and (monitor.shouldPersistFindingsAndAlerts == null || monitor.shouldPersistFindingsAndAlerts == false)) {
+            if (shouldCreateFinding and (
+                monitor.shouldCreateSingleAlertForFindings == null ||
+                    monitor.shouldCreateSingleAlertForFindings == false
+                )
+            ) {
                 indexRequests += IndexRequest(monitor.dataSources.findingsIndex)
                     .source(findingStr, XContentType.JSON)
                     .id(finding.id)
@@ -594,7 +598,7 @@ class TransportDocLevelMonitorFanOutAction
             bulkIndexFindings(monitor, indexRequests)
         }
 
-        if (monitor.shouldPersistFindingsAndAlerts == null || monitor.shouldPersistFindingsAndAlerts == false) {
+        if (monitor.shouldCreateSingleAlertForFindings == null || monitor.shouldCreateSingleAlertForFindings == false) {
             try {
                 findings.forEach { finding ->
                     publishFinding(monitor, finding)
@@ -957,11 +961,11 @@ class TransportDocLevelMonitorFanOutAction
         val boolQueryBuilder = BoolQueryBuilder()
         boolQueryBuilder.filter(QueryBuilders.rangeQuery("_seq_no").gt(prevSeqNo).lte(maxSeqNo))
 
-        if (monitor.shouldPersistFindingsAndAlerts == null || monitor.shouldPersistFindingsAndAlerts == false) {
+        if (monitor.shouldCreateSingleAlertForFindings == null || monitor.shouldCreateSingleAlertForFindings == false) {
             if (!docIds.isNullOrEmpty()) {
                 boolQueryBuilder.filter(QueryBuilders.termsQuery("_id", docIds))
             }
-        } else if (monitor.shouldPersistFindingsAndAlerts == true) {
+        } else if (monitor.shouldCreateSingleAlertForFindings == true) {
             val docIdsParam = mutableListOf<String>()
             if (docIds != null) {
                 docIdsParam.addAll(docIds)

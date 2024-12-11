@@ -223,7 +223,7 @@ fun randomDocumentLevelMonitor(
         name = name, monitorType = Monitor.MonitorType.DOC_LEVEL_MONITOR.value, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
         uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf(), dataSources = dataSources,
-        ignoreFindingsAndAlerts = ignoreFindingsAndAlerts, owner = owner
+        shouldCreateSingleAlertForFindings = ignoreFindingsAndAlerts, owner = owner
     )
 }
 

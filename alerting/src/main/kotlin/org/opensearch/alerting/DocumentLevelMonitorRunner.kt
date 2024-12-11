@@ -138,8 +138,12 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             }
 
             // Map of document ids per index when monitor is workflow delegate and has chained findings
-            val matchingDocIdsPerIndex = workflowRunContext?.matchingDocIdsPerIndex?.first
-            val findingIdsForMatchingDocIds = workflowRunContext?.matchingDocIdsPerIndex?.second
+            val matchingDocIdsPerIndex = workflowRunContext?.matchingDocIdsPerIndex
+            val findingIdsForMatchingDocIds = if (workflowRunContext?.findingIds != null) {
+                workflowRunContext.findingIds
+            } else {
+                listOf()
+            }
 
             val concreteIndicesSeenSoFar = mutableListOf<String>()
             val updatedIndexNames = mutableListOf<String>()
