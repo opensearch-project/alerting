@@ -297,19 +297,37 @@ class TransportDocLevelMonitorFanOutAction
                     createFindings(monitor, docsToQueries, idQueryMap, true)
                 }
             } else {
-                monitor.triggers.forEach {
-                    triggerResults[it.id] = runForEachDocTrigger(
-                        monitorResult,
-                        it as DocumentLevelTrigger,
-                        monitor,
-                        idQueryMap,
-                        docsToQueries,
-                        queryToDocIds,
-                        dryrun,
-                        executionId = executionId,
-                        findingIdToDocSource,
-                        workflowRunContext = workflowRunContext
-                    )
+                /**
+                 * if should_persist_findings_and_alerts flag is not set, doc-level trigger generates alerts else doc-level trigger
+                 * generates a single alert with multiple findings.
+                 */
+                if (monitor.shouldCreateSingleAlertForFindings == null || monitor.shouldCreateSingleAlertForFindings == false) {
+                    monitor.triggers.forEach {
+                        triggerResults[it.id] = runForEachDocTrigger(
+                            monitorResult,
+                            it as DocumentLevelTrigger,
+                            monitor,
+                            idQueryMap,
+                            docsToQueries,
+                            queryToDocIds,
+                            dryrun,
+                            executionId = executionId,
+                            findingIdToDocSource,
+                            workflowRunContext = workflowRunContext
+                        )
+                    }
+                } else if (monitor.shouldCreateSingleAlertForFindings == true) {
+                    monitor.triggers.forEach {
+                        triggerResults[it.id] = runForEachDocTriggerCreateSingleGroupedAlert(
+                            monitorResult,
+                            it as DocumentLevelTrigger,
+                            monitor,
+                            queryToDocIds,
+                            dryrun,
+                            executionId,
+                            workflowRunContext
+                        )
+                    }
                 }
             }
 
@@ -347,6 +365,58 @@ class TransportDocLevelMonitorFanOutAction
             )
             listener.onFailure(AlertingException.wrap(e))
         }
+    }
+
+    /**
+     * run doc-level triggers ignoring findings and alerts and generating a single alert.
+     */
+    private suspend fun runForEachDocTriggerCreateSingleGroupedAlert(
+        monitorResult: MonitorRunResult<DocumentLevelTriggerRunResult>,
+        trigger: DocumentLevelTrigger,
+        monitor: Monitor,
+        queryToDocIds: Map<DocLevelQuery, Set<String>>,
+        dryrun: Boolean,
+        executionId: String,
+        workflowRunContext: WorkflowRunContext?
+    ): DocumentLevelTriggerRunResult {
+        val triggerResult = triggerService.runDocLevelTrigger(monitor, trigger, queryToDocIds)
+        if (triggerResult.triggeredDocs.isNotEmpty()) {
+            val findingIds = if (workflowRunContext?.findingIds != null) {
+                workflowRunContext.findingIds
+            } else {
+                listOf()
+            }
+            val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger)
+            val alert = alertService.composeDocLevelAlert(
+                findingIds!!,
+                triggerResult.triggeredDocs,
+                triggerCtx,
+                monitorResult.alertError() ?: triggerResult.alertError(),
+                executionId = executionId,
+                workflorwRunContext = workflowRunContext
+            )
+            for (action in trigger.actions) {
+                this.runAction(action, triggerCtx.copy(alerts = listOf(AlertContext(alert))), monitor, dryrun)
+            }
+
+            if (!dryrun && monitor.id != Monitor.NO_ID) {
+                val actionResults = triggerResult.actionResultsMap.getOrDefault(alert.id, emptyMap())
+                val actionExecutionResults = actionResults.values.map { actionRunResult ->
+                    ActionExecutionResult(actionRunResult.actionId, actionRunResult.executionTime, if (actionRunResult.throttled) 1 else 0)
+                }
+                val updatedAlert = alert.copy(actionExecutionResults = actionExecutionResults)
+
+                retryPolicy.let {
+                    alertService.saveAlerts(
+                        monitor.dataSources,
+                        listOf(updatedAlert),
+                        it,
+                        routingId = monitor.id
+                    )
+                }
+            }
+        }
+        return DocumentLevelTriggerRunResult(trigger.name, listOf(), monitorResult.error)
     }
 
     private suspend fun runForEachDocTrigger(
@@ -512,7 +582,11 @@ class TransportDocLevelMonitorFanOutAction
                     .string()
             log.debug("Findings: $findingStr")
 
-            if (shouldCreateFinding) {
+            if (shouldCreateFinding and (
+                monitor.shouldCreateSingleAlertForFindings == null ||
+                    monitor.shouldCreateSingleAlertForFindings == false
+                )
+            ) {
                 indexRequests += IndexRequest(monitor.dataSources.findingsIndex)
                     .source(findingStr, XContentType.JSON)
                     .id(finding.id)
@@ -524,13 +598,15 @@ class TransportDocLevelMonitorFanOutAction
             bulkIndexFindings(monitor, indexRequests)
         }
 
-        try {
-            findings.forEach { finding ->
-                publishFinding(monitor, finding)
+        if (monitor.shouldCreateSingleAlertForFindings == null || monitor.shouldCreateSingleAlertForFindings == false) {
+            try {
+                findings.forEach { finding ->
+                    publishFinding(monitor, finding)
+                }
+            } catch (e: Exception) {
+                // suppress exception
+                log.error("Optional finding callback failed", e)
             }
-        } catch (e: Exception) {
-            // suppress exception
-            log.error("Optional finding callback failed", e)
         }
         this.findingsToTriggeredQueries += findingsToTriggeredQueries
 
@@ -688,6 +764,7 @@ class TransportDocLevelMonitorFanOutAction
                 var to: Long = Long.MAX_VALUE
                 while (to >= from) {
                     val hits: SearchHits = searchShard(
+                        monitor,
                         indexExecutionCtx.concreteIndexName,
                         shard,
                         from,
@@ -870,6 +947,7 @@ class TransportDocLevelMonitorFanOutAction
      * This method hence fetches only docs from shard which haven't been queried before
      */
     private suspend fun searchShard(
+        monitor: Monitor,
         index: String,
         shard: String,
         prevSeqNo: Long?,
@@ -883,8 +961,16 @@ class TransportDocLevelMonitorFanOutAction
         val boolQueryBuilder = BoolQueryBuilder()
         boolQueryBuilder.filter(QueryBuilders.rangeQuery("_seq_no").gt(prevSeqNo).lte(maxSeqNo))
 
-        if (!docIds.isNullOrEmpty()) {
-            boolQueryBuilder.filter(QueryBuilders.termsQuery("_id", docIds))
+        if (monitor.shouldCreateSingleAlertForFindings == null || monitor.shouldCreateSingleAlertForFindings == false) {
+            if (!docIds.isNullOrEmpty()) {
+                boolQueryBuilder.filter(QueryBuilders.termsQuery("_id", docIds))
+            }
+        } else if (monitor.shouldCreateSingleAlertForFindings == true) {
+            val docIdsParam = mutableListOf<String>()
+            if (docIds != null) {
+                docIdsParam.addAll(docIds)
+            }
+            boolQueryBuilder.filter(QueryBuilders.termsQuery("_id", docIdsParam))
         }
 
         val request: SearchRequest = SearchRequest()

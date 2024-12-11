@@ -216,12 +216,14 @@ fun randomDocumentLevelMonitor(
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     withMetadata: Boolean = false,
     dataSources: DataSources,
+    ignoreFindingsAndAlerts: Boolean? = false,
     owner: String? = null
 ): Monitor {
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.DOC_LEVEL_MONITOR.value, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
-        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf(), dataSources = dataSources, owner = owner
+        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf(), dataSources = dataSources,
+        shouldCreateSingleAlertForFindings = ignoreFindingsAndAlerts, owner = owner
     )
 }
 
