@@ -2765,7 +2765,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         )
 
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", fields = listOf(), name = "3")
-        val docLevelInput = DocLevelMonitorInput("description", listOf(aliasName), listOf(docQuery))
+        val docLevelInput = DocLevelMonitorInput("description", listOf(aliasName), listOf(docQuery), false)
 
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
         val monitor = createMonitor(
@@ -2773,8 +2773,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
                 inputs = listOf(docLevelInput),
                 triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))),
                 enabled = true,
-                schedule = IntervalSchedule(1, ChronoUnit.MINUTES),
-                fanoutEnabled = false
+                schedule = IntervalSchedule(1, ChronoUnit.MINUTES)
             )
         )
 

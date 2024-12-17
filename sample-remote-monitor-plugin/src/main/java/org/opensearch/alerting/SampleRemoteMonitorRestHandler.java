@@ -96,8 +96,7 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
                 new DataSources(),
                 false,
                 false,
-                "sample-remote-monitor-plugin",
-                true
+                "sample-remote-monitor-plugin"
         );
         IndexMonitorRequest indexMonitorRequest1 = new IndexMonitorRequest(
                 Monitor.NO_ID,
@@ -137,7 +136,7 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
             };
         } else if (runMonitorParam.equals("multiple")) {
             SampleRemoteMonitorInput2 input2 = new SampleRemoteMonitorInput2("hello",
-                    new DocLevelMonitorInput("test", List.of("test"), List.of(new DocLevelQuery("query", "query", List.of(), "test:1", List.of()))));
+                    new DocLevelMonitorInput("test", List.of("test"), List.of(new DocLevelQuery("query", "query", List.of(), "test:1", List.of())), true));
             BytesStreamOutput out1 = new BytesStreamOutput();
             input2.writeTo(out1);
             BytesReference input1Serialized1 = out1.bytes();
@@ -159,8 +158,7 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
                     new DataSources(),
                     false,
                     false,
-                    "sample-remote-monitor-plugin",
-                    true
+                    "sample-remote-monitor-plugin"
             );
             IndexMonitorRequest indexMonitorRequest2 = new IndexMonitorRequest(
                     Monitor.NO_ID,
@@ -222,7 +220,7 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
             sampleRemoteDocLevelMonitorInput.writeTo(out2);
             BytesReference sampleRemoteDocLevelMonitorInputSerialized = out2.bytes();
 
-            DocLevelMonitorInput docLevelMonitorInput = new DocLevelMonitorInput("description", index, emptyList());
+            DocLevelMonitorInput docLevelMonitorInput = new DocLevelMonitorInput("description", index, emptyList(), true);
             RemoteDocLevelMonitorInput remoteDocLevelMonitorInput = new RemoteDocLevelMonitorInput(sampleRemoteDocLevelMonitorInputSerialized, docLevelMonitorInput);
 
             Monitor remoteDocLevelMonitor = new Monitor(
@@ -245,8 +243,7 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
                     new DataSources(),
                     false,
                     false,
-                    "sample-remote-monitor-plugin",
-                    true
+                    "sample-remote-monitor-plugin"
             );
             IndexMonitorRequest indexDocLevelMonitorRequest = new IndexMonitorRequest(
                     Monitor.NO_ID,
