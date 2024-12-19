@@ -2789,6 +2789,68 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         } catch (e: ResponseException) {
             assertTrue(e.message!!.contains("alerting_exception"))
         }
+   }
+     
+   fun `test document-level monitor fanout disabled approach when aliases contain indices with multiple shards`() {
+        val aliasName = "test-alias"
+        createIndexAlias(
+            aliasName,
+            """
+                "properties" : {
+                  "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
+                  "test_field" : { "type" : "keyword" },
+                  "number" : { "type" : "keyword" }
+                }
+            """.trimIndent(),
+            "\"index.number_of_shards\": 7"
+        )
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", fields = listOf(), name = "3")
+        val docLevelInput = DocLevelMonitorInput("description", listOf(aliasName), listOf(docQuery), false)
+
+        val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))),
+                enabled = true,
+                schedule = IntervalSchedule(1, ChronoUnit.MINUTES)
+            )
+        )
+
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "@timestamp": "$testTime",
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+        indexDoc(aliasName, "1", testDoc)
+        indexDoc(aliasName, "2", testDoc)
+        indexDoc(aliasName, "4", testDoc)
+        indexDoc(aliasName, "5", testDoc)
+        indexDoc(aliasName, "6", testDoc)
+        indexDoc(aliasName, "7", testDoc)
+        OpenSearchTestCase.waitUntil(
+            { searchFindings(monitor).size == 6 && searchAlertsWithFilter(monitor).size == 1 },
+            2,
+            TimeUnit.MINUTES
+        )
+
+        rolloverDatastream(aliasName)
+        indexDoc(aliasName, "11", testDoc)
+        indexDoc(aliasName, "12", testDoc)
+        indexDoc(aliasName, "14", testDoc)
+        indexDoc(aliasName, "15", testDoc)
+        indexDoc(aliasName, "16", testDoc)
+        indexDoc(aliasName, "17", testDoc)
+        OpenSearchTestCase.waitUntil(
+            { searchFindings(monitor).size == 6 && searchAlertsWithFilter(monitor).size == 1 },
+            2,
+            TimeUnit.MINUTES
+        )
+
+        deleteDataStream(aliasName)
     }
 
     fun `test execute monitor generates alerts and findings with renewable locks`() {
