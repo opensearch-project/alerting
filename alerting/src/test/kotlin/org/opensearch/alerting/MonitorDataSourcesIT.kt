@@ -5079,7 +5079,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         } catch (e: Exception) {
             e.message?.let {
                 assertTrue(
-                    "Exception not returning GetMonitor Action error ",
+                    "Expected 0 hits for searchMonitorMetadata, got non-0 results.",
                     it.contains("List is empty")
                 )
             }
@@ -5119,7 +5119,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         } catch (e: Exception) {
             e.message?.let {
                 assertTrue(
-                    "Exception not returning GetWorkflow Action error ",
+                    "Expected 0 hits for searchMonitorMetadata, got non-0 results.",
                     it.contains("Workflow not found.")
                 )
             }
@@ -5142,7 +5142,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         } catch (e: Exception) {
             e.message?.let {
                 assertTrue(
-                    "Exception not returning GetMonitor Action error ",
+                    "Exception not returning searchMonitorMetadata error ",
                     it.contains("List is empty")
                 )
             }
