@@ -172,7 +172,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
                     }
 
                     // Delete monitors workflow metadata
-                    // Monitor metadata will be in workflowId-monitorId-metadata format
+                    // Monitor metadata will be in workflowId-metadata-monitorId-metadata format
                     metadataIdsToDelete.addAll(delegateMonitors.map { MonitorMetadata.getId(it, workflowMetadataId) })
                     try {
                         // Delete the monitors workflow metadata
