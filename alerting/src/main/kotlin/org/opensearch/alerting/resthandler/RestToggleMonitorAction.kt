@@ -9,9 +9,9 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.client.node.NodeClient
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.alerting.action.AlertingActions.UPDATE_MONITOR_STATE_ACTION_TYPE
-import org.opensearch.commons.alerting.action.UpdateMonitorStateRequest
-import org.opensearch.commons.alerting.action.UpdateMonitorStateResponse
+import org.opensearch.commons.alerting.action.AlertingActions.TOGGLE_MONITOR_ACTION_TYPE
+import org.opensearch.commons.alerting.action.ToggleMonitorRequest
+import org.opensearch.commons.alerting.action.ToggleMonitorResponse
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.action.ActionListener
@@ -27,12 +27,11 @@ import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestRequest.Method.PUT
 import java.io.IOException
 
-private val log = LogManager.getLogger(RestUpdateMonitorStateAction::class.java)
+private val log = LogManager.getLogger(RestToggleMonitorAction::class.java)
 
-// Rest handler to enable and disable monitors.
-class RestUpdateMonitorStateAction : BaseRestHandler() {
+class RestToggleMonitorAction : BaseRestHandler() {
     override fun getName(): String {
-        return "update_monitor_state_action"
+        return "toggle_monitor_action"
     }
 
     override fun routes(): List<Route> {
@@ -69,19 +68,19 @@ class RestUpdateMonitorStateAction : BaseRestHandler() {
         log.debug("{} {}/{}/{}", request.method(), AlertingPlugin.MONITOR_BASE_URI, monitorId, if (enabled) "enable" else "disable")
 
         return RestChannelConsumer { channel ->
-            val updateMonitorStateRequest = UpdateMonitorStateRequest(
+            val toggleMonitorRequest = ToggleMonitorRequest(
                 monitorId = monitorId,
                 enabled = enabled,
-                seqNo = -1, // This will be handled in transport layer
-                primaryTerm = -1, // This will be handled in transport layer
+                seqNo = -1, // Updated in the transport layer
+                primaryTerm = -1, // Updated in the transport layer
                 method = request.method()
             )
 
             client.execute(
-                UPDATE_MONITOR_STATE_ACTION_TYPE,
-                updateMonitorStateRequest,
-                object : ActionListener<UpdateMonitorStateResponse> {
-                    override fun onResponse(response: UpdateMonitorStateResponse) {
+                TOGGLE_MONITOR_ACTION_TYPE,
+                toggleMonitorRequest,
+                object : ActionListener<ToggleMonitorResponse> {
+                    override fun onResponse(response: ToggleMonitorResponse) {
                         channel.sendResponse(
                             BytesRestResponse(
                                 RestStatus.OK,

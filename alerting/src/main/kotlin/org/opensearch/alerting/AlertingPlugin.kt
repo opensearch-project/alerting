@@ -51,7 +51,7 @@ import org.opensearch.alerting.resthandler.RestSearchAlertingCommentAction
 import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
 import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
 import org.opensearch.alerting.resthandler.RestSearchMonitorAction
-import org.opensearch.alerting.resthandler.RestUpdateMonitorStateAction
+import org.opensearch.alerting.resthandler.RestToggleMonitorAction
 import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings
@@ -84,7 +84,7 @@ import org.opensearch.alerting.transport.TransportSearchAlertingCommentAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
-import org.opensearch.alerting.transport.TransportUpdateMonitorStateAction
+import org.opensearch.alerting.transport.TransportToggleMonitorAction
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
 import org.opensearch.client.Client
@@ -219,7 +219,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestIndexAlertingCommentAction(),
             RestSearchAlertingCommentAction(),
             RestDeleteAlertingCommentAction(),
-            RestUpdateMonitorStateAction(),
+            RestToggleMonitorAction(),
         )
     }
 
@@ -252,7 +252,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(ExecuteWorkflowAction.INSTANCE, TransportExecuteWorkflowAction::class.java),
             ActionPlugin.ActionHandler(GetRemoteIndexesAction.INSTANCE, TransportGetRemoteIndexesAction::class.java),
             ActionPlugin.ActionHandler(DocLevelMonitorFanOutAction.INSTANCE, TransportDocLevelMonitorFanOutAction::class.java),
-            ActionPlugin.ActionHandler(AlertingActions.UPDATE_MONITOR_STATE_ACTION_TYPE, TransportUpdateMonitorStateAction::class.java)
+            ActionPlugin.ActionHandler(AlertingActions.TOGGLE_MONITOR_ACTION_TYPE, TransportToggleMonitorAction::class.java)
         )
     }
 
