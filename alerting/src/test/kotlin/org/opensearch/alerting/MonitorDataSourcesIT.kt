@@ -5053,6 +5053,9 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertNotNull(getWorkflowResponse)
         assertEquals(workflowId, getWorkflowResponse.id)
 
+        // Verify that monitor workflow metadata exists
+        assertNotNull(searchMonitorMetadata("${workflowResponse.id}-metadata-${monitorResponse.id}-metadata"))
+
         deleteWorkflow(workflowId, false)
         // Verify that the workflow is deleted
         try {
@@ -5068,6 +5071,19 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         // Verify that the monitor is not deleted
         val existingDelegate = getMonitorResponse(monitorResponse.id)
         assertNotNull(existingDelegate)
+
+        // Verify that the monitor workflow metadata is deleted
+        try {
+            searchMonitorMetadata("${workflowResponse.id}-metadata-${monitorResponse.id}-metadata")
+            fail("expected searchMonitorMetadata method to throw exception")
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Expected 0 hits for searchMonitorMetadata, got non-0 results.",
+                    it.contains("List is empty")
+                )
+            }
+        }
     }
 
     fun `test delete workflow delegate monitor deleted`() {
@@ -5093,6 +5109,9 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertNotNull(getWorkflowResponse)
         assertEquals(workflowId, getWorkflowResponse.id)
 
+        // Verify that monitor workflow metadata exists
+        assertNotNull(searchMonitorMetadata("${workflowResponse.id}-metadata-${monitorResponse.id}-metadata"))
+
         deleteWorkflow(workflowId, true)
         // Verify that the workflow is deleted
         try {
@@ -5113,6 +5132,18 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 assertTrue(
                     "Exception not returning GetMonitor Action error ",
                     it.contains("Monitor not found")
+                )
+            }
+        }
+        // Verify that the monitor workflow metadata is deleted
+        try {
+            searchMonitorMetadata("${workflowResponse.id}-metadata-${monitorResponse.id}-metadata")
+            fail("expected searchMonitorMetadata method to throw exception")
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Expected 0 hits for searchMonitorMetadata, got non-0 results.",
+                    it.contains("List is empty")
                 )
             }
         }
