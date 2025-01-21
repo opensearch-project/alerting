@@ -55,6 +55,7 @@ import org.opensearch.commons.alerting.model.Delegate
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTriggerRunResult
+import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
@@ -6379,5 +6380,107 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 assertFindings(docLevelMonitorResponse.id, docCustomFindingsIndex, 0, 0, listOf("1", "2", "3", "4"))
             }
         }
+    }
+
+    fun `test execute workflow when monitor is disabled and re-enabled`() {
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+
+        val index1 = "index_123"
+        createIndex(index1, Settings.EMPTY)
+        val q1 = DocLevelQuery(query = "properties:\"abcd\"", name = "1", fields = listOf())
+
+        val docLevelInput = DocLevelMonitorInput(
+            "description",
+            listOf(index1),
+            listOf(q1)
+        )
+
+        val customQueryIndex = "custom_alerts_index"
+
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(
+                queryIndex = customQueryIndex
+            )
+        )
+
+        val monitorResponse = createMonitor(monitor)!!
+
+        val workflowRequest = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id)
+        )
+        val workflowResponse = upsertWorkflow(workflowRequest)!!
+        val workflowId = workflowResponse.id
+        val getWorkflowResponse = getWorkflowById(id = workflowResponse.id)
+
+        assertNotNull(getWorkflowResponse)
+        assertEquals(workflowId, getWorkflowResponse.id)
+
+        // Verify that monitor workflow metadata exists
+        assertNotNull(searchMonitorMetadata("${workflowResponse.id}-metadata-${monitorResponse.id}-metadata"))
+
+        val testDoc1 = """{
+            "properties": "abcd"
+        }"""
+        indexDoc(index1, "1", testDoc1)
+        indexDoc(index1, "2", testDoc1)
+        indexDoc(index1, "3", testDoc1)
+
+        // Run workflow
+        executeWorkflow(workflowRequest, workflowId, false)
+        var findings: List<Finding>
+        OpenSearchTestCase.waitUntil({
+            findings = searchFindings(monitorResponse.id)
+            if (findings.size >= 1) {
+                return@waitUntil true
+            }
+            return@waitUntil false
+        }, 30, TimeUnit.SECONDS)
+
+        // Verify that monitor workflow metadata is updated with lastRunContext
+        var monitorWokflowMetadata = searchMonitorMetadata("${workflowResponse.id}-metadata-${monitorResponse.id}-metadata")
+        val lastRunContextBeforeDisable = (monitorWokflowMetadata?.lastRunContext?.get(index1) as? Map<String, Any>)
+        assertEquals(2, lastRunContextBeforeDisable?.get("0"))
+
+        // Disable workflow
+        val disabledWorkflowRequest = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id),
+            id = workflowId,
+            enabled = false
+        )
+        upsertWorkflow(disabledWorkflowRequest)
+        OpenSearchTestCase.waitUntil({
+            val workflowResponse = getWorkflowById(workflowId)
+            if (workflowResponse.workflow?.enabled == false) {
+                return@waitUntil true
+            }
+            return@waitUntil false
+        }, 30, TimeUnit.SECONDS)
+
+        // Index doc, since workflow is disabled, monitor workflow metadata shouldn't be updated
+        indexDoc(index1, "4", testDoc1)
+
+        // re-enable workflow
+        val enabledWorkflowRequest = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id),
+            id = workflowId,
+            enabled = true
+        )
+        upsertWorkflow(enabledWorkflowRequest, method = RestRequest.Method.PUT, id = workflowId)
+        OpenSearchTestCase.waitUntil({
+            val workflowResponse = getWorkflowById(workflowId)
+            if (workflowResponse.workflow?.enabled == true) {
+                return@waitUntil true
+            }
+            return@waitUntil false
+        }, 30, TimeUnit.SECONDS)
+
+        // Verify that monitor workflow metadata exists
+        // Since workflow is re-enabled, last run context should be updated with latest sequence number
+        monitorWokflowMetadata = searchMonitorMetadata("${workflowResponse.id}-metadata-${monitorResponse.id}-metadata")
+        assertNotNull(monitorWokflowMetadata)
+        val lastRunContext = (monitorWokflowMetadata?.lastRunContext?.get(index1) as? Map<String, Any>)
+        assertEquals(3, lastRunContext?.get("0"))
     }
 }
