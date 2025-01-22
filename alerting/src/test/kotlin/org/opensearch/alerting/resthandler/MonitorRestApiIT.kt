@@ -1337,7 +1337,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val monitorId = createMonitor(randomQueryLevelMonitor(enabled = false, enabledTime = null), refresh = true).id
         val response = client().makeRequest(
             "PUT",
-            "${AlertingPlugin.MONITOR_BASE_URI}/$monitorId/enable",
+            "${AlertingPlugin.MONITOR_BASE_URI}/$monitorId/_enable",
             emptyMap(),
             null
         )
@@ -1352,7 +1352,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val monitorId = createMonitor(randomQueryLevelMonitor(enabled = true, enabledTime = Instant.now()), refresh = true).id
         val response = client().makeRequest(
             "PUT",
-            "${AlertingPlugin.MONITOR_BASE_URI}/$monitorId/disable",
+            "${AlertingPlugin.MONITOR_BASE_URI}/$monitorId/_disable",
             emptyMap(),
             null
         )
@@ -1370,7 +1370,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val exception = assertThrows(ResponseException::class.java) {
             client().makeRequest(
                 "PUT",
-                "${AlertingPlugin.MONITOR_BASE_URI}/$monitorId/enable",
+                "${AlertingPlugin.MONITOR_BASE_URI}/$monitorId/_enable",
                 emptyMap(),
                 null
             )
@@ -1398,7 +1398,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val exception = assertThrows(ResponseException::class.java) {
             client().makeRequest(
                 "PUT",
-                "${AlertingPlugin.MONITOR_BASE_URI}/$monitorId/disable",
+                "${AlertingPlugin.MONITOR_BASE_URI}/$monitorId/_disable",
                 emptyMap(),
                 null
             )

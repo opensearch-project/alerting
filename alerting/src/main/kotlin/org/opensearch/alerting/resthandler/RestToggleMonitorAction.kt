@@ -63,7 +63,7 @@ class RestToggleMonitorAction : BaseRestHandler() {
         }
 
         // Check if the request is being made to enable the monitor
-        val enabled = request.path().endsWith("/enable")
+        val enabled = request.path().endsWith("/_enable")
 
         log.debug("{} {}/{}/{}", request.method(), AlertingPlugin.MONITOR_BASE_URI, monitorId, if (enabled) "enable" else "disable")
 
