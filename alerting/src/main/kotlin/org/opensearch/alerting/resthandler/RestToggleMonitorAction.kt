@@ -42,15 +42,15 @@ class RestToggleMonitorAction : BaseRestHandler() {
         return mutableListOf(
             ReplacedRoute(
                 PUT,
-                "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/enable",
+                "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_enable",
                 PUT,
-                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/{monitorID}/enable"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/{monitorID}/_enable"
             ),
             ReplacedRoute(
                 PUT,
-                "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/disable",
+                "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_disable",
                 PUT,
-                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/{monitorID}/disable"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/{monitorID}/_disable"
             )
         )
     }
