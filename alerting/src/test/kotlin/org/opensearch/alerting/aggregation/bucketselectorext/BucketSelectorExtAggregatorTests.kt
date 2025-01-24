@@ -102,10 +102,12 @@ class BucketSelectorExtAggregatorTests : AggregatorTestCase() {
                 iw.addDocument(doc)
             },
             Consumer { f: InternalFilters ->
+                val bucketSelectorIndices = f.buckets[0].aggregations.get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices
                 assertThat(
-                    (f.buckets[0].aggregations.get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices).bucketIndices[0],
+                    bucketSelectorIndices.bucketIndices[0],
                     CoreMatchers.equalTo(1)
                 )
+                assertEquals(BucketSelectorExtAggregationBuilder.NAME.preferredName, bucketSelectorIndices.writeableName)
             },
             fieldType, fieldType1
         )
@@ -162,10 +164,12 @@ class BucketSelectorExtAggregatorTests : AggregatorTestCase() {
                 iw.addDocument(doc)
             },
             Consumer { f: InternalFilters ->
+                val bucketSelectorIndices = f.buckets[0].aggregations.get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices
                 assertThat(
-                    (f.buckets[0].aggregations.get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices).bucketIndices.size,
+                    bucketSelectorIndices.bucketIndices.size,
                     CoreMatchers.equalTo(0)
                 )
+                assertEquals(BucketSelectorExtAggregationBuilder.NAME.preferredName, bucketSelectorIndices.writeableName)
             },
             fieldType, fieldType1
         )
@@ -183,10 +187,12 @@ class BucketSelectorExtAggregatorTests : AggregatorTestCase() {
                 iw.addDocument(doc)
             },
             Consumer { f: InternalFilters ->
+                val bucketSelectorIndices = f.buckets[0].aggregations.get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices
                 assertThat(
-                    (f.buckets[0].aggregations.get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices).bucketIndices[0],
+                    bucketSelectorIndices.bucketIndices[0],
                     CoreMatchers.equalTo(1)
                 )
+                assertEquals(BucketSelectorExtAggregationBuilder.NAME.preferredName, bucketSelectorIndices.writeableName)
             },
             fieldType, fieldType1
         )
@@ -226,10 +232,12 @@ class BucketSelectorExtAggregatorTests : AggregatorTestCase() {
                 iw.addDocument(doc)
             },
             Consumer { f: InternalFilters ->
+                val bucketSelectorIndices = f.buckets[0].aggregations.get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices
                 assertThat(
-                    (f.buckets[0].aggregations.get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices).bucketIndices.size,
+                    bucketSelectorIndices.bucketIndices.size,
                     CoreMatchers.equalTo(0)
                 )
+                assertEquals(BucketSelectorExtAggregationBuilder.NAME.preferredName, bucketSelectorIndices.writeableName)
             },
             fieldType, fieldType1
         )
@@ -270,10 +278,12 @@ class BucketSelectorExtAggregatorTests : AggregatorTestCase() {
                 iw.addDocument(doc)
             },
             Consumer { f: InternalFilters ->
+                val bucketSelectorIndices = f.buckets[0].aggregations.get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices
                 assertThat(
-                    (f.buckets[0].aggregations.get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices).bucketIndices[0],
+                    bucketSelectorIndices.bucketIndices[0],
                     CoreMatchers.equalTo(0)
                 )
+                assertEquals(BucketSelectorExtAggregationBuilder.NAME.preferredName, bucketSelectorIndices.writeableName)
             },
             fieldType, fieldType1
         )
@@ -318,10 +328,12 @@ class BucketSelectorExtAggregatorTests : AggregatorTestCase() {
                 iw.addDocument(doc)
             },
             Consumer { f: InternalFilter ->
+                val bucketSelectorIndices = f.aggregations.get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices
                 assertThat(
-                    (f.aggregations.get<Aggregation>("test_bucket_selector_ext") as BucketSelectorIndices).bucketIndices[0],
+                    bucketSelectorIndices.bucketIndices[0],
                     CoreMatchers.equalTo(1)
                 )
+                assertEquals(BucketSelectorExtAggregationBuilder.NAME.preferredName, bucketSelectorIndices.writeableName)
             },
             fieldType, fieldType1
         )
