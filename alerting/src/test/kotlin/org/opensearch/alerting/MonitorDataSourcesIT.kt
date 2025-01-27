@@ -6449,14 +6449,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             id = workflowId,
             enabled = false
         )
-        upsertWorkflow(disabledWorkflowRequest)
-        OpenSearchTestCase.waitUntil({
-            val workflowResponse = getWorkflowById(workflowId)
-            if (workflowResponse.workflow?.enabled == false) {
-                return@waitUntil true
-            }
-            return@waitUntil false
-        }, 30, TimeUnit.SECONDS)
+        upsertWorkflow(disabledWorkflowRequest, method = RestRequest.Method.PUT, id = workflowId)
 
         // Index doc, since workflow is disabled, monitor workflow metadata shouldn't be updated
         indexDoc(index1, "4", testDoc1)
@@ -6468,13 +6461,6 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             enabled = true
         )
         upsertWorkflow(enabledWorkflowRequest, method = RestRequest.Method.PUT, id = workflowId)
-        OpenSearchTestCase.waitUntil({
-            val workflowResponse = getWorkflowById(workflowId)
-            if (workflowResponse.workflow?.enabled == true) {
-                return@waitUntil true
-            }
-            return@waitUntil false
-        }, 30, TimeUnit.SECONDS)
 
         // Verify that monitor workflow metadata exists
         // Since workflow is re-enabled, last run context should be updated with latest sequence number
@@ -6482,5 +6468,88 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertNotNull(monitorWokflowMetadata)
         val lastRunContext = (monitorWokflowMetadata?.lastRunContext?.get(index1) as? Map<String, Any>)
         assertEquals(3, lastRunContext?.get("0"))
+    }
+
+    fun `test doc level monitor when it is disabled and re-enabled`() {
+        // Setup doc level monitor
+        val docQuery = DocLevelQuery(query = "eventType:\"login\"", name = "3", fields = listOf())
+
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(docQuery)
+        )
+        val customFindingsIndex = "custom_findings_index"
+        val customFindingsIndexPattern = "custom_findings_index-1"
+        val customQueryIndex = "custom_alerts_index"
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(),
+            dataSources = DataSources(
+                queryIndex = customQueryIndex,
+                findingsIndex = customFindingsIndex,
+                findingsIndexPattern = customFindingsIndexPattern
+            )
+        )
+        val monitorResponse = createMonitor(monitor)
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+
+        val testDoc = """{
+            "eventType" : "login"
+        }"""
+        indexDoc(index, "1", testDoc)
+
+        monitor = monitorResponse!!.monitor
+        val id = monitorResponse.id
+
+        // Execute monitor
+        var executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertNotNull(executeMonitorResponse)
+
+        // Assert findings generated and last run context in monitor metadata is updated
+        var findings = searchFindings(id, customFindingsIndex)
+        assertEquals(1, findings.size)
+
+        var monitorMetadata = searchMonitorMetadata("${monitorResponse.id}-metadata")
+        val lastRunContextBeforeDisable = (monitorMetadata?.lastRunContext?.get(index) as? Map<String, Any>)
+        assertEquals(0, lastRunContextBeforeDisable?.get("0"))
+
+        // Disable monitor
+        var updateMonitorResponse = updateMonitor(
+            monitor.copy(
+                id = monitorResponse.id,
+                dataSources = DataSources(
+                    queryIndex = customQueryIndex,
+                ),
+                enabled = false,
+                enabledTime = null
+            ),
+            monitorResponse.id
+        )
+        Assert.assertNotNull(updateMonitorResponse)
+
+        // Index doc. Since monitor is disabled, monitor workflow metadata shouldn't be updated
+        indexDoc(index, "2", testDoc)
+        indexDoc(index, "3", testDoc)
+        indexDoc(index, "4", testDoc)
+
+        // re-enable monitor
+        updateMonitorResponse = updateMonitor(
+            monitor.copy(
+                id = monitorResponse.id,
+                dataSources = DataSources(
+                    queryIndex = customQueryIndex,
+                ),
+                enabled = true,
+                enabledTime = Instant.now().truncatedTo(ChronoUnit.MILLIS)
+            ),
+            monitorResponse.id
+        )
+        Assert.assertNotNull(updateMonitorResponse)
+        // Assert no new findings since monitor didnt run
+        findings = searchFindings(id, customFindingsIndex)
+        assertEquals(1, findings.size)
+        // Assert last run context in monitor metadata updated on enabling it, with no new findings generated
+        monitorMetadata = searchMonitorMetadata("${monitorResponse.id}-metadata")
+        val lastRunContextAfterEnable = (monitorMetadata?.lastRunContext?.get(index) as? Map<String, Any>)
+        assertEquals(3, lastRunContextAfterEnable?.get("0"))
     }
 }
