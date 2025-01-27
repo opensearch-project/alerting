@@ -55,7 +55,6 @@ import org.opensearch.commons.alerting.model.Delegate
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTriggerRunResult
-import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
@@ -6428,15 +6427,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         indexDoc(index1, "3", testDoc1)
 
         // Run workflow
-        executeWorkflow(workflowRequest, workflowId, false)
-        var findings: List<Finding>
-        OpenSearchTestCase.waitUntil({
-            findings = searchFindings(monitorResponse.id)
-            if (findings.size >= 1) {
-                return@waitUntil true
-            }
-            return@waitUntil false
-        }, 30, TimeUnit.SECONDS)
+        var executeWorkflowResponse = executeWorkflow(workflowRequest, workflowId, false)
+        Assert.assertNotNull(executeWorkflowResponse)
+        var findings = searchFindings(monitorResponse.id)
+        assertEquals(3, findings.size)
 
         // Verify that monitor workflow metadata is updated with lastRunContext
         var monitorWokflowMetadata = searchMonitorMetadata("${workflowResponse.id}-metadata-${monitorResponse.id}-metadata")
@@ -6451,7 +6445,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         )
         upsertWorkflow(disabledWorkflowRequest, method = RestRequest.Method.PUT, id = workflowId)
 
-        // Index doc, since workflow is disabled, monitor workflow metadata shouldn't be updated
+        // Index doc. Since workflow is disabled, monitor workflow metadata shouldn't be updated
         indexDoc(index1, "4", testDoc1)
 
         // re-enable workflow
@@ -6461,6 +6455,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             enabled = true
         )
         upsertWorkflow(enabledWorkflowRequest, method = RestRequest.Method.PUT, id = workflowId)
+
+        // Assert no new findings generated after workflow is re-enabled
+        executeWorkflowResponse = executeWorkflow(workflowRequest, workflowId, false)
+        Assert.assertNotNull(executeWorkflowResponse)
+        findings = searchFindings(monitorResponse.id)
+        assertEquals(3, findings.size)
 
         // Verify that monitor workflow metadata exists
         // Since workflow is re-enabled, last run context should be updated with latest sequence number
@@ -6531,6 +6531,13 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         indexDoc(index, "3", testDoc)
         indexDoc(index, "4", testDoc)
 
+        executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertNotNull(executeMonitorResponse)
+
+        // Assert no new findings since monitor was disabled
+        findings = searchFindings(id, customFindingsIndex)
+        assertEquals(1, findings.size)
+
         // re-enable monitor
         updateMonitorResponse = updateMonitor(
             monitor.copy(
@@ -6544,6 +6551,9 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             monitorResponse.id
         )
         Assert.assertNotNull(updateMonitorResponse)
+        executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertNotNull(executeMonitorResponse)
+
         // Assert no new findings since monitor didnt run
         findings = searchFindings(id, customFindingsIndex)
         assertEquals(1, findings.size)
