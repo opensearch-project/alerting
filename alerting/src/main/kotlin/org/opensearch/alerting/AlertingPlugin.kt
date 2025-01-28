@@ -97,6 +97,7 @@ import org.opensearch.common.settings.SettingsFilter
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutAction
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
+import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorIndices
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.ChainedAlertTrigger
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
@@ -468,10 +469,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             SearchPlugin.PipelineAggregationSpec(
                 BucketSelectorExtAggregationBuilder.NAME,
                 { sin: StreamInput -> BucketSelectorExtAggregationBuilder(sin) },
-                { parser: XContentParser, agg_name: String ->
-                    BucketSelectorExtAggregationBuilder.parse(agg_name, parser)
-                }
-            )
+                { parser: XContentParser, agg_name: String -> BucketSelectorExtAggregationBuilder.parse(agg_name, parser) }
+            ).addResultReader({ sin: StreamInput -> BucketSelectorIndices(sin) })
         )
     }
 
