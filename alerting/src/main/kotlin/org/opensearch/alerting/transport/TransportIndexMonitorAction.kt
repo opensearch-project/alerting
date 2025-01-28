@@ -709,8 +709,21 @@ class TransportIndexMonitorAction @Inject constructor(
                     )
                     return
                 }
+                var isDocLevelMonitorRestarted = false
+                // Force re-creation of last run context if monitor is of type standard doc-level/threat-intel
+                // And monitor is re-enabled
+                if (request.monitor.enabled && !currentMonitor.enabled &&
+                    request.monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value)
+                ) {
+                    isDocLevelMonitorRestarted = true
+                }
+
                 var updatedMetadata: MonitorMetadata
-                val (metadata, created) = MonitorMetadataService.getOrCreateMetadata(request.monitor)
+                val (metadata, created) = MonitorMetadataService.getOrCreateMetadata(
+                    request.monitor,
+                    forceCreateLastRunContext = isDocLevelMonitorRestarted
+                )
+
                 // Recreate runContext if metadata exists
                 // Delete and insert all queries from/to queryIndex
 

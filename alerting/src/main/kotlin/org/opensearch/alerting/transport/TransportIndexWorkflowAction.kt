@@ -551,10 +551,17 @@ class TransportIndexWorkflowAction @Inject constructor(
                 val monitors = monitorCtx.workflowService!!.getMonitorsById(delegates.map { it.monitorId }, delegates.size)
 
                 for (monitor in monitors) {
+                    var isWorkflowRestarted = false
+
+                    if (request.workflow.enabled && !currentWorkflow.enabled) {
+                        isWorkflowRestarted = true
+                    }
+
                     val (monitorMetadata, created) = MonitorMetadataService.getOrCreateMetadata(
                         monitor = monitor,
                         createWithRunContext = true,
-                        workflowMetadataId = workflowMetadata.id
+                        workflowMetadataId = workflowMetadata.id,
+                        forceCreateLastRunContext = isWorkflowRestarted
                     )
                     if (!created &&
                         Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
