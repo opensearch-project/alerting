@@ -273,17 +273,17 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val expectedError = mapOf(
             "error" to mapOf(
                 "reason" to "Invalid monitor name [$invalidName]. " +
-                    "Monitor Name should be alphanumeric (4-50 chars) starting with letter or underscore",
+                    "Monitor Name should be alphanumeric (4-50 chars) starting with letter or underscore.",
                 "caused_by" to mapOf(
                     "reason" to "java.lang.IllegalArgumentException: Invalid monitor name [$invalidName]. " +
-                        "Monitor Name should be alphanumeric (4-50 chars) starting with letter or underscore",
+                        "Monitor Name should be alphanumeric (4-50 chars) starting with letter or underscore.",
                     "type" to "exception"
                 ),
                 "type" to "alerting_exception",
                 "root_cause" to listOf(
                     mapOf(
                         "reason" to "Invalid monitor name [$invalidName]. " +
-                            "Monitor Name should be alphanumeric (4-50 chars) starting with letter or underscore",
+                            "Monitor Name should be alphanumeric (4-50 chars) starting with letter or underscore.",
                         "type" to "alerting_exception",
                     )
                 )
@@ -304,17 +304,17 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val expectedError = mapOf(
             "error" to mapOf(
                 "reason" to "Invalid trigger name [$invalidName]. " +
-                    "Trigger Name should be alphanumeric (4-50 chars) starting with letter or underscore",
+                    "Trigger Name should be alphanumeric (4-50 chars) starting with letter or underscore.",
                 "caused_by" to mapOf(
                     "reason" to "java.lang.IllegalArgumentException: Invalid trigger name [$invalidName]. " +
-                        "Trigger Name should be alphanumeric (4-50 chars) starting with letter or underscore",
+                        "Trigger Name should be alphanumeric (4-50 chars) starting with letter or underscore.",
                     "type" to "exception"
                 ),
                 "type" to "alerting_exception",
                 "root_cause" to listOf(
                     mapOf(
                         "reason" to "Invalid trigger name [$invalidName]. " +
-                            "Trigger Name should be alphanumeric (4-50 chars) starting with letter or underscore",
+                            "Trigger Name should be alphanumeric (4-50 chars) starting with letter or underscore.",
                         "type" to "alerting_exception",
                     )
                 )
@@ -335,17 +335,17 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val expectedError = mapOf(
             "error" to mapOf(
                 "reason" to "Invalid destination ID [$invalidId]. " +
-                    "Destination ID should be alphanumeric string with +, /, _, or - characters only",
+                    "Destination ID should be alphanumeric string with +, /, _, or - characters only.",
                 "caused_by" to mapOf(
                     "reason" to "java.lang.IllegalArgumentException: Invalid destination ID [$invalidId]. " +
-                        "Destination ID should be alphanumeric string with +, /, _, or - characters only",
+                        "Destination ID should be alphanumeric string with +, /, _, or - characters only.",
                     "type" to "exception"
                 ),
                 "type" to "alerting_exception",
                 "root_cause" to listOf(
                     mapOf(
                         "reason" to "Invalid destination ID [$invalidId]. " +
-                            "Destination ID should be alphanumeric string with +, /, _, or - characters only",
+                            "Destination ID should be alphanumeric string with +, /, _, or - characters only.",
                         "type" to "alerting_exception",
                     )
                 )
