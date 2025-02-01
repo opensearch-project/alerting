@@ -1365,6 +1365,38 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertNull(enabledTime)
     }
 
+    fun `test enable monitor with query params`() {
+        val monitorId = createMonitor(randomQueryLevelMonitor(enabled = false, enabledTime = null), refresh = true).id
+        val response = client().makeRequest(
+            "PUT",
+            "${AlertingPlugin.MONITOR_BASE_URI}/$monitorId/_enable?pretty",
+            emptyMap(),
+            null
+        )
+        val jsonResponse = createParser(XContentType.JSON.xContent(), response.entity.content).map()
+        val monitor = jsonResponse["Monitor"] as Map<*, *>
+        val enabled = monitor["enabled"]
+        // Monitor should be enabled
+        assertEquals(true, enabled)
+    }
+
+    fun `test disable monitor with query params`() {
+        val monitorId = createMonitor(randomQueryLevelMonitor(enabled = true, enabledTime = Instant.now()), refresh = true).id
+        val response = client().makeRequest(
+            "PUT",
+            "${AlertingPlugin.MONITOR_BASE_URI}/$monitorId/_disable?pretty",
+            emptyMap(),
+            null
+        )
+        val jsonResponse = createParser(XContentType.JSON.xContent(), response.entity.content).map()
+        val monitor = jsonResponse["Monitor"] as Map<*, *>
+        val enabled = monitor["enabled"]
+        val enabledTime = monitor["enabledTime"]
+        // Monitor should be disabled and the enabledTime should be null
+        assertEquals(false, enabled)
+        assertNull(enabledTime)
+    }
+
     fun `test enable monitor when already enabled`() {
         val monitorId = createMonitor(randomQueryLevelMonitor(enabled = true, enabledTime = Instant.now()), refresh = true).id
         val exception = assertThrows(ResponseException::class.java) {
@@ -1382,11 +1414,11 @@ class MonitorRestApiIT : AlertingRestTestCase() {
                 "root_cause" to listOf(
                     mapOf(
                         "type" to "status_exception",
-                        "reason" to "Monitor $monitorId is already enabled"
+                        "reason" to "Monitor $monitorId is already enabled."
                     )
                 ),
                 "type" to "status_exception",
-                "reason" to "Monitor $monitorId is already enabled"
+                "reason" to "Monitor $monitorId is already enabled."
             ),
             "status" to 400
         )
@@ -1410,11 +1442,11 @@ class MonitorRestApiIT : AlertingRestTestCase() {
                 "root_cause" to listOf(
                     mapOf(
                         "type" to "status_exception",
-                        "reason" to "Monitor $monitorId is already disabled"
+                        "reason" to "Monitor $monitorId is already disabled."
                     )
                 ),
                 "type" to "status_exception",
-                "reason" to "Monitor $monitorId is already disabled"
+                "reason" to "Monitor $monitorId is already disabled."
             ),
             "status" to 400
         )

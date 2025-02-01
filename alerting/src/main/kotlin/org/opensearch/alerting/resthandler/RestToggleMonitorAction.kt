@@ -58,8 +58,8 @@ class RestToggleMonitorAction : BaseRestHandler() {
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
         val monitorId = request.param("monitorID", Monitor.NO_ID)
-        if (request.method() == PUT && Monitor.NO_ID == monitorId) {
-            throw AlertingException.wrap(IllegalArgumentException("Missing monitor ID"))
+        if (Monitor.NO_ID == monitorId) {
+            throw AlertingException.wrap(IllegalArgumentException("Missing monitor ID."))
         }
 
         // Check if the request is being made to enable the monitor

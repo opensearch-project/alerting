@@ -62,7 +62,7 @@ class TransportToggleMonitorAction @Inject constructor(
                     try {
                         if (getMonitorResponse.monitor == null) {
                             actionListener.onFailure(
-                                OpenSearchStatusException("Monitor $monitorId not found", RestStatus.NOT_FOUND)
+                                OpenSearchStatusException("Monitor $monitorId not found.", RestStatus.NOT_FOUND)
                             )
                             return
                         }
@@ -70,7 +70,7 @@ class TransportToggleMonitorAction @Inject constructor(
                         if (getMonitorResponse.monitor!!.enabled == enabled) {
                             actionListener.onFailure(
                                 OpenSearchStatusException(
-                                    "Monitor $monitorId is already ${if (enabled) "enabled" else "disabled"}",
+                                    "Monitor $monitorId is already ${if (enabled) "enabled." else "disabled."}",
                                     RestStatus.BAD_REQUEST
                                 )
                             )
