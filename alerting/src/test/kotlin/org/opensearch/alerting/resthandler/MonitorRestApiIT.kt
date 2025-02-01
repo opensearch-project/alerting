@@ -537,7 +537,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
         val updatedTriggers = listOf(
             QueryLevelTrigger(
-                name = "foo",
+                name = "sample",
                 severity = "1",
                 condition = Script("return true"),
                 actions = emptyList()
@@ -1422,7 +1422,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
         val updatedTriggers = listOf(
             DocumentLevelTrigger(
-                name = "foo",
+                name = "sample",
                 severity = "1",
                 condition = Script("return true"),
                 actions = emptyList()
