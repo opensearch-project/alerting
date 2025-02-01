@@ -1377,7 +1377,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     @Throws(Exception::class)
     fun `test creating a document monitor`() {
         val testIndex = createTestIndex()
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "query-3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
@@ -1398,7 +1398,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     @Throws(Exception::class)
     fun `test getting a document level monitor`() {
         val testIndex = createTestIndex()
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "query-3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
@@ -1414,7 +1414,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     @Throws(Exception::class)
     fun `test updating conditions for a doc-level monitor`() {
         val testIndex = createTestIndex()
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "query-3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
@@ -1445,7 +1445,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     @Throws(Exception::class)
     fun `test deleting a document level monitor`() {
         val testIndex = createTestIndex()
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "query-3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
@@ -1509,7 +1509,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
         // successfully creating monitor with valid query name
         val testIndex = createTestIndex()
-        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "valid (name)", fields = listOf())
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "validName)", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
