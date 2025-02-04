@@ -47,7 +47,7 @@ jobs:
       - name: Build and run with Gradle
         run: |
           chown -R 1000:1000 `pwd`
-          su `id -un 1000` -c "whoami && java -version && ./gradlew assemble integTest"
+          su `id -un 1000` -c "whoami && java -version && ./gradlew assemble integTest --refresh-dependencies"
       - name: Create Artifact Path
         run: |
           mkdir -p alerting-artifacts
@@ -99,7 +99,7 @@ jobs:
           java-version: ${{ matrix.java }}
       - name: Build and run with Gradle
         working-directory: ${{ env.WORKING_DIR }}
-        run: ./gradlew assemble ${{ env.BUILD_ARGS }}
+        run: ./gradlew assemble ${{ env.BUILD_ARGS }} --refresh-dependencies
         env:
           _JAVA_OPTIONS: ${{ matrix.os_java_options }}
       - name: Create Artifact Path

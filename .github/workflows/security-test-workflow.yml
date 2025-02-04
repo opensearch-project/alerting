@@ -33,7 +33,7 @@ jobs:
           java-version: ${{ matrix.java }}
       - name: Build Alerting
         # Only assembling since the full build is governed by other workflows
-        run: ./gradlew assemble
+        run: ./gradlew assemble --refresh-dependencies
       - name: Pull and Run Docker
         run: |
           plugin=`basename $(ls alerting/build/distributions/*.zip)`
@@ -87,7 +87,7 @@ jobs:
           if [ $security -gt 0 ]
           then
             echo "Security plugin is available"
-            ./gradlew :alerting:integTest -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=docker-cluster -Dsecurity=true -Dhttps=true -Duser=admin -Dpassword=myStrongPassword123!
+            ./gradlew :alerting:integTest --refresh-dependencies -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername=docker-cluster -Dsecurity=true -Dhttps=true -Duser=admin -Dpassword=myStrongPassword123!
           else
             echo "Security plugin is NOT available skipping this run as tests without security have already been run"
           fi
