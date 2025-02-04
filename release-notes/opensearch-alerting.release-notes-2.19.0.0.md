@@ -13,4 +13,4 @@ Compatible with OpenSearch 2.19.0
 * Fix bucket selector aggregation writeable name. ([#1780](https://github.com/opensearch-project/alerting/pull/1780))
 
 ### Documentation
-* Added 2.18.0 release notes. ([#1718](https://github.com/opensearch-project/alerting/pull/1718))
+* Added 2.19.0 release notes. ([#1790](https://github.com/opensearch-project/alerting/pull/1790))
