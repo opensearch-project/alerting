@@ -90,7 +90,7 @@ jobs:
             working_directory: X:\
             os_java_options: -Xmx4096M
           - os: macos-latest
-            os_build_args: -x integTest -x
+            os_build_args: -x integTest
 
     # Job name
     name: Build Alerting with JDK ${{ matrix.java }} on ${{ matrix.os }}
