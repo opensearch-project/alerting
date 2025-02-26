@@ -20,7 +20,7 @@ import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.admin.indices.rollover.RolloverRequest
 import org.opensearch.action.admin.indices.rollover.RolloverResponse
 import org.opensearch.action.support.IndicesOptions
-import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.action.support.clustermanager.AcknowledgedResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
@@ -117,7 +117,7 @@ class CommentsIndices(
         } catch (e: Exception) {
             // This should be run on cluster startup
             logger.error(
-                "Error creating comments indices. Comments can't be recorded until master node is restarted.",
+                "Error creating comments indices. Comments can't be recorded until clustermanager node is restarted.",
                 e
             )
         }
@@ -132,9 +132,9 @@ class CommentsIndices(
     }
 
     override fun clusterChanged(event: ClusterChangedEvent) {
-        // Instead of using a LocalNodeClusterManagerListener to track master changes, this service will
-        // track them here to avoid conditions where master listener events run after other
-        // listeners that depend on what happened in the master listener
+        // Instead of using a LocalNodeClusterManagerListener to track clustermanager changes, this service will
+        // track them here to avoid conditions where clustermanager listener events run after other
+        // listeners that depend on what happened in the clustermanager listener
         if (this.isClusterManager != event.localNodeClusterManager()) {
             this.isClusterManager = event.localNodeClusterManager()
             if (this.isClusterManager) {
@@ -149,7 +149,7 @@ class CommentsIndices(
     }
 
     private fun rescheduleCommentsRollover() {
-        if (clusterService.state().nodes.isLocalNodeElectedMaster) {
+        if (clusterService.state().nodes.isLocalNodeElectedClusterManager) {
             scheduledCommentsRollover?.cancel()
             scheduledCommentsRollover = threadPool
                 .scheduleWithFixedDelay({ rolloverAndDeleteCommentsHistoryIndices() }, commentsHistoryRolloverPeriod, executorName())

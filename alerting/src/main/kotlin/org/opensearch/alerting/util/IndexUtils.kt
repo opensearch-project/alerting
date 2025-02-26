@@ -7,7 +7,7 @@ package org.opensearch.alerting.util
 
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.support.IndicesOptions
-import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.action.support.clustermanager.AcknowledgedResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.comments.CommentsIndices
 import org.opensearch.alerting.core.ScheduledJobIndices

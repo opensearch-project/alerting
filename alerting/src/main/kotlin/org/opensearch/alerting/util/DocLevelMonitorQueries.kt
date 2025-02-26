@@ -26,7 +26,7 @@ import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
-import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.action.support.clustermanager.AcknowledgedResponse
 import org.opensearch.alerting.MonitorRunnerService.monitorCtx
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.cluster.ClusterState

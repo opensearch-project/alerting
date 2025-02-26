@@ -74,7 +74,7 @@ class DestinationMigrationCoordinator(
             return
         }
 
-        if (!clusterService.state().nodes().isLocalNodeElectedMaster) {
+        if (!clusterService.state().nodes().isLocalNodeElectedClusterManager) {
             scheduledMigration?.cancel()
             return
         }
