@@ -11,7 +11,7 @@ import org.opensearch.action.support.clustermanager.AcknowledgedResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.comments.CommentsIndices
 import org.opensearch.alerting.core.ScheduledJobIndices
-import org.opensearch.client.IndicesAdminClient
+import org.opensearch.transport.client.IndicesAdminClient
 import org.opensearch.cluster.ClusterState
 import org.opensearch.cluster.metadata.IndexAbstraction
 import org.opensearch.cluster.metadata.IndexMetadata
