@@ -11,7 +11,6 @@ import org.opensearch.Version
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.getBucketKeysHash
-import org.opensearch.client.Client
 import org.opensearch.cluster.node.DiscoveryNode
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.ClusterSettings
@@ -26,6 +25,7 @@ import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.test.ClusterServiceUtils
 import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.threadpool.ThreadPool
+import org.opensearch.transport.client.Client
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 

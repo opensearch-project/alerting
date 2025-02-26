@@ -13,8 +13,6 @@ import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.opensearchapi.retryForNotification
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.util.use
-import org.opensearch.client.Client
-import org.opensearch.client.node.NodeClient
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.destination.message.LegacyBaseMessage
@@ -31,6 +29,8 @@ import org.opensearch.commons.notifications.model.EventSource
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import org.opensearch.commons.notifications.model.SeverityType
 import org.opensearch.core.rest.RestStatus
+import org.opensearch.transport.client.Client
+import org.opensearch.transport.client.node.NodeClient
 
 class NotificationApiUtils {
 

@@ -23,7 +23,6 @@ import org.opensearch.alerting.util.destinationmigration.sendNotification
 import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isTestAction
 import org.opensearch.alerting.util.use
-import org.opensearch.client.node.NodeClient
 import org.opensearch.commons.alerting.model.ActionRunResult
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorRunResult
@@ -33,6 +32,7 @@ import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
 import org.opensearch.core.common.Strings
 import org.opensearch.transport.TransportService
+import org.opensearch.transport.client.node.NodeClient
 import java.time.Instant
 
 abstract class MonitorRunner {

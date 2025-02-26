@@ -20,7 +20,6 @@ import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
@@ -38,6 +37,7 @@ import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
+import org.opensearch.transport.client.Client
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset

@@ -18,7 +18,6 @@ import org.opensearch.alerting.model.destination.email.EmailGroup
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.alerting.util.use
-import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
@@ -32,6 +31,7 @@ import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
+import org.opensearch.transport.client.Client
 
 private val log = LogManager.getLogger(TransportGetEmailGroupAction::class.java)
 

@@ -43,7 +43,6 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDING_HISTO
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.alerting.util.IndexUtils
-import org.opensearch.client.Client
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.metadata.IndexMetadata
@@ -64,6 +63,7 @@ import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.threadpool.Scheduler.Cancellable
 import org.opensearch.threadpool.ThreadPool
+import org.opensearch.transport.client.Client
 import java.time.Instant
 
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)

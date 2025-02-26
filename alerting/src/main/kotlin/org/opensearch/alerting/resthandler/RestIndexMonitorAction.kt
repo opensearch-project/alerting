@@ -11,7 +11,6 @@ import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.util.IF_PRIMARY_TERM
 import org.opensearch.alerting.util.IF_SEQ_NO
 import org.opensearch.alerting.util.REFRESH
-import org.opensearch.client.node.NodeClient
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.IndexMonitorRequest
 import org.opensearch.commons.alerting.action.IndexMonitorResponse
@@ -41,6 +40,7 @@ import org.opensearch.rest.RestRequest.Method.POST
 import org.opensearch.rest.RestRequest.Method.PUT
 import org.opensearch.rest.RestResponse
 import org.opensearch.rest.action.RestResponseListener
+import org.opensearch.transport.client.node.NodeClient
 import java.io.IOException
 import java.time.Instant
 import java.util.*

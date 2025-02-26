@@ -25,7 +25,6 @@ import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.IndexUtils
-import org.opensearch.client.Client
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.metadata.IndexMetadata
@@ -36,6 +35,7 @@ import org.opensearch.common.xcontent.XContentType
 import org.opensearch.core.action.ActionListener
 import org.opensearch.threadpool.Scheduler
 import org.opensearch.threadpool.ThreadPool
+import org.opensearch.transport.client.Client
 import java.time.Instant
 
 /**

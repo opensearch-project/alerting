@@ -29,7 +29,6 @@ import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.MonitorRunnerService.monitorCtx
 import org.opensearch.alerting.opensearchapi.suspendUntil
-import org.opensearch.client.Client
 import org.opensearch.cluster.ClusterState
 import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.service.ClusterService
@@ -50,6 +49,7 @@ import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
 import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
+import org.opensearch.transport.client.Client
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine

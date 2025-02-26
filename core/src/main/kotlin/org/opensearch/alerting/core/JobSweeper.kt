@@ -17,7 +17,6 @@ import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEE
 import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEEP_PERIOD
 import org.opensearch.alerting.opensearchapi.firstFailureOrNull
 import org.opensearch.alerting.opensearchapi.retry
-import org.opensearch.client.Client
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.routing.IndexShardRoutingTable
@@ -48,6 +47,7 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.FieldSortBuilder
 import org.opensearch.threadpool.Scheduler
 import org.opensearch.threadpool.ThreadPool
+import org.opensearch.transport.client.Client
 import java.util.TreeMap
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors

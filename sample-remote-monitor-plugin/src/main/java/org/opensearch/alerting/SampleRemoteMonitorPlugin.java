@@ -14,7 +14,6 @@ import org.opensearch.alerting.monitor.runners.SampleRemoteMonitorRunner1;
 import org.opensearch.alerting.monitor.runners.SampleRemoteMonitorRunner2;
 import org.opensearch.alerting.spi.RemoteMonitorRunner;
 import org.opensearch.alerting.spi.RemoteMonitorRunnerExtension;
-import org.opensearch.client.Client;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.cluster.service.ClusterService;
@@ -34,6 +33,7 @@ import org.opensearch.rest.RestController;
 import org.opensearch.rest.RestHandler;
 import org.opensearch.script.ScriptService;
 import org.opensearch.threadpool.ThreadPool;
+import org.opensearch.transport.client.Client;
 import org.opensearch.watcher.ResourceWatcherService;
 import reactor.util.annotation.NonNull;
 

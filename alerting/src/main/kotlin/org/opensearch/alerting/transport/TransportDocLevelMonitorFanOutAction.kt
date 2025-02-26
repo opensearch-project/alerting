@@ -63,8 +63,6 @@ import org.opensearch.alerting.util.isTestAction
 import org.opensearch.alerting.util.parseSampleDocTags
 import org.opensearch.alerting.util.printsSampleDocData
 import org.opensearch.alerting.util.use
-import org.opensearch.client.Client
-import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.routing.Preference
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -122,6 +120,8 @@ import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.search.sort.SortOrder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
+import org.opensearch.transport.client.Client
+import org.opensearch.transport.client.node.NodeClient
 import java.io.IOException
 import java.time.Instant
 import java.util.UUID

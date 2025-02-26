@@ -7,7 +7,6 @@ package org.opensearch.alerting.resthandler
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.client.node.NodeClient
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.GetAlertsRequest
 import org.opensearch.commons.alerting.model.Table
@@ -18,6 +17,7 @@ import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestRequest.Method.GET
 import org.opensearch.rest.action.RestToXContentListener
+import org.opensearch.transport.client.node.NodeClient
 
 /**
  * This class consists of the REST handler to retrieve alerts .

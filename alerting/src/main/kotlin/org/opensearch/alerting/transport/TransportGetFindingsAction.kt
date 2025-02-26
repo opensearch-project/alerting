@@ -22,7 +22,6 @@ import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_FINDING_INDEX_P
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.use
-import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
@@ -53,6 +52,7 @@ import org.opensearch.search.sort.SortBuilders
 import org.opensearch.search.sort.SortOrder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
+import org.opensearch.transport.client.Client
 
 private val log = LogManager.getLogger(TransportGetFindingsSearchAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)

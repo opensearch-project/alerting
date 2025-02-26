@@ -11,7 +11,6 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.comments.CommentsIndices.Companion.ALL_COMMENTS_INDEX_PATTERN
 import org.opensearch.alerting.util.context
-import org.opensearch.client.node.NodeClient
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentType
@@ -29,6 +28,7 @@ import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestResponse
 import org.opensearch.rest.action.RestResponseListener
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.transport.client.node.NodeClient
 import java.io.IOException
 
 private val log = LogManager.getLogger(RestIndexMonitorAction::class.java)

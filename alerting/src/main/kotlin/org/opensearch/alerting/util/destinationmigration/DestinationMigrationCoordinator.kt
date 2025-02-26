@@ -11,8 +11,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.core.ScheduledJobIndices
-import org.opensearch.client.Client
-import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.service.ClusterService
@@ -20,6 +18,8 @@ import org.opensearch.common.lifecycle.LifecycleListener
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.threadpool.Scheduler
 import org.opensearch.threadpool.ThreadPool
+import org.opensearch.transport.client.Client
+import org.opensearch.transport.client.node.NodeClient
 import kotlin.coroutines.CoroutineContext
 
 class DestinationMigrationCoordinator(

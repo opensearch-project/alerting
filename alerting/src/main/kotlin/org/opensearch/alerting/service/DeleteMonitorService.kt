@@ -28,7 +28,6 @@ import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_DELEGATE_PATH
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_MONITOR_PATH
 import org.opensearch.alerting.util.use
-import org.opensearch.client.Client
 import org.opensearch.commons.alerting.action.DeleteMonitorResponse
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
@@ -39,6 +38,7 @@ import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
 import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.transport.client.Client
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine

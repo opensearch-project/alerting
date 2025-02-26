@@ -14,7 +14,6 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.use
-import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
@@ -34,6 +33,7 @@ import org.opensearch.index.query.MatchQueryBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
+import org.opensearch.transport.client.Client
 
 private val log = LogManager.getLogger(TransportSearchMonitorAction::class.java)
 

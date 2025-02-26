@@ -52,7 +52,6 @@ import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.isDocLevelMonitor
 import org.opensearch.alerting.workflow.CompositeWorkflowRunner
-import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.lifecycle.AbstractLifecycleComponent
@@ -77,6 +76,7 @@ import org.opensearch.script.ScriptService
 import org.opensearch.script.TemplateScript
 import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.TransportService
+import org.opensearch.transport.client.Client
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset

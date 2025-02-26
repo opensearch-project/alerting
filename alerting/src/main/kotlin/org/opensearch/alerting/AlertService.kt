@@ -28,7 +28,6 @@ import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.MAX_SEARCH_SIZE
 import org.opensearch.alerting.util.getBucketKeysHash
-import org.opensearch.client.Client
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
@@ -63,6 +62,7 @@ import org.opensearch.index.reindex.DeleteByQueryAction
 import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortOrder
+import org.opensearch.transport.client.Client
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.TimeUnit
