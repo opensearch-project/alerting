@@ -50,8 +50,8 @@ apply from: 'build-tools/merged-coverage.gradle'
 configurations {
     ktlint {
       resolutionStrategy {
-          force "ch.qos.logback:logback-classic:1.3.14"
-          force "ch.qos.logback:logback-core:1.3.14"
+          force "ch.qos.logback:logback-classic:1.5.16"
+          force "ch.qos.logback:logback-core:1.5.16"
       }
    }
 }
