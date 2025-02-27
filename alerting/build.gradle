@@ -13,7 +13,6 @@ apply plugin: 'org.jetbrains.kotlin.jvm'
 apply plugin: 'opensearch.opensearchplugin'
 apply plugin: 'opensearch.pluginzip'
 apply plugin: 'jacoco'
-apply plugin: 'com.gradleup.shadow'
 
 def usingRemoteCluster = System.properties.containsKey('tests.rest.cluster') || System.properties.containsKey('tests.cluster')
 def usingMultiNode = project.properties.containsKey('numNodes')
