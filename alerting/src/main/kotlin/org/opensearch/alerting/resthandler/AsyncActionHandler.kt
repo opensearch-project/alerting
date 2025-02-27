@@ -5,9 +5,9 @@
 
 package org.opensearch.alerting.resthandler
 
-import org.opensearch.client.node.NodeClient
 import org.opensearch.rest.BytesRestResponse
 import org.opensearch.rest.RestChannel
+import org.opensearch.transport.client.node.NodeClient
 
 abstract class AsyncActionHandler(protected val client: NodeClient, protected val channel: RestChannel) {
 

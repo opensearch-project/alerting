@@ -9,7 +9,6 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
-import org.opensearch.client.node.NodeClient
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.core.xcontent.XContentParser
@@ -18,6 +17,7 @@ import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.RestHandler
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.action.RestToXContentListener
+import org.opensearch.transport.client.node.NodeClient
 import java.time.Instant
 
 private val log = LogManager.getLogger(RestExecuteWorkflowAction::class.java)

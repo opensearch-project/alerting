@@ -9,7 +9,6 @@ import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.util.IF_PRIMARY_TERM
 import org.opensearch.alerting.util.IF_SEQ_NO
 import org.opensearch.alerting.util.REFRESH
-import org.opensearch.client.node.NodeClient
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.IndexWorkflowRequest
 import org.opensearch.commons.alerting.action.IndexWorkflowResponse
@@ -28,6 +27,7 @@ import org.opensearch.rest.RestHandler
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestResponse
 import org.opensearch.rest.action.RestResponseListener
+import org.opensearch.transport.client.node.NodeClient
 import java.io.IOException
 import java.time.Instant
 

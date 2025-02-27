@@ -13,7 +13,6 @@ import org.opensearch.action.support.WriteRequest;
 import org.opensearch.alerting.monitor.inputs.SampleRemoteDocLevelMonitorInput;
 import org.opensearch.alerting.monitor.runners.SampleRemoteDocLevelMonitorRunner;
 import org.opensearch.alerting.monitor.triggers.SampleRemoteMonitorTrigger1;
-import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.common.settings.Settings;
@@ -31,6 +30,7 @@ import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
+import org.opensearch.transport.client.Client;
 
 import java.util.HashMap;
 import java.util.Map;

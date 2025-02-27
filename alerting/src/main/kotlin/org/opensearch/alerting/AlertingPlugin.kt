@@ -85,7 +85,6 @@ import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
-import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.node.DiscoveryNodes
 import org.opensearch.cluster.service.ClusterService
@@ -135,6 +134,7 @@ import org.opensearch.rest.RestHandler
 import org.opensearch.script.ScriptContext
 import org.opensearch.script.ScriptService
 import org.opensearch.threadpool.ThreadPool
+import org.opensearch.transport.client.Client
 import org.opensearch.watcher.ResourceWatcherService
 import java.util.function.Supplier
 

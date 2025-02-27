@@ -13,7 +13,7 @@ apply plugin: 'java'
 apply plugin: 'opensearch.java-rest-test'
 apply plugin: 'org.jetbrains.kotlin.jvm'
 apply plugin: 'jacoco'
-apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 'com.gradleup.shadow'
 apply plugin: 'opensearch.repositories'
 
 dependencies {

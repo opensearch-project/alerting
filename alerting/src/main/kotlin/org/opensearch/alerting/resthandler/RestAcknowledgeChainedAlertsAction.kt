@@ -8,7 +8,6 @@ package org.opensearch.alerting.resthandler
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.client.node.NodeClient
 import org.opensearch.commons.alerting.action.AcknowledgeChainedAlertRequest
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.core.xcontent.XContentParser
@@ -19,6 +18,7 @@ import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestRequest.Method.POST
 import org.opensearch.rest.action.RestToXContentListener
+import org.opensearch.transport.client.node.NodeClient
 import java.io.IOException
 
 private val log: Logger = LogManager.getLogger(RestAcknowledgeAlertAction::class.java)

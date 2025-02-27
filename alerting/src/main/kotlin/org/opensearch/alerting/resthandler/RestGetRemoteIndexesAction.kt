@@ -9,12 +9,12 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.GetRemoteIndexesAction
 import org.opensearch.alerting.action.GetRemoteIndexesRequest
-import org.opensearch.client.node.NodeClient
 import org.opensearch.core.common.Strings
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.RestHandler
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.action.RestToXContentListener
+import org.opensearch.transport.client.node.NodeClient
 
 private val log = LogManager.getLogger(RestGetRemoteIndexesAction::class.java)
 

@@ -21,7 +21,6 @@ import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.executeTranspor
 import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.toMap
 import org.opensearch.alerting.util.getRoleFilterEnabled
 import org.opensearch.alerting.util.use
-import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.routing.Preference
 import org.opensearch.cluster.service.ClusterService
@@ -49,6 +48,7 @@ import org.opensearch.script.ScriptService
 import org.opensearch.script.ScriptType
 import org.opensearch.script.TemplateScript
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.transport.client.Client
 import java.time.Duration
 import java.time.Instant
 

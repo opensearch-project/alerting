@@ -26,7 +26,7 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.action.support.clustermanager.AcknowledgedResponse
 import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.MonitorRunnerService.monitorCtx
 import org.opensearch.alerting.WorkflowMetadataService
@@ -46,7 +46,6 @@ import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.isQueryLevelMonitor
 import org.opensearch.alerting.util.use
 import org.opensearch.alerting.workflow.CompositeWorkflowRunner
-import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
@@ -80,6 +79,7 @@ import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
+import org.opensearch.transport.client.Client
 import java.util.Locale
 import java.util.UUID
 import java.util.stream.Collectors

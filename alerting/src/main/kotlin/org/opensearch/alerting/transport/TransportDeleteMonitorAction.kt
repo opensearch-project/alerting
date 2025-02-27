@@ -19,7 +19,6 @@ import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
@@ -39,6 +38,7 @@ import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
+import org.opensearch.transport.client.Client
 
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 private val log = LogManager.getLogger(TransportDeleteMonitorAction::class.java)

@@ -6,13 +6,13 @@
 package org.opensearch.alerting.util
 
 import org.opensearch.action.search.SearchRequest
-import org.opensearch.client.Client
-import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.transport.client.Client
+import org.opensearch.transport.client.node.NodeClient
 
 class CrossClusterMonitorUtils {
     companion object {

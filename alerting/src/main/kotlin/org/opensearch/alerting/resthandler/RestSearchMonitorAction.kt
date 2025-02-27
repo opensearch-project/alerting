@@ -12,7 +12,6 @@ import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.context
-import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
@@ -37,6 +36,7 @@ import org.opensearch.rest.RestRequest.Method.POST
 import org.opensearch.rest.RestResponse
 import org.opensearch.rest.action.RestResponseListener
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.transport.client.node.NodeClient
 import java.io.IOException
 
 private val log = LogManager.getLogger(RestSearchMonitorAction::class.java)

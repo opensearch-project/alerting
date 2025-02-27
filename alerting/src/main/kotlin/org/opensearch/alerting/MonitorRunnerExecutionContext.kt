@@ -14,7 +14,6 @@ import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings
 import org.opensearch.alerting.util.DocLevelMonitorQueries
-import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
@@ -24,6 +23,7 @@ import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.monitor.jvm.JvmStats
 import org.opensearch.script.ScriptService
 import org.opensearch.threadpool.ThreadPool
+import org.opensearch.transport.client.Client
 
 data class MonitorRunnerExecutionContext(
 
