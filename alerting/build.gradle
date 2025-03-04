@@ -16,7 +16,6 @@ apply plugin: 'jacoco'
 
 def usingRemoteCluster = System.properties.containsKey('tests.rest.cluster') || System.properties.containsKey('tests.cluster')
 def usingMultiNode = project.properties.containsKey('numNodes')
-String bwcVersion = "2.12.0.0"
 
 ext {
     projectSubstitutions = [:]
@@ -93,8 +92,29 @@ configurations.testImplementation {
 }
 
 configurations {
+    opensearchPlugin
     zipArchive
 }
+
+// Always be minimumCompatibilityVersion of current opensearch version(3.0.0)
+// get latest 2.x version from OpenSearch 2.x branch
+static def fetchVersionProperties() {
+    def url = 'https://raw.githubusercontent.com/opensearch-project/OpenSearch/refs/heads/2.x/buildSrc/version.properties'
+    def content = new URL(url).text
+    // Use regex to extract the version number
+    def matcher = content =~ /opensearch\s*=\s*(\d+\.\d+\.\d+)/
+    if (matcher.find()) {
+        def version = matcher.group(1)
+        println("Extracted latest 2.x version: $version")
+        return version
+    } else {
+        return "2.19.0"
+    }
+}
+String bwcVersionShort = fetchVersionProperties()
+def bwcVersion = bwcVersionShort + ".0"
+def bwcOpenSearchVersion = bwcVersionShort + "-SNAPSHOT"
+def bwcPluginVersion = bwcVersion + "-SNAPSHOT"
 
 dependencies {
     // Needed for integ tests
@@ -102,7 +122,7 @@ dependencies {
     zipArchive group: 'org.opensearch.plugin', name:'notifications', version: "${opensearch_build}"
 
     // Needed for BWC tests
-    zipArchive group: 'org.opensearch.plugin', name:'alerting', version: "${bwcVersion}-SNAPSHOT"
+    opensearchPlugin "org.opensearch.plugin:alerting:${bwcPluginVersion}@zip"
 
     compileOnly "org.opensearch.plugin:opensearch-scripting-painless-spi:${versions.opensearch}"
     api "org.opensearch.plugin:percolator-client:${opensearch_version}"
@@ -261,7 +281,7 @@ String baseName = "alertingBwcCluster"
     testClusters {
         "${baseName}$i" {
             testDistribution = "ARCHIVE"
-            versions = ["2.12.0-SNAPSHOT", "3.0.0-SNAPSHOT"]
+            versions = [bwcOpenSearchVersion, opensearch_version]
             numberOfNodes = 3
             plugin(provider(new Callable<RegularFile>(){
                 @Override
