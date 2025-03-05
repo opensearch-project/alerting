@@ -3,8 +3,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.security.GeneralSecurityException
+import java.security.cert.X509Certificate
 import java.util.concurrent.Callable
+import java.util.concurrent.TimeUnit
+import java.util.function.Predicate
+import java.util.stream.Collectors
+import javax.net.ssl.HostnameVerifier
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLSession
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 import org.opensearch.gradle.test.RestIntegTestTask
+import org.opensearch.gradle.testclusters.OpenSearchCluster
 import org.opensearch.gradle.testclusters.StandaloneRestIntegTestTask
 
 apply plugin: 'java'
@@ -16,12 +30,24 @@ apply plugin: 'jacoco'
 
 def usingRemoteCluster = System.properties.containsKey('tests.rest.cluster') || System.properties.containsKey('tests.cluster')
 def usingMultiNode = project.properties.containsKey('numNodes')
-String bwcVersion = "2.12.0.0"
 
 ext {
     projectSubstitutions = [:]
     licenseFile = rootProject.file('LICENSE.txt')
     noticeFile = rootProject.file('NOTICE.txt')
+
+    // Retrieve sample security plugin files for security tests
+    ['esnode.pem', 'esnode-key.pem', 'kirk.pem', 'kirk-key.pem', 'root-ca.pem', 'sample.pem', 'test-kirk.jks'].forEach { file ->
+        File local = getLayout().getBuildDirectory().file(file).get().getAsFile()
+        download.run {
+            src "https://raw.githubusercontent.com/opensearch-project/security/refs/heads/main/bwc-test/src/test/resources/security/" + file
+            dest local
+            overwrite false
+        }
+        processResources {
+            from(local)
+        }
+    }
 }
 
 opensearchplugin {
@@ -93,16 +119,45 @@ configurations.testImplementation {
 }
 
 configurations {
+    opensearchPlugin
     zipArchive
 }
+
+// This flag indicates the existence of security plugin
+def securityEnabled = System.getProperty("security", "false") == "true" || System.getProperty("https", "false") == "true"
+
+// Always be minimumCompatibilityVersion of current opensearch version(3.0.0)
+// get latest 2.x version from OpenSearch 2.x branch
+static def fetchVersionProperties() {
+    def url = 'https://raw.githubusercontent.com/opensearch-project/OpenSearch/refs/heads/2.x/buildSrc/version.properties'
+    def content = new URL(url).text
+    // Use regex to extract the version number
+    def matcher = content =~ /opensearch\s*=\s*(\d+\.\d+\.\d+)/
+    if (matcher.find()) {
+        def version = matcher.group(1)
+        println("Extracted latest 2.x version: $version")
+        return version
+    } else {
+        return "2.19.0"
+    }
+}
+String bwcVersionShort = fetchVersionProperties()
+def bwcVersion = bwcVersionShort + ".0"
+def bwcOpenSearchVersion = bwcVersionShort + "-SNAPSHOT"
+def bwcPluginVersion = bwcVersion + "-SNAPSHOT"
 
 dependencies {
     // Needed for integ tests
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-notifications-core', version: "${opensearch_build}"
     zipArchive group: 'org.opensearch.plugin', name:'notifications', version: "${opensearch_build}"
 
+    // Needed for security tests
+    if (securityEnabled) {
+        opensearchPlugin "org.opensearch.plugin:opensearch-security:${opensearch_build}@zip"
+    }
+
     // Needed for BWC tests
-    zipArchive group: 'org.opensearch.plugin', name:'alerting', version: "${bwcVersion}-SNAPSHOT"
+    opensearchPlugin "org.opensearch.plugin:alerting:${bwcPluginVersion}@zip"
 
     compileOnly "org.opensearch.plugin:opensearch-scripting-painless-spi:${versions.opensearch}"
     api "org.opensearch.plugin:percolator-client:${opensearch_version}"
@@ -189,20 +244,60 @@ testClusters.integTest {
             }
         }
     }))
+
+    if (securityEnabled) {
+        plugin(provider({
+            new RegularFile() {
+                @Override
+                File getAsFile() {
+                    return configurations.opensearchPlugin.resolvedConfiguration.resolvedArtifacts
+                            .find { ResolvedArtifact f ->
+                                f.name.startsWith("opensearch-security")
+                            }
+                            .file
+                }
+            }
+        }))
+    }
 }
 
 testClusters.integTest.nodes.each { node ->
     node.setting("plugins.destination.host.deny_list", "[\"10.0.0.0/8\", \"127.0.0.1\"]")
+
+    if (securityEnabled) {
+        node.extraConfigFile("kirk.pem", file("build/resources/main/kirk.pem"))
+        node.extraConfigFile("kirk-key.pem", file("build/resources/main/kirk-key.pem"))
+        node.extraConfigFile("esnode.pem", file("build/resources/main/esnode.pem"))
+        node.extraConfigFile("esnode-key.pem", file("build/resources/main/esnode-key.pem"))
+        node.extraConfigFile("root-ca.pem", file("build/resources/main/root-ca.pem"))
+        node.setting("plugins.security.ssl.transport.pemcert_filepath", "esnode.pem")
+        node.setting("plugins.security.ssl.transport.pemkey_filepath", "esnode-key.pem")
+        node.setting("plugins.security.ssl.transport.pemtrustedcas_filepath", "root-ca.pem")
+        node.setting("plugins.security.ssl.transport.enforce_hostname_verification", "false")
+        node.setting("plugins.security.ssl.http.enabled", "true")
+        node.setting("plugins.security.ssl.http.pemcert_filepath", "esnode.pem")
+        node.setting("plugins.security.ssl.http.pemkey_filepath", "esnode-key.pem")
+        node.setting("plugins.security.ssl.http.pemtrustedcas_filepath", "root-ca.pem")
+        node.setting("plugins.security.allow_unsafe_democertificates", "true")
+        node.setting("plugins.security.allow_default_init_securityindex", "true")
+        node.setting("plugins.security.authcz.admin_dn", "\n - CN=kirk,OU=client,O=client,L=test,C=de")
+        node.setting("plugins.security.audit.type", "internal_opensearch")
+        node.setting("plugins.security.enable_snapshot_restore_privilege", "true")
+        node.setting("plugins.security.check_snapshot_restore_write_privileges", "true")
+        node.setting("plugins.security.restapi.roles_enabled", "[\"all_access\", \"security_rest_api_access\"]")
+        node.setting("plugins.security.system_indices.enabled", "true")
+    }
 }
 
 integTest {
     systemProperty 'tests.security.manager', 'false'
     systemProperty 'java.io.tmpdir', opensearch_tmp_dir.absolutePath
 
+    systemProperty 'buildDir', buildDir.path
     systemProperty "https", System.getProperty("https")
     systemProperty "security", System.getProperty("security")
-    systemProperty "user", System.getProperty("user")
-    systemProperty "password", System.getProperty("password")
+    systemProperty "user", System.getProperty("user", "admin")
+    systemProperty "password", System.getProperty("password", "admin")
 
     // The 'doFirst' delays till execution time.
     doFirst {
@@ -215,7 +310,7 @@ integTest {
         // There seems to be an issue when running multi node run or integ tasks with unicast_hosts
         // not being written, the waitForAllConditions ensures it's written
         getClusters().forEach { cluster ->
-            cluster.waitForAllConditions()
+            waitForClusterSetup(cluster, securityEnabled)
         }
     }
 
@@ -261,7 +356,7 @@ String baseName = "alertingBwcCluster"
     testClusters {
         "${baseName}$i" {
             testDistribution = "ARCHIVE"
-            versions = ["2.12.0-SNAPSHOT", "3.0.0-SNAPSHOT"]
+            versions = [bwcOpenSearchVersion, opensearch_version]
             numberOfNodes = 3
             plugin(provider(new Callable<RegularFile>(){
                 @Override
@@ -428,6 +523,135 @@ run {
 // Only apply jacoco test coverage if we are running a local single node cluster
 if (!usingRemoteCluster && !usingMultiNode) {
     apply from: '../build-tools/opensearchplugin-coverage.gradle'
+}
+
+// Re-write WaitForHttpResource with updated code to support security plugin use case
+class WaitForClusterYellow {
+
+    private URL url
+    private String username
+    private String password
+    Set<Integer> validResponseCodes = Collections.singleton(200)
+
+    WaitForClusterYellow(String protocol, String host, int numberOfNodes) throws MalformedURLException {
+        this(new URL(protocol + "://" + host + "/_cluster/health?wait_for_nodes=>=" + numberOfNodes + "&wait_for_status=yellow"))
+    }
+
+    WaitForClusterYellow(URL url) {
+        this.url = url
+    }
+
+    boolean wait(int durationInMs) throws GeneralSecurityException, InterruptedException, IOException {
+        final long waitUntil = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(durationInMs)
+        final long sleep = 100
+
+        IOException failure = null
+        while (true) {
+            try {
+                checkResource()
+                return true
+            } catch (IOException e) {
+                failure = e
+            }
+            if (System.nanoTime() < waitUntil) {
+                Thread.sleep(sleep)
+            } else {
+                throw failure
+            }
+        }
+    }
+
+    void setUsername(String username) {
+        this.username = username
+    }
+
+    void setPassword(String password) {
+        this.password = password
+    }
+
+    void checkResource() throws IOException {
+        final HttpURLConnection connection = buildConnection()
+        connection.connect()
+        final Integer response = connection.getResponseCode()
+        if (validResponseCodes.contains(response)) {
+            return
+        } else {
+            throw new IOException(response + " " + connection.getResponseMessage())
+        }
+    }
+
+    HttpURLConnection buildConnection() throws IOException {
+        final HttpURLConnection connection = (HttpURLConnection) this.@url.openConnection()
+
+        if (connection instanceof HttpsURLConnection) {
+            TrustManager[] trustAllCerts = [new X509TrustManager() {
+                X509Certificate[] getAcceptedIssuers() {
+                    return null
+                }
+
+                void checkClientTrusted(X509Certificate[] certs, String authType) {
+                }
+
+                void checkServerTrusted(X509Certificate[] certs, String authType) {
+                }
+            }
+            ] as TrustManager[]
+            SSLContext sc = SSLContext.getInstance("SSL")
+            sc.init(null, trustAllCerts, new java.security.SecureRandom())
+            connection.setSSLSocketFactory(sc.getSocketFactory())
+            // Create all-trusting host name verifier
+            HostnameVerifier allHostsValid = new HostnameVerifier() {
+                boolean verify(String hostname, SSLSession session) {
+                    return true
+                }
+            }
+            // Install the all-trusting host verifier
+            connection.setHostnameVerifier(allHostsValid)
+        }
+
+        configureBasicAuth(connection)
+        connection.setRequestMethod("GET")
+        return connection
+    }
+
+    void configureBasicAuth(HttpURLConnection connection) {
+        if (username != null) {
+            if (password == null) {
+                throw new IllegalStateException("Basic Auth user [" + username + "] has been set, but no password has been configured")
+            }
+            connection.setRequestProperty(
+                    "Authorization",
+                    "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8))
+            )
+        }
+    }
+
+}
+
+def waitForClusterSetup(OpenSearchCluster cluster, Boolean securityEnabled) {
+    cluster.@waitConditions.clear()
+    String unicastUris = cluster.nodes.stream().flatMap { node ->
+        node.getAllTransportPortURI().stream()
+    }.collect(Collectors.joining("\n"))
+    cluster.nodes.forEach { node ->
+        try {
+            Files.write(node.getConfigDir().resolve("unicast_hosts.txt"), unicastUris.getBytes(StandardCharsets.UTF_8))
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException("Failed to write configuation files for " + this, e)
+        }
+    }
+
+    Predicate pred = {
+        String protocol = securityEnabled ? "https" : "http"
+        String host = System.getProperty("tests.cluster", cluster.getFirstNode().getHttpSocketURI())
+        WaitForClusterYellow wait = new WaitForClusterYellow(protocol, host, cluster.nodes.size())
+        wait.setUsername(System.getProperty("user", "admin"))
+        wait.setPassword(System.getProperty("password", "admin"))
+        return wait.wait(180000)
+    }
+
+    cluster.@waitConditions.put("cluster health yellow", pred)
+    cluster.waitForAllConditions()
 }
 
 apply from: '../build-tools/pkgbuild.gradle'
