@@ -3,22 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import java.nio.charset.StandardCharsets
-import java.nio.file.Files
-import java.security.GeneralSecurityException
-import java.security.cert.X509Certificate
 import java.util.concurrent.Callable
-import java.util.concurrent.TimeUnit
-import java.util.function.Predicate
-import java.util.stream.Collectors
-import javax.net.ssl.HostnameVerifier
-import javax.net.ssl.HttpsURLConnection
-import javax.net.ssl.SSLContext
-import javax.net.ssl.SSLSession
-import javax.net.ssl.TrustManager
-import javax.net.ssl.X509TrustManager
 import org.opensearch.gradle.test.RestIntegTestTask
-import org.opensearch.gradle.testclusters.OpenSearchCluster
 import org.opensearch.gradle.testclusters.StandaloneRestIntegTestTask
 
 apply plugin: 'java'
