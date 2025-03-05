@@ -3,8 +3,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.security.GeneralSecurityException
+import java.security.cert.X509Certificate
 import java.util.concurrent.Callable
+import java.util.concurrent.TimeUnit
+import java.util.function.Predicate
+import java.util.stream.Collectors
+import javax.net.ssl.HostnameVerifier
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLSession
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 import org.opensearch.gradle.test.RestIntegTestTask
+import org.opensearch.gradle.testclusters.OpenSearchCluster
 import org.opensearch.gradle.testclusters.StandaloneRestIntegTestTask
 
 apply plugin: 'java'
@@ -21,6 +35,19 @@ ext {
     projectSubstitutions = [:]
     licenseFile = rootProject.file('LICENSE.txt')
     noticeFile = rootProject.file('NOTICE.txt')
+
+    // Retrieve sample security plugin files for security tests
+    ['esnode.pem', 'esnode-key.pem', 'kirk.pem', 'kirk-key.pem', 'root-ca.pem', 'sample.pem', 'test-kirk.jks'].forEach { file ->
+        File local = getLayout().getBuildDirectory().file(file).get().getAsFile()
+        download.run {
+            src "https://raw.githubusercontent.com/opensearch-project/security/refs/heads/main/bwc-test/src/test/resources/security/" + file
+            dest local
+            overwrite false
+        }
+        processResources {
+            from(local)
+        }
+    }
 }
 
 opensearchplugin {
@@ -96,6 +123,9 @@ configurations {
     zipArchive
 }
 
+// This flag indicates the existence of security plugin
+def securityEnabled = System.getProperty("security", "false") == "true" || System.getProperty("https", "false") == "true"
+
 // Always be minimumCompatibilityVersion of current opensearch version(3.0.0)
 // get latest 2.x version from OpenSearch 2.x branch
 static def fetchVersionProperties() {
@@ -120,6 +150,11 @@ dependencies {
     // Needed for integ tests
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-notifications-core', version: "${opensearch_build}"
     zipArchive group: 'org.opensearch.plugin', name:'notifications', version: "${opensearch_build}"
+
+    // Needed for security tests
+    if (securityEnabled) {
+        opensearchPlugin "org.opensearch.plugin:opensearch-security:${opensearch_build}@zip"
+    }
 
     // Needed for BWC tests
     opensearchPlugin "org.opensearch.plugin:alerting:${bwcPluginVersion}@zip"
@@ -209,20 +244,60 @@ testClusters.integTest {
             }
         }
     }))
+
+    if (securityEnabled) {
+        plugin(provider({
+            new RegularFile() {
+                @Override
+                File getAsFile() {
+                    return configurations.opensearchPlugin.resolvedConfiguration.resolvedArtifacts
+                            .find { ResolvedArtifact f ->
+                                f.name.startsWith("opensearch-security")
+                            }
+                            .file
+                }
+            }
+        }))
+    }
 }
 
 testClusters.integTest.nodes.each { node ->
     node.setting("plugins.destination.host.deny_list", "[\"10.0.0.0/8\", \"127.0.0.1\"]")
+
+    if (securityEnabled) {
+        node.extraConfigFile("kirk.pem", file("build/resources/main/kirk.pem"))
+        node.extraConfigFile("kirk-key.pem", file("build/resources/main/kirk-key.pem"))
+        node.extraConfigFile("esnode.pem", file("build/resources/main/esnode.pem"))
+        node.extraConfigFile("esnode-key.pem", file("build/resources/main/esnode-key.pem"))
+        node.extraConfigFile("root-ca.pem", file("build/resources/main/root-ca.pem"))
+        node.setting("plugins.security.ssl.transport.pemcert_filepath", "esnode.pem")
+        node.setting("plugins.security.ssl.transport.pemkey_filepath", "esnode-key.pem")
+        node.setting("plugins.security.ssl.transport.pemtrustedcas_filepath", "root-ca.pem")
+        node.setting("plugins.security.ssl.transport.enforce_hostname_verification", "false")
+        node.setting("plugins.security.ssl.http.enabled", "true")
+        node.setting("plugins.security.ssl.http.pemcert_filepath", "esnode.pem")
+        node.setting("plugins.security.ssl.http.pemkey_filepath", "esnode-key.pem")
+        node.setting("plugins.security.ssl.http.pemtrustedcas_filepath", "root-ca.pem")
+        node.setting("plugins.security.allow_unsafe_democertificates", "true")
+        node.setting("plugins.security.allow_default_init_securityindex", "true")
+        node.setting("plugins.security.authcz.admin_dn", "\n - CN=kirk,OU=client,O=client,L=test,C=de")
+        node.setting("plugins.security.audit.type", "internal_opensearch")
+        node.setting("plugins.security.enable_snapshot_restore_privilege", "true")
+        node.setting("plugins.security.check_snapshot_restore_write_privileges", "true")
+        node.setting("plugins.security.restapi.roles_enabled", "[\"all_access\", \"security_rest_api_access\"]")
+        node.setting("plugins.security.system_indices.enabled", "true")
+    }
 }
 
 integTest {
     systemProperty 'tests.security.manager', 'false'
     systemProperty 'java.io.tmpdir', opensearch_tmp_dir.absolutePath
 
+    systemProperty 'buildDir', buildDir.path
     systemProperty "https", System.getProperty("https")
     systemProperty "security", System.getProperty("security")
-    systemProperty "user", System.getProperty("user")
-    systemProperty "password", System.getProperty("password")
+    systemProperty "user", System.getProperty("user", "admin")
+    systemProperty "password", System.getProperty("password", "admin")
 
     // The 'doFirst' delays till execution time.
     doFirst {
