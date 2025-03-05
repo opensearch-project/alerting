@@ -15,6 +15,9 @@ jobs:
       product: opensearch
 
   build-linux:
+    strategy:
+      matrix:
+        java: [ 21 ]
     needs: Get-CI-Image-Tag
     # This job runs on Linux
     runs-on: ubuntu-latest
