@@ -6,3 +6,6 @@ Compatible with OpenSearch 3.0.0.0-alpha1
 * Increment version to 3.0.0.0-alpha1 ([#1786](https://github.com/opensearch-project/alerting/pull/1786))
 * CVE fix for ktlint ([#1802](https://github.com/opensearch-project/alerting/pull/1802))
 * Fix security-enabled test configurations for 3.0-alpha1. ([#1807](https://github.com/opensearch-project/alerting/pull/1807))
+
+### Bug fixes
+* Fix bucket selector aggregation writeable name. ([#1780](https://github.com/opensearch-project/alerting/pull/1780))
