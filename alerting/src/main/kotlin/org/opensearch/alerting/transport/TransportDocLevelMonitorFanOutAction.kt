@@ -207,6 +207,22 @@ class TransportDocLevelMonitorFanOutAction
         listener: ActionListener<DocLevelMonitorFanOutResponse>
     ) {
         try {
+            // handle situations where coordinator node is not on the same opensearch version or
+            // from the same domain instance and return no-op response instead of failing entire fan-out
+            if (request.indexExecutionContext == null) {
+                listener.onResponse(
+                    DocLevelMonitorFanOutResponse(
+                        nodeId = clusterService.localNode().id,
+                        executionId = request.executionId,
+                        monitorId = "",
+                        lastRunContexts = mutableMapOf(),
+                        inputResults = InputRunResults(emptyList()),
+                        triggerResults = emptyMap(),
+                        exception = null
+                    )
+                )
+                return
+            }
             val monitor = request.monitor
             var monitorResult = MonitorRunResult<DocumentLevelTriggerRunResult>(monitor.name, Instant.now(), Instant.now())
             val updatedIndexNames = request.indexExecutionContext!!.updatedIndexNames
