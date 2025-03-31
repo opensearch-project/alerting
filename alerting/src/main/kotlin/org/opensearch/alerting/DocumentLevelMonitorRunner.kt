@@ -7,7 +7,6 @@ package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
-import org.opensearch.Version
 import org.opensearch.action.ActionListenerResponseHandler
 import org.opensearch.action.support.GroupedActionListener
 import org.opensearch.alerting.util.IndexUtils
@@ -580,10 +579,6 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
     private fun getShardsCount(clusterService: ClusterService, index: String): Int {
         val allShards: List<ShardRouting> = clusterService!!.state().routingTable().allShards(index)
         return allShards.filter { it.primary() }.size
-    }
-
-    private fun getNodes(monitorCtx: MonitorRunnerExecutionContext): Map<String, DiscoveryNode> {
-        return monitorCtx.clusterService!!.state().nodes.dataNodes.filter { it.value.version >= Version.CURRENT }
     }
 
     private fun distributeShards(
