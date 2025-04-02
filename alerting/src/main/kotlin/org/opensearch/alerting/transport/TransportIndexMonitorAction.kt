@@ -208,34 +208,29 @@ class TransportIndexMonitorAction @Inject constructor(
         }
         val searchRequest = SearchRequest().indices(*updatedIndices.toTypedArray())
             .source(SearchSourceBuilder.searchSource().size(1).query(QueryBuilders.matchAllQuery()))
-        client.search(
-            searchRequest,
-            object : ActionListener<SearchResponse> {
-                override fun onResponse(searchResponse: SearchResponse) {
-                    // User has read access to configured indices in the monitor, now create monitor with out user context.
-                    client.threadPool().threadContext.stashContext().use {
-                        IndexMonitorHandler(client, actionListener, request, user).resolveUserAndStart()
-                    }
+        scope.launch {
+            try {
+                client.suspendUntil { client.search(searchRequest, it) }
+                // User has read access to configured indices in the monitor, now create monitor without user context.
+                client.threadPool().threadContext.stashContext().use {
+                    IndexMonitorHandler(client, actionListener, request, user).resolveUserAndStart()
                 }
-
+            } catch (t: Exception) {
                 //  Due to below issue with security plugin, we get security_exception when invalid index name is mentioned.
                 //  https://github.com/opendistro-for-elasticsearch/security/issues/718
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(
-                        AlertingException.wrap(
-                            when (t is OpenSearchSecurityException) {
-                                true -> OpenSearchStatusException(
-                                    "User doesn't have read permissions for one or more configured index " +
-                                        "$indices",
-                                    RestStatus.FORBIDDEN
-                                )
-                                false -> t
-                            }
-                        )
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        when (t is OpenSearchSecurityException) {
+                            true -> OpenSearchStatusException(
+                                "User doesn't have read permissions for one or more configured index " + "$indices",
+                                RestStatus.FORBIDDEN
+                            )
+                            false -> t
+                        }
                     )
-                }
+                )
             }
-        )
+        }
     }
 
     /**
@@ -283,37 +278,31 @@ class TransportIndexMonitorAction @Inject constructor(
                     .copy(user = User("", listOf(), listOf(), listOf()))
                 start()
             } else {
-                try {
-                    request.monitor = request.monitor
-                        .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttNames))
-                    val searchSourceBuilder = SearchSourceBuilder().size(0)
-                    if (getRoleFilterEnabled(clusterService, settings, "plugins.anomaly_detection.filter_by_backend_roles")) {
-                        addUserBackendRolesFilter(user, searchSourceBuilder)
-                    }
-                    val searchRequest = SearchRequest().indices(".opendistro-anomaly-detectors").source(searchSourceBuilder)
-                    client.search(
-                        searchRequest,
-                        object : ActionListener<SearchResponse> {
-                            override fun onResponse(response: SearchResponse?) {
-                                val totalHits = response?.hits?.totalHits?.value
-                                if (totalHits != null && totalHits > 0L) {
-                                    start()
-                                } else {
-                                    actionListener.onFailure(
-                                        AlertingException.wrap(
-                                            OpenSearchStatusException("User has no available detectors", RestStatus.NOT_FOUND)
-                                        )
-                                    )
-                                }
-                            }
-
-                            override fun onFailure(t: Exception) {
-                                actionListener.onFailure(AlertingException.wrap(t))
-                            }
+                scope.launch {
+                    try {
+                        request.monitor = request.monitor
+                            .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttNames))
+                        val searchSourceBuilder = SearchSourceBuilder().size(0)
+                        if (getRoleFilterEnabled(
+                                clusterService,
+                                settings,
+                                "plugins.anomaly_detection.filter_by_backend_roles"
+                            )
+                        ) {
+                            addUserBackendRolesFilter(user, searchSourceBuilder)
                         }
-                    )
-                } catch (ex: IOException) {
-                    actionListener.onFailure(AlertingException.wrap(ex))
+                        val searchRequest =
+                            SearchRequest().indices(".opendistro-anomaly-detectors").source(searchSourceBuilder)
+                        val response = client.suspendUntil { client.search(searchRequest, it) }
+                        val totalHits = response?.hits?.totalHits?.value
+                        if (totalHits != null && totalHits > 0L) {
+                            start()
+                        } else {
+                            throw OpenSearchStatusException("User has no available detectors", RestStatus.NOT_FOUND)
+                        }
+                    } catch (ex: IOException) {
+                        actionListener.onFailure(AlertingException.wrap(ex))
+                    }
                 }
             }
         }
@@ -391,19 +380,14 @@ class TransportIndexMonitorAction @Inject constructor(
                 val query = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery("${Monitor.MONITOR_TYPE}.type", Monitor.MONITOR_TYPE))
                 val searchSource = SearchSourceBuilder().query(query).timeout(requestTimeout)
                 val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
-
-                client.search(
-                    searchRequest,
-                    object : ActionListener<SearchResponse> {
-                        override fun onResponse(searchResponse: SearchResponse) {
-                            onSearchResponse(searchResponse)
-                        }
-
-                        override fun onFailure(t: Exception) {
-                            actionListener.onFailure(AlertingException.wrap(t))
-                        }
+                scope.launch {
+                    try {
+                        val searchResponse = client.suspendUntil { client.search(searchRequest, it) }
+                        onSearchResponse(searchResponse)
+                    } catch (t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
                     }
-                )
+                }
             }
         }
 
