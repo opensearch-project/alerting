@@ -8,6 +8,10 @@ package org.opensearch.alerting.settings
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.unit.TimeValue
+import org.opensearch.remote.metadata.common.CommonValue.REMOTE_METADATA_ENDPOINT_KEY
+import org.opensearch.remote.metadata.common.CommonValue.REMOTE_METADATA_REGION_KEY
+import org.opensearch.remote.metadata.common.CommonValue.REMOTE_METADATA_SERVICE_NAME_KEY
+import org.opensearch.remote.metadata.common.CommonValue.REMOTE_METADATA_TYPE_KEY
 import java.util.concurrent.TimeUnit
 
 /**
@@ -275,5 +279,40 @@ class AlertingSettings {
             0,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+
+        /** This setting controls whether multi tenancy is enabled */
+        val MULTI_TENANCY_ENABLED: Setting<Boolean?> = Setting
+            .boolSetting(
+                "plugins.alerting.multi_tenancy_enabled",
+                false, Setting.Property.NodeScope
+            )
+
+        /** This setting sets the remote metadata store type  */
+        val REMOTE_METADATA_STORE_TYPE: Setting<String?> = Setting
+            .simpleString(
+                "plugins.alerting.$REMOTE_METADATA_TYPE_KEY",
+                Setting.Property.NodeScope, Setting.Property.Final
+            )
+
+        /** This setting sets the remote metadata endpoint  */
+        val REMOTE_METADATA_ENDPOINT: Setting<String?> = Setting
+            .simpleString(
+                "plugins.alerting.$REMOTE_METADATA_ENDPOINT_KEY",
+                Setting.Property.NodeScope, Setting.Property.Final
+            )
+
+        /** This setting sets the remote metadata region  */
+        val REMOTE_METADATA_REGION: Setting<String?> = Setting
+            .simpleString(
+                "plugins.alerting.$REMOTE_METADATA_REGION_KEY",
+                Setting.Property.NodeScope, Setting.Property.Final
+            )
+
+        /** This setting sets the remote metadata service name  */
+        val REMOTE_METADATA_SERVICE_NAME: Setting<String?> = Setting
+            .simpleString(
+                "plugins.alerting.$REMOTE_METADATA_SERVICE_NAME_KEY",
+                Setting.Property.NodeScope, Setting.Property.Final
+            )
     }
 }
