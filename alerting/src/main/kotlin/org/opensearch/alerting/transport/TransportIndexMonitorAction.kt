@@ -7,6 +7,7 @@ package org.opensearch.alerting.transport
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.future.await
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
@@ -21,7 +22,6 @@ import org.opensearch.action.admin.cluster.health.ClusterHealthResponse
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
-import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
@@ -74,10 +74,13 @@ import org.opensearch.core.common.io.stream.NamedWriteableRegistry
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.ToXContent
+import org.opensearch.index.engine.VersionConflictEngineException
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
 import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
+import org.opensearch.remote.metadata.client.PutDataObjectRequest
+import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
@@ -93,6 +96,7 @@ private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 class TransportIndexMonitorAction @Inject constructor(
     transportService: TransportService,
     val client: Client,
+    val sdkClient: SdkClient,
     actionFilters: ActionFilters,
     val scheduledJobIndices: ScheduledJobIndices,
     val docLevelMonitorQueries: DocLevelMonitorQueries,
@@ -484,8 +488,6 @@ class TransportIndexMonitorAction @Inject constructor(
 
         private suspend fun indexMonitor() {
             if (user != null) {
-                // Use the backend roles which is an intersection of the requested backend roles and the user's backend roles.
-                // Admins can pass in any backend role. Also if no backend role is passed in, all the user's backend roles are used.
                 val rbacRoles = if (request.rbacRoles == null) user.backendRoles.toSet()
                 else if (!isAdmin(user)) request.rbacRoles?.intersect(user.backendRoles)?.toSet()
                 else request.rbacRoles
@@ -496,12 +498,14 @@ class TransportIndexMonitorAction @Inject constructor(
                 log.debug("Created monitor's backend roles: $rbacRoles")
             }
 
-            val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
-                .setRefreshPolicy(request.refreshPolicy)
-                .source(request.monitor.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-                .setIfSeqNo(request.seqNo)
-                .setIfPrimaryTerm(request.primaryTerm)
+            val putRequest = PutDataObjectRequest.builder()
+                .index(SCHEDULED_JOBS_INDEX)
+                .refreshPolicy(request.refreshPolicy)
+                .dataObject({ builder, params -> request.monitor.toXContentWithUser(builder, ToXContent.MapParams(mapOf("with_type" to "true"))) })
+                .ifPrimaryTerm(request.primaryTerm)
+                .ifSeqNo(request.seqNo)
                 .timeout(indexTimeout)
+                .build()
 
             log.info(
                 "Creating new monitor: ${request.monitor.toXContentWithUser(
@@ -511,7 +515,12 @@ class TransportIndexMonitorAction @Inject constructor(
             )
 
             try {
-                val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
+                val putResponse = sdkClient.putDataObjectAsync(putRequest).await()
+                val indexResponse = putResponse.parser()?.let { parser -> IndexResponse.fromXContent(parser) }
+                    ?: throw OpenSearchStatusException(
+                        "Failed to parse sdkClient response into IndexResponse",
+                        RestStatus.INTERNAL_SERVER_ERROR
+                    )
                 val failureReasons = checkShardsFailure(indexResponse)
                 if (failureReasons != null) {
                     log.info(failureReasons.toString())
@@ -556,7 +565,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     )
                 )
             } catch (t: Exception) {
-                actionListener.onFailure(AlertingException.wrap(t))
+                actionListener.onFailure(convertToOpenSearchException(t))
             }
         }
 
@@ -668,13 +677,16 @@ class TransportIndexMonitorAction @Inject constructor(
             }
 
             request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
-            val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
-                .setRefreshPolicy(request.refreshPolicy)
-                .source(request.monitor.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+            val putRequest = PutDataObjectRequest.builder()
+                .index(SCHEDULED_JOBS_INDEX)
+                .refreshPolicy(request.refreshPolicy)
+                .dataObject({ builder, params -> request.monitor.toXContentWithUser(builder, ToXContent.MapParams(mapOf("with_type" to "true"))) })
                 .id(request.monitorId)
-                .setIfSeqNo(request.seqNo)
-                .setIfPrimaryTerm(request.primaryTerm)
+                .ifPrimaryTerm(request.primaryTerm)
+                .ifSeqNo(request.seqNo)
                 .timeout(indexTimeout)
+                .overwriteIfExists(true)
+                .build()
 
             log.info(
                 "Updating monitor, ${currentMonitor.id}, from: ${currentMonitor.toXContentWithUser(
@@ -684,7 +696,11 @@ class TransportIndexMonitorAction @Inject constructor(
             )
 
             try {
-                val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
+
+                val putResponse = sdkClient.putDataObjectAsync(putRequest).await()
+                val indexResponse = putResponse.parser()?.let { parser -> IndexResponse.fromXContent(parser) }
+                    ?: throw OpenSearchStatusException("Failed to parse sdkClient response into IndexResponse", RestStatus.INTERNAL_SERVER_ERROR)
+
                 val failureReasons = checkShardsFailure(indexResponse)
                 if (failureReasons != null) {
                     actionListener.onFailure(
@@ -738,7 +754,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     )
                 )
             } catch (t: Exception) {
-                actionListener.onFailure(AlertingException.wrap(t))
+                actionListener.onFailure(convertToOpenSearchException(t))
             }
         }
 
@@ -752,6 +768,14 @@ class TransportIndexMonitorAction @Inject constructor(
                 return failureReasons.toString()
             }
             return null
+        }
+
+        private fun convertToOpenSearchException(t: Exception): OpenSearchException {
+            if (t is VersionConflictEngineException || (t is OpenSearchStatusException && t.cause is VersionConflictEngineException)) {
+                val message = t.message ?: "Version conflict while trying to index monitor"
+                return AlertingException.wrap(OpenSearchStatusException(message, RestStatus.CONFLICT))
+            }
+            return AlertingException.wrap(t)
         }
     }
 }
