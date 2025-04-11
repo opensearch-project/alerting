@@ -7,13 +7,12 @@ package org.opensearch.alerting.remote.monitors
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
-import org.opensearch.Version
 import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.MonitorRunner
 import org.opensearch.alerting.MonitorRunnerExecutionContext
+import org.opensearch.alerting.getNodes
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.cluster.metadata.IndexMetadata
-import org.opensearch.cluster.node.DiscoveryNode
 import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutResponse
@@ -205,10 +204,6 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
         if ((monitor.inputs[0] as RemoteDocLevelMonitorInput).docLevelMonitorInput.indices.isEmpty()) {
             throw IllegalArgumentException("DocLevelMonitorInput has no indices")
         }
-    }
-
-    private fun getNodes(monitorCtx: MonitorRunnerExecutionContext): Map<String, DiscoveryNode> {
-        return monitorCtx.clusterService!!.state().nodes.dataNodes.filter { it.value.version >= Version.CURRENT }
     }
 
     private fun distributeShards(
