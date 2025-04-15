@@ -78,6 +78,7 @@ import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
 import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
+import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
@@ -93,6 +94,7 @@ private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 class TransportIndexMonitorAction @Inject constructor(
     transportService: TransportService,
     val client: Client,
+    val sdkClient: SdkClient,
     actionFilters: ActionFilters,
     val scheduledJobIndices: ScheduledJobIndices,
     val docLevelMonitorQueries: DocLevelMonitorQueries,
