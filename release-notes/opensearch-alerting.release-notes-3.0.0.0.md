@@ -11,4 +11,4 @@ Compatible with OpenSearch 3.0.0
 * Fix build due to phasing off SecurityManager usage in favor of Java Agent ([#1823](https://github.com/opensearch-project/alerting/pull/1823))
 
 ### Documentation
-* Added 3.0 release notes. ([#1838](https://github.com/opensearch-project/alerting/pull/1838))
+* Added 3.0 release notes. ([#1843](https://github.com/opensearch-project/alerting/pull/1843))
