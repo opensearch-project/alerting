@@ -1093,6 +1093,117 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         }
     }
 
+    fun `test execute monitor with indices having fields with different data types with doc mismatches`() {
+        val testIndex = createTestIndex(
+            "test1",
+            """"properties": {
+                    "source.device.port": { "type": "long" },
+                    "source.device.hwd.id": { "type": "long" },
+                    "nested_field": {
+                      "type": "nested",
+                      "properties": {
+                        "test1": {
+                          "type": "keyword"
+                        }
+                      }
+                    },
+                    "my_join_field": { 
+                      "type": "join",
+                      "relations": {
+                         "question": "answer" 
+                      }
+                   },
+                   "test_field" : { "type" : "integer" }
+                }
+            """.trimIndent()
+        )
+        var testDoc = """{
+            "source" : { "device": {"port" : 12345 } },
+            "nested_field": { "test1": "some text" },
+            "test_field": 12345
+        }"""
+        indexDoc(testIndex, "1", testDoc)
+        val testIndex2 = createTestIndex(
+            "test2",
+            """
+                "properties" : {
+                  "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
+                  "test_field" : { "type" : "keyword" },
+                  "number" : { "type" : "keyword" }
+                }
+            """.trimIndent()
+        )
+        val testDoc2 = """{
+            "source" : { "device": {"port" : "12345" } },
+            "nested_field": { "test1": "some text" },
+            "test_field": "12345"
+        }"""
+        indexDoc(testIndex2, "1", testDoc2)
+
+        val docQuery = DocLevelQuery(
+            query = "(source.device.port:\"12345\" AND test_field:\"12345\") OR source.device.hwd.id:\"12345\"",
+            name = "5",
+            fields = listOf()
+        )
+        val docLevelInput = DocLevelMonitorInput("description", listOf("test*"), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "2", testDoc)
+        executeMonitor(monitor.id)
+
+        var findings = searchFindings(monitor)
+        assertEquals("Findings saved for test monitor", 1, findings.size)
+
+        findings = searchFindings(monitor)
+        assertEquals("Findings saved for test monitor", 1, findings.size)
+
+        // clear previous findings and alerts
+        deleteIndex(ALL_FINDING_INDEX_PATTERN)
+        deleteIndex(ALL_ALERT_INDEX_PATTERN)
+
+        indexDoc(testIndex2, "4", testDoc2)
+        testDoc = """{
+            "source" : { "device": {"port" : "12345" } },
+            "nested_field": { "test1": "some text" },
+            "test_field": 12345
+        }"""
+        indexDoc(testIndex, "4", testDoc)
+        executeMonitor(monitor.id)
+
+        findings = searchFindings(monitor)
+        assertEquals("Alert saved for test monitor", 2, findings.size)
+    }
+
+    fun `test execute monitor with index patterns having no indices`() {
+        val docQuery = DocLevelQuery(
+            query = "(source.device.port:\"12345\" AND test_field:\"12345\") OR source.device.hwd.id:\"12345\"",
+            name = "5",
+            fields = listOf()
+        )
+        val docLevelInput = DocLevelMonitorInput("description", listOf("test*"), listOf(docQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+        assertNotNull(monitor.id)
+
+        val request = """
+                { "query": { "match_all": {} }
+                }
+        """.trimIndent()
+        val httpResponse = adminClient().makeRequest(
+            "GET",
+            "/.opensearch-alerting-queries-*/_search",
+            StringEntity(request, ContentType.APPLICATION_JSON)
+        )
+        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
+
+        val searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, httpResponse.entity.content))
+        assertEquals(0L, searchResponse.hits.totalHits?.value)
+    }
+
     fun `test execute monitor with indices having fields with same name but with different nesting`() {
         val testIndex = createTestIndex(
             "test1",
