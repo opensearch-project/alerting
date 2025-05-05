@@ -31,6 +31,9 @@ import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.ExistsQueryBuilder
 import org.opensearch.index.query.MatchQueryBuilder
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.remote.metadata.client.SdkClient
+import org.opensearch.remote.metadata.client.SearchDataObjectRequest
+import org.opensearch.remote.metadata.common.SdkClientUtils
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
@@ -41,6 +44,7 @@ class TransportSearchMonitorAction @Inject constructor(
     transportService: TransportService,
     val settings: Settings,
     val client: Client,
+    val sdkClient: SdkClient,
     clusterService: ClusterService,
     actionFilters: ActionFilters,
     val namedWriteableRegistry: NamedWriteableRegistry
@@ -101,18 +105,25 @@ class TransportSearchMonitorAction @Inject constructor(
     }
 
     fun search(searchRequest: SearchRequest, actionListener: ActionListener<SearchResponse>) {
-        client.search(
-            searchRequest,
-            object : ActionListener<SearchResponse> {
-                override fun onResponse(response: SearchResponse) {
-                    actionListener.onResponse(response)
-                }
+        val searchDataObjectRequest = SearchDataObjectRequest.builder()
+            .indices(*searchRequest.indices())
+            .searchSourceBuilder(searchRequest.source())
+            .build()
 
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
-                }
-            }
-        )
+        client.threadPool().threadContext.stashContext().use {
+            sdkClient.searchDataObjectAsync(searchDataObjectRequest)
+                .whenComplete(
+                    SdkClientUtils.wrapSearchCompletion(object : ActionListener<SearchResponse> {
+                        override fun onResponse(response: SearchResponse) {
+                            actionListener.onResponse(response)
+                        }
+
+                        override fun onFailure(t: Exception) {
+                            actionListener.onFailure(AlertingException.wrap(t))
+                        }
+                    })
+                )
+        }
     }
 
     private fun addOwnerFieldIfNotExists(searchRequest: SearchRequest) {

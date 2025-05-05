@@ -20,6 +20,9 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
+import org.opensearch.remote.metadata.client.SdkClient
+import org.opensearch.remote.metadata.client.SearchDataObjectRequest
+import org.opensearch.remote.metadata.common.SdkClientUtils
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
@@ -27,6 +30,7 @@ import org.opensearch.transport.client.Client
 class TransportSearchEmailGroupAction @Inject constructor(
     transportService: TransportService,
     val client: Client,
+    val sdkClient: SdkClient,
     actionFilters: ActionFilters,
     val clusterService: ClusterService,
     settings: Settings
@@ -54,19 +58,22 @@ class TransportSearchEmailGroupAction @Inject constructor(
             return
         }
 
-        client.threadPool().threadContext.stashContext().use {
-            client.search(
-                searchRequest,
-                object : ActionListener<SearchResponse> {
-                    override fun onResponse(response: SearchResponse) {
-                        actionListener.onResponse(response)
-                    }
+        val searchDataObjectRequest = SearchDataObjectRequest.builder().indices(*searchRequest.indices())
+            .searchSourceBuilder(searchRequest.source()).build()
 
-                    override fun onFailure(e: Exception) {
-                        actionListener.onFailure(e)
-                    }
-                }
-            )
+        client.threadPool().threadContext.stashContext().use {
+            sdkClient.searchDataObjectAsync(searchDataObjectRequest)
+                .whenComplete(
+                    SdkClientUtils.wrapSearchCompletion(object : ActionListener<SearchResponse> {
+                        override fun onResponse(response: SearchResponse) {
+                            actionListener.onResponse(response)
+                        }
+
+                        override fun onFailure(e: Exception) {
+                            actionListener.onFailure(e)
+                        }
+                    })
+                )
         }
     }
 }

@@ -12,13 +12,13 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.delete.DeleteRequest
-import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.comments.CommentsIndices.Companion.ALL_COMMENTS_INDEX_PATTERN
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.util.suspendUntil
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
@@ -38,6 +38,8 @@ import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.remote.metadata.client.SdkClient
+import org.opensearch.remote.metadata.client.SearchDataObjectRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -49,6 +51,7 @@ private val log = LogManager.getLogger(TransportDeleteAlertingCommentAction::cla
 class TransportDeleteAlertingCommentAction @Inject constructor(
     transportService: TransportService,
     val client: Client,
+    val sdkClient: SdkClient,
     actionFilters: ActionFilters,
     val clusterService: ClusterService,
     settings: Settings,
@@ -151,11 +154,15 @@ class TransportDeleteAlertingCommentAction @Inject constructor(
                     .version(true)
                     .seqNoAndPrimaryTerm(true)
                     .query(queryBuilder)
-            val searchRequest = SearchRequest()
-                .source(searchSourceBuilder)
+            val searchRequest = SearchDataObjectRequest.builder()
+                .searchSourceBuilder(searchSourceBuilder)
                 .indices(ALL_COMMENTS_INDEX_PATTERN)
+                .build()
 
-            val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
+            val searchResponse: SearchResponse = sdkClient.suspendUntil {
+                searchDataObjectAsync(searchRequest).whenComplete(it)
+            }
+
             val comments = searchResponse.hits.map { hit ->
                 val xcp = XContentHelper.createParser(
                     NamedXContentRegistry.EMPTY,
