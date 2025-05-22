@@ -761,38 +761,52 @@ class TransportDocLevelMonitorFanOutAction
             try {
                 val prevSeqNo = indexExecutionCtx.lastRunContext[shard].toString().toLongOrNull()
                 val from = prevSeqNo ?: SequenceNumbers.NO_OPS_PERFORMED
-                var to: Long = Long.MAX_VALUE
-                while (to >= from) {
-                    val hits: SearchHits = searchShard(
+
+                // First get the max sequence number for the shard
+                val maxSeqNo = getMaxSeqNoForShard(
+                    monitor,
+                    indexExecutionCtx.concreteIndexName,
+                    shard,
+                    indexExecutionCtx.docIds
+                )
+
+                if (maxSeqNo == null || maxSeqNo <= from) {
+                    // No new documents to process
+                    updateLastRunContext(shard, (prevSeqNo ?: SequenceNumbers.NO_OPS_PERFORMED).toString())
+                    continue
+                }
+
+                // Update the last run context with max sequence number
+                updateLastRunContext(shard, maxSeqNo.toString())
+
+                // Process documents in chunks between prevSeqNo and maxSeqNo
+                var currentSeqNo = from
+                while (currentSeqNo < maxSeqNo) {
+                    val hits = searchShard(
                         monitor,
                         indexExecutionCtx.concreteIndexName,
                         shard,
-                        from,
-                        to,
+                        currentSeqNo,
+                        maxSeqNo,
                         indexExecutionCtx.docIds,
-                        fieldsToBeQueried,
+                        fieldsToBeQueried
                     )
+
                     if (hits.hits.isEmpty()) {
-                        if (to == Long.MAX_VALUE) {
-                            updateLastRunContext(shard, (prevSeqNo ?: SequenceNumbers.NO_OPS_PERFORMED).toString()) // didn't find any docs
-                        }
                         break
                     }
-                    if (to == Long.MAX_VALUE) { // max sequence number of shard needs to be computed
-                        updateLastRunContext(shard, hits.hits[0].seqNo.toString())
-                    }
-                    val leastSeqNoFromHits = hits.hits.last().seqNo
-                    to = leastSeqNoFromHits - 1
+
                     val startTime = System.currentTimeMillis()
-                    transformedDocs.addAll(
-                        transformSearchHitsAndReconstructDocs(
-                            hits,
-                            indexExecutionCtx.indexName,
-                            indexExecutionCtx.concreteIndexName,
-                            monitor.id,
-                            indexExecutionCtx.conflictingFields,
-                        )
+                    val newDocs = transformSearchHitsAndReconstructDocs(
+                        hits,
+                        indexExecutionCtx.indexName,
+                        indexExecutionCtx.concreteIndexName,
+                        monitor.id,
+                        indexExecutionCtx.conflictingFields,
                     )
+
+                    transformedDocs.addAll(newDocs)
+
                     if (
                         transformedDocs.isNotEmpty() &&
                         shouldPerformPercolateQueryAndFlushInMemoryDocs(transformedDocs.size)
@@ -808,6 +822,9 @@ class TransportDocLevelMonitorFanOutAction
                         )
                     }
                     docTransformTimeTakenStat += System.currentTimeMillis() - startTime
+
+                    // Move to next chunk - use the last document's sequence number
+                    currentSeqNo = hits.hits.last().seqNo
                 }
             } catch (e: Exception) {
                 log.error(
@@ -871,6 +888,48 @@ class TransportDocLevelMonitorFanOutAction
             transformedDocs.clear()
             docsSizeOfBatchInBytes = 0
         }
+    }
+
+    private suspend fun getMaxSeqNoForShard(
+        monitor: Monitor,
+        index: String,
+        shard: String,
+        docIds: List<String>? = null
+    ): Long? {
+        val boolQueryBuilder = BoolQueryBuilder()
+
+        if (monitor.shouldCreateSingleAlertForFindings == null || monitor.shouldCreateSingleAlertForFindings == false) {
+            if (!docIds.isNullOrEmpty()) {
+                boolQueryBuilder.filter(QueryBuilders.termsQuery("_id", docIds))
+            }
+        } else if (monitor.shouldCreateSingleAlertForFindings == true) {
+            val docIdsParam = mutableListOf<String>()
+            if (docIds != null) {
+                docIdsParam.addAll(docIds)
+            }
+            boolQueryBuilder.filter(QueryBuilders.termsQuery("_id", docIdsParam))
+        }
+
+        val request = SearchRequest()
+            .indices(index)
+            .preference("_shards:$shard")
+            .source(
+                SearchSourceBuilder()
+                    .size(1)
+                    .sort("_seq_no", SortOrder.DESC)
+                    .seqNoAndPrimaryTerm(true)
+                    .query(boolQueryBuilder)
+            )
+
+        val response: SearchResponse = client.suspendUntil { client.search(request, it) }
+        if (response.status() !== RestStatus.OK) {
+            throw IOException(
+                "Failed to get max sequence number for shard: [$shard] in index [$index]. Response status is ${response.status()}"
+            )
+        }
+
+        nonPercolateSearchesTimeTakenStat += response.took.millis
+        return if (response.hits.hits.isNotEmpty()) response.hits.hits[0].seqNo else null
     }
 
     /** Executes percolate query on the docs against the monitor's query index and return the hits from the search response*/
@@ -943,7 +1002,7 @@ class TransportDocLevelMonitorFanOutAction
         return boolQueryBuilder
     }
 
-    /** Executes search query on given shard of given index to fetch docs with sequene number greater than prevSeqNo.
+    /** Executes search query on given shard of given index to fetch docs with sequence number greater than prevSeqNo.
      * This method hence fetches only docs from shard which haven't been queried before
      */
     private suspend fun searchShard(
@@ -979,7 +1038,7 @@ class TransportDocLevelMonitorFanOutAction
             .source(
                 SearchSourceBuilder()
                     .version(true)
-                    .sort("_seq_no", SortOrder.DESC)
+                    .sort("_seq_no", SortOrder.ASC)
                     .seqNoAndPrimaryTerm(true)
                     .query(boolQueryBuilder)
                     .size(docLevelMonitorShardFetchSize)
