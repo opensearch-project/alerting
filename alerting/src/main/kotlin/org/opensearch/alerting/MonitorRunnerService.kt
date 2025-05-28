@@ -36,6 +36,8 @@ import org.opensearch.alerting.script.TriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_MILLIS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION
+import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION
 import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED
 import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE
 import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDINGS_INDEXING_BATCH_SIZE
@@ -223,6 +225,16 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         monitorCtx.percQueryMaxNumDocsInMemory = PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY.get(monitorCtx.settings)
         monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY) {
             monitorCtx.percQueryMaxNumDocsInMemory = it
+        }
+
+        monitorCtx.docLevelMonitorFanoutMaxDuration = DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION.get(monitorCtx.settings)
+        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION) {
+            monitorCtx.docLevelMonitorFanoutMaxDuration = it
+        }
+
+        monitorCtx.docLevelMonitorExecutionMaxDuration = DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION.get(monitorCtx.settings)
+        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION) {
+            monitorCtx.docLevelMonitorExecutionMaxDuration = it
         }
 
         monitorCtx.percQueryDocsSizeMemoryPercentageLimit =

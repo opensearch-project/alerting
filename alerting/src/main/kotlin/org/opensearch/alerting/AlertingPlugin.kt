@@ -386,6 +386,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.DOC_LEVEL_MONITOR_FAN_OUT_NODES,
             DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE,
             AlertingSettings.PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY,
+            AlertingSettings.DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION,
+            AlertingSettings.DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION,
             AlertingSettings.REQUEST_TIMEOUT,
             AlertingSettings.MAX_ACTION_THROTTLE_VALUE,
             AlertingSettings.FILTER_BY_BACKEND_ROLES,

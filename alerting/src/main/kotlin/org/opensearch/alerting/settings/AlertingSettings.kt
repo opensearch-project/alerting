@@ -21,6 +21,8 @@ class AlertingSettings {
         const val DEFAULT_PERCOLATE_QUERY_NUM_DOCS_IN_MEMORY = 50000
         const val DEFAULT_PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT = 10
         const val DEFAULT_DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE = 10000
+        const val DEFAULT_MAX_DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION_MINUTES = 3L
+        const val DEFAULT_MAX_DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION_MINUTES = 4L
         const val DEFAULT_FAN_OUT_NODES = 1000
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(
@@ -47,6 +49,22 @@ class AlertingSettings {
             DEFAULT_DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE,
             1,
             10000,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        /** Setting to help timebox doc level monitor fanout
+         */
+        val DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION = Setting.positiveTimeSetting(
+            "plugins.alerting.monitor.doc_level_monitor_fanout_max_duration",
+            TimeValue.timeValueMinutes(DEFAULT_MAX_DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION_MINUTES),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        /** Setting to help timebox doc level monitor execution
+         */
+        val DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION = Setting.positiveTimeSetting(
+            "plugins.alerting.monitor.doc_level_monitor_execution_max_duration",
+            TimeValue.timeValueMinutes(DEFAULT_MAX_DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION_MINUTES),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 

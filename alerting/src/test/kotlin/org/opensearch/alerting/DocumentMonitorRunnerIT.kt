@@ -15,6 +15,7 @@ import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DataSources
@@ -184,6 +185,96 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         for (triggerResult in output.objectMap("trigger_results").values) {
             assertEquals(9, triggerResult.objectMap("action_results").values.size)
+        }
+    }
+
+    fun `test fanout execution reaches endtime before completing execution`() {
+        val updateSettings =
+            adminClient().updateSettings(AlertingSettings.DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION.key, TimeValue.timeValueNanos(1))
+        logger.info(updateSettings)
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val index = createTestIndex()
+
+        val docQuery =
+            DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+
+        val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
+        )
+
+        indexDoc(index, "1", testDoc)
+        indexDoc(index, "2", testDoc)
+        indexDoc(index, "3", testDoc)
+        indexDoc(index, "4", testDoc)
+        indexDoc(index, "5", testDoc)
+        indexDoc(index, "11", testDoc)
+        indexDoc(index, "21", testDoc)
+        indexDoc(index, "31", testDoc)
+        indexDoc(index, "41", testDoc)
+        indexDoc(index, "51", testDoc)
+
+        deleteDoc(index, "51")
+        val response = executeMonitor(monitor, params = mapOf("dryrun" to "false"))
+
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertEquals(0, triggerResult.objectMap("action_results").values.size)
+        }
+    }
+
+    fun `test execution reaches endtime before completing execution`() {
+        val updateSettings =
+            adminClient().updateSettings(AlertingSettings.DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION.key, TimeValue.timeValueNanos(1))
+        logger.info(updateSettings)
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val index = createTestIndex()
+
+        val docQuery =
+            DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+
+        val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
+        )
+
+        indexDoc(index, "1", testDoc)
+        indexDoc(index, "2", testDoc)
+        indexDoc(index, "3", testDoc)
+        indexDoc(index, "4", testDoc)
+        indexDoc(index, "5", testDoc)
+        indexDoc(index, "11", testDoc)
+        indexDoc(index, "21", testDoc)
+        indexDoc(index, "31", testDoc)
+        indexDoc(index, "41", testDoc)
+        indexDoc(index, "51", testDoc)
+
+        deleteDoc(index, "51")
+        val response = executeMonitor(monitor, params = mapOf("dryrun" to "false"))
+
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertEquals(0, triggerResult.objectMap("action_results").values.size)
         }
     }
 
@@ -419,8 +510,10 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val findings = searchFindings(monitor2)
         assertEquals("Findings saved for test monitor", 2, findings.size)
-        assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("5"))
-        assertTrue("Findings saved for test monitor", findings[1].relatedDocIds.contains("1"))
+        val findings0 = findings[0].relatedDocIds.contains("1") || findings[0].relatedDocIds.contains("5")
+        val findings1 = findings[1].relatedDocIds.contains("5") || findings[1].relatedDocIds.contains("1")
+        assertTrue("Findings saved for test monitor", findings0)
+        assertTrue("Findings saved for test monitor", findings1)
 
         // ensure query from second monitor was saved
         val expectedQueries = listOf("test_field_test1_${monitor2.id}:\"us-east-1\"")

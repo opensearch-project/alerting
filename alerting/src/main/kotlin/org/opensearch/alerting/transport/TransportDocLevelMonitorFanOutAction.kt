@@ -44,6 +44,7 @@ import org.opensearch.alerting.script.TriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_MILLIS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION
 import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED
 import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE
 import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDINGS_INDEXING_BATCH_SIZE
@@ -154,6 +155,7 @@ class TransportDocLevelMonitorFanOutAction
     var findingsToTriggeredQueries: Map<String, List<DocLevelQuery>> = mutableMapOf()
 
     @Volatile var percQueryMaxNumDocsInMemory: Int = PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY.get(settings)
+    @Volatile var docLevelMonitorFanoutMaxDuration = DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION.get(settings)
     @Volatile var percQueryDocsSizeMemoryPercentageLimit: Int = PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT.get(settings)
     @Volatile var docLevelMonitorShardFetchSize: Int = DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE.get(settings)
     @Volatile var findingsIndexBatchSize: Int = FINDINGS_INDEXING_BATCH_SIZE.get(settings)
@@ -165,6 +167,9 @@ class TransportDocLevelMonitorFanOutAction
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY) {
             percQueryMaxNumDocsInMemory = it
+        }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION) {
+            docLevelMonitorFanoutMaxDuration = it
         }
         clusterService.clusterSettings.addSettingsUpdateConsumer(PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT) {
             percQueryDocsSizeMemoryPercentageLimit = it
@@ -207,6 +212,7 @@ class TransportDocLevelMonitorFanOutAction
         listener: ActionListener<DocLevelMonitorFanOutResponse>
     ) {
         try {
+            val endTime = Instant.now().plusMillis(docLevelMonitorFanoutMaxDuration.millis())
             val monitor = request.monitor
             var monitorResult = MonitorRunResult<DocumentLevelTriggerRunResult>(monitor.name, Instant.now(), Instant.now())
             val updatedIndexNames = request.indexExecutionContext!!.updatedIndexNames
@@ -252,6 +258,7 @@ class TransportDocLevelMonitorFanOutAction
 
             fetchShardDataAndMaybeExecutePercolateQueries(
                 monitor,
+                endTime,
                 indexExecutionContext!!,
                 monitorMetadata,
                 inputRunResults,
@@ -738,13 +745,18 @@ class TransportDocLevelMonitorFanOutAction
         return actionResponseContent
     }
 
+    private fun isFanOutTimeEnded(endTime: Instant): Boolean {
+        return Instant.now().isAfter(endTime)
+    }
+
     /** 1. Fetch data per shard for given index. (only 10000 docs are fetched.
      * needs to be converted to scroll if not performant enough)
      *  2. Transform documents to conform to format required for percolate query
      *  3a. Check if docs in memory are crossing threshold defined by setting.
      *  3b. If yes, perform percolate query and update docToQueries Map with all hits from percolate queries */
-    private suspend fun fetchShardDataAndMaybeExecutePercolateQueries(
+    suspend fun fetchShardDataAndMaybeExecutePercolateQueries( // package-private for testing visibility
         monitor: Monitor,
+        endTime: Instant,
         indexExecutionCtx: IndexExecutionContext,
         monitorMetadata: MonitorMetadata,
         inputRunResults: MutableMap<String, MutableSet<String>>,
@@ -761,7 +773,15 @@ class TransportDocLevelMonitorFanOutAction
             try {
                 val prevSeqNo = indexExecutionCtx.lastRunContext[shard].toString().toLongOrNull()
                 val from = prevSeqNo ?: SequenceNumbers.NO_OPS_PERFORMED
-
+                if (isFanOutTimeEnded(endTime)) {
+                    log.info(
+                        "Doc level monitor ${monitor.id}: " +
+                            "Fanout execution on node ${clusterService.localNode().id}" +
+                            " unable to complete in $docLevelMonitorFanoutMaxDuration." +
+                            " Skipping shard [${indexExecutionCtx.concreteIndexName}][$shardId]"
+                    )
+                    continue
+                }
                 // First get the max sequence number for the shard
                 val maxSeqNo = getMaxSeqNoForShard(
                     monitor,
@@ -775,13 +795,33 @@ class TransportDocLevelMonitorFanOutAction
                     updateLastRunContext(shard, (prevSeqNo ?: SequenceNumbers.NO_OPS_PERFORMED).toString())
                     continue
                 }
-
-                // Update the last run context with max sequence number
-                updateLastRunContext(shard, maxSeqNo.toString())
-
                 // Process documents in chunks between prevSeqNo and maxSeqNo
                 var currentSeqNo = from
                 while (currentSeqNo < maxSeqNo) {
+                    if (isFanOutTimeEnded(endTime)) { // process percolate queries and exit
+                        if (
+                            transformedDocs.isNotEmpty() &&
+                            shouldPerformPercolateQueryAndFlushInMemoryDocs(transformedDocs.size)
+                        ) {
+                            performPercolateQueryAndResetCounters(
+                                monitor,
+                                monitorMetadata,
+                                monitorInputIndices,
+                                concreteIndices,
+                                inputRunResults,
+                                docsToQueries,
+                                transformedDocs
+                            )
+                        }
+                        log.info(
+                            "Doc level monitor ${monitor.id}: " +
+                                "Fanout execution on node ${clusterService.localNode().id}" +
+                                " unable to complete in $docLevelMonitorFanoutMaxDuration!! Gracefully exiting." +
+                                "FanoutShardStats: shard[${indexExecutionCtx.concreteIndexName}][$shardId], " +
+                                "start_seq_no[$from], current_seq_no[$currentSeqNo], max_seq_no[$maxSeqNo]"
+                        )
+                        break
+                    }
                     val hits = searchShard(
                         monitor,
                         indexExecutionCtx.concreteIndexName,
@@ -825,6 +865,8 @@ class TransportDocLevelMonitorFanOutAction
 
                     // Move to next chunk - use the last document's sequence number
                     currentSeqNo = hits.hits.last().seqNo
+                    // update last seen sequence number after every set of seen docs
+                    updateLastRunContext(shard, currentSeqNo.toString())
                 }
             } catch (e: Exception) {
                 log.error(
