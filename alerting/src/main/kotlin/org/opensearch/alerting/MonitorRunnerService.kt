@@ -60,6 +60,7 @@ import org.opensearch.common.lifecycle.AbstractLifecycleComponent
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorRunResult
 import org.opensearch.commons.alerting.model.ScheduledJob
@@ -67,6 +68,8 @@ import org.opensearch.commons.alerting.model.TriggerRunResult
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.model.WorkflowRunResult
 import org.opensearch.commons.alerting.model.action.Action
+import org.opensearch.commons.alerting.util.AlertingException
+import org.opensearch.commons.alerting.util.IndexPatternUtils
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
 import org.opensearch.commons.alerting.util.isMonitorOfStandardType
 import org.opensearch.core.action.ActionListener
@@ -453,6 +456,18 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         val executionId = "${monitor.id}_${LocalDateTime.now(ZoneOffset.UTC)}_${UUID.randomUUID()}"
 
         if (monitor.isMonitorOfStandardType()) {
+            if (
+                dryrun &&
+                monitor.inputs.isNotEmpty() &&
+                monitor.inputs[0] is DocLevelMonitorInput &&
+                (monitor.inputs[0] as DocLevelMonitorInput).indices.stream().anyMatch { IndexPatternUtils.containsPatternSyntax(it) }
+            ) {
+                throw AlertingException(
+                    "Index patterns are not supported in doc level monitors.",
+                    RestStatus.BAD_REQUEST,
+                    IllegalArgumentException("Index patterns are not supported in doc level monitors.")
+                )
+            }
             logger.info(
                 "Executing scheduled monitor - id: ${monitor.id}, type: ${monitor.monitorType}, periodStart: $periodStart, " +
                     "periodEnd: $periodEnd, dryrun: $dryrun, executionId: $executionId"
