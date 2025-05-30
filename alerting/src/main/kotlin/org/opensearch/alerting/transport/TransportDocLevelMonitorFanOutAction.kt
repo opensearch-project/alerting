@@ -212,6 +212,8 @@ class TransportDocLevelMonitorFanOutAction
         listener: ActionListener<DocLevelMonitorFanOutResponse>
     ) {
         try {
+            log.info("Starting fan_out for doc level monitor ${request.monitor.id}. ExecutionId: ${request.executionId}")
+            val startTime = System.currentTimeMillis()
             val endTime = Instant.now().plusMillis(docLevelMonitorFanoutMaxDuration.millis())
             val monitor = request.monitor
             var monitorResult = MonitorRunResult<DocumentLevelTriggerRunResult>(monitor.name, Instant.now(), Instant.now())
@@ -363,6 +365,11 @@ class TransportDocLevelMonitorFanOutAction
                     InputRunResults(listOf(inputRunResults)),
                     triggerResults
                 )
+            )
+            val completedTime = System.currentTimeMillis()
+            val fanoutDuration = completedTime - startTime
+            log.info(
+                "Completed fan_out for doc level monitor ${request.monitor.id} in $fanoutDuration ms. ExecutionId: ${request.executionId}"
             )
         } catch (e: Exception) {
             log.error(
