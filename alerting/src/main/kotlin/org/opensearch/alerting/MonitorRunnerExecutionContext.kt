@@ -59,10 +59,16 @@ data class MonitorRunnerExecutionContext(
     @Volatile var findingsIndexBatchSize: Int = AlertingSettings.DEFAULT_FINDINGS_INDEXING_BATCH_SIZE,
     @Volatile var fetchOnlyQueryFieldNames: Boolean = true,
     @Volatile var percQueryMaxNumDocsInMemory: Int = AlertingSettings.DEFAULT_PERCOLATE_QUERY_NUM_DOCS_IN_MEMORY,
+    @Volatile var docLevelMonitorFanoutMaxDuration: TimeValue = TimeValue.timeValueMinutes(
+        AlertingSettings.DEFAULT_MAX_DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION_MINUTES
+    ),
+    @Volatile var docLevelMonitorExecutionMaxDuration: TimeValue = TimeValue.timeValueMinutes(
+        AlertingSettings.DEFAULT_MAX_DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION_MINUTES
+    ),
     @Volatile var percQueryDocsSizeMemoryPercentageLimit: Int =
         AlertingSettings.DEFAULT_PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT,
     @Volatile var docLevelMonitorShardFetchSize: Int =
         AlertingSettings.DEFAULT_DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE,
     @Volatile var totalNodesFanOut: Int = AlertingSettings.DEFAULT_FAN_OUT_NODES,
-    @Volatile var lockService: LockService? = null
+    @Volatile var lockService: LockService? = null,
 )
