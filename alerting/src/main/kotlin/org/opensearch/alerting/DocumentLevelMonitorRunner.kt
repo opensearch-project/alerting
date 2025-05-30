@@ -38,6 +38,7 @@ import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.node.NodeClosedException
 import org.opensearch.transport.ActionNotFoundTransportException
 import org.opensearch.transport.ConnectTransportException
+import org.opensearch.transport.ReceiveTimeoutTransportException
 import org.opensearch.transport.RemoteTransportException
 import org.opensearch.transport.TransportException
 import org.opensearch.transport.TransportRequestOptions
@@ -295,12 +296,32 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                                     node.value,
                                     DocLevelMonitorFanOutAction.NAME,
                                     docLevelMonitorFanOutRequest,
-                                    TransportRequestOptions.EMPTY,
+                                    TransportRequestOptions
+                                        .builder()
+                                        .withTimeout(monitorCtx.docLevelMonitorExecutionMaxDuration)
+                                        .build(),
                                     object : ActionListenerResponseHandler<DocLevelMonitorFanOutResponse>(
                                         listener,
                                         responseReader
                                     ) {
                                         override fun handleException(e: TransportException) {
+                                            if (
+                                                e is ReceiveTimeoutTransportException
+                                            ) {
+                                                logger.warn(
+                                                    "fan_out timed out in node ${localNode.id} for doc level monitor ${monitor.id}," +
+                                                        " attempting to collect partial results from other nodes. ExecutionId: $executionId"
+                                                )
+                                                listener.onResponse(
+                                                    DocLevelMonitorFanOutResponse(
+                                                        localNode.id,
+                                                        executionId,
+                                                        monitor.id,
+                                                        mutableMapOf()
+                                                    )
+                                                )
+                                                return
+                                            }
                                             val cause = e.unwrapCause()
                                             if (cause is ConnectTransportException ||
                                                 (
@@ -318,7 +339,10 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                                                     localNode,
                                                     DocLevelMonitorFanOutAction.NAME,
                                                     docLevelMonitorFanOutRequest,
-                                                    TransportRequestOptions.EMPTY,
+                                                    TransportRequestOptions
+                                                        .builder()
+                                                        .withTimeout(monitorCtx.docLevelMonitorExecutionMaxDuration)
+                                                        .build(),
                                                     object :
                                                         ActionListenerResponseHandler<DocLevelMonitorFanOutResponse>(
                                                             listener,
