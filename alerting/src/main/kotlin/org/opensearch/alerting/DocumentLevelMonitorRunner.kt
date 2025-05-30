@@ -10,6 +10,7 @@ import org.opensearch.ExceptionsHelper
 import org.opensearch.Version
 import org.opensearch.action.ActionListenerResponseHandler
 import org.opensearch.action.support.GroupedActionListener
+import org.opensearch.alerting.listener.TimeOutWrappedListener
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.node.DiscoveryNode
@@ -36,6 +37,7 @@ import org.opensearch.core.rest.RestStatus
 import org.opensearch.index.IndexNotFoundException
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.node.NodeClosedException
+import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.ActionNotFoundTransportException
 import org.opensearch.transport.ConnectTransportException
 import org.opensearch.transport.RemoteTransportException
@@ -290,6 +292,27 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                                     concreteIndicesSeenSoFar,
                                     workflowRunContext
                                 )
+                                val timeout = monitorCtx.docLevelMonitorExecutionMaxDuration
+                                val timeoutWrappedListener = TimeOutWrappedListener.wrapScheduledTimeout(
+                                    threadPool = monitorCtx.threadPool!!,
+                                    timeout = timeout,
+                                    executor = ThreadPool.Names.SAME,
+                                    actionListener = listener,
+                                    timeoutConsumer = { timeoutListener ->
+                                        logger.error(
+                                            "Node ${node.key} timed out for doc level monitor id" +
+                                                " ${monitor.id} named ${monitor.name} in fanout after {${timeout.minutes}} minutes"
+                                        )
+                                        listener.onResponse(
+                                            DocLevelMonitorFanOutResponse(
+                                                nodeId = node.key,
+                                                executionId = executionId,
+                                                monitorId = monitor.id,
+                                                mutableMapOf()
+                                            )
+                                        )
+                                    }
+                                )
 
                                 transportService.sendRequest(
                                     node.value,
@@ -297,7 +320,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                                     docLevelMonitorFanOutRequest,
                                     TransportRequestOptions.EMPTY,
                                     object : ActionListenerResponseHandler<DocLevelMonitorFanOutResponse>(
-                                        listener,
+                                        timeoutWrappedListener,
                                         responseReader
                                     ) {
                                         override fun handleException(e: TransportException) {
@@ -321,12 +344,16 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                                                     TransportRequestOptions.EMPTY,
                                                     object :
                                                         ActionListenerResponseHandler<DocLevelMonitorFanOutResponse>(
-                                                            listener,
+                                                            timeoutWrappedListener,
                                                             responseReader
                                                         ) {
                                                         override fun handleException(e: TransportException) {
-                                                            logger.error("Fan out retry failed in node ${localNode.id}", e)
-                                                            listener.onResponse(
+                                                            logger.error(
+                                                                "Fan out retry failed in node ${localNode.id} " +
+                                                                    "for doc level monitor $monitor.id",
+                                                                e
+                                                            )
+                                                            timeoutWrappedListener.onResponse(
                                                                 DocLevelMonitorFanOutResponse(
                                                                     "",
                                                                     "",
@@ -342,13 +369,13 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                                                         }
 
                                                         override fun handleResponse(response: DocLevelMonitorFanOutResponse) {
-                                                            listener.onResponse(response)
+                                                            timeoutWrappedListener.onResponse(response)
                                                         }
                                                     }
                                                 )
                                             } else {
                                                 logger.error("Fan out failed in node ${node.key}", e)
-                                                listener.onResponse(
+                                                timeoutWrappedListener.onResponse(
                                                     DocLevelMonitorFanOutResponse(
                                                         "",
                                                         "",
@@ -365,7 +392,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                                         }
 
                                         override fun handleResponse(response: DocLevelMonitorFanOutResponse) {
-                                            listener.onResponse(response)
+                                            timeoutWrappedListener.onResponse(response)
                                         }
                                     }
                                 )
