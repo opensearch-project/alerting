@@ -614,9 +614,7 @@ class TransportDocLevelMonitorFanOutAction
 
         if (monitor.shouldCreateSingleAlertForFindings == null || monitor.shouldCreateSingleAlertForFindings == false) {
             try {
-                findings.forEach { finding ->
-                    publishFinding(monitor, finding)
-                }
+                publishFindings(monitor, findings)
             } catch (e: Exception) {
                 // suppress exception
                 log.error("Optional finding callback failed", e)
@@ -648,9 +646,9 @@ class TransportDocLevelMonitorFanOutAction
         client.execute(RefreshAction.INSTANCE, RefreshRequest(monitor.dataSources.findingsIndex))
     }
 
-    private fun publishFinding(
+    private fun publishFindings(
         monitor: Monitor,
-        finding: Finding
+        finding: List<Finding>
     ) {
         val publishFindingsRequest = PublishFindingsRequest(monitor.id, finding)
         AlertingPluginInterface.publishFinding(
