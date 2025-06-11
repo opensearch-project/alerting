@@ -74,6 +74,7 @@ import org.opensearch.commons.alerting.AlertingPluginInterface
 import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutAction
 import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutRequest
 import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutResponse
+import org.opensearch.commons.alerting.action.PublishBatchFindingsRequest
 import org.opensearch.commons.alerting.action.PublishFindingsRequest
 import org.opensearch.commons.alerting.action.SubscribeFindingsResponse
 import org.opensearch.commons.alerting.model.ActionExecutionResult
@@ -614,7 +615,7 @@ class TransportDocLevelMonitorFanOutAction
 
         if (monitor.shouldCreateSingleAlertForFindings == null || monitor.shouldCreateSingleAlertForFindings == false) {
             try {
-                publishFindings(monitor, findings)
+                publishBatchFindings(monitor, findings)
             } catch (e: Exception) {
                 // suppress exception
                 log.error("Optional finding callback failed", e)
@@ -648,12 +649,28 @@ class TransportDocLevelMonitorFanOutAction
 
     private fun publishFindings(
         monitor: Monitor,
-        finding: List<Finding>
+        finding: Finding
     ) {
         val publishFindingsRequest = PublishFindingsRequest(monitor.id, finding)
         AlertingPluginInterface.publishFinding(
             client as NodeClient,
             publishFindingsRequest,
+            object : ActionListener<SubscribeFindingsResponse> {
+                override fun onResponse(response: SubscribeFindingsResponse) {}
+
+                override fun onFailure(e: Exception) {}
+            }
+        )
+    }
+
+    private fun publishBatchFindings(
+        monitor: Monitor,
+        findings: List<Finding>
+    ) {
+        val publishBatchFindingsRequest = PublishBatchFindingsRequest(monitor.id, findings)
+        AlertingPluginInterface.publishBatchFindings(
+            client as NodeClient,
+            publishBatchFindingsRequest,
             object : ActionListener<SubscribeFindingsResponse> {
                 override fun onResponse(response: SubscribeFindingsResponse) {}
 
