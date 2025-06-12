@@ -672,9 +672,13 @@ class TransportDocLevelMonitorFanOutAction
             client as NodeClient,
             publishBatchFindingsRequest,
             object : ActionListener<SubscribeFindingsResponse> {
-                override fun onResponse(response: SubscribeFindingsResponse) {}
+                override fun onResponse(response: SubscribeFindingsResponse) {
+                    log.info("findings published successfully")
+                }
 
-                override fun onFailure(e: Exception) {}
+                override fun onFailure(e: Exception) {
+                    log.error("findings published failed due to {}", e.message)
+                }
             }
         )
     }
