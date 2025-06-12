@@ -668,6 +668,7 @@ class TransportDocLevelMonitorFanOutAction
         findings: List<Finding>
     ) {
         val publishBatchFindingsRequest = PublishBatchFindingsRequest(monitor.id, findings)
+        log.debug("publishing {} findings from node {}", findings.size, clusterService.localNode().id)
         AlertingPluginInterface.publishBatchFindings(
             client as NodeClient,
             publishBatchFindingsRequest,
@@ -677,7 +678,7 @@ class TransportDocLevelMonitorFanOutAction
                 }
 
                 override fun onFailure(e: Exception) {
-                    log.error("findings published failed due to {}", e.message)
+                    log.error("publishing findings failed", e)
                 }
             }
         )
