@@ -647,7 +647,7 @@ class TransportDocLevelMonitorFanOutAction
         client.execute(RefreshAction.INSTANCE, RefreshRequest(monitor.dataSources.findingsIndex))
     }
 
-    private fun publishFindings(
+    private fun publishFinding(
         monitor: Monitor,
         finding: Finding
     ) {
@@ -673,7 +673,7 @@ class TransportDocLevelMonitorFanOutAction
             publishBatchFindingsRequest,
             object : ActionListener<SubscribeFindingsResponse> {
                 override fun onResponse(response: SubscribeFindingsResponse) {
-                    log.info("findings published successfully")
+                    log.debug("findings published successfully")
                 }
 
                 override fun onFailure(e: Exception) {
