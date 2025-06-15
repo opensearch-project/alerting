@@ -149,7 +149,9 @@ class TransportGetMonitorAction @Inject constructor(
                     }
 
                     override fun onFailure(t: Exception) {
-                        actionListener.onFailure(AlertingException.wrap(t))
+                        actionListener.onFailure(
+                            AlertingException.wrap(OpenSearchStatusException("Monitor not found.", RestStatus.NOT_FOUND))
+                        )
                     }
                 }
             )
