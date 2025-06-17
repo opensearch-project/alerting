@@ -1,6 +1,9 @@
 ## Version 3.1.0.0 2025-06-17
 Compatible with OpenSearch 3.1.0
 
+### Maintenance
+* [AUTO] Increment version to 3.1.0-SNAPSHOT ([#1837](https://github.com/opensearch-project/alerting/pull/1837))
+
 ### Bug Fixes
 * Timebox doc level monitor execution ([#1850](https://github.com/opensearch-project/alerting/pull/1850))
 * Prevent dry run execution of doc level monitor with index pattern ([#1854](https://github.com/opensearch-project/alerting/pull/1854))
