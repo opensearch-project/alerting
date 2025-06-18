@@ -41,9 +41,11 @@ import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.index.IndexNotFoundException
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
+import org.opensearch.transport.RemoteTransportException
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 
@@ -148,14 +150,36 @@ class TransportGetMonitorAction @Inject constructor(
                         }
                     }
 
-                    override fun onFailure(t: Exception) {
-                        actionListener.onFailure(
-                            AlertingException.wrap(OpenSearchStatusException("Monitor not found.", RestStatus.NOT_FOUND))
-                        )
+                    override fun onFailure(ex: Exception) {
+                        if (isIndexNotFoundException(ex)) {
+                            log.error("Index not found while getting monitor", ex)
+                            actionListener.onFailure(
+                                AlertingException.wrap(
+                                    OpenSearchStatusException("Monitor not found. Backing index is missing.", RestStatus.NOT_FOUND, ex)
+                                )
+                            )
+                        } else {
+                            log.error("Unexpected error while getting monitor", ex)
+                            actionListener.onFailure(AlertingException.wrap(ex))
+                        }
                     }
                 }
             )
         }
+    }
+
+    // Checks if the exception is caused by an IndexNotFoundException (directly or nested).
+    private fun isIndexNotFoundException(e: Exception): Boolean {
+        if (e is IndexNotFoundException) {
+            return true
+        }
+        if (e is RemoteTransportException) {
+            val cause = e.cause
+            if (cause is IndexNotFoundException) {
+                return true
+            }
+        }
+        return false
     }
 
     private suspend fun getAssociatedWorkflows(id: String): List<AssociatedWorkflow> {
