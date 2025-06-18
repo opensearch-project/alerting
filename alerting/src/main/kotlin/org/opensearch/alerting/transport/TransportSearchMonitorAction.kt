@@ -6,10 +6,13 @@
 package org.opensearch.alerting.transport
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.OpenSearchStatusException
+import org.apache.lucene.search.TotalHits
+import org.apache.lucene.search.TotalHits.Relation
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
+import org.opensearch.action.search.SearchResponse.Clusters
+import org.opensearch.action.search.ShardSearchFailure
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.opensearchapi.addFilter
@@ -28,14 +31,21 @@ import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry
-import org.opensearch.core.rest.RestStatus
+import org.opensearch.index.IndexNotFoundException
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.ExistsQueryBuilder
 import org.opensearch.index.query.MatchQueryBuilder
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.search.SearchHits
+import org.opensearch.search.aggregations.InternalAggregations
+import org.opensearch.search.internal.InternalSearchResponse
+import org.opensearch.search.profile.SearchProfileShardResults
+import org.opensearch.search.suggest.Suggest
 import org.opensearch.tasks.Task
+import org.opensearch.transport.RemoteTransportException
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
+import java.util.Collections
 
 private val log = LogManager.getLogger(TransportSearchMonitorAction::class.java)
 
@@ -102,6 +112,39 @@ class TransportSearchMonitorAction @Inject constructor(
         }
     }
 
+    fun getEmptySearchResponse(): SearchResponse {
+        val internalSearchResponse = InternalSearchResponse(
+            SearchHits(emptyArray(), TotalHits(0L, Relation.EQUAL_TO), 0.0f),
+            InternalAggregations.from(Collections.emptyList()),
+            Suggest(Collections.emptyList()),
+            SearchProfileShardResults(Collections.emptyMap()),
+            false,
+            false,
+            0
+        )
+
+        return SearchResponse(
+            internalSearchResponse,
+            "",
+            0,
+            0,
+            0,
+            0,
+            ShardSearchFailure.EMPTY_ARRAY,
+            SearchResponse.Clusters.EMPTY
+        )
+    }
+
+    // Checks if the exception is caused by an IndexNotFoundException (directly or nested).
+    private fun isIndexNotFoundException(e: Exception): Boolean {
+        if (e is IndexNotFoundException) return true
+        if (e is RemoteTransportException) {
+            val cause = e.cause
+            if (cause is IndexNotFoundException) return true
+        }
+        return false
+    }
+
     fun search(searchRequest: SearchRequest, actionListener: ActionListener<SearchResponse>) {
         client.search(
             searchRequest,
@@ -110,10 +153,15 @@ class TransportSearchMonitorAction @Inject constructor(
                     actionListener.onResponse(response)
                 }
 
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(
-                        AlertingException.wrap(OpenSearchStatusException("Monitor not found.", RestStatus.NOT_FOUND))
-                    )
+                override fun onFailure(ex: Exception) {
+                    if (isIndexNotFoundException(ex)) {
+                        log.error("Index not found while searching monitor", ex)
+                        val emptyResponse = getEmptySearchResponse()
+                        actionListener.onResponse(emptyResponse)
+                    } else {
+                        log.error("Unexpected error while searching monitor", ex)
+                        actionListener.onFailure(AlertingException.wrap(ex))
+                    }
                 }
             }
         )
