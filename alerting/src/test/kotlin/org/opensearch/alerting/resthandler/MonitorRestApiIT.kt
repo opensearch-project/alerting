@@ -396,6 +396,31 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
+    fun `test get monitor returns 404 when alerting config index is missing`() {
+        try {
+            deleteIndex(".opendistro-alerting-config")
+        } catch (e: ResponseException) {
+            if (e.response.restStatus() != RestStatus.NOT_FOUND) {
+                throw e
+            }
+        }
+        val fakeMonitorId = "nonexistent-monitor-id"
+        try {
+            client().makeRequest("GET", "$ALERTING_BASE_URI/$fakeMonitorId")
+            fail("Expected 404 when config index is missing")
+        } catch (e: ResponseException) {
+            val errorMessage = e.message ?: ""
+            assertTrue(
+                "Error message should indicate missing monitor or index",
+                errorMessage.contains("Monitor not found") ||
+                    errorMessage.contains("index not found") ||
+                    errorMessage.contains("no such index") ||
+                    errorMessage.contains("Configured indices are not found")
+            )
+        }
+    }
+
+    @Throws(Exception::class)
     fun `test checking if a monitor exists`() {
         val monitor = createRandomMonitor()
 
@@ -499,6 +524,65 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
         val numberDocsFound = hits["total"]?.get("value")
         assertEquals("Monitor found during search when no document present.", 0, numberDocsFound)
+    }
+
+    @Throws(Exception::class)
+    fun `test search monitor returns empty response when index is missing`() {
+        try {
+            deleteIndex(".opendistro-alerting-config")
+        } catch (e: ResponseException) {
+            if (e.response.restStatus() != RestStatus.NOT_FOUND) {
+                throw e
+            }
+        }
+        val searchBody = """
+            {
+                "query": {
+                    "match_all": {}
+                }
+            }
+        """.trimIndent()
+        val response = client().makeRequest(
+            "POST",
+            "$ALERTING_BASE_URI/_search",
+            emptyMap(),
+            StringEntity(searchBody, ContentType.APPLICATION_JSON)
+        )
+        val responseBody = response.asMap()
+        val total = ((responseBody["hits"] as? Map<*, *>)?.get("total") as? Map<*, *>)?.get("value") as? Int ?: 0
+        assertEquals("Expected no search results when config index is missing", 0, total)
+    }
+
+    @Throws(Exception::class)
+    fun `test search monitor fails with unexpected error`() {
+        val invalidSearchBody = """
+            {
+                "query": {
+                    "bad_query_type": {}
+                }
+            }
+        """.trimIndent()
+        try {
+            client().makeRequest(
+                "POST",
+                "$ALERTING_BASE_URI/_search",
+                emptyMap(),
+                StringEntity(invalidSearchBody, ContentType.APPLICATION_JSON)
+            )
+            fail("Expected failure due to bad query")
+        } catch (e: ResponseException) {
+            val responseBody = e.response.entity.content.bufferedReader().use { it.readText() }
+            assertTrue(
+                "Should receive an error from unexpected query type",
+                e.response.restStatus() === RestStatus.BAD_REQUEST ||
+                    e.response.restStatus() === RestStatus.INTERNAL_SERVER_ERROR
+            )
+            assertTrue(
+                "Response body should indicate query parsing error",
+                responseBody.contains("parsing_exception") ||
+                    responseBody.contains("failed to parse")
+            )
+        }
     }
 
     fun `test query a monitor with UI metadata from OpenSearch Dashboards`() {
