@@ -141,7 +141,7 @@ class TransportDocLevelMonitorFanOutAction
     val alertService: AlertService,
     val scriptService: ScriptService,
     val settings: Settings,
-    val xContentRegistry: NamedXContentRegistry
+    val xContentRegistry: NamedXContentRegistry,
 ) : HandledTransportAction<DocLevelMonitorFanOutRequest, DocLevelMonitorFanOutResponse>(
     DocLevelMonitorFanOutAction.NAME, transportService, actionFilters, ::DocLevelMonitorFanOutRequest
 ),
@@ -773,7 +773,7 @@ class TransportDocLevelMonitorFanOutAction
         fieldsToBeQueried: List<String>,
         shardList: List<Int>,
         transformedDocs: MutableList<Pair<String, TransformedDocDto>>,
-        updateLastRunContext: (String, String) -> Unit
+        updateLastRunContext: (String, Long) -> Unit
     ) {
         for (shardId in shardList) {
             val shard = shardId.toString()
@@ -799,7 +799,7 @@ class TransportDocLevelMonitorFanOutAction
 
                 if (maxSeqNo == null || maxSeqNo <= from) {
                     // No new documents to process
-                    updateLastRunContext(shard, (prevSeqNo ?: SequenceNumbers.NO_OPS_PERFORMED).toString())
+                    updateLastRunContext(shard, (prevSeqNo ?: SequenceNumbers.NO_OPS_PERFORMED))
                     continue
                 }
                 // Process documents in chunks between prevSeqNo and maxSeqNo
@@ -873,7 +873,7 @@ class TransportDocLevelMonitorFanOutAction
                     // Move to next chunk - use the last document's sequence number
                     currentSeqNo = hits.hits.last().seqNo
                     // update last seen sequence number after every set of seen docs
-                    updateLastRunContext(shard, currentSeqNo.toString())
+                    updateLastRunContext(shard, currentSeqNo)
                 }
             } catch (e: Exception) {
                 log.error(
