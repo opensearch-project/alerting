@@ -216,8 +216,15 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                         // update lastRunContext if its a temp monitor as we only want to view the last bit of data then
                         // TODO: If dryrun, we should make it so we limit the search as this could still potentially give us lots of data
                         if (isTempMonitor) {
-                            indexLastRunContext[shard] =
-                                max(-1, (indexUpdatedRunContext[shard] as String).toInt() - 10)
+                            indexLastRunContext[shard] = if (indexLastRunContext.containsKey(shard)) {
+                                if (indexLastRunContext[shard] is Long) {
+                                    max(-1L, indexUpdatedRunContext[shard] as Long - 10L)
+                                } else if (indexLastRunContext[shard] is Int) {
+                                    max(-1L, (indexUpdatedRunContext[shard] as Int).toLong() - 10L)
+                                } else -1L
+                            } else {
+                                -1L
+                            }
                         }
                     }
                     val indexExecutionContext = IndexExecutionContext(
@@ -420,7 +427,9 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             return monitorResult.copy(triggerResults = triggerResults, inputResults = inputRunResults)
         } catch (e: Exception) {
             val errorMessage = ExceptionsHelper.detailedMessage(e)
-            monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor, errorMessage, executionId, workflowRunContext)
+            if (false == dryrun) {
+                monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor, errorMessage, executionId, workflowRunContext)
+            }
             logger.error("Failed running Document-level-monitor ${monitor.name}", e)
             val alertingException = AlertingException(
                 errorMessage,
@@ -454,7 +463,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                     if (fanOutResponse.lastRunContexts.contains("index") && fanOutResponse.lastRunContexts["index"] == indexName) {
                         fanOutResponse.lastRunContexts.keys.forEach {
 
-                            val seq_no = fanOutResponse.lastRunContexts[it].toString().toIntOrNull()
+                            val seq_no = fanOutResponse.lastRunContexts[it].toString().toLongOrNull()
                             if (
                                 it != "shards_count" &&
                                 it != "index" &&

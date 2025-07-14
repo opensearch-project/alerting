@@ -269,12 +269,12 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
                     if (fanOutResponse.lastRunContexts.contains(indexName)) {
                         (fanOutResponse.lastRunContexts[indexName] as Map<String, Any>).forEach {
 
-                            val seq_no = it.value.toString().toIntOrNull()
+                            val seq_no = it.value.toString().toLongOrNull()
                             if (
                                 it.key != "shards_count" &&
                                 it.key != "index" &&
                                 seq_no != null &&
-                                seq_no >= 0
+                                seq_no >= 0L
                             ) {
                                 indexLastRunContext[it.key] = seq_no
                             }
