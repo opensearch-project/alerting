@@ -595,7 +595,7 @@ class TransportDocLevelMonitorFanOutAction
             val findingStr =
                 finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS)
                     .string()
-            log.debug("Findings: $findingStr")
+            log.trace("Findings: $findingStr")
 
             if (shouldCreateFinding and (
                 monitor.shouldCreateSingleAlertForFindings == null ||
@@ -1267,13 +1267,17 @@ class TransportDocLevelMonitorFanOutAction
         findingIdToDocSource: MutableMap<String, MultiGetItemResponse>
     ) {
         val docFieldTags = parseSampleDocTags(monitor.triggers)
-        val request = MultiGetRequest()
 
         // Perform mGet request in batches.
         findingToDocPairs.chunked(findingsIndexBatchSize).forEach { batch ->
+            val request = MultiGetRequest()
+            val docIdToFindingId = mutableMapOf<String, String>()
+
             batch.forEach { (findingId, docIdAndIndex) ->
                 val docIdAndIndexSplit = docIdAndIndex.split("|")
                 val docId = docIdAndIndexSplit[0]
+                docIdToFindingId[docId] = findingId
+
                 val concreteIndex = docIdAndIndexSplit[1]
                 if (findingId.isNotEmpty() && docId.isNotEmpty() && concreteIndex.isNotEmpty()) {
                     val docItem = MultiGetRequest.Item(concreteIndex, docId)
@@ -1281,9 +1285,20 @@ class TransportDocLevelMonitorFanOutAction
                         docItem.fetchSourceContext(FetchSourceContext(true, docFieldTags.toTypedArray(), emptyArray()))
                     request.add(docItem)
                 }
-                val response = client.suspendUntil { client.multiGet(request, it) }
-                response.responses.forEach { item ->
+            }
+
+            val startMget = System.currentTimeMillis()
+            val response = client.suspendUntil { client.multiGet(request, it) }
+            val mgetDuration = System.currentTimeMillis() - startMget
+            log.debug(
+                "DocLevelMonitor ${monitor.id} mget retrieved [${response.responses.size}] documents. Took: ${mgetDuration}ms"
+            )
+            response.responses.forEach { item ->
+                val findingId = docIdToFindingId[item.id]
+                if (findingId != null) {
                     findingIdToDocSource[findingId] = item
+                } else {
+                    log.error("Unable to find finding ID for document with ID [${item.id}] for monitor [${monitor.id}]")
                 }
             }
         }
