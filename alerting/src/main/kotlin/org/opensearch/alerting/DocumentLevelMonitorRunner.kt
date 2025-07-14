@@ -33,7 +33,6 @@ import org.opensearch.core.common.breaker.CircuitBreakingException
 import org.opensearch.core.common.io.stream.Writeable
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.index.IndexNotFoundException
-import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.node.NodeClosedException
 import org.opensearch.transport.ActionNotFoundTransportException
 import org.opensearch.transport.ConnectTransportException
@@ -188,12 +187,12 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                         )
                         MonitorMetadataService.createRunContextForIndex(concreteIndexName, isIndexCreatedRecently)
                     }
-
+                    val shardCount: Int = getShardsCount(monitorCtx.clusterService!!, concreteIndexName)
                     // Prepare updatedLastRunContext for each index
                     val indexUpdatedRunContext = initializeNewLastRunContext(
                         indexLastRunContext.toMutableMap(),
-                        monitorCtx,
                         concreteIndexName,
+                        shardCount
                     ) as MutableMap<String, Any>
                     if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
                         IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
@@ -558,20 +557,6 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             }
         }
         return InputRunResults(listOf(inputRunResults), if (!errors.isEmpty()) AlertingException.merge(*errors.toTypedArray()) else null)
-    }
-
-    private fun initializeNewLastRunContext(
-        lastRunContext: Map<String, Any>,
-        monitorCtx: MonitorRunnerExecutionContext,
-        index: String,
-    ): Map<String, Any> {
-        val count: Int = getShardsCount(monitorCtx.clusterService!!, index)
-        val updatedLastRunContext = lastRunContext.toMutableMap()
-        for (i: Int in 0 until count) {
-            val shard = i.toString()
-            updatedLastRunContext[shard] = SequenceNumbers.UNASSIGNED_SEQ_NO.toString()
-        }
-        return updatedLastRunContext
     }
 
     private fun validate(monitor: Monitor) {
