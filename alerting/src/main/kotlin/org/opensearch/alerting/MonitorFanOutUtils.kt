@@ -6,8 +6,6 @@ package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
-import org.opensearch.Version
-import org.opensearch.cluster.node.DiscoveryNode
 import org.opensearch.core.index.Index
 import org.opensearch.core.index.shard.ShardId
 

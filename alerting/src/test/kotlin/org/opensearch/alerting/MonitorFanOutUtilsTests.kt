@@ -4,8 +4,6 @@
  */
 package org.opensearch.alerting
 
-import org.opensearch.Version
-import org.opensearch.core.index.Index
 import org.opensearch.core.index.shard.ShardId
 import org.opensearch.test.OpenSearchTestCase
 
