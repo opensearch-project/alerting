@@ -1,5 +1,6 @@
 package org.opensearch.alerting
 
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope
 import org.junit.Assert
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.common.unit.TimeValue
@@ -11,6 +12,7 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit.MILLIS
 
+@ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 class DocLeveFanOutIT : AlertingRestTestCase() {
 
     fun `test execution reaches endtime before completing execution`() {

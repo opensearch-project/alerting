@@ -67,7 +67,7 @@ fun initializeNewLastRunContext(
         val shard = i.toString()
         // Preserve existing sequence numbers instead of resetting to UNASSIGNED
         if (!updatedLastRunContext.containsKey(shard)) {
-            updatedLastRunContext[shard] = SequenceNumbers.UNASSIGNED_SEQ_NO.toString()
+            updatedLastRunContext[shard] = SequenceNumbers.UNASSIGNED_SEQ_NO
         }
     }
 
