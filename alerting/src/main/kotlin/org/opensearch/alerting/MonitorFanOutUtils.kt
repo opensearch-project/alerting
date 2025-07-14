@@ -8,6 +8,7 @@ import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import org.opensearch.core.index.Index
 import org.opensearch.core.index.shard.ShardId
+import org.opensearch.index.seqno.SequenceNumbers
 
 private val logger: Logger = LogManager.getLogger("FanOutEligibility")
 
@@ -41,4 +42,38 @@ fun distributeShards(
     }
 
     return nodeShardAssignments
+}
+
+/**
+ * Initializes the last run context for a given index.
+ *
+ * This method prepares the context structure to be updated later by fan-out operations.
+ * It preserves existing sequence numbers and initializes new shards with UNASSIGNED_SEQ_NO.
+ *
+ * @param lastRunContext The previous run context from monitor metadata
+ * @param monitorCtx The execution context containing cluster service
+ * @param index The name of the index for which the context is being initialized
+ * @return A map containing the initialized last run context
+ */
+fun initializeNewLastRunContext(
+    lastRunContext: Map<String, Any>,
+    index: String,
+    shardCount: Int,
+): Map<String, Any> {
+    val updatedLastRunContext = lastRunContext.toMutableMap()
+
+    // Only initialize shards that don't already have a sequence number
+    for (i: Int in 0 until shardCount) {
+        val shard = i.toString()
+        // Preserve existing sequence numbers instead of resetting to UNASSIGNED
+        if (!updatedLastRunContext.containsKey(shard)) {
+            updatedLastRunContext[shard] = SequenceNumbers.UNASSIGNED_SEQ_NO.toString()
+        }
+    }
+
+    // Metadata fields
+    updatedLastRunContext["shards_count"] = shardCount
+    updatedLastRunContext["index"] = index
+
+    return updatedLastRunContext
 }
