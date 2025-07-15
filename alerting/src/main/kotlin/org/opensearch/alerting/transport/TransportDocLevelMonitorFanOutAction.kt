@@ -74,7 +74,6 @@ import org.opensearch.commons.alerting.AlertingPluginInterface
 import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutAction
 import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutRequest
 import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutResponse
-import org.opensearch.commons.alerting.action.PublishBatchFindingsRequest
 import org.opensearch.commons.alerting.action.PublishFindingsRequest
 import org.opensearch.commons.alerting.action.SubscribeFindingsResponse
 import org.opensearch.commons.alerting.model.ActionExecutionResult
@@ -615,7 +614,9 @@ class TransportDocLevelMonitorFanOutAction
 
         if (monitor.shouldCreateSingleAlertForFindings == null || monitor.shouldCreateSingleAlertForFindings == false) {
             try {
-                publishBatchFindings(monitor, findings)
+                findings.forEach { finding ->
+                    publishFinding(monitor, finding)
+                }
             } catch (e: Exception) {
                 // suppress exception
                 log.error("Optional finding callback failed", e)
@@ -659,27 +660,6 @@ class TransportDocLevelMonitorFanOutAction
                 override fun onResponse(response: SubscribeFindingsResponse) {}
 
                 override fun onFailure(e: Exception) {}
-            }
-        )
-    }
-
-    private fun publishBatchFindings(
-        monitor: Monitor,
-        findings: List<Finding>
-    ) {
-        val publishBatchFindingsRequest = PublishBatchFindingsRequest(monitor.id, findings)
-        log.debug("publishing {} findings from node {}", findings.size, clusterService.localNode().id)
-        AlertingPluginInterface.publishBatchFindings(
-            client as NodeClient,
-            publishBatchFindingsRequest,
-            object : ActionListener<SubscribeFindingsResponse> {
-                override fun onResponse(response: SubscribeFindingsResponse) {
-                    log.debug("findings published successfully")
-                }
-
-                override fun onFailure(e: Exception) {
-                    log.error("publishing findings failed", e)
-                }
             }
         )
     }
