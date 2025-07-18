@@ -105,8 +105,6 @@ configurations.all {
         force "commons-logging:commons-logging:${versions.commonslogging}"
         // force the version until OpenSearch upgrade to an invulnerable one, https://www.whitesourcesoftware.com/vulnerability-database/WS-2019-0379
         force "commons-codec:commons-codec:1.13"
-        // force commons-beanutils to a non-vulnerable version
-        force "commons-beanutils:commons-beanutils:1.11.0"
 
         force "org.slf4j:slf4j-api:${versions.slf4j}" //Needed for http5
         
