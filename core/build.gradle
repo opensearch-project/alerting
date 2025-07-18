@@ -7,6 +7,15 @@ apply plugin: 'java'
 apply plugin: 'org.jetbrains.kotlin.jvm'
 apply plugin: 'jacoco'
 
+configurations{
+    all {
+        resolutionStrategy {
+            // force commons-beanutils to a non-vulnerable version
+            force "commons-beanutils:commons-beanutils:1.11.0"
+        }
+    }
+}
+
 dependencies {
     compileOnly "org.opensearch:opensearch:${opensearch_version}"
     implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
