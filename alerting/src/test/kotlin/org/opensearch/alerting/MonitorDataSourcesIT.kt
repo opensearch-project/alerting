@@ -117,18 +117,18 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         searchAlerts(id)
         val table = Table("asc", "id", null, 1, 0, "")
         var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", null, null))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 0)
         getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, null))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", id, null))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 0)
         try {
             client()
-                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, "wrong_alert_index"))
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", null, "wrong_alert_index"))
                 .get()
             fail()
         } catch (e: Exception) {
@@ -164,12 +164,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals("Alert saved for test monitor", 1, alerts.size)
         val table = Table("asc", "id", null, 1, 0, "")
         var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, customAlertsIndex))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", null, customAlertsIndex))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, null))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", id, null))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
@@ -301,7 +301,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         searchAlerts(id)
         val table = Table("asc", "id", null, 1, 0, "")
         var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", null, null))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
@@ -344,7 +344,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         searchAlerts(id)
         var table = Table("asc", "id", null, 1, 0, "")
         var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", null, null))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.isEmpty())
@@ -357,7 +357,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         searchAlerts(id)
         table = Table("asc", "id", null, 1, 0, "")
         getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", null, null))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.isEmpty())
@@ -629,7 +629,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         searchAlerts(id)
         val table = Table("asc", "id", null, 1, 0, "")
         var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", null, null))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
@@ -741,7 +741,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         searchAlerts(id)
         val table = Table("asc", "id", null, 1, 0, "")
         var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", null, null))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
@@ -801,7 +801,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         searchAlerts(id)
         val table = Table("asc", "id", null, 1, 0, "")
         var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", null, null))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
@@ -841,7 +841,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         searchAlerts(id)
         var table = Table("asc", "id", null, 1, 0, "")
         var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", null, null))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
@@ -862,7 +862,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         searchAlerts(id)
         table = Table("asc", "id", null, 10, 0, "")
         getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", null, null))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
@@ -897,7 +897,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         searchAlerts(id)
         var table = Table("asc", "id", null, 1, 0, "")
         var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", null, null))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
@@ -911,7 +911,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         searchAlerts(id)
         table = Table("asc", "id", null, 10, 0, "")
         getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", null, null))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
@@ -954,7 +954,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         searchAlerts(id)
         var table = Table("asc", "id", null, 1, 0, "")
         var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, customAlertIndex))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", id, customAlertIndex))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertEquals(1, getAlertsResponse.alerts.size)
@@ -973,14 +973,14 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         // Verify that alert is moved to history index
         table = Table("asc", "id", null, 10, 0, "")
         getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, customAlertIndex))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", id, customAlertIndex))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertEquals(0, getAlertsResponse.alerts.size)
 
         table = Table("asc", "id", null, 10, 0, "")
         getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, customAlertHistoryIndex))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", id, customAlertHistoryIndex))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertEquals(1, getAlertsResponse.alerts.size)
@@ -1044,7 +1044,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         }
         var table = Table("asc", "id", null, 1000, 0, "")
         var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, customAlertIndex))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", monitorId, customAlertIndex))
             .get()
 
         Assert.assertTrue(getAlertsResponse != null)
@@ -1065,14 +1065,14 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         // Verify that alert is moved to history index
         table = Table("asc", "id", null, 1000, 0, "")
         getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, customAlertIndex))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", monitorId, customAlertIndex))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertEquals(0, getAlertsResponse.alerts.size)
 
         table = Table("asc", "id", null, 1000, 0, "")
         getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, customAlertHistoryIndex))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", monitorId, customAlertHistoryIndex))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertEquals(11, getAlertsResponse.alerts.size)
@@ -1144,7 +1144,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         searchAlerts(id)
         val table = Table("asc", "id", null, 1, 0, "")
         var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", null, null))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
@@ -1669,12 +1669,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals("Alert saved for test monitor", 1, customAlertsIndexAlerts.size)
         val table = Table("asc", "id", null, 1, 0, "")
         var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, customAlertsIndex))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", null, customAlertsIndex))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, null))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", monitorId, null))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
@@ -1931,12 +1931,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals("Alert saved for test monitor", 1, alerts.size)
         val table = Table("asc", "id", null, 1, 0, "")
         var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, customAlertsIndex))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", null, customAlertsIndex))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, null))
+            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, null, "ALL", "ALL", id, null))
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
@@ -2139,7 +2139,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         var getAlertsResponse = client()
             .execute(
                 AlertingActions.GET_ALERTS_ACTION_TYPE,
-                GetAlertsRequest(table, "ALL", "ALL", null, null)
+                GetAlertsRequest(table, null, "ALL", "ALL", null, null)
             )
             .get()
 
@@ -2149,7 +2149,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         var alertsResponseForRequestWithoutCustomIndex = client()
             .execute(
                 AlertingActions.GET_ALERTS_ACTION_TYPE,
-                GetAlertsRequest(table, "ALL", "ALL", null, null, monitorIds = listOf(id, id1, "1", "2"))
+                GetAlertsRequest(table, null, "ALL", "ALL", null, null, monitorIds = listOf(id, id1, "1", "2"))
             )
             .get()
         Assert.assertTrue(alertsResponseForRequestWithoutCustomIndex != null)
@@ -2158,7 +2158,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         var getAlertsByAlertIds = client()
             .execute(
                 AlertingActions.GET_ALERTS_ACTION_TYPE,
-                GetAlertsRequest(table, "ALL", "ALL", null, null, alertIds = alertIds)
+                GetAlertsRequest(table, null, "ALL", "ALL", null, null, alertIds = alertIds)
             )
             .get()
         Assert.assertTrue(getAlertsByAlertIds != null)
@@ -2167,7 +2167,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         var getAlertsByWrongAlertIds = client()
             .execute(
                 AlertingActions.GET_ALERTS_ACTION_TYPE,
-                GetAlertsRequest(table, "ALL", "ALL", null, null, alertIds = listOf("1", "2"))
+                GetAlertsRequest(table, null, "ALL", "ALL", null, null, alertIds = listOf("1", "2"))
             )
             .get()
 
@@ -2854,7 +2854,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             .execute(
                 AlertingActions.GET_ALERTS_ACTION_TYPE,
                 GetAlertsRequest(
-                    table, "ALL", "ALL", monitorId, customAlertsIndex,
+                    table, null, "ALL", "ALL", monitorId, customAlertsIndex,
                     workflowIds = listOf(workflowId)
                 )
             )
@@ -4076,7 +4076,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         var getAlertsResponse = client()
             .execute(
                 AlertingActions.GET_ALERTS_ACTION_TYPE,
-                GetAlertsRequest(table, "ALL", "ALL", null, alertsIndex)
+                GetAlertsRequest(table, null, "ALL", "ALL", null, alertsIndex)
             )
             .get()
         assertTrue(getAlertsResponse != null)
@@ -4084,7 +4084,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         getAlertsResponse = client()
             .execute(
                 AlertingActions.GET_ALERTS_ACTION_TYPE,
-                GetAlertsRequest(table, "ALL", "ALL", monitorId, null, workflowIds = listOf(workflowId))
+                GetAlertsRequest(table, null, "ALL", "ALL", monitorId, null, workflowIds = listOf(workflowId))
             )
             .get()
         assertTrue(getAlertsResponse != null)
@@ -4455,6 +4455,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             AlertingActions.GET_ALERTS_ACTION_TYPE,
             GetAlertsRequest(
                 table = table,
+                findingIds = null,
                 severityLevel = "ALL",
                 alertState = "ALL",
                 monitorId = null,
@@ -4512,6 +4513,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             AlertingActions.GET_ALERTS_ACTION_TYPE,
             GetAlertsRequest(
                 table = table,
+                findingIds = null,
                 severityLevel = "ALL",
                 alertState = "AUDIT",
                 monitorId = monitorResponse.id,
