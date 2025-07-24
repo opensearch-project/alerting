@@ -69,6 +69,10 @@
     },
     "execution_id": {
       "type": "keyword"
+    },
+    "additional_fields": {
+      "type": "object",
+      "enabled": false
     }
   }
 }

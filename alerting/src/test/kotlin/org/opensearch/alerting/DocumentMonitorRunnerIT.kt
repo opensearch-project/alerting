@@ -3027,4 +3027,40 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         )
         assertEquals(found.get(), false)
     }
+
+    fun `test execute monitor with dryrun with finding metadata enabled`() {
+
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val index = createTestIndex()
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
+
+        val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))),
+                metadataForFindings = listOf("test_field", "message")
+            )
+        )
+
+        indexDoc(index, "1", testDoc)
+
+        val response = executeMonitor(monitor.id)
+
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        assertEquals(1, output.objectMap("trigger_results").values.size)
+
+        val findings = searchFindings(monitor)
+        assertEquals(2, findings[0].additionalFields!!.size)
+    }
 }
