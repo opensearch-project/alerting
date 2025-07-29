@@ -575,6 +575,11 @@ class TransportDocLevelMonitorFanOutAction
 
             // Before the "|" is the doc id and after the "|" is the index
             val docIndex = it.key.split("|")
+            val additionalFields = this.fetchDocForFinding(
+                docIndex[1],
+                docIndex[0],
+                monitor.metadataForFindings!!
+            )
 
             val finding = Finding(
                 id = UUID.randomUUID().toString(),
@@ -585,7 +590,8 @@ class TransportDocLevelMonitorFanOutAction
                 index = docIndex[1],
                 docLevelQueries = triggeredQueries,
                 timestamp = Instant.now(),
-                executionId = workflowExecutionId
+                executionId = workflowExecutionId,
+                additionalFields = additionalFields
             )
             findingDocPairs.add(Pair(finding.id, it.key))
             findings.add(finding)
@@ -1105,6 +1111,41 @@ class TransportDocLevelMonitorFanOutAction
         }
         nonPercolateSearchesTimeTakenStat += response.took.millis
         return response.hits
+    }
+
+    private suspend fun fetchDocForFinding(
+        index: String,
+        docId: String,
+        fields: List<String>
+    ): Map<String, List<Any>> {
+        val qb = QueryBuilders.matchQuery("_id", docId)
+
+        val request: SearchRequest = SearchRequest()
+            .indices(index)
+            .source(
+                SearchSourceBuilder()
+                    .version(true)
+                    .sort("_seq_no", SortOrder.ASC)
+                    .seqNoAndPrimaryTerm(true)
+                    .query(qb)
+                    .fetchSource(false)
+            )
+
+        if (fields.isNotEmpty()) {
+            for (field in fields) {
+                request.source().fetchField(field)
+            }
+        }
+        val response: SearchResponse = client.suspendUntil { client.search(request, it) }
+        if (response.status() !== RestStatus.OK) {
+            throw IOException("Failed to search in index [$index]. Response status is ${response.status()}")
+        }
+
+        val additionalFields: MutableMap<String, List<Any>> = mutableMapOf()
+        for (field in response.hits.hits[0].fields) {
+            additionalFields[field.key] = field.value.values
+        }
+        return additionalFields
     }
 
     /** Transform field names and index names in all the search hits to format required to run percolate search against them.
