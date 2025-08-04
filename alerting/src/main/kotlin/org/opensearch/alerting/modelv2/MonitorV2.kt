@@ -58,7 +58,11 @@ interface MonitorV2 : ScheduledJob {
     ): MonitorV2
 
     enum class MonitorV2Type(val value: String) {
+<<<<<<< HEAD
         PPL_SQL_MONITOR(PPL_SQL_MONITOR_TYPE);
+=======
+        PPL_MONITOR(PPL_SQL_MONITOR_TYPE);
+>>>>>>> f9f7bd54 (PPL Alerting initial commit)
 
         override fun toString(): String {
             return value
@@ -122,20 +126,32 @@ interface MonitorV2 : ScheduledJob {
             val monitorType = MonitorV2Type.enumFromString(monitorTypeText)
                 ?: throw IllegalStateException(
                     "when parsing MonitorV2, received invalid monitor type: $monitorTypeText. " +
+<<<<<<< HEAD
                         "Please ensure monitor object is wrapped in an outer $PPL_SQL_MONITOR_TYPE object"
+=======
+                        "Please ensure monitor object is wrapped in an outer ppl_sql_monitor object"
+>>>>>>> f9f7bd54 (PPL Alerting initial commit)
                 )
 
             // inner monitor object start
             XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
 
             return when (monitorType) {
+<<<<<<< HEAD
                 MonitorV2Type.PPL_SQL_MONITOR -> PPLSQLMonitor.parse(xcp, id, version)
+=======
+                MonitorV2Type.PPL_MONITOR -> PPLSQLMonitor.parse(xcp, id, version)
+>>>>>>> f9f7bd54 (PPL Alerting initial commit)
             }
         }
 
         fun readFrom(sin: StreamInput): MonitorV2 {
             return when (val monitorType = sin.readEnum(MonitorV2Type::class.java)) {
+<<<<<<< HEAD
                 MonitorV2Type.PPL_SQL_MONITOR -> PPLSQLMonitor(sin)
+=======
+                MonitorV2Type.PPL_MONITOR -> PPLSQLMonitor(sin)
+>>>>>>> f9f7bd54 (PPL Alerting initial commit)
                 else -> throw IllegalStateException("Unexpected input \"$monitorType\" when reading MonitorV2")
             }
         }
@@ -143,7 +159,11 @@ interface MonitorV2 : ScheduledJob {
         fun writeTo(out: StreamOutput, monitorV2: MonitorV2) {
             when (monitorV2) {
                 is PPLSQLMonitor -> {
+<<<<<<< HEAD
                     out.writeEnum(MonitorV2Type.PPL_SQL_MONITOR)
+=======
+                    out.writeEnum(MonitorV2Type.PPL_MONITOR)
+>>>>>>> f9f7bd54 (PPL Alerting initial commit)
                     monitorV2.writeTo(out)
                 }
             }

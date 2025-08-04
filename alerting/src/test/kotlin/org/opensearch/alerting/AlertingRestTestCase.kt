@@ -17,8 +17,10 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin.Companion.COMMENTS_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
+import org.opensearch.alerting.AlertingPlugin.Companion.MONITOR_V2_BASE_URI
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRITE_INDEX
+import org.opensearch.alerting.alertsv2.AlertV2Indices
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.CustomWebhook
@@ -26,6 +28,9 @@ import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.Slack
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
+import org.opensearch.alerting.modelv2.AlertV2
+import org.opensearch.alerting.modelv2.MonitorV2
+import org.opensearch.alerting.modelv2.PPLSQLMonitor
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.DestinationType
@@ -66,23 +71,25 @@ import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
+import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.SearchModule
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.test.OpenSearchTestCase
 import java.net.URLEncoder
 import java.nio.file.Files
 import java.time.Instant
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import java.time.temporal.ChronoUnit.MILLIS
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import java.util.stream.Collectors
 import javax.management.MBeanServerInvocationHandler
 import javax.management.ObjectName
 import javax.management.remote.JMXConnectorFactory
 import javax.management.remote.JMXServiceURL
-import kotlin.collections.ArrayList
-import kotlin.collections.HashMap
 
 /**
  * Superclass for tests that interact with an external test cluster using OpenSearch's RestClient
@@ -103,6 +110,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return NamedXContentRegistry(
             mutableListOf(
                 Monitor.XCONTENT_REGISTRY,
+                MonitorV2.XCONTENT_REGISTRY,
                 SearchInput.XCONTENT_REGISTRY,
                 DocLevelMonitorInput.XCONTENT_REGISTRY,
                 QueryLevelTrigger.XCONTENT_REGISTRY,
@@ -123,6 +131,17 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             return monitor.toHttpEntity()
         }
         val temp = monitor.toJsonString()
+        val toReplace = temp.lastIndexOf("}")
+        val rbacString = rbacRoles.joinToString { "\"$it\"" }
+        val jsonString = temp.substring(0, toReplace) + ", \"rbac_roles\": [$rbacString] }"
+        return StringEntity(jsonString, APPLICATION_JSON)
+    }
+
+    private fun createMonitorV2EntityWithBackendRoles(monitorV2: MonitorV2, rbacRoles: List<String>?): HttpEntity {
+        if (rbacRoles == null) {
+            return monitorV2.toHttpEntity()
+        }
+        val temp = monitorV2.toJsonString()
         val toReplace = temp.lastIndexOf("}")
         val rbacString = rbacRoles.joinToString { "\"$it\"" }
         val jsonString = temp.substring(0, toReplace) + ", \"rbac_roles\": [$rbacString] }"
@@ -150,14 +169,61 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return getMonitor(monitorId = monitorJson["_id"] as String)
     }
 
+    protected fun createMonitorV2WithClient(
+        client: RestClient,
+        monitorV2: MonitorV2,
+        rbacRoles: List<String>? = null
+    ): MonitorV2 {
+        // every random ppl monitor's query searches index TEST_INDEX_NAME
+        // by default, so create that first before creating the monitor
+        val indexExistsResponse = client().makeRequest("HEAD", TEST_INDEX_NAME)
+        if (indexExistsResponse.restStatus() == RestStatus.NOT_FOUND) {
+            createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
+        }
+
+        // be sure to use the passed in client to send the create monitor request,
+        // as the user stored in this client is the user whose permissions we want
+        // to test, not client()'s admin level user
+        val response = client.makeRequest(
+            "POST", MONITOR_V2_BASE_URI, emptyMap(),
+            createMonitorV2EntityWithBackendRoles(monitorV2, rbacRoles)
+        )
+        assertEquals("Unable to create a new monitor v2", RestStatus.OK, response.restStatus())
+
+        val monitorV2Json = jsonXContent.createParser(
+            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            response.entity.content
+        ).map()
+        assertUserNull(monitorV2Json as HashMap<String, Any>)
+
+        return getMonitorV2(monitorV2Id = monitorV2Json["_id"] as String)
+    }
+
     protected fun createMonitor(monitor: Monitor, refresh: Boolean = true): Monitor {
         return createMonitorWithClient(client(), monitor, emptyList(), refresh)
+    }
+
+    protected fun createMonitorV2(monitorV2: MonitorV2): MonitorV2 {
+        val client = client()
+        val response = client.makeRequest("POST", MONITOR_V2_BASE_URI, emptyMap(), monitorV2.toHttpEntity())
+        assertEquals("Unable to create a new monitor", RestStatus.OK, response.restStatus())
+
+        return getMonitorV2(monitorV2Id = response.asMap()["_id"] as String)
     }
 
     protected fun deleteMonitor(monitor: Monitor, refresh: Boolean = true): Response {
         val response = client().makeRequest(
             "DELETE", "$ALERTING_BASE_URI/${monitor.id}?refresh=$refresh", emptyMap(),
             monitor.toHttpEntity()
+        )
+        assertEquals("Unable to delete a monitor", RestStatus.OK, response.restStatus())
+
+        return response
+    }
+
+    protected fun deleteMonitorV2(monitorV2Id: String): Response {
+        val response = client().makeRequest(
+            "DELETE", "$MONITOR_V2_BASE_URI/$monitorV2Id?refresh=true", emptyMap()
         )
         assertEquals("Unable to delete a monitor", RestStatus.OK, response.restStatus())
 
@@ -535,6 +601,18 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return getMonitor(monitorId = monitorId)
     }
 
+    protected fun createRandomPPLMonitor(pplMonitorConfig: PPLSQLMonitor = randomPPLMonitor()): PPLSQLMonitor {
+        // every random ppl monitor's query searches index TEST_INDEX_NAME
+        // by default, so create that first before creating the monitor
+        val indexExistsResponse = adminClient().makeRequest("HEAD", TEST_INDEX_NAME)
+        if (indexExistsResponse.restStatus() == RestStatus.NOT_FOUND) {
+            createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
+        }
+        logger.info("ppl monitor: $pplMonitorConfig")
+        val pplMonitorId = createMonitorV2(pplMonitorConfig).id
+        return getMonitorV2(monitorV2Id = pplMonitorId) as PPLSQLMonitor
+    }
+
     protected fun createRandomDocumentMonitor(refresh: Boolean = false, withMetadata: Boolean = false): Monitor {
         val monitor = randomDocumentLevelMonitor(withMetadata = withMetadata)
         val monitorId = createMonitor(monitor, refresh).id
@@ -566,6 +644,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         assertEquals("Unable to update a workflow", RestStatus.OK, response.restStatus())
         assertUserNull(response.asMap()["workflow"] as Map<String, Any>)
         return getWorkflow(workflowId = workflow.id)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    protected fun updateMonitorV2(monitorV2: MonitorV2, refresh: Boolean = false): MonitorV2 {
+        val response = client().makeRequest(
+            "PUT", "$MONITOR_V2_BASE_URI/${monitorV2.id}?refresh=$refresh",
+            emptyMap(), monitorV2.toHttpEntity()
+        )
+        assertEquals("Unable to update a monitorV2", RestStatus.OK, response.restStatus())
+        return getMonitorV2(monitorV2Id = monitorV2.id)
     }
 
     protected fun updateMonitorWithClient(
@@ -633,6 +721,33 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
         assertUserNull(monitor)
         return monitor.copy(id = id, version = version)
+    }
+
+    protected fun getMonitorV2(
+        monitorV2Id: String,
+        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+    ): MonitorV2 {
+        val response = client().makeRequest("GET", "$MONITOR_V2_BASE_URI/$monitorV2Id", null, header)
+        assertEquals("Unable to get monitorV2 $monitorV2Id", RestStatus.OK, response.restStatus())
+
+        val parser = createParser(XContentType.JSON.xContent(), response.entity.content)
+        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser)
+
+        lateinit var id: String
+        var version: Long = 0
+        lateinit var monitorV2: MonitorV2
+
+        while (parser.nextToken() != XContentParser.Token.END_OBJECT) {
+            parser.nextToken()
+
+            when (parser.currentName()) {
+                "_id" -> id = parser.text()
+                "_version" -> version = parser.longValue()
+                "monitorV2" -> monitorV2 = MonitorV2.parse(parser)
+            }
+        }
+
+        return monitorV2.makeCopy(id = id, version = version)
     }
 
     // TODO: understand why doc alerts wont work with the normal search Alerts function
@@ -730,6 +845,35 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         }
     }
 
+    protected fun searchAlertV2s(
+        monitorV2Id: String,
+        indices: String = AlertV2Indices.ALERT_V2_INDEX,
+        refresh: Boolean = true
+    ): List<AlertV2> {
+        try {
+            if (refresh) refreshIndex(indices)
+        } catch (e: Exception) {
+            logger.warn("Could not refresh index $indices because: ${e.message}")
+            return emptyList()
+        }
+
+        // If this is a test monitor (it doesn't have an ID) and no alerts will be saved for it.
+        val searchParams = if (monitorV2Id != MonitorV2.NO_ID) mapOf("routing" to monitorV2Id) else mapOf()
+        val request = """
+                { "version" : true,
+                  "query" : { "term" : { "${AlertV2.MONITOR_V2_ID_FIELD}" : "$monitorV2Id" } }
+                }
+        """.trimIndent()
+        val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", searchParams, StringEntity(request, APPLICATION_JSON))
+        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
+
+        val searchResponse = SearchResponse.fromXContent(createParser(jsonXContent, httpResponse.entity.content))
+        return searchResponse.hits.hits.map {
+            val xcp = createParser(jsonXContent, it.sourceRef)
+            AlertV2.parse(xcp, it.id, it.version)
+        }
+    }
+
     protected fun acknowledgeAlerts(monitor: Monitor, vararg alerts: Alert): Response {
         val request = XContentFactory.jsonBuilder().startObject()
             .array("alerts", *alerts.map { it.id }.toTypedArray())
@@ -780,6 +924,17 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
     ): Response {
         return getAlerts(client(), dataMap, header)
+    }
+
+    protected fun getAlertV2s(): Response {
+        val response = client().makeRequest(
+            "GET",
+            "$MONITOR_V2_BASE_URI/alerts?",
+            null,
+            BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        )
+        assertEquals("Get call failed.", RestStatus.OK, response.restStatus())
+        return response
     }
 
     protected fun refreshIndex(index: String): Response {
@@ -842,6 +997,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun executeMonitor(client: RestClient, monitor: Monitor, params: Map<String, String> = mapOf()): Response =
         client.makeRequest("POST", "$ALERTING_BASE_URI/_execute", params, monitor.toHttpEntityWithUser())
+
+    protected fun executeMonitorV2(monitorId: String, params: Map<String, String> = mutableMapOf()): Response =
+        client().makeRequest("POST", "$MONITOR_V2_BASE_URI/$monitorId/_execute", params)
 
     protected fun searchFindings(params: Map<String, String> = mutableMapOf()): GetFindingsResponse {
 
@@ -1282,6 +1440,14 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertIndices.FINDING_HISTORY_WRITE_INDEX}\" : {}")
     }
 
+    fun putAlertV2Mappings(mapping: String? = null) {
+        val mappingHack = if (mapping != null) mapping else AlertV2Indices.alertV2Mapping().trimStart('{').trimEnd('}')
+        val encodedHistoryIndex = URLEncoder.encode(AlertV2Indices.ALERT_V2_HISTORY_INDEX_PATTERN, Charsets.UTF_8.toString())
+        val settings = Settings.builder().put("index.hidden", true).build()
+        createIndex(AlertV2Indices.ALERT_V2_INDEX, settings, mappingHack)
+        createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertV2Indices.ALERT_V2_HISTORY_WRITE_INDEX}\" : {}")
+    }
+
     fun scheduledJobMappings(): String {
         return javaClass.classLoader.getResource("mappings/scheduled-jobs.json").readText()
     }
@@ -1314,6 +1480,23 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     private fun Monitor.toJsonStringWithUser(): String {
+        val builder = jsonBuilder()
+        return shuffleXContent(toXContentWithUser(builder, ToXContent.EMPTY_PARAMS)).string()
+    }
+
+    protected fun MonitorV2.toHttpEntity(): HttpEntity {
+        return StringEntity(toJsonString(), APPLICATION_JSON)
+    }
+
+    private fun MonitorV2.toJsonString(): String {
+        return shuffleXContent(toXContent(jsonBuilder(), ToXContent.EMPTY_PARAMS)).string()
+    }
+
+    protected fun MonitorV2.toHttpEntityWithUser(): HttpEntity {
+        return StringEntity(toJsonStringWithUser(), APPLICATION_JSON)
+    }
+
+    private fun MonitorV2.toJsonStringWithUser(): String {
         val builder = jsonBuilder()
         return shuffleXContent(toXContentWithUser(builder, ToXContent.EMPTY_PARAMS)).string()
     }
@@ -1436,6 +1619,12 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     fun getAlertingStats(metrics: String = ""): Map<String, Any> {
         val monitorStatsResponse = client().makeRequest("GET", "/_plugins/_alerting/stats$metrics")
+        val responseMap = createParser(XContentType.JSON.xContent(), monitorStatsResponse.entity.content).map()
+        return responseMap
+    }
+
+    fun getAlertingV2Stats(metrics: String = ""): Map<String, Any> {
+        val monitorStatsResponse = client().makeRequest("GET", "/_plugins/_alerting/v2/stats$metrics")
         val responseMap = createParser(XContentType.JSON.xContent(), monitorStatsResponse.entity.content).map()
         return responseMap
     }
@@ -2005,5 +2194,85 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val deletedCommentId = deleteResponseBody["_id"] as String
 
         return deletedCommentId
+    }
+
+    protected fun isMonitorScheduled(monitorId: String, alertingStatsResponse: Map<String, Any>): Boolean {
+        val nodesInfo = alertingStatsResponse["nodes"] as Map<String, Any>
+        for (nodeId in nodesInfo.keys) {
+            val nodeInfo = nodesInfo[nodeId] as Map<String, Any>
+            val jobsInfo = nodeInfo["jobs_info"] as Map<String, Any>
+            if (jobsInfo.keys.contains(monitorId)) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    // this function is used for PPL Alerting testing.
+    // precondition: TEST_INDEX_NAME must be created before calling this
+    // indexes a doc from some time ago into index TEST_INDEX_NAME.
+    // this function only works on the TEST_INDEX_NAME index created
+    // specifically for this IT suite. It has fields
+    // "timestamp" (date), "abc" (string), "number" (integer)
+    protected fun indexDocFromSomeTimeAgo(timeValue: Long, timeUnit: ChronoUnit, abc: String, number: Int) {
+        val someTimeAgo = ZonedDateTime.now().minus(timeValue, timeUnit).truncatedTo(MILLIS)
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(someTimeAgo) // the timestamp string is given a random timezone offset
+        val testDoc = """{ "timestamp" : "$testTime", "abc": "$abc", "number" : "$number" }"""
+        indexDoc(TEST_INDEX_NAME, UUID.randomUUID().toString(), testDoc)
+    }
+
+    protected fun ensureNumMonitorV2s(expectedNum: Int) {
+        // if a validation error is thrown but a monitor is still accidentally created,
+        // what happens is that this check runs before the workflows to create
+        // alerting-config index and index the monitor complete, meaning this check gets
+        // no search results, then afterwards, the monitor is created, leading this function
+        // to falsely believe no monitor was create. wait some amount of time to let the
+        // workflows incorrectly create whatever monitors it will
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil false
+        }, 10, TimeUnit.SECONDS)
+
+        val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
+        val searchResponse = client().makeRequest(
+            "POST", "$MONITOR_V2_BASE_URI/_search",
+            StringEntity(search, ContentType.APPLICATION_JSON)
+        )
+
+        assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
+        val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
+        val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+        val numberDocsFound = hits["total"]?.get("value")
+        assertEquals("Unexpected number of PPL Monitors found in Search Monitors", expectedNum, numberDocsFound)
+    }
+
+    // takes in an execute monitor API response and returns true if the
+    // trigger condition was met. assumes the monitor executed only had 1 trigger
+    protected fun isTriggered(pplMonitor: PPLSQLMonitor, executeResponse: Response): Boolean {
+        val executeResponseMap = entityAsMap(executeResponse)
+        val triggerResultsObj = (executeResponseMap["trigger_results"] as Map<String, Any>)[pplMonitor.triggers[0].id] as Map<String, Any>
+        return triggerResultsObj["triggered"] as Boolean
+    }
+
+    // takes in a get alerts API response and returns the current number of active alerts
+    protected fun numAlerts(getAlertsResponse: Response): Int {
+        logger.info("get alerts response: ${entityAsMap(getAlertsResponse)}")
+        return entityAsMap(getAlertsResponse)["totalAlertV2s"] as Int
+    }
+
+    protected fun getAlertV2HistoryDocCount(): Long {
+        val request = """
+            {
+                "query": {
+                    "match_all": {}
+                }
+            }
+        """.trimIndent()
+        val response = adminClient().makeRequest(
+            "POST", "${AlertV2Indices.ALERT_V2_HISTORY_ALL}/_search", emptyMap(),
+            StringEntity(request, APPLICATION_JSON)
+        )
+        assertEquals("Request to get alert v2 history failed", RestStatus.OK, response.restStatus())
+        return SearchResponse.fromXContent(createParser(jsonXContent, response.entity.content)).hits.totalHits!!.value
     }
 }

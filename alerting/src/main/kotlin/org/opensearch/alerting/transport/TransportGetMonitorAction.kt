@@ -18,6 +18,8 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.AlertingV1Utils.isIndexNotFoundException
+import org.opensearch.alerting.AlertingV2Utils.validateMonitorV1
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_DELEGATE_PATH
@@ -41,11 +43,9 @@ import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
-import org.opensearch.index.IndexNotFoundException
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
-import org.opensearch.transport.RemoteTransportException
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 
@@ -116,7 +116,14 @@ class TransportGetMonitorAction @Inject constructor(
                                 response.sourceAsBytesRef,
                                 XContentType.JSON
                             ).use { xcp ->
-                                monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
+                                val scheduledJob = ScheduledJob.parse(xcp, response.id, response.version)
+
+                                validateMonitorV1(scheduledJob)?.let {
+                                    actionListener.onFailure(AlertingException.wrap(it))
+                                    return
+                                }
+
+                                monitor = scheduledJob as Monitor
 
                                 // security is enabled and filterby is enabled
                                 if (!checkUserPermissionsWithResource(
@@ -166,20 +173,6 @@ class TransportGetMonitorAction @Inject constructor(
                 }
             )
         }
-    }
-
-    // Checks if the exception is caused by an IndexNotFoundException (directly or nested).
-    private fun isIndexNotFoundException(e: Exception): Boolean {
-        if (e is IndexNotFoundException) {
-            return true
-        }
-        if (e is RemoteTransportException) {
-            val cause = e.cause
-            if (cause is IndexNotFoundException) {
-                return true
-            }
-        }
-        return false
     }
 
     private suspend fun getAssociatedWorkflows(id: String): List<AssociatedWorkflow> {
