@@ -61,6 +61,7 @@ class TriggerV2Tests : OpenSearchTestCase() {
         } catch (_: IllegalArgumentException) {}
     }
 
+<<<<<<< HEAD
     fun `test number of results trigger with negative number of results value`() {
         try {
             randomPPLTrigger(
@@ -72,6 +73,8 @@ class TriggerV2Tests : OpenSearchTestCase() {
         } catch (_: IllegalArgumentException) {}
     }
 
+=======
+>>>>>>> f9f7bd54 (PPL Alerting initial commit)
     fun `test trigger action name too long`() {
         var actionName = ""
         for (i in 0 until ALERTING_V2_MAX_NAME_LENGTH + 1) {

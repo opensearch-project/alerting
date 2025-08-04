@@ -1,0 +1,118 @@
+{
+  "dynamic": "strict",
+  "_routing": {
+    "required": false
+  },
+  "_meta" : {
+    "schema_version": 5
+  },
+  "properties": {
+    "schema_version": {
+      "type": "integer"
+    },
+    "monitor_v2_id": {
+      "type": "keyword"
+    },
+    "monitor_v2_version": {
+      "type": "long"
+    },
+    "id": {
+      "type": "keyword"
+    },
+    "version": {
+      "type": "long"
+    },
+    "severity": {
+      "type": "keyword"
+    },
+    "monitor_v2_name": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    },
+    "monitor_v2_user": {
+      "properties": {
+        "name": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "backend_roles": {
+          "type" : "text",
+          "fields" : {
+            "keyword" : {
+              "type" : "keyword"
+            }
+          }
+        },
+        "roles": {
+          "type" : "text",
+          "fields" : {
+            "keyword" : {
+              "type" : "keyword"
+            }
+          }
+        },
+        "custom_attribute_names": {
+          "type" : "text",
+          "fields" : {
+            "keyword" : {
+              "type" : "keyword"
+            }
+          }
+        }
+      }
+    },
+    "execution_id": {
+      "type": "keyword"
+    },
+    "trigger_v2_id": {
+      "type": "keyword"
+    },
+    "trigger_v2_name": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    },
+    "triggered_time": {
+      "type": "date"
+    },
+    "error_message": {
+      "type": "text"
+    },
+    "query": {
+      "type": "text"
+    },
+    "query_results":  {
+      "type": "nested",
+      "properties": {
+        "schema": {
+          "type": "nested",
+          "dynamic": true
+        },
+        "datarows": {
+          "type": "object",
+          "enabled": false
+        },
+        "total": {
+          "type": "integer"
+        },
+        "size": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

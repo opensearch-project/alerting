@@ -87,6 +87,7 @@ data class PPLSQLMonitor(
         }
 
         require(this.name.length <= ALERTING_V2_MAX_NAME_LENGTH) {
+<<<<<<< HEAD
             "Monitor name too long, length must be less than $ALERTING_V2_MAX_NAME_LENGTH."
         }
 
@@ -102,17 +103,42 @@ data class PPLSQLMonitor(
         lookBackWindow?.let {
             require(this.lookBackWindow >= MONITOR_V2_MIN_LOOK_BACK_WINDOW) {
                 "Monitors look back windows must be at least $MONITOR_V2_MIN_LOOK_BACK_WINDOW minute."
+=======
+            "Monitor name too long, length must be less than $ALERTING_V2_MAX_NAME_LENGTH"
+        }
+
+        if (this.lookBackWindow != null) {
+            requireNotNull(this.timestampField) { "If look back window is specified, timestamp field must not be null" }
+        } else {
+            require(this.timestampField == null) { "If look back window is not specified, timestamp field must not be specified" }
+        }
+
+        require(this.triggers.isNotEmpty()) { "Monitor must include at least 1 trigger" }
+        require(this.triggers.size <= MONITOR_V2_MAX_TRIGGERS) { "Monitors can only have $MONITOR_V2_MAX_TRIGGERS triggers" }
+
+        lookBackWindow?.let {
+            require(this.lookBackWindow >= MONITOR_V2_MIN_LOOK_BACK_WINDOW) {
+                "Monitors look back windows must be at least $MONITOR_V2_MIN_LOOK_BACK_WINDOW minute"
+>>>>>>> f9f7bd54 (PPL Alerting initial commit)
             }
         }
 
         this.description?.let {
+<<<<<<< HEAD
             require(this.description.length <= DESCRIPTION_MAX_LENGTH) { "Description must be under $DESCRIPTION_MAX_LENGTH characters." }
+=======
+            require(this.description.length <= DESCRIPTION_MAX_LENGTH) { "Description must be under $DESCRIPTION_MAX_LENGTH characters" }
+>>>>>>> f9f7bd54 (PPL Alerting initial commit)
         }
 
         // for checking trigger ID uniqueness
         val triggerIds = mutableSetOf<String>()
         this.triggers.forEach { trigger ->
+<<<<<<< HEAD
             require(triggerIds.add(trigger.id)) { "Duplicate trigger id: ${trigger.id}. Trigger ids must be unique." }
+=======
+            require(triggerIds.add(trigger.id)) { "Duplicate trigger id: ${trigger.id}. Trigger ids must be unique" }
+>>>>>>> f9f7bd54 (PPL Alerting initial commit)
         }
 
         if (this.enabled) {
@@ -281,7 +307,11 @@ data class PPLSQLMonitor(
 
     companion object {
         // monitor type name
+<<<<<<< HEAD
         const val PPL_SQL_MONITOR_TYPE = "ppl_monitor"
+=======
+        const val PPL_SQL_MONITOR_TYPE = "ppl_sql_monitor"
+>>>>>>> f9f7bd54 (PPL Alerting initial commit)
 
         // query languages
         const val PPL_QUERY_LANGUAGE = "ppl"

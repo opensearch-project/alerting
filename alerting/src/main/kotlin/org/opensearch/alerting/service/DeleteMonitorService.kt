@@ -22,6 +22,7 @@ import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.clustermanager.AcknowledgedResponse
 import org.opensearch.alerting.MonitorMetadataService
+import org.opensearch.alerting.actionv2.DeleteMonitorV2Response
 import org.opensearch.alerting.core.lock.LockModel
 import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -74,6 +75,19 @@ object DeleteMonitorService :
         return DeleteMonitorResponse(deleteResponse.id, deleteResponse.version)
     }
 
+    /**
+     * Deletes the monitorV2, which does not come with other metadata and queries
+     * like doc level monitors
+     * @param monitorV2Id monitorV2 ID to be deleted
+     * @param refreshPolicy
+     */
+    suspend fun deleteMonitorV2(monitorV2Id: String, refreshPolicy: RefreshPolicy): DeleteMonitorV2Response {
+        val deleteResponse = deleteMonitor(monitorV2Id, refreshPolicy)
+        deleteLock(monitorV2Id)
+        return DeleteMonitorV2Response(deleteResponse.id, deleteResponse.version)
+    }
+
+    // both Alerting v1 and v2 workflows flow through this function
     private suspend fun deleteMonitor(monitorId: String, refreshPolicy: RefreshPolicy): DeleteResponse {
         val deleteMonitorRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, monitorId)
             .setRefreshPolicy(refreshPolicy)
@@ -167,7 +181,12 @@ object DeleteMonitorService :
     }
 
     private suspend fun deleteLock(monitor: Monitor) {
-        client.suspendUntil<Client, Boolean> { lockService.deleteLock(LockModel.generateLockId(monitor.id), it) }
+        deleteLock(monitor.id)
+    }
+
+    // both Alerting v1 and v2 workflows flow through this function
+    private suspend fun deleteLock(monitorId: String) {
+        client.suspendUntil<Client, Boolean> { lockService.deleteLock(LockModel.generateLockId(monitorId), it) }
     }
 
     /**
