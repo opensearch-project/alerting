@@ -112,6 +112,12 @@ data class PPLSQLTrigger(
             require(it.destinationId.length <= NOTIFICATIONS_ID_MAX_LENGTH) {
                 "Channel ID of action with ID ${it.id} too long, length must be less than $NOTIFICATIONS_ID_MAX_LENGTH."
             }
+            require(it.destinationId.isNotEmpty()) {
+                "Channel ID should not be empty."
+            }
+            require(it.destinationId.matches(Regex("^[a-zA-Z0-9_-]+$"))) {
+                "Channel ID should only have alphanumeric characters, dashes, and underscores."
+            }
         }
 
         when (this.conditionType) {

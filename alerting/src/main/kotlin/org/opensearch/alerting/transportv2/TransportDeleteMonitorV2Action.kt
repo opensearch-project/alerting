@@ -18,6 +18,7 @@ import org.opensearch.alerting.AlertingV2Utils
 import org.opensearch.alerting.actionv2.DeleteMonitorV2Action
 import org.opensearch.alerting.actionv2.DeleteMonitorV2Request
 import org.opensearch.alerting.actionv2.DeleteMonitorV2Response
+import org.opensearch.alerting.core.settings.AlertingV2Settings.Companion.ALERTING_V2_ENABLED
 import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.service.DeleteMonitorService
@@ -53,13 +54,29 @@ class TransportDeleteMonitorV2Action @Inject constructor(
 ),
     SecureTransportAction {
 
+    @Volatile private var alertingV2Enabled = ALERTING_V2_ENABLED.get(settings)
+
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_ENABLED) { alertingV2Enabled = it }
         listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(task: Task, request: DeleteMonitorV2Request, actionListener: ActionListener<DeleteMonitorV2Response>) {
+        if (!alertingV2Enabled) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "Alerting V2 is currently disabled, please enable it with the " +
+                            "cluster setting: ${ALERTING_V2_ENABLED.key}.",
+                        RestStatus.FORBIDDEN
+                    ),
+                )
+            )
+            return
+        }
+
         val user = readUserFromThreadContext(client)
 
         if (!validateUserBackendRoles(user, actionListener)) {

@@ -529,6 +529,95 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         searchUserClient.close()
     }
 
+    fun `test RBAC execute monitorV2 as user with correct backend roles succeeds`() {
+        enableFilterBy()
+        if (!isHttps()) {
+            return
+        }
+        val pplMonitorConfig = randomPPLMonitor(enabled = true)
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
+            listOf("backend_role_a", "backend_role_b"),
+            false
+        )
+
+        val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
+
+        // getUser should have access to the monitor above created by user
+        val executeUser = "executeUser"
+
+        createUserWithRoles(
+            executeUser,
+            listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
+            listOf("backend_role_a"),
+            true
+        )
+
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), executeUser, password)
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
+
+        val getMonitorResponse = getUserClient!!.makeRequest(
+            "POST",
+            "$MONITOR_V2_BASE_URI/${pplMonitor.id}/_execute",
+            null,
+            BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        )
+        assertEquals("Get monitorV2 failed", RestStatus.OK, getMonitorResponse.restStatus())
+
+        // cleanup
+        getUserClient.close()
+    }
+
+    fun `test RBAC execute monitorV2 as user without correct backend roles fails`() {
+        enableFilterBy()
+        if (!isHttps()) {
+            return
+        }
+        val pplMonitorConfig = randomPPLMonitor(enabled = true)
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
+            listOf("backend_role_a", "backend_role_b"),
+            false
+        )
+
+        val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
+
+        // getUser should not have access to the monitor above created by user
+        val executeUser = "executeUser"
+
+        createUserWithRoles(
+            executeUser,
+            listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
+            listOf("backend_role_c"),
+            true
+        )
+
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), executeUser, password)
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
+
+        try {
+            getUserClient!!.makeRequest(
+                "POST",
+                "$MONITOR_V2_BASE_URI/${pplMonitor.id}/_execute",
+                null,
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+            )
+            fail("Expected Forbidden exception")
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected delete monitor status", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
+        } finally {
+            getUserClient?.close()
+        }
+    }
+
     fun `test RBAC delete monitorV2 as user with correct backend roles succeeds`() {
         enableFilterBy()
         if (!isHttps()) {

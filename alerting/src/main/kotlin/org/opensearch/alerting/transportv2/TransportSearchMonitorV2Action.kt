@@ -6,6 +6,7 @@
 package org.opensearch.alerting.transportv2
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
@@ -13,6 +14,7 @@ import org.opensearch.alerting.AlertingV2Utils.getEmptySearchResponse
 import org.opensearch.alerting.AlertingV2Utils.isIndexNotFoundException
 import org.opensearch.alerting.actionv2.SearchMonitorV2Action
 import org.opensearch.alerting.actionv2.SearchMonitorV2Request
+import org.opensearch.alerting.core.settings.AlertingV2Settings.Companion.ALERTING_V2_ENABLED
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.MONITOR_V2_TYPE
 import org.opensearch.alerting.modelv2.PPLSQLMonitor.Companion.PPL_SQL_MONITOR_TYPE
 import org.opensearch.alerting.opensearchapi.addFilter
@@ -24,6 +26,7 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.tasks.Task
@@ -44,14 +47,30 @@ class TransportSearchMonitorV2Action @Inject constructor(
 ),
     SecureTransportAction {
 
+    @Volatile private var alertingV2Enabled = ALERTING_V2_ENABLED.get(settings)
+
     @Volatile
     override var filterByEnabled: Boolean = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_ENABLED) { alertingV2Enabled = it }
         listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(task: Task, request: SearchMonitorV2Request, actionListener: ActionListener<SearchResponse>) {
+        if (!alertingV2Enabled) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "Alerting V2 is currently disabled, please enable it with the " +
+                            "cluster setting: ${ALERTING_V2_ENABLED.key}",
+                        RestStatus.FORBIDDEN
+                    ),
+                )
+            )
+            return
+        }
+
         val searchSourceBuilder = request.searchRequest.source()
 
         val queryBuilder = if (searchSourceBuilder.query() == null) BoolQueryBuilder()

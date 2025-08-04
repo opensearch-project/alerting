@@ -21,6 +21,7 @@ import org.opensearch.alerting.modelv2.PPLSQLTrigger.ConditionType
 import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomPPLMonitor
 import org.opensearch.alerting.randomPPLTrigger
+import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomTemplateScript
 import org.opensearch.alerting.resthandler.MonitorRestApiIT.Companion.USE_TYPED_KEYS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_EXPIRE_DURATION
@@ -495,5 +496,23 @@ class MonitorV2RestApiIT : AlertingRestTestCase() {
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.NOT_FOUND, e.response.restStatus())
         }
+    }
+
+    fun `test monitor stats v1 and v2 only return stats for their respective monitors`() {
+        enableScheduledJob()
+
+        val monitorV1Id = createMonitor(randomQueryLevelMonitor(enabled = true)).id
+        val monitorV2Id = createRandomPPLMonitor(randomPPLMonitor(enabled = true)).id
+
+        val statsV1Response = getAlertingStats()
+        val statsV2Response = getAlertingV2Stats()
+
+        logger.info("v1 stats: $statsV1Response")
+        logger.info("v2 stats: $statsV2Response")
+
+        assertTrue("V1 stats does not contain V1 Monitor", isMonitorScheduled(monitorV1Id, statsV1Response))
+        assertTrue("V2 stats does not contain V2 Monitor", isMonitorScheduled(monitorV2Id, statsV2Response))
+        assertFalse("V2 stats contains V1 Monitor", isMonitorScheduled(monitorV1Id, statsV2Response))
+        assertFalse("V1 stats contains V2 Monitor", isMonitorScheduled(monitorV2Id, statsV1Response))
     }
 }

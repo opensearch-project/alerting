@@ -39,6 +39,7 @@ import org.opensearch.alerting.actionv2.IndexMonitorV2Action
 import org.opensearch.alerting.actionv2.IndexMonitorV2Request
 import org.opensearch.alerting.actionv2.IndexMonitorV2Response
 import org.opensearch.alerting.core.ScheduledJobIndices
+import org.opensearch.alerting.core.settings.AlertingV2Settings.Companion.ALERTING_V2_ENABLED
 import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.MONITOR_V2_TYPE
 import org.opensearch.alerting.modelv2.PPLSQLMonitor
@@ -101,6 +102,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
     SecureTransportAction {
 
     // adjustable limits (via settings)
+    @Volatile private var alertingV2Enabled = ALERTING_V2_ENABLED.get(settings)
     @Volatile private var maxMonitors = ALERTING_V2_MAX_MONITORS.get(settings)
     @Volatile private var maxThrottleDuration = ALERTING_V2_MAX_THROTTLE_DURATION.get(settings)
     @Volatile private var maxExpireDuration = ALERTING_V2_MAX_EXPIRE_DURATION.get(settings)
@@ -114,6 +116,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_ENABLED) { alertingV2Enabled = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_MONITORS) { maxMonitors = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_THROTTLE_DURATION) { maxThrottleDuration = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_EXPIRE_DURATION) { maxExpireDuration = it }
@@ -136,6 +139,19 @@ class TransportIndexMonitorV2Action @Inject constructor(
         indexMonitorV2Request: IndexMonitorV2Request,
         actionListener: ActionListener<IndexMonitorV2Response>
     ) {
+        if (!alertingV2Enabled) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "Alerting V2 is currently disabled, please enable it with the " +
+                            "cluster setting: ${ALERTING_V2_ENABLED.key}",
+                        RestStatus.FORBIDDEN
+                    ),
+                )
+            )
+            return
+        }
+
         // read the user from thread context immediately, before
         // downstream flows spin up new threads with fresh context
         val user = readUserFromThreadContext(client)
