@@ -138,6 +138,7 @@ import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.client.Client
 import org.opensearch.watcher.ResourceWatcherService
 import java.util.function.Supplier
+import org.opensearch.alerting.resthandler.RestIndexMonitorV2Action
 
 /**
  * Entry point of the OpenDistro for Elasticsearch alerting plugin
@@ -157,6 +158,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         @JvmField val OPEN_SEARCH_DASHBOARDS_USER_AGENT = "OpenSearch-Dashboards"
         @JvmField val UI_METADATA_EXCLUDE = arrayOf("monitor.${Monitor.UI_METADATA_FIELD}")
         @JvmField val MONITOR_BASE_URI = "/_plugins/_alerting/monitors"
+        @JvmField val MONITOR_V2_BASE_URI = "/_plugins/_alerting/v2/monitors"
         @JvmField val WORKFLOW_BASE_URI = "/_plugins/_alerting/workflows"
         @JvmField val REMOTE_BASE_URI = "/_plugins/_alerting/remote"
         @JvmField val DESTINATION_BASE_URI = "/_plugins/_alerting/destinations"
@@ -197,6 +199,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestGetMonitorAction(),
             RestDeleteMonitorAction(),
             RestIndexMonitorAction(),
+            RestIndexMonitorV2Action(),
             RestIndexWorkflowAction(),
             RestSearchMonitorAction(settings, clusterService),
             RestExecuteMonitorAction(),

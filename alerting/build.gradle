@@ -81,6 +81,7 @@ publishing {
     }
 
     repositories {
+        mavenLocal()
         maven {
             name = "Snapshots"
             url = "https://aws.oss.sonatype.org/content/repositories/snapshots"
