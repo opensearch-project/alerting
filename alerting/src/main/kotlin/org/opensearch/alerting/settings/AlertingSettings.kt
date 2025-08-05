@@ -225,7 +225,7 @@ class AlertingSettings {
 
         val ALERTING_COMMENTS_ENABLED = Setting.boolSetting(
             "plugins.alerting.comments_enabled",
-            false,
+            true,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
