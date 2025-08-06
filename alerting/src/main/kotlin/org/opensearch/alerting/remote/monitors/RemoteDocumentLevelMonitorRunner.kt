@@ -11,6 +11,7 @@ import org.opensearch.Version
 import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.MonitorRunner
 import org.opensearch.alerting.MonitorRunnerExecutionContext
+import org.opensearch.alerting.initializeNewLastRunContext
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.node.DiscoveryNode
@@ -27,7 +28,6 @@ import org.opensearch.commons.alerting.model.remote.monitors.RemoteDocLevelMonit
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.index.shard.ShardId
 import org.opensearch.core.rest.RestStatus
-import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.transport.TransportService
 import java.io.IOException
 import java.time.Instant
@@ -121,11 +121,11 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
                         )
                         MonitorMetadataService.createRunContextForIndex(concreteIndexName, isIndexCreatedRecently)
                     }
-
+                    val shardCount: Int = getShardsCount(monitorCtx.clusterService!!, concreteIndexName)
                     val indexUpdatedRunContext = initializeNewLastRunContext(
                         indexLastRunContext.toMutableMap(),
-                        monitorCtx,
-                        concreteIndexName
+                        concreteIndexName,
+                        shardCount
                     ) as MutableMap<String, Any>
                     if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
                         IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
@@ -269,12 +269,12 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
                     if (fanOutResponse.lastRunContexts.contains(indexName)) {
                         (fanOutResponse.lastRunContexts[indexName] as Map<String, Any>).forEach {
 
-                            val seq_no = it.value.toString().toIntOrNull()
+                            val seq_no = it.value.toString().toLongOrNull()
                             if (
                                 it.key != "shards_count" &&
                                 it.key != "index" &&
                                 seq_no != null &&
-                                seq_no >= 0
+                                seq_no >= 0L
                             ) {
                                 indexLastRunContext[it.key] = seq_no
                             }
@@ -369,19 +369,5 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
         val lastExecutionTime = if (periodStart == periodEnd) monitor.lastUpdateTime else periodStart
         val indexCreationDate = indexMetadata.settings.get("index.creation_date")?.toLong() ?: 0L
         return indexCreationDate > lastExecutionTime.toEpochMilli()
-    }
-
-    private fun initializeNewLastRunContext(
-        lastRunContext: Map<String, Any>,
-        monitorCtx: MonitorRunnerExecutionContext,
-        index: String,
-    ): Map<String, Any> {
-        val count: Int = getShardsCount(monitorCtx.clusterService!!, index)
-        val updatedLastRunContext = lastRunContext.toMutableMap()
-        for (i: Int in 0 until count) {
-            val shard = i.toString()
-            updatedLastRunContext[shard] = SequenceNumbers.UNASSIGNED_SEQ_NO
-        }
-        return updatedLastRunContext
     }
 }
