@@ -410,9 +410,7 @@ fun randomAnomalyResult(
             "roles" : [
               ${user.roles.joinToString { "\"${it}\"" }}
             ],
-            "custom_attribute_names" : [
-              ${user.customAttributes.joinToString { "\"${it}\"" }}
-            ]
+            "custom_attributes" : ${user.customAttributes}
           }
         }
     """.trimIndent()
@@ -503,6 +501,6 @@ fun randomADMonitor(
 fun randomADUser(backendRole: String = OpenSearchRestTestCase.randomAlphaOfLength(10)): User {
     return User(
         OpenSearchRestTestCase.randomAlphaOfLength(10), listOf(backendRole),
-        listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), ALL_ACCESS_ROLE), listOf("test_attr=test")
+        listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), ALL_ACCESS_ROLE), mapOf("test_attr", "test")
     )
 }
