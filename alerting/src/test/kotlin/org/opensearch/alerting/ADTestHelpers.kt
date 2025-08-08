@@ -411,7 +411,7 @@ fun randomAnomalyResult(
               ${user.roles.joinToString { "\"${it}\"" }}
             ],
             "custom_attribute_names" : [
-              ${user.customAttNames.joinToString { "\"${it}\"" }}
+              ${user.customAttributes.joinToString { "\"${it}\"" }}
             ]
           }
         }
@@ -472,7 +472,7 @@ fun maxAnomalyGradeSearchInput(
 
 fun adMonitorTrigger(): QueryLevelTrigger {
     val triggerScript = """
-            return ctx.results[0].aggregations.max_anomaly_grade.value != null && 
+            return ctx.results[0].aggregations.max_anomaly_grade.value != null &&
                    ctx.results[0].aggregations.max_anomaly_grade.value > 0.7
     """.trimIndent()
     return randomQueryLevelTrigger(condition = Script(triggerScript))
