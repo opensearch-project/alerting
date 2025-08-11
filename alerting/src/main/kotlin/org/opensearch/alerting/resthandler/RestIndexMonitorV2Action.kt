@@ -1,13 +1,8 @@
 package org.opensearch.alerting.resthandler
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.rest.BaseRestHandler
-import org.opensearch.rest.RestHandler.Route
-import org.opensearch.rest.RestRequest.Method.POST
-import java.io.IOException
-import java.time.Instant
 import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.util.IF_PRIMARY_TERM
 import org.opensearch.alerting.util.IF_SEQ_NO
 import org.opensearch.alerting.util.REFRESH
@@ -18,9 +13,13 @@ import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.xcontent.XContentParser.Token
 import org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken
 import org.opensearch.index.seqno.SequenceNumbers
+import org.opensearch.rest.BaseRestHandler
+import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
+import org.opensearch.rest.RestRequest.Method.POST
 import org.opensearch.rest.action.RestToXContentListener
 import org.opensearch.transport.client.node.NodeClient
+import java.io.IOException
 
 private val log = LogManager.getLogger(RestIndexMonitorV2Action::class.java)
 
