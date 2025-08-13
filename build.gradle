@@ -71,6 +71,10 @@ task ktlint(type: JavaExec, group: "verification") {
     description = "Check Kotlin code style."
     main = "com.pinterest.ktlint.Main"
     classpath = configurations.ktlint
+    jvmArgs = [
+        "--add-opens=java.base/java.lang=ALL-UNNAMED",
+        "--add-opens=java.base/java.util=ALL-UNNAMED"
+    ]
     args "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
 }
 
@@ -78,6 +82,10 @@ task ktlintFormat(type: JavaExec, group: "formatting") {
     description = "Fix Kotlin code style deviations."
     main = "com.pinterest.ktlint.Main"
     classpath = configurations.ktlint
+    jvmArgs = [
+        "--add-opens=java.base/java.lang=ALL-UNNAMED",
+        "--add-opens=java.base/java.util=ALL-UNNAMED"
+    ]
     args "-F", "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
 }
 
