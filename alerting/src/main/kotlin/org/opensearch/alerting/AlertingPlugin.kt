@@ -84,6 +84,7 @@ import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
 import org.opensearch.alerting.util.DocLevelMonitorQueries
+import org.opensearch.alerting.util.PluginClient
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.node.DiscoveryNodes
@@ -116,6 +117,7 @@ import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.env.Environment
 import org.opensearch.env.NodeEnvironment
+import org.opensearch.identity.PluginSubject
 import org.opensearch.index.IndexModule
 import org.opensearch.indices.SystemIndexDescriptor
 import org.opensearch.monitor.jvm.JvmStats
@@ -125,6 +127,7 @@ import org.opensearch.painless.spi.PainlessExtension
 import org.opensearch.percolator.PercolatorPluginExt
 import org.opensearch.plugins.ActionPlugin
 import org.opensearch.plugins.ExtensiblePlugin
+import org.opensearch.plugins.IdentityAwarePlugin
 import org.opensearch.plugins.ReloadablePlugin
 import org.opensearch.plugins.ScriptPlugin
 import org.opensearch.plugins.SearchPlugin
@@ -146,7 +149,7 @@ import java.util.function.Supplier
  * [BucketLevelTrigger.XCONTENT_REGISTRY], [ClusterMetricsInput.XCONTENT_REGISTRY] to the [NamedXContentRegistry] so that we are able to deserialize the custom named objects.
  */
 internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, ReloadablePlugin,
-    SearchPlugin, SystemIndexPlugin, PercolatorPluginExt() {
+    SearchPlugin, SystemIndexPlugin, IdentityAwarePlugin, PercolatorPluginExt() {
 
     override fun getContextAllowlists(): Map<ScriptContext<*>, List<Allowlist>> {
         val whitelist = AllowlistLoader.loadFromResourceFiles(javaClass, "org.opensearch.alerting.txt")
@@ -182,6 +185,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     lateinit var alertIndices: AlertIndices
     lateinit var clusterService: ClusterService
     lateinit var destinationMigrationCoordinator: DestinationMigrationCoordinator
+    lateinit var pluginClient: PluginClient
     var monitorTypeToMonitorRunners: MutableMap<String, RemoteMonitorRegistry> = mutableMapOf()
 
     override fun getRestHandlers(
@@ -283,6 +287,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     ): Collection<Any> {
         // Need to figure out how to use the OpenSearch DI classes rather than handwiring things here.
         val settings = environment.settings()
+        pluginClient = PluginClient(client)
         val lockService = LockService(client, clusterService)
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
         val alertService = AlertService(client, xContentRegistry, alertIndices)
@@ -320,7 +325,10 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         commentsIndices = CommentsIndices(environment.settings(), client, threadPool, clusterService)
         docLevelMonitorQueries = DocLevelMonitorQueries(client, clusterService)
         scheduler = JobScheduler(threadPool, runner)
-        sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
+        sweeper = JobSweeper(
+            environment.settings(), client, clusterService, threadPool, xContentRegistry,
+            scheduler, ALERTING_JOB_TYPES
+        )
         destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool, scheduledJobIndices)
         this.threadPool = threadPool
         this.clusterService = clusterService
@@ -351,8 +359,15 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             destinationMigrationCoordinator,
             lockService,
             alertService,
-            triggerService
+            triggerService,
+            pluginClient
         )
+    }
+
+    override fun assignSubject(pluginSubject: PluginSubject) {
+        // When security is not installed, the pluginSubject will still be assigned.
+        requireNotNull(pluginSubject)
+        pluginClient.setSubject(pluginSubject)
     }
 
     override fun getSettings(): List<Setting<*>> {

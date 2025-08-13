@@ -5,22 +5,16 @@
 
 package org.opensearch.alerting.transport
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.get.GetRequest
-import org.opensearch.action.get.GetResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.opensearchapi.addFilter
-import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
@@ -51,9 +45,10 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 import java.io.IOException
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletableFuture.completedFuture
 
 private val log = LogManager.getLogger(TransportGetAlertsAction::class.java)
-private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
 class TransportGetAlertsAction @Inject constructor(
     transportService: TransportService,
@@ -147,19 +142,16 @@ class TransportGetAlertsAction @Inject constructor(
             .size(tableProp.size)
             .from(tableProp.startIndex)
 
-        client.threadPool().threadContext.stashContext().use {
-            scope.launch {
-                try {
-                    val alertIndex = resolveAlertsIndexName(getAlertsRequest)
-                    getAlerts(alertIndex, searchSourceBuilder, actionListener, user)
-                } catch (t: Exception) {
-                    log.error("Failed to get alerts", t)
-                    if (t is AlertingException) {
-                        actionListener.onFailure(t)
-                    } else {
-                        actionListener.onFailure(AlertingException.wrap(t))
-                    }
-                }
+        try {
+            resolveAlertsIndexNameAsync(getAlertsRequest).thenAccept { alertIndex ->
+                getAlerts(alertIndex, searchSourceBuilder, actionListener, user)
+            }
+        } catch (t: Exception) {
+            log.error("Failed to get alerts", t)
+            if (t is AlertingException) {
+                actionListener.onFailure(t)
+            } else {
+                actionListener.onFailure(AlertingException.wrap(t))
             }
         }
     }
@@ -179,43 +171,55 @@ class TransportGetAlertsAction @Inject constructor(
         }
     }
 
+    private fun normalizeAlertIndex(index: String): String =
+        if (index == AlertIndices.ALERT_INDEX) AlertIndices.ALL_ALERT_INDEX_PATTERN else index
+
     /** Precedence order for resolving alert index to be queried:
      1. alertIndex param.
      2. alert index mentioned in monitor data sources.
      3. Default alert indices pattern
      */
-    suspend fun resolveAlertsIndexName(getAlertsRequest: GetAlertsRequest): String {
-        var alertIndex = AlertIndices.ALL_ALERT_INDEX_PATTERN
-        if (getAlertsRequest.alertIndex.isNullOrEmpty() == false) {
-            alertIndex = getAlertsRequest.alertIndex!!
-        } else if (getAlertsRequest.monitorId.isNullOrEmpty() == false) {
-            val retrievedMonitor = getMonitor(getAlertsRequest)
-            if (retrievedMonitor != null) {
-                alertIndex = retrievedMonitor.dataSources.alertsIndex
+    fun resolveAlertsIndexNameAsync(getAlertsRequest: GetAlertsRequest): CompletableFuture<String> {
+        // 1) Explicit param wins
+        if (!getAlertsRequest.alertIndex.isNullOrBlank()) {
+            return completedFuture(normalizeAlertIndex(getAlertsRequest.alertIndex!!))
+        }
+
+        // 2) Lookup via monitor if monitorId present
+        if (!getAlertsRequest.monitorId.isNullOrBlank()) {
+            return getMonitorAsync(getAlertsRequest).thenApply { monitor ->
+                monitor?.dataSources?.alertsIndex?.let(::normalizeAlertIndex)
+                    ?: AlertIndices.ALL_ALERT_INDEX_PATTERN
             }
         }
-        return if (alertIndex == AlertIndices.ALERT_INDEX)
-            AlertIndices.ALL_ALERT_INDEX_PATTERN
-        else
-            alertIndex
+
+        // 3) Default
+        return completedFuture(AlertIndices.ALL_ALERT_INDEX_PATTERN)
     }
 
-    private suspend fun getMonitor(getAlertsRequest: GetAlertsRequest): Monitor? {
+    private fun getMonitorAsync(getAlertsRequest: GetAlertsRequest): CompletableFuture<Monitor?> {
+        val future = CompletableFuture<Monitor?>()
         val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, getAlertsRequest.monitorId!!)
-        try {
-            val getResponse: GetResponse = client.suspendUntil { client.get(getRequest, it) }
-            if (!getResponse.isExists) {
-                return null
+        client.getAsync(getRequest).thenAccept { getResponse ->
+            try {
+                if (!getResponse.isExists) {
+                    future.complete(null)
+                    return@thenAccept
+                }
+                val xcp = XContentHelper.createParser(
+                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                    getResponse.sourceAsBytesRef, XContentType.JSON
+                )
+                val monitor = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
+                future.complete(monitor)
+            } catch (e: Exception) {
+                future.completeExceptionally(e)
             }
-            val xcp = XContentHelper.createParser(
-                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                getResponse.sourceAsBytesRef, XContentType.JSON
-            )
-            return ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
-        } catch (t: Exception) {
-            log.error("Failure in fetching monitor ${getAlertsRequest.monitorId} to resolve alert index in get alerts action", t)
-            return null
+        }.exceptionally { t ->
+            future.completeExceptionally(t)
+            null
         }
+        return future
     }
 
     fun getAlerts(
