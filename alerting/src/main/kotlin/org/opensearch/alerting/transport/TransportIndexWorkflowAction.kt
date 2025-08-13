@@ -223,11 +223,11 @@ class TransportIndexWorkflowAction @Inject constructor(
                 if (user == null) {
                     // Security is disabled, add empty user to Workflow. user is null for older versions.
                     request.workflow = request.workflow
-                        .copy(user = User("", listOf(), listOf(), listOf()))
+                        .copy(user = User("", listOf(), listOf(), mapOf()))
                     start()
                 } else {
                     request.workflow = request.workflow
-                        .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttNames))
+                        .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttributes))
                     start()
                 }
             }
@@ -346,7 +346,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                 else request.rbacRoles
 
                 request.workflow = request.workflow.copy(
-                    user = User(user.name, rbacRoles.orEmpty().toList(), user.roles, user.customAttNames)
+                    user = User(user.name, rbacRoles.orEmpty().toList(), user.roles, user.customAttributes)
                 )
                 log.debug("Created workflow's backend roles: $rbacRoles")
             }
@@ -484,7 +484,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                 if (request.rbacRoles != null) {
                     if (isAdmin(user)) {
                         request.workflow = request.workflow.copy(
-                            user = User(user.name, request.rbacRoles, user.roles, user.customAttNames)
+                            user = User(user.name, request.rbacRoles, user.roles, user.customAttributes)
                         )
                     } else {
                         // rolesToRemove: these are the backend roles to remove from the monitor
@@ -493,7 +493,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                         val updatedRbac =
                             currentWorkflow.user?.backendRoles.orEmpty() - rolesToRemove + request.rbacRoles.orEmpty()
                         request.workflow = request.workflow.copy(
-                            user = User(user.name, updatedRbac, user.roles, user.customAttNames)
+                            user = User(user.name, updatedRbac, user.roles, user.customAttributes)
                         )
                     }
                 } else {
@@ -503,7 +503,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                                 user.name,
                                 currentWorkflow.user!!.backendRoles,
                                 user.roles,
-                                user.customAttNames
+                                user.customAttributes
                             )
                         )
                 }

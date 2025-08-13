@@ -1072,7 +1072,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             // for old monitor before enable FGAC, the user field is empty
             val monitor = randomADMonitor(
                 inputs = listOf(adSearchInput(detectorId)), triggers = listOf(adMonitorTrigger()),
-                user = User(user.name, listOf(), user.roles, user.customAttNames)
+                user = User(user.name, listOf(), user.roles, user.customAttributes)
             )
             val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
             val output = entityAsMap(response)
@@ -2252,7 +2252,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         indexDoc(adResultIndex, "3", testResult3)
         val testResult4 = randomAnomalyResult(
             detectorId = detectorId, executionEndTime = testTime,
-            user = User(user.name, listOf(), user.roles, user.customAttNames),
+            user = User(user.name, listOf(), user.roles, user.customAttributes),
             anomalyGrade = 0.9
         )
         indexDoc(adResultIndex, "4", testResult4)
