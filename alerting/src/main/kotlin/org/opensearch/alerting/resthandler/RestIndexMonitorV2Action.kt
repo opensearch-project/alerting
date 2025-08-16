@@ -32,7 +32,7 @@ class RestIndexMonitorV2Action : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return mutableListOf(
+        return listOf(
             Route(
                 POST,
                 AlertingPlugin.MONITOR_V2_BASE_URI
@@ -48,9 +48,12 @@ class RestIndexMonitorV2Action : BaseRestHandler() {
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
         log.debug("${request.method()} ${request.path()}")
+        log.info("preparing rest request")
 
         val xcp = request.contentParser()
         ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
+
+        log.info("initial ensure")
 
         val monitorV2: MonitorV2
         try {
@@ -58,6 +61,8 @@ class RestIndexMonitorV2Action : BaseRestHandler() {
         } catch (e: Exception) {
             throw AlertingException.wrap(e)
         }
+
+        log.info("monitorv2 retrieved")
 
         val id = request.param("monitorID", MonitorV2.NO_ID)
         val seqNo = request.paramAsLong(IF_SEQ_NO, SequenceNumbers.UNASSIGNED_SEQ_NO)

@@ -18,6 +18,9 @@ import org.opensearch.action.support.clustermanager.AcknowledgedResponse
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorResponse
+import org.opensearch.alerting.action.ExecuteMonitorV2Action
+import org.opensearch.alerting.action.ExecuteMonitorV2Request
+import org.opensearch.alerting.action.ExecuteMonitorV2Response
 import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.alerting.action.ExecuteWorkflowResponse
@@ -63,6 +66,10 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorRunResult
+import org.opensearch.commons.alerting.model.MonitorV2
+import org.opensearch.commons.alerting.model.MonitorV2RunResult
+import org.opensearch.commons.alerting.model.PPLMonitor
+import org.opensearch.commons.alerting.model.PPLMonitor.Companion.PPL_MONITOR_TYPE
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.TriggerRunResult
 import org.opensearch.commons.alerting.model.Workflow
@@ -408,6 +415,44 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                     }
                 }
             }
+            is MonitorV2 -> {
+                if (job !is PPLMonitor) {
+                    throw IllegalStateException("Unexpected invalid MonitorV2 type: ${job.javaClass.name}")
+                }
+
+                launch {
+                    var monitorLock: LockModel? = null
+                    try {
+                        monitorLock = monitorCtx.client!!.suspendUntil<Client, LockModel?> {
+                            monitorCtx.lockService!!.acquireLock(job, it)
+                        } ?: return@launch
+                        logger.debug("lock ${monitorLock!!.lockId} acquired")
+                        logger.debug(
+                            "PERF_DEBUG: executing $PPL_MONITOR_TYPE ${job.id} on node " +
+                                monitorCtx.clusterService!!.state().nodes().localNode.id
+                        )
+                        val executeMonitorV2Request = ExecuteMonitorV2Request(
+                            false,
+                            job.id,
+                            job,
+                            TimeValue(periodStart.toEpochMilli()),
+                            TimeValue(periodEnd.toEpochMilli())
+                        )
+                        monitorCtx.client!!.suspendUntil<Client, ExecuteMonitorV2Response> {
+                            monitorCtx.client!!.execute(
+                                ExecuteMonitorV2Action.INSTANCE,
+                                executeMonitorV2Request,
+                                it
+                            )
+                        }
+                    } catch (e: Exception) {
+                        logger.error("MonitorV2 run failed for monitor with id ${job.id}", e)
+                    } finally {
+                        monitorCtx.client!!.suspendUntil<Client, Boolean> { monitorCtx.lockService!!.release(monitorLock, it) }
+                        logger.debug("lock ${monitorLock?.lockId} released")
+                    }
+                }
+            }
             else -> {
                 throw IllegalArgumentException("Invalid job type")
             }
@@ -537,6 +582,55 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 )
             }
         }
+    }
+
+    suspend fun runJobV2(
+        monitorV2: MonitorV2,
+        periodStart: Instant,
+        periodEnd: Instant,
+        dryrun: Boolean,
+        transportService: TransportService,
+    ): MonitorV2RunResult<*> {
+        // Updating the scheduled job index at the start of monitor execution runs for when there is an upgrade the the schema mapping
+        // has not been updated.
+        if (!IndexUtils.scheduledJobIndexUpdated && monitorCtx.clusterService != null && monitorCtx.client != null) {
+            IndexUtils.updateIndexMapping(
+                ScheduledJob.SCHEDULED_JOBS_INDEX,
+                ScheduledJobIndices.scheduledJobMappings(), monitorCtx.clusterService!!.state(), monitorCtx.client!!.admin().indices(),
+                object : ActionListener<AcknowledgedResponse> {
+                    override fun onResponse(response: AcknowledgedResponse) {
+                    }
+
+                    override fun onFailure(t: Exception) {
+                        logger.error("Failed to update config index schema", t)
+                    }
+                }
+            )
+        }
+
+        val executionId = "${monitorV2.id}_${LocalDateTime.now(ZoneOffset.UTC)}_${UUID.randomUUID()}"
+        val monitorV2Type = when (monitorV2) {
+            is PPLMonitor -> PPL_MONITOR_TYPE
+            else -> throw IllegalStateException("Unexpected MonitorV2 type: ${monitorV2.javaClass.name}")
+        }
+
+        logger.info(
+            "Executing scheduled monitor - id: ${monitorV2.id}, type: $monitorV2Type, periodStart: $periodStart, " +
+                "periodEnd: $periodEnd, dryrun: $dryrun, executionId: $executionId"
+        )
+
+        // to introduce new MonitorV2 type, create its MonitorRunner, and if/else branch
+        // to the corresponding MonitorRunners based on type. For now, default to PPLMonitorRunner
+        val runResult = PPLMonitorRunner.runMonitorV2(
+            monitorV2,
+            monitorCtx,
+            periodStart,
+            periodEnd,
+            dryrun,
+            executionId = executionId,
+            transportService = transportService,
+        )
+        return runResult
     }
 
     // TODO: See if we can move below methods (or few of these) to a common utils
