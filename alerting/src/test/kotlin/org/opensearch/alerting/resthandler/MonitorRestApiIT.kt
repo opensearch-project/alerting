@@ -823,7 +823,11 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Delete request not successful", RestStatus.OK, deleteResponse.restStatus())
 
         // Wait 5 seconds for event to be processed and alerts moved
-        Thread.sleep(5000)
+        OpenSearchTestCase.waitUntil({
+            val alerts = searchAlerts(monitor)
+            val historyAlerts = searchAlerts(monitor, AlertIndices.ALERT_HISTORY_WRITE_INDEX)
+            return@waitUntil (alerts.isEmpty() && historyAlerts.size == 1)
+        }, 5, TimeUnit.SECONDS)
 
         val alerts = searchAlerts(monitor)
         assertEquals("Active alert was not deleted", 0, alerts.size)
@@ -854,7 +858,9 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Update request not successful", RestStatus.OK, updateResponse.restStatus())
 
         // Wait 5 seconds for event to be processed and alerts moved
-        Thread.sleep(5000)
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil false
+        }, 5, TimeUnit.SECONDS)
 
         val alerts = searchAlerts(monitor)
         assertEquals("Active alert was not deleted", 0, alerts.size)
@@ -884,7 +890,11 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Update request not successful", RestStatus.OK, updateResponse.restStatus())
 
         // Wait 5 seconds for event to be processed and alerts moved
-        Thread.sleep(5000)
+        OpenSearchTestCase.waitUntil({
+            val alerts = searchAlerts(monitor)
+            val historyAlerts = searchAlerts(monitor, AlertIndices.ALERT_HISTORY_WRITE_INDEX)
+            return@waitUntil (alerts.isEmpty() && historyAlerts.size == 1)
+        }, 5, TimeUnit.SECONDS)
 
         val alerts = searchAlerts(monitor)
         assertEquals("Active alert was not deleted", 0, alerts.size)
@@ -1005,7 +1015,9 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         enableScheduledJob()
 
         // Sleep briefly so sweep can reschedule the Monitor
-        Thread.sleep(2000)
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil false
+        }, 2, TimeUnit.SECONDS)
 
         alertingStats = getAlertingStats()
         assertAlertingStatsSweeperEnabled(alertingStats, true)
