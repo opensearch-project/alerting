@@ -33,6 +33,7 @@ import org.opensearch.alerting.resthandler.RestAcknowledgeAlertAction
 import org.opensearch.alerting.resthandler.RestAcknowledgeChainedAlertAction
 import org.opensearch.alerting.resthandler.RestDeleteAlertingCommentAction
 import org.opensearch.alerting.resthandler.RestDeleteMonitorAction
+import org.opensearch.alerting.resthandler.RestDeleteMonitorV2Action
 import org.opensearch.alerting.resthandler.RestDeleteWorkflowAction
 import org.opensearch.alerting.resthandler.RestExecuteMonitorAction
 import org.opensearch.alerting.resthandler.RestExecuteMonitorV2Action
@@ -65,6 +66,7 @@ import org.opensearch.alerting.transport.TransportAcknowledgeAlertAction
 import org.opensearch.alerting.transport.TransportAcknowledgeChainedAlertAction
 import org.opensearch.alerting.transport.TransportDeleteAlertingCommentAction
 import org.opensearch.alerting.transport.TransportDeleteMonitorAction
+import org.opensearch.alerting.transport.TransportDeleteMonitorV2Action
 import org.opensearch.alerting.transport.TransportDeleteWorkflowAction
 import org.opensearch.alerting.transport.TransportDocLevelMonitorFanOutAction
 import org.opensearch.alerting.transport.TransportExecuteMonitorAction
@@ -229,6 +231,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             // Alerting V2
             RestIndexMonitorV2Action(),
             RestExecuteMonitorV2Action(),
+            RestDeleteMonitorV2Action(),
         )
     }
 
@@ -265,6 +268,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
 
             // Alerting V2
             ActionPlugin.ActionHandler(AlertingActions.INDEX_MONITOR_V2_ACTION_TYPE, TransportIndexMonitorV2Action::class.java),
+            ActionPlugin.ActionHandler(AlertingActions.DELETE_MONITOR_V2_ACTION_TYPE, TransportDeleteMonitorV2Action::class.java),
             ActionPlugin.ActionHandler(ExecuteMonitorV2Action.INSTANCE, TransportExecuteMonitorV2Action::class.java),
         )
     }

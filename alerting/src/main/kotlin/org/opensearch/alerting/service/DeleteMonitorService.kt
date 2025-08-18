@@ -51,7 +51,7 @@ object DeleteMonitorService :
     private val log = LogManager.getLogger(this.javaClass)
 
     private lateinit var client: Client
-    private lateinit var lockService: LockService
+    lateinit var lockService: LockService
 
     fun initialize(
         client: Client,
@@ -74,7 +74,8 @@ object DeleteMonitorService :
         return DeleteMonitorResponse(deleteResponse.id, deleteResponse.version)
     }
 
-    private suspend fun deleteMonitor(monitorId: String, refreshPolicy: RefreshPolicy): DeleteResponse {
+    // both Alerting v1 and v2 workflows use this function
+    suspend fun deleteMonitor(monitorId: String, refreshPolicy: RefreshPolicy): DeleteResponse {
         val deleteMonitorRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, monitorId)
             .setRefreshPolicy(refreshPolicy)
         return client.suspendUntil { delete(deleteMonitorRequest, it) }
@@ -166,8 +167,12 @@ object DeleteMonitorService :
         }
     }
 
-    private suspend fun deleteLock(monitor: Monitor) {
-        client.suspendUntil<Client, Boolean> { lockService.deleteLock(LockModel.generateLockId(monitor.id), it) }
+    suspend fun deleteLock(monitor: Monitor) {
+        deleteLock(monitor.id)
+    }
+
+    suspend fun deleteLock(monitorId: String) {
+        client.suspendUntil<Client, Boolean> { lockService.deleteLock(LockModel.generateLockId(monitorId), it) }
     }
 
     /**
