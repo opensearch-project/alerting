@@ -33,6 +33,8 @@ import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.node.NodeClient
 import java.time.Instant
+import java.time.ZoneOffset.UTC
+import java.time.format.DateTimeFormatter
 
 object PPLMonitorRunner : MonitorV2Runner() {
     private val logger = LogManager.getLogger(javaClass)
@@ -41,6 +43,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
     const val PPL_SQL_QUERY_FIELD = "query" // name of PPL query field when passing into PPL/SQL Execute API call
 
     // TODO: this is a hacky implementation, needs serious revision and additions
+    // TODO: implement custom condition triggering
     override suspend fun runMonitorV2(
         monitorV2: MonitorV2,
         monitorCtx: MonitorRunnerExecutionContext, // MonitorV2 reads from same context as Monitor
@@ -65,7 +68,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
         // TODO: should alerting v1 and v2 alerts index be separate?
         // TODO: should alerting v1 and v2 alerting-config index be separate?
         val currentAlerts = try {
-            // write generated V2 alerts to existing alerts v1 index for now
+            // TODO: write generated V2 alerts to existing alerts v1 index for now, revisit this decision
             monitorCtx.alertIndices!!.createOrUpdateAlertIndex()
             monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex()
         } catch (e: Exception) {
@@ -75,9 +78,36 @@ object PPLMonitorRunner : MonitorV2Runner() {
             return monitorV2Result.copy(error = e)
         }
 
-        // call PPL plugin to execute query
+        // inject time filter into PPL query to only query for data within the (periodStart, periodEnd) interval
+        // TODO: if query contains "_time", "span", "earliest", "latest", skip adding filter
+        // TODO: pending https://github.com/opensearch-project/sql/issues/3969
+        // for now assume "_time" field is always present in customer data
+
+        // PPL plugin only accepts timestamp strings in this format
+        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(UTC)
+
+        val periodStartPplTimestamp = formatter.format(periodStart)
+        val periodEndPplTimeStamp = formatter.format(periodEnd)
+
+        val timeFilterReplace = "| where _time > TIMESTAMP('$periodStartPplTimestamp') and _time < TIMESTAMP('$periodEndPplTimeStamp') |"
+        val timeFilterAppend = "| where _time > TIMESTAMP('$periodStartPplTimestamp') and _time < TIMESTAMP('$periodEndPplTimeStamp')"
+
+        val timeFilteredQuery: String = if (monitorV2.query.contains("|")) {
+            // if Monitor query contains piped statements, inject the time filter
+            // as the first piped statement (i.e. before more complex statements
+            // like aggregations can take effect later in the query)
+            monitorV2.query.replaceFirst("|", timeFilterReplace)
+        } else {
+            // otherwise the query contains no piped statements and is simply a
+            // `search source=<index>` statement, simply append time filter at the end
+            monitorV2.query + timeFilterAppend
+        }
+
+        logger.info("time filtered query: $timeFilteredQuery")
+
+        // call PPL plugin to execute time filtered query
         val transportPplQueryRequest = TransportPPLQueryRequest(
-            monitorV2.query,
+            timeFilteredQuery,
             JSONObject(mapOf(PPL_SQL_QUERY_FIELD to monitorV2.query)),
             null // null path falls back to a default path internal to SQL/PPL Plugin
         )
@@ -93,6 +123,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
         val queryResponseJson = JSONObject(transportPplQueryResponse.result)
         val numResults = queryResponseJson.getLong("total")
 
+        // TODO: create Map<triggerId, queryResponseJson> queryResults
         val triggerResults = mutableMapOf<String, PPLTriggerRunResult>()
         val generatedAlerts = mutableListOf<AlertV2>()
 
@@ -105,6 +136,9 @@ object PPLMonitorRunner : MonitorV2Runner() {
             val triggered = evaluateNumResultsTrigger(numResults, trigger.numResultsCondition!!, trigger.numResultsValue!!)
 
             val pplTriggerRunResult = PPLTriggerRunResult(trigger.name, triggered, null)
+
+            logger.info("trigger ${trigger.name} triggered: $triggered")
+            logger.info("ppl query results: $queryResponseJson")
 
             // TODO: currently naively generates an alert and action every time
             // TODO: maintain alert state, check for COMPLETED alert and suppression condition, like query level monitor
@@ -123,7 +157,10 @@ object PPLMonitorRunner : MonitorV2Runner() {
             )
 
             triggerResults[pplTrigger.id] = pplTriggerRunResult
-            generatedAlerts.add(alertV2)
+
+            if (triggered) {
+                generatedAlerts.add(alertV2)
+            }
 
 //            if (monitorCtx.triggerService!!.isQueryLevelTriggerActionable(triggerCtx, triggerResult, workflowRunContext)) {
 //                val actionCtx = triggerCtx.copy(error = monitorResult.error ?: triggerResult.error)

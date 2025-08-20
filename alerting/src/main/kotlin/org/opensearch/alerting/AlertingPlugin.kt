@@ -54,6 +54,7 @@ import org.opensearch.alerting.resthandler.RestSearchAlertingCommentAction
 import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
 import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
 import org.opensearch.alerting.resthandler.RestSearchMonitorAction
+import org.opensearch.alerting.resthandler.RestSearchMonitorV2Action
 import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings
@@ -89,6 +90,7 @@ import org.opensearch.alerting.transport.TransportSearchAlertingCommentAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
+import org.opensearch.alerting.transport.TransportSearchMonitorV2Action
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
@@ -177,7 +179,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         @JvmField val FINDING_BASE_URI = "/_plugins/_alerting/findings"
         @JvmField val COMMENTS_BASE_URI = "/_plugins/_alerting/comments"
 
-        @JvmField val ALERTING_JOB_TYPES = listOf("monitor", "workflow")
+        @JvmField val ALERTING_JOB_TYPES = listOf("monitor", "workflow", "monitor_v2")
     }
 
     lateinit var runner: MonitorRunnerService
@@ -232,6 +234,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestIndexMonitorV2Action(),
             RestExecuteMonitorV2Action(),
             RestDeleteMonitorV2Action(),
+            RestSearchMonitorV2Action(settings, clusterService),
         )
     }
 
@@ -268,6 +271,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
 
             // Alerting V2
             ActionPlugin.ActionHandler(AlertingActions.INDEX_MONITOR_V2_ACTION_TYPE, TransportIndexMonitorV2Action::class.java),
+            ActionPlugin.ActionHandler(AlertingActions.SEARCH_MONITORS_V2_ACTION_TYPE, TransportSearchMonitorV2Action::class.java),
             ActionPlugin.ActionHandler(AlertingActions.DELETE_MONITOR_V2_ACTION_TYPE, TransportDeleteMonitorV2Action::class.java),
             ActionPlugin.ActionHandler(ExecuteMonitorV2Action.INSTANCE, TransportExecuteMonitorV2Action::class.java),
         )

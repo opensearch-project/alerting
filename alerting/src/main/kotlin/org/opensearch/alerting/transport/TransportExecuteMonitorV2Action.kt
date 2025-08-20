@@ -54,7 +54,7 @@ class TransportExecuteMonitorV2Action @Inject constructor(
         actionListener: ActionListener<ExecuteMonitorV2Response>
     ) {
 //        client.threadPool().threadContext.stashContext().use { // TODO: include this when security plugin enabled
-        // first define a function that will be used later to run MonitorV2s
+        /* first define a function that will be used later to run MonitorV2s */
         val executeMonitorV2 = fun (monitorV2: MonitorV2) {
             runner.launch {
                 // get execution time interval
@@ -96,7 +96,16 @@ class TransportExecuteMonitorV2Action @Inject constructor(
             }
         }
 
-        // now execute the MonitorV2
+        /* now execute the MonitorV2 */
+
+        // if both monitor_v2 id and object were passed in, ignore object and proceed with id
+        if (execMonitorV2Request.monitorId != null && execMonitorV2Request.monitorV2 != null) {
+            log.info(
+                "Both a monitor_v2 id and monitor_v2 object were passed in to ExecuteMonitorV2" +
+                    "request. Proceeding to execute by monitor_v2 ID and ignoring monitor_v2 object."
+            )
+        }
+
         if (execMonitorV2Request.monitorId != null) { // execute with monitor ID case
             // search the alerting-config index for the MonitorV2 with this ID
             val getMonitorV2Request = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX).id(execMonitorV2Request.monitorId)
@@ -116,7 +125,6 @@ class TransportExecuteMonitorV2Action @Inject constructor(
                             return
                         }
                         if (!getMonitorV2Response.isSourceEmpty) {
-                            log.info("found monitor")
                             XContentHelper.createParser(
                                 xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                                 getMonitorV2Response.sourceAsBytesRef, XContentType.JSON

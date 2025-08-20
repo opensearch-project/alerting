@@ -49,11 +49,6 @@ class ExecuteMonitorV2Request : ActionRequest {
                 "Neither a monitor ID or monitor object was supplied",
                 exception
             )
-        } else if (monitorV2 != null && monitorId != null) {
-            exception = ValidateActions.addValidationError(
-                "Both a monitor ID and a monitor object were supplied, only one of these is accepted",
-                exception
-            )
         }
         return exception
     }

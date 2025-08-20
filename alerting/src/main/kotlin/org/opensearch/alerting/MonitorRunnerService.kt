@@ -323,6 +323,8 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                     logger.error("Failed to move active alerts for monitor [${job.id}].", e)
                 }
             }
+        } else if (job is MonitorV2) {
+            return
         } else {
             throw IllegalArgumentException("Invalid job type")
         }
@@ -433,8 +435,8 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                         )
                         val executeMonitorV2Request = ExecuteMonitorV2Request(
                             false,
-                            job.id,
-                            job,
+                            job.id, // only need to pass in MonitorV2 ID
+                            null, // no need to pass in MonitorV2 object itself
                             TimeValue(periodStart.toEpochMilli()),
                             TimeValue(periodEnd.toEpochMilli())
                         )
