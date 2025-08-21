@@ -63,32 +63,29 @@ object PPLMonitorRunner : MonitorV2Runner() {
             logger.warn("Start and end time are the same: $periodStart. This monitor will probably only run once.")
         }
 
-        var monitorV2Result = PPLMonitorRunResult(monitorV2.name, null, periodStart, periodEnd, mapOf(), "")
+        var monitorV2Result = PPLMonitorRunResult(monitorV2.name, null, periodStart, periodEnd, mapOf(), mapOf())
 
         // TODO: should alerting v1 and v2 alerts index be separate?
         // TODO: should alerting v1 and v2 alerting-config index be separate?
-        val currentAlerts = try {
-            // TODO: write generated V2 alerts to existing alerts v1 index for now, revisit this decision
-            monitorCtx.alertIndices!!.createOrUpdateAlertIndex()
-            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex()
-        } catch (e: Exception) {
-            // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
-            val id = if (monitorV2.id.trim().isEmpty()) "_na_" else monitorV2.id
-            logger.error("Error loading alerts for monitorV2: $id", e)
-            return monitorV2Result.copy(error = e)
-        }
+//        val currentAlerts = try {
+//            // TODO: write generated V2 alerts to existing alerts v1 index for now, revisit this decision
+//            monitorCtx.alertIndices!!.createOrUpdateAlertIndex()
+//            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex()
+//        } catch (e: Exception) {
+//            // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
+//            val id = if (monitorV2.id.trim().isEmpty()) "_na_" else monitorV2.id
+//            logger.error("Error loading alerts for monitorV2: $id", e)
+//            return monitorV2Result.copy(error = e)
+//        }
 
         val timeFilteredQuery = addTimeFilter(monitorV2.query, periodStart, periodEnd)
 
-        // TODO: create Map<triggerId, queryResponseJson> queryResults
         val triggerResults = mutableMapOf<String, PPLTriggerRunResult>()
+        val pplQueryResults = mutableMapOf<String, JSONObject>()
         val generatedAlerts = mutableListOf<AlertV2>()
 
         for (trigger in monitorV2.triggers) {
             val pplTrigger = trigger as PPLTrigger
-            if (pplTrigger.mode == TriggerMode.PER_RESULT) {
-                break // TODO: handle custom condition case and per result trigger mode
-            }
 
             if (pplTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number_of_results trigger
                 val queryResponseJson = executePplQuery(timeFilteredQuery, monitorCtx)
@@ -100,6 +97,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
                 val pplTriggerRunResult = PPLTriggerRunResult(trigger.name, triggered, null)
 
                 triggerResults[pplTrigger.id] = pplTriggerRunResult
+                pplQueryResults[pplTrigger.id] = queryResponseJson
 
                 logger.info("trigger ${trigger.name} triggered: $triggered")
                 logger.info("ppl query results: $queryResponseJson")
@@ -107,6 +105,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
                 if (triggered) {
                     // TODO: currently naively generates an alert and action every time
                     // TODO: maintain alert state, check for COMPLETED alert and suppression condition, like query level monitor
+                    // query results will not be stored in alerts, but are instead included in notification actions
                     val alertV2 = AlertV2(
                         monitorId = monitorV2.id,
                         monitorName = monitorV2.name,
@@ -120,7 +119,13 @@ object PPLMonitorRunner : MonitorV2Runner() {
                         actionExecutionResults = listOf(),
                     )
 
-                    generatedAlerts.add(alertV2)
+                    if (pplTrigger.mode == TriggerMode.RESULT_SET) {
+                        generatedAlerts.add(alertV2)
+                    } else { // TriggerMode.PER_RESULT
+                        for (i in 0 until numResults) {
+                            generatedAlerts.add(alertV2)
+                        }
+                    }
                 }
             } else { // custom trigger
                 val queryWithCustomCondition = addCustomCondition(timeFilteredQuery, trigger.customCondition!!)
@@ -173,19 +178,20 @@ object PPLMonitorRunner : MonitorV2Runner() {
                 }
 
                 val dataRowList = queryResponseJson.getJSONArray("datarows")
-                var triggered = false
+                var numTriggered = 0 // the number of query result rows that evaluated to true
                 for (i in 0 until dataRowList.length()) {
                     val dataRow = dataRowList.getJSONArray(i)
                     val evalResult = dataRow.getBoolean(evalResultVarIdx)
                     if (evalResult) {
-                        triggered = true
-                        break
+                        numTriggered++
                     }
                 }
 
+                val triggered = numTriggered > 0
                 val pplTriggerRunResult = PPLTriggerRunResult(trigger.name, triggered, null)
 
                 triggerResults[pplTrigger.id] = pplTriggerRunResult
+                pplQueryResults[pplTrigger.id] = queryResponseJson
 
                 logger.info("trigger ${trigger.name} triggered: $triggered")
                 logger.info("ppl query results: $queryResponseJson")
@@ -206,7 +212,13 @@ object PPLMonitorRunner : MonitorV2Runner() {
                         actionExecutionResults = listOf(),
                     )
 
-                    generatedAlerts.add(alertV2)
+                    if (pplTrigger.mode == TriggerMode.RESULT_SET) {
+                        generatedAlerts.add(alertV2)
+                    } else { // TriggerMode.PER_RESULT
+                        for (i in 0 until numTriggered) {
+                            generatedAlerts.add(alertV2)
+                        }
+                    }
                 }
             }
 
@@ -228,7 +240,10 @@ object PPLMonitorRunner : MonitorV2Runner() {
             )
         }
 
-        return monitorV2Result.copy(triggerResults = triggerResults)
+        logger.info("trigger results: $triggerResults")
+        logger.info("ppl query results: $pplQueryResults")
+
+        return monitorV2Result.copy(triggerResults = triggerResults, pplQueryResults = pplQueryResults)
     }
 
     private fun evaluateNumResultsTrigger(numResults: Long, numResultsCondition: NumResultsCondition, numResultsValue: Long): Boolean {
