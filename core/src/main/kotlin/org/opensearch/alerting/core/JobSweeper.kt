@@ -428,6 +428,7 @@ class JobSweeper(
                 "Unable to parse ScheduledJob source: {}",
                 Strings.cleanTruncate(jobSource.utf8ToString(), 1000)
             )
+            logger.warn("exception thrown: $e")
             sweep(shardId, jobId, jobVersion, null, true)
             null
         }

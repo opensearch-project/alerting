@@ -131,6 +131,9 @@
     "end_time": {
       "type": "date"
     },
+    "expiration_time": {
+      "type": "date"
+    },
     "error_message": {
       "type": "text"
     },

@@ -192,6 +192,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     lateinit var alertIndices: AlertIndices
     lateinit var clusterService: ClusterService
     lateinit var destinationMigrationCoordinator: DestinationMigrationCoordinator
+    lateinit var alertV2Expirer: AlertV2Expirer
     var monitorTypeToMonitorRunners: MutableMap<String, RemoteMonitorRegistry> = mutableMapOf()
 
     override fun getRestHandlers(
@@ -347,6 +348,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         scheduler = JobScheduler(threadPool, runner)
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
         destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool, scheduledJobIndices)
+        alertV2Expirer = AlertV2Expirer(client, threadPool, clusterService)
         this.threadPool = threadPool
         this.clusterService = clusterService
 
@@ -374,6 +376,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             commentsIndices,
             docLevelMonitorQueries,
             destinationMigrationCoordinator,
+            alertV2Expirer,
             lockService,
             alertService,
             triggerService
