@@ -98,9 +98,6 @@ class AlertV2Expirer(
                 .execute(
                     object : ActionListener<BulkByScrollResponse> {
                         override fun onResponse(response: BulkByScrollResponse) {
-                            logger.info("noops: ${response.noops}")
-                            logger.info("status: ${response.status}")
-                            logger.info("searchFailures: ${response.searchFailures}")
                             logger.info("Deleted ${response.deleted} expired alerts")
                         }
                         override fun onFailure(e: Exception) {

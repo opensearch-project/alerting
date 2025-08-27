@@ -24,36 +24,17 @@ import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsAction
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsTransportAction
 import org.opensearch.alerting.core.lock.LockService
-import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler
 import org.opensearch.alerting.core.schedule.JobScheduler
 import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSettings
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.remote.monitors.RemoteMonitorRegistry
-import org.opensearch.alerting.resthandler.RestAcknowledgeAlertAction
-import org.opensearch.alerting.resthandler.RestAcknowledgeChainedAlertAction
-import org.opensearch.alerting.resthandler.RestDeleteAlertingCommentAction
 import org.opensearch.alerting.resthandler.RestDeleteMonitorAction
 import org.opensearch.alerting.resthandler.RestDeleteMonitorV2Action
-import org.opensearch.alerting.resthandler.RestDeleteWorkflowAction
-import org.opensearch.alerting.resthandler.RestExecuteMonitorAction
 import org.opensearch.alerting.resthandler.RestExecuteMonitorV2Action
-import org.opensearch.alerting.resthandler.RestExecuteWorkflowAction
-import org.opensearch.alerting.resthandler.RestGetAlertsAction
-import org.opensearch.alerting.resthandler.RestGetDestinationsAction
-import org.opensearch.alerting.resthandler.RestGetEmailAccountAction
-import org.opensearch.alerting.resthandler.RestGetEmailGroupAction
-import org.opensearch.alerting.resthandler.RestGetFindingsAction
+import org.opensearch.alerting.resthandler.RestGetAlertsV2Action
 import org.opensearch.alerting.resthandler.RestGetMonitorAction
-import org.opensearch.alerting.resthandler.RestGetRemoteIndexesAction
-import org.opensearch.alerting.resthandler.RestGetWorkflowAction
-import org.opensearch.alerting.resthandler.RestGetWorkflowAlertsAction
-import org.opensearch.alerting.resthandler.RestIndexAlertingCommentAction
 import org.opensearch.alerting.resthandler.RestIndexMonitorAction
 import org.opensearch.alerting.resthandler.RestIndexMonitorV2Action
-import org.opensearch.alerting.resthandler.RestSearchAlertingCommentAction
-import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
-import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
-import org.opensearch.alerting.resthandler.RestSearchMonitorAction
 import org.opensearch.alerting.resthandler.RestSearchMonitorV2Action
 import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.service.DeleteMonitorService
@@ -206,36 +187,37 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     ): List<RestHandler> {
         return listOf(
             // Alerting V1
-            RestGetMonitorAction(),
-            RestDeleteMonitorAction(),
+//            RestGetMonitorAction(),
+//            RestDeleteMonitorAction(),
 //            RestIndexMonitorAction(),
 //            RestIndexWorkflowAction(),
-            RestSearchMonitorAction(settings, clusterService),
-            RestExecuteMonitorAction(),
-            RestExecuteWorkflowAction(),
-            RestAcknowledgeAlertAction(),
-            RestAcknowledgeChainedAlertAction(),
-            RestScheduledJobStatsHandler("_alerting"),
-            RestSearchEmailAccountAction(),
-            RestGetEmailAccountAction(),
-            RestSearchEmailGroupAction(),
-            RestGetEmailGroupAction(),
-            RestGetDestinationsAction(),
-            RestGetAlertsAction(),
-            RestGetWorkflowAlertsAction(),
-            RestGetFindingsAction(),
-            RestGetWorkflowAction(),
-            RestDeleteWorkflowAction(),
-            RestGetRemoteIndexesAction(),
-            RestIndexAlertingCommentAction(),
-            RestSearchAlertingCommentAction(),
-            RestDeleteAlertingCommentAction(),
+//            RestSearchMonitorAction(settings, clusterService),
+//            RestExecuteMonitorAction(),
+//            RestExecuteWorkflowAction(),
+//            RestAcknowledgeAlertAction(),
+//            RestAcknowledgeChainedAlertAction(),
+//            RestScheduledJobStatsHandler("_alerting"),
+//            RestSearchEmailAccountAction(),
+//            RestGetEmailAccountAction(),
+//            RestSearchEmailGroupAction(),
+//            RestGetEmailGroupAction(),
+//            RestGetDestinationsAction(),
+//            RestGetAlertsAction(),
+//            RestGetWorkflowAlertsAction(),
+//            RestGetFindingsAction(),
+//            RestGetWorkflowAction(),
+//            RestDeleteWorkflowAction(),
+//            RestGetRemoteIndexesAction(),
+//            RestIndexAlertingCommentAction(),
+//            RestSearchAlertingCommentAction(),
+//            RestDeleteAlertingCommentAction(),
 
             // Alerting V2
             RestIndexMonitorV2Action(),
             RestExecuteMonitorV2Action(),
             RestDeleteMonitorV2Action(),
             RestSearchMonitorV2Action(settings, clusterService),
+            RestGetAlertsV2Action(),
         )
     }
 

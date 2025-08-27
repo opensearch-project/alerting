@@ -93,6 +93,7 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.UUID
+import org.opensearch.alerting.script.TriggerV2ExecutionContext
 import kotlin.coroutines.CoroutineContext
 
 object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
@@ -674,6 +675,12 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     }
 
     internal fun compileTemplate(template: Script, ctx: TriggerExecutionContext): String {
+        return monitorCtx.scriptService!!.compile(template, TemplateScript.CONTEXT)
+            .newInstance(template.params + mapOf("ctx" to ctx.asTemplateArg()))
+            .execute()
+    }
+
+    internal fun compileTemplateV2(template: Script, ctx: TriggerV2ExecutionContext): String {
         return monitorCtx.scriptService!!.compile(template, TemplateScript.CONTEXT)
             .newInstance(template.params + mapOf("ctx" to ctx.asTemplateArg()))
             .execute()

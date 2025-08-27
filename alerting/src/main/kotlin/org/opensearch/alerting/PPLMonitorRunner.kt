@@ -35,6 +35,11 @@ import java.time.Instant
 import java.time.ZoneOffset.UTC
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import org.opensearch.alerting.QueryLevelMonitorRunner.getConfigAndSendNotification
+import org.opensearch.alerting.script.PPLTriggerExecutionContext
+import org.opensearch.commons.alerting.model.ActionRunResult
+import org.opensearch.commons.alerting.model.action.Action
+import org.opensearch.core.common.Strings
 
 object PPLMonitorRunner : MonitorV2Runner() {
     private val logger = LogManager.getLogger(javaClass)
@@ -72,6 +77,10 @@ object PPLMonitorRunner : MonitorV2Runner() {
         val pplQueryResults = mutableMapOf<String, JSONObject>()
         val generatedAlerts = mutableListOf<AlertV2>()
 
+        // TODO: Instant.ofEpochMilli(monitorCtx.threadPool!!.absoluteTimeInMillis()) alternative?
+        // set the current execution time
+        val timeOfCurrentExecution = Instant.now()
+
         // TODO: should alerting v1 and v2 alerts index be separate?
         // TODO: should alerting v1 and v2 alerting-config index be separate?
         try {
@@ -90,115 +99,101 @@ object PPLMonitorRunner : MonitorV2Runner() {
 
         // run each trigger
         for (trigger in pplMonitor.triggers) {
-            val pplTrigger = trigger as PPLTrigger
+            try {
+                val pplTrigger = trigger as PPLTrigger
 
-            // check for suppression and skip execution
-            // before even running the trigger itself
-            val suppressed = checkForSuppress(pplTrigger)
-            if (suppressed) {
-                logger.info("throttling trigger ${pplTrigger.name} from monitor ${pplMonitor.name}")
-                continue
-            }
-            logger.info("throttling check passed, executing trigger ${pplTrigger.name} from monitor ${pplMonitor.name}")
+                // check for suppression and skip execution
+                // before even running the trigger itself
+                val suppressed = checkForSuppress(pplTrigger, timeOfCurrentExecution)
+                if (suppressed) {
+                    logger.info("suppressing trigger ${pplTrigger.name} from monitor ${pplMonitor.name}")
+                    continue
+                }
+                logger.info("suppression check passed, executing trigger ${pplTrigger.name} from monitor ${pplMonitor.name}")
 
-//            internal fun isActionActionable(action: Action, alert: Alert?): Boolean {
-//                if (alert != null && alert.state == Alert.State.AUDIT)
-//                    return false
-//                if (alert == null || action.throttle == null) {
+//                internal fun isActionActionable(action: Action, alert: Alert?): Boolean {
+//                    if (alert != null && alert.state == Alert.State.AUDIT)
+//                        return false
+//                    if (alert == null || action.throttle == null) {
+//                        return true
+//                    }
+//                    if (action.throttleEnabled) {
+//                        val result = alert.actionExecutionResults.firstOrNull { r -> r.actionId == action.id }
+//                        val lastExecutionTime: Instant? = result?.lastExecutionTime
+//                        val throttledTimeBound = currentTime().minus(action.throttle!!.value.toLong(), action.throttle!!.unit)
+//                        return (lastExecutionTime == null || lastExecutionTime.isBefore(throttledTimeBound))
+//                    }
 //                    return true
 //                }
-//                if (action.throttleEnabled) {
-//                    val result = alert.actionExecutionResults.firstOrNull { r -> r.actionId == action.id }
-//                    val lastExecutionTime: Instant? = result?.lastExecutionTime
-//                    val throttledTimeBound = currentTime().minus(action.throttle!!.value.toLong(), action.throttle!!.unit)
-//                    return (lastExecutionTime == null || lastExecutionTime.isBefore(throttledTimeBound))
-//                }
-//                return true
-//            }
 
-            // if trigger uses custom condition, append the custom condition to query, otherwise simply proceed
-            val queryToExecute = if (pplTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number of results trigger
-                timeFilteredQuery
-            } else { // custom condition trigger
-                appendCustomCondition(timeFilteredQuery, pplTrigger.customCondition!!)
+                // if trigger uses custom condition, append the custom condition to query, otherwise simply proceed
+                val queryToExecute = if (pplTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number of results trigger
+                    timeFilteredQuery
+                } else { // custom condition trigger
+                    appendCustomCondition(timeFilteredQuery, pplTrigger.customCondition!!)
+                }
+
+                // TODO: does this handle pagination? does it need to?
+                // execute the PPL query
+                val queryResponseJson = executePplQuery(queryToExecute, nodeClient)
+                logger.info("query execution results for trigger ${pplTrigger.name}: $queryResponseJson")
+
+                // retrieve the number of results
+                // for number of results triggers, this is simply the number of PPL query results
+                // for custom triggers, this is the number of rows in the query response's eval result column that evaluated to true
+                val numResults = if (pplTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number of results trigger
+                    queryResponseJson.getLong("total")
+                } else { // custom condition trigger
+                    evaluateCustomConditionTrigger(queryResponseJson, pplTrigger)
+                }
+
+                // determine if the trigger condition has been met
+                val triggered = if (pplTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number of results trigger
+                    evaluateNumResultsTrigger(numResults, pplTrigger.numResultsCondition!!, pplTrigger.numResultsValue!!)
+                } else { // custom condition trigger
+                    numResults > 0 // if any of the query results satisfied the custom condition, the trigger counts as triggered
+                }
+
+                logger.info("PPLTrigger ${pplTrigger.name} triggered: $triggered")
+
+                // store the trigger execution and ppl query results for
+                // trigger execution response and notification message context
+                triggerResults[pplTrigger.id] = PPLTriggerRunResult(pplTrigger.name, triggered, null)
+                pplQueryResults[pplTrigger.id] = queryResponseJson
+
+                if (triggered) {
+                    // collect the generated alerts to be written to alerts index
+                    generatedAlerts.addAll(generateAlerts(pplTrigger, pplMonitor, numResults, timeOfCurrentExecution))
+
+                    // update the trigger's last execution time for future suppression checks
+                    pplTrigger.lastTriggeredTime = timeOfCurrentExecution
+
+                    // TODO: this is purely a result set implementation
+                    // TODO: when trigger is per result, need to send for every individual result, not just the whole thing
+                    // send alert notifications
+                    val pplTriggerExecutionContext = PPLTriggerExecutionContext(
+                        monitorV2,
+                        periodStart,
+                        periodEnd,
+                        null,
+                        pplTrigger,
+                        pplQueryResults[pplTrigger.id]!!.toMap()
+                    )
+                    for (action in pplTrigger.actions) {
+                        runAction(
+                            action,
+                            pplTriggerExecutionContext,
+                            monitorCtx,
+                            pplMonitor,
+                            dryRun,
+                            timeOfCurrentExecution
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                logger.error("failed to run PPL Trigger for PPL Monitor ${pplMonitor.name}", e)
+                continue
             }
-
-            // TODO: does this handle pagination? does it need to?
-            // execute the PPL query
-            val queryResponseJson = executePplQuery(queryToExecute, nodeClient)
-
-            // retrieve the number of results
-            // for number of results triggers, this is simply the number of PPL query results
-            // for custom triggers, this is the number of rows in the query response's eval result column that evaluated to true
-            val numResults = if (pplTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number of results trigger
-                queryResponseJson.getLong("total")
-            } else { // custom condition trigger
-                evaluateCustomConditionTrigger(queryResponseJson, pplTrigger)
-            }
-
-            // determine if the trigger condition has been met
-            val triggered = if (pplTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number of results trigger
-                evaluateNumResultsTrigger(numResults, pplTrigger.numResultsCondition!!, pplTrigger.numResultsValue!!)
-            } else { // custom condition trigger
-                numResults > 0 // if any of the query results satisfied the custom condition, the trigger counts as triggered
-            }
-
-            logger.info("PPLTrigger ${pplTrigger.name} triggered: $triggered")
-
-            // store the trigger execution and ppl query results for
-            // trigger execution response and notification message context
-            triggerResults[pplTrigger.id] = PPLTriggerRunResult(pplTrigger.name, triggered, null)
-            pplQueryResults[pplTrigger.id] = queryResponseJson
-
-            // generate an alert if triggered
-            if (triggered) {
-                generatedAlerts.addAll(generateAlerts(pplTrigger, pplMonitor, numResults))
-            }
-
-//            // execute and evaluate trigger based on trigger type
-//            if (pplTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number_of_results trigger
-//                // execute the PPL query
-//                val queryResponseJson = executePplQuery(timeFilteredQuery, monitorCtx)
-//
-//                // read in the number of results
-//                val numResults = queryResponseJson.getLong("total")
-//
-//                // check if the number of results satisfies the trigger condition
-//                val triggered = evaluateNumResultsTrigger(numResults, trigger.numResultsCondition!!, trigger.numResultsValue!!)
-//
-//                // store the trigger execution and ppl query results for execution response
-//                // and notification message context
-//                triggerResults[pplTrigger.id] = PPLTriggerRunResult(trigger.name, triggered, null)
-//                pplQueryResults[pplTrigger.id] = queryResponseJson
-//
-//                logger.info("number of results trigger ${trigger.name} triggered: $triggered")
-//
-//                // generate an alert if triggered
-//                if (triggered) {
-//                    generateAlerts(trigger, numResults)
-//                }
-//            } else { // custom trigger
-//                val queryWithCustomCondition = appendCustomCondition(timeFilteredQuery, trigger.customCondition!!)
-//                val queryResponseJson = executePplQuery(queryWithCustomCondition, monitorCtx)
-//                val numTriggered = evaluateCustomConditionTrigger(queryResponseJson, pplTrigger, pplMonitor)
-//                val triggered = numTriggered > 0
-//
-//                triggerResults[pplTrigger.id] = PPLTriggerRunResult(trigger.name, triggered, null)
-//                pplQueryResults[pplTrigger.id] = queryResponseJson
-//
-//                logger.info("custom condition trigger ${trigger.name} triggered: $triggered")
-//
-//                if (triggered) {
-//                    generateAlerts(trigger, numTriggered)
-//                }
-//            }
-
-//            if (monitorCtx.triggerService!!.isQueryLevelTriggerActionable(triggerCtx, triggerResult, workflowRunContext)) {
-//                val actionCtx = triggerCtx.copy(error = monitorResult.error ?: triggerResult.error)
-//                for (action in trigger.actions) {
-//                    triggerResult.actionResults[action.id] = this.runAction(action, actionCtx, monitorCtx, monitor, dryrun)
-//                }
-//            }
         }
 
         // TODO: what if retry policy null?
@@ -212,22 +207,27 @@ object PPLMonitorRunner : MonitorV2Runner() {
         // with updated last triggered times for each of its triggers
         updateMonitorWithLastTriggeredTimes(pplMonitor, nodeClient)
 
-        return PPLMonitorRunResult(pplMonitor.name, null, periodStart, periodEnd, triggerResults, pplQueryResults)
+        return PPLMonitorRunResult(
+            pplMonitor.name,
+            null,
+            periodStart,
+            periodEnd,
+            triggerResults,
+            pplQueryResults.map { it.key to it.value.toMap() }.toMap()
+        )
     }
 
-    private fun checkForSuppress(pplTrigger: PPLTrigger): Boolean {
-        val currentTime = Instant.now() // TODO: Instant.ofEpochMilli(monitorCtx.threadPool!!.absoluteTimeInMillis()) alternative?
-
+    private fun checkForSuppress(pplTrigger: PPLTrigger, timeOfCurrentExecution: Instant): Boolean {
         // the interval between throttledTimeBound and now is the suppression window
         // i.e. any PPLTrigger whose last trigger time is in this window must be suppressed
-        val throttledTimeBound = pplTrigger.suppressDuration?.let {
-            currentTime.minus(pplTrigger.suppressDuration!!.millis, ChronoUnit.MILLIS)
+        val suppressTimeBound = pplTrigger.suppressDuration?.let {
+            timeOfCurrentExecution.minus(pplTrigger.suppressDuration!!.millis, ChronoUnit.MILLIS)
         }
 
         // the trigger must be suppressed if...
         return pplTrigger.suppressDuration != null && // suppression is enabled on the PPLTrigger
             pplTrigger.lastTriggeredTime != null && // and it has triggered before at least once
-            pplTrigger.lastTriggeredTime!!.isAfter(throttledTimeBound!!) // and it's not yet out of the suppression window
+            pplTrigger.lastTriggeredTime!!.isAfter(suppressTimeBound!!) // and it's not yet out of the suppression window
     }
 
     // adds monitor schedule-based time filter
@@ -305,14 +305,14 @@ object PPLMonitorRunner : MonitorV2Runner() {
         // do not trigger alert, but warn that query likely is not functioning as user intended
         if (customConditionQueryResponse.getLong("total") == 0L) {
             logger.warn(
-                "During execution of PPL Trigger ${pplTrigger.name}, PPL query with custom" +
+                "During execution of PPL Trigger ${pplTrigger.name}, PPL query with custom " +
                     "condition returned no results. Proceeding without generating alert."
             )
             return 0L
         }
 
         // find the name of the eval result variable defined in custom condition
-        val evalResultVarName = pplTrigger.customCondition!!.split(" ")[1] // [0] is "eval", [1] is the var name
+        val evalResultVarName = findEvalResultVar(pplTrigger.customCondition!!)
 
         // find the eval statement result variable in the PPL query response schema
         val schemaList = customConditionQueryResponse.getJSONArray("schema")
@@ -337,7 +337,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
         // eval statement result variable should always be found
         if (evalResultVarIdx == -1) {
             throw IllegalStateException(
-                "expected to find eval statement results variable $evalResultVarName in results" +
+                "expected to find eval statement results variable \"$evalResultVarName\" in results " +
                     "of PPL query with custom condition, but did not."
             )
         }
@@ -355,11 +355,30 @@ object PPLMonitorRunner : MonitorV2Runner() {
         return numTriggered
     }
 
-    private fun generateAlerts(pplTrigger: PPLTrigger, pplMonitor: PPLMonitor, numAlertsToGenerate: Long): List<AlertV2> {
+    // TODO: is there maybe some PPL plugin util function we can use to replace this?
+    // searches a given custom condition eval statement for the name of the result
+    // variable and returns it
+    private fun findEvalResultVar(customCondition: String): String {
+        // the PPL keyword "eval", followed by a whitespace must be present, otherwise a syntax error from PPL plugin would've
+        // been thrown when executing the query (without the whitespace, the query would've had something like "evalresult",
+        // which is invalid PPL
+        val startOfEvalStatement = "eval "
+
+        val startIdx = customCondition.indexOf(startOfEvalStatement) + startOfEvalStatement.length
+        val endIdx = startIdx + customCondition.substring(startIdx).indexOfFirst { it == ' ' || it == '=' }
+        return customCondition.substring(startIdx, endIdx)
+    }
+
+    private fun generateAlerts(
+        pplTrigger: PPLTrigger,
+        pplMonitor: PPLMonitor,
+        numAlertsToGenerate: Long,
+        timeOfCurrentExecution: Instant
+    ): List<AlertV2> {
         // TODO: currently naively generates an alert and action every time
         // TODO: maintain alert state, check for COMPLETED alert and suppression condition, like query level monitor
 
-        val expirationTime = pplTrigger.expireDuration?.millis?.let { Instant.now().plus(it, ChronoUnit.MILLIS) }
+        val expirationTime = pplTrigger.expireDuration?.millis?.let { timeOfCurrentExecution.plus(it, ChronoUnit.MILLIS) }
 
         val alertV2 = AlertV2(
             monitorId = pplMonitor.id,
@@ -368,7 +387,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
             triggerId = pplTrigger.id,
             triggerName = pplTrigger.name,
             state = Alert.State.ACTIVE,
-            startTime = Instant.now(),
+            startTime = timeOfCurrentExecution,
             expirationTime = expirationTime,
             errorHistory = listOf(),
             severity = pplTrigger.severity.value,
@@ -439,5 +458,57 @@ object PPLMonitorRunner : MonitorV2Runner() {
         val indexResponse = client.suspendUntil { index(indexRequest, it) }
 
         logger.info("PPLMonitor update with last execution times index response: ${indexResponse.result}")
+    }
+
+    suspend fun runAction(
+        action: Action,
+        triggerCtx: PPLTriggerExecutionContext,
+        monitorCtx: MonitorRunnerExecutionContext,
+        pplMonitor: PPLMonitor,
+        dryrun: Boolean,
+        timeOfCurrentExecution: Instant
+    ): ActionRunResult {
+        return try {
+            val actionOutput = mutableMapOf<String, String>()
+            actionOutput[Action.SUBJECT] = if (action.subjectTemplate != null)
+                MonitorRunnerService.compileTemplateV2(action.subjectTemplate!!, triggerCtx)
+            else ""
+            actionOutput[Action.MESSAGE] = MonitorRunnerService.compileTemplateV2(action.messageTemplate, triggerCtx)
+            if (Strings.isNullOrEmpty(actionOutput[Action.MESSAGE])) {
+                throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
+            }
+
+            if (!dryrun) {
+//                val client = monitorCtx.client
+                actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
+                    action,
+                    monitorCtx,
+                    actionOutput[Action.SUBJECT],
+                    actionOutput[Action.MESSAGE]!!
+                )
+                // TODO: use this block when security plugin is enabled
+//                client!!.threadPool().threadContext.stashContext().use {
+//                    withClosableContext(
+//                        InjectorContextElement(
+//                            pplMonitor.id,
+//                            monitorCtx.settings!!,
+//                            monitorCtx.threadPool!!.threadContext,
+//                            pplMonitor.user?.roles,
+//                            pplMonitor.user
+//                        )
+//                    ) {
+//                        actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
+//                            action,
+//                            monitorCtx,
+//                            actionOutput[Action.SUBJECT],
+//                            actionOutput[Action.MESSAGE]!!
+//                        )
+//                    }
+//                }
+            }
+            ActionRunResult(action.id, action.name, actionOutput, false, timeOfCurrentExecution, null)
+        } catch (e: Exception) {
+            ActionRunResult(action.id, action.name, mapOf(), false, timeOfCurrentExecution, e)
+        }
     }
 }
