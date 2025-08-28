@@ -664,7 +664,7 @@ fun randomUser(): User {
             OpenSearchRestTestCase.randomAlphaOfLength(10)
         ),
         listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), ALL_ACCESS_ROLE),
-        mapOf("test_attr", "test"),
+        mapOf("test_attr" to "test"),
     )
 }
 

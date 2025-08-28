@@ -501,6 +501,6 @@ fun randomADMonitor(
 fun randomADUser(backendRole: String = OpenSearchRestTestCase.randomAlphaOfLength(10)): User {
     return User(
         OpenSearchRestTestCase.randomAlphaOfLength(10), listOf(backendRole),
-        listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), ALL_ACCESS_ROLE), mapOf("test_attr", "test")
+        listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), ALL_ACCESS_ROLE), mapOf("test_attr" to "test")
     )
 }
