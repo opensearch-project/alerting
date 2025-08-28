@@ -11,6 +11,7 @@ import org.apache.hc.core5.http.message.BasicHeader
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.ANOMALY_DETECTOR_INDEX
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.LEGACY_OPENDISTRO_ALERTING_BASE_URI
 import org.opensearch.alerting.alerts.AlertIndices
@@ -1414,6 +1415,126 @@ class MonitorRestApiIT : AlertingRestTestCase() {
                 getInvalidNameChars().replace("\\", "")
             e.message?.let { assertTrue(it.contains(expectedMessage)) }
         }
+    }
+
+    fun `test enable monitor`() {
+        val monitorId = createMonitor(randomQueryLevelMonitor(enabled = false, enabledTime = null), refresh = true).id
+        val response = client().makeRequest(
+            "PUT",
+            "${AlertingPlugin.MONITOR_BASE_URI}/$monitorId/_enable",
+            emptyMap(),
+            null
+        )
+        val jsonResponse = createParser(XContentType.JSON.xContent(), response.entity.content).map()
+        val monitor = jsonResponse["Monitor"] as Map<*, *>
+        val enabled = monitor["enabled"]
+        // Monitor should be enabled
+        assertEquals(true, enabled)
+    }
+
+    fun `test disable monitor`() {
+        val monitorId = createMonitor(randomQueryLevelMonitor(enabled = true, enabledTime = Instant.now()), refresh = true).id
+        val response = client().makeRequest(
+            "PUT",
+            "${AlertingPlugin.MONITOR_BASE_URI}/$monitorId/_disable",
+            emptyMap(),
+            null
+        )
+        val jsonResponse = createParser(XContentType.JSON.xContent(), response.entity.content).map()
+        val monitor = jsonResponse["Monitor"] as Map<*, *>
+        val enabled = monitor["enabled"]
+        val enabledTime = monitor["enabledTime"]
+        // Monitor should be disabled and the enabledTime should be null
+        assertEquals(false, enabled)
+        assertNull(enabledTime)
+    }
+
+    fun `test enable monitor with query params`() {
+        val monitorId = createMonitor(randomQueryLevelMonitor(enabled = false, enabledTime = null), refresh = true).id
+        val response = client().makeRequest(
+            "PUT",
+            "${AlertingPlugin.MONITOR_BASE_URI}/$monitorId/_enable?pretty",
+            emptyMap(),
+            null
+        )
+        val jsonResponse = createParser(XContentType.JSON.xContent(), response.entity.content).map()
+        val monitor = jsonResponse["Monitor"] as Map<*, *>
+        val enabled = monitor["enabled"]
+        // Monitor should be enabled
+        assertEquals(true, enabled)
+    }
+
+    fun `test disable monitor with query params`() {
+        val monitorId = createMonitor(randomQueryLevelMonitor(enabled = true, enabledTime = Instant.now()), refresh = true).id
+        val response = client().makeRequest(
+            "PUT",
+            "${AlertingPlugin.MONITOR_BASE_URI}/$monitorId/_disable?pretty",
+            emptyMap(),
+            null
+        )
+        val jsonResponse = createParser(XContentType.JSON.xContent(), response.entity.content).map()
+        val monitor = jsonResponse["Monitor"] as Map<*, *>
+        val enabled = monitor["enabled"]
+        val enabledTime = monitor["enabledTime"]
+        // Monitor should be disabled and the enabledTime should be null
+        assertEquals(false, enabled)
+        assertNull(enabledTime)
+    }
+
+    fun `test enable monitor when already enabled`() {
+        val monitorId = createMonitor(randomQueryLevelMonitor(enabled = true, enabledTime = Instant.now()), refresh = true).id
+        val exception = assertThrows(ResponseException::class.java) {
+            client().makeRequest(
+                "PUT",
+                "${AlertingPlugin.MONITOR_BASE_URI}/$monitorId/_enable",
+                emptyMap(),
+                null
+            )
+        }
+        val errorResponse = createParser(XContentType.JSON.xContent(), exception.response.entity.content).map()
+        // Expected error
+        val expectedError = mapOf(
+            "error" to mapOf(
+                "root_cause" to listOf(
+                    mapOf(
+                        "type" to "status_exception",
+                        "reason" to "Monitor $monitorId is already enabled."
+                    )
+                ),
+                "type" to "status_exception",
+                "reason" to "Monitor $monitorId is already enabled."
+            ),
+            "status" to 400
+        )
+        assertEquals(expectedError, errorResponse)
+    }
+
+    fun `test disable monitor when already disabled`() {
+        val monitorId = createMonitor(randomQueryLevelMonitor(enabled = false, enabledTime = null), refresh = true).id
+        val exception = assertThrows(ResponseException::class.java) {
+            client().makeRequest(
+                "PUT",
+                "${AlertingPlugin.MONITOR_BASE_URI}/$monitorId/_disable",
+                emptyMap(),
+                null
+            )
+        }
+        val errorResponse = createParser(XContentType.JSON.xContent(), exception.response.entity.content).map()
+        // Expected error
+        val expectedError = mapOf(
+            "error" to mapOf(
+                "root_cause" to listOf(
+                    mapOf(
+                        "type" to "status_exception",
+                        "reason" to "Monitor $monitorId is already disabled."
+                    )
+                ),
+                "type" to "status_exception",
+                "reason" to "Monitor $monitorId is already disabled."
+            ),
+            "status" to 400
+        )
+        assertEquals(expectedError, errorResponse)
     }
 
     /**
