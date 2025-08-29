@@ -9,10 +9,13 @@ import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.QueryLevelMonitorRunner.getConfigAndSendNotification
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.script.PPLTriggerExecutionContext
 import org.opensearch.common.xcontent.XContentFactory
+import org.opensearch.commons.alerting.model.ActionRunResult
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.AlertV2
 import org.opensearch.commons.alerting.model.MonitorV2
@@ -25,8 +28,10 @@ import org.opensearch.commons.alerting.model.PPLTrigger.NumResultsCondition
 import org.opensearch.commons.alerting.model.PPLTrigger.TriggerMode
 import org.opensearch.commons.alerting.model.PPLTriggerRunResult
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
+import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.ppl.PPLPluginInterface
 import org.opensearch.commons.ppl.action.TransportPPLQueryRequest
+import org.opensearch.core.common.Strings
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.transport.TransportService
@@ -35,11 +40,6 @@ import java.time.Instant
 import java.time.ZoneOffset.UTC
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import org.opensearch.alerting.QueryLevelMonitorRunner.getConfigAndSendNotification
-import org.opensearch.alerting.script.PPLTriggerExecutionContext
-import org.opensearch.commons.alerting.model.ActionRunResult
-import org.opensearch.commons.alerting.model.action.Action
-import org.opensearch.core.common.Strings
 
 object PPLMonitorRunner : MonitorV2Runner() {
     private val logger = LogManager.getLogger(javaClass)

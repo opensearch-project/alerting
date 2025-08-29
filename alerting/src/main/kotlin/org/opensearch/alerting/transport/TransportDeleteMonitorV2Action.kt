@@ -47,6 +47,7 @@ class TransportDeleteMonitorV2Action @Inject constructor(
 //        if (!validateUserBackendRoles(user, actionListener)) {
 //            return
 //        }
+        // TOOD: when monitor is deleted, immediately expire all alerts it generated
         scope.launch {
             try {
                 // TODO: might be able to simply run DeleteMonitorService.deleteMonitor() directly, even if PPLMonitors have no metadata

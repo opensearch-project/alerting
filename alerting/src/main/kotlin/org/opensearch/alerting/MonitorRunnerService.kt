@@ -36,6 +36,7 @@ import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.remote.monitors.RemoteDocumentLevelMonitorRunner
 import org.opensearch.alerting.remote.monitors.RemoteMonitorRegistry
 import org.opensearch.alerting.script.TriggerExecutionContext
+import org.opensearch.alerting.script.TriggerV2ExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_MILLIS
@@ -93,7 +94,6 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.UUID
-import org.opensearch.alerting.script.TriggerV2ExecutionContext
 import kotlin.coroutines.CoroutineContext
 
 object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
