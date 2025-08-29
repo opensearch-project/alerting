@@ -664,12 +664,12 @@ fun randomUser(): User {
             OpenSearchRestTestCase.randomAlphaOfLength(10)
         ),
         listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), ALL_ACCESS_ROLE),
-        listOf("test_attr=test")
+        mapOf("test_attr" to "test"),
     )
 }
 
 fun randomUserEmpty(): User {
-    return User("", listOf(), listOf(), listOf())
+    return User("", listOf(), listOf(), mapOf())
 }
 
 fun EmailAccount.toJsonString(): String {

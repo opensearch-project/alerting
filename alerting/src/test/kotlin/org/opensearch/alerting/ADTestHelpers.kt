@@ -410,9 +410,7 @@ fun randomAnomalyResult(
             "roles" : [
               ${user.roles.joinToString { "\"${it}\"" }}
             ],
-            "custom_attribute_names" : [
-              ${user.customAttNames.joinToString { "\"${it}\"" }}
-            ]
+            "custom_attributes" : ${user.customAttributes.entries.joinToString(prefix = "{", separator = ", ", postfix = "}") { "\"${it.key}\": \"${it.value}\"" }}
           }
         }
     """.trimIndent()
@@ -472,7 +470,7 @@ fun maxAnomalyGradeSearchInput(
 
 fun adMonitorTrigger(): QueryLevelTrigger {
     val triggerScript = """
-            return ctx.results[0].aggregations.max_anomaly_grade.value != null && 
+            return ctx.results[0].aggregations.max_anomaly_grade.value != null &&
                    ctx.results[0].aggregations.max_anomaly_grade.value > 0.7
     """.trimIndent()
     return randomQueryLevelTrigger(condition = Script(triggerScript))
@@ -503,6 +501,6 @@ fun randomADMonitor(
 fun randomADUser(backendRole: String = OpenSearchRestTestCase.randomAlphaOfLength(10)): User {
     return User(
         OpenSearchRestTestCase.randomAlphaOfLength(10), listOf(backendRole),
-        listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), ALL_ACCESS_ROLE), listOf("test_attr=test")
+        listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), ALL_ACCESS_ROLE), mapOf("test_attr" to "test")
     )
 }

@@ -124,7 +124,15 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             //  If a setting is imposed that limits buckets that can be processed for Bucket-Level Monitors, we'd need to iterate over
             //  the buckets until we hit that threshold. In that case, we'd want to exit the execution without creating any alerts since the
             //  buckets we iterate over before hitting the limit is not deterministic. Is there a better way to fail faster in this case?
-            withClosableContext(InjectorContextElement(monitor.id, monitorCtx.settings!!, monitorCtx.threadPool!!.threadContext, roles)) {
+            withClosableContext(
+                InjectorContextElement(
+                    monitor.id,
+                    monitorCtx.settings!!,
+                    monitorCtx.threadPool!!.threadContext,
+                    roles,
+                    monitor.user
+                )
+            ) {
                 // Storing the first page of results in the case of pagination input results to prevent empty results
                 // in the final output of monitorResult which occurs when all pages have been exhausted.
                 // If it's favorable to return the last page, will need to check how to accomplish that with multiple aggregation paths
