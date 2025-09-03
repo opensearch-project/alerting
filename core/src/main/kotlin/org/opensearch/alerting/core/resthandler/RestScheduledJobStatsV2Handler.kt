@@ -1,17 +1,17 @@
 package org.opensearch.alerting.core.resthandler
 
-import java.util.*
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsAction
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsRequest
 import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler.Companion.METRICS
 import org.opensearch.core.common.Strings
 import org.opensearch.rest.BaseRestHandler
-import org.opensearch.rest.RestHandler
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestRequest.Method.GET
 import org.opensearch.rest.action.RestActions
 import org.opensearch.transport.client.node.NodeClient
+import java.util.Locale
+import java.util.TreeSet
 
 /**
  * RestScheduledJobStatsHandler is handler for getting ScheduledJob Stats for Alerting V2 Scheduled Jobs.

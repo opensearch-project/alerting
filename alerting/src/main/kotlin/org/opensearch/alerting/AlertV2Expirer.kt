@@ -45,9 +45,6 @@ class AlertV2Expirer(
     private val checkForExpirationInterval = TimeValue(1L, TimeUnit.MINUTES)
 
     override fun clusterChanged(event: ClusterChangedEvent) {
-        // Instead of using a LocalNodeClusterManagerListener to track clustermanager changes, this service will
-        // track them here to avoid conditions where clustermanager listener events run after other
-        // listeners that depend on what happened in the clustermanager listener
         if (this.isClusterManager != event.localNodeClusterManager()) {
             this.isClusterManager = event.localNodeClusterManager()
             if (this.isClusterManager) {
@@ -63,7 +60,7 @@ class AlertV2Expirer(
 
     fun onManager() {
         try {
-            // try to sweep current AlertV2s immediately as we might be restarting the cluster
+            // try to sweep current AlertV2s for expiration immediately as we might be restarting the cluster
             expireAlertV2s()
             // schedule expiration checks and expirations to happen repeatedly at some interval
             scheduledAlertsV2CheckAndExpire = threadPool
@@ -71,7 +68,7 @@ class AlertV2Expirer(
         } catch (e: Exception) {
             // This should be run on cluster startup
             logger.error(
-                "Error creating comments indices. Comments can't be recorded until clustermanager node is restarted.",
+                "Error sweeping AlertV2s for expiration. This cannot be done until clustermanager node is restarted.",
                 e
             )
         }
