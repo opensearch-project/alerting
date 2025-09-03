@@ -27,18 +27,18 @@ class RestDeleteMonitorV2Action : BaseRestHandler() {
         return mutableListOf(
             Route(
                 DELETE,
-                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitorId}"
+                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitorV2Id}"
             )
         )
     }
 
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        val monitorId = request.param("monitorId")
-        log.info("${request.method()} ${AlertingPlugin.MONITOR_V2_BASE_URI}/$monitorId")
+        val monitorV2Id = request.param("monitorV2Id")
+        log.info("${request.method()} ${AlertingPlugin.MONITOR_V2_BASE_URI}/$monitorV2Id")
 
         val refreshPolicy = RefreshPolicy.parse(request.param(REFRESH, RefreshPolicy.IMMEDIATE.value))
-        val deleteMonitorV2Request = DeleteMonitorV2Request(monitorId, refreshPolicy)
+        val deleteMonitorV2Request = DeleteMonitorV2Request(monitorV2Id, refreshPolicy)
 
         return RestChannelConsumer { channel ->
             client.execute(AlertingActions.DELETE_MONITOR_V2_ACTION_TYPE, deleteMonitorV2Request, RestToXContentListener(channel))

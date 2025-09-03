@@ -12,6 +12,8 @@ import org.opensearch.action.admin.cluster.health.ClusterHealthAction
 import org.opensearch.action.admin.cluster.health.ClusterHealthRequest
 import org.opensearch.action.admin.cluster.health.ClusterHealthResponse
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
+import org.opensearch.action.get.GetRequest
+import org.opensearch.action.get.GetResponse
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.search.SearchRequest
@@ -29,12 +31,17 @@ import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
+import org.opensearch.common.xcontent.XContentHelper
+import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.IndexMonitorV2Request
 import org.opensearch.commons.alerting.action.IndexMonitorV2Response
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.MonitorV2
 import org.opensearch.commons.alerting.model.PPLMonitor
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.action.ActionListener
@@ -43,6 +50,7 @@ import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -174,7 +182,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
         // Below check needs to be async operations and needs to be refactored issue#269
         // checkForDisallowedDestinations(allowList)
 
-        // TODO: checks for throttling/suppression
+        // TODO: checks for throttling/suppression, should not be needed here, done in common utils when parsing PPLTriggers
 //        try {
 //            validateActionThrottle(request.monitor, maxActionThrottle, TimeValue.timeValueMinutes(1))
 //        } catch (e: RuntimeException) {
@@ -182,47 +190,115 @@ class TransportIndexMonitorV2Action @Inject constructor(
 //            return
 //        }
 
-        val query = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery("${Monitor.MONITOR_TYPE}.type", Monitor.MONITOR_TYPE))
-        val searchSource = SearchSourceBuilder().query(query).timeout(requestTimeout)
-        val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
-
-        client.search(
-            searchRequest,
-            object : ActionListener<SearchResponse> {
-                override fun onResponse(searchResponse: SearchResponse) {
-                    onMonitorCountSearchResponse(searchResponse, indexMonitorRequest, actionListener)
-                }
-
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
-                }
+        if (indexMonitorRequest.method == RestRequest.Method.PUT) { // update monitor case
+            scope.launch {
+                updateMonitor(indexMonitorRequest, actionListener)
             }
+        } else { // create monitor case
+            val query = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery("${Monitor.MONITOR_TYPE}.type", Monitor.MONITOR_TYPE))
+            val searchSource = SearchSourceBuilder().query(query).timeout(requestTimeout)
+            val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
+
+            client.search(
+                searchRequest,
+                object : ActionListener<SearchResponse> {
+                    override fun onResponse(searchResponse: SearchResponse) {
+                        onMonitorCountSearchResponse(searchResponse, indexMonitorRequest, actionListener)
+                    }
+
+                    override fun onFailure(t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                    }
+                }
+            )
+        }
+    }
+
+    /* Functions for Update Monitor flow */
+
+    private suspend fun updateMonitor(indexMonitorRequest: IndexMonitorV2Request, actionListener: ActionListener<IndexMonitorV2Response>) {
+        val getRequest = GetRequest(SCHEDULED_JOBS_INDEX, indexMonitorRequest.monitorId)
+        try {
+            val getResponse: GetResponse = client.suspendUntil { client.get(getRequest, it) }
+            if (!getResponse.isExists) {
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException("MonitorV2 with ${indexMonitorRequest.monitorId} is not found", RestStatus.NOT_FOUND)
+                    )
+                )
+                return
+            }
+            val xcp = XContentHelper.createParser(
+                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                getResponse.sourceAsBytesRef, XContentType.JSON
+            )
+            val monitorV2 = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as MonitorV2
+            onGetMonitorResponseForUpdate(monitorV2, indexMonitorRequest, actionListener)
+        } catch (t: Exception) {
+            actionListener.onFailure(AlertingException.wrap(t))
+        }
+    }
+
+    private suspend fun onGetMonitorResponseForUpdate(
+        currentMonitorV2: MonitorV2,
+        indexMonitorRequest: IndexMonitorV2Request,
+        actionListener: ActionListener<IndexMonitorV2Response>
+    ) {
+        var newMonitorV2 = when (indexMonitorRequest.monitorV2) {
+            is PPLMonitor -> indexMonitorRequest.monitorV2 as PPLMonitor
+            else -> throw IllegalArgumentException("received unsupported monitor type to index: ${indexMonitorRequest.monitorV2.javaClass}")
+        }
+
+        if (currentMonitorV2 !is PPLMonitor) {
+            throw IllegalStateException(
+                "During update, existing monitor ${currentMonitorV2.id} had unexpected type ${currentMonitorV2::class.java}"
+            )
+        }
+
+        if (newMonitorV2.enabled && currentMonitorV2.enabled) {
+            newMonitorV2 = newMonitorV2.copy(enabledTime = currentMonitorV2.enabledTime)
+        }
+
+        // TODO: add schemaVersion field to MonitorV2 model
+//        newPplMonitor = newPplMonitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
+
+        val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
+            .setRefreshPolicy(indexMonitorRequest.refreshPolicy)
+            .source(newMonitorV2.toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+            .id(indexMonitorRequest.monitorId)
+            .setIfSeqNo(indexMonitorRequest.seqNo)
+            .setIfPrimaryTerm(indexMonitorRequest.primaryTerm)
+            .timeout(indexTimeout)
+
+        log.info(
+            "Updating monitor, ${currentMonitorV2.id}, from: ${currentMonitorV2.toXContent(
+                jsonBuilder(),
+                ToXContent.MapParams(mapOf("with_type" to "true"))
+            )} \n to: ${newMonitorV2.toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true")))}"
         )
 
-        // TODO: this if else forks between update or create monitor, come back to this when supporting update monitor
-//        if (request.method == RestRequest.Method.PUT) {
-//            scope.launch {
-//                updateMonitor()
-//            }
-//        } else {
-//            val query = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery("${Monitor.MONITOR_TYPE}.type", Monitor.MONITOR_TYPE))
-//            val searchSource = SearchSourceBuilder().query(query).timeout(requestTimeout)
-//            val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
-//
-//            client.search(
-//                searchRequest,
-//                object : ActionListener<SearchResponse> {
-//                    override fun onResponse(searchResponse: SearchResponse) {
-//                        onSearchResponse(searchResponse)
-//                    }
-//
-//                    override fun onFailure(t: Exception) {
-//                        actionListener.onFailure(AlertingException.wrap(t))
-//                    }
-//                }
-//            )
-//        }
+        try {
+            val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
+            val failureReasons = checkShardsFailure(indexResponse)
+            if (failureReasons != null) {
+                actionListener.onFailure(
+                    AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), indexResponse.status()))
+                )
+                return
+            }
+
+            actionListener.onResponse(
+                IndexMonitorV2Response(
+                    indexResponse.id, indexResponse.version, indexResponse.seqNo,
+                    indexResponse.primaryTerm, newMonitorV2
+                )
+            )
+        } catch (e: Exception) {
+            actionListener.onFailure(AlertingException.wrap(e))
+        }
     }
+
+    /* Functions for Create Monitor flow */
 
     /**
      * After searching for all existing monitors we validate the system can support another monitor to be created.
@@ -265,7 +341,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
 //        }
         var monitorV2 = when (indexMonitorRequest.monitorV2) {
             is PPLMonitor -> indexMonitorRequest.monitorV2 as PPLMonitor
-            else -> throw IllegalStateException("received unsupported monitor type to index: ${indexMonitorRequest.monitorV2.javaClass}")
+            else -> throw IllegalArgumentException("received unsupported monitor type to index: ${indexMonitorRequest.monitorV2.javaClass}")
         }
 
         val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
@@ -304,6 +380,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
         }
     }
 
+    // TODO: copied from V1 TransportIndexMonitorAction, abstract this out into a util function
     private fun checkShardsFailure(response: IndexResponse): String? {
         val failureReasons = StringBuilder()
         if (response.shardInfo.failed > 0) {

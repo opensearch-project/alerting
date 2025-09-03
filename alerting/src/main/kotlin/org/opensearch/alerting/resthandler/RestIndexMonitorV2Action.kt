@@ -68,7 +68,7 @@ class RestIndexMonitorV2Action : BaseRestHandler() {
             WriteRequest.RefreshPolicy.IMMEDIATE
         }
 
-        val indexMonitorV2Request = IndexMonitorV2Request(seqNo, primaryTerm, refreshPolicy, monitorV2)
+        val indexMonitorV2Request = IndexMonitorV2Request(id, seqNo, primaryTerm, refreshPolicy, request.method(), monitorV2)
 
         return RestChannelConsumer { channel ->
             client.execute(AlertingActions.INDEX_MONITOR_V2_ACTION_TYPE, indexMonitorV2Request, RestToXContentListener(channel))

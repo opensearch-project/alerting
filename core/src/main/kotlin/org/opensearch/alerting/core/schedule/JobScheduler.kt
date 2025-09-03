@@ -8,6 +8,8 @@ package org.opensearch.alerting.core.schedule
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.core.JobRunner
 import org.opensearch.common.unit.TimeValue
+import org.opensearch.commons.alerting.model.MonitorV2
+import org.opensearch.commons.alerting.model.PPLMonitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.threadpool.Scheduler
 import org.opensearch.threadpool.ThreadPool
@@ -193,6 +195,19 @@ class JobScheduler(private val threadPool: ThreadPool, private val jobRunner: Jo
 
     fun getJobSchedulerMetric(): List<JobSchedulerMetrics> {
         return scheduledJobIdToInfo.entries.stream()
+            .map { entry ->
+                JobSchedulerMetrics(
+                    entry.value.scheduledJobId,
+                    entry.value.actualPreviousExecutionTime?.toEpochMilli(),
+                    entry.value.scheduledJob.schedule.runningOnTime(entry.value.actualPreviousExecutionTime)
+                )
+            }
+            .collect(Collectors.toList())
+    }
+
+    fun getJobSchedulerV2Metric(): List<JobSchedulerMetrics> {
+        return scheduledJobIdToInfo.entries.filter { it.value.scheduledJob is MonitorV2 }
+            .stream()
             .map { entry ->
                 JobSchedulerMetrics(
                     entry.value.scheduledJobId,

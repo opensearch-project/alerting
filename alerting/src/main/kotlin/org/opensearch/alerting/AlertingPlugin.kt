@@ -24,6 +24,8 @@ import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsAction
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsTransportAction
 import org.opensearch.alerting.core.lock.LockService
+import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler
+import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsV2Handler
 import org.opensearch.alerting.core.schedule.JobScheduler
 import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSettings
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
@@ -33,6 +35,7 @@ import org.opensearch.alerting.resthandler.RestDeleteMonitorV2Action
 import org.opensearch.alerting.resthandler.RestExecuteMonitorV2Action
 import org.opensearch.alerting.resthandler.RestGetAlertsV2Action
 import org.opensearch.alerting.resthandler.RestGetMonitorAction
+import org.opensearch.alerting.resthandler.RestGetMonitorV2Action
 import org.opensearch.alerting.resthandler.RestIndexMonitorAction
 import org.opensearch.alerting.resthandler.RestIndexMonitorV2Action
 import org.opensearch.alerting.resthandler.RestSearchMonitorV2Action
@@ -60,6 +63,7 @@ import org.opensearch.alerting.transport.TransportGetEmailAccountAction
 import org.opensearch.alerting.transport.TransportGetEmailGroupAction
 import org.opensearch.alerting.transport.TransportGetFindingsSearchAction
 import org.opensearch.alerting.transport.TransportGetMonitorAction
+import org.opensearch.alerting.transport.TransportGetMonitorV2Action
 import org.opensearch.alerting.transport.TransportGetRemoteIndexesAction
 import org.opensearch.alerting.transport.TransportGetWorkflowAction
 import org.opensearch.alerting.transport.TransportGetWorkflowAlertsAction
@@ -189,14 +193,14 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             // Alerting V1
 //            RestGetMonitorAction(),
 //            RestDeleteMonitorAction(),
-//            RestIndexMonitorAction(),
+            RestIndexMonitorAction(),
 //            RestIndexWorkflowAction(),
 //            RestSearchMonitorAction(settings, clusterService),
 //            RestExecuteMonitorAction(),
 //            RestExecuteWorkflowAction(),
 //            RestAcknowledgeAlertAction(),
 //            RestAcknowledgeChainedAlertAction(),
-//            RestScheduledJobStatsHandler("_alerting"),
+            RestScheduledJobStatsHandler("_alerting"),
 //            RestSearchEmailAccountAction(),
 //            RestGetEmailAccountAction(),
 //            RestSearchEmailGroupAction(),
@@ -216,8 +220,10 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestIndexMonitorV2Action(),
             RestExecuteMonitorV2Action(),
             RestDeleteMonitorV2Action(),
+            RestGetMonitorV2Action(),
             RestSearchMonitorV2Action(settings, clusterService),
             RestGetAlertsV2Action(),
+            RestScheduledJobStatsV2Handler()
         )
     }
 
@@ -254,6 +260,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
 
             // Alerting V2
             ActionPlugin.ActionHandler(AlertingActions.INDEX_MONITOR_V2_ACTION_TYPE, TransportIndexMonitorV2Action::class.java),
+            ActionPlugin.ActionHandler(AlertingActions.GET_MONITOR_V2_ACTION_TYPE, TransportGetMonitorV2Action::class.java),
             ActionPlugin.ActionHandler(AlertingActions.SEARCH_MONITORS_V2_ACTION_TYPE, TransportSearchMonitorV2Action::class.java),
             ActionPlugin.ActionHandler(AlertingActions.DELETE_MONITOR_V2_ACTION_TYPE, TransportDeleteMonitorV2Action::class.java),
             ActionPlugin.ActionHandler(ExecuteMonitorV2Action.INSTANCE, TransportExecuteMonitorV2Action::class.java),

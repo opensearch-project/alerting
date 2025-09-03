@@ -1,71 +1,44 @@
-/*
- * Copyright OpenSearch Contributors
- * SPDX-License-Identifier: Apache-2.0
- */
-
 package org.opensearch.alerting.core.resthandler
 
+import java.util.*
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsAction
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsRequest
+import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler.Companion.METRICS
 import org.opensearch.core.common.Strings
 import org.opensearch.rest.BaseRestHandler
-import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.RestHandler
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestRequest.Method.GET
 import org.opensearch.rest.action.RestActions
 import org.opensearch.transport.client.node.NodeClient
-import java.util.Locale
-import java.util.TreeSet
 
 /**
- * RestScheduledJobStatsHandler is handler for getting ScheduledJob Stats.
+ * RestScheduledJobStatsHandler is handler for getting ScheduledJob Stats for Alerting V2 Scheduled Jobs.
  */
-class RestScheduledJobStatsHandler(private val path: String) : BaseRestHandler() {
-
-    companion object {
-        const val JOB_SCHEDULING_METRICS: String = "job_scheduling_metrics"
-        const val JOBS_INFO: String = "jobs_info"
-        val METRICS = mapOf<String, (ScheduledJobsStatsRequest) -> Unit>(
-            JOB_SCHEDULING_METRICS to { it -> it.jobSchedulingMetrics = true },
-            JOBS_INFO to { it -> it.jobsInfo = true }
-        )
-    }
+class RestScheduledJobStatsV2Handler : BaseRestHandler() {
 
     override fun getName(): String {
-        return "${path}_jobs_stats"
+        return "alerting_jobs_stats_v2"
     }
 
     override fun routes(): List<Route> {
-        return listOf()
-    }
-
-    override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
-        return mutableListOf(
-            RestHandler.ReplacedRoute(
+        return listOf(
+            Route(
                 GET,
-                "/_plugins/$path/{nodeId}/stats/",
-                GET,
-                "/_opendistro/$path/{nodeId}/stats/"
+                "/_plugins/_alerting/v2/stats/"
             ),
-            RestHandler.ReplacedRoute(
+            Route(
                 GET,
-                "/_plugins/$path/{nodeId}/stats/{metric}",
-                GET,
-                "/_opendistro/$path/{nodeId}/stats/{metric}"
+                "/_plugins/_alerting/v2/stats/{metric}"
             ),
-            RestHandler.ReplacedRoute(
+            Route(
                 GET,
-                "/_plugins/$path/stats/",
-                GET,
-                "/_opendistro/$path/stats/"
+                "/_plugins/_alerting/v2/{nodeId}/stats/"
             ),
-            RestHandler.ReplacedRoute(
+            Route(
                 GET,
-                "/_plugins/$path/stats/{metric}",
-                GET,
-                "/_opendistro/$path/stats/{metric}"
+                "/_plugins/_alerting/v2/{nodeId}/stats/{metric}"
             )
         )
     }
@@ -84,7 +57,7 @@ class RestScheduledJobStatsHandler(private val path: String) : BaseRestHandler()
     private fun getRequest(request: RestRequest): ScheduledJobsStatsRequest {
         val nodesIds = Strings.splitStringByCommaToArray(request.param("nodeId"))
         val metrics = Strings.tokenizeByCommaToSet(request.param("metric"))
-        val scheduledJobsStatsRequest = ScheduledJobsStatsRequest(nodeIds = nodesIds, showAlertingV2ScheduledJobs = false)
+        val scheduledJobsStatsRequest = ScheduledJobsStatsRequest(nodeIds = nodesIds, showAlertingV2ScheduledJobs = true)
         scheduledJobsStatsRequest.timeout(request.param("timeout"))
 
         if (metrics.isEmpty()) {
