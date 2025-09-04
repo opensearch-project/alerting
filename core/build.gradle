@@ -8,15 +8,6 @@ apply plugin: 'opensearch.java-rest-test'
 apply plugin: 'org.jetbrains.kotlin.jvm'
 apply plugin: 'jacoco'
 
-configurations{
-    all {
-        resolutionStrategy {
-            // force commons-beanutils to a non-vulnerable version
-            force "commons-beanutils:commons-beanutils:1.11.0"
-        }
-    }
-}
-
 dependencies {
     compileOnly "org.opensearch:opensearch:${opensearch_version}"
     implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
@@ -25,7 +16,7 @@ dependencies {
     implementation "com.cronutils:cron-utils:9.1.7"
     api "org.opensearch.client:opensearch-rest-client:${opensearch_version}"
     api "org.opensearch:common-utils:${common_utils_version}@jar"
-    implementation 'commons-validator:commons-validator:1.7'
+    implementation 'commons-validator:commons-validator:1.10.0'
 
     testImplementation "org.opensearch.test:framework:${opensearch_version}"
     testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlin_version}"
