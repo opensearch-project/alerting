@@ -17,6 +17,7 @@ import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestRequest.Method.POST
+import org.opensearch.rest.RestRequest.Method.PUT
 import org.opensearch.rest.action.RestToXContentListener
 import org.opensearch.transport.client.node.NodeClient
 import java.io.IOException
@@ -37,11 +38,10 @@ class RestIndexMonitorV2Action : BaseRestHandler() {
                 POST,
                 AlertingPlugin.MONITOR_V2_BASE_URI
             ),
-            // TODO: support UpdateMonitor
-//            Route(
-//                PUT,
-//                "${AlertingPlugin.PPL_MONITOR_BASE_URI}/{monitorID}"
-//            )
+            Route(
+                PUT,
+                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitorV2Id}"
+            )
         )
     }
 
@@ -59,7 +59,7 @@ class RestIndexMonitorV2Action : BaseRestHandler() {
             throw AlertingException.wrap(e)
         }
 
-        val id = request.param("monitorID", MonitorV2.NO_ID)
+        val id = request.param("monitorV2Id", MonitorV2.NO_ID)
         val seqNo = request.paramAsLong(IF_SEQ_NO, SequenceNumbers.UNASSIGNED_SEQ_NO)
         val primaryTerm = request.paramAsLong(IF_PRIMARY_TERM, SequenceNumbers.UNASSIGNED_PRIMARY_TERM)
         val refreshPolicy = if (request.hasParam(REFRESH)) {

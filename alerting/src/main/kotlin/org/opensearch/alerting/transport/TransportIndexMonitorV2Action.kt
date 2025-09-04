@@ -259,9 +259,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
             newMonitorV2 = newMonitorV2.copy(enabledTime = currentMonitorV2.enabledTime)
         }
 
-        // TODO: add schemaVersion field to MonitorV2 model
-//        newPplMonitor = newPplMonitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
-
+        newMonitorV2 = newMonitorV2.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
         val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
             .setRefreshPolicy(indexMonitorRequest.refreshPolicy)
             .source(newMonitorV2.toXContent(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))

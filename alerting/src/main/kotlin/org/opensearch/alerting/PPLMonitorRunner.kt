@@ -14,6 +14,7 @@ import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.PPLTriggerExecutionContext
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.commons.alerting.model.ActionRunResult
 import org.opensearch.commons.alerting.model.Alert
@@ -94,8 +95,12 @@ object PPLMonitorRunner : MonitorV2Runner() {
         }
 
         // only query data between now and the last PPL Monitor execution
-        // do this by injecting a time filtering where statement into PPL Monitor query
-        val timeFilteredQuery = addTimeFilter(pplMonitor.query, periodStart, periodEnd)
+        // unless a look back window is specified, in which case use that instead,
+        // then inject a time filter where statement into PPL Monitor query.
+        // if the given monitor query already has any time check whatsoever, this
+        // simply returns the original query itself
+        val timeFilteredQuery = addTimeFilter(pplMonitor.query, periodStart, periodEnd, pplMonitor.lookBackWindow)
+        logger.info("time filtered query: $timeFilteredQuery")
 
         // run each trigger
         for (trigger in pplMonitor.triggers) {
@@ -231,16 +236,31 @@ object PPLMonitorRunner : MonitorV2Runner() {
     }
 
     // adds monitor schedule-based time filter
-    private fun addTimeFilter(query: String, periodStart: Instant, periodEnd: Instant): String {
+    // query: the raw PPL Monitor query
+    // periodStart: the lower bound of the initially computed query interval based on monitor schedule
+    // periodEnd: the upper bound of the initially computed query interval based on monitor schedule
+    // lookBackWindow: customer's desired query look back window, overrides [periodStart, periodEnd] if not null
+    private fun addTimeFilter(query: String, periodStart: Instant, periodEnd: Instant, lookBackWindow: TimeValue?): String {
         // inject time filter into PPL query to only query for data within the (periodStart, periodEnd) interval
         // TODO: if query contains "_time", "span", "earliest", "latest", skip adding filter
         // TODO: pending https://github.com/opensearch-project/sql/issues/3969
         // for now assume "_time" field is always present in customer data
 
+        // if the raw query contained any time check whatsoever, skip adding a time filter internally
+        // and return query as is, customer's in-query time checks instantly and automatically overrides
+        if (query.contains("_time")) { // TODO: replace with PPL time keyword checks after that's GA
+            return query
+        }
+
+        // if customer passed in a look back window, override the precomputed interval with it
+        val updatedPeriodStart = lookBackWindow?.let { window ->
+            periodEnd.minus(window.millis, ChronoUnit.MILLIS)
+        } ?: periodStart
+
         // PPL plugin only accepts timestamp strings in this format
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(UTC)
 
-        val periodStartPplTimestamp = formatter.format(periodStart)
+        val periodStartPplTimestamp = formatter.format(updatedPeriodStart)
         val periodEndPplTimeStamp = formatter.format(periodEnd)
 
         val timeFilterReplace = "| where _time > TIMESTAMP('$periodStartPplTimestamp') and _time < TIMESTAMP('$periodEndPplTimeStamp') |"
@@ -256,8 +276,6 @@ object PPLMonitorRunner : MonitorV2Runner() {
             // `search source=<index>` statement, simply append time filter at the end
             query + timeFilterAppend
         }
-
-        logger.info("time filtered query: $timeFilteredQuery")
 
         return timeFilteredQuery
     }
