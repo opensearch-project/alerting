@@ -190,6 +190,8 @@ object PPLMonitorRunner : MonitorV2Runner() {
                         timeOfCurrentExecution
                     )
 
+                    // TODO: save alert error message and action results in alert
+
                     // collect the generated alerts to be written to alerts index
                     // if the trigger is on result_set mode
 //                    generatedAlerts.addAll(thisTriggersGeneratedAlerts)
@@ -198,6 +200,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
                     pplTrigger.lastTriggeredTime = timeOfCurrentExecution
 
                     // send alert notifications
+//                    val actionExecutionResults = mutableListOf<ActionExecutionResult>()
                     for (action in pplTrigger.actions) {
                         for (alert in thisTriggersGeneratedAlerts) {
                             val pplTriggerExecutionContext = PPLTriggerExecutionContext(
@@ -467,10 +470,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
                 triggerId = pplTrigger.id,
                 triggerName = pplTrigger.name,
                 queryResults = queryResult.toMap(),
-                state = Alert.State.ACTIVE,
-                startTime = timeOfCurrentExecution,
                 expirationTime = expirationTime,
-                errorHistory = listOf(),
                 severity = pplTrigger.severity.value,
                 actionExecutionResults = listOf(),
             )
@@ -494,17 +494,12 @@ object PPLMonitorRunner : MonitorV2Runner() {
             // back we're ok if that acknowledgement is lost. It's easier to get the user to retry than for the runner to
             // spend time reloading the alert and writing it back.
 
-            when (alert.state) {
-                Alert.State.ACTIVE, Alert.State.ERROR -> {
-                    listOf<DocWriteRequest<*>>(
-                        IndexRequest(AlertIndices.ALERT_INDEX)
-                            .routing(pplMonitor.id) // set routing ID to PPL Monitor ID
-                            .source(alert.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
-                            .id(if (alert.id != Alert.NO_ID) alert.id else null)
-                    )
-                }
-                else -> throw IllegalStateException("trying to save non ACTIVE alert, unimplemented territory")
-            }
+            listOf<DocWriteRequest<*>>(
+                IndexRequest(AlertIndices.ALERT_INDEX)
+                    .routing(pplMonitor.id) // set routing ID to PPL Monitor ID
+                    .source(alert.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
+                    .id(if (alert.id != Alert.NO_ID) alert.id else null)
+            )
         }
 
         if (requestsToRetry.isEmpty()) return
