@@ -137,6 +137,18 @@
     "error_message": {
       "type": "text"
     },
+    "query_results": {
+      "type": "nested",
+      "properties": {
+        "schema": {
+          "type": "nested",
+          "dynamic": true
+        },
+        "datarows": {
+          "type": "text"
+        }
+      }
+    },
     "alert_history": {
       "type": "nested",
       "properties": {

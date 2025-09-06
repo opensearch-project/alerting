@@ -32,10 +32,10 @@ import org.opensearch.commons.alerting.model.PPLTriggerRunResult
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.ppl.PPLPluginInterface
-import org.opensearch.commons.ppl.action.TransportPPLQueryRequest
 import org.opensearch.core.common.Strings
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent
+import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.node.NodeClient
 import java.time.Instant
@@ -77,7 +77,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
         // create some objects that will be used later
         val triggerResults = mutableMapOf<String, PPLTriggerRunResult>()
         val pplQueryResults = mutableMapOf<String, JSONObject>()
-        val generatedAlerts = mutableListOf<AlertV2>()
+//        val generatedAlerts = mutableListOf<AlertV2>()
 
         // TODO: Instant.ofEpochMilli(monitorCtx.threadPool!!.absoluteTimeInMillis()) alternative?
         // set the current execution time
@@ -176,26 +176,30 @@ object PPLMonitorRunner : MonitorV2Runner() {
                 pplQueryResults[pplTrigger.id] = queryResponseJson
 
                 if (triggered) {
+                    // if trigger is on result set mode, this list will have exactly 1 element
+                    // if trigger is on per result mode, this list will have as many elements as the query results had rows
+                    val preparedQueryResults = prepareQueryResults(relevantQueryResultRows, pplTrigger.mode)
+
                     // generate alerts based on trigger mode
                     // if this trigger is on result_set mode, this list contains exactly 1 alert
                     // if this trigger is on per_result mode, this list has any alerts as there are relevant query results
                     val thisTriggersGeneratedAlerts = generateAlerts(
                         pplTrigger,
                         pplMonitor,
-                        relevantQueryResultRows,
+                        preparedQueryResults,
                         timeOfCurrentExecution
                     )
 
                     // collect the generated alerts to be written to alerts index
                     // if the trigger is on result_set mode
-                    generatedAlerts.addAll(thisTriggersGeneratedAlerts)
+//                    generatedAlerts.addAll(thisTriggersGeneratedAlerts)
 
                     // update the trigger's last execution time for future suppression checks
                     pplTrigger.lastTriggeredTime = timeOfCurrentExecution
 
                     // send alert notifications
                     for (action in pplTrigger.actions) {
-                        for (alert in generatedAlerts) {
+                        for (alert in thisTriggersGeneratedAlerts) {
                             val pplTriggerExecutionContext = PPLTriggerExecutionContext(
                                 monitorV2,
                                 periodStart,
@@ -205,6 +209,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
                                 alert.queryResults
                             )
 
+                            // TODO: store this in trigger action results and store in alerts
                             runAction(
                                 action,
                                 pplTriggerExecutionContext,
@@ -215,17 +220,17 @@ object PPLMonitorRunner : MonitorV2Runner() {
                             )
                         }
                     }
+
+                    // TODO: what if retry policy null?
+                    // write the alerts to the alerts index
+                    monitorCtx.retryPolicy?.let {
+                        saveAlertsV2(thisTriggersGeneratedAlerts, pplMonitor, it, nodeClient)
+                    }
                 }
             } catch (e: Exception) {
                 logger.error("failed to run PPL Trigger for PPL Monitor ${pplMonitor.name}", e)
                 continue
             }
-        }
-
-        // TODO: what if retry policy null?
-        // write the alerts to the alerts index
-        monitorCtx.retryPolicy?.let {
-            saveAlertsV2(generatedAlerts, pplMonitor, it, nodeClient)
         }
 
         // TODO: collect all triggers that were throttled, and if none were throttled, skip update monitor? saves on write requests
@@ -350,6 +355,8 @@ object PPLMonitorRunner : MonitorV2Runner() {
             return customConditionQueryResponse
         }
 
+        // TODO: dont create a copy, just remove irrelevant rows from the original reference in-place
+
         // this will eventually store just the rows that triggered the custom condition
         val relevantQueryResultRows = JSONObject()
 
@@ -421,23 +428,45 @@ object PPLMonitorRunner : MonitorV2Runner() {
         return customCondition.substring(startIdx, endIdx)
     }
 
+    // prepares the query results to be passed into alerts and notifications based on trigger mode
+    // if result set, alert and notification simply stores all of the query results
+    // if per result, each alert and notification stores a single row of the query results
+    private fun prepareQueryResults(relevantQueryResultRows: JSONObject, triggerMode: TriggerMode): List<JSONObject> {
+        // case: result set
+        if (triggerMode == TriggerMode.RESULT_SET) {
+            return listOf(relevantQueryResultRows)
+        }
+
+        // case: per result
+        val individualRows = mutableListOf<JSONObject>()
+        val numAlertsToGenerate = relevantQueryResultRows.getInt("total")
+        for (i in 0 until numAlertsToGenerate) {
+            val individualRow = JSONObject()
+            individualRow.put("schema", JSONArray(relevantQueryResultRows.getJSONArray("schema").toList()))
+            individualRow.put("datarows", JSONArray(relevantQueryResultRows.getJSONArray("datarows").getJSONArray(i).toList()))
+            individualRows.add(individualRow)
+        }
+
+        return individualRows
+    }
+
     private fun generateAlerts(
         pplTrigger: PPLTrigger,
         pplMonitor: PPLMonitor,
-        relevantQueryResultRows: JSONObject,
+        preparedQueryResults: List<JSONObject>,
         timeOfCurrentExecution: Instant
     ): List<AlertV2> {
         val expirationTime = pplTrigger.expireDuration?.millis?.let { timeOfCurrentExecution.plus(it, ChronoUnit.MILLIS) }
 
         val alertV2s = mutableListOf<AlertV2>()
-        if (pplTrigger.mode == TriggerMode.RESULT_SET) {
+        for (queryResult in preparedQueryResults) {
             val alertV2 = AlertV2(
                 monitorId = pplMonitor.id,
                 monitorName = pplMonitor.name,
                 monitorVersion = pplMonitor.version,
                 triggerId = pplTrigger.id,
                 triggerName = pplTrigger.name,
-                queryResults = relevantQueryResultRows.toMap(),
+                queryResults = queryResult.toMap(),
                 state = Alert.State.ACTIVE,
                 startTime = timeOfCurrentExecution,
                 expirationTime = expirationTime,
@@ -446,33 +475,9 @@ object PPLMonitorRunner : MonitorV2Runner() {
                 actionExecutionResults = listOf(),
             )
             alertV2s.add(alertV2)
-        } else { // TriggerMode.PER_RESULT
-            val numAlertsToGenerate = relevantQueryResultRows.getInt("total")
-
-            for (i in 0 until numAlertsToGenerate) {
-                val individualRow = JSONObject()
-                individualRow.put("schema", JSONArray(relevantQueryResultRows.getJSONArray("schema").toList()))
-                individualRow.put("datarows", JSONArray(relevantQueryResultRows.getJSONArray("datarows").getJSONArray(i).toList()))
-
-                val alertV2 = AlertV2(
-                    monitorId = pplMonitor.id,
-                    monitorName = pplMonitor.name,
-                    monitorVersion = pplMonitor.version,
-                    triggerId = pplTrigger.id,
-                    triggerName = pplTrigger.name,
-                    queryResults = individualRow.toMap(),
-                    state = Alert.State.ACTIVE,
-                    startTime = timeOfCurrentExecution,
-                    expirationTime = expirationTime,
-                    errorHistory = listOf(),
-                    severity = pplTrigger.severity.value,
-                    actionExecutionResults = listOf(),
-                )
-                alertV2s.add(alertV2)
-            }
         }
 
-        return alertV2s.toList() // return an immutable list
+        return alertV2s.toList() // return as immutable list
     }
 
     private suspend fun saveAlertsV2(
@@ -508,6 +513,9 @@ object PPLMonitorRunner : MonitorV2Runner() {
             val bulkRequest = BulkRequest().add(requestsToRetry).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
             val bulkResponse: BulkResponse = client.suspendUntil { client.bulk(bulkRequest, it) }
             val failedResponses = (bulkResponse.items ?: arrayOf()).filter { it.isFailed }
+            failedResponses.forEach {
+                logger.info("write alerts failed responses: ${it.failureMessage}")
+            }
             requestsToRetry = failedResponses.filter { it.status() == RestStatus.TOO_MANY_REQUESTS }
                 .map { bulkRequest.requests()[it.itemId] as IndexRequest }
 
