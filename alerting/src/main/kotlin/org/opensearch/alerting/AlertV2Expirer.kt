@@ -79,8 +79,7 @@ class AlertV2Expirer(
     }
 
     private fun expireAlertV2s() {
-        if (!areAlertsIndicesInitialized()) {
-            // TODO: edge case: what if alert history indices are present but regular alerts index is absent
+        if (!areAlertsIndicesPresent()) {
             return
         }
 
@@ -107,7 +106,7 @@ class AlertV2Expirer(
         }
     }
 
-    private fun areAlertsIndicesInitialized(): Boolean {
-        return alertIndexInitialized && alertHistoryIndexInitialized
+    private fun areAlertsIndicesPresent(): Boolean {
+        return alertIndexInitialized || alertHistoryIndexInitialized
     }
 }

@@ -17,7 +17,7 @@ import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.PPLTriggerExecutionContext
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentFactory
-import org.opensearch.commons.alerting.model.ActionRunResult
+import org.opensearch.commons.alerting.alerts.AlertError
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.AlertV2
 import org.opensearch.commons.alerting.model.MonitorV2
@@ -30,7 +30,9 @@ import org.opensearch.commons.alerting.model.PPLTrigger.NumResultsCondition
 import org.opensearch.commons.alerting.model.PPLTrigger.TriggerMode
 import org.opensearch.commons.alerting.model.PPLTriggerRunResult
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
+import org.opensearch.commons.alerting.model.TriggerV2
 import org.opensearch.commons.alerting.model.action.Action
+import org.opensearch.commons.alerting.model.userErrorMessage
 import org.opensearch.commons.ppl.PPLPluginInterface
 import org.opensearch.core.common.Strings
 import org.opensearch.core.rest.RestStatus
@@ -76,15 +78,13 @@ object PPLMonitorRunner : MonitorV2Runner() {
 
         // create some objects that will be used later
         val triggerResults = mutableMapOf<String, PPLTriggerRunResult>()
-        val pplQueryResults = mutableMapOf<String, JSONObject>()
-//        val generatedAlerts = mutableListOf<AlertV2>()
+        val pplQueryResults = mutableMapOf<String, Map<String, Any>>()
 
-        // TODO: Instant.ofEpochMilli(monitorCtx.threadPool!!.absoluteTimeInMillis()) alternative?
         // set the current execution time
-        val timeOfCurrentExecution = Instant.now()
+        // use threadpool time for cross node consistency
+        val timeOfCurrentExecution = Instant.ofEpochMilli(MonitorRunnerService.monitorCtx.threadPool!!.absoluteTimeInMillis())
 
         // TODO: should alerting v1 and v2 alerts index be separate?
-        // TODO: should alerting v1 and v2 alerting-config index be separate?
         try {
             // TODO: write generated V2 alerts to existing alerts v1 index for now, revisit this decision
             monitorCtx.alertIndices!!.createOrUpdateAlertIndex()
@@ -104,15 +104,17 @@ object PPLMonitorRunner : MonitorV2Runner() {
         logger.info("time filtered query: $timeFilteredQuery")
 
         // run each trigger
-        for (trigger in pplMonitor.triggers) {
+        for (pplTrigger in pplMonitor.triggers) {
             try {
-                val pplTrigger = trigger as PPLTrigger
-
                 // check for suppression and skip execution
                 // before even running the trigger itself
                 val suppressed = checkForSuppress(pplTrigger, timeOfCurrentExecution)
                 if (suppressed) {
                     logger.info("suppressing trigger ${pplTrigger.name} from monitor ${pplMonitor.name}")
+
+                    // automatically set this trigger to untriggered
+                    triggerResults[pplTrigger.id] = PPLTriggerRunResult(pplTrigger.name, false, null)
+
                     continue
                 }
                 logger.info("suppression check passed, executing trigger ${pplTrigger.name} from monitor ${pplMonitor.name}")
@@ -173,7 +175,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
                 // store the trigger execution and ppl query results for
                 // trigger execution response and notification message context
                 triggerResults[pplTrigger.id] = PPLTriggerRunResult(pplTrigger.name, triggered, null)
-                pplQueryResults[pplTrigger.id] = queryResponseJson
+                pplQueryResults[pplTrigger.id] = queryResponseJson.toMap()
 
                 if (triggered) {
                     // if trigger is on result set mode, this list will have exactly 1 element
@@ -189,8 +191,6 @@ object PPLMonitorRunner : MonitorV2Runner() {
                         preparedQueryResults,
                         timeOfCurrentExecution
                     )
-
-                    // TODO: save alert error message and action results in alert
 
                     // collect the generated alerts to be written to alerts index
                     // if the trigger is on result_set mode
@@ -212,34 +212,43 @@ object PPLMonitorRunner : MonitorV2Runner() {
                                 alert.queryResults
                             )
 
-                            // TODO: store this in trigger action results and store in alerts
                             runAction(
                                 action,
                                 pplTriggerExecutionContext,
                                 monitorCtx,
                                 pplMonitor,
-                                dryRun,
-                                timeOfCurrentExecution
+                                dryRun
                             )
                         }
                     }
 
-                    // TODO: what if retry policy null?
                     // write the alerts to the alerts index
                     monitorCtx.retryPolicy?.let {
                         saveAlertsV2(thisTriggersGeneratedAlerts, pplMonitor, it, nodeClient)
                     }
                 }
             } catch (e: Exception) {
-                logger.error("failed to run PPL Trigger for PPL Monitor ${pplMonitor.name}", e)
+                logger.error("failed to run PPL Trigger ${pplTrigger.name} for PPL Monitor ${pplMonitor.name}", e)
+
+                // generate an alert with an error message
+                monitorCtx.retryPolicy?.let {
+                    saveAlertsV2(
+                        generateErrorAlert(pplTrigger, pplMonitor, e, timeOfCurrentExecution),
+                        pplMonitor,
+                        it,
+                        nodeClient
+                    )
+                }
+
                 continue
             }
         }
 
-        // TODO: collect all triggers that were throttled, and if none were throttled, skip update monitor? saves on write requests
-        // for suppression checking purposes, update the PPL Monitor in the alerting-config index
+        // for suppression checking purposes, reindex the PPL Monitor into the alerting-config index
         // with updated last triggered times for each of its triggers
-        updateMonitorWithLastTriggeredTimes(pplMonitor, nodeClient)
+        if (triggerResults.any { it.value.triggered }) {
+            updateMonitorWithLastTriggeredTimes(pplMonitor, nodeClient)
+        }
 
         return PPLMonitorRunResult(
             pplMonitor.name,
@@ -247,7 +256,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
             periodStart,
             periodEnd,
             triggerResults,
-            pplQueryResults.map { it.key to it.value.toMap() }.toMap()
+            pplQueryResults
         )
     }
 
@@ -272,7 +281,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
     private fun addTimeFilter(query: String, periodStart: Instant, periodEnd: Instant, lookBackWindow: TimeValue?): String {
         // inject time filter into PPL query to only query for data within the (periodStart, periodEnd) interval
         // TODO: if query contains "_time", "span", "earliest", "latest", skip adding filter
-        // TODO: pending https://github.com/opensearch-project/sql/issues/3969
+        // pending https://github.com/opensearch-project/sql/issues/3969
         // for now assume "_time" field is always present in customer data
 
         // if the raw query contained any time check whatsoever, skip adding a time filter internally
@@ -319,7 +328,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
         // call PPL plugin to execute time filtered query
         val transportPplQueryRequest = TransportPPLQueryRequest(
             query,
-            JSONObject(mapOf(PPL_SQL_QUERY_FIELD to query)), // TODO: what is the purpose of this arg?
+            JSONObject(mapOf(PPL_SQL_QUERY_FIELD to query)),
             null // null path falls back to a default path internal to SQL/PPL Plugin
         )
 
@@ -357,8 +366,6 @@ object PPLMonitorRunner : MonitorV2Runner() {
             )
             return customConditionQueryResponse
         }
-
-        // TODO: dont create a copy, just remove irrelevant rows from the original reference in-place
 
         // this will eventually store just the rows that triggered the custom condition
         val relevantQueryResultRows = JSONObject()
@@ -470,14 +477,42 @@ object PPLMonitorRunner : MonitorV2Runner() {
                 triggerId = pplTrigger.id,
                 triggerName = pplTrigger.name,
                 queryResults = queryResult.toMap(),
+                triggeredTime = timeOfCurrentExecution,
                 expirationTime = expirationTime,
-                severity = pplTrigger.severity.value,
-                actionExecutionResults = listOf(),
+                severity = pplTrigger.severity.value
             )
             alertV2s.add(alertV2)
         }
 
         return alertV2s.toList() // return as immutable list
+    }
+
+    private fun generateErrorAlert(
+        pplTrigger: PPLTrigger,
+        pplMonitor: PPLMonitor,
+        exception: Exception,
+        timeOfCurrentExecution: Instant
+    ): List<AlertV2> {
+        val expirationTime = pplTrigger.expireDuration?.millis?.let { timeOfCurrentExecution.plus(it, ChronoUnit.MILLIS) }
+
+        val errorMessage = "Failed to run PPL Trigger ${pplTrigger.name} from PPL Monitor ${pplMonitor.name}: " +
+            exception.userErrorMessage()
+        val obfuscatedErrorMessage = AlertError.obfuscateIPAddresses(errorMessage)
+
+        val alertV2 = AlertV2(
+            monitorId = pplMonitor.id,
+            monitorName = pplMonitor.name,
+            monitorVersion = pplMonitor.version,
+            triggerId = pplTrigger.id,
+            triggerName = pplTrigger.name,
+            queryResults = mapOf(),
+            triggeredTime = timeOfCurrentExecution,
+            expirationTime = expirationTime,
+            errorMessage = obfuscatedErrorMessage,
+            severity = TriggerV2.Severity.ERROR.value
+        )
+
+        return listOf(alertV2)
     }
 
     private suspend fun saveAlertsV2(
@@ -489,11 +524,6 @@ object PPLMonitorRunner : MonitorV2Runner() {
         logger.info("received alerts: $alerts")
 
         var requestsToRetry = alerts.flatMap { alert ->
-            // We don't want to set the version when saving alerts because the MonitorRunner has first priority when writing alerts.
-            // In the rare event that a user acknowledges an alert between when it's read and when it's written
-            // back we're ok if that acknowledgement is lost. It's easier to get the user to retry than for the runner to
-            // spend time reloading the alert and writing it back.
-
             listOf<DocWriteRequest<*>>(
                 IndexRequest(AlertIndices.ALERT_INDEX)
                     .routing(pplMonitor.id) // set routing ID to PPL Monitor ID
@@ -537,28 +567,28 @@ object PPLMonitorRunner : MonitorV2Runner() {
         triggerCtx: PPLTriggerExecutionContext,
         monitorCtx: MonitorRunnerExecutionContext,
         pplMonitor: PPLMonitor,
-        dryrun: Boolean,
-        timeOfCurrentExecution: Instant
-    ): ActionRunResult {
-        return try {
-            val actionOutput = mutableMapOf<String, String>()
-            actionOutput[Action.SUBJECT] = if (action.subjectTemplate != null)
-                MonitorRunnerService.compileTemplateV2(action.subjectTemplate!!, triggerCtx)
-            else ""
-            actionOutput[Action.MESSAGE] = MonitorRunnerService.compileTemplateV2(action.messageTemplate, triggerCtx)
-            if (Strings.isNullOrEmpty(actionOutput[Action.MESSAGE])) {
-                throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
-            }
+        dryrun: Boolean
+    ) {
+        // this function can throw an exception, which is caught by the try
+        // catch in runMonitor() to generate an error alert
+        val actionOutput = mutableMapOf<String, String>()
+        actionOutput[Action.SUBJECT] = if (action.subjectTemplate != null)
+            MonitorRunnerService.compileTemplateV2(action.subjectTemplate!!, triggerCtx)
+        else ""
+        actionOutput[Action.MESSAGE] = MonitorRunnerService.compileTemplateV2(action.messageTemplate, triggerCtx)
+        if (Strings.isNullOrEmpty(actionOutput[Action.MESSAGE])) {
+            throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
+        }
 
-            if (!dryrun) {
+        if (!dryrun) {
 //                val client = monitorCtx.client
-                actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
-                    action,
-                    monitorCtx,
-                    actionOutput[Action.SUBJECT],
-                    actionOutput[Action.MESSAGE]!!
-                )
-                // TODO: use this block when security plugin is enabled
+            actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
+                action,
+                monitorCtx,
+                actionOutput[Action.SUBJECT],
+                actionOutput[Action.MESSAGE]!!
+            )
+            // TODO: use this block when security plugin is enabled
 //                client!!.threadPool().threadContext.stashContext().use {
 //                    withClosableContext(
 //                        InjectorContextElement(
@@ -577,10 +607,6 @@ object PPLMonitorRunner : MonitorV2Runner() {
 //                        )
 //                    }
 //                }
-            }
-            ActionRunResult(action.id, action.name, actionOutput, false, timeOfCurrentExecution, null)
-        } catch (e: Exception) {
-            ActionRunResult(action.id, action.name, mapOf(), false, timeOfCurrentExecution, e)
         }
     }
 }
