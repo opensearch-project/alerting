@@ -18,9 +18,6 @@ import org.opensearch.action.support.clustermanager.AcknowledgedResponse
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorResponse
-import org.opensearch.alerting.action.ExecuteMonitorV2Action
-import org.opensearch.alerting.action.ExecuteMonitorV2Request
-import org.opensearch.alerting.action.ExecuteMonitorV2Response
 import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.alerting.action.ExecuteWorkflowResponse
@@ -63,6 +60,9 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.lifecycle.AbstractLifecycleComponent
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
+import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.ExecuteMonitorV2Request
+import org.opensearch.commons.alerting.action.ExecuteMonitorV2Response
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.Monitor
@@ -443,7 +443,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                         )
                         monitorCtx.client!!.suspendUntil<Client, ExecuteMonitorV2Response> {
                             monitorCtx.client!!.execute(
-                                ExecuteMonitorV2Action.INSTANCE,
+                                AlertingActions.EXECUTE_MONITOR_V2_ACTION_TYPE,
                                 executeMonitorV2Request,
                                 it
                             )
@@ -594,8 +594,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         dryrun: Boolean,
         transportService: TransportService,
     ): MonitorV2RunResult<*> {
-        // Updating the scheduled job index at the start of monitor execution runs for when there is an upgrade the the schema mapping
-        // has not been updated.
         if (!IndexUtils.scheduledJobIndexUpdated && monitorCtx.clusterService != null && monitorCtx.client != null) {
             IndexUtils.updateIndexMapping(
                 ScheduledJob.SCHEDULED_JOBS_INDEX,

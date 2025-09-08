@@ -10,9 +10,6 @@ import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.MonitorRunnerService
-import org.opensearch.alerting.action.ExecuteMonitorV2Action
-import org.opensearch.alerting.action.ExecuteMonitorV2Request
-import org.opensearch.alerting.action.ExecuteMonitorV2Response
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -20,6 +17,9 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.action.AlertingActions
+import org.opensearch.commons.alerting.action.ExecuteMonitorV2Request
+import org.opensearch.commons.alerting.action.ExecuteMonitorV2Response
 import org.opensearch.commons.alerting.model.MonitorV2
 import org.opensearch.commons.alerting.model.PPLMonitor
 import org.opensearch.commons.alerting.model.PPLMonitor.Companion.PPL_MONITOR_TYPE
@@ -44,7 +44,7 @@ class TransportExecuteMonitorV2Action @Inject constructor(
     val xContentRegistry: NamedXContentRegistry,
     private val settings: Settings
 ) : HandledTransportAction<ExecuteMonitorV2Request, ExecuteMonitorV2Response>(
-    ExecuteMonitorV2Action.NAME, transportService, actionFilters, ::ExecuteMonitorV2Request
+    AlertingActions.EXECUTE_MONITOR_V2_ACTION_NAME, transportService, actionFilters, ::ExecuteMonitorV2Request
 ) {
     @Volatile private var indexTimeout = AlertingSettings.INDEX_TIMEOUT.get(settings)
 
@@ -60,7 +60,7 @@ class TransportExecuteMonitorV2Action @Inject constructor(
                 // get execution time interval
                 val (periodStart, periodEnd) = if (execMonitorV2Request.requestStart != null) {
                     Pair(
-                        Instant.ofEpochMilli(execMonitorV2Request.requestStart.millis),
+                        Instant.ofEpochMilli(execMonitorV2Request.requestStart!!.millis),
                         Instant.ofEpochMilli(execMonitorV2Request.requestEnd.millis)
                     )
                 } else {

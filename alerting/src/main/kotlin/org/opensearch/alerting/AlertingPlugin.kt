@@ -7,7 +7,6 @@ package org.opensearch.alerting
 
 import org.opensearch.action.ActionRequest
 import org.opensearch.alerting.action.ExecuteMonitorAction
-import org.opensearch.alerting.action.ExecuteMonitorV2Action
 import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetEmailAccountAction
@@ -263,7 +262,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(AlertingActions.GET_MONITOR_V2_ACTION_TYPE, TransportGetMonitorV2Action::class.java),
             ActionPlugin.ActionHandler(AlertingActions.SEARCH_MONITORS_V2_ACTION_TYPE, TransportSearchMonitorV2Action::class.java),
             ActionPlugin.ActionHandler(AlertingActions.DELETE_MONITOR_V2_ACTION_TYPE, TransportDeleteMonitorV2Action::class.java),
-            ActionPlugin.ActionHandler(ExecuteMonitorV2Action.INSTANCE, TransportExecuteMonitorV2Action::class.java),
+            ActionPlugin.ActionHandler(AlertingActions.EXECUTE_MONITOR_V2_ACTION_TYPE, TransportExecuteMonitorV2Action::class.java),
         )
     }
 

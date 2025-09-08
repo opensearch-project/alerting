@@ -149,6 +149,9 @@
         },
         "datarows": {
           "type": "text"
+        },
+        "total": {
+          "type": "integer"
         }
       }
     },
