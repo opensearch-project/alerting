@@ -50,15 +50,13 @@ class TransportDeleteMonitorV2Action @Inject constructor(
         // TOOD: when monitor is deleted, immediately expire all alerts it generated
         scope.launch {
             try {
-                // TODO: might be able to simply run DeleteMonitorService.deleteMonitor() directly, even if PPLMonitors have no metadata
-                val deleteResponse = DeleteMonitorService.deleteMonitor(request.monitorV2Id, request.refreshPolicy)
-                DeleteMonitorService.deleteLock(request.monitorV2Id)
-                actionListener.onResponse(DeleteMonitorV2Response(deleteResponse.id, deleteResponse.version))
+                val deleteResponse = DeleteMonitorService.deleteMonitorV2(request.monitorV2Id, request.refreshPolicy)
+                actionListener.onResponse(deleteResponse)
             } catch (e: Exception) {
                 actionListener.onFailure(e)
             }
 
-            // TODO: logic for deleting alerts
+            // we do not expire the alerts associated with the deleted monitor, but instead let its expiration time delete it
         }
     }
 }

@@ -331,6 +331,8 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         }
     }
 
+    // TODO: if MonitorV2 was deleted, skip trying to move alerts
+    // cluster throws failed to move alerts exception whenever a MonitorV2 is deleted
     override fun postDelete(jobId: String) {
         launch {
             try {

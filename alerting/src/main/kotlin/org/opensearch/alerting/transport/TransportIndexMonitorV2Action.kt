@@ -178,18 +178,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
      * and compare this to the [maxMonitorCount]. Requests that breach this threshold will be rejected.
      */
     private fun prepareMonitorIndexing(indexMonitorRequest: IndexMonitorV2Request, actionListener: ActionListener<IndexMonitorV2Response>) {
-
-        // Below check needs to be async operations and needs to be refactored issue#269
-        // checkForDisallowedDestinations(allowList)
-
-        // TODO: checks for throttling/suppression, should not be needed here, done in common utils when parsing PPLTriggers
-//        try {
-//            validateActionThrottle(request.monitor, maxActionThrottle, TimeValue.timeValueMinutes(1))
-//        } catch (e: RuntimeException) {
-//            actionListener.onFailure(AlertingException.wrap(e))
-//            return
-//        }
-
         if (indexMonitorRequest.method == RestRequest.Method.PUT) { // update monitor case
             scope.launch {
                 updateMonitor(indexMonitorRequest, actionListener)
@@ -277,7 +265,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
 
         try {
             val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
-            val failureReasons = checkShardsFailure(indexResponse)
+            val failureReasons = IndexUtils.checkShardsFailure(indexResponse)
             if (failureReasons != null) {
                 actionListener.onFailure(
                     AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), indexResponse.status()))
@@ -358,7 +346,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
 
         try {
             val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
-            val failureReasons = checkShardsFailure(indexResponse)
+            val failureReasons = IndexUtils.checkShardsFailure(indexResponse)
             if (failureReasons != null) {
                 log.info(failureReasons.toString())
                 actionListener.onFailure(
@@ -376,18 +364,5 @@ class TransportIndexMonitorV2Action @Inject constructor(
         } catch (t: Exception) {
             actionListener.onFailure(AlertingException.wrap(t))
         }
-    }
-
-    // TODO: copied from V1 TransportIndexMonitorAction, abstract this out into a util function
-    private fun checkShardsFailure(response: IndexResponse): String? {
-        val failureReasons = StringBuilder()
-        if (response.shardInfo.failed > 0) {
-            response.shardInfo.failures.forEach {
-                    entry ->
-                failureReasons.append(entry.reason())
-            }
-            return failureReasons.toString()
-        }
-        return null
     }
 }

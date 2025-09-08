@@ -151,7 +151,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
                 // for custom triggers, that's only rows that evaluated to true
                 val relevantQueryResultRows = if (pplTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) {
                     // number of results trigger
-                    queryResponseJson
+                    getQueryResponseWithoutSize(queryResponseJson)
                 } else {
                     // custom condition trigger
                     evaluateCustomConditionTrigger(queryResponseJson, pplTrigger)
@@ -357,6 +357,28 @@ object PPLMonitorRunner : MonitorV2Runner() {
         }
     }
 
+    private fun getQueryResponseWithoutSize(queryResponseJson: JSONObject): JSONObject {
+        // this will eventually store a deep copy of just the rows that triggered the custom condition
+        val queryResponseDeepCopy = JSONObject()
+
+        // first add a deep copy of the schema
+        queryResponseDeepCopy.put("schema", JSONArray(queryResponseJson.getJSONArray("schema").toList()))
+
+        // append empty datarows list, to be populated later
+        queryResponseDeepCopy.put("datarows", JSONArray())
+
+        val dataRowList = queryResponseJson.getJSONArray("datarows")
+        for (i in 0 until dataRowList.length()) {
+            val dataRow = dataRowList.getJSONArray(i)
+            queryResponseDeepCopy.getJSONArray("datarows").put(JSONArray(dataRow.toList()))
+        }
+
+        // include the total but not the size field of the PPL Query response
+        queryResponseDeepCopy.put("total", queryResponseJson.getLong("total"))
+
+        return queryResponseDeepCopy
+    }
+
     private fun evaluateCustomConditionTrigger(customConditionQueryResponse: JSONObject, pplTrigger: PPLTrigger): JSONObject {
         // a PPL query with custom condition returning 0 results should imply a valid but not useful query.
         // do not trigger alert, but warn that query likely is not functioning as user intended
@@ -368,7 +390,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
             return customConditionQueryResponse
         }
 
-        // this will eventually store just the rows that triggered the custom condition
+        // this will eventually store a deep copy of just the rows that triggered the custom condition
         val relevantQueryResultRows = JSONObject()
 
         // first add a deep copy of the schema
@@ -419,6 +441,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
             }
         }
 
+        // include the total but not the size field of the PPL Query response
         relevantQueryResultRows.put("total", relevantQueryResultRows.getJSONArray("datarows").length())
 
         // return only the rows that triggered the custom condition

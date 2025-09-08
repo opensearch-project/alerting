@@ -65,11 +65,6 @@ class RestSearchMonitorV2Action(
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
         log.debug("${request.method()} ${AlertingPlugin.MONITOR_V2_BASE_URI}/_search")
 
-//        val index = request.param("index", SCHEDULED_JOBS_INDEX)
-//        if (index != SCHEDULED_JOBS_INDEX && index != ALL_ALERT_INDEX_PATTERN) {
-//            throw IllegalArgumentException("Invalid index name.")
-//        }
-
         val searchSourceBuilder = SearchSourceBuilder()
         searchSourceBuilder.parseXContent(request.contentOrSourceParamParser())
         searchSourceBuilder.fetchSource(context(request))

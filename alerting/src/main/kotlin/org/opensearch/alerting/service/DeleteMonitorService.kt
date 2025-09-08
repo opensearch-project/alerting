@@ -29,6 +29,7 @@ import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_DELEGAT
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_MONITOR_PATH
 import org.opensearch.alerting.util.use
 import org.opensearch.commons.alerting.action.DeleteMonitorResponse
+import org.opensearch.commons.alerting.action.DeleteMonitorV2Response
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.util.AlertingException
@@ -51,7 +52,7 @@ object DeleteMonitorService :
     private val log = LogManager.getLogger(this.javaClass)
 
     private lateinit var client: Client
-    lateinit var lockService: LockService
+    private lateinit var lockService: LockService
 
     fun initialize(
         client: Client,
@@ -74,8 +75,20 @@ object DeleteMonitorService :
         return DeleteMonitorResponse(deleteResponse.id, deleteResponse.version)
     }
 
-    // both Alerting v1 and v2 workflows use this function
-    suspend fun deleteMonitor(monitorId: String, refreshPolicy: RefreshPolicy): DeleteResponse {
+    /**
+     * Deletes the monitorV2, which does not come with other metadata and queries
+     * like doc level monitors
+     * @param monitorV2Id monitorV2 ID to be deleted
+     * @param refreshPolicy
+     */
+    suspend fun deleteMonitorV2(monitorV2Id: String, refreshPolicy: RefreshPolicy): DeleteMonitorV2Response {
+        val deleteResponse = deleteMonitor(monitorV2Id, refreshPolicy)
+        deleteLock(monitorV2Id)
+        return DeleteMonitorV2Response(deleteResponse.id, deleteResponse.version)
+    }
+
+    // both Alerting v1 and v2 workflows flow through this function
+    private suspend fun deleteMonitor(monitorId: String, refreshPolicy: RefreshPolicy): DeleteResponse {
         val deleteMonitorRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, monitorId)
             .setRefreshPolicy(refreshPolicy)
         return client.suspendUntil { delete(deleteMonitorRequest, it) }
@@ -167,11 +180,12 @@ object DeleteMonitorService :
         }
     }
 
-    suspend fun deleteLock(monitor: Monitor) {
+    private suspend fun deleteLock(monitor: Monitor) {
         deleteLock(monitor.id)
     }
 
-    suspend fun deleteLock(monitorId: String) {
+    // both Alerting v1 and v2 workflows flow through this function
+    private suspend fun deleteLock(monitorId: String) {
         client.suspendUntil<Client, Boolean> { lockService.deleteLock(LockModel.generateLockId(monitorId), it) }
     }
 
