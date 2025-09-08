@@ -189,6 +189,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
                         pplTrigger,
                         pplMonitor,
                         preparedQueryResults,
+                        executionId,
                         timeOfCurrentExecution
                     )
 
@@ -233,7 +234,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
                 // generate an alert with an error message
                 monitorCtx.retryPolicy?.let {
                     saveAlertsV2(
-                        generateErrorAlert(pplTrigger, pplMonitor, e, timeOfCurrentExecution),
+                        generateErrorAlert(pplTrigger, pplMonitor, e, executionId, timeOfCurrentExecution),
                         pplMonitor,
                         it,
                         nodeClient
@@ -464,6 +465,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
         pplTrigger: PPLTrigger,
         pplMonitor: PPLMonitor,
         preparedQueryResults: List<JSONObject>,
+        executionId: String,
         timeOfCurrentExecution: Instant
     ): List<AlertV2> {
         val expirationTime = pplTrigger.expireDuration?.millis?.let { timeOfCurrentExecution.plus(it, ChronoUnit.MILLIS) }
@@ -479,7 +481,8 @@ object PPLMonitorRunner : MonitorV2Runner() {
                 queryResults = queryResult.toMap(),
                 triggeredTime = timeOfCurrentExecution,
                 expirationTime = expirationTime,
-                severity = pplTrigger.severity.value
+                severity = pplTrigger.severity.value,
+                executionId = executionId
             )
             alertV2s.add(alertV2)
         }
@@ -491,6 +494,7 @@ object PPLMonitorRunner : MonitorV2Runner() {
         pplTrigger: PPLTrigger,
         pplMonitor: PPLMonitor,
         exception: Exception,
+        executionId: String,
         timeOfCurrentExecution: Instant
     ): List<AlertV2> {
         val expirationTime = pplTrigger.expireDuration?.millis?.let { timeOfCurrentExecution.plus(it, ChronoUnit.MILLIS) }
@@ -509,7 +513,8 @@ object PPLMonitorRunner : MonitorV2Runner() {
             triggeredTime = timeOfCurrentExecution,
             expirationTime = expirationTime,
             errorMessage = obfuscatedErrorMessage,
-            severity = TriggerV2.Severity.ERROR.value
+            severity = TriggerV2.Severity.ERROR.value,
+            executionId = executionId
         )
 
         return listOf(alertV2)
