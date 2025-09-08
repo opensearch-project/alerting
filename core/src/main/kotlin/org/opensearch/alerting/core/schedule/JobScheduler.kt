@@ -193,7 +193,8 @@ class JobScheduler(private val threadPool: ThreadPool, private val jobRunner: Jo
     }
 
     fun getJobSchedulerMetric(): List<JobSchedulerMetrics> {
-        return scheduledJobIdToInfo.entries.stream()
+        return scheduledJobIdToInfo.entries.filter { it.value.scheduledJob !is MonitorV2 }
+            .stream()
             .map { entry ->
                 JobSchedulerMetrics(
                     entry.value.scheduledJobId,

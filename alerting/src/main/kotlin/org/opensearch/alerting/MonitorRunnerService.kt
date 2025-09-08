@@ -333,6 +333,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
     // TODO: if MonitorV2 was deleted, skip trying to move alerts
     // cluster throws failed to move alerts exception whenever a MonitorV2 is deleted
+    // because Alerting V2's stateless alerts don't need to be moved
     override fun postDelete(jobId: String) {
         launch {
             try {
@@ -483,20 +484,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     ): MonitorRunResult<*> {
         // Updating the scheduled job index at the start of monitor execution runs for when there is an upgrade the the schema mapping
         // has not been updated.
-        if (!IndexUtils.scheduledJobIndexUpdated && monitorCtx.clusterService != null && monitorCtx.client != null) {
-            IndexUtils.updateIndexMapping(
-                ScheduledJob.SCHEDULED_JOBS_INDEX,
-                ScheduledJobIndices.scheduledJobMappings(), monitorCtx.clusterService!!.state(), monitorCtx.client!!.admin().indices(),
-                object : ActionListener<AcknowledgedResponse> {
-                    override fun onResponse(response: AcknowledgedResponse) {
-                    }
-
-                    override fun onFailure(t: Exception) {
-                        logger.error("Failed to update config index schema", t)
-                    }
-                }
-            )
-        }
+        updateAlertingConfigIndexSchema()
 
         if (job is Workflow) {
             logger.info("Executing scheduled workflow - id: ${job.id}, periodStart: $periodStart, periodEnd: $periodEnd, dryrun: $dryrun")
@@ -589,6 +577,9 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         }
     }
 
+    // after the above JobRunner interface override runJob calls ExecuteMonitorV2 API,
+    // the ExecuteMonitorV2 transport action calls this function to call the PPLMonitorRunner,
+    // where the core PPL Monitor execution logic resides
     suspend fun runJobV2(
         monitorV2: MonitorV2,
         periodStart: Instant,
@@ -596,20 +587,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         dryrun: Boolean,
         transportService: TransportService,
     ): MonitorV2RunResult<*> {
-        if (!IndexUtils.scheduledJobIndexUpdated && monitorCtx.clusterService != null && monitorCtx.client != null) {
-            IndexUtils.updateIndexMapping(
-                ScheduledJob.SCHEDULED_JOBS_INDEX,
-                ScheduledJobIndices.scheduledJobMappings(), monitorCtx.clusterService!!.state(), monitorCtx.client!!.admin().indices(),
-                object : ActionListener<AcknowledgedResponse> {
-                    override fun onResponse(response: AcknowledgedResponse) {
-                    }
-
-                    override fun onFailure(t: Exception) {
-                        logger.error("Failed to update config index schema", t)
-                    }
-                }
-            )
-        }
+        updateAlertingConfigIndexSchema()
 
         val executionId = "${monitorV2.id}_${LocalDateTime.now(ZoneOffset.UTC)}_${UUID.randomUUID()}"
         val monitorV2Type = when (monitorV2) {
@@ -622,6 +600,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 "periodEnd: $periodEnd, dryrun: $dryrun, executionId: $executionId"
         )
 
+        // for now, always call PPLMonitorRunner since only PPL Monitors are initially supported
         // to introduce new MonitorV2 type, create its MonitorRunner, and if/else branch
         // to the corresponding MonitorRunners based on type. For now, default to PPLMonitorRunner
         val runResult = PPLMonitorRunner.runMonitorV2(
@@ -684,5 +663,22 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         return monitorCtx.scriptService!!.compile(template, TemplateScript.CONTEXT)
             .newInstance(template.params + mapOf("ctx" to ctx.asTemplateArg()))
             .execute()
+    }
+
+    private fun updateAlertingConfigIndexSchema() {
+        if (!IndexUtils.scheduledJobIndexUpdated && monitorCtx.clusterService != null && monitorCtx.client != null) {
+            IndexUtils.updateIndexMapping(
+                ScheduledJob.SCHEDULED_JOBS_INDEX,
+                ScheduledJobIndices.scheduledJobMappings(), monitorCtx.clusterService!!.state(), monitorCtx.client!!.admin().indices(),
+                object : ActionListener<AcknowledgedResponse> {
+                    override fun onResponse(response: AcknowledgedResponse) {
+                    }
+
+                    override fun onFailure(t: Exception) {
+                        logger.error("Failed to update config index schema", t)
+                    }
+                }
+            )
+        }
     }
 }

@@ -15,19 +15,6 @@ data class PPLTriggerExecutionContext(
     val pplQueryResults: Map<String, Any?> // keys are PPL query result fields, not trigger ID
 ) : TriggerV2ExecutionContext(monitorV2, periodStart, periodEnd, error) {
 
-//        constructor(
-//            pplMonitor: PPLMonitor,
-//            pplTrigger: PPLTrigger,
-//            pplMonitorRunResult: PPLMonitorRunResult
-//        ) : this(
-//            pplMonitor,
-//            pplMonitorRunResult.periodStart,
-//            pplMonitorRunResult.periodEnd,
-//            pplMonitorRunResult.error,
-//            pplTrigger,
-//            pplMonitorRunResult.pplQueryResults[pplTrigger.id]!!
-//        )
-
     override fun asTemplateArg(): Map<String, Any?> {
         val templateArg = super.asTemplateArg().toMutableMap()
         templateArg[PPL_TRIGGER_FIELD] = pplTrigger.asTemplateArg()

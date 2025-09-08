@@ -129,13 +129,25 @@ class TransportExecuteMonitorV2Action @Inject constructor(
                                 xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                                 getMonitorV2Response.sourceAsBytesRef, XContentType.JSON
                             ).use { xcp ->
-                                val monitorV2 = ScheduledJob.parse(
-                                    xcp,
-                                    getMonitorV2Response.id,
-                                    getMonitorV2Response.version
-                                ) as MonitorV2
-                                // TODO: validate that this is a MonitorV2 and not a Monitor
-                                executeMonitorV2(monitorV2)
+                                try {
+                                    val monitorV2 = ScheduledJob.parse(
+                                        xcp,
+                                        getMonitorV2Response.id,
+                                        getMonitorV2Response.version
+                                    ) as MonitorV2
+                                    executeMonitorV2(monitorV2)
+                                } catch (e: ClassCastException) {
+                                    actionListener.onFailure(
+                                        AlertingException.wrap(
+                                            IllegalArgumentException(
+                                                "Passed in Monitor ID is a legacy Alerting Monitor, please pass in an " +
+                                                    "Alerting V2 Monitor"
+                                            )
+                                        )
+                                    )
+                                } catch (e: Exception) {
+                                    actionListener.onFailure(AlertingException.wrap(e))
+                                }
                             }
                         }
                     }
@@ -146,8 +158,12 @@ class TransportExecuteMonitorV2Action @Inject constructor(
                 }
             )
         } else { // execute with monitor object case
-            val monitorV2 = execMonitorV2Request.monitorV2 as MonitorV2
-            executeMonitorV2(monitorV2)
+            try {
+                val monitorV2 = execMonitorV2Request.monitorV2 as MonitorV2
+                executeMonitorV2(monitorV2)
+            } catch (e: Exception) {
+                actionListener.onFailure(AlertingException.wrap(e))
+            }
         }
 //        }
     }

@@ -5,8 +5,8 @@ import org.opensearch.commons.alerting.model.MonitorV2RunResult
 import org.opensearch.transport.TransportService
 import java.time.Instant
 
-abstract class MonitorV2Runner {
-    abstract suspend fun runMonitorV2(
+interface MonitorV2Runner {
+    suspend fun runMonitorV2(
         monitorV2: MonitorV2,
         monitorCtx: MonitorRunnerExecutionContext, // MonitorV2 reads from same context as Monitor
         periodStart: Instant,

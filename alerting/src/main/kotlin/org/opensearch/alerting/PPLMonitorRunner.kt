@@ -45,7 +45,7 @@ import java.time.ZoneOffset.UTC
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
-object PPLMonitorRunner : MonitorV2Runner() {
+object PPLMonitorRunner : MonitorV2Runner {
     private val logger = LogManager.getLogger(javaClass)
 
     private const val PPL_SQL_QUERY_FIELD = "query" // name of PPL query field when passing into PPL/SQL Execute API call
