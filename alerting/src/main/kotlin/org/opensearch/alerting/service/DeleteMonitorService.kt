@@ -22,6 +22,7 @@ import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.clustermanager.AcknowledgedResponse
 import org.opensearch.alerting.MonitorMetadataService
+import org.opensearch.alerting.actionv2.DeleteMonitorV2Response
 import org.opensearch.alerting.core.lock.LockModel
 import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -29,7 +30,6 @@ import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_DELEGAT
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_MONITOR_PATH
 import org.opensearch.alerting.util.use
 import org.opensearch.commons.alerting.action.DeleteMonitorResponse
-import org.opensearch.commons.alerting.action.DeleteMonitorV2Response
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.util.AlertingException

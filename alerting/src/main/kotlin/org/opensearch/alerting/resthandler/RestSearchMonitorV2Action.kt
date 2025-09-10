@@ -4,6 +4,8 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.actionv2.SearchMonitorV2Action
+import org.opensearch.alerting.actionv2.SearchMonitorV2Request
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.context
 import org.opensearch.cluster.service.ClusterService
@@ -11,8 +13,6 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.alerting.action.AlertingActions
-import org.opensearch.commons.alerting.action.SearchMonitorV2Request
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.core.common.bytes.BytesReference
@@ -75,7 +75,7 @@ class RestSearchMonitorV2Action(
 
         val searchMonitorV2Request = SearchMonitorV2Request(searchRequest)
         return RestChannelConsumer { channel ->
-            client.execute(AlertingActions.SEARCH_MONITORS_V2_ACTION_TYPE, searchMonitorV2Request, searchMonitorResponse(channel))
+            client.execute(SearchMonitorV2Action.INSTANCE, searchMonitorV2Request, searchMonitorResponse(channel))
         }
     }
 

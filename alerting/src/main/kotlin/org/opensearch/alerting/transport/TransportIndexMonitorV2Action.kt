@@ -21,7 +21,12 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.clustermanager.AcknowledgedResponse
+import org.opensearch.alerting.actionv2.IndexMonitorV2Action
+import org.opensearch.alerting.actionv2.IndexMonitorV2Request
+import org.opensearch.alerting.actionv2.IndexMonitorV2Response
 import org.opensearch.alerting.core.ScheduledJobIndices
+import org.opensearch.alerting.core.modelv2.MonitorV2
+import org.opensearch.alerting.core.modelv2.PPLMonitor
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
@@ -35,12 +40,7 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.alerting.action.AlertingActions
-import org.opensearch.commons.alerting.action.IndexMonitorV2Request
-import org.opensearch.commons.alerting.action.IndexMonitorV2Response
 import org.opensearch.commons.alerting.model.Monitor
-import org.opensearch.commons.alerting.model.MonitorV2
-import org.opensearch.commons.alerting.model.PPLMonitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.util.AlertingException
@@ -69,7 +69,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
     val xContentRegistry: NamedXContentRegistry,
     val namedWriteableRegistry: NamedWriteableRegistry,
 ) : HandledTransportAction<IndexMonitorV2Request, IndexMonitorV2Response>(
-    AlertingActions.INDEX_MONITOR_V2_ACTION_NAME, transportService, actionFilters, ::IndexMonitorV2Request
+    IndexMonitorV2Action.NAME, transportService, actionFilters, ::IndexMonitorV2Request
 ),
     SecureTransportAction {
 

@@ -8,6 +8,10 @@ import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.actionv2.GetMonitorV2Action
+import org.opensearch.alerting.actionv2.GetMonitorV2Request
+import org.opensearch.alerting.actionv2.GetMonitorV2Response
+import org.opensearch.alerting.core.modelv2.MonitorV2
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -15,10 +19,6 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.alerting.action.AlertingActions
-import org.opensearch.commons.alerting.action.GetMonitorV2Request
-import org.opensearch.commons.alerting.action.GetMonitorV2Response
-import org.opensearch.commons.alerting.model.MonitorV2
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.action.ActionListener
@@ -39,7 +39,7 @@ class TransportGetMonitorV2Action @Inject constructor(
     val clusterService: ClusterService,
     settings: Settings,
 ) : HandledTransportAction<GetMonitorV2Request, GetMonitorV2Response>(
-    AlertingActions.GET_MONITOR_V2_ACTION_NAME,
+    GetMonitorV2Action.NAME,
     transportService,
     actionFilters,
     ::GetMonitorV2Request

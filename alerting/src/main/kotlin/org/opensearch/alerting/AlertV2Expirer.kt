@@ -4,11 +4,11 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_HISTORY_WRITE_INDEX
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
+import org.opensearch.alerting.core.modelv2.AlertV2.Companion.EXPIRATION_TIME_FIELD
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.unit.TimeValue
-import org.opensearch.commons.alerting.model.AlertV2.Companion.EXPIRATION_TIME_FIELD
 import org.opensearch.core.action.ActionListener
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse

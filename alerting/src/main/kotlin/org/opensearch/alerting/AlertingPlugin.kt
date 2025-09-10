@@ -14,6 +14,11 @@ import org.opensearch.alerting.action.GetEmailGroupAction
 import org.opensearch.alerting.action.GetRemoteIndexesAction
 import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
+import org.opensearch.alerting.actionv2.DeleteMonitorV2Action
+import org.opensearch.alerting.actionv2.ExecuteMonitorV2Action
+import org.opensearch.alerting.actionv2.GetMonitorV2Action
+import org.opensearch.alerting.actionv2.IndexMonitorV2Action
+import org.opensearch.alerting.actionv2.SearchMonitorV2Action
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.comments.CommentsIndices
@@ -23,6 +28,7 @@ import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsAction
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsTransportAction
 import org.opensearch.alerting.core.lock.LockService
+import org.opensearch.alerting.core.modelv2.MonitorV2
 import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsV2Handler
 import org.opensearch.alerting.core.schedule.JobScheduler
 import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSettings
@@ -94,7 +100,6 @@ import org.opensearch.commons.alerting.model.ClusterMetricsInput
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
-import org.opensearch.commons.alerting.model.MonitorV2
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
@@ -257,11 +262,11 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(DocLevelMonitorFanOutAction.INSTANCE, TransportDocLevelMonitorFanOutAction::class.java),
 
             // Alerting V2
-            ActionPlugin.ActionHandler(AlertingActions.INDEX_MONITOR_V2_ACTION_TYPE, TransportIndexMonitorV2Action::class.java),
-            ActionPlugin.ActionHandler(AlertingActions.GET_MONITOR_V2_ACTION_TYPE, TransportGetMonitorV2Action::class.java),
-            ActionPlugin.ActionHandler(AlertingActions.SEARCH_MONITORS_V2_ACTION_TYPE, TransportSearchMonitorV2Action::class.java),
-            ActionPlugin.ActionHandler(AlertingActions.DELETE_MONITOR_V2_ACTION_TYPE, TransportDeleteMonitorV2Action::class.java),
-            ActionPlugin.ActionHandler(AlertingActions.EXECUTE_MONITOR_V2_ACTION_TYPE, TransportExecuteMonitorV2Action::class.java),
+            ActionPlugin.ActionHandler(IndexMonitorV2Action.INSTANCE, TransportIndexMonitorV2Action::class.java),
+            ActionPlugin.ActionHandler(GetMonitorV2Action.INSTANCE, TransportGetMonitorV2Action::class.java),
+            ActionPlugin.ActionHandler(SearchMonitorV2Action.INSTANCE, TransportSearchMonitorV2Action::class.java),
+            ActionPlugin.ActionHandler(DeleteMonitorV2Action.INSTANCE, TransportDeleteMonitorV2Action::class.java),
+            ActionPlugin.ActionHandler(ExecuteMonitorV2Action.INSTANCE, TransportExecuteMonitorV2Action::class.java),
         )
     }
 

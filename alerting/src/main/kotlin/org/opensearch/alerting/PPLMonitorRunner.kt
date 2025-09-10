@@ -12,6 +12,18 @@ import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.QueryLevelMonitorRunner.getConfigAndSendNotification
 import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.core.modelv2.AlertV2
+import org.opensearch.alerting.core.modelv2.MonitorV2
+import org.opensearch.alerting.core.modelv2.MonitorV2RunResult
+import org.opensearch.alerting.core.modelv2.PPLMonitor
+import org.opensearch.alerting.core.modelv2.PPLMonitorRunResult
+import org.opensearch.alerting.core.modelv2.PPLTrigger
+import org.opensearch.alerting.core.modelv2.PPLTrigger.ConditionType
+import org.opensearch.alerting.core.modelv2.PPLTrigger.NumResultsCondition
+import org.opensearch.alerting.core.modelv2.PPLTrigger.TriggerMode
+import org.opensearch.alerting.core.modelv2.PPLTriggerRunResult
+import org.opensearch.alerting.core.modelv2.TriggerV2.Severity
+import org.opensearch.alerting.core.ppl.PPLPluginInterface
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.PPLTriggerExecutionContext
@@ -19,21 +31,9 @@ import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.commons.alerting.alerts.AlertError
 import org.opensearch.commons.alerting.model.Alert
-import org.opensearch.commons.alerting.model.AlertV2
-import org.opensearch.commons.alerting.model.MonitorV2
-import org.opensearch.commons.alerting.model.MonitorV2RunResult
-import org.opensearch.commons.alerting.model.PPLMonitor
-import org.opensearch.commons.alerting.model.PPLMonitorRunResult
-import org.opensearch.commons.alerting.model.PPLTrigger
-import org.opensearch.commons.alerting.model.PPLTrigger.ConditionType
-import org.opensearch.commons.alerting.model.PPLTrigger.NumResultsCondition
-import org.opensearch.commons.alerting.model.PPLTrigger.TriggerMode
-import org.opensearch.commons.alerting.model.PPLTriggerRunResult
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
-import org.opensearch.commons.alerting.model.TriggerV2
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.alerting.model.userErrorMessage
-import org.opensearch.commons.ppl.PPLPluginInterface
 import org.opensearch.core.common.Strings
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent
@@ -205,7 +205,7 @@ object PPLMonitorRunner : MonitorV2Runner {
                     for (action in pplTrigger.actions) {
                         for (alert in thisTriggersGeneratedAlerts) {
                             val pplTriggerExecutionContext = PPLTriggerExecutionContext(
-                                monitorV2,
+                                pplMonitor,
                                 periodStart,
                                 periodEnd,
                                 null,
@@ -463,7 +463,7 @@ object PPLMonitorRunner : MonitorV2Runner {
     }
 
     // prepares the query results to be passed into alerts and notifications based on trigger mode
-    // if result set, alert and notification simply stores all of the query results
+    // if result set, alert and notification simply stores all query results
     // if per result, each alert and notification stores a single row of the query results
     private fun prepareQueryResults(relevantQueryResultRows: JSONObject, triggerMode: TriggerMode): List<JSONObject> {
         // case: result set
@@ -491,7 +491,7 @@ object PPLMonitorRunner : MonitorV2Runner {
         executionId: String,
         timeOfCurrentExecution: Instant
     ): List<AlertV2> {
-        val expirationTime = pplTrigger.expireDuration?.millis?.let { timeOfCurrentExecution.plus(it, ChronoUnit.MILLIS) }
+        val expirationTime = pplTrigger.expireDuration.millis.let { timeOfCurrentExecution.plus(it, ChronoUnit.MILLIS) }
 
         val alertV2s = mutableListOf<AlertV2>()
         for (queryResult in preparedQueryResults) {
@@ -504,7 +504,7 @@ object PPLMonitorRunner : MonitorV2Runner {
                 queryResults = queryResult.toMap(),
                 triggeredTime = timeOfCurrentExecution,
                 expirationTime = expirationTime,
-                severity = pplTrigger.severity.value,
+                severity = pplTrigger.severity,
                 executionId = executionId
             )
             alertV2s.add(alertV2)
@@ -520,7 +520,7 @@ object PPLMonitorRunner : MonitorV2Runner {
         executionId: String,
         timeOfCurrentExecution: Instant
     ): List<AlertV2> {
-        val expirationTime = pplTrigger.expireDuration?.millis?.let { timeOfCurrentExecution.plus(it, ChronoUnit.MILLIS) }
+        val expirationTime = pplTrigger.expireDuration.millis.let { timeOfCurrentExecution.plus(it, ChronoUnit.MILLIS) }
 
         val errorMessage = "Failed to run PPL Trigger ${pplTrigger.name} from PPL Monitor ${pplMonitor.name}: " +
             exception.userErrorMessage()
@@ -536,7 +536,7 @@ object PPLMonitorRunner : MonitorV2Runner {
             triggeredTime = timeOfCurrentExecution,
             expirationTime = expirationTime,
             errorMessage = obfuscatedErrorMessage,
-            severity = TriggerV2.Severity.ERROR.value,
+            severity = Severity.ERROR,
             executionId = executionId
         )
 

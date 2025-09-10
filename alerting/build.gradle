@@ -21,6 +21,24 @@ import org.opensearch.gradle.test.RestIntegTestTask
 import org.opensearch.gradle.testclusters.OpenSearchCluster
 import org.opensearch.gradle.testclusters.StandaloneRestIntegTestTask
 
+buildscript {
+    ext {
+        opensearch_group = "org.opensearch"
+        opensearch_version = System.getProperty("opensearch.version", "3.1.0-SNAPSHOT")
+        isSnapshot = "true" == System.getProperty("build.snapshot", "true")
+        buildVersionQualifier = System.getProperty("build.version_qualifier", "")
+        kotlin_version = System.getProperty("kotlin.version", "1.9.25")
+        version_tokens = opensearch_version.tokenize('-')
+        opensearch_build = version_tokens[0] + '.0'
+        if (buildVersionQualifier) {
+            opensearch_build += "-${buildVersionQualifier}"
+        }
+        if (isSnapshot) {
+            opensearch_build += "-SNAPSHOT"
+        }
+    }
+}
+
 apply plugin: 'java'
 apply plugin: 'idea'
 apply plugin: 'org.jetbrains.kotlin.jvm'
@@ -147,6 +165,18 @@ def bwcVersion = bwcVersionShort + ".0"
 def bwcOpenSearchVersion = bwcVersionShort + "-SNAPSHOT"
 def bwcPluginVersion = bwcVersion + "-SNAPSHOT"
 
+def sqlJarDirectory = "$buildDir/dependencies/opensearch-sql-plugin"
+
+task addJarsToClasspath(type: Copy) {
+    from(fileTree(dir: sqlJarDirectory)) {
+        include "opensearch-sql-${opensearch_build}.jar"
+        include "ppl-${opensearch_build}.jar"
+        include "protocol-${opensearch_build}.jar"
+        include "core-${opensearch_build}.jar"
+    }
+    into("$buildDir/classes")
+}
+
 dependencies {
     // Needed for integ tests
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-notifications-core', version: "${opensearch_build}"
@@ -168,6 +198,11 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-common:${kotlin_version}"
     implementation "org.jetbrains:annotations:13.0"
 
+    // SQL/PPL plugin dependencies
+    implementation 'org.json:json:20240303'
+//    implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-thin-${opensearch_build}.jar", "ppl-${opensearch_build}.jar", "protocol-${opensearch_build}.jar", "core-${opensearch_build}.jar"])
+//    zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${opensearch_build}"
+
     api project(":alerting-core")
     implementation "com.github.seancfoley:ipaddress:5.4.1"
     implementation project(path: ":alerting-spi", configuration: 'shadow')
@@ -180,6 +215,29 @@ dependencies {
     testImplementation "org.opensearch.plugin:lang-painless:${opensearch_version}"
     testImplementation "org.opensearch.plugin:lang-mustache-client:${opensearch_version}"
 }
+
+task extractSqlJar(type: Copy) {
+    mustRunAfter()
+    from(zipTree(configurations.zipArchive.find { it.name.startsWith("opensearch-sql-plugin") }))
+    into sqlJarDirectory
+}
+
+task extractSqlClass(type: Copy, dependsOn: [extractSqlJar]) {
+    from zipTree("${sqlJarDirectory}/opensearch-sql-${opensearch_build}.jar")
+    into("$buildDir/opensearch-sql")
+    include 'org/opensearch/sql/**'
+}
+
+task replaceSqlJar(type: Jar, dependsOn: [extractSqlClass]) {
+    from("$buildDir/opensearch-sql")
+    archiveFileName = "opensearch-sql-thin-${opensearch_build}.jar"
+    destinationDirectory = file(sqlJarDirectory)
+    doLast {
+        file("${sqlJarDirectory}/opensearch-sql-${opensearch_build}.jar").delete()
+    }
+}
+
+tasks.addJarsToClasspath.dependsOn(replaceSqlJar)
 
 javadoc.enabled = false // turn off javadoc as it barfs on Kotlin code
 licenseHeaders.enabled = true
@@ -656,3 +714,11 @@ def waitForClusterSetup(OpenSearchCluster cluster, Boolean securityEnabled) {
 }
 
 apply from: '../build-tools/pkgbuild.gradle'
+
+//compileJava {
+//    dependsOn addJarsToClasspath
+//}
+//
+//compileKotlin {
+//    dependsOn addJarsToClasspath
+//}

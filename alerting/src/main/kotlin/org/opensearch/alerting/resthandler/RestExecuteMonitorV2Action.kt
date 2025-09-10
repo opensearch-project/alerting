@@ -2,10 +2,10 @@ package org.opensearch.alerting.resthandler
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.actionv2.ExecuteMonitorV2Action
+import org.opensearch.alerting.actionv2.ExecuteMonitorV2Request
+import org.opensearch.alerting.core.modelv2.MonitorV2
 import org.opensearch.common.unit.TimeValue
-import org.opensearch.commons.alerting.action.AlertingActions
-import org.opensearch.commons.alerting.action.ExecuteMonitorV2Request
-import org.opensearch.commons.alerting.model.MonitorV2
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.xcontent.XContentParser.Token.START_OBJECT
 import org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken
@@ -46,7 +46,7 @@ class RestExecuteMonitorV2Action : BaseRestHandler() {
             if (request.hasParam("monitorV2Id")) {
                 val monitorV2Id = request.param("monitorV2Id")
                 val execMonitorV2Request = ExecuteMonitorV2Request(dryrun, monitorV2Id, null, null, requestEnd)
-                client.execute(AlertingActions.EXECUTE_MONITOR_V2_ACTION_TYPE, execMonitorV2Request, RestToXContentListener(channel))
+                client.execute(ExecuteMonitorV2Action.INSTANCE, execMonitorV2Request, RestToXContentListener(channel))
             } else {
                 val xcp = request.contentParser()
                 ensureExpectedToken(START_OBJECT, xcp.nextToken(), xcp)
@@ -59,7 +59,7 @@ class RestExecuteMonitorV2Action : BaseRestHandler() {
                 }
 
                 val execMonitorV2Request = ExecuteMonitorV2Request(dryrun, null, monitorV2, null, requestEnd)
-                client.execute(AlertingActions.EXECUTE_MONITOR_V2_ACTION_TYPE, execMonitorV2Request, RestToXContentListener(channel))
+                client.execute(ExecuteMonitorV2Action.INSTANCE, execMonitorV2Request, RestToXContentListener(channel))
             }
         }
     }

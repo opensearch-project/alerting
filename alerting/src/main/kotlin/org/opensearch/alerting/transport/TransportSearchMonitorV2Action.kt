@@ -4,13 +4,13 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.actionv2.SearchMonitorV2Action
+import org.opensearch.alerting.actionv2.SearchMonitorV2Request
+import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.MONITOR_V2_TYPE
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
-import org.opensearch.commons.alerting.action.AlertingActions
-import org.opensearch.commons.alerting.action.SearchMonitorV2Request
-import org.opensearch.commons.alerting.model.MonitorV2.Companion.MONITOR_V2_TYPE
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry
@@ -30,7 +30,7 @@ class TransportSearchMonitorV2Action @Inject constructor(
     actionFilters: ActionFilters,
     val namedWriteableRegistry: NamedWriteableRegistry
 ) : HandledTransportAction<SearchMonitorV2Request, SearchResponse>(
-    AlertingActions.SEARCH_MONITORS_V2_ACTION_NAME, transportService, actionFilters, ::SearchMonitorV2Request
+    SearchMonitorV2Action.NAME, transportService, actionFilters, ::SearchMonitorV2Request
 ),
     SecureTransportAction {
 

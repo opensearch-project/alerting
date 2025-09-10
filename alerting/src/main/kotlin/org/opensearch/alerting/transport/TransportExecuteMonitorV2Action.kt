@@ -10,6 +10,12 @@ import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.MonitorRunnerService
+import org.opensearch.alerting.actionv2.ExecuteMonitorV2Action
+import org.opensearch.alerting.actionv2.ExecuteMonitorV2Request
+import org.opensearch.alerting.actionv2.ExecuteMonitorV2Response
+import org.opensearch.alerting.core.modelv2.MonitorV2
+import org.opensearch.alerting.core.modelv2.PPLMonitor
+import org.opensearch.alerting.core.modelv2.PPLMonitor.Companion.PPL_MONITOR_TYPE
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -17,12 +23,6 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.alerting.action.AlertingActions
-import org.opensearch.commons.alerting.action.ExecuteMonitorV2Request
-import org.opensearch.commons.alerting.action.ExecuteMonitorV2Response
-import org.opensearch.commons.alerting.model.MonitorV2
-import org.opensearch.commons.alerting.model.PPLMonitor
-import org.opensearch.commons.alerting.model.PPLMonitor.Companion.PPL_MONITOR_TYPE
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.action.ActionListener
@@ -44,7 +44,7 @@ class TransportExecuteMonitorV2Action @Inject constructor(
     val xContentRegistry: NamedXContentRegistry,
     private val settings: Settings
 ) : HandledTransportAction<ExecuteMonitorV2Request, ExecuteMonitorV2Response>(
-    AlertingActions.EXECUTE_MONITOR_V2_ACTION_NAME, transportService, actionFilters, ::ExecuteMonitorV2Request
+    ExecuteMonitorV2Action.NAME, transportService, actionFilters, ::ExecuteMonitorV2Request
 ) {
     @Volatile private var indexTimeout = AlertingSettings.INDEX_TIMEOUT.get(settings)
 

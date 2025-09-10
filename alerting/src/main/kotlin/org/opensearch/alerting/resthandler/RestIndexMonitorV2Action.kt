@@ -3,12 +3,12 @@ package org.opensearch.alerting.resthandler
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.actionv2.IndexMonitorV2Action
+import org.opensearch.alerting.actionv2.IndexMonitorV2Request
+import org.opensearch.alerting.core.modelv2.MonitorV2
 import org.opensearch.alerting.util.IF_PRIMARY_TERM
 import org.opensearch.alerting.util.IF_SEQ_NO
 import org.opensearch.alerting.util.REFRESH
-import org.opensearch.commons.alerting.action.AlertingActions
-import org.opensearch.commons.alerting.action.IndexMonitorV2Request
-import org.opensearch.commons.alerting.model.MonitorV2
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.xcontent.XContentParser.Token
 import org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken
@@ -71,7 +71,7 @@ class RestIndexMonitorV2Action : BaseRestHandler() {
         val indexMonitorV2Request = IndexMonitorV2Request(id, seqNo, primaryTerm, refreshPolicy, request.method(), monitorV2)
 
         return RestChannelConsumer { channel ->
-            client.execute(AlertingActions.INDEX_MONITOR_V2_ACTION_TYPE, indexMonitorV2Request, RestToXContentListener(channel))
+            client.execute(IndexMonitorV2Action.INSTANCE, indexMonitorV2Request, RestToXContentListener(channel))
         }
     }
 }

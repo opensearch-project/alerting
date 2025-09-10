@@ -6,14 +6,14 @@ import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.actionv2.DeleteMonitorV2Action
+import org.opensearch.alerting.actionv2.DeleteMonitorV2Request
+import org.opensearch.alerting.actionv2.DeleteMonitorV2Response
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
-import org.opensearch.commons.alerting.action.AlertingActions
-import org.opensearch.commons.alerting.action.DeleteMonitorV2Request
-import org.opensearch.commons.alerting.action.DeleteMonitorV2Response
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.tasks.Task
@@ -31,7 +31,7 @@ class TransportDeleteMonitorV2Action @Inject constructor(
     settings: Settings,
     val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<DeleteMonitorV2Request, DeleteMonitorV2Response>(
-    AlertingActions.DELETE_MONITOR_V2_ACTION_NAME, transportService, actionFilters, ::DeleteMonitorV2Request
+    DeleteMonitorV2Action.NAME, transportService, actionFilters, ::DeleteMonitorV2Request
 ),
     SecureTransportAction {
 

@@ -1,18 +1,18 @@
 package org.opensearch.alerting.script
 
-import org.opensearch.commons.alerting.model.MonitorV2
-import org.opensearch.commons.alerting.model.PPLMonitorRunResult.Companion.PPL_QUERY_RESULTS_FIELD
-import org.opensearch.commons.alerting.model.PPLTrigger
-import org.opensearch.commons.alerting.model.PPLTrigger.Companion.PPL_TRIGGER_FIELD
+import org.opensearch.alerting.core.modelv2.PPLMonitor
+import org.opensearch.alerting.core.modelv2.PPLMonitorRunResult.Companion.PPL_QUERY_RESULTS_FIELD
+import org.opensearch.alerting.core.modelv2.PPLTrigger
+import org.opensearch.alerting.core.modelv2.PPLTrigger.Companion.PPL_TRIGGER_FIELD
 import java.time.Instant
 
 data class PPLTriggerExecutionContext(
-    override val monitorV2: MonitorV2,
+    override val monitorV2: PPLMonitor,
     override val periodStart: Instant,
     override val periodEnd: Instant,
     override val error: Exception? = null,
     val pplTrigger: PPLTrigger,
-    val pplQueryResults: Map<String, Any?> // keys are PPL query result fields, not trigger ID
+    val pplQueryResults: Map<String, Any?> // keys are PPL query result fields
 ) : TriggerV2ExecutionContext(monitorV2, periodStart, periodEnd, error) {
 
     override fun asTemplateArg(): Map<String, Any?> {

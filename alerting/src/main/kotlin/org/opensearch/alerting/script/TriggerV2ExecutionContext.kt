@@ -1,8 +1,8 @@
 package org.opensearch.alerting.script
 
-import org.opensearch.commons.alerting.model.MonitorV2
-import org.opensearch.commons.alerting.model.MonitorV2RunResult
-import org.opensearch.commons.alerting.model.TriggerV2
+import org.opensearch.alerting.core.modelv2.MonitorV2
+import org.opensearch.alerting.core.modelv2.MonitorV2RunResult
+import org.opensearch.alerting.core.modelv2.TriggerV2
 import java.time.Instant
 
 abstract class TriggerV2ExecutionContext(

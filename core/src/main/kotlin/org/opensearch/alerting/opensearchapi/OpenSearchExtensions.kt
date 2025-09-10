@@ -14,6 +14,7 @@ import org.opensearch.OpenSearchException
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.search.ShardSearchFailure
+import org.opensearch.alerting.core.ppl.PPLPluginInterface
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.util.concurrent.ThreadContext
 import org.opensearch.common.xcontent.XContentHelper
@@ -21,7 +22,6 @@ import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.InjectSecurity
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.notifications.NotificationsPluginInterface
-import org.opensearch.commons.ppl.PPLPluginInterface
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.rest.RestStatus.BAD_GATEWAY

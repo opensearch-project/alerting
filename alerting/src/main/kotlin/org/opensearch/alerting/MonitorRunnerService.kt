@@ -21,12 +21,19 @@ import org.opensearch.alerting.action.ExecuteMonitorResponse
 import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.alerting.action.ExecuteWorkflowResponse
+import org.opensearch.alerting.actionv2.ExecuteMonitorV2Action
+import org.opensearch.alerting.actionv2.ExecuteMonitorV2Request
+import org.opensearch.alerting.actionv2.ExecuteMonitorV2Response
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertMover.Companion.moveAlerts
 import org.opensearch.alerting.core.JobRunner
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.lock.LockModel
 import org.opensearch.alerting.core.lock.LockService
+import org.opensearch.alerting.core.modelv2.MonitorV2
+import org.opensearch.alerting.core.modelv2.MonitorV2RunResult
+import org.opensearch.alerting.core.modelv2.PPLMonitor
+import org.opensearch.alerting.core.modelv2.PPLMonitor.Companion.PPL_MONITOR_TYPE
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -60,17 +67,10 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.lifecycle.AbstractLifecycleComponent
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
-import org.opensearch.commons.alerting.action.AlertingActions
-import org.opensearch.commons.alerting.action.ExecuteMonitorV2Request
-import org.opensearch.commons.alerting.action.ExecuteMonitorV2Response
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorRunResult
-import org.opensearch.commons.alerting.model.MonitorV2
-import org.opensearch.commons.alerting.model.MonitorV2RunResult
-import org.opensearch.commons.alerting.model.PPLMonitor
-import org.opensearch.commons.alerting.model.PPLMonitor.Companion.PPL_MONITOR_TYPE
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.TriggerRunResult
 import org.opensearch.commons.alerting.model.Workflow
@@ -446,7 +446,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                         )
                         monitorCtx.client!!.suspendUntil<Client, ExecuteMonitorV2Response> {
                             monitorCtx.client!!.execute(
-                                AlertingActions.EXECUTE_MONITOR_V2_ACTION_TYPE,
+                                ExecuteMonitorV2Action.INSTANCE,
                                 executeMonitorV2Request,
                                 it
                             )
