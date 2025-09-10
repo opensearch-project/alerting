@@ -1,5 +1,6 @@
 package org.opensearch.alerting.core.modelv2
 
+import org.opensearch.alerting.core.util.nonOptionalTimeField
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.CronSchedule
 import org.opensearch.commons.alerting.model.IntervalSchedule
@@ -7,7 +8,6 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.Schedule
 import org.opensearch.commons.alerting.util.IndexUtils
 import org.opensearch.commons.alerting.util.instant
-import org.opensearch.commons.alerting.util.nonOptionalTimeField
 import org.opensearch.commons.alerting.util.optionalTimeField
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.common.io.stream.StreamOutput

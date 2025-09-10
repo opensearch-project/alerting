@@ -1,6 +1,7 @@
 package org.opensearch.alerting.core.modelv2
 
 import org.opensearch.alerting.core.modelv2.TriggerV2.Severity
+import org.opensearch.alerting.core.util.nonOptionalTimeField
 import org.opensearch.common.lucene.uid.Versions
 import org.opensearch.commons.alerting.model.Alert.Companion.ALERT_ID_FIELD
 import org.opensearch.commons.alerting.model.Alert.Companion.ALERT_VERSION_FIELD
@@ -17,7 +18,6 @@ import org.opensearch.commons.alerting.model.Alert.Companion.TRIGGER_ID_FIELD
 import org.opensearch.commons.alerting.model.Alert.Companion.TRIGGER_NAME_FIELD
 import org.opensearch.commons.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
 import org.opensearch.commons.alerting.util.instant
-import org.opensearch.commons.alerting.util.nonOptionalTimeField
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.common.io.stream.StreamOutput
 import org.opensearch.core.common.io.stream.Writeable

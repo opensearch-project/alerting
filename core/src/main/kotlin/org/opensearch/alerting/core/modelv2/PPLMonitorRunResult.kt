@@ -5,7 +5,7 @@ import org.opensearch.alerting.core.modelv2.MonitorV2RunResult.Companion.MONITOR
 import org.opensearch.alerting.core.modelv2.MonitorV2RunResult.Companion.PERIOD_END_FIELD
 import org.opensearch.alerting.core.modelv2.MonitorV2RunResult.Companion.PERIOD_START_FIELD
 import org.opensearch.alerting.core.modelv2.MonitorV2RunResult.Companion.TRIGGER_RESULTS_FIELD
-import org.opensearch.commons.alerting.util.nonOptionalTimeField
+import org.opensearch.alerting.core.util.nonOptionalTimeField
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.common.io.stream.StreamOutput
 import org.opensearch.core.xcontent.ToXContent
