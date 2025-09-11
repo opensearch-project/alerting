@@ -6,7 +6,7 @@
 buildscript {
     ext {
         opensearch_group = "org.opensearch"
-        opensearch_version = System.getProperty("opensearch.version", "3.1.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "3.3.0-SNAPSHOT")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
         kotlin_version = System.getProperty("kotlin.version", "1.9.25")
@@ -28,6 +28,12 @@ apply plugin: 'jacoco'
 
 configurations {
     zipArchive
+    all {
+        resolutionStrategy {
+            // force commons-beanutils to a non-vulnerable version
+            force "commons-beanutils:commons-beanutils:1.11.0"
+        }
+    }
 }
 
 def sqlJarDirectory = "$buildDir/dependencies/opensearch-sql-plugin"

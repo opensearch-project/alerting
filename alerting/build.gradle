@@ -24,7 +24,7 @@ import org.opensearch.gradle.testclusters.StandaloneRestIntegTestTask
 buildscript {
     ext {
         opensearch_group = "org.opensearch"
-        opensearch_version = System.getProperty("opensearch.version", "3.1.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "3.3.0-SNAPSHOT")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
         kotlin_version = System.getProperty("kotlin.version", "1.9.25")
@@ -99,13 +99,12 @@ publishing {
     }
 
     repositories {
-        mavenLocal()
         maven {
             name = "Snapshots"
-            url = "https://aws.oss.sonatype.org/content/repositories/snapshots"
+            url = "https://central.sonatype.com/repository/maven-snapshots/"
             credentials {
-                username "$System.env.SONATYPE_USERNAME"
-                password "$System.env.SONATYPE_PASSWORD"
+                username System.getenv("SONATYPE_USERNAME")
+                password System.getenv("SONATYPE_PASSWORD")
             }
         }
     }
@@ -145,19 +144,19 @@ configurations {
 // This flag indicates the existence of security plugin
 def securityEnabled = System.getProperty("security", "false") == "true" || System.getProperty("https", "false") == "true"
 
-// Always be minimumCompatibilityVersion of current opensearch version(3.1.0)
-// get latest 2.x version from OpenSearch 2.x branch
+// Always be minimumCompatibilityVersion of current opensearch version(3.3.0)
+// get latest 3.x version from OpenSearch
 static def fetchVersionProperties() {
-    def url = 'https://raw.githubusercontent.com/opensearch-project/OpenSearch/refs/heads/2.x/buildSrc/version.properties'
+    def url = 'https://raw.githubusercontent.com/opensearch-project/OpenSearch/refs/heads/3.x/buildSrc/version.properties'
     def content = new URL(url).text
     // Use regex to extract the version number
     def matcher = content =~ /opensearch\s*=\s*(\d+\.\d+\.\d+)/
     if (matcher.find()) {
         def version = matcher.group(1)
-        println("Extracted latest 2.x version: $version")
+        println("Extracted latest 3.x version: $version")
         return version
     } else {
-        return "2.19.0"
+        return "3.1.0"
     }
 }
 String bwcVersionShort = fetchVersionProperties()
@@ -198,10 +197,7 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-common:${kotlin_version}"
     implementation "org.jetbrains:annotations:13.0"
 
-    // SQL/PPL plugin dependencies
     implementation 'org.json:json:20240303'
-//    implementation fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-thin-${opensearch_build}.jar", "ppl-${opensearch_build}.jar", "protocol-${opensearch_build}.jar", "core-${opensearch_build}.jar"])
-//    zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${opensearch_build}"
 
     api project(":alerting-core")
     implementation "com.github.seancfoley:ipaddress:5.4.1"
@@ -714,11 +710,3 @@ def waitForClusterSetup(OpenSearchCluster cluster, Boolean securityEnabled) {
 }
 
 apply from: '../build-tools/pkgbuild.gradle'
-
-//compileJava {
-//    dependsOn addJarsToClasspath
-//}
-//
-//compileKotlin {
-//    dependsOn addJarsToClasspath
-//}
