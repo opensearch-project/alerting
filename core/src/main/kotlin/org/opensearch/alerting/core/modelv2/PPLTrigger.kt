@@ -313,7 +313,7 @@ data class PPLTrigger(
                             actions.add(Action.parse(xcp))
                         }
                     }
-                    else -> throw IllegalArgumentException("Unexpected field $fieldName when parsing PPL Trigger")
+                    else -> throw IllegalArgumentException("Unexpected field when parsing PPL Trigger: $fieldName")
                 }
             }
 

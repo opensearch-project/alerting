@@ -48,7 +48,6 @@ interface MonitorV2 : ScheduledJob {
 
         // field names
         const val NAME_FIELD = "name"
-        const val MONITOR_TYPE_FIELD = "monitor_type"
         const val ENABLED_FIELD = "enabled"
         const val SCHEDULE_FIELD = "schedule"
         const val LAST_UPDATE_TIME_FIELD = "last_update_time"

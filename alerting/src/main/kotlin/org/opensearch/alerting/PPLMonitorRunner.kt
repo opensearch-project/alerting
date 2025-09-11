@@ -50,6 +50,8 @@ object PPLMonitorRunner : MonitorV2Runner {
 
     private const val PPL_SQL_QUERY_FIELD = "query" // name of PPL query field when passing into PPL/SQL Execute API call
 
+    private const val TIMESTAMP_FIELD = "timestamp" // TODO: this should be deleted once PPL plugin side time keywords are introduced
+
     override suspend fun runMonitorV2(
         monitorV2: MonitorV2,
         monitorCtx: MonitorRunnerExecutionContext, // MonitorV2 reads from same context as Monitor
@@ -141,7 +143,6 @@ object PPLMonitorRunner : MonitorV2Runner {
                     appendCustomCondition(timeFilteredQuery, pplTrigger.customCondition!!)
                 }
 
-                // TODO: does this handle pagination? does it need to?
                 // execute the PPL query
                 val queryResponseJson = executePplQuery(queryToExecute, nodeClient)
                 logger.info("query execution results for trigger ${pplTrigger.name}: $queryResponseJson")
@@ -229,7 +230,7 @@ object PPLMonitorRunner : MonitorV2Runner {
                     }
                 }
             } catch (e: Exception) {
-                logger.error("failed to run PPL Trigger ${pplTrigger.name} for PPL Monitor ${pplMonitor.name}", e)
+                logger.error("failed to run PPL Trigger ${pplTrigger.name} from PPL Monitor ${pplMonitor.name}", e)
 
                 // generate an alert with an error message
                 monitorCtx.retryPolicy?.let {
@@ -283,11 +284,11 @@ object PPLMonitorRunner : MonitorV2Runner {
         // inject time filter into PPL query to only query for data within the (periodStart, periodEnd) interval
         // TODO: if query contains "_time", "span", "earliest", "latest", skip adding filter
         // pending https://github.com/opensearch-project/sql/issues/3969
-        // for now assume "_time" field is always present in customer data
+        // for now assume TIMESTAMP_FIELD field is always present in customer data
 
         // if the raw query contained any time check whatsoever, skip adding a time filter internally
         // and return query as is, customer's in-query time checks instantly and automatically overrides
-        if (query.contains("_time")) { // TODO: replace with PPL time keyword checks after that's GA
+        if (query.contains(TIMESTAMP_FIELD)) { // TODO: replace with PPL time keyword checks after that's GA
             return query
         }
 
@@ -302,8 +303,9 @@ object PPLMonitorRunner : MonitorV2Runner {
         val periodStartPplTimestamp = formatter.format(updatedPeriodStart)
         val periodEndPplTimeStamp = formatter.format(periodEnd)
 
-        val timeFilterReplace = "| where _time > TIMESTAMP('$periodStartPplTimestamp') and _time < TIMESTAMP('$periodEndPplTimeStamp') |"
-        val timeFilterAppend = "| where _time > TIMESTAMP('$periodStartPplTimestamp') and _time < TIMESTAMP('$periodEndPplTimeStamp')"
+        val timeFilterAppend = "| where $TIMESTAMP_FIELD > TIMESTAMP('$periodStartPplTimestamp') and " +
+            "$TIMESTAMP_FIELD < TIMESTAMP('$periodEndPplTimeStamp')"
+        val timeFilterReplace = "$timeFilterAppend |"
 
         val timeFilteredQuery: String = if (query.contains("|")) {
             // if Monitor query contains piped statements, inject the time filter
@@ -317,33 +319,6 @@ object PPLMonitorRunner : MonitorV2Runner {
         }
 
         return timeFilteredQuery
-    }
-
-    // appends user-defined custom trigger condition to PPL query, only for custom condition Triggers
-    private fun appendCustomCondition(query: String, customCondition: String): String {
-        return "$query | $customCondition"
-    }
-
-    // returns PPL query response as parsable JSONObject
-    private suspend fun executePplQuery(query: String, client: NodeClient): JSONObject {
-        // call PPL plugin to execute time filtered query
-        val transportPplQueryRequest = TransportPPLQueryRequest(
-            query,
-            JSONObject(mapOf(PPL_SQL_QUERY_FIELD to query)),
-            null // null path falls back to a default path internal to SQL/PPL Plugin
-        )
-
-        val transportPplQueryResponse = PPLPluginInterface.suspendUntil {
-            this.executeQuery(
-                client,
-                transportPplQueryRequest,
-                it
-            )
-        }
-
-        val queryResponseJson = JSONObject(transportPplQueryResponse.result)
-
-        return queryResponseJson
     }
 
     private fun evaluateNumResultsTrigger(numResults: Long, numResultsCondition: NumResultsCondition, numResultsValue: Long): Boolean {
@@ -402,33 +377,8 @@ object PPLMonitorRunner : MonitorV2Runner {
         // find the name of the eval result variable defined in custom condition
         val evalResultVarName = findEvalResultVar(pplTrigger.customCondition!!)
 
-        // find the eval statement result variable in the PPL query response schema
-        val schemaList = customConditionQueryResponse.getJSONArray("schema")
-        var evalResultVarIdx = -1
-        for (i in 0 until schemaList.length()) {
-            val schemaObj = schemaList.getJSONObject(i)
-            val columnName = schemaObj.getString("name")
-
-            if (columnName == evalResultVarName) {
-                if (schemaObj.getString("type") != "boolean") {
-                    throw IllegalStateException(
-                        "parsing results of PPL query with custom condition failed," +
-                            "eval statement variable was not type boolean, but instead type: ${schemaObj.getString("type")}"
-                    )
-                }
-
-                evalResultVarIdx = i
-                break
-            }
-        }
-
-        // eval statement result variable should always be found
-        if (evalResultVarIdx == -1) {
-            throw IllegalStateException(
-                "expected to find eval statement results variable \"$evalResultVarName\" in results " +
-                    "of PPL query with custom condition, but did not."
-            )
-        }
+        // find the index eval statement result variable in the PPL query response schema
+        val evalResultVarIdx = findEvalResultVarIdxInSchema(customConditionQueryResponse, evalResultVarName)
 
         val dataRowList = customConditionQueryResponse.getJSONArray("datarows")
         for (i in 0 until dataRowList.length()) {
@@ -446,20 +396,6 @@ object PPLMonitorRunner : MonitorV2Runner {
 
         // return only the rows that triggered the custom condition
         return relevantQueryResultRows
-    }
-
-    // TODO: is there maybe some PPL plugin util function we can use to replace this?
-    // searches a given custom condition eval statement for the name of the result
-    // variable and returns it
-    private fun findEvalResultVar(customCondition: String): String {
-        // the PPL keyword "eval", followed by a whitespace must be present, otherwise a syntax error from PPL plugin would've
-        // been thrown when executing the query (without the whitespace, the query would've had something like "evalresult",
-        // which is invalid PPL
-        val startOfEvalStatement = "eval "
-
-        val startIdx = customCondition.indexOf(startOfEvalStatement) + startOfEvalStatement.length
-        val endIdx = startIdx + customCondition.substring(startIdx).indexOfFirst { it == ' ' || it == '=' }
-        return customCondition.substring(startIdx, endIdx)
     }
 
     // prepares the query results to be passed into alerts and notifications based on trigger mode
@@ -480,7 +416,6 @@ object PPLMonitorRunner : MonitorV2Runner {
             individualRow.put("datarows", JSONArray(relevantQueryResultRows.getJSONArray("datarows").getJSONArray(i).toList()))
             individualRows.add(individualRow)
         }
-
         return individualRows
     }
 
@@ -636,5 +571,73 @@ object PPLMonitorRunner : MonitorV2Runner {
 //                    }
 //                }
         }
+    }
+
+    /* public util functions */
+
+    // appends user-defined custom trigger condition to PPL query, only for custom condition Triggers
+    fun appendCustomCondition(query: String, customCondition: String): String {
+        return "$query | $customCondition"
+    }
+
+    // returns PPL query response as parsable JSONObject
+    suspend fun executePplQuery(query: String, client: NodeClient): JSONObject {
+        // call PPL plugin to execute time filtered query
+        val transportPplQueryRequest = TransportPPLQueryRequest(
+            query,
+            JSONObject(mapOf(PPL_SQL_QUERY_FIELD to query)),
+            null // null path falls back to a default path internal to SQL/PPL Plugin
+        )
+
+        val transportPplQueryResponse = PPLPluginInterface.suspendUntil {
+            this.executeQuery(
+                client,
+                transportPplQueryRequest,
+                it
+            )
+        }
+
+        val queryResponseJson = JSONObject(transportPplQueryResponse.result)
+
+        return queryResponseJson
+    }
+
+    // TODO: is there maybe some PPL plugin util function we can use to replace this?
+    // searches a given custom condition eval statement for the name of
+    // the eval result variable and returns it
+    fun findEvalResultVar(customCondition: String): String {
+        // the PPL keyword "eval", followed by a whitespace must be present, otherwise a syntax error from PPL plugin would've
+        // been thrown when executing the query (without the whitespace, the query would've had something like "evalresult",
+        // which is invalid PPL
+        val startOfEvalStatement = "eval "
+
+        val startIdx = customCondition.indexOf(startOfEvalStatement) + startOfEvalStatement.length
+        val endIdx = startIdx + customCondition.substring(startIdx).indexOfFirst { it == ' ' || it == '=' }
+        return customCondition.substring(startIdx, endIdx)
+    }
+
+    fun findEvalResultVarIdxInSchema(customConditionQueryResponse: JSONObject, evalResultVarName: String): Int {
+        // find the index eval statement result variable in the PPL query response schema
+        val schemaList = customConditionQueryResponse.getJSONArray("schema")
+        var evalResultVarIdx = -1
+        for (i in 0 until schemaList.length()) {
+            val schemaObj = schemaList.getJSONObject(i)
+            val columnName = schemaObj.getString("name")
+
+            if (columnName == evalResultVarName) {
+                evalResultVarIdx = i
+                break
+            }
+        }
+
+        // eval statement result variable should always be found
+        if (evalResultVarIdx == -1) {
+            throw IllegalStateException(
+                "expected to find eval statement results variable \"$evalResultVarName\" in results " +
+                    "of PPL query with custom condition, but did not."
+            )
+        }
+
+        return evalResultVarIdx
     }
 }

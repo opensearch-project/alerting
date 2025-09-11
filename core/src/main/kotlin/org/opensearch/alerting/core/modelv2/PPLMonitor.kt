@@ -209,7 +209,6 @@ data class PPLMonitor(
         @Throws(IOException::class)
         fun parse(xcp: XContentParser, id: String = MonitorV2.NO_ID, version: Long = MonitorV2.NO_VERSION): PPLMonitor {
             var name: String? = null
-            var monitorType: String = PPL_MONITOR_TYPE
             var enabled = true
             var schedule: Schedule? = null
             var lookBackWindow: TimeValue? = null
@@ -228,7 +227,6 @@ data class PPLMonitor(
 
                 when (fieldName) {
                     MonitorV2.NAME_FIELD -> name = xcp.text()
-                    MonitorV2.MONITOR_TYPE_FIELD -> monitorType = xcp.text()
                     MonitorV2.ENABLED_FIELD -> enabled = xcp.booleanValue()
                     MonitorV2.SCHEDULE_FIELD -> schedule = Schedule.parse(xcp)
                     MonitorV2.LOOK_BACK_WINDOW_FIELD -> {
@@ -263,16 +261,11 @@ data class PPLMonitor(
                         queryLanguage = enumMatchResult
                     }
                     QUERY_FIELD -> query = xcp.text()
-                    else -> throw IllegalArgumentException("Unexpected field \"$fieldName\" when parsing PPL Monitor")
+                    else -> throw IllegalArgumentException("Unexpected field when parsing PPL Monitor: $fieldName")
                 }
             }
 
             /* validations */
-
-            // ensure MonitorV2 XContent being parsed by PPLMonitor class is PPL Monitor type
-            if (monitorType != PPL_MONITOR_TYPE) {
-                throw IllegalArgumentException("Invalid monitor type: $monitorType")
-            }
 
             // ensure there's at least 1 trigger
             if (triggers.isEmpty()) {

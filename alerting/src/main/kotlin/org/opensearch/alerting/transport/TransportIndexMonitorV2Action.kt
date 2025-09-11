@@ -21,12 +21,17 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.clustermanager.AcknowledgedResponse
+import org.opensearch.alerting.PPLMonitorRunner.appendCustomCondition
+import org.opensearch.alerting.PPLMonitorRunner.executePplQuery
+import org.opensearch.alerting.PPLMonitorRunner.findEvalResultVar
+import org.opensearch.alerting.PPLMonitorRunner.findEvalResultVarIdxInSchema
 import org.opensearch.alerting.actionv2.IndexMonitorV2Action
 import org.opensearch.alerting.actionv2.IndexMonitorV2Request
 import org.opensearch.alerting.actionv2.IndexMonitorV2Response
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.modelv2.MonitorV2
 import org.opensearch.alerting.core.modelv2.PPLMonitor
+import org.opensearch.alerting.core.modelv2.PPLTrigger.ConditionType
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
@@ -43,6 +48,7 @@ import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
+import org.opensearch.commons.alerting.model.userErrorMessage
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry
@@ -55,6 +61,7 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
+import org.opensearch.transport.client.node.NodeClient
 
 private val log = LogManager.getLogger(TransportIndexMonitorV2Action::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
@@ -81,6 +88,86 @@ class TransportIndexMonitorV2Action @Inject constructor(
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     override fun doExecute(task: Task, indexMonitorRequest: IndexMonitorV2Request, actionListener: ActionListener<IndexMonitorV2Response>) {
+        // validate the MonitorV2 based on its type
+        when (indexMonitorRequest.monitorV2) {
+            is PPLMonitor -> validateMonitorPplQuery(
+                indexMonitorRequest.monitorV2 as PPLMonitor,
+                object : ActionListener<Unit> { // validationListener
+                    override fun onResponse(response: Unit) {
+                        checkScheduledJobIndex(indexMonitorRequest, actionListener)
+                    }
+
+                    override fun onFailure(e: Exception) {
+                        actionListener.onFailure(e)
+                    }
+                }
+            )
+            else -> actionListener.onFailure(
+                AlertingException.wrap(
+                    IllegalStateException(
+                        "unexpected MonitorV2 type: ${indexMonitorRequest.monitorV2.javaClass.name}"
+                    )
+                )
+            )
+        }
+    }
+
+    private fun validateMonitorPplQuery(pplMonitor: PPLMonitor, validationListener: ActionListener<Unit>) {
+        scope.launch {
+            try {
+                val nodeClient = client as NodeClient
+
+                // first attempt to run the base query
+                // if there are any PPL syntax errors, this will throw an exception
+                executePplQuery(pplMonitor.query, nodeClient)
+
+                // now scan all the triggers with custom conditions, and ensure each query constructed
+                // from the base query + custom condition is valid
+                val allCustomTriggersValid = true
+                for (pplTrigger in pplMonitor.triggers) {
+                    if (pplTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) {
+                        continue
+                    }
+
+                    val evalResultVar = findEvalResultVar(pplTrigger.customCondition!!)
+
+                    val queryWithCustomCondition = appendCustomCondition(pplMonitor.query, pplTrigger.customCondition!!)
+
+                    val executePplQueryResponse = executePplQuery(queryWithCustomCondition, nodeClient)
+
+                    val evalResultVarIdx = findEvalResultVarIdxInSchema(executePplQueryResponse, evalResultVar)
+
+                    val resultVarType = executePplQueryResponse
+                        .getJSONArray("schema")
+                        .getJSONObject(evalResultVarIdx)
+                        .getString("type")
+
+                    // custom conditions must evaluate to a boolean result, otherwise it's invalid
+                    if (resultVarType != "boolean") {
+                        validationListener.onFailure(
+                            AlertingException.wrap(
+                                IllegalArgumentException(
+                                    "Custom condition in trigger ${pplTrigger.name} is invalid because it does not " +
+                                        "evaluate to a boolean, but instead to type: $resultVarType"
+                                )
+                            )
+                        )
+                        return@launch
+                    }
+                }
+
+                validationListener.onResponse(Unit)
+            } catch (e: Exception) {
+                validationListener.onFailure(
+                    AlertingException.wrap(
+                        IllegalArgumentException("Invalid PPL Query in PPL Monitor: ${e.userErrorMessage()}")
+                    )
+                )
+            }
+        }
+    }
+
+    private fun checkScheduledJobIndex(indexMonitorRequest: IndexMonitorV2Request, actionListener: ActionListener<IndexMonitorV2Response>) {
         /* check to see if alerting-config index (scheduled job index) is created and updated before indexing MonitorV2 into it */
         if (!scheduledJobIndices.scheduledJobIndexExists()) { // if alerting-config index doesn't exist, send request to create it
             scheduledJobIndices.initScheduledJobIndex(object : ActionListener<CreateIndexResponse> {
