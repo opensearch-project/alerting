@@ -147,7 +147,7 @@ def securityEnabled = System.getProperty("security", "false") == "true" || Syste
 // Always be minimumCompatibilityVersion of current opensearch version(3.3.0)
 // get latest 3.x version from OpenSearch
 static def fetchVersionProperties() {
-    def url = 'https://raw.githubusercontent.com/opensearch-project/OpenSearch/refs/heads/3.x/buildSrc/version.properties'
+    def url = 'https://raw.githubusercontent.com/opensearch-project/OpenSearch/refs/heads/3.1/buildSrc/version.properties'
     def content = new URL(url).text
     // Use regex to extract the version number
     def matcher = content =~ /opensearch\s*=\s*(\d+\.\d+\.\d+)/
