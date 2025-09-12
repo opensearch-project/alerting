@@ -135,6 +135,8 @@ import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.client.Client
 import org.opensearch.watcher.ResourceWatcherService
 import java.util.function.Supplier
+import org.opensearch.alerting.alertsv2.AlertV2Indices
+import org.opensearch.alerting.alertsv2.AlertV2Mover
 
 /**
  * Entry point of the OpenDistro for Elasticsearch alerting plugin
@@ -178,9 +180,10 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     lateinit var docLevelMonitorQueries: DocLevelMonitorQueries
     lateinit var threadPool: ThreadPool
     lateinit var alertIndices: AlertIndices
+    lateinit var alertV2Indices: AlertV2Indices
     lateinit var clusterService: ClusterService
     lateinit var destinationMigrationCoordinator: DestinationMigrationCoordinator
-    lateinit var alertV2Expirer: AlertV2Expirer
+    lateinit var alertV2Mover: AlertV2Mover
     var monitorTypeToMonitorRunners: MutableMap<String, RemoteMonitorRegistry> = mutableMapOf()
 
     override fun getRestHandlers(
@@ -314,6 +317,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerSettings(settings)
             .registerThreadPool(threadPool)
             .registerAlertIndices(alertIndices)
+            .registerAlertV2Indices(alertV2Indices)
             .registerInputService(
                 InputService(
                     client,
@@ -340,7 +344,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         scheduler = JobScheduler(threadPool, runner)
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
         destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool, scheduledJobIndices)
-        alertV2Expirer = AlertV2Expirer(client, threadPool, clusterService)
+        alertV2Mover = AlertV2Mover(environment.settings(), client, threadPool, clusterService)
         this.threadPool = threadPool
         this.clusterService = clusterService
 
@@ -368,7 +372,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             commentsIndices,
             docLevelMonitorQueries,
             destinationMigrationCoordinator,
-            alertV2Expirer,
+            alertV2Mover,
             lockService,
             alertService,
             triggerService

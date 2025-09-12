@@ -44,6 +44,7 @@ import java.time.Instant
 import java.time.ZoneOffset.UTC
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import org.opensearch.alerting.alertsv2.AlertV2Indices
 
 object PPLMonitorRunner : MonitorV2Runner {
     private val logger = LogManager.getLogger(javaClass)
@@ -86,11 +87,10 @@ object PPLMonitorRunner : MonitorV2Runner {
         // use threadpool time for cross node consistency
         val timeOfCurrentExecution = Instant.ofEpochMilli(MonitorRunnerService.monitorCtx.threadPool!!.absoluteTimeInMillis())
 
-        // TODO: should alerting v1 and v2 alerts index be separate?
+        // TODO: put alertV2s in their own index
         try {
-            // TODO: write generated V2 alerts to existing alerts v1 index for now, revisit this decision
-            monitorCtx.alertIndices!!.createOrUpdateAlertIndex()
-            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex()
+            monitorCtx.alertV2Indices!!.createOrUpdateAlertV2Index()
+            monitorCtx.alertV2Indices!!.createOrUpdateInitialAlertV2HistoryIndex()
         } catch (e: Exception) {
             val id = if (pplMonitor.id.trim().isEmpty()) "_na_" else pplMonitor.id
             logger.error("Error loading alerts for monitorV2: $id", e)
@@ -121,21 +121,6 @@ object PPLMonitorRunner : MonitorV2Runner {
                 }
                 logger.info("suppression check passed, executing trigger ${pplTrigger.name} from monitor ${pplMonitor.name}")
 
-//                internal fun isActionActionable(action: Action, alert: Alert?): Boolean {
-//                    if (alert != null && alert.state == Alert.State.AUDIT)
-//                        return false
-//                    if (alert == null || action.throttle == null) {
-//                        return true
-//                    }
-//                    if (action.throttleEnabled) {
-//                        val result = alert.actionExecutionResults.firstOrNull { r -> r.actionId == action.id }
-//                        val lastExecutionTime: Instant? = result?.lastExecutionTime
-//                        val throttledTimeBound = currentTime().minus(action.throttle!!.value.toLong(), action.throttle!!.unit)
-//                        return (lastExecutionTime == null || lastExecutionTime.isBefore(throttledTimeBound))
-//                    }
-//                    return true
-//                }
-
                 // if trigger uses custom condition, append the custom condition to query, otherwise simply proceed
                 val queryToExecute = if (pplTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number of results trigger
                     timeFilteredQuery
@@ -147,7 +132,7 @@ object PPLMonitorRunner : MonitorV2Runner {
                 val queryResponseJson = executePplQuery(queryToExecute, nodeClient)
                 logger.info("query execution results for trigger ${pplTrigger.name}: $queryResponseJson")
 
-                // retrieve only the relevant query response rows.
+                // retrieve deep copies of only the relevant query response rows.
                 // for num_results triggers, that's the entire response
                 // for custom triggers, that's only rows that evaluated to true
                 val relevantQueryResultRows = if (pplTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) {
@@ -155,7 +140,7 @@ object PPLMonitorRunner : MonitorV2Runner {
                     getQueryResponseWithoutSize(queryResponseJson)
                 } else {
                     // custom condition trigger
-                    evaluateCustomConditionTrigger(queryResponseJson, pplTrigger)
+                    collectCustomConditionResults(queryResponseJson, pplTrigger)
                 }
 
                 // retrieve the number of results
@@ -193,10 +178,6 @@ object PPLMonitorRunner : MonitorV2Runner {
                         executionId,
                         timeOfCurrentExecution
                     )
-
-                    // collect the generated alerts to be written to alerts index
-                    // if the trigger is on result_set mode
-//                    generatedAlerts.addAll(thisTriggersGeneratedAlerts)
 
                     // update the trigger's last execution time for future suppression checks
                     pplTrigger.lastTriggeredTime = timeOfCurrentExecution
@@ -354,7 +335,7 @@ object PPLMonitorRunner : MonitorV2Runner {
         return queryResponseDeepCopy
     }
 
-    private fun evaluateCustomConditionTrigger(customConditionQueryResponse: JSONObject, pplTrigger: PPLTrigger): JSONObject {
+    private fun collectCustomConditionResults(customConditionQueryResponse: JSONObject, pplTrigger: PPLTrigger): JSONObject {
         // a PPL query with custom condition returning 0 results should imply a valid but not useful query.
         // do not trigger alert, but warn that query likely is not functioning as user intended
         if (customConditionQueryResponse.getLong("total") == 0L) {
@@ -445,7 +426,10 @@ object PPLMonitorRunner : MonitorV2Runner {
             alertV2s.add(alertV2)
         }
 
-        return alertV2s.toList() // return as immutable list
+        // TODO: this is a magic number right now, make it a setting
+        val alertsLimit = 10
+
+        return alertV2s.take(alertsLimit).toList() // return as immutable list
     }
 
     private fun generateErrorAlert(
@@ -488,7 +472,7 @@ object PPLMonitorRunner : MonitorV2Runner {
 
         var requestsToRetry = alerts.flatMap { alert ->
             listOf<DocWriteRequest<*>>(
-                IndexRequest(AlertIndices.ALERT_INDEX)
+                IndexRequest(AlertV2Indices.ALERT_V2_INDEX)
                     .routing(pplMonitor.id) // set routing ID to PPL Monitor ID
                     .source(alert.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
                     .id(if (alert.id != Alert.NO_ID) alert.id else null)

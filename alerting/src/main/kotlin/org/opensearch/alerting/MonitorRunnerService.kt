@@ -94,6 +94,7 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.UUID
+import org.opensearch.alerting.alertsv2.AlertV2Indices
 import kotlin.coroutines.CoroutineContext
 
 object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
@@ -142,6 +143,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
     fun registerAlertIndices(alertIndices: AlertIndices): MonitorRunnerService {
         this.monitorCtx.alertIndices = alertIndices
+        return this
+    }
+
+    fun registerAlertV2Indices(alertV2Indices: AlertV2Indices): MonitorRunnerService {
+        this.monitorCtx.alertV2Indices = alertV2Indices
         return this
     }
 
