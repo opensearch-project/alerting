@@ -513,8 +513,6 @@ task bwcTestSuite(type: StandaloneRestIntegTestTask) {
 
 run {
     doFirst {
-        dependsOn addJarsToClasspath
-
         // There seems to be an issue when running multi node run or integ tasks with unicast_hosts
         // not being written, the waitForAllConditions ensures it's written
         getClusters().forEach { cluster ->
