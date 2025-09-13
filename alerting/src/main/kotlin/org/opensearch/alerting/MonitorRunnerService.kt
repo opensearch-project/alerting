@@ -26,6 +26,7 @@ import org.opensearch.alerting.actionv2.ExecuteMonitorV2Request
 import org.opensearch.alerting.actionv2.ExecuteMonitorV2Response
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertMover.Companion.moveAlerts
+import org.opensearch.alerting.alertsv2.AlertV2Indices
 import org.opensearch.alerting.core.JobRunner
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.lock.LockModel
@@ -94,7 +95,6 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.UUID
-import org.opensearch.alerting.alertsv2.AlertV2Indices
 import kotlin.coroutines.CoroutineContext
 
 object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleComponent() {

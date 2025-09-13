@@ -16,11 +16,14 @@ import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
 import org.opensearch.alerting.actionv2.DeleteMonitorV2Action
 import org.opensearch.alerting.actionv2.ExecuteMonitorV2Action
+import org.opensearch.alerting.actionv2.GetAlertsV2Action
 import org.opensearch.alerting.actionv2.GetMonitorV2Action
 import org.opensearch.alerting.actionv2.IndexMonitorV2Action
 import org.opensearch.alerting.actionv2.SearchMonitorV2Action
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
+import org.opensearch.alerting.alertsv2.AlertV2Indices
+import org.opensearch.alerting.alertsv2.AlertV2Mover
 import org.opensearch.alerting.comments.CommentsIndices
 import org.opensearch.alerting.comments.CommentsIndices.Companion.ALL_COMMENTS_INDEX_PATTERN
 import org.opensearch.alerting.core.JobSweeper
@@ -62,6 +65,7 @@ import org.opensearch.alerting.transport.TransportExecuteMonitorAction
 import org.opensearch.alerting.transport.TransportExecuteMonitorV2Action
 import org.opensearch.alerting.transport.TransportExecuteWorkflowAction
 import org.opensearch.alerting.transport.TransportGetAlertsAction
+import org.opensearch.alerting.transport.TransportGetAlertsV2Action
 import org.opensearch.alerting.transport.TransportGetDestinationsAction
 import org.opensearch.alerting.transport.TransportGetEmailAccountAction
 import org.opensearch.alerting.transport.TransportGetEmailGroupAction
@@ -135,8 +139,6 @@ import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.client.Client
 import org.opensearch.watcher.ResourceWatcherService
 import java.util.function.Supplier
-import org.opensearch.alerting.alertsv2.AlertV2Indices
-import org.opensearch.alerting.alertsv2.AlertV2Mover
 
 /**
  * Entry point of the OpenDistro for Elasticsearch alerting plugin
@@ -270,6 +272,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(SearchMonitorV2Action.INSTANCE, TransportSearchMonitorV2Action::class.java),
             ActionPlugin.ActionHandler(DeleteMonitorV2Action.INSTANCE, TransportDeleteMonitorV2Action::class.java),
             ActionPlugin.ActionHandler(ExecuteMonitorV2Action.INSTANCE, TransportExecuteMonitorV2Action::class.java),
+            ActionPlugin.ActionHandler(GetAlertsV2Action.INSTANCE, TransportGetAlertsV2Action::class.java)
         )
     }
 
@@ -306,6 +309,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         val settings = environment.settings()
         val lockService = LockService(client, clusterService)
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
+        alertV2Indices = AlertV2Indices(settings, client, threadPool, clusterService)
         val alertService = AlertService(client, xContentRegistry, alertIndices)
         val triggerService = TriggerService(scriptService)
         runner = MonitorRunnerService
@@ -455,7 +459,12 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.COMMENTS_HISTORY_RETENTION_PERIOD,
             AlertingSettings.COMMENTS_MAX_CONTENT_SIZE,
             AlertingSettings.MAX_COMMENTS_PER_ALERT,
-            AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION
+            AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION,
+            AlertingSettings.ALERT_V2_HISTORY_ENABLED,
+            AlertingSettings.ALERT_V2_HISTORY_ROLLOVER_PERIOD,
+            AlertingSettings.ALERT_V2_HISTORY_INDEX_MAX_AGE,
+            AlertingSettings.ALERT_V2_HISTORY_MAX_DOCS,
+            AlertingSettings.ALERT_V2_HISTORY_RETENTION_PERIOD
         )
     }
 

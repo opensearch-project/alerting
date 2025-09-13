@@ -11,7 +11,7 @@ import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.QueryLevelMonitorRunner.getConfigAndSendNotification
-import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.alertsv2.AlertV2Indices
 import org.opensearch.alerting.core.modelv2.AlertV2
 import org.opensearch.alerting.core.modelv2.MonitorV2
 import org.opensearch.alerting.core.modelv2.MonitorV2RunResult
@@ -44,7 +44,6 @@ import java.time.Instant
 import java.time.ZoneOffset.UTC
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import org.opensearch.alerting.alertsv2.AlertV2Indices
 
 object PPLMonitorRunner : MonitorV2Runner {
     private val logger = LogManager.getLogger(javaClass)

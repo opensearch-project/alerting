@@ -169,6 +169,7 @@ dependencies {
 
     // SQL/PPL plugin dependencies are included in alerting-core
     api project(":alerting-core")
+    implementation 'org.json:json:20240303'
 
     implementation "com.github.seancfoley:ipaddress:5.4.1"
     implementation project(path: ":alerting-spi", configuration: 'shadow')

@@ -1,6 +1,5 @@
 package org.opensearch.alerting.alertsv2
 
-import java.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -20,7 +19,6 @@ import org.opensearch.action.admin.indices.rollover.RolloverRequest
 import org.opensearch.action.admin.indices.rollover.RolloverResponse
 import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.clustermanager.AcknowledgedResponse
-import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_V2_HISTORY_ENABLED
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_V2_HISTORY_INDEX_MAX_AGE
@@ -41,6 +39,7 @@ import org.opensearch.core.action.ActionListener
 import org.opensearch.threadpool.Scheduler.Cancellable
 import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.client.Client
+import java.time.Instant
 
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 private val logger = LogManager.getLogger(AlertV2Indices::class.java)
@@ -86,24 +85,19 @@ class AlertV2Indices(
         const val ALL_ALERT_V2_INDEX_PATTERN = ".opensearch-alerting-v2-alert*"
 
         @JvmStatic
-        fun alertV2Mapping() = // TODO: create alert_v2 mappings
+        fun alertV2Mapping() =
             AlertV2Indices::class.java.getResource("alert_v2_mapping.json").readText()
     }
 
     @Volatile private var alertV2HistoryEnabled = ALERT_V2_HISTORY_ENABLED.get(settings)
 
-
     @Volatile private var alertV2HistoryMaxDocs = ALERT_V2_HISTORY_MAX_DOCS.get(settings)
-
 
     @Volatile private var alertV2HistoryMaxAge = ALERT_V2_HISTORY_INDEX_MAX_AGE.get(settings)
 
-
     @Volatile private var alertV2HistoryRolloverPeriod = ALERT_V2_HISTORY_ROLLOVER_PERIOD.get(settings)
 
-
     @Volatile private var alertV2HistoryRetentionPeriod = ALERT_V2_HISTORY_RETENTION_PERIOD.get(settings)
-
 
     @Volatile private var requestTimeout = REQUEST_TIMEOUT.get(settings)
 
@@ -350,8 +344,12 @@ class AlertV2Indices(
         val indicesToDelete = mutableListOf<String>()
         for (entry in clusterStateResponse.state.metadata.indices) {
             val indexMetaData = entry.value
-            getHistoryIndexToDelete(indexMetaData, alertV2HistoryRetentionPeriod.millis, ALERT_V2_HISTORY_WRITE_INDEX, alertV2HistoryEnabled)
-                ?.let { indicesToDelete.add(it) }
+            getHistoryIndexToDelete(
+                indexMetaData,
+                alertV2HistoryRetentionPeriod.millis,
+                ALERT_V2_HISTORY_WRITE_INDEX,
+                alertV2HistoryEnabled
+            )?.let { indicesToDelete.add(it) }
         }
         return indicesToDelete
     }

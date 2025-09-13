@@ -1,7 +1,5 @@
 package org.opensearch.alerting.alertsv2
 
-import java.time.Instant
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -12,7 +10,6 @@ import org.opensearch.action.delete.DeleteRequest
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.core.modelv2.AlertV2
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_V2_HISTORY_ENABLED
@@ -25,9 +22,6 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.alerting.model.Alert
-import org.opensearch.commons.alerting.model.ScheduledJob
-import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.bytes.BytesReference
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -36,14 +30,12 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.VersionType
 import org.opensearch.index.query.QueryBuilders
-import org.opensearch.index.query.RangeQueryBuilder
-import org.opensearch.index.reindex.BulkByScrollResponse
-import org.opensearch.index.reindex.DeleteByQueryAction
-import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.threadpool.Scheduler
 import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.client.Client
+import java.time.Instant
+import java.util.concurrent.TimeUnit
 
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 private val logger = LogManager.getLogger(AlertV2Mover::class.java)
@@ -139,9 +131,9 @@ class AlertV2Mover(
             .version(true)
 
         val activeAlertsRequest = SearchRequest(AlertV2Indices.ALERT_V2_INDEX)
-//                .routing(monitorId)
             .source(expiredAlertsSearchQuery)
-        return client.suspendUntil { search(activeAlertsRequest, it) }
+        val searchResponse: SearchResponse = client.suspendUntil { search(activeAlertsRequest, it) }
+        return searchResponse
     }
 
     private suspend fun copyExpiredAlerts(expiredAlertsSearchResponse: SearchResponse): BulkResponse? {
@@ -152,7 +144,6 @@ class AlertV2Mover(
 
         val indexRequests = expiredAlertsSearchResponse.hits.map { hit ->
             IndexRequest(AlertV2Indices.ALERT_V2_HISTORY_WRITE_INDEX)
-//                        .routing(monitorId)
                 .source(
                     AlertV2.parse(alertV2ContentParser(hit.sourceRef), hit.id, hit.version)
                         .toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS)
@@ -171,28 +162,29 @@ class AlertV2Mover(
     private suspend fun deleteExpiredAlerts(expiredAlertsSearchResponse: SearchResponse): BulkResponse {
         val deleteRequests = expiredAlertsSearchResponse.hits.map {
             DeleteRequest(AlertV2Indices.ALERT_V2_INDEX, it.id)
-//                .routing(monitorId)
                 .version(it.version)
                 .versionType(VersionType.EXTERNAL_GTE)
         }
 
-        val deleteResponse: BulkResponse = client.suspendUntil { bulk(BulkRequest().add(deleteRequests), it) }
+        val deleteRequest = BulkRequest().add(deleteRequests)
+        val deleteResponse: BulkResponse = client.suspendUntil { bulk(deleteRequest, it) }
+
         return deleteResponse
     }
 
     private suspend fun deleteExpiredAlertsThatWereCopied(copyResponse: BulkResponse?): BulkResponse? {
-        // if there were no expired alerts, skip deleting anything
+        // if there were no expired alerts to copy, skip deleting anything
         if (copyResponse == null) {
             return null
         }
 
         val deleteRequests = copyResponse.items.filterNot { it.isFailed }.map {
             DeleteRequest(AlertV2Indices.ALERT_V2_INDEX, it.id)
-//                .routing(monitorId)
                 .version(it.version)
                 .versionType(VersionType.EXTERNAL_GTE)
         }
         val deleteResponse: BulkResponse = client.suspendUntil { bulk(BulkRequest().add(deleteRequests), it) }
+
         return deleteResponse
     }
 
@@ -219,7 +211,6 @@ class AlertV2Mover(
         XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
         return xcp
     }
-
 
     private fun areAlertV2IndicesPresent(): Boolean {
         return alertV2IndexInitialized && alertV2HistoryIndexInitialized

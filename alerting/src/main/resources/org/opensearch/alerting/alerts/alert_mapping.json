@@ -131,29 +131,8 @@
     "end_time": {
       "type": "date"
     },
-    "triggered_time": {
-      "type": "date"
-    },
-    "expiration_time": {
-      "type": "date"
-    },
     "error_message": {
       "type": "text"
-    },
-    "query_results": {
-      "type": "nested",
-      "properties": {
-        "schema": {
-          "type": "nested",
-          "dynamic": true
-        },
-        "datarows": {
-          "type": "text"
-        },
-        "total": {
-          "type": "integer"
-        }
-      }
     },
     "alert_history": {
       "type": "nested",
