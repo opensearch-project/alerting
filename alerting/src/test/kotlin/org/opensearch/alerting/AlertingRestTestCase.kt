@@ -1504,13 +1504,20 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     fun createUser(name: String, backendRoles: Array<String>) {
+        this.createUserWithAttributes(name, backendRoles, mapOf())
+    }
+
+    fun createUserWithAttributes(name: String, backendRoles: Array<String>, customAttributes: Map<String, String>) {
         val request = Request("PUT", "/_plugins/_security/api/internalusers/$name")
         val broles = backendRoles.joinToString { it -> "\"$it\"" }
+        val customAttributesString = customAttributes.entries.joinToString(prefix = "{", separator = ", ", postfix = "}") {
+            "\"${it.key}\": \"${it.value}\""
+        }
         var entity = " {\n" +
             "\"password\": \"$password\",\n" +
             "\"backend_roles\": [$broles],\n" +
-            "\"attributes\": {\n" +
-            "}} "
+            "\"custom_attributes\": $customAttributesString\n" +
+            "} "
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
