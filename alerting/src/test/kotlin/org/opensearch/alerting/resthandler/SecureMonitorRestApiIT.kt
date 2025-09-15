@@ -1401,7 +1401,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     /*
     TODO: https://github.com/opensearch-project/alerting/issues/300
      */
-    fun `test execute query-level monitor with user having partial index permissions`() {
+    fun `test execute query-level monitor with user role using static DLS`() {
         createUser(user, arrayOf(TEST_HR_BACKEND_ROLE))
         createTestIndex(TEST_HR_INDEX)
         createIndexRoleWithDocLevelSecurity(
@@ -1418,7 +1418,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             """
             {
               "test_field": "a",
-              "accessible": true 
+              "accessible": true
             }
             """.trimIndent()
         )
@@ -1437,7 +1437,64 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         val input = SearchInput(indices = listOf(TEST_HR_INDEX), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
         val triggerScript = """
             // make sure there is exactly one hit
-            return ctx.results[0].hits.hits.size() == 1 
+            return ctx.results[0].hits.hits.size() == 1
+        """.trimIndent()
+
+        val trigger = randomQueryLevelTrigger(condition = Script(triggerScript)).copy(actions = listOf())
+        val monitor = createMonitorWithClient(
+            userClient!!,
+            randomQueryLevelMonitor(inputs = listOf(input), triggers = listOf(trigger))
+        )
+
+        try {
+            executeMonitor(monitor.id)
+            val alerts = searchAlerts(monitor)
+            assertEquals("Incorrect number of alerts", 1, alerts.size)
+        } finally {
+            deleteRoleAndRoleMapping(TEST_HR_ROLE)
+        }
+    }
+
+    fun `test execute query-level monitor with user role using dynamic DLS with parameter substitution`() {
+        createUserWithAttributes(user, arrayOf(TEST_HR_BACKEND_ROLE), mapOf("attr.proxy.team" to "red"))
+        createTestIndex(TEST_HR_INDEX)
+        // The ${'$'} is an attempt to bypass the fact that Kotlin treats ${} as string interpolation in a
+        // triple quoted string, but we need to preserve the reference as ${attr.proxy.team}
+        val dlsQuery = """{\"term\": { \"team\": \"${'$'}{attr.proxy.team}\"}}"""
+        createIndexRoleWithDocLevelSecurity(
+            TEST_HR_ROLE,
+            TEST_HR_INDEX,
+            dlsQuery,
+            getClusterPermissionsFromCustomRole(ALERTING_INDEX_MONITOR_ACCESS)
+        )
+        createUserRolesMapping(TEST_HR_ROLE, arrayOf(user))
+
+        // Add a doc that is accessible to the user
+        indexDoc(
+            TEST_HR_INDEX, "1",
+            """
+            {
+              "test_field": "a",
+              "team": "red"
+            }
+            """.trimIndent()
+        )
+
+        // Add a second doc that is not accessible to the user
+        indexDoc(
+            TEST_HR_INDEX, "2",
+            """
+            {
+              "test_field": "b",
+              "team": "blue"
+            }
+            """.trimIndent()
+        )
+
+        val input = SearchInput(indices = listOf(TEST_HR_INDEX), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
+        val triggerScript = """
+            // make sure there is exactly one hit
+            return ctx.results[0].hits.hits.size() == 1
         """.trimIndent()
 
         val trigger = randomQueryLevelTrigger(condition = Script(triggerScript)).copy(actions = listOf())
