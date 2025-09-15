@@ -5,6 +5,7 @@ import org.opensearch.common.CheckedFunction
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.Schedule
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.authuser.User
 import org.opensearch.core.ParseField
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.common.io.stream.StreamOutput
@@ -22,6 +23,7 @@ interface MonitorV2 : ScheduledJob {
     override val schedule: Schedule
     override val lastUpdateTime: Instant // required for scheduled job maintenance
     override val enabledTime: Instant? // required for scheduled job maintenance
+    val user: User?
     val triggers: List<TriggerV2>
     val schemaVersion: Int // for updating monitors
     val lookBackWindow: TimeValue? // how far back to look when querying data during monitor execution
@@ -52,8 +54,10 @@ interface MonitorV2 : ScheduledJob {
         const val SCHEDULE_FIELD = "schedule"
         const val LAST_UPDATE_TIME_FIELD = "last_update_time"
         const val ENABLED_TIME_FIELD = "enabled_time"
+        const val USER_FIELD = "user"
         const val TRIGGERS_FIELD = "triggers"
         const val LOOK_BACK_WINDOW_FIELD = "look_back_window"
+        const val SCHEMA_VERSION_FIELD = "schema_version"
 
         // default values
         const val NO_ID = ""

@@ -1,5 +1,14 @@
 package org.opensearch.alerting.core.modelv2
 
+import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.ENABLED_FIELD
+import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.ENABLED_TIME_FIELD
+import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.LAST_UPDATE_TIME_FIELD
+import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.LOOK_BACK_WINDOW_FIELD
+import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.NAME_FIELD
+import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.SCHEDULE_FIELD
+import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.SCHEMA_VERSION_FIELD
+import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.TRIGGERS_FIELD
+import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.USER_FIELD
 import org.opensearch.alerting.core.util.nonOptionalTimeField
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.CronSchedule
@@ -9,6 +18,8 @@ import org.opensearch.commons.alerting.model.Schedule
 import org.opensearch.commons.alerting.util.IndexUtils
 import org.opensearch.commons.alerting.util.instant
 import org.opensearch.commons.alerting.util.optionalTimeField
+import org.opensearch.commons.alerting.util.optionalUserField
+import org.opensearch.commons.authuser.User
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.common.io.stream.StreamOutput
 import org.opensearch.core.xcontent.ToXContent
@@ -49,6 +60,7 @@ data class PPLMonitor(
     override val lookBackWindow: TimeValue? = null,
     override val lastUpdateTime: Instant,
     override val enabledTime: Instant?,
+    override val user: User?,
     override val triggers: List<PPLTrigger>,
     override val schemaVersion: Int = IndexUtils.NO_SCHEMA_VERSION,
     val queryLanguage: QueryLanguage = QueryLanguage.PPL, // default to PPL, SQL not currently supported
@@ -78,10 +90,6 @@ data class PPLMonitor(
             require(enabledTime == null)
         }
 
-        triggers.forEach { trigger ->
-            require(trigger is PPLTrigger) { "Incompatible trigger [${trigger.id}] for monitor type [$PPL_MONITOR_TYPE]" }
-        }
-
         // TODO: create setting for max triggers and check for max triggers here
     }
 
@@ -95,13 +103,26 @@ data class PPLMonitor(
         lookBackWindow = TimeValue.parseTimeValue(sin.readString(), PLACEHOLDER_LOOK_BACK_WINDOW_SETTING_NAME),
         lastUpdateTime = sin.readInstant(),
         enabledTime = sin.readOptionalInstant(),
+        user = if (sin.readBoolean()) {
+            User(sin)
+        } else {
+            null
+        },
         triggers = sin.readList(PPLTrigger::readFrom),
         schemaVersion = sin.readInt(),
         queryLanguage = sin.readEnum(QueryLanguage::class.java),
         query = sin.readString()
     )
 
+    fun toXContentWithUser(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+        return createXContentBuilder(builder, params, true)
+    }
+
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+        return createXContentBuilder(builder, params, false)
+    }
+
+    private fun createXContentBuilder(builder: XContentBuilder, params: ToXContent.Params, withUser: Boolean): XContentBuilder {
         builder.startObject() // overall start object
 
         // if this is being written as ScheduledJob, add extra object layer and add ScheduledJob
@@ -114,6 +135,10 @@ data class PPLMonitor(
         // required for MonitorV2 XContentParser to first encounter this,
         // read in monitor type, then delegate to correct parse() function
         builder.startObject(PPL_MONITOR_TYPE) // monitor type start object
+
+        if (withUser) {
+            builder.optionalUserField(USER_FIELD, user)
+        }
 
         builder.field(MonitorV2.NAME_FIELD, name)
         builder.field(MonitorV2.SCHEDULE_FIELD, schedule)
@@ -155,6 +180,10 @@ data class PPLMonitor(
 
         out.writeInstant(lastUpdateTime)
         out.writeOptionalInstant(enabledTime)
+
+        out.writeBoolean(user != null)
+        user?.writeTo(out)
+
         out.writeVInt(triggers.size)
         triggers.forEach { it.writeTo(out) }
         out.writeInt(schemaVersion)
@@ -166,13 +195,13 @@ data class PPLMonitor(
         return mapOf(
             IndexUtils._ID to id,
             IndexUtils._VERSION to version,
-            MonitorV2.NAME_FIELD to name,
-            MonitorV2.ENABLED_FIELD to enabled,
-            MonitorV2.SCHEDULE_FIELD to schedule,
-            MonitorV2.LOOK_BACK_WINDOW_FIELD to lookBackWindow?.toHumanReadableString(0),
-            MonitorV2.LAST_UPDATE_TIME_FIELD to lastUpdateTime.toEpochMilli(),
-            MonitorV2.ENABLED_TIME_FIELD to enabledTime?.toEpochMilli(),
-            MonitorV2.TRIGGERS_FIELD to triggers,
+            NAME_FIELD to name,
+            ENABLED_FIELD to enabled,
+            SCHEDULE_FIELD to schedule,
+            LOOK_BACK_WINDOW_FIELD to lookBackWindow?.toHumanReadableString(0),
+            LAST_UPDATE_TIME_FIELD to lastUpdateTime.toEpochMilli(),
+            ENABLED_TIME_FIELD to enabledTime?.toEpochMilli(),
+            TRIGGERS_FIELD to triggers,
             QUERY_LANGUAGE_FIELD to queryLanguage.value,
             QUERY_FIELD to query
         )
@@ -214,6 +243,7 @@ data class PPLMonitor(
             var lookBackWindow: TimeValue? = null
             var lastUpdateTime: Instant? = null
             var enabledTime: Instant? = null
+            var user: User? = null
             val triggers: MutableList<PPLTrigger> = mutableListOf()
             var schemaVersion = IndexUtils.NO_SCHEMA_VERSION
             var queryLanguage: QueryLanguage = QueryLanguage.PPL // default to PPL
@@ -226,10 +256,10 @@ data class PPLMonitor(
                 xcp.nextToken()
 
                 when (fieldName) {
-                    MonitorV2.NAME_FIELD -> name = xcp.text()
-                    MonitorV2.ENABLED_FIELD -> enabled = xcp.booleanValue()
-                    MonitorV2.SCHEDULE_FIELD -> schedule = Schedule.parse(xcp)
-                    MonitorV2.LOOK_BACK_WINDOW_FIELD -> {
+                    NAME_FIELD -> name = xcp.text()
+                    ENABLED_FIELD -> enabled = xcp.booleanValue()
+                    SCHEDULE_FIELD -> schedule = Schedule.parse(xcp)
+                    LOOK_BACK_WINDOW_FIELD -> {
                         lookBackWindow = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) {
                             null
                         } else {
@@ -238,9 +268,10 @@ data class PPLMonitor(
                             TimeValue.parseTimeValue(input, PLACEHOLDER_LOOK_BACK_WINDOW_SETTING_NAME)
                         }
                     }
-                    MonitorV2.LAST_UPDATE_TIME_FIELD -> lastUpdateTime = xcp.instant()
-                    MonitorV2.ENABLED_TIME_FIELD -> enabledTime = xcp.instant()
-                    MonitorV2.TRIGGERS_FIELD -> {
+                    LAST_UPDATE_TIME_FIELD -> lastUpdateTime = xcp.instant()
+                    ENABLED_TIME_FIELD -> enabledTime = xcp.instant()
+                    Monitor.USER_FIELD -> user = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) null else User.parse(xcp)
+                    TRIGGERS_FIELD -> {
                         XContentParserUtils.ensureExpectedToken(
                             XContentParser.Token.START_ARRAY,
                             xcp.currentToken(),
@@ -250,7 +281,7 @@ data class PPLMonitor(
                             triggers.add(PPLTrigger.parseInner(xcp))
                         }
                     }
-                    Monitor.SCHEMA_VERSION_FIELD -> schemaVersion = xcp.intValue()
+                    SCHEMA_VERSION_FIELD -> schemaVersion = xcp.intValue()
                     QUERY_LANGUAGE_FIELD -> {
                         val input = xcp.text()
                         val enumMatchResult = QueryLanguage.enumFromString(input)
@@ -297,7 +328,6 @@ data class PPLMonitor(
             // check for required fields
             requireNotNull(name) { "Monitor name is null" }
             requireNotNull(schedule) { "Schedule is null" }
-            requireNotNull(queryLanguage) { "Query language is null" }
             requireNotNull(query) { "Query is null" }
             requireNotNull(lastUpdateTime) { "Last update time is null" }
 
@@ -319,6 +349,7 @@ data class PPLMonitor(
                 lookBackWindow,
                 lastUpdateTime,
                 enabledTime,
+                user,
                 triggers,
                 schemaVersion,
                 queryLanguage,

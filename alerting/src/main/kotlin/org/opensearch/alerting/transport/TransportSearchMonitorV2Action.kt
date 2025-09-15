@@ -43,6 +43,9 @@ class TransportSearchMonitorV2Action @Inject constructor(
 
     override fun doExecute(task: Task, request: SearchMonitorV2Request, actionListener: ActionListener<SearchResponse>) {
 
+        // TODO: if alerting-config index doesnt exist, OS error is thrown to customer saying that much, try to catch that and
+        // throw more explicit error like "no monitorV2 exists"
+
         val searchSourceBuilder = request.searchRequest.source()
 
         val queryBuilder = if (searchSourceBuilder.query() == null) BoolQueryBuilder()

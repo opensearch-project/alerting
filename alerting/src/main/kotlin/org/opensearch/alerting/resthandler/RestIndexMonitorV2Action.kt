@@ -53,8 +53,10 @@ class RestIndexMonitorV2Action : BaseRestHandler() {
         ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
 
         val monitorV2: MonitorV2
+        val rbacRoles: List<String>?
         try {
             monitorV2 = MonitorV2.parse(xcp)
+            rbacRoles = request.contentParser().map()["rbac_roles"] as List<String>?
         } catch (e: Exception) {
             throw AlertingException.wrap(e)
         }
@@ -68,7 +70,7 @@ class RestIndexMonitorV2Action : BaseRestHandler() {
             WriteRequest.RefreshPolicy.IMMEDIATE
         }
 
-        val indexMonitorV2Request = IndexMonitorV2Request(id, seqNo, primaryTerm, refreshPolicy, request.method(), monitorV2)
+        val indexMonitorV2Request = IndexMonitorV2Request(id, seqNo, primaryTerm, refreshPolicy, request.method(), monitorV2, rbacRoles)
 
         return RestChannelConsumer { channel ->
             client.execute(IndexMonitorV2Action.INSTANCE, indexMonitorV2Request, RestToXContentListener(channel))
