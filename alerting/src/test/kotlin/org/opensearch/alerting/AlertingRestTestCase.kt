@@ -1516,7 +1516,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         var entity = " {\n" +
             "\"password\": \"$password\",\n" +
             "\"backend_roles\": [$broles],\n" +
-            "\"custom_attributes\": $customAttributesString\n" +
+            "\"attributes\": $customAttributesString\n" +
             "} "
         request.setJsonEntity(entity)
         client().performRequest(request)
