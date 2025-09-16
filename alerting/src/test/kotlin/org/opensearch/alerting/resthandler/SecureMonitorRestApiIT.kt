@@ -1456,11 +1456,11 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test execute query-level monitor with user role using dynamic DLS with parameter substitution`() {
-        createUserWithAttributes(user, arrayOf(TEST_HR_BACKEND_ROLE), mapOf("attr.proxy.team" to "red"))
+        createUserWithAttributes(user, arrayOf(TEST_HR_BACKEND_ROLE), mapOf("team" to "red"))
         createTestIndex(TEST_HR_INDEX)
         // The ${'$'} is an attempt to bypass the fact that Kotlin treats ${} as string interpolation in a
-        // triple quoted string, but we need to preserve the reference as ${attr.proxy.team}
-        val dlsQuery = """{\"term\": { \"team\": \"${'$'}{attr.proxy.team}\"}}"""
+        // triple quoted string, but we need to preserve the reference as ${attr.internal.team}
+        val dlsQuery = """{\"term\": { \"team\": \"${'$'}{attr.internal.team}\"}}"""
         createIndexRoleWithDocLevelSecurity(
             TEST_HR_ROLE,
             TEST_HR_INDEX,
