@@ -5,6 +5,8 @@ import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.ENABLED_TIME_FIE
 import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.LAST_UPDATE_TIME_FIELD
 import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.LOOK_BACK_WINDOW_FIELD
 import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.NAME_FIELD
+import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.NO_ID
+import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.NO_VERSION
 import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.SCHEDULE_FIELD
 import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.SCHEMA_VERSION_FIELD
 import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.TRIGGERS_FIELD
@@ -12,8 +14,6 @@ import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.USER_FIELD
 import org.opensearch.alerting.core.util.nonOptionalTimeField
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.CronSchedule
-import org.opensearch.commons.alerting.model.IntervalSchedule
-import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.Schedule
 import org.opensearch.commons.alerting.util.IndexUtils
 import org.opensearch.commons.alerting.util.instant
@@ -52,8 +52,8 @@ import java.time.Instant
  * @property query The PPL query string to be executed by this monitor.
  */
 data class PPLMonitor(
-    override val id: String = MonitorV2.NO_ID,
-    override val version: Long = MonitorV2.NO_VERSION,
+    override val id: String = NO_ID,
+    override val version: Long = NO_VERSION,
     override val name: String,
     override val enabled: Boolean,
     override val schedule: Schedule,
@@ -140,14 +140,14 @@ data class PPLMonitor(
             builder.optionalUserField(USER_FIELD, user)
         }
 
-        builder.field(MonitorV2.NAME_FIELD, name)
-        builder.field(MonitorV2.SCHEDULE_FIELD, schedule)
-        builder.field(MonitorV2.LOOK_BACK_WINDOW_FIELD, lookBackWindow?.toHumanReadableString(0))
-        builder.field(MonitorV2.ENABLED_FIELD, enabled)
-        builder.nonOptionalTimeField(MonitorV2.LAST_UPDATE_TIME_FIELD, lastUpdateTime)
-        builder.optionalTimeField(MonitorV2.ENABLED_TIME_FIELD, enabledTime)
-        builder.field(MonitorV2.TRIGGERS_FIELD, triggers.toTypedArray())
-        builder.field(Monitor.SCHEMA_VERSION_FIELD, schemaVersion)
+        builder.field(NAME_FIELD, name)
+        builder.field(SCHEDULE_FIELD, schedule)
+        builder.field(LOOK_BACK_WINDOW_FIELD, lookBackWindow?.toHumanReadableString(0))
+        builder.field(ENABLED_FIELD, enabled)
+        builder.nonOptionalTimeField(LAST_UPDATE_TIME_FIELD, lastUpdateTime)
+        builder.optionalTimeField(ENABLED_TIME_FIELD, enabledTime)
+        builder.field(TRIGGERS_FIELD, triggers.toTypedArray())
+        builder.field(SCHEMA_VERSION_FIELD, schemaVersion)
         builder.field(QUERY_LANGUAGE_FIELD, queryLanguage.value)
         builder.field(QUERY_FIELD, query)
 
@@ -236,7 +236,7 @@ data class PPLMonitor(
         @JvmStatic
         @JvmOverloads
         @Throws(IOException::class)
-        fun parse(xcp: XContentParser, id: String = MonitorV2.NO_ID, version: Long = MonitorV2.NO_VERSION): PPLMonitor {
+        fun parse(xcp: XContentParser, id: String = NO_ID, version: Long = NO_VERSION): PPLMonitor {
             var name: String? = null
             var enabled = true
             var schedule: Schedule? = null
@@ -270,7 +270,7 @@ data class PPLMonitor(
                     }
                     LAST_UPDATE_TIME_FIELD -> lastUpdateTime = xcp.instant()
                     ENABLED_TIME_FIELD -> enabledTime = xcp.instant()
-                    Monitor.USER_FIELD -> user = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) null else User.parse(xcp)
+                    USER_FIELD -> user = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) null else User.parse(xcp)
                     TRIGGERS_FIELD -> {
                         XContentParserUtils.ensureExpectedToken(
                             XContentParser.Token.START_ARRAY,
@@ -330,10 +330,6 @@ data class PPLMonitor(
             requireNotNull(schedule) { "Schedule is null" }
             requireNotNull(query) { "Query is null" }
             requireNotNull(lastUpdateTime) { "Last update time is null" }
-
-            if (schedule is IntervalSchedule && lookBackWindow != null) {
-                throw IllegalArgumentException("Look back windows only supported for CRON schedules")
-            }
 
             if (queryLanguage == QueryLanguage.SQL) {
                 throw IllegalArgumentException("SQL queries are not supported. Please use a PPL query.")
