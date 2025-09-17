@@ -1,6 +1,6 @@
 {
   "_meta" : {
-    "schema_version": 8
+    "schema_version": 9
   },
   "properties": {
     "monitor": {
@@ -64,6 +64,10 @@
                   "type" : "keyword"
                 }
               }
+            },
+            "custom_attributes": {
+              "type": "object",
+              "dynamic": "true"
             }
           }
         },
@@ -363,6 +367,10 @@
                   "type" : "keyword"
                 }
               }
+            },
+            "custom_attributes": {
+              "type": "object",
+              "dynamic": "true"
             }
           }
         },
@@ -499,6 +507,10 @@
                   "type" : "keyword"
                 }
               }
+            },
+            "custom_attributes": {
+              "type": "object",
+              "dynamic": "true"
             }
           }
         },
