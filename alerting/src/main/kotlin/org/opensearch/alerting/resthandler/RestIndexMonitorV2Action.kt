@@ -53,7 +53,7 @@ class RestIndexMonitorV2Action : BaseRestHandler() {
         ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
 
         val monitorV2: MonitorV2
-        val rbacRoles: List<String>?
+        val rbacRoles: List<String>? // TODO: do we want to support specifying rbac roles in monitor body?
         try {
             monitorV2 = MonitorV2.parse(xcp)
             rbacRoles = request.contentParser().map()["rbac_roles"] as List<String>?

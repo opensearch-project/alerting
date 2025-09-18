@@ -181,7 +181,12 @@ class TransportIndexMonitorV2Action @Inject constructor(
         indexMonitorV2Request: IndexMonitorV2Request
     ) {
         /* check initial user permissions */
+        val headers = client.threadPool().threadContext.headers
+        log.info("Headers in transport layer: $headers")
+
         val user = readUserFromThreadContext(client)
+
+        log.info("user in checkUserAndIndicesAccess: $user")
 
         if (!validateUserBackendRoles(user, actionListener)) {
             return
@@ -205,7 +210,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
                     )
                 )
                 return
-            } else if (indexMonitorV2Request.rbacRoles.isEmpty() == true) {
+            } else if (indexMonitorV2Request.rbacRoles.isEmpty()) {
                 log.debug(
                     "Non-admin user are not allowed to specify an empty set of backend roles. " +
                         "Please don't pass in the parameter or pass in at least one backend role."
@@ -235,6 +240,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
         actionListener: ActionListener<IndexMonitorV2Response>,
         user: User?
     ) {
+        log.info("user in checkPplQueryIndices: $user")
         val pplMonitor = indexMonitorV2Request.monitorV2 as PPLMonitor
         val pplQuery = pplMonitor.query
         val indices = getIndicesFromPplQuery(pplQuery)
@@ -245,7 +251,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
             searchRequest,
             object : ActionListener<SearchResponse> {
                 override fun onResponse(searchResponse: SearchResponse) {
-                    // User has read access to configured indices in the monitor, now create monitor with out user context.
+                    // User has read access to configured indices in the monitor, now create monitor without user context.
                     client.threadPool().threadContext.stashContext().use {
                         if (user == null) {
                             // Security is disabled, add empty user to Monitor. user is null for older versions.
@@ -285,6 +291,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
         actionListener: ActionListener<IndexMonitorV2Response>,
         user: User?
     ) {
+        log.info("user in checkScheduledJobIndex: $user")
         /* check to see if alerting-config index (scheduled job index) is created and updated before indexing MonitorV2 into it */
         if (!scheduledJobIndices.scheduledJobIndexExists()) { // if alerting-config index doesn't exist, send request to create it
             scheduledJobIndices.initScheduledJobIndex(object : ActionListener<CreateIndexResponse> {
@@ -339,6 +346,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
         actionListener: ActionListener<IndexMonitorV2Response>,
         user: User?
     ) {
+        log.info("user in onCreateMappingsResponse: $user")
         if (isAcknowledged) {
             log.info("Created $SCHEDULED_JOBS_INDEX with mappings.")
             prepareMonitorIndexing(request, actionListener, user)
@@ -361,6 +369,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
         actionListener: ActionListener<IndexMonitorV2Response>,
         user: User?
     ) {
+        log.info("user in onUpdateMappingsResponse: $user")
         if (response.isAcknowledged) {
             log.info("Updated  $SCHEDULED_JOBS_INDEX with mappings.")
             IndexUtils.scheduledJobIndexUpdated()
@@ -388,6 +397,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
         actionListener: ActionListener<IndexMonitorV2Response>,
         user: User?
     ) {
+        log.info("user in prepareMonitorIndexing: $user")
         if (indexMonitorRequest.method == RestRequest.Method.PUT) { // update monitor case
             scope.launch {
                 updateMonitor(indexMonitorRequest, actionListener, user)
@@ -436,8 +446,18 @@ class TransportIndexMonitorV2Action @Inject constructor(
             )
             val monitorV2 = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as MonitorV2
             onGetMonitorResponseForUpdate(monitorV2, indexMonitorRequest, actionListener, user)
-        } catch (t: Exception) {
-            actionListener.onFailure(AlertingException.wrap(t))
+        } catch (e: ClassCastException) {
+            // if ScheduledJob parsed the object and could not cast it to MonitorV2, we must
+            // have gotten a Monitor V1 from the given ID
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    IllegalArgumentException(
+                        "The ID given corresponds to a V1 Monitor, please pass in the ID of a V2 Monitor"
+                    )
+                )
+            )
+        } catch (e: Exception) {
+            actionListener.onFailure(AlertingException.wrap(e))
         }
     }
 
@@ -517,6 +537,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
             .setRefreshPolicy(indexMonitorRequest.refreshPolicy)
             .source(newMonitorV2.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
             .id(indexMonitorRequest.monitorId)
+            .routing(indexMonitorRequest.monitorId)
             .setIfSeqNo(indexMonitorRequest.seqNo)
             .setIfPrimaryTerm(indexMonitorRequest.primaryTerm)
             .timeout(indexTimeout)
@@ -560,6 +581,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
         actionListener: ActionListener<IndexMonitorV2Response>,
         user: User?
     ) {
+        log.info("user in onMonitorCountSearchResponse: $user")
         val totalHits = monitorCountSearchResponse.hits.totalHits?.value
         if (totalHits != null && totalHits >= maxMonitors) {
             log.info("This request would create more than the allowed monitors [$maxMonitors].")
@@ -582,6 +604,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
         actionListener: ActionListener<IndexMonitorV2Response>,
         user: User?
     ) {
+        log.info("user in indexMonitor: $user")
         var monitorV2 = when (indexMonitorRequest.monitorV2) {
             is PPLMonitor -> indexMonitorRequest.monitorV2 as PPLMonitor
             else -> throw IllegalArgumentException("received unsupported monitor type to index: ${indexMonitorRequest.monitorV2.javaClass}")
@@ -609,6 +632,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
         val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
             .setRefreshPolicy(indexMonitorRequest.refreshPolicy)
             .source(monitorV2.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+            .routing(indexMonitorRequest.monitorId)
             .setIfSeqNo(indexMonitorRequest.seqNo)
             .setIfPrimaryTerm(indexMonitorRequest.primaryTerm)
             .timeout(indexTimeout)

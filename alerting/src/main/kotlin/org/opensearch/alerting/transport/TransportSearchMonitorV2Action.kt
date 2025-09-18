@@ -7,6 +7,7 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.actionv2.SearchMonitorV2Action
 import org.opensearch.alerting.actionv2.SearchMonitorV2Request
 import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.MONITOR_V2_TYPE
+import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -59,23 +60,27 @@ class TransportSearchMonitorV2Action @Inject constructor(
             .seqNoAndPrimaryTerm(true)
             .version(true)
 
-//        addOwnerFieldIfNotExists(transformedRequest.searchRequest)
-//        val user = readUserFromThreadContext(client)
-//        client.threadPool().threadContext.stashContext().use {
-//            resolve(transformedRequest, actionListener, user)
-//        }
-
-        client.search(
-            request.searchRequest,
-            object : ActionListener<SearchResponse> {
-                override fun onResponse(response: SearchResponse) {
-                    actionListener.onResponse(response)
-                }
-
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
-                }
+        val user = readUserFromThreadContext(client)
+        client.threadPool().threadContext.stashContext().use {
+            // if user is null, security plugin is disabled or user is super-admin
+            // if doFilterForUser() is false, security is enabled but filterby is disabled
+            if (user != null && doFilterForUser(user)) {
+                log.info("Filtering result by: ${user.backendRoles}")
+                addFilter(user, request.searchRequest.source(), "monitor.user.backend_roles.keyword")
             }
-        )
+
+            client.search(
+                request.searchRequest,
+                object : ActionListener<SearchResponse> {
+                    override fun onResponse(response: SearchResponse) {
+                        actionListener.onResponse(response)
+                    }
+
+                    override fun onFailure(t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                    }
+                }
+            )
+        }
     }
 }

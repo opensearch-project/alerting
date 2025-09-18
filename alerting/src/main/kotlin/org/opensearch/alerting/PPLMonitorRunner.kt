@@ -24,8 +24,10 @@ import org.opensearch.alerting.core.modelv2.PPLTrigger.TriggerMode
 import org.opensearch.alerting.core.modelv2.PPLTriggerRunResult
 import org.opensearch.alerting.core.modelv2.TriggerV2.Severity
 import org.opensearch.alerting.core.ppl.PPLPluginInterface
+import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.PPLTriggerExecutionContext
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentFactory
@@ -414,6 +416,7 @@ object PPLMonitorRunner : MonitorV2Runner {
                 monitorId = pplMonitor.id,
                 monitorName = pplMonitor.name,
                 monitorVersion = pplMonitor.version,
+                monitorUser = pplMonitor.user,
                 triggerId = pplTrigger.id,
                 triggerName = pplTrigger.name,
                 queryResults = queryResult.toMap(),
@@ -448,6 +451,7 @@ object PPLMonitorRunner : MonitorV2Runner {
             monitorId = pplMonitor.id,
             monitorName = pplMonitor.name,
             monitorVersion = pplMonitor.version,
+            monitorUser = pplMonitor.user,
             triggerId = pplTrigger.id,
             triggerName = pplTrigger.name,
             queryResults = mapOf(),
@@ -473,7 +477,7 @@ object PPLMonitorRunner : MonitorV2Runner {
             listOf<DocWriteRequest<*>>(
                 IndexRequest(AlertV2Indices.ALERT_V2_INDEX)
                     .routing(pplMonitor.id) // set routing ID to PPL Monitor ID
-                    .source(alert.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
+                    .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
                     .id(if (alert.id != Alert.NO_ID) alert.id else null)
             )
         }
@@ -500,9 +504,15 @@ object PPLMonitorRunner : MonitorV2Runner {
     private suspend fun updateMonitorWithLastTriggeredTimes(pplMonitor: PPLMonitor, client: NodeClient) {
         val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
             .id(pplMonitor.id)
-            .source(pplMonitor.toXContentWithType(XContentFactory.jsonBuilder()))
+            .source(
+                pplMonitor.toXContentWithUser(
+                    XContentFactory.jsonBuilder(),
+                    ToXContent.MapParams(
+                        mapOf("with_type" to "true")
+                    )
+                )
+            )
             .routing(pplMonitor.id)
-
         val indexResponse = client.suspendUntil { index(indexRequest, it) }
 
         logger.info("PPLMonitor update with last execution times index response: ${indexResponse.result}")
@@ -517,42 +527,44 @@ object PPLMonitorRunner : MonitorV2Runner {
     ) {
         // this function can throw an exception, which is caught by the try
         // catch in runMonitor() to generate an error alert
-        val actionOutput = mutableMapOf<String, String>()
-        actionOutput[Action.SUBJECT] = if (action.subjectTemplate != null)
+        // TODO: is actionOutput even needed, we dont store action run results in alert
+//        val actionOutput = mutableMapOf<String, String>()
+        val notifSubject = if (action.subjectTemplate != null)
             MonitorRunnerService.compileTemplateV2(action.subjectTemplate!!, triggerCtx)
         else ""
-        actionOutput[Action.MESSAGE] = MonitorRunnerService.compileTemplateV2(action.messageTemplate, triggerCtx)
-        if (Strings.isNullOrEmpty(actionOutput[Action.MESSAGE])) {
+        // TODO: check query results size, truncate accordingly, and append to notifMessage before sending
+        // TODO: maybe remove actionOutput, p sure that was for storing action execution results, which we arent doing
+        val notifMessage = MonitorRunnerService.compileTemplateV2(action.messageTemplate, triggerCtx)
+        if (Strings.isNullOrEmpty(notifMessage)) {
             throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
         }
 
         if (!dryrun) {
-//                val client = monitorCtx.client
-            actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
-                action,
-                monitorCtx,
-                actionOutput[Action.SUBJECT],
-                actionOutput[Action.MESSAGE]!!
-            )
-            // TODO: use this block when security plugin is enabled
-//                client!!.threadPool().threadContext.stashContext().use {
-//                    withClosableContext(
-//                        InjectorContextElement(
-//                            pplMonitor.id,
-//                            monitorCtx.settings!!,
-//                            monitorCtx.threadPool!!.threadContext,
-//                            pplMonitor.user?.roles,
-//                            pplMonitor.user
-//                        )
-//                    ) {
-//                        actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
-//                            action,
-//                            monitorCtx,
-//                            actionOutput[Action.SUBJECT],
-//                            actionOutput[Action.MESSAGE]!!
-//                        )
-//                    }
-//                }
+            val client = monitorCtx.client
+//          actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
+//              action,
+//              monitorCtx,
+//              actionOutput[Action.SUBJECT],
+//              actionOutput[Action.MESSAGE]!!
+//          )
+            client!!.threadPool().threadContext.stashContext().use {
+                withClosableContext(
+                    InjectorContextElement(
+                        pplMonitor.id,
+                        monitorCtx.settings!!,
+                        monitorCtx.threadPool!!.threadContext,
+                        pplMonitor.user?.roles,
+                        pplMonitor.user
+                    )
+                ) {
+                    getConfigAndSendNotification(
+                        action,
+                        monitorCtx,
+                        notifSubject,
+                        notifMessage
+                    )
+                }
+            }
         }
     }
 

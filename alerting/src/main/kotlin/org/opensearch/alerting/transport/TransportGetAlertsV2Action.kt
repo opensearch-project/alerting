@@ -13,6 +13,7 @@ import org.opensearch.alerting.actionv2.GetAlertsV2Request
 import org.opensearch.alerting.actionv2.GetAlertsV2Response
 import org.opensearch.alerting.alertsv2.AlertV2Indices
 import org.opensearch.alerting.core.modelv2.AlertV2
+import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
@@ -22,6 +23,7 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.util.AlertingException
+import org.opensearch.commons.authuser.User
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -68,7 +70,7 @@ class TransportGetAlertsV2Action @Inject constructor(
         getAlertsV2Request: GetAlertsV2Request,
         actionListener: ActionListener<GetAlertsV2Response>,
     ) {
-//        val user = readUserFromThreadContext(client)
+        val user = readUserFromThreadContext(client)
 
         val tableProp = getAlertsV2Request.table
         val sortBuilder = SortBuilders
@@ -84,7 +86,7 @@ class TransportGetAlertsV2Action @Inject constructor(
             queryBuilder.filter(QueryBuilders.termQuery("severity", getAlertsV2Request.severityLevel))
         }
 
-        if (getAlertsV2Request.alertV2Ids.isNullOrEmpty() == false) {
+        if (!getAlertsV2Request.alertV2Ids.isNullOrEmpty()) {
             queryBuilder.filter(QueryBuilders.termsQuery("_id", getAlertsV2Request.alertV2Ids))
         }
 
@@ -115,7 +117,7 @@ class TransportGetAlertsV2Action @Inject constructor(
         client.threadPool().threadContext.stashContext().use {
             scope.launch {
                 try {
-                    getAlerts(AlertV2Indices.ALERT_V2_INDEX, searchSourceBuilder, actionListener/*, user*/)
+                    getAlerts(AlertV2Indices.ALERT_V2_INDEX, searchSourceBuilder, actionListener, user)
                 } catch (t: Exception) {
                     log.error("Failed to get alerts", t)
                     if (t is AlertingException) {
@@ -132,27 +134,17 @@ class TransportGetAlertsV2Action @Inject constructor(
         alertIndex: String,
         searchSourceBuilder: SearchSourceBuilder,
         actionListener: ActionListener<GetAlertsV2Response>,
-//        user: User?,
+        user: User?
     ) {
-        // TODO: when implementing RBAC, pivot to this implementation
-//        // user is null when: 1/ security is disabled. 2/when user is super-admin.
-//        if (user == null) {
-//            // user is null when: 1/ security is disabled. 2/when user is super-admin.
-//            search(alertIndex, searchSourceBuilder, actionListener)
-//        } else if (!doFilterForUser(user)) {
-//            // security is enabled and filterby is disabled.
-//            search(alertIndex, searchSourceBuilder, actionListener)
-//        } else {
-//            // security is enabled and filterby is enabled.
-//            try {
-//                log.info("Filtering result by: ${user.backendRoles}")
-//                addFilter(user, searchSourceBuilder, "monitor_user.backend_roles.keyword")
-//                search(alertIndex, searchSourceBuilder, actionListener)
-//            } catch (ex: IOException) {
-//                actionListener.onFailure(AlertingException.wrap(ex))
-//            }
-//        }
         try {
+            // if user is null, security plugin is disabled or user is super-admin
+            // if doFilterForUser() is false, security is enabled but filterby is disabled
+            if (user != null && doFilterForUser(user)) {
+                // if security is enabled and filterby is enabled, add search filter
+                log.info("Filtering result by: ${user.backendRoles}")
+                addFilter(user, searchSourceBuilder, "monitor.user.backend_roles.keyword")
+            }
+
             search(alertIndex, searchSourceBuilder, actionListener)
         } catch (ex: IOException) {
             actionListener.onFailure(AlertingException.wrap(ex))

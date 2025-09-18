@@ -79,7 +79,7 @@ class RestSearchMonitorV2Action(
         }
     }
 
-    // once ths search response is received, rewrite the search hits to remove the extra "monitor_v2" JSON object wrapper
+    // once the search response is received, rewrite the search hits to remove the extra "monitor_v2" JSON object wrapper
     // that is used as ScheduledJob metadata
     private fun searchMonitorResponse(channel: RestChannel): RestResponseListener<SearchResponse> {
         return object : RestResponseListener<SearchResponse>(channel) {
@@ -89,13 +89,16 @@ class RestSearchMonitorV2Action(
                     return BytesRestResponse(RestStatus.REQUEST_TIMEOUT, response.toString())
                 }
 
-                // Swallow exception and return response as is
                 try {
                     for (hit in response.hits) {
                         XContentType.JSON.xContent().createParser(
                             channel.request().xContentRegistry,
                             LoggingDeprecationHandler.INSTANCE, hit.sourceAsString
                         ).use { hitsParser ->
+                            // when reconstructing XContent, intentionally leave out
+                            // user field in response for security reasons by
+                            // calling ScheduledJob.toXContent instead of
+                            // a MonitorV2's toXContentWithUser
                             val monitorV2 = ScheduledJob.parse(hitsParser, hit.id, hit.version)
                             val xcb = monitorV2.toXContent(jsonBuilder(), EMPTY_PARAMS)
 
@@ -105,6 +108,7 @@ class RestSearchMonitorV2Action(
                         }
                     }
                 } catch (e: Exception) {
+                    // Swallow exception and return response as is
                     log.error("The monitor_v2 parsing failed. Will return response as is.")
                 }
                 return BytesRestResponse(RestStatus.OK, response.toXContent(channel.newBuilder(), EMPTY_PARAMS))

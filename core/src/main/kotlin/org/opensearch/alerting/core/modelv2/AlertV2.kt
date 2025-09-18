@@ -9,6 +9,7 @@ import org.opensearch.commons.alerting.model.Alert.Companion.ERROR_MESSAGE_FIELD
 import org.opensearch.commons.alerting.model.Alert.Companion.EXECUTION_ID_FIELD
 import org.opensearch.commons.alerting.model.Alert.Companion.MONITOR_ID_FIELD
 import org.opensearch.commons.alerting.model.Alert.Companion.MONITOR_NAME_FIELD
+import org.opensearch.commons.alerting.model.Alert.Companion.MONITOR_USER_FIELD
 import org.opensearch.commons.alerting.model.Alert.Companion.MONITOR_VERSION_FIELD
 import org.opensearch.commons.alerting.model.Alert.Companion.NO_ID
 import org.opensearch.commons.alerting.model.Alert.Companion.NO_VERSION
@@ -18,6 +19,8 @@ import org.opensearch.commons.alerting.model.Alert.Companion.TRIGGER_ID_FIELD
 import org.opensearch.commons.alerting.model.Alert.Companion.TRIGGER_NAME_FIELD
 import org.opensearch.commons.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
 import org.opensearch.commons.alerting.util.instant
+import org.opensearch.commons.alerting.util.optionalUserField
+import org.opensearch.commons.authuser.User
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.common.io.stream.StreamOutput
 import org.opensearch.core.common.io.stream.Writeable
@@ -64,7 +67,7 @@ data class AlertV2(
     val monitorId: String,
     val monitorName: String,
     val monitorVersion: Long,
-//    val monitorUser: User?,
+    val monitorUser: User?,
     val triggerId: String,
     val triggerName: String,
     val queryResults: Map<String, Any>,
@@ -82,11 +85,11 @@ data class AlertV2(
         monitorId = sin.readString(),
         monitorName = sin.readString(),
         monitorVersion = sin.readLong(),
-//        monitorUser = if (sin.readBoolean()) {
-//            User(sin)
-//        } else {
-//            null
-//        },
+        monitorUser = if (sin.readBoolean()) {
+            User(sin)
+        } else {
+            null
+        },
         triggerId = sin.readString(),
         triggerName = sin.readString(),
         queryResults = sin.readMap()!!.toMap(),
@@ -105,8 +108,8 @@ data class AlertV2(
         out.writeString(monitorId)
         out.writeString(monitorName)
         out.writeLong(monitorVersion)
-//        out.writeBoolean(monitorUser != null)
-//        monitorUser?.writeTo(out)
+        out.writeBoolean(monitorUser != null)
+        monitorUser?.writeTo(out)
         out.writeString(triggerId)
         out.writeString(triggerName)
         out.writeMap(queryResults)
@@ -118,6 +121,14 @@ data class AlertV2(
     }
 
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+        return createXContentBuilder(builder, false)
+    }
+
+    fun toXContentWithUser(builder: XContentBuilder): XContentBuilder {
+        return createXContentBuilder(builder, true)
+    }
+
+    private fun createXContentBuilder(builder: XContentBuilder, withUser: Boolean): XContentBuilder {
         builder.startObject()
             .field(ALERT_ID_FIELD, id)
             .field(ALERT_VERSION_FIELD, version)
@@ -133,11 +144,12 @@ data class AlertV2(
             .field(SEVERITY_FIELD, severity.value)
             .nonOptionalTimeField(TRIGGERED_TIME_FIELD, triggeredTime)
             .nonOptionalTimeField(EXPIRATION_TIME_FIELD, expirationTime)
-            .endObject()
 
-//        if (!secure) {
-//            builder.optionalUserField(MONITOR_USER_FIELD, monitorUser)
-//        }
+        if (withUser) {
+            builder.optionalUserField(MONITOR_USER_FIELD, monitorUser)
+        }
+
+        builder.endObject()
 
         return builder
     }
@@ -166,7 +178,7 @@ data class AlertV2(
             lateinit var monitorId: String
             lateinit var monitorName: String
             var monitorVersion: Long = Versions.NOT_FOUND
-//            var monitorUser: User? = null
+            var monitorUser: User? = null
             lateinit var triggerId: String
             lateinit var triggerName: String
             var queryResults: Map<String, Any> = mapOf()
@@ -186,12 +198,12 @@ data class AlertV2(
                     SCHEMA_VERSION_FIELD -> schemaVersion = xcp.intValue()
                     MONITOR_NAME_FIELD -> monitorName = xcp.text()
                     MONITOR_VERSION_FIELD -> monitorVersion = xcp.longValue()
-//                    MONITOR_USER_FIELD ->
-//                        monitorUser = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) {
-//                            null
-//                        } else {
-//                            User.parse(xcp)
-//                        }
+                    MONITOR_USER_FIELD ->
+                        monitorUser = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) {
+                            null
+                        } else {
+                            User.parse(xcp)
+                        }
                     TRIGGER_ID_FIELD -> triggerId = xcp.text()
                     TRIGGER_NAME_FIELD -> triggerName = xcp.text()
                     QUERY_RESULTS_FIELD -> queryResults = xcp.map()
@@ -218,7 +230,7 @@ data class AlertV2(
                 monitorId = requireNotNull(monitorId),
                 monitorName = requireNotNull(monitorName),
                 monitorVersion = monitorVersion,
-//                monitorUser = monitorUser,
+                monitorUser = monitorUser,
                 triggerId = requireNotNull(triggerId),
                 triggerName = requireNotNull(triggerName),
                 queryResults = requireNotNull(queryResults),

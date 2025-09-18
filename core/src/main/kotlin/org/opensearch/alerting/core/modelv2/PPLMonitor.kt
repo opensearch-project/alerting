@@ -136,10 +136,6 @@ data class PPLMonitor(
         // read in monitor type, then delegate to correct parse() function
         builder.startObject(PPL_MONITOR_TYPE) // monitor type start object
 
-        if (withUser) {
-            builder.optionalUserField(USER_FIELD, user)
-        }
-
         builder.field(NAME_FIELD, name)
         builder.field(SCHEDULE_FIELD, schedule)
         builder.field(LOOK_BACK_WINDOW_FIELD, lookBackWindow?.toHumanReadableString(0))
@@ -150,6 +146,10 @@ data class PPLMonitor(
         builder.field(SCHEMA_VERSION_FIELD, schemaVersion)
         builder.field(QUERY_LANGUAGE_FIELD, queryLanguage.value)
         builder.field(QUERY_FIELD, query)
+
+        if (withUser) {
+            builder.optionalUserField(USER_FIELD, user)
+        }
 
         builder.endObject() // monitor type end object
 
