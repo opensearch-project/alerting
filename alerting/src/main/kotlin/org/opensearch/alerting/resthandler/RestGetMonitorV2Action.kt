@@ -24,7 +24,7 @@ class RestGetMonitorV2Action : BaseRestHandler() {
     }
 
     override fun routes(): List<Route> {
-        return mutableListOf(
+        return listOf(
             Route(
                 GET,
                 "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitorV2Id}"

@@ -8,6 +8,7 @@ import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.AlertingV2Utils.validateMonitorV2
 import org.opensearch.alerting.actionv2.GetMonitorV2Action
 import org.opensearch.alerting.actionv2.GetMonitorV2Request
 import org.opensearch.alerting.actionv2.GetMonitorV2Response
@@ -76,35 +77,32 @@ class TransportGetMonitorV2Action @Inject constructor(
                             return
                         }
 
-                        var monitorV2: MonitorV2? = null
-                        try {
-                            if (!response.isSourceEmpty) {
-                                XContentHelper.createParser(
-                                    xContentRegistry,
-                                    LoggingDeprecationHandler.INSTANCE,
-                                    response.sourceAsBytesRef,
-                                    XContentType.JSON
-                                ).use { xcp ->
-                                    monitorV2 = ScheduledJob.parse(xcp, response.id, response.version) as MonitorV2
-                                }
-                            }
-                        } catch (e: ClassCastException) {
-                            // if ScheduledJob parsed the object and could not cast it to MonitorV2, we must
-                            // have gotten a Monitor V1 from the given ID
+                        if (response.isSourceEmpty) {
                             actionListener.onFailure(
-                                AlertingException.wrap(
-                                    IllegalArgumentException(
-                                        "The ID given corresponds to a V1 Monitor, please pass in the ID of a V2 Monitor"
-                                    )
-                                )
+                                AlertingException.wrap(OpenSearchStatusException("MonitorV2 found but was empty.", RestStatus.NO_CONTENT))
                             )
                             return
                         }
 
+                        val xcp = XContentHelper.createParser(
+                            xContentRegistry,
+                            LoggingDeprecationHandler.INSTANCE,
+                            response.sourceAsBytesRef,
+                            XContentType.JSON
+                        )
+                        val scheduledJob = ScheduledJob.parse(xcp, response.id, response.version)
+
+                        validateMonitorV2(scheduledJob)?.let {
+                            actionListener.onFailure(AlertingException.wrap(it))
+                            return
+                        }
+
+                        val monitorV2 = scheduledJob as MonitorV2
+
                         // security is enabled and filterby is enabled
                         if (!checkUserPermissionsWithResource(
                                 user,
-                                monitorV2?.user,
+                                monitorV2.user,
                                 actionListener,
                                 "monitor",
                                 request.monitorV2Id

@@ -22,6 +22,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.clustermanager.AcknowledgedResponse
+import org.opensearch.alerting.AlertingV2Utils.validateMonitorV2
 import org.opensearch.alerting.PPLMonitorRunner.appendCustomCondition
 import org.opensearch.alerting.PPLMonitorRunner.executePplQuery
 import org.opensearch.alerting.PPLMonitorRunner.findEvalResultVar
@@ -181,9 +182,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
         indexMonitorV2Request: IndexMonitorV2Request
     ) {
         /* check initial user permissions */
-        val headers = client.threadPool().threadContext.headers
-        log.info("Headers in transport layer: $headers")
-
         val user = readUserFromThreadContext(client)
 
         log.info("user in checkUserAndIndicesAccess: $user")
@@ -444,18 +442,16 @@ class TransportIndexMonitorV2Action @Inject constructor(
                 xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                 getResponse.sourceAsBytesRef, XContentType.JSON
             )
-            val monitorV2 = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as MonitorV2
+            val scheduledJob = ScheduledJob.parse(xcp, getResponse.id, getResponse.version)
+
+            validateMonitorV2(scheduledJob)?.let {
+                actionListener.onFailure(AlertingException.wrap(it))
+                return
+            }
+
+            val monitorV2 = scheduledJob as MonitorV2
+
             onGetMonitorResponseForUpdate(monitorV2, indexMonitorRequest, actionListener, user)
-        } catch (e: ClassCastException) {
-            // if ScheduledJob parsed the object and could not cast it to MonitorV2, we must
-            // have gotten a Monitor V1 from the given ID
-            actionListener.onFailure(
-                AlertingException.wrap(
-                    IllegalArgumentException(
-                        "The ID given corresponds to a V1 Monitor, please pass in the ID of a V2 Monitor"
-                    )
-                )
-            )
         } catch (e: Exception) {
             actionListener.onFailure(AlertingException.wrap(e))
         }

@@ -9,6 +9,7 @@ import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.AlertingV2Utils.validateMonitorV2
 import org.opensearch.alerting.actionv2.DeleteMonitorV2Action
 import org.opensearch.alerting.actionv2.DeleteMonitorV2Request
 import org.opensearch.alerting.actionv2.DeleteMonitorV2Response
@@ -94,26 +95,19 @@ class TransportDeleteMonitorV2Action @Inject constructor(
             )
             return null
         }
+
         val xcp = XContentHelper.createParser(
             xContentRegistry, LoggingDeprecationHandler.INSTANCE,
             getResponse.sourceAsBytesRef, XContentType.JSON
         )
+        val scheduledJob = ScheduledJob.parse(xcp, getResponse.id, getResponse.version)
 
-        val monitorV2: MonitorV2?
-        try {
-            monitorV2 = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as MonitorV2
-        } catch (e: ClassCastException) {
-            // if ScheduledJob parsed the object and could not cast it to MonitorV2, we must
-            // have gotten a Monitor V1 from the given ID
-            actionListener.onFailure(
-                AlertingException.wrap(
-                    IllegalArgumentException(
-                        "The ID given corresponds to a V1 Monitor, please pass in the ID of a V2 Monitor"
-                    )
-                )
-            )
+        validateMonitorV2(scheduledJob)?.let {
+            actionListener.onFailure(AlertingException.wrap(it))
             return null
         }
+
+        val monitorV2 = scheduledJob as MonitorV2
 
         return monitorV2
     }

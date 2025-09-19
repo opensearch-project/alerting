@@ -16,6 +16,7 @@ import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
+import org.opensearch.alerting.AlertingV2Utils.validateMonitorV1
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings
@@ -87,7 +88,7 @@ class TransportDeleteMonitorAction @Inject constructor(
     ) {
         suspend fun resolveUserAndStart(refreshPolicy: RefreshPolicy) {
             try {
-                val monitor = getMonitor()
+                val monitor = getMonitor() ?: return // null means there was an issue retrieving the Monitor
 
                 val canDelete = user == null || !doFilterForUser(user) ||
                     checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", monitorId)
@@ -115,11 +116,11 @@ class TransportDeleteMonitorAction @Inject constructor(
             }
         }
 
-        private suspend fun getMonitor(): Monitor {
+        private suspend fun getMonitor(): Monitor? {
             val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, monitorId)
 
             val getResponse: GetResponse = client.suspendUntil { get(getRequest, it) }
-            if (getResponse.isExists == false) {
+            if (!getResponse.isExists) {
                 actionListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException("Monitor with $monitorId is not found", RestStatus.NOT_FOUND)
@@ -130,7 +131,16 @@ class TransportDeleteMonitorAction @Inject constructor(
                 xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                 getResponse.sourceAsBytesRef, XContentType.JSON
             )
-            return ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
+            val scheduledJob = ScheduledJob.parse(xcp, getResponse.id, getResponse.version)
+
+            validateMonitorV1(scheduledJob)?.let {
+                actionListener.onFailure(AlertingException.wrap(it))
+                return null
+            }
+
+            val monitor = scheduledJob as Monitor
+
+            return monitor
         }
     }
 }
