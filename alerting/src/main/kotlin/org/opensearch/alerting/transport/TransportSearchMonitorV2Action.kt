@@ -66,7 +66,7 @@ class TransportSearchMonitorV2Action @Inject constructor(
             // if doFilterForUser() is false, security is enabled but filterby is disabled
             if (user != null && doFilterForUser(user)) {
                 log.info("Filtering result by: ${user.backendRoles}")
-                addFilter(user, request.searchRequest.source(), "monitor.user.backend_roles.keyword")
+                addFilter(user, request.searchRequest.source(), "monitor_v2.ppl_monitor.user.backend_roles.keyword")
             }
 
             client.search(

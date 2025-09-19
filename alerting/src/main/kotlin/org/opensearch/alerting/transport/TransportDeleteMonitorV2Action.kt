@@ -72,7 +72,7 @@ class TransportDeleteMonitorV2Action @Inject constructor(
                     actionListener.onResponse(deleteResponse)
                 } else {
                     actionListener.onFailure(
-                        AlertingException("Not allowed to delete this monitor_v2", RestStatus.FORBIDDEN, IllegalStateException())
+                        AlertingException("Not allowed to delete this Monitor V2", RestStatus.FORBIDDEN, IllegalStateException())
                     )
                 }
             } catch (e: Exception) {
@@ -90,7 +90,7 @@ class TransportDeleteMonitorV2Action @Inject constructor(
         if (!getResponse.isExists) {
             actionListener.onFailure(
                 AlertingException.wrap(
-                    OpenSearchStatusException("MonitorV2 with $monitorV2Id is not found", RestStatus.NOT_FOUND)
+                    OpenSearchStatusException("Monitor V2 with $monitorV2Id is not found", RestStatus.NOT_FOUND)
                 )
             )
             return null

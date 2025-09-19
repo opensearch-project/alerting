@@ -88,21 +88,31 @@ class TransportIndexMonitorV2Action @Inject constructor(
     @Volatile private var maxMonitors = ALERTING_MAX_MONITORS.get(settings)
     @Volatile private var requestTimeout = REQUEST_TIMEOUT.get(settings)
     @Volatile private var indexTimeout = INDEX_TIMEOUT.get(settings)
-//    @Volatile private var maxActionThrottle = MAX_ACTION_THROTTLE_VALUE.get(settings)
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+
+    init {
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_MAX_MONITORS) { maxMonitors = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(REQUEST_TIMEOUT) { requestTimeout = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(INDEX_TIMEOUT) { indexTimeout = it }
+        listenFilterBySettingChange(clusterService)
+    }
 
     override fun doExecute(
         task: Task,
         indexMonitorV2Request: IndexMonitorV2Request,
         actionListener: ActionListener<IndexMonitorV2Response>
     ) {
+        // read the user from thread context immediately, before
+        // downstream flows spin up new threads with fresh context
+        val user = readUserFromThreadContext(client)
+
         // validate the MonitorV2 based on its type
         when (indexMonitorV2Request.monitorV2) {
             is PPLMonitor -> validateMonitorPplQuery(
                 indexMonitorV2Request.monitorV2 as PPLMonitor,
                 object : ActionListener<Unit> { // validationListener
                     override fun onResponse(response: Unit) {
-                        checkUserAndIndicesAccess(client, actionListener, indexMonitorV2Request)
+                        checkUserAndIndicesAccess(client, actionListener, indexMonitorV2Request, user)
                     }
 
                     override fun onFailure(e: Exception) {
@@ -134,7 +144,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
                 // from the base query + custom condition is valid
                 val allCustomTriggersValid = true
                 for (pplTrigger in pplMonitor.triggers) {
-                    if (pplTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) {
+                    if (pplTrigger.conditionType != ConditionType.CUSTOM) {
                         continue
                     }
 
@@ -179,11 +189,10 @@ class TransportIndexMonitorV2Action @Inject constructor(
     private fun checkUserAndIndicesAccess(
         client: Client,
         actionListener: ActionListener<IndexMonitorV2Response>,
-        indexMonitorV2Request: IndexMonitorV2Request
+        indexMonitorV2Request: IndexMonitorV2Request,
+        user: User?
     ) {
         /* check initial user permissions */
-        val user = readUserFromThreadContext(client)
-
         log.info("user in checkUserAndIndicesAccess: $user")
 
         if (!validateUserBackendRoles(user, actionListener)) {
@@ -463,12 +472,14 @@ class TransportIndexMonitorV2Action @Inject constructor(
         actionListener: ActionListener<IndexMonitorV2Response>,
         user: User?
     ) {
+        log.info("user: $user")
+        log.info("monitor user: ${existingMonitorV2.user}")
         if (
             !checkUserPermissionsWithResource(
                 user,
                 existingMonitorV2.user,
                 actionListener,
-                "monitor",
+                "monitor_v2",
                 indexMonitorRequest.monitorId
             )
         ) {
@@ -514,7 +525,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
                     )
                 } else {
                     // rolesToRemove: these are the backend roles to remove from the monitor
-                    val rolesToRemove = user.backendRoles - indexMonitorRequest.rbacRoles.orEmpty()
+                    val rolesToRemove = user.backendRoles - indexMonitorRequest.rbacRoles
                     // remove the monitor's roles with rolesToRemove and add any roles passed into the request.rbacRoles
                     val updatedRbac = currentMonitorV2.user?.backendRoles.orEmpty() - rolesToRemove + indexMonitorRequest.rbacRoles
                     newMonitorV2 = newMonitorV2.copy(
@@ -525,7 +536,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
                 newMonitorV2 = newMonitorV2
                     .copy(user = User(user.name, currentMonitorV2.user!!.backendRoles, user.roles, user.customAttNames))
             }
-            log.debug("Update monitor backend roles to: ${newMonitorV2.user?.backendRoles}")
+            log.info("Update monitor backend roles to: ${newMonitorV2.user?.backendRoles}")
         }
 
         newMonitorV2 = newMonitorV2.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
