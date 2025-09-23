@@ -295,32 +295,39 @@ class AlertingSettings {
         )
 
         val ALERT_V2_HISTORY_ENABLED = Setting.boolSetting(
-            "plugins.alerting.v2.alert_history_enabled",
+            "plugins.alerting_v2.alert_history_enabled",
             true,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         val ALERT_V2_HISTORY_ROLLOVER_PERIOD = Setting.positiveTimeSetting(
-            "plugins.alerting.v2.alert_history_rollover_period",
+            "plugins.alerting_v2.alert_history_rollover_period",
             TimeValue(12, TimeUnit.HOURS),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         val ALERT_V2_HISTORY_INDEX_MAX_AGE = Setting.positiveTimeSetting(
-            "plugins.alerting.v2.alert_history_max_age",
+            "plugins.alerting_v2.alert_history_max_age",
             TimeValue(30, TimeUnit.DAYS),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         val ALERT_V2_HISTORY_MAX_DOCS = Setting.longSetting(
-            "plugins.alerting.v2.alert_history_max_docs",
+            "plugins.alerting_v2.alert_history_max_docs",
             1000L, 0L,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         val ALERT_V2_HISTORY_RETENTION_PERIOD = Setting.positiveTimeSetting(
-            "plugins.alerting.v2.alert_history_retention_period",
+            "plugins.alerting_v2.alert_history_retention_period",
             TimeValue(60, TimeUnit.DAYS),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val ALERT_V2_NOTIF_QUERY_RESULTS_MAX_SIZE = Setting.longSetting(
+            "plugins.alerting_v2.notif_query_results_max_size",
+            3000L,
+            0L,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
     }

@@ -12,6 +12,7 @@ import org.opensearch.common.CheckedFunction
 import org.opensearch.common.UUIDs
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.action.Action
+import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.alerting.util.instant
 import org.opensearch.commons.alerting.util.optionalTimeField
 import org.opensearch.core.ParseField
@@ -287,19 +288,30 @@ data class PPLTrigger(
                     }
                     SUPPRESS_FIELD -> {
                         suppressDuration = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) {
+                            // if expire field is null, skip reading it and let it retain the default value
                             null
                         } else {
                             val input = xcp.text()
-                            // throws IllegalArgumentException if there's parsing error
-                            TimeValue.parseTimeValue(input, PLACEHOLDER_SUPPRESS_SETTING_NAME)
+                            try {
+                                TimeValue.parseTimeValue(input, PLACEHOLDER_SUPPRESS_SETTING_NAME)
+                            } catch (e: Exception) {
+                                throw AlertingException.wrap(
+                                    IllegalArgumentException("Invalid value for field: $SUPPRESS_FIELD", e)
+                                )
+                            }
                         }
                     }
                     EXPIRE_FIELD -> {
+                        // if expire field is null, skip reading it and let it retain the default value
                         if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
-                            // if expire field is null, skip reading it and let it retain the default value
                             val input = xcp.text()
-                            // throws IllegalArgumentException if there's parsing error
-                            expireDuration = TimeValue.parseTimeValue(input, PLACEHOLDER_EXPIRE_SETTING_NAME)
+                            try {
+                                expireDuration = TimeValue.parseTimeValue(input, PLACEHOLDER_EXPIRE_SETTING_NAME)
+                            } catch (e: Exception) {
+                                throw AlertingException.wrap(
+                                    IllegalArgumentException("Invalid value for field: $EXPIRE_FIELD", e)
+                                )
+                            }
                         }
                     }
                     LAST_TRIGGERED_FIELD -> lastTriggeredTime = xcp.instant()

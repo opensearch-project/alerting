@@ -95,20 +95,8 @@
     "error_message": {
       "type": "text"
     },
-    "query_results": {
-      "type": "nested",
-      "properties": {
-        "schema": {
-          "type": "nested",
-          "dynamic": true
-        },
-        "datarows": {
-          "type": "text"
-        },
-        "total": {
-          "type": "integer"
-        }
-      }
+    "query": {
+      "type": "text"
     }
   }
 }

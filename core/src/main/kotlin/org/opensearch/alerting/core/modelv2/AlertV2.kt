@@ -70,7 +70,7 @@ data class AlertV2(
     val monitorUser: User?,
     val triggerId: String,
     val triggerName: String,
-    val queryResults: Map<String, Any>,
+    val query: String,
     val triggeredTime: Instant,
     val expirationTime: Instant,
     val errorMessage: String? = null,
@@ -92,7 +92,7 @@ data class AlertV2(
         },
         triggerId = sin.readString(),
         triggerName = sin.readString(),
-        queryResults = sin.readMap()!!.toMap(),
+        query = sin.readString(),
         triggeredTime = sin.readInstant(),
         expirationTime = sin.readInstant(),
         errorMessage = sin.readOptionalString(),
@@ -112,7 +112,7 @@ data class AlertV2(
         monitorUser?.writeTo(out)
         out.writeString(triggerId)
         out.writeString(triggerName)
-        out.writeMap(queryResults)
+        out.writeString(query)
         out.writeInstant(triggeredTime)
         out.writeInstant(expirationTime)
         out.writeOptionalString(errorMessage)
@@ -139,7 +139,7 @@ data class AlertV2(
             .field(EXECUTION_ID_FIELD, executionId)
             .field(TRIGGER_ID_FIELD, triggerId)
             .field(TRIGGER_NAME_FIELD, triggerName)
-            .field(QUERY_RESULTS_FIELD, queryResults)
+            .field(QUERY_FIELD, query)
             .field(ERROR_MESSAGE_FIELD, errorMessage)
             .field(SEVERITY_FIELD, severity.value)
             .nonOptionalTimeField(TRIGGERED_TIME_FIELD, triggeredTime)
@@ -168,7 +168,7 @@ data class AlertV2(
     companion object {
         const val TRIGGERED_TIME_FIELD = "triggered_time"
         const val EXPIRATION_TIME_FIELD = "expiration_time"
-        const val QUERY_RESULTS_FIELD = "query_results"
+        const val QUERY_FIELD = "query"
 
         @JvmStatic
         @JvmOverloads
@@ -181,7 +181,7 @@ data class AlertV2(
             var monitorUser: User? = null
             lateinit var triggerId: String
             lateinit var triggerName: String
-            var queryResults: Map<String, Any> = mapOf()
+            lateinit var query: String
             lateinit var severity: Severity
             var triggeredTime: Instant? = null
             var expirationTime: Instant? = null
@@ -206,7 +206,7 @@ data class AlertV2(
                         }
                     TRIGGER_ID_FIELD -> triggerId = xcp.text()
                     TRIGGER_NAME_FIELD -> triggerName = xcp.text()
-                    QUERY_RESULTS_FIELD -> queryResults = xcp.map()
+                    QUERY_FIELD -> query = xcp.text()
                     TRIGGERED_TIME_FIELD -> triggeredTime = xcp.instant()
                     EXPIRATION_TIME_FIELD -> expirationTime = xcp.instant()
                     ERROR_MESSAGE_FIELD -> errorMessage = xcp.textOrNull()
@@ -233,7 +233,7 @@ data class AlertV2(
                 monitorUser = monitorUser,
                 triggerId = requireNotNull(triggerId),
                 triggerName = requireNotNull(triggerName),
-                queryResults = requireNotNull(queryResults),
+                query = requireNotNull(query),
                 triggeredTime = requireNotNull(triggeredTime),
                 expirationTime = requireNotNull(expirationTime),
                 errorMessage = errorMessage,

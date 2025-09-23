@@ -184,16 +184,15 @@ object PPLMonitorRunner : MonitorV2Runner {
                     pplTrigger.lastTriggeredTime = timeOfCurrentExecution
 
                     // send alert notifications
-//                    val actionExecutionResults = mutableListOf<ActionExecutionResult>()
                     for (action in pplTrigger.actions) {
-                        for (alert in thisTriggersGeneratedAlerts) {
+                        for (queryResult in preparedQueryResults) {
                             val pplTriggerExecutionContext = PPLTriggerExecutionContext(
                                 pplMonitor,
                                 periodStart,
                                 periodEnd,
                                 null,
                                 pplTrigger,
-                                alert.queryResults
+                                queryResult
                             )
 
                             runAction(
@@ -419,7 +418,7 @@ object PPLMonitorRunner : MonitorV2Runner {
                 monitorUser = pplMonitor.user,
                 triggerId = pplTrigger.id,
                 triggerName = pplTrigger.name,
-                queryResults = queryResult.toMap(),
+                query = pplMonitor.query,
                 triggeredTime = timeOfCurrentExecution,
                 expirationTime = expirationTime,
                 severity = pplTrigger.severity,
@@ -454,7 +453,7 @@ object PPLMonitorRunner : MonitorV2Runner {
             monitorUser = pplMonitor.user,
             triggerId = pplTrigger.id,
             triggerName = pplTrigger.name,
-            queryResults = mapOf(),
+            query = pplMonitor.query,
             triggeredTime = timeOfCurrentExecution,
             expirationTime = expirationTime,
             errorMessage = obfuscatedErrorMessage,
@@ -528,8 +527,17 @@ object PPLMonitorRunner : MonitorV2Runner {
     ) {
         // this function can throw an exception, which is caught by the try
         // catch in runMonitor() to generate an error alert
-        // TODO: is actionOutput even needed, we dont store action run results in alert
 //        val actionOutput = mutableMapOf<String, String>()
+
+        // TODO: make queryResults a JSON
+//        val pplQueryResultsToInclude: Map<String, Any>
+//        val size = triggerCtx.pplQueryResults.toString().length
+//        val maxSize = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERT_V2_NOTIF_QUERY_RESULTS_MAX_SIZE)
+//
+//        if (size < maxSize) {
+//
+//        }
+
         val notifSubject = if (action.subjectTemplate != null)
             MonitorRunnerService.compileTemplateV2(action.subjectTemplate!!, triggerCtx)
         else ""

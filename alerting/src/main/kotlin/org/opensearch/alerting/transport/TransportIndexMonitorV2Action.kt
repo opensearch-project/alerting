@@ -193,8 +193,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
         user: User?
     ) {
         /* check initial user permissions */
-        log.info("user in checkUserAndIndicesAccess: $user")
-
         if (!validateUserBackendRoles(user, actionListener)) {
             return
         }
@@ -247,7 +245,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
         actionListener: ActionListener<IndexMonitorV2Response>,
         user: User?
     ) {
-        log.info("user in checkPplQueryIndices: $user")
         val pplMonitor = indexMonitorV2Request.monitorV2 as PPLMonitor
         val pplQuery = pplMonitor.query
         val indices = getIndicesFromPplQuery(pplQuery)
@@ -298,7 +295,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
         actionListener: ActionListener<IndexMonitorV2Response>,
         user: User?
     ) {
-        log.info("user in checkScheduledJobIndex: $user")
         /* check to see if alerting-config index (scheduled job index) is created and updated before indexing MonitorV2 into it */
         if (!scheduledJobIndices.scheduledJobIndexExists()) { // if alerting-config index doesn't exist, send request to create it
             scheduledJobIndices.initScheduledJobIndex(object : ActionListener<CreateIndexResponse> {
@@ -353,7 +349,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
         actionListener: ActionListener<IndexMonitorV2Response>,
         user: User?
     ) {
-        log.info("user in onCreateMappingsResponse: $user")
         if (isAcknowledged) {
             log.info("Created $SCHEDULED_JOBS_INDEX with mappings.")
             prepareMonitorIndexing(request, actionListener, user)
@@ -376,7 +371,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
         actionListener: ActionListener<IndexMonitorV2Response>,
         user: User?
     ) {
-        log.info("user in onUpdateMappingsResponse: $user")
         if (response.isAcknowledged) {
             log.info("Updated  $SCHEDULED_JOBS_INDEX with mappings.")
             IndexUtils.scheduledJobIndexUpdated()
@@ -404,7 +398,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
         actionListener: ActionListener<IndexMonitorV2Response>,
         user: User?
     ) {
-        log.info("user in prepareMonitorIndexing: $user")
         if (indexMonitorRequest.method == RestRequest.Method.PUT) { // update monitor case
             scope.launch {
                 updateMonitor(indexMonitorRequest, actionListener, user)
@@ -588,7 +581,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
         actionListener: ActionListener<IndexMonitorV2Response>,
         user: User?
     ) {
-        log.info("user in onMonitorCountSearchResponse: $user")
         val totalHits = monitorCountSearchResponse.hits.totalHits?.value
         if (totalHits != null && totalHits >= maxMonitors) {
             log.info("This request would create more than the allowed monitors [$maxMonitors].")
@@ -611,7 +603,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
         actionListener: ActionListener<IndexMonitorV2Response>,
         user: User?
     ) {
-        log.info("user in indexMonitor: $user")
         var monitorV2 = when (indexMonitorRequest.monitorV2) {
             is PPLMonitor -> indexMonitorRequest.monitorV2 as PPLMonitor
             else -> throw IllegalArgumentException("received unsupported monitor type to index: ${indexMonitorRequest.monitorV2.javaClass}")
