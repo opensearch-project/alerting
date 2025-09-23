@@ -240,7 +240,7 @@ data class PPLMonitor(
             var name: String? = null
             var enabled = true
             var schedule: Schedule? = null
-            var lookBackWindow: TimeValue? = null
+            var lookBackWindow: TimeValue? = null // TODO: default value
             var lastUpdateTime: Instant? = null
             var enabledTime: Instant? = null
             var user: User? = null

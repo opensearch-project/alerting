@@ -29,6 +29,7 @@ import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.PPLTriggerExecutionContext
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.commons.alerting.alerts.AlertError
@@ -529,34 +530,63 @@ object PPLMonitorRunner : MonitorV2Runner {
         // catch in runMonitor() to generate an error alert
 //        val actionOutput = mutableMapOf<String, String>()
 
-        // TODO: make queryResults a JSON
-//        val pplQueryResultsToInclude: Map<String, Any>
-//        val size = triggerCtx.pplQueryResults.toString().length
-//        val maxSize = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERT_V2_NOTIF_QUERY_RESULTS_MAX_SIZE)
-//
-//        if (size < maxSize) {
-//
-//        }
+//        JSONArray(relevantQueryResultRows.getJSONArray("datarows").getJSONArray(i).toList())
+
+        val pplQueryResultsToInclude: Map<String, Any>
+
+        // these are the full query results we got from the monitor's
+        // query execution
+        val pplQueryFullResults = triggerCtx.pplQueryResults
+
+        // make a deep copy of the original query results with only a single data row
+        // do this by serializing the full results into a string, then creating a new JSONObject from the string,
+        // then remove all but one row in the deep copy's datarows
+        val pplQueryResultsSingleRow = JSONObject(pplQueryFullResults.toString())
+        pplQueryResultsSingleRow.getJSONArray("datarows").apply {
+            for (i in length() - 1 downTo 1) {
+                remove(i)
+            }
+        }
+
+        // estimate byte size with string length
+        val size = pplQueryFullResults.toString().length
+        val oneRowSize = pplQueryResultsSingleRow.toString().length
+
+        logger.info("size: $size")
+        logger.info("oneRowSize: $oneRowSize")
+
+        // retrieve the size limit from cluster settings
+        val maxSize = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERT_V2_NOTIF_QUERY_RESULTS_MAX_SIZE)
+
+        var truncatedToSingleRow = false
+        var truncatedEntirely = false
+        if (size > maxSize && oneRowSize <= maxSize) {
+            triggerCtx.pplQueryResults = pplQueryResultsSingleRow
+            truncatedToSingleRow = true
+        } else if (size > maxSize && oneRowSize > maxSize) {
+            triggerCtx.pplQueryResults = JSONObject()
+            truncatedEntirely = true
+        }
 
         val notifSubject = if (action.subjectTemplate != null)
             MonitorRunnerService.compileTemplateV2(action.subjectTemplate!!, triggerCtx)
         else ""
-        // TODO: check query results size, truncate accordingly, and append to notifMessage before sending
-        // TODO: maybe remove actionOutput, p sure that was for storing action execution results, which we arent doing
-        val notifMessage = MonitorRunnerService.compileTemplateV2(action.messageTemplate, triggerCtx)
+
+        var notifMessage = MonitorRunnerService.compileTemplateV2(action.messageTemplate, triggerCtx)
         if (Strings.isNullOrEmpty(notifMessage)) {
             throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
         }
 
+        if (truncatedToSingleRow) {
+            notifMessage += "\n\n(Note from Alerting Plugin: the full query results were too large, " +
+                "only one query result row was passed into this notification)"
+        } else if (truncatedEntirely) {
+            notifMessage += "\n\n(Note from Alerting Plugin: the query results were too large, " +
+                "no query results were passed into this notification)"
+        }
+
         if (!dryrun) {
-            val client = monitorCtx.client
-//          actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
-//              action,
-//              monitorCtx,
-//              actionOutput[Action.SUBJECT],
-//              actionOutput[Action.MESSAGE]!!
-//          )
-            client!!.threadPool().threadContext.stashContext().use {
+            monitorCtx.client!!.threadPool().threadContext.stashContext().use {
                 withClosableContext(
                     InjectorContextElement(
                         pplMonitor.id,

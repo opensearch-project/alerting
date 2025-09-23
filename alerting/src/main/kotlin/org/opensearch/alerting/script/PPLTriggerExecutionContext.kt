@@ -13,7 +13,7 @@ data class PPLTriggerExecutionContext(
     override val periodEnd: Instant,
     override val error: Exception? = null,
     val pplTrigger: PPLTrigger,
-    val pplQueryResults: JSONObject // can be a full set of PPL query results, or an individual result row
+    var pplQueryResults: JSONObject // can be a full set of PPL query results, or an individual result row
 ) : TriggerV2ExecutionContext(monitorV2, periodStart, periodEnd, error) {
 
     override fun asTemplateArg(): Map<String, Any?> {
