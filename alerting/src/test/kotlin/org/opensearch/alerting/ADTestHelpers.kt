@@ -410,7 +410,9 @@ fun randomAnomalyResult(
             "roles" : [
               ${user.roles.joinToString { "\"${it}\"" }}
             ],
-            "custom_attributes" : ${user.customAttributes.entries.joinToString(prefix = "{", separator = ", ", postfix = "}") { "\"${it.key}\": \"${it.value}\"" }}
+            "custom_attribute_names" : [
+              ${user.customAttNames.joinToString { "\"${it}\"" }}
+            ]
           }
         }
     """.trimIndent()
