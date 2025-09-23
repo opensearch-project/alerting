@@ -64,10 +64,6 @@
                   "type" : "keyword"
                 }
               }
-            },
-            "custom_attributes": {
-              "type": "object",
-              "dynamic": "true"
             }
           }
         },
@@ -367,10 +363,6 @@
                   "type" : "keyword"
                 }
               }
-            },
-            "custom_attributes": {
-              "type": "object",
-              "dynamic": "true"
             }
           }
         },
@@ -507,10 +499,6 @@
                   "type" : "keyword"
                 }
               }
-            },
-            "custom_attributes": {
-              "type": "object",
-              "dynamic": "true"
             }
           }
         },
