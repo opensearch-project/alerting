@@ -4,7 +4,7 @@
     "required": true
   },
   "_meta" : {
-    "schema_version": 6
+    "schema_version": 5
   },
   "properties": {
     "schema_version": {
@@ -68,10 +68,6 @@
               "type" : "keyword"
             }
           }
-        },
-        "custom_attributes": {
-          "type": "object",
-          "dynamic": "true"
         }
       }
     },

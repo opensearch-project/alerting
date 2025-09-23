@@ -49,10 +49,6 @@
               "type" : "keyword"
             }
           }
-        },
-        "custom_attributes": {
-          "type": "object",
-          "dynamic": "true"
         }
       }
     }
