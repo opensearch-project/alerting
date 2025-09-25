@@ -34,6 +34,7 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 import java.time.Instant
+import org.opensearch.alerting.AlertingV2Utils.validateMonitorV2
 
 private val log = LogManager.getLogger(TransportExecuteMonitorV2Action::class.java)
 
@@ -66,7 +67,7 @@ class TransportExecuteMonitorV2Action @Inject constructor(
                     // get execution time interval
                     val (periodStart, periodEnd) = if (execMonitorV2Request.requestStart != null) {
                         Pair(
-                            Instant.ofEpochMilli(execMonitorV2Request.requestStart!!.millis),
+                            Instant.ofEpochMilli(execMonitorV2Request.requestStart.millis),
                             Instant.ofEpochMilli(execMonitorV2Request.requestEnd.millis)
                         )
                     } else {
@@ -81,13 +82,14 @@ class TransportExecuteMonitorV2Action @Inject constructor(
                         }
                         log.info(
                             "Executing MonitorV2 from API - id: ${monitorV2.id}, type: $monitorV2Type, " +
-                                "periodStart: $periodStart, periodEnd: $periodEnd, dryrun: ${execMonitorV2Request.dryrun}"
+                                "periodStart: $periodStart, periodEnd: $periodEnd, manual: ${execMonitorV2Request.manual}"
                         )
                         val monitorV2RunResult = runner.runJobV2(
                             monitorV2,
                             periodStart,
                             periodEnd,
                             execMonitorV2Request.dryrun,
+                            execMonitorV2Request.manual,
                             transportService
                         )
                         withContext(Dispatchers.IO) {
@@ -135,22 +137,15 @@ class TransportExecuteMonitorV2Action @Inject constructor(
                                     xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                                     getMonitorV2Response.sourceAsBytesRef, XContentType.JSON
                                 ).use { xcp ->
+                                    val scheduledJob = ScheduledJob.parse(xcp, getMonitorV2Response.id, getMonitorV2Response.version)
+                                    validateMonitorV2(scheduledJob)?.let {
+                                        actionListener.onFailure(AlertingException.wrap(it))
+                                        return
+                                    }
+                                    val monitorV2 = scheduledJob as MonitorV2
+                                    executeMonitorV2(monitorV2)
                                     try {
-                                        val monitorV2 = ScheduledJob.parse(
-                                            xcp,
-                                            getMonitorV2Response.id,
-                                            getMonitorV2Response.version
-                                        ) as MonitorV2
                                         executeMonitorV2(monitorV2)
-                                    } catch (e: ClassCastException) {
-                                        actionListener.onFailure(
-                                            AlertingException.wrap(
-                                                IllegalArgumentException(
-                                                    "Passed in Monitor ID is a legacy Alerting Monitor, please pass in an " +
-                                                        "Alerting V2 Monitor"
-                                                )
-                                            )
-                                        )
                                     } catch (e: Exception) {
                                         actionListener.onFailure(AlertingException.wrap(e))
                                     }

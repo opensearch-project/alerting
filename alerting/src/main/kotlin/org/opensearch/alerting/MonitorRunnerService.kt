@@ -445,6 +445,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                         )
                         val executeMonitorV2Request = ExecuteMonitorV2Request(
                             false,
+                            false,
                             job.id, // only need to pass in MonitorV2 ID
                             null, // no need to pass in MonitorV2 object itself
                             TimeValue(periodStart.toEpochMilli()),
@@ -460,7 +461,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                     } catch (e: Exception) {
                         logger.error("MonitorV2 run failed for monitor with id ${job.id}", e)
                     } finally {
-                        monitorCtx.client!!.suspendUntil<Client, Boolean> { monitorCtx.lockService!!.release(monitorLock, it) }
+                        monitorCtx.client!!.suspendUntil { monitorCtx.lockService!!.release(monitorLock, it) }
                         logger.debug("lock ${monitorLock?.lockId} released")
                     }
                 }
@@ -591,6 +592,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         periodStart: Instant,
         periodEnd: Instant,
         dryrun: Boolean,
+        manual: Boolean,
         transportService: TransportService,
     ): MonitorV2RunResult<*> {
         updateAlertingConfigIndexSchema()
@@ -603,7 +605,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
         logger.info(
             "Executing scheduled monitor - id: ${monitorV2.id}, type: $monitorV2Type, periodStart: $periodStart, " +
-                "periodEnd: $periodEnd, dryrun: $dryrun, executionId: $executionId"
+                "periodEnd: $periodEnd, dryrun: $dryrun, manual: $manual, executionId: $executionId"
         )
 
         // for now, always call PPLMonitorRunner since only PPL Monitors are initially supported
@@ -615,6 +617,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             periodStart,
             periodEnd,
             dryrun,
+            manual,
             executionId = executionId,
             transportService = transportService,
         )

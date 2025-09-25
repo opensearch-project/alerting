@@ -12,6 +12,7 @@ interface MonitorV2Runner {
         periodStart: Instant,
         periodEnd: Instant,
         dryRun: Boolean,
+        manual: Boolean,
         executionId: String,
         transportService: TransportService
     ): MonitorV2RunResult<*>

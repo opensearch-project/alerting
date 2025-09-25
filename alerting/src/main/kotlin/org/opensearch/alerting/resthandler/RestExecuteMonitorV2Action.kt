@@ -45,7 +45,7 @@ class RestExecuteMonitorV2Action : BaseRestHandler() {
 
             if (request.hasParam("monitorV2Id")) {
                 val monitorV2Id = request.param("monitorV2Id")
-                val execMonitorV2Request = ExecuteMonitorV2Request(dryrun, monitorV2Id, null, null, requestEnd)
+                val execMonitorV2Request = ExecuteMonitorV2Request(dryrun, true, monitorV2Id, null, null, requestEnd)
                 client.execute(ExecuteMonitorV2Action.INSTANCE, execMonitorV2Request, RestToXContentListener(channel))
             } else {
                 val xcp = request.contentParser()
@@ -58,7 +58,7 @@ class RestExecuteMonitorV2Action : BaseRestHandler() {
                     throw AlertingException.wrap(e)
                 }
 
-                val execMonitorV2Request = ExecuteMonitorV2Request(dryrun, null, monitorV2, null, requestEnd)
+                val execMonitorV2Request = ExecuteMonitorV2Request(dryrun, true, null, monitorV2, null, requestEnd)
                 client.execute(ExecuteMonitorV2Action.INSTANCE, execMonitorV2Request, RestToXContentListener(channel))
             }
         }

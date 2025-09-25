@@ -11,6 +11,7 @@ import java.io.IOException
 
 class ExecuteMonitorV2Request : ActionRequest {
     val dryrun: Boolean
+    val manual: Boolean
     val monitorId: String? // exactly one of monitorId or monitor must be non-null
     val monitorV2: MonitorV2?
     val requestStart: TimeValue?
@@ -18,12 +19,14 @@ class ExecuteMonitorV2Request : ActionRequest {
 
     constructor(
         dryrun: Boolean,
+        manual: Boolean, // if execute was called by user or by scheduled job
         monitorId: String?,
         monitorV2: MonitorV2?,
         requestStart: TimeValue? = null,
         requestEnd: TimeValue
     ) : super() {
         this.dryrun = dryrun
+        this.manual = manual
         this.monitorId = monitorId
         this.monitorV2 = monitorV2
         this.requestStart = requestStart
@@ -33,6 +36,7 @@ class ExecuteMonitorV2Request : ActionRequest {
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
         sin.readBoolean(), // dryrun
+        sin.readBoolean(), // manual
         sin.readOptionalString(), // monitorId
         if (sin.readBoolean()) {
             MonitorV2.readFrom(sin) // monitor
@@ -53,6 +57,7 @@ class ExecuteMonitorV2Request : ActionRequest {
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {
         out.writeBoolean(dryrun)
+        out.writeBoolean(manual)
         out.writeOptionalString(monitorId)
         if (monitorV2 != null) {
             out.writeBoolean(true)

@@ -61,6 +61,7 @@ object PPLMonitorRunner : MonitorV2Runner {
         periodStart: Instant,
         periodEnd: Instant,
         dryRun: Boolean,
+        manual: Boolean,
         executionId: String,
         transportService: TransportService,
     ): MonitorV2RunResult<*> {
@@ -111,7 +112,7 @@ object PPLMonitorRunner : MonitorV2Runner {
             try {
                 // check for suppression and skip execution
                 // before even running the trigger itself
-                val suppressed = checkForSuppress(pplTrigger, timeOfCurrentExecution)
+                val suppressed = checkForSuppress(pplTrigger, timeOfCurrentExecution, manual)
                 if (suppressed) {
                     logger.info("suppressing trigger ${pplTrigger.name} from monitor ${pplMonitor.name}")
 
@@ -244,7 +245,13 @@ object PPLMonitorRunner : MonitorV2Runner {
         )
     }
 
-    private fun checkForSuppress(pplTrigger: PPLTrigger, timeOfCurrentExecution: Instant): Boolean {
+    // returns true if the pplTrigger should be suppressed
+    private fun checkForSuppress(pplTrigger: PPLTrigger, timeOfCurrentExecution: Instant, manual: Boolean): Boolean {
+        // manual calls from the user to execute a monitor should never be suppressed
+        if (manual) {
+            return false
+        }
+
         // the interval between throttledTimeBound and now is the suppression window
         // i.e. any PPLTrigger whose last trigger time is in this window must be suppressed
         val suppressTimeBound = pplTrigger.suppressDuration?.let {
