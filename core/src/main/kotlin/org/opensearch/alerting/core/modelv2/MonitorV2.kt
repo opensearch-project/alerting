@@ -26,7 +26,7 @@ interface MonitorV2 : ScheduledJob {
     val user: User?
     val triggers: List<TriggerV2>
     val schemaVersion: Int // for updating monitors
-    val lookBackWindow: TimeValue? // how far back to look when querying data during monitor execution
+    val lookBackWindow: TimeValue // how far back to look when querying data during monitor execution
 
     fun asTemplateArg(): Map<String, Any?>
 

@@ -57,7 +57,7 @@ data class PPLMonitor(
     override val name: String,
     override val enabled: Boolean,
     override val schedule: Schedule,
-    override val lookBackWindow: TimeValue? = null,
+    override val lookBackWindow: TimeValue,
     override val lastUpdateTime: Instant,
     override val enabledTime: Instant?,
     override val user: User?,
@@ -316,6 +316,9 @@ data class PPLMonitor(
                 }
             }
 
+            // if no lookback window was given, set a default one
+            lookBackWindow = lookBackWindow ?: TimeValue.timeValueHours(1L)
+
             // if enabled, set time of MonitorV2 creation/update is set as enable time
             if (enabled && enabledTime == null) {
                 enabledTime = Instant.now()
@@ -330,6 +333,7 @@ data class PPLMonitor(
             requireNotNull(schedule) { "Schedule is null" }
             requireNotNull(query) { "Query is null" }
             requireNotNull(lastUpdateTime) { "Last update time is null" }
+            requireNotNull(lookBackWindow) { "Look back window is null" }
 
             if (queryLanguage == QueryLanguage.SQL) {
                 throw IllegalArgumentException("SQL queries are not supported. Please use a PPL query.")

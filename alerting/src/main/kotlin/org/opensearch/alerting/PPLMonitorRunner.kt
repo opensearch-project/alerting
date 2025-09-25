@@ -104,6 +104,7 @@ object PPLMonitorRunner : MonitorV2Runner {
         // then inject a time filter where statement into PPL Monitor query.
         // if the given monitor query already has any time check whatsoever, this
         // simply returns the original query itself
+        // TODO: get lookback window based start time and put that in execution results instead of periodStart
         val timeFilteredQuery = addTimeFilter(pplMonitor.query, periodStart, periodEnd, pplMonitor.lookBackWindow)
         logger.info("time filtered query: $timeFilteredQuery")
 
@@ -269,12 +270,13 @@ object PPLMonitorRunner : MonitorV2Runner {
     // periodStart: the lower bound of the initially computed query interval based on monitor schedule
     // periodEnd: the upper bound of the initially computed query interval based on monitor schedule
     // lookBackWindow: customer's desired query look back window, overrides [periodStart, periodEnd] if not null
-    private fun addTimeFilter(query: String, periodStart: Instant, periodEnd: Instant, lookBackWindow: TimeValue?): String {
+    private fun addTimeFilter(query: String, periodStart: Instant, periodEnd: Instant, lookBackWindow: TimeValue): String {
         // inject time filter into PPL query to only query for data within the (periodStart, periodEnd) interval
         // TODO: if query contains "_time", "span", "earliest", "latest", skip adding filter
         // pending https://github.com/opensearch-project/sql/issues/3969
         // for now assume TIMESTAMP_FIELD field is always present in customer data
 
+        // TODO: delete this, add lookback window time filter always
         // if the raw query contained any time check whatsoever, skip adding a time filter internally
         // and return query as is, customer's in-query time checks instantly and automatically overrides
         if (query.contains(TIMESTAMP_FIELD)) { // TODO: replace with PPL time keyword checks after that's GA
@@ -282,9 +284,7 @@ object PPLMonitorRunner : MonitorV2Runner {
         }
 
         // if customer passed in a look back window, override the precomputed interval with it
-        val updatedPeriodStart = lookBackWindow?.let { window ->
-            periodEnd.minus(window.millis, ChronoUnit.MILLIS)
-        } ?: periodStart
+        val updatedPeriodStart = periodEnd.minus(lookBackWindow.millis, ChronoUnit.MILLIS)
 
         // PPL plugin only accepts timestamp strings in this format
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(UTC)

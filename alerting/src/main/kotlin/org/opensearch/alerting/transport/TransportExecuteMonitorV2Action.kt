@@ -9,6 +9,7 @@ import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.AlertingV2Utils.validateMonitorV2
 import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.actionv2.ExecuteMonitorV2Action
 import org.opensearch.alerting.actionv2.ExecuteMonitorV2Request
@@ -34,7 +35,6 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 import java.time.Instant
-import org.opensearch.alerting.AlertingV2Utils.validateMonitorV2
 
 private val log = LogManager.getLogger(TransportExecuteMonitorV2Action::class.java)
 
@@ -143,7 +143,6 @@ class TransportExecuteMonitorV2Action @Inject constructor(
                                         return
                                     }
                                     val monitorV2 = scheduledJob as MonitorV2
-                                    executeMonitorV2(monitorV2)
                                     try {
                                         executeMonitorV2(monitorV2)
                                     } catch (e: Exception) {
