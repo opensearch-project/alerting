@@ -330,5 +330,12 @@ class AlertingSettings {
             0L,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+
+        val ALERT_V2_PER_RESULT_TRIGGER_MAX_ALERTS = Setting.intSetting(
+            "plugins.alerting_v2.per_result_trigger_max_alerts",
+            10,
+            1,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
     }
 }

@@ -89,7 +89,6 @@ object PPLMonitorRunner : MonitorV2Runner {
         // use threadpool time for cross node consistency
         val timeOfCurrentExecution = Instant.ofEpochMilli(MonitorRunnerService.monitorCtx.threadPool!!.absoluteTimeInMillis())
 
-        // TODO: put alertV2s in their own index
         try {
             monitorCtx.alertV2Indices!!.createOrUpdateAlertV2Index()
             monitorCtx.alertV2Indices!!.createOrUpdateInitialAlertV2HistoryIndex()
@@ -168,7 +167,8 @@ object PPLMonitorRunner : MonitorV2Runner {
                 if (triggered) {
                     // if trigger is on result set mode, this list will have exactly 1 element
                     // if trigger is on per result mode, this list will have as many elements as the query results had rows
-                    val preparedQueryResults = prepareQueryResults(relevantQueryResultRows, pplTrigger.mode)
+                    // up to the max number of alerts a per result trigger can generate
+                    val preparedQueryResults = prepareQueryResults(relevantQueryResultRows, pplTrigger.mode, monitorCtx)
 
                     // generate alerts based on trigger mode
                     // if this trigger is on result_set mode, this list contains exactly 1 alert
@@ -383,22 +383,41 @@ object PPLMonitorRunner : MonitorV2Runner {
     // prepares the query results to be passed into alerts and notifications based on trigger mode
     // if result set, alert and notification simply stores all query results
     // if per result, each alert and notification stores a single row of the query results
-    private fun prepareQueryResults(relevantQueryResultRows: JSONObject, triggerMode: TriggerMode): List<JSONObject> {
+    private fun prepareQueryResults(
+        relevantQueryResultRows: JSONObject,
+        triggerMode: TriggerMode,
+        monitorCtx: MonitorRunnerExecutionContext
+    ): List<JSONObject> {
         // case: result set
+        // return the results as a single set of all the results
         if (triggerMode == TriggerMode.RESULT_SET) {
             return listOf(relevantQueryResultRows)
         }
 
         // case: per result
+        // prepare to generate an alert for each query result row
         val individualRows = mutableListOf<JSONObject>()
         val numAlertsToGenerate = relevantQueryResultRows.getInt("total")
         for (i in 0 until numAlertsToGenerate) {
             val individualRow = JSONObject()
             individualRow.put("schema", JSONArray(relevantQueryResultRows.getJSONArray("schema").toList()))
-            individualRow.put("datarows", JSONArray(relevantQueryResultRows.getJSONArray("datarows").getJSONArray(i).toList()))
+            individualRow.put(
+                "datarows",
+                JSONArray().put(
+                    JSONArray(relevantQueryResultRows.getJSONArray("datarows").getJSONArray(i).toList())
+                )
+            )
             individualRows.add(individualRow)
         }
-        return individualRows
+
+        logger.info("individualRows: $individualRows")
+
+        // there may be many query result rows, and generating an alert for each of them could lead to cluster issues,
+        // so limit the number of per_result alerts that are generated
+        val maxAlerts = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERT_V2_PER_RESULT_TRIGGER_MAX_ALERTS)
+        val reducedIndividualRows = individualRows.take(maxAlerts)
+
+        return reducedIndividualRows
     }
 
     private fun generateAlerts(
@@ -428,10 +447,7 @@ object PPLMonitorRunner : MonitorV2Runner {
             alertV2s.add(alertV2)
         }
 
-        // TODO: this is a magic number right now, make it a setting
-        val alertsLimit = 10
-
-        return alertV2s.take(alertsLimit).toList() // return as immutable list
+        return alertV2s.toList() // return as immutable list
     }
 
     private fun generateErrorAlert(
@@ -532,8 +548,6 @@ object PPLMonitorRunner : MonitorV2Runner {
 
 //        JSONArray(relevantQueryResultRows.getJSONArray("datarows").getJSONArray(i).toList())
 
-        val pplQueryResultsToInclude: Map<String, Any>
-
         // these are the full query results we got from the monitor's
         // query execution
         val pplQueryFullResults = triggerCtx.pplQueryResults
@@ -552,8 +566,8 @@ object PPLMonitorRunner : MonitorV2Runner {
         val size = pplQueryFullResults.toString().length
         val oneRowSize = pplQueryResultsSingleRow.toString().length
 
-        logger.info("size: $size")
-        logger.info("oneRowSize: $oneRowSize")
+        logger.info("pplQueryFullResults: $pplQueryFullResults")
+        logger.info("pplQueryResultsSingleRow: $pplQueryResultsSingleRow")
 
         // retrieve the size limit from cluster settings
         val maxSize = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERT_V2_NOTIF_QUERY_RESULTS_MAX_SIZE)
