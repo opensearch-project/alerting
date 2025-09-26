@@ -133,7 +133,17 @@ object PPLMonitorRunner : MonitorV2Runner {
                 }
 
                 // execute the PPL query
-                val queryResponseJson = executePplQuery(queryToExecute, nodeClient)
+                val queryResponseJson = withClosableContext(
+                    InjectorContextElement(
+                        pplMonitor.id,
+                        monitorCtx.settings!!,
+                        monitorCtx.threadPool!!.threadContext,
+                        pplMonitor.user?.roles,
+                        pplMonitor.user
+                    )
+                ) {
+                    executePplQuery(queryToExecute, nodeClient)
+                }
                 logger.info("query execution results for trigger ${pplTrigger.name}: $queryResponseJson")
 
                 // retrieve deep copies of only the relevant query response rows.
@@ -548,9 +558,6 @@ object PPLMonitorRunner : MonitorV2Runner {
     ) {
         // this function can throw an exception, which is caught by the try
         // catch in runMonitor() to generate an error alert
-//        val actionOutput = mutableMapOf<String, String>()
-
-//        JSONArray(relevantQueryResultRows.getJSONArray("datarows").getJSONArray(i).toList())
 
         // these are the full query results we got from the monitor's
         // query execution
