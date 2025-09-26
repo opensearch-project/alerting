@@ -83,6 +83,7 @@ import org.opensearch.transport.client.Client
 import java.util.Locale
 import java.util.UUID
 import java.util.stream.Collectors
+import org.opensearch.alerting.AlertingV2Utils.validateMonitorV1
 
 private val log = LogManager.getLogger(TransportIndexWorkflowAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
@@ -442,7 +443,12 @@ class TransportIndexWorkflowAction @Inject constructor(
                     xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                     getResponse.sourceAsBytesRef, XContentType.JSON
                 )
-                val workflow = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Workflow
+                val scheduledJob = ScheduledJob.parse(xcp, getResponse.id, getResponse.version)
+                validateMonitorV1(scheduledJob)?.let {
+                    actionListener.onFailure(AlertingException.wrap(it))
+                    return
+                }
+                val workflow = scheduledJob as Workflow
                 onGetResponse(workflow)
             } catch (t: Exception) {
                 actionListener.onFailure(AlertingException.wrap(t))
@@ -454,7 +460,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                     user,
                     currentWorkflow.user,
                     actionListener,
-                    "workfklow",
+                    "workflow",
                     request.workflowId
                 )
             ) {
@@ -715,7 +721,11 @@ class TransportIndexWorkflowAction @Inject constructor(
                 xContentRegistry,
                 LoggingDeprecationHandler.INSTANCE, hit.sourceAsString
             ).use { hitsParser ->
-                val monitor = ScheduledJob.parse(hitsParser, hit.id, hit.version) as Monitor
+                val scheduledJob = ScheduledJob.parse(hitsParser, hit.id, hit.version)
+                validateMonitorV1(scheduledJob)?.let {
+                    throw OpenSearchException(it)
+                }
+                val monitor = scheduledJob as Monitor
                 monitors.add(monitor)
             }
         }

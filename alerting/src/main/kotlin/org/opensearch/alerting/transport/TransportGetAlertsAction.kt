@@ -51,6 +51,7 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 import java.io.IOException
+import org.opensearch.alerting.AlertingV2Utils.validateMonitorV1
 
 private val log = LogManager.getLogger(TransportGetAlertsAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
@@ -211,7 +212,11 @@ class TransportGetAlertsAction @Inject constructor(
                 xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                 getResponse.sourceAsBytesRef, XContentType.JSON
             )
-            return ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
+            val scheduledJob = ScheduledJob.parse(xcp, getResponse.id, getResponse.version)
+            validateMonitorV1(scheduledJob)?.let {
+                throw it
+            }
+            return scheduledJob as Monitor
         } catch (t: Exception) {
             log.error("Failure in fetching monitor ${getAlertsRequest.monitorId} to resolve alert index in get alerts action", t)
             return null

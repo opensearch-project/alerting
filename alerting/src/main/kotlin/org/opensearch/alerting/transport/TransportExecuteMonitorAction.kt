@@ -44,6 +44,7 @@ import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 import java.time.Instant
 import java.util.Locale
+import org.opensearch.alerting.AlertingV2Utils.validateMonitorV1
 
 private val log = LogManager.getLogger(TransportExecuteMonitorAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
@@ -119,7 +120,12 @@ class TransportExecuteMonitorAction @Inject constructor(
                                     xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                                     response.sourceAsBytesRef, XContentType.JSON
                                 ).use { xcp ->
-                                    val monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
+                                    val scheduledJob = ScheduledJob.parse(xcp, response.id, response.version)
+                                    validateMonitorV1(scheduledJob)?.let {
+                                        actionListener.onFailure(AlertingException.wrap(it))
+                                        return
+                                    }
+                                    val monitor = scheduledJob as Monitor
                                     executeMonitor(monitor)
                                 }
                             }

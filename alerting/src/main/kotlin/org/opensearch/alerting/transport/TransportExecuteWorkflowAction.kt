@@ -35,6 +35,7 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 import java.time.Instant
+import org.opensearch.alerting.AlertingV2Utils.validateMonitorV1
 
 private val log = LogManager.getLogger(TransportExecuteWorkflowAction::class.java)
 
@@ -119,7 +120,12 @@ class TransportExecuteWorkflowAction @Inject constructor(
                                     xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                                     response.sourceAsBytesRef, XContentType.JSON
                                 ).use { xcp ->
-                                    val workflow = ScheduledJob.parse(xcp, response.id, response.version) as Workflow
+                                    val scheduledJob = ScheduledJob.parse(xcp, response.id, response.version)
+                                    validateMonitorV1(scheduledJob)?.let {
+                                        actionListener.onFailure(AlertingException.wrap(it))
+                                        return
+                                    }
+                                    val workflow = scheduledJob as Workflow
                                     executeWorkflow(workflow)
                                 }
                             }
