@@ -190,6 +190,9 @@ data class PPLTrigger(
         const val NUM_RESULTS_VALUE_FIELD = "num_results_value"
         const val CUSTOM_CONDITION_FIELD = "custom_condition"
 
+        // default fallback values of fields if none are passed in
+        val DEFAULT_EXPIRE_DURATION = TimeValue.timeValueDays(7)
+
         // mock setting name used when parsing TimeValue
         // TimeValue class is usually reserved for declaring settings, but we're using it
         // outside that use case here, which is why we need these placeholders
@@ -209,8 +212,7 @@ data class PPLTrigger(
             var name: String? = null
             var severity: Severity? = null
             var suppressDuration: TimeValue? = null
-            var expireDuration: TimeValue =
-                TimeValue.timeValueDays(7) // default to 7 days // TODO: add this as a setting
+            var expireDuration: TimeValue = DEFAULT_EXPIRE_DURATION
             var lastTriggeredTime: Instant? = null
             val actions: MutableList<Action> = mutableListOf()
             var mode: TriggerMode? = null

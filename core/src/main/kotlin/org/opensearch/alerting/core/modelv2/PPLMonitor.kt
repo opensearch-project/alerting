@@ -15,6 +15,7 @@ import org.opensearch.alerting.core.util.nonOptionalTimeField
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.CronSchedule
 import org.opensearch.commons.alerting.model.Schedule
+import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.alerting.util.IndexUtils
 import org.opensearch.commons.alerting.util.instant
 import org.opensearch.commons.alerting.util.optionalTimeField
@@ -28,6 +29,7 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import java.io.IOException
 import java.time.Instant
+import java.util.concurrent.TimeUnit
 
 // TODO: probably change this to be called PPLSQLMonitor. A PPL Monitor and SQL Monitor
 // would have the exact same functionality, except the choice of language
@@ -228,6 +230,9 @@ data class PPLMonitor(
         const val QUERY_LANGUAGE_FIELD = "query_language"
         const val QUERY_FIELD = "query"
 
+        // default fallback values of fields if none are passed in
+        val DEFAULT_LOOK_BACK_WINDOW = TimeValue(1L, TimeUnit.HOURS)
+
         // mock setting name used when parsing TimeValue
         // TimeValue class is usually reserved for declaring settings, but we're using it
         // outside that use case here, which is why we need these placeholders
@@ -240,7 +245,7 @@ data class PPLMonitor(
             var name: String? = null
             var enabled = true
             var schedule: Schedule? = null
-            var lookBackWindow: TimeValue? = null // TODO: default value
+            var lookBackWindow = DEFAULT_LOOK_BACK_WINDOW
             var lastUpdateTime: Instant? = null
             var enabledTime: Instant? = null
             var user: User? = null
@@ -260,12 +265,15 @@ data class PPLMonitor(
                     ENABLED_FIELD -> enabled = xcp.booleanValue()
                     SCHEDULE_FIELD -> schedule = Schedule.parse(xcp)
                     LOOK_BACK_WINDOW_FIELD -> {
-                        lookBackWindow = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) {
-                            null
-                        } else {
+                        if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
                             val input = xcp.text()
-                            // throws IllegalArgumentException if there's parsing error
-                            TimeValue.parseTimeValue(input, PLACEHOLDER_LOOK_BACK_WINDOW_SETTING_NAME)
+                            try {
+                                lookBackWindow = TimeValue.parseTimeValue(input, PLACEHOLDER_LOOK_BACK_WINDOW_SETTING_NAME)
+                            } catch (e: Exception) {
+                                throw AlertingException.wrap(
+                                    IllegalArgumentException("Invalid value for field $LOOK_BACK_WINDOW_FIELD", e)
+                                )
+                            }
                         }
                     }
                     LAST_UPDATE_TIME_FIELD -> lastUpdateTime = xcp.instant()
@@ -285,9 +293,11 @@ data class PPLMonitor(
                     QUERY_LANGUAGE_FIELD -> {
                         val input = xcp.text()
                         val enumMatchResult = QueryLanguage.enumFromString(input)
-                            ?: throw IllegalArgumentException(
-                                "Invalid value for $QUERY_LANGUAGE_FIELD: $input. " +
-                                    "Supported values are ${QueryLanguage.entries.map { it.value }}"
+                            ?: throw AlertingException.wrap(
+                                IllegalArgumentException(
+                                    "Invalid value for $QUERY_LANGUAGE_FIELD: $input. " +
+                                        "Supported values are ${QueryLanguage.entries.map { it.value }}"
+                                )
                             )
                         queryLanguage = enumMatchResult
                     }
@@ -303,22 +313,6 @@ data class PPLMonitor(
                 throw IllegalArgumentException("Monitor must include at least 1 trigger")
             }
 
-            // ensure the trigger suppress durations are valid
-            triggers.forEach { trigger ->
-                trigger.suppressDuration?.let { suppressDuration ->
-                    // TODO: these max and min values are completely arbitrary, make them settings
-                    val minValue = TimeValue.timeValueMinutes(1)
-                    val maxValue = TimeValue.timeValueDays(5)
-
-                    require(suppressDuration <= maxValue) { "Suppress duration must be at most $maxValue but was $suppressDuration" }
-
-                    require(suppressDuration >= minValue) { "Suppress duration must be at least $minValue but was $suppressDuration" }
-                }
-            }
-
-            // if no lookback window was given, set a default one
-            lookBackWindow = lookBackWindow ?: TimeValue.timeValueHours(1L)
-
             // if enabled, set time of MonitorV2 creation/update is set as enable time
             if (enabled && enabledTime == null) {
                 enabledTime = Instant.now()
@@ -333,7 +327,6 @@ data class PPLMonitor(
             requireNotNull(schedule) { "Schedule is null" }
             requireNotNull(query) { "Query is null" }
             requireNotNull(lastUpdateTime) { "Last update time is null" }
-            requireNotNull(lookBackWindow) { "Look back window is null" }
 
             if (queryLanguage == QueryLanguage.SQL) {
                 throw IllegalArgumentException("SQL queries are not supported. Please use a PPL query.")

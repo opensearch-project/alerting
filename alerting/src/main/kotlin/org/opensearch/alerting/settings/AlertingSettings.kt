@@ -324,6 +324,30 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        val ALERTING_V2_MAX_MONITORS = Setting.intSetting(
+            "plugins.alerting_v2.monitor.max_monitors",
+            1000,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val ALERTING_V2_MIN_SUPPRESSION_DURATION = Setting.positiveTimeSetting(
+            "plugins.alerting_v2.monitor.min_suppression_duration",
+            TimeValue(1, TimeUnit.MINUTES),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val ALERTING_V2_MAX_SUPPRESSION_DURATION = Setting.positiveTimeSetting(
+            "plugins.alerting_v2.monitor.max_suppression_duration",
+            TimeValue(5, TimeUnit.DAYS),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val ALERTING_V2_MAX_QUERY_LENGTH = Setting.longSetting(
+            "plugins.alerting_v2.monitor.max_query_length",
+            2000L,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
         val ALERT_V2_NOTIF_QUERY_RESULTS_MAX_SIZE = Setting.longSetting(
             "plugins.alerting_v2.notif_query_results_max_size",
             3000L,

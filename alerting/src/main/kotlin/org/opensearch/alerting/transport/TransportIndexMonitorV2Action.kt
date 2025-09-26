@@ -37,7 +37,10 @@ import org.opensearch.alerting.core.modelv2.PPLMonitor
 import org.opensearch.alerting.core.modelv2.PPLTrigger.ConditionType
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_MONITORS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_QUERY_LENGTH
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_SUPPRESSION_DURATION
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MIN_SUPPRESSION_DURATION
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.util.IndexUtils
@@ -85,14 +88,19 @@ class TransportIndexMonitorV2Action @Inject constructor(
 ),
     SecureTransportAction {
 
-    // TODO: add monitor v2 versions of these settings
-    @Volatile private var maxMonitors = ALERTING_MAX_MONITORS.get(settings)
+    @Volatile private var maxMonitors = ALERTING_V2_MAX_MONITORS.get(settings)
+    @Volatile private var minSuppressDuration = ALERTING_V2_MIN_SUPPRESSION_DURATION.get(settings)
+    @Volatile private var maxSuppressDuration = ALERTING_V2_MAX_SUPPRESSION_DURATION.get(settings)
+    @Volatile private var maxQueryLength = ALERTING_V2_MAX_QUERY_LENGTH.get(settings)
     @Volatile private var requestTimeout = REQUEST_TIMEOUT.get(settings)
     @Volatile private var indexTimeout = INDEX_TIMEOUT.get(settings)
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_MAX_MONITORS) { maxMonitors = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_MONITORS) { maxMonitors = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MIN_SUPPRESSION_DURATION) { minSuppressDuration = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_SUPPRESSION_DURATION) { maxSuppressDuration = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_QUERY_LENGTH) { maxQueryLength = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(REQUEST_TIMEOUT) { requestTimeout = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(INDEX_TIMEOUT) { indexTimeout = it }
         listenFilterBySettingChange(clusterService)
@@ -583,7 +591,11 @@ class TransportIndexMonitorV2Action @Inject constructor(
         user: User?
     ) {
         var monitorV2 = when (indexMonitorRequest.monitorV2) {
-            is PPLMonitor -> indexMonitorRequest.monitorV2 as PPLMonitor
+            is PPLMonitor -> {
+                val pplMonitor = indexMonitorRequest.monitorV2 as PPLMonitor
+                validatePplMonitor(pplMonitor)
+                pplMonitor
+            }
             else -> throw IllegalArgumentException("received unsupported monitor type to index: ${indexMonitorRequest.monitorV2.javaClass}")
         }
 
@@ -657,5 +669,24 @@ class TransportIndexMonitorV2Action @Inject constructor(
             )
 
         return indices
+    }
+
+    private fun validatePplMonitor(pplMonitor: PPLMonitor) {
+        // ensure the trigger suppress durations are valid
+        pplMonitor.triggers.forEach { trigger ->
+            trigger.suppressDuration?.let { suppressDuration ->
+                require(suppressDuration <= maxSuppressDuration) {
+                    "Suppress duration must be at most $maxSuppressDuration but was $suppressDuration"
+                }
+                require(suppressDuration >= minSuppressDuration) {
+                    "Suppress duration must be at least $minSuppressDuration but was $suppressDuration"
+                }
+            }
+        }
+
+        // ensure the query length doesn't exceed the limit
+        require(pplMonitor.query.length <= maxQueryLength) {
+            "PPL Query length must be at most $maxQueryLength but was ${pplMonitor.query.length}"
+        }
     }
 }

@@ -16,6 +16,7 @@ import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.AlertingV2Utils.validateMonitorV1
 import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.action.ExecuteMonitorAction
@@ -44,7 +45,6 @@ import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 import java.time.Instant
 import java.util.Locale
-import org.opensearch.alerting.AlertingV2Utils.validateMonitorV1
 
 private val log = LogManager.getLogger(TransportExecuteMonitorAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
