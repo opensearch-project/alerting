@@ -661,11 +661,16 @@ object PPLMonitorRunner : MonitorV2Runner {
         // the PPL keyword "eval", followed by a whitespace must be present, otherwise a syntax error from PPL plugin would've
         // been thrown when executing the query (without the whitespace, the query would've had something like "evalresult",
         // which is invalid PPL
-        val startOfEvalStatement = "eval "
+        val regex = """\beval\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=""".toRegex()
+        val evalResultVar = regex.find(customCondition)?.groupValues?.get(1)
+            ?: throw IllegalArgumentException("Given custom condition is invalid, could not find eval result variable")
+        return evalResultVar
 
-        val startIdx = customCondition.indexOf(startOfEvalStatement) + startOfEvalStatement.length
-        val endIdx = startIdx + customCondition.substring(startIdx).indexOfFirst { it == ' ' || it == '=' }
-        return customCondition.substring(startIdx, endIdx)
+//        val startOfEvalStatement = "eval "
+//
+//        val startIdx = customCondition.indexOf(startOfEvalStatement) + startOfEvalStatement.length
+//        val endIdx = startIdx + customCondition.substring(startIdx).indexOfFirst { it == ' ' || it == '=' }
+//        return customCondition.substring(startIdx, endIdx)
     }
 
     fun findEvalResultVarIdxInSchema(customConditionQueryResponse: JSONObject, evalResultVarName: String): Int {
