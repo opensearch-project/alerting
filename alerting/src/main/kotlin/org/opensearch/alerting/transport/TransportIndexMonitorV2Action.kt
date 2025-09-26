@@ -3,10 +3,11 @@ package org.opensearch.alerting.transport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.newSingleThreadContext
+import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
 import org.opensearch.OpenSearchException
-import org.opensearch.OpenSearchSecurityException
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.ResourceAlreadyExistsException
 import org.opensearch.action.admin.cluster.health.ClusterHealthAction
@@ -108,11 +109,27 @@ class TransportIndexMonitorV2Action @Inject constructor(
 
         // validate the MonitorV2 based on its type
         when (indexMonitorV2Request.monitorV2) {
-            is PPLMonitor -> validateMonitorPplQuery(
-                indexMonitorV2Request.monitorV2 as PPLMonitor,
+            is PPLMonitor -> validateUserPermissionsAndMonitorPplQuery(
+                indexMonitorV2Request,
+                user,
                 object : ActionListener<Unit> { // validationListener
                     override fun onResponse(response: Unit) {
-                        checkUserAndIndicesAccess(client, actionListener, indexMonitorV2Request, user)
+                        // user permissions to indices have already been checked
+                        // proceed without the context of the user, otherwise,
+                        // we would get permissions errors trying to search the alerting-config
+                        // index as the user. pass the user object itself so backend
+                        // roles can be matched and checked downstream
+                        client.threadPool().threadContext.stashContext().use {
+                            val pplMonitor = indexMonitorV2Request.monitorV2 as PPLMonitor
+                            if (user == null) {
+                                indexMonitorV2Request.monitorV2 = pplMonitor
+                                    .copy(user = User("", listOf(), listOf(), listOf()))
+                            } else {
+                                indexMonitorV2Request.monitorV2 = pplMonitor
+                                    .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttNames))
+                            }
+                            checkScheduledJobIndex(indexMonitorV2Request, actionListener, user)
+                        }
                     }
 
                     override fun onFailure(e: Exception) {
@@ -130,67 +147,81 @@ class TransportIndexMonitorV2Action @Inject constructor(
         }
     }
 
-    // validates the PPL Monitor query by submitting it to SQL/PPL plugin
-    private fun validateMonitorPplQuery(pplMonitor: PPLMonitor, validationListener: ActionListener<Unit>) {
-        scope.launch {
-            try {
-                val nodeClient = client as NodeClient
+    // validates the PPL Monitor query and user's permissions to the indices it queries by submitting it to SQL/PPL plugin
+    private fun validateUserPermissionsAndMonitorPplQuery(
+        indexMonitorV2Request: IndexMonitorV2Request,
+        user: User?,
+        validationListener: ActionListener<Unit>
+    ) {
+        client.threadPool().threadContext.stashContext().use {
+            scope.launch {
+                val singleThreadContext = newSingleThreadContext("IndexMonitorV2ActionThread")
+                withContext(singleThreadContext) {
+                    it.restore()
 
-                // first attempt to run the base query
-                // if there are any PPL syntax errors, this will throw an exception
-                executePplQuery(pplMonitor.query, nodeClient)
+                    checkUser(user, validationListener, indexMonitorV2Request)
+                    log.info("done checking user")
 
-                // now scan all the triggers with custom conditions, and ensure each query constructed
-                // from the base query + custom condition is valid
-                val allCustomTriggersValid = true
-                for (pplTrigger in pplMonitor.triggers) {
-                    if (pplTrigger.conditionType != ConditionType.CUSTOM) {
-                        continue
-                    }
+                    val pplMonitor = indexMonitorV2Request.monitorV2 as PPLMonitor
 
-                    val evalResultVar = findEvalResultVar(pplTrigger.customCondition!!)
+                    try {
+                        val nodeClient = client as NodeClient
 
-                    val queryWithCustomCondition = appendCustomCondition(pplMonitor.query, pplTrigger.customCondition!!)
+                        // first attempt to run the base query
+                        // if there are any PPL syntax errors, this will throw an exception
+                        executePplQuery(pplMonitor.query, nodeClient)
 
-                    val executePplQueryResponse = executePplQuery(queryWithCustomCondition, nodeClient)
+                        // now scan all the triggers with custom conditions, and ensure each query constructed
+                        // from the base query + custom condition is valid
+                        for (pplTrigger in pplMonitor.triggers) {
+                            if (pplTrigger.conditionType != ConditionType.CUSTOM) {
+                                continue
+                            }
 
-                    val evalResultVarIdx = findEvalResultVarIdxInSchema(executePplQueryResponse, evalResultVar)
+                            val evalResultVar = findEvalResultVar(pplTrigger.customCondition!!)
 
-                    val resultVarType = executePplQueryResponse
-                        .getJSONArray("schema")
-                        .getJSONObject(evalResultVarIdx)
-                        .getString("type")
+                            val queryWithCustomCondition = appendCustomCondition(pplMonitor.query, pplTrigger.customCondition!!)
 
-                    // custom conditions must evaluate to a boolean result, otherwise it's invalid
-                    if (resultVarType != "boolean") {
+                            val executePplQueryResponse = executePplQuery(queryWithCustomCondition, nodeClient)
+
+                            val evalResultVarIdx = findEvalResultVarIdxInSchema(executePplQueryResponse, evalResultVar)
+
+                            val resultVarType = executePplQueryResponse
+                                .getJSONArray("schema")
+                                .getJSONObject(evalResultVarIdx)
+                                .getString("type")
+
+                            // custom conditions must evaluate to a boolean result, otherwise it's invalid
+                            if (resultVarType != "boolean") {
+                                validationListener.onFailure(
+                                    AlertingException.wrap(
+                                        IllegalArgumentException(
+                                            "Custom condition in trigger ${pplTrigger.name} is invalid because it does not " +
+                                                "evaluate to a boolean, but instead to type: $resultVarType"
+                                        )
+                                    )
+                                )
+                                return@withContext
+                            }
+                        }
+
+                        validationListener.onResponse(Unit)
+                    } catch (e: Exception) {
                         validationListener.onFailure(
                             AlertingException.wrap(
-                                IllegalArgumentException(
-                                    "Custom condition in trigger ${pplTrigger.name} is invalid because it does not " +
-                                        "evaluate to a boolean, but instead to type: $resultVarType"
-                                )
+                                IllegalArgumentException("Validation error for PPL Query in PPL Monitor: ${e.userErrorMessage()}")
                             )
                         )
-                        return@launch
                     }
                 }
-
-                validationListener.onResponse(Unit)
-            } catch (e: Exception) {
-                validationListener.onFailure(
-                    AlertingException.wrap(
-                        IllegalArgumentException("Invalid PPL Query in PPL Monitor: ${e.userErrorMessage()}")
-                    )
-                )
             }
         }
     }
 
-    private fun checkUserAndIndicesAccess(
-        client: Client,
-        actionListener: ActionListener<IndexMonitorV2Response>,
+    private fun checkUser(
+        user: User?,
+        actionListener: ActionListener<Unit>,
         indexMonitorV2Request: IndexMonitorV2Request,
-        user: User?
     ) {
         /* check initial user permissions */
         if (!validateUserBackendRoles(user, actionListener)) {
@@ -230,64 +261,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
                 return
             }
         }
-
-        /* check user access to indices */
-        when (indexMonitorV2Request.monitorV2) {
-            is PPLMonitor -> {
-                checkPplQueryIndices(indexMonitorV2Request, client, actionListener, user)
-            }
-        }
-    }
-
-    private fun checkPplQueryIndices(
-        indexMonitorV2Request: IndexMonitorV2Request,
-        client: Client,
-        actionListener: ActionListener<IndexMonitorV2Response>,
-        user: User?
-    ) {
-        val pplMonitor = indexMonitorV2Request.monitorV2 as PPLMonitor
-        val pplQuery = pplMonitor.query
-        val indices = getIndicesFromPplQuery(pplQuery)
-
-        val searchRequest = SearchRequest().indices(*indices.toTypedArray())
-            .source(SearchSourceBuilder.searchSource().size(1).query(QueryBuilders.matchAllQuery()))
-        client.search(
-            searchRequest,
-            object : ActionListener<SearchResponse> {
-                override fun onResponse(searchResponse: SearchResponse) {
-                    // User has read access to configured indices in the monitor, now create monitor without user context.
-                    client.threadPool().threadContext.stashContext().use {
-                        if (user == null) {
-                            // Security is disabled, add empty user to Monitor. user is null for older versions.
-                            indexMonitorV2Request.monitorV2 = pplMonitor
-                                .copy(user = User("", listOf(), listOf(), listOf()))
-                            checkScheduledJobIndex(indexMonitorV2Request, actionListener, user)
-                        } else {
-                            indexMonitorV2Request.monitorV2 = pplMonitor
-                                .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttNames))
-                            checkScheduledJobIndex(indexMonitorV2Request, actionListener, user)
-                        }
-                    }
-                }
-
-                //  Due to below issue with security plugin, we get security_exception when invalid index name is mentioned.
-                //  https://github.com/opendistro-for-elasticsearch/security/issues/718
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(
-                        AlertingException.wrap(
-                            when (t is OpenSearchSecurityException) {
-                                true -> OpenSearchStatusException(
-                                    "User doesn't have read permissions for one or more configured index " +
-                                        "$indices",
-                                    RestStatus.FORBIDDEN
-                                )
-                                false -> t
-                            }
-                        )
-                    )
-                }
-            }
-        )
     }
 
     private fun checkScheduledJobIndex(
@@ -295,51 +268,57 @@ class TransportIndexMonitorV2Action @Inject constructor(
         actionListener: ActionListener<IndexMonitorV2Response>,
         user: User?
     ) {
-        /* check to see if alerting-config index (scheduled job index) is created and updated before indexing MonitorV2 into it */
-        if (!scheduledJobIndices.scheduledJobIndexExists()) { // if alerting-config index doesn't exist, send request to create it
-            scheduledJobIndices.initScheduledJobIndex(object : ActionListener<CreateIndexResponse> {
-                override fun onResponse(response: CreateIndexResponse) {
-                    onCreateMappingsResponse(response.isAcknowledged, indexMonitorRequest, actionListener, user)
-                }
+        // user permissions to indices have already been checked
+        // proceed without the context of the user, otherwise,
+        // we would get permissions errors trying to search the alerting-config
+        // index as the user
+        client.threadPool().threadContext.stashContext().use {
+            /* check to see if alerting-config index (scheduled job index) is created and updated before indexing MonitorV2 into it */
+            if (!scheduledJobIndices.scheduledJobIndexExists()) { // if alerting-config index doesn't exist, send request to create it
+                scheduledJobIndices.initScheduledJobIndex(object : ActionListener<CreateIndexResponse> {
+                    override fun onResponse(response: CreateIndexResponse) {
+                        onCreateMappingsResponse(response.isAcknowledged, indexMonitorRequest, actionListener, user)
+                    }
 
-                override fun onFailure(e: Exception) {
-                    if (ExceptionsHelper.unwrapCause(e) is ResourceAlreadyExistsException) {
-                        scope.launch {
-                            // Wait for the yellow status
-                            val clusterHealthRequest = ClusterHealthRequest()
-                                .indices(SCHEDULED_JOBS_INDEX)
-                                .waitForYellowStatus()
-                            val response: ClusterHealthResponse = client.suspendUntil {
-                                execute(ClusterHealthAction.INSTANCE, clusterHealthRequest, it)
+                    override fun onFailure(e: Exception) {
+                        if (ExceptionsHelper.unwrapCause(e) is ResourceAlreadyExistsException) {
+                            scope.launch {
+                                // Wait for the yellow status
+                                val clusterHealthRequest = ClusterHealthRequest()
+                                    .indices(SCHEDULED_JOBS_INDEX)
+                                    .waitForYellowStatus()
+                                val response: ClusterHealthResponse = client.suspendUntil {
+                                    execute(ClusterHealthAction.INSTANCE, clusterHealthRequest, it)
+                                }
+                                if (response.isTimedOut) {
+                                    actionListener.onFailure(
+                                        OpenSearchException("Cannot determine that the $SCHEDULED_JOBS_INDEX index is healthy")
+                                    )
+                                }
+                                // Retry mapping of monitor
+                                onCreateMappingsResponse(true, indexMonitorRequest, actionListener, user)
                             }
-                            if (response.isTimedOut) {
-                                actionListener.onFailure(
-                                    OpenSearchException("Cannot determine that the $SCHEDULED_JOBS_INDEX index is healthy")
-                                )
-                            }
-                            // Retry mapping of monitor
-                            onCreateMappingsResponse(true, indexMonitorRequest, actionListener, user)
+                        } else {
+                            actionListener.onFailure(AlertingException.wrap(e))
                         }
-                    } else {
-                        actionListener.onFailure(AlertingException.wrap(e))
                     }
-                }
-            })
-        } else if (!IndexUtils.scheduledJobIndexUpdated) {
-            IndexUtils.updateIndexMapping(
-                SCHEDULED_JOBS_INDEX,
-                ScheduledJobIndices.scheduledJobMappings(), clusterService.state(), client.admin().indices(),
-                object : ActionListener<AcknowledgedResponse> {
-                    override fun onResponse(response: AcknowledgedResponse) {
-                        onUpdateMappingsResponse(response, indexMonitorRequest, actionListener, user)
+                })
+            } else if (!IndexUtils.scheduledJobIndexUpdated) {
+                IndexUtils.updateIndexMapping(
+                    SCHEDULED_JOBS_INDEX,
+                    ScheduledJobIndices.scheduledJobMappings(), clusterService.state(), client.admin().indices(),
+                    object : ActionListener<AcknowledgedResponse> {
+                        override fun onResponse(response: AcknowledgedResponse) {
+                            onUpdateMappingsResponse(response, indexMonitorRequest, actionListener, user)
+                        }
+                        override fun onFailure(t: Exception) {
+                            actionListener.onFailure(AlertingException.wrap(t))
+                        }
                     }
-                    override fun onFailure(t: Exception) {
-                        actionListener.onFailure(AlertingException.wrap(t))
-                    }
-                }
-            )
-        } else {
-            prepareMonitorIndexing(indexMonitorRequest, actionListener, user)
+                )
+            } else {
+                prepareMonitorIndexing(indexMonitorRequest, actionListener, user)
+            }
         }
     }
 
