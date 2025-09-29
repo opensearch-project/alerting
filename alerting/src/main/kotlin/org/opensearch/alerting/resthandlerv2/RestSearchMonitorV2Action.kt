@@ -1,4 +1,4 @@
-package org.opensearch.alerting.resthandler
+package org.opensearch.alerting.resthandlerv2
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.search.SearchRequest

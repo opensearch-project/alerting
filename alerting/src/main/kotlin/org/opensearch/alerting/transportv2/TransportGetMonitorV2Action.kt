@@ -1,4 +1,4 @@
-package org.opensearch.alerting.transport
+package org.opensearch.alerting.transportv2
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,6 +14,8 @@ import org.opensearch.alerting.actionv2.GetMonitorV2Request
 import org.opensearch.alerting.actionv2.GetMonitorV2Response
 import org.opensearch.alerting.core.modelv2.MonitorV2
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.transport.SecureTransportAction
+import org.opensearch.alerting.transport.TransportGetMonitorAction
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings

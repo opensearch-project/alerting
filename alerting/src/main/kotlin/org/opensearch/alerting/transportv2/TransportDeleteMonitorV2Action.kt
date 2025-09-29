@@ -1,4 +1,4 @@
-package org.opensearch.alerting.transport
+package org.opensearch.alerting.transportv2
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -9,7 +9,7 @@ import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.alerting.AlertingV2Utils.validateMonitorV2
+import org.opensearch.alerting.AlertingV2Utils
 import org.opensearch.alerting.actionv2.DeleteMonitorV2Action
 import org.opensearch.alerting.actionv2.DeleteMonitorV2Request
 import org.opensearch.alerting.actionv2.DeleteMonitorV2Response
@@ -17,6 +17,7 @@ import org.opensearch.alerting.core.modelv2.MonitorV2
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.transport.SecureTransportAction
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
@@ -33,7 +34,7 @@ import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
-private val log = LogManager.getLogger(TransportDeleteMonitorAction::class.java)
+private val log = LogManager.getLogger(TransportDeleteMonitorV2Action::class.java)
 
 class TransportDeleteMonitorV2Action @Inject constructor(
     transportService: TransportService,
@@ -68,11 +69,16 @@ class TransportDeleteMonitorV2Action @Inject constructor(
                     checkUserPermissionsWithResource(user, monitorV2!!.user, actionListener, "monitor_v2", request.monitorV2Id)
 
                 if (canDelete) {
-                    val deleteResponse = DeleteMonitorService.deleteMonitorV2(request.monitorV2Id, request.refreshPolicy)
+                    val deleteResponse =
+                        DeleteMonitorService.deleteMonitorV2(request.monitorV2Id, request.refreshPolicy)
                     actionListener.onResponse(deleteResponse)
                 } else {
                     actionListener.onFailure(
-                        AlertingException("Not allowed to delete this Monitor V2", RestStatus.FORBIDDEN, IllegalStateException())
+                        AlertingException(
+                            "Not allowed to delete this Monitor V2",
+                            RestStatus.FORBIDDEN,
+                            IllegalStateException()
+                        )
                     )
                 }
             } catch (e: Exception) {
@@ -102,7 +108,7 @@ class TransportDeleteMonitorV2Action @Inject constructor(
         )
         val scheduledJob = ScheduledJob.parse(xcp, getResponse.id, getResponse.version)
 
-        validateMonitorV2(scheduledJob)?.let {
+        AlertingV2Utils.validateMonitorV2(scheduledJob)?.let {
             actionListener.onFailure(AlertingException.wrap(it))
             return null
         }

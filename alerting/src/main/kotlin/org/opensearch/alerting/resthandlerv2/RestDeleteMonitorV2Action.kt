@@ -1,4 +1,4 @@
-package org.opensearch.alerting.resthandler
+package org.opensearch.alerting.resthandlerv2
 
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
@@ -15,7 +15,7 @@ import org.opensearch.rest.action.RestToXContentListener
 import org.opensearch.transport.client.node.NodeClient
 import java.io.IOException
 
-private val log: Logger = LogManager.getLogger(RestDeleteMonitorAction::class.java)
+private val log: Logger = LogManager.getLogger(RestDeleteMonitorV2Action::class.java)
 
 class RestDeleteMonitorV2Action : BaseRestHandler() {
 

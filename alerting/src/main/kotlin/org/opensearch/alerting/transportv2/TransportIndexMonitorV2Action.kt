@@ -1,4 +1,4 @@
-package org.opensearch.alerting.transport
+package org.opensearch.alerting.transportv2
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +43,7 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_M
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MIN_SUPPRESSION_DURATION
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
+import org.opensearch.alerting.transport.SecureTransportAction
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService

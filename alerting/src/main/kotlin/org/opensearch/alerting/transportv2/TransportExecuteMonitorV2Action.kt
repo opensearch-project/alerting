@@ -1,4 +1,4 @@
-package org.opensearch.alerting.transport
+package org.opensearch.alerting.transportv2
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
