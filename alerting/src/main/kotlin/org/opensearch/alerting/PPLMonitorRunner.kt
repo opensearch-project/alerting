@@ -273,21 +273,26 @@ object PPLMonitorRunner : MonitorV2Runner {
 
     private fun containsTimestampField(getMappingsResponse: GetMappingsResponse): Boolean {
         val metadataMap = getMappingsResponse.mappings
-        for (index in metadataMap.keys) {
-            try {
+        try {
+            for (index in metadataMap.keys) {
                 val metadata = metadataMap[index]!!.sourceAsMap["properties"] as Map<String, Any>
-                logger.info("metadata: $metadata")
-                if (metadata.keys.contains(TIMESTAMP_FIELD)) {
-                    logger.info("query indices contains timestamp field: $TIMESTAMP_FIELD, ignoring lookback window")
-                    return true
+                if (!metadata.keys.contains(TIMESTAMP_FIELD)) {
+                    logger.info("query indices don't contain timestamp field: $TIMESTAMP_FIELD, ignoring lookback window")
+                    return false
                 }
-            } catch (e: Exception) {
-                logger.info("failed to read query indices' fields, ignoring lookback window")
-                return false
+                val typeInfo = metadata["timestamp"] as Map<String, String>
+                if (typeInfo["type"] != "date") {
+                    logger.info("timestamp field: $TIMESTAMP_FIELD is present but not of type date, ignoring lookback window")
+                    return false
+                }
             }
+        } catch (e: Exception) {
+            logger.info("failed to read query indices' fields, ignoring lookback window")
+            return false
         }
-        logger.info("query indices doesn't contain timestamp field: $TIMESTAMP_FIELD, ignoring lookback window")
-        return false
+
+        logger.info("all query indices contain timestamp field: $TIMESTAMP_FIELD of type date, using lookback window")
+        return true
     }
 
     // returns true if the pplTrigger should be suppressed
