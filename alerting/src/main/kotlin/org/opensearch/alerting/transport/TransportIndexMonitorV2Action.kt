@@ -656,21 +656,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
     }
 
     /* Utils */
-    private fun getIndicesFromPplQuery(pplQuery: String): List<String> {
-        // captures comma-separated concrete indices, index patterns, and index aliases
-        val indicesRegex = """(?i)source(?:\s*)=(?:\s*)([-\w.*'+]+(?:\*)?(?:\s*,\s*[-\w.*'+]+\*?)*)\s*\|*""".toRegex()
-
-        // use find() instead of findAll() because a PPL query only ever has one source statement
-        // the only capture group specified in the regex captures the comma separated list of indices/index patterns
-        val indices = indicesRegex.find(pplQuery)?.groupValues?.get(1)?.split(",")?.map { it.trim() }
-            ?: throw IllegalStateException(
-                "Could not find indices that PPL Monitor query searches even " +
-                    "after validating the query through SQL/PPL plugin"
-            )
-
-        return indices
-    }
-
     private fun validatePplMonitor(pplMonitor: PPLMonitor) {
         // ensure the trigger suppress durations are valid
         pplMonitor.triggers.forEach { trigger ->
