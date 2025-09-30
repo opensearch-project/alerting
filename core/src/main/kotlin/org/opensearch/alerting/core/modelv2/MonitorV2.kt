@@ -10,6 +10,8 @@ import org.opensearch.core.ParseField
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.common.io.stream.StreamOutput
 import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.ToXContent
+import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import java.io.IOException
@@ -29,6 +31,8 @@ interface MonitorV2 : ScheduledJob {
     val lookBackWindow: TimeValue // how far back to look when querying data during monitor execution
 
     fun asTemplateArg(): Map<String, Any?>
+
+    fun toXContentWithUser(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder
 
     enum class MonitorV2Type(val value: String) {
         PPL_MONITOR(PPL_MONITOR_TYPE);

@@ -150,11 +150,17 @@ dependencies {
     // Needed for integ tests
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-notifications-core', version: "${opensearch_build}"
     zipArchive group: 'org.opensearch.plugin', name:'notifications', version: "${opensearch_build}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-job-scheduler', version: "${opensearch_build}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${opensearch_build}"
 
     // Needed for security tests
     if (securityEnabled) {
         opensearchPlugin "org.opensearch.plugin:opensearch-security:${opensearch_build}@zip"
     }
+
+//    // Needed for Alerting V2
+//    opensearchPlugin "org.opensearch.plugin:opensearch-job-scheduler:${opensearch_build}@zip"
+//    opensearchPlugin "org.opensearch.plugin:opensearch-sql-plugin:${opensearch_build}@zip"
 
     // Needed for BWC tests
     opensearchPlugin "org.opensearch.plugin:alerting:${bwcPluginVersion}@zip"
@@ -247,6 +253,54 @@ testClusters.integTest {
             }
         }
     }))
+
+    plugin(provider({
+        new RegularFile() {
+            @Override
+            File getAsFile() {
+                return configurations.zipArchive.asFileTree.matching {
+                    include '**/opensearch-job-scheduler*'
+                }.singleFile
+            }
+        }
+    }))
+
+    plugin(provider({
+        new RegularFile() {
+            @Override
+            File getAsFile() {
+                return configurations.zipArchive.asFileTree.matching {
+                    include '**/opensearch-sql-plugin*'
+                }.singleFile
+            }
+        }
+    }))
+
+//    plugin(provider({
+//        new RegularFile() {
+//            @Override
+//            File getAsFile() {
+//                return configurations.opensearchPlugin.resolvedConfiguration.resolvedArtifacts
+//                        .find { ResolvedArtifact f ->
+//                            f.name.startsWith("opensearch-job-scheduler")
+//                        }
+//                        .file
+//            }
+//        }
+//    }))
+//
+//    plugin(provider({
+//        new RegularFile() {
+//            @Override
+//            File getAsFile() {
+//                return configurations.opensearchPlugin.resolvedConfiguration.resolvedArtifacts
+//                        .find { ResolvedArtifact f ->
+//                            f.name.startsWith("opensearch-sql-plugin")
+//                        }
+//                        .file
+//            }
+//        }
+//    }))
 
     if (securityEnabled) {
         plugin(provider({

@@ -72,7 +72,9 @@ import java.util.concurrent.TimeUnit
 @Suppress("UNCHECKED_CAST")
 class MonitorRestApiIT : AlertingRestTestCase() {
 
-    val USE_TYPED_KEYS = ToXContent.MapParams(mapOf("with_type" to "true"))
+    companion object {
+        val USE_TYPED_KEYS = ToXContent.MapParams(mapOf("with_type" to "true"))
+    }
 
     @Throws(Exception::class)
     fun `test plugin is loaded`() {

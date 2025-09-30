@@ -8,6 +8,13 @@ package org.opensearch.alerting
 import junit.framework.TestCase.assertNull
 import org.apache.hc.core5.http.Header
 import org.apache.hc.core5.http.HttpEntity
+import org.opensearch.alerting.core.modelv2.PPLMonitor
+import org.opensearch.alerting.core.modelv2.PPLMonitor.QueryLanguage
+import org.opensearch.alerting.core.modelv2.PPLTrigger
+import org.opensearch.alerting.core.modelv2.PPLTrigger.ConditionType
+import org.opensearch.alerting.core.modelv2.PPLTrigger.NumResultsCondition
+import org.opensearch.alerting.core.modelv2.PPLTrigger.TriggerMode
+import org.opensearch.alerting.core.modelv2.TriggerV2.Severity
 import org.opensearch.alerting.model.AlertContext
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailEntry
@@ -20,6 +27,7 @@ import org.opensearch.client.RestClient
 import org.opensearch.client.WarningsHandler
 import org.opensearch.common.UUIDs
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
@@ -79,9 +87,11 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase.randomBoolean
 import org.opensearch.test.OpenSearchTestCase.randomInt
 import org.opensearch.test.OpenSearchTestCase.randomIntBetween
+import org.opensearch.test.OpenSearchTestCase.randomLongBetween
 import org.opensearch.test.rest.OpenSearchRestTestCase
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.TimeUnit
 
 fun randomQueryLevelMonitor(
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
@@ -292,6 +302,32 @@ fun randomWorkflowWithDelegates(
     )
 }
 
+fun randomPPLMonitor(
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    enabled: Boolean = randomBoolean(),
+    schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
+    lookbackWindow: TimeValue = randomTimeValue(),
+    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+    enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
+    triggers: List<PPLTrigger> = (1..randomInt(10)).map { randomPPLTrigger() },
+    user: User = randomUser(),
+    queryLanguage: QueryLanguage = QueryLanguage.PPL,
+    query: String = "source = index | head 10"
+): PPLMonitor {
+    return PPLMonitor(
+        name = name,
+        enabled = enabled,
+        schedule = schedule,
+        lookBackWindow = lookbackWindow,
+        lastUpdateTime = lastUpdateTime,
+        enabledTime = enabledTime,
+        triggers = triggers,
+        user = user,
+        queryLanguage = queryLanguage,
+        query = query
+    )
+}
+
 fun randomQueryLevelTrigger(
     id: String = UUIDs.base64UUID(),
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
@@ -345,6 +381,33 @@ fun randomDocumentLevelTrigger(
         actions = if (actions.isEmpty() && destinationId.isNotBlank())
             (0..randomInt(10)).map { randomAction(destinationId = destinationId) }
         else actions
+    )
+}
+
+fun randomPPLTrigger(
+    id: String = UUIDs.base64UUID(),
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    severity: Severity = Severity.entries.random(),
+    suppressDuration: TimeValue = randomTimeValue(),
+    expireDuration: TimeValue = randomTimeValue(),
+    actions: List<Action> = mutableListOf(),
+    mode: TriggerMode = TriggerMode.entries.random()
+): PPLTrigger {
+    // random PPLTrigger will always be a number_of_results trigger, because a custom condition
+    // would require knowledge of the PPL Monitor's query
+    return PPLTrigger(
+        id = id,
+        name = name,
+        severity = severity,
+        suppressDuration = suppressDuration,
+        expireDuration = expireDuration,
+        lastTriggeredTime = null,
+        actions = actions,
+        mode = mode,
+        conditionType = ConditionType.NUMBER_OF_RESULTS,
+        numResultsCondition = NumResultsCondition.entries.random(),
+        numResultsValue = randomLongBetween(1L, 50L),
+        customCondition = null
     )
 }
 
@@ -415,6 +478,13 @@ val TEST_HR_BACKEND_ROLE = "HR"
 // in the request made using triple-quote strings (i.e. createIndexRoleWithDocLevelSecurity).
 // Removing the escape slash in the request causes the security API role request to fail with parsing exception.
 val TERM_DLS_QUERY = """{\"term\": { \"accessible\": true}}"""
+
+fun randomTimeValue(
+    unit: TimeUnit = setOf(TimeUnit.MINUTES, TimeUnit.HOURS, TimeUnit.DAYS).random(),
+    value: Long = randomLongBetween(1, 50)
+): TimeValue {
+    return TimeValue(value, unit)
+}
 
 fun randomTemplateScript(
     source: String,

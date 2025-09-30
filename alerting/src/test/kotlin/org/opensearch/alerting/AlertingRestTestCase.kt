@@ -17,8 +17,11 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.AlertingPlugin.Companion.COMMENTS_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
+import org.opensearch.alerting.AlertingPlugin.Companion.MONITOR_V2_BASE_URI
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRITE_INDEX
+import org.opensearch.alerting.core.modelv2.MonitorV2
+import org.opensearch.alerting.core.modelv2.PPLMonitor
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.CustomWebhook
@@ -152,6 +155,19 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun createMonitor(monitor: Monitor, refresh: Boolean = true): Monitor {
         return createMonitorWithClient(client(), monitor, emptyList(), refresh)
+    }
+
+    protected fun createMonitorV2(monitorV2: MonitorV2): MonitorV2 {
+        val client = client()
+        val response = client.makeRequest("POST", MONITOR_V2_BASE_URI, emptyMap(), monitorV2.toHttpEntity())
+        assertEquals("Unable to create a new monitor", RestStatus.CREATED, response.restStatus())
+
+        val monitorV2Json = jsonXContent.createParser(
+            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+            response.entity.content
+        ).map()
+
+        return getMonitorV2(monitorV2Id = monitorV2Json["_id"] as String)
     }
 
     protected fun deleteMonitor(monitor: Monitor, refresh: Boolean = true): Response {
@@ -535,6 +551,12 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return getMonitor(monitorId = monitorId)
     }
 
+    protected fun createRandomPPLMonitor(): PPLMonitor {
+        val pplMonitor = randomPPLMonitor()
+        val pplMonitorId = createMonitorV2(pplMonitor).id
+        return getMonitorV2(monitorV2Id = pplMonitorId) as PPLMonitor
+    }
+
     protected fun createRandomDocumentMonitor(refresh: Boolean = false, withMetadata: Boolean = false): Monitor {
         val monitor = randomDocumentLevelMonitor(withMetadata = withMetadata)
         val monitorId = createMonitor(monitor, refresh).id
@@ -633,6 +655,36 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
         assertUserNull(monitor)
         return monitor.copy(id = id, version = version)
+    }
+
+    protected fun getMonitorV2(
+        monitorV2Id: String,
+        header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+    ): MonitorV2 {
+        val response = client().makeRequest("GET", "$MONITOR_V2_BASE_URI/$monitorV2Id", null, header)
+        assertEquals("Unable to get monitorV2 $monitorV2Id", RestStatus.OK, response.restStatus())
+
+        val parser = createParser(XContentType.JSON.xContent(), response.entity.content)
+        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser)
+
+        lateinit var id: String
+        var version: Long = 0
+        lateinit var monitorV2: MonitorV2
+
+        while (parser.nextToken() != XContentParser.Token.END_OBJECT) {
+            parser.nextToken()
+
+            when (parser.currentName()) {
+                "_id" -> id = parser.text()
+                "_version" -> version = parser.longValue()
+                "monitor_v2" -> monitorV2 = MonitorV2.parse(parser)
+            }
+        }
+
+        when (monitorV2) {
+            is PPLMonitor -> return monitorV2.copy(id = id, version = version)
+            else -> throw IllegalStateException("got MonitorV2 of unexpected type: ${monitorV2.javaClass.name}")
+        }
     }
 
     // TODO: understand why doc alerts wont work with the normal search Alerts function
@@ -1314,6 +1366,24 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     private fun Monitor.toJsonStringWithUser(): String {
+        val builder = jsonBuilder()
+        return shuffleXContent(toXContentWithUser(builder, ToXContent.EMPTY_PARAMS)).string()
+    }
+
+    protected fun MonitorV2.toHttpEntity(): HttpEntity {
+        return StringEntity(toJsonString(), APPLICATION_JSON)
+    }
+
+    private fun MonitorV2.toJsonString(): String {
+        val builder = XContentFactory.jsonBuilder()
+        return shuffleXContent(toXContent(builder, ToXContent.EMPTY_PARAMS)).string()
+    }
+
+    protected fun MonitorV2.toHttpEntityWithUser(): HttpEntity {
+        return StringEntity(toJsonStringWithUser(), APPLICATION_JSON)
+    }
+
+    private fun MonitorV2.toJsonStringWithUser(): String {
         val builder = jsonBuilder()
         return shuffleXContent(toXContentWithUser(builder, ToXContent.EMPTY_PARAMS)).string()
     }

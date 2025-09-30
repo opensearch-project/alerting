@@ -116,7 +116,7 @@ data class PPLMonitor(
         query = sin.readString()
     )
 
-    fun toXContentWithUser(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+    override fun toXContentWithUser(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         return createXContentBuilder(builder, params, true)
     }
 
