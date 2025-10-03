@@ -33,15 +33,11 @@ buildscript {
             mavenContent {
                 snapshotsOnly()
             }
-            credentials {
-                username System.getenv("SONATYPE_USERNAME")
-                password System.getenv("SONATYPE_PASSWORD")
-            }
         }
         mavenCentral()
         maven { url "https://plugins.gradle.org/m2/" }
     }
-    
+
     dependencies {
         classpath "org.opensearch.gradle:build-tools:${opensearch_version}"
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlin_version}"
