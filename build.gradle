@@ -28,11 +28,16 @@ buildscript {
 
     repositories {
         mavenLocal()
-        maven { url "https://central.sonatype.com/repository/maven-snapshots/" }
-        maven { url "https://aws.oss.sonatype.org/content/repositories/snapshots" }
+        maven { 
+            url "https://central.sonatype.com/repository/maven-snapshots/"
+            mavenContent {
+                snapshotsOnly()
+            }
+        }
         mavenCentral()
         maven { url "https://plugins.gradle.org/m2/" }
     }
+
     dependencies {
         classpath "org.opensearch.gradle:build-tools:${opensearch_version}"
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlin_version}"
