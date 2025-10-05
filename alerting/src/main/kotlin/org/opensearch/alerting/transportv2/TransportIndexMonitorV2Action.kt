@@ -118,7 +118,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
 
         // validate the MonitorV2 based on its type
         when (indexMonitorV2Request.monitorV2) {
-            is PPLMonitor -> validateUserPermissionsAndMonitorPplQuery(
+            is PPLMonitor -> validatePplMonitorUserPermissionsAndQuery(
                 indexMonitorV2Request,
                 user,
                 object : ActionListener<Unit> { // validationListener
@@ -157,7 +157,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
     }
 
     // validates the PPL Monitor query and user's permissions to the indices it queries by submitting it to SQL/PPL plugin
-    private fun validateUserPermissionsAndMonitorPplQuery(
+    private fun validatePplMonitorUserPermissionsAndQuery(
         indexMonitorV2Request: IndexMonitorV2Request,
         user: User?,
         validationListener: ActionListener<Unit>
@@ -467,21 +467,12 @@ class TransportIndexMonitorV2Action @Inject constructor(
             return
         }
 
-        var newMonitorV2: MonitorV2
-        val currentMonitorV2: MonitorV2 // this is the same as existingMonitorV2, but will be cast to a specific MonitorV2 type
-
-        when (indexMonitorRequest.monitorV2) {
-            is PPLMonitor -> {
-                newMonitorV2 = indexMonitorRequest.monitorV2 as PPLMonitor
-                currentMonitorV2 = existingMonitorV2 as PPLMonitor
-            }
-            else -> throw IllegalStateException("received unsupported monitor type to index: ${indexMonitorRequest.monitorV2.javaClass}")
-        }
+        var newMonitorV2 = indexMonitorRequest.monitorV2
 
         // If both are enabled, use the current existing monitor enabled time, otherwise the next execution will be
         // incorrect.
-        if (newMonitorV2.enabled && currentMonitorV2.enabled) {
-            newMonitorV2 = newMonitorV2.copy(enabledTime = currentMonitorV2.enabledTime)
+        if (newMonitorV2.enabled && existingMonitorV2.enabled) {
+            newMonitorV2 = newMonitorV2.makeCopy(enabledTime = existingMonitorV2.enabledTime)
         }
 
         /**
@@ -501,26 +492,26 @@ class TransportIndexMonitorV2Action @Inject constructor(
         if (user != null) {
             if (indexMonitorRequest.rbacRoles != null) {
                 if (isAdmin(user)) {
-                    newMonitorV2 = newMonitorV2.copy(
+                    newMonitorV2 = newMonitorV2.makeCopy(
                         user = User(user.name, indexMonitorRequest.rbacRoles, user.roles, user.customAttributes)
                     )
                 } else {
                     // rolesToRemove: these are the backend roles to remove from the monitor
                     val rolesToRemove = user.backendRoles - indexMonitorRequest.rbacRoles
                     // remove the monitor's roles with rolesToRemove and add any roles passed into the request.rbacRoles
-                    val updatedRbac = currentMonitorV2.user?.backendRoles.orEmpty() - rolesToRemove + indexMonitorRequest.rbacRoles
-                    newMonitorV2 = newMonitorV2.copy(
+                    val updatedRbac = existingMonitorV2.user?.backendRoles.orEmpty() - rolesToRemove + indexMonitorRequest.rbacRoles
+                    newMonitorV2 = newMonitorV2.makeCopy(
                         user = User(user.name, updatedRbac, user.roles, user.customAttributes)
                     )
                 }
             } else {
                 newMonitorV2 = newMonitorV2
-                    .copy(user = User(user.name, currentMonitorV2.user!!.backendRoles, user.roles, user.customAttributes))
+                    .makeCopy(user = User(user.name, existingMonitorV2.user!!.backendRoles, user.roles, user.customAttributes))
             }
             log.info("Update monitor backend roles to: ${newMonitorV2.user?.backendRoles}")
         }
 
-        newMonitorV2 = newMonitorV2.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
+        newMonitorV2 = newMonitorV2.makeCopy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
         val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
             .setRefreshPolicy(indexMonitorRequest.refreshPolicy)
             .source(newMonitorV2.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
@@ -531,7 +522,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
             .timeout(indexTimeout)
 
         log.info(
-            "Updating monitor, ${currentMonitorV2.id}, from: ${currentMonitorV2.toXContentWithUser(
+            "Updating monitor, ${existingMonitorV2.id}, from: ${existingMonitorV2.toXContentWithUser(
                 jsonBuilder(),
                 ToXContent.MapParams(mapOf("with_type" to "true"))
             )} \n to: ${newMonitorV2.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true")))}"
@@ -607,14 +598,10 @@ class TransportIndexMonitorV2Action @Inject constructor(
             else if (!isAdmin(user)) indexMonitorRequest.rbacRoles.intersect(user.backendRoles).toSet()
             else indexMonitorRequest.rbacRoles
 
-            monitorV2 = when (monitorV2) {
-                is PPLMonitor -> monitorV2.copy(
-                    user = User(user.name, rbacRoles.toList(), user.roles, user.customAttributes)
-                )
-                else -> throw IllegalArgumentException(
-                    "received unsupported monitor type when resolving backend roles: ${indexMonitorRequest.monitorV2.javaClass}"
-                )
-            }
+            monitorV2 = monitorV2.makeCopy(
+                user = User(user.name, rbacRoles.toList(), user.roles, user.customAttributes)
+            )
+
             log.debug("Created monitor's backend roles: $rbacRoles")
         }
 

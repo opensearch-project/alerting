@@ -159,12 +159,13 @@ class TransportExecuteMonitorV2Action @Inject constructor(
                 )
             } else { // execute with monitor object case
                 try {
-                    val monitorV2 = when (execMonitorV2Request.monitorV2) {
-                        is PPLMonitor -> execMonitorV2Request.monitorV2.copy(user = user)
-                        else -> throw IllegalStateException(
-                            "unexpected MonitorV2 type: ${execMonitorV2Request.monitorV2!!.javaClass.name}"
-                        )
-                    }
+//                    val monitorV2 = when (execMonitorV2Request.monitorV2) {
+//                        is PPLMonitor -> execMonitorV2Request.monitorV2.copy(user = user)
+//                        else -> throw IllegalStateException(
+//                            "unexpected MonitorV2 type: ${execMonitorV2Request.monitorV2!!.javaClass.name}"
+//                        )
+//                    }
+                    val monitorV2 = execMonitorV2Request.monitorV2!!.makeCopy(user = user)
                     executeMonitorV2(monitorV2)
                 } catch (e: Exception) {
                     actionListener.onFailure(AlertingException.wrap(e))

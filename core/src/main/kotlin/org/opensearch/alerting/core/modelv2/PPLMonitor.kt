@@ -209,6 +209,32 @@ data class PPLMonitor(
         )
     }
 
+    override fun makeCopy(
+        id: String,
+        version: Long,
+        name: String,
+        enabled: Boolean,
+        schedule: Schedule,
+        lastUpdateTime: Instant,
+        enabledTime: Instant?,
+        user: User?,
+        schemaVersion: Int,
+        lookBackWindow: TimeValue
+    ): PPLMonitor {
+        return copy(
+            id = id,
+            version = version,
+            name = name,
+            enabled = enabled,
+            schedule = schedule,
+            lastUpdateTime = lastUpdateTime,
+            enabledTime = enabledTime,
+            user = user,
+            schemaVersion = schemaVersion,
+            lookBackWindow = lookBackWindow
+        )
+    }
+
     enum class QueryLanguage(val value: String) {
         PPL(PPL_QUERY_LANGUAGE),
         SQL(SQL_QUERY_LANGUAGE);

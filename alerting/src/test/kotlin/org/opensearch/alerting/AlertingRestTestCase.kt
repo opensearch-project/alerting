@@ -681,10 +681,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             }
         }
 
-        when (monitorV2) {
-            is PPLMonitor -> return monitorV2.copy(id = id, version = version)
-            else -> throw IllegalStateException("got MonitorV2 of unexpected type: ${monitorV2.javaClass.name}")
-        }
+        return monitorV2.makeCopy(id = id, version = version)
     }
 
     // TODO: understand why doc alerts wont work with the normal search Alerts function

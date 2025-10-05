@@ -55,8 +55,7 @@ dependencies {
     api "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlin_version}"
     implementation "com.cronutils:cron-utils:9.1.7"
     api "org.opensearch.client:opensearch-rest-client:${opensearch_version}"
-//    api "org.opensearch:common-utils:${common_utils_version}@jar"
-    api files('/Users/toepkerd/Documents/SecurityAnalytics/common-utils/build/libs/common-utils-3.2.0.0-SNAPSHOT.jar')
+    api "org.opensearch:common-utils:${common_utils_version}@jar"
     implementation 'commons-validator:commons-validator:1.7'
     implementation 'org.json:json:20240303'
 

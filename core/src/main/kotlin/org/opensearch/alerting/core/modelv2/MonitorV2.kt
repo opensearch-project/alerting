@@ -34,6 +34,20 @@ interface MonitorV2 : ScheduledJob {
 
     fun toXContentWithUser(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder
 
+    fun makeCopy(
+        id: String = this.id,
+        version: Long = this.version,
+        name: String = this.name,
+        enabled: Boolean = this.enabled,
+        schedule: Schedule = this.schedule,
+        lastUpdateTime: Instant = this.lastUpdateTime,
+        enabledTime: Instant? = this.enabledTime,
+        user: User? = this.user,
+        // not supporting overriding triggers in copy
+        schemaVersion: Int = this.schemaVersion,
+        lookBackWindow: TimeValue = this.lookBackWindow
+    ): MonitorV2
+
     enum class MonitorV2Type(val value: String) {
         PPL_MONITOR(PPL_MONITOR_TYPE);
 
