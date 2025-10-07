@@ -93,8 +93,6 @@ data class PPLMonitor(
         } else {
             require(enabledTime == null)
         }
-
-        // TODO: create setting for max triggers and check for max triggers here
     }
 
     @Throws(IOException::class)
