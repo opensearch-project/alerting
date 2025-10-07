@@ -5,8 +5,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.opensearch.ExceptionsHelper
 import org.opensearch.action.DocWriteRequest
-import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest
-import org.opensearch.action.admin.indices.mapping.get.GetMappingsResponse
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
@@ -32,7 +30,6 @@ import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.PPLTriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.commons.alerting.alerts.AlertError
 import org.opensearch.commons.alerting.model.Alert
@@ -54,8 +51,6 @@ object PPLMonitorRunner : MonitorV2Runner {
     private val logger = LogManager.getLogger(javaClass)
 
     private const val PPL_SQL_QUERY_FIELD = "query" // name of PPL query field when passing into PPL/SQL Execute API call
-
-    private const val TIMESTAMP_FIELD = "timestamp" // TODO: this should be deleted once PPL plugin side time keywords are introduced
 
     override suspend fun runMonitorV2(
         monitorV2: MonitorV2,
@@ -98,28 +93,22 @@ object PPLMonitorRunner : MonitorV2Runner {
         } catch (e: Exception) {
             val id = if (pplMonitor.id.trim().isEmpty()) "_na_" else pplMonitor.id
             logger.error("Error loading alerts for monitorV2: $id", e)
-            return PPLMonitorRunResult(pplMonitor.name, e, periodStart, periodEnd, mapOf(), mapOf())
+            return PPLMonitorRunResult(pplMonitor.name, e, mapOf(), mapOf())
         }
 
-        val indices = getIndicesFromPplQuery(pplMonitor.query)
-        logger.info("indices: $indices")
-        val mappingsRequest = GetMappingsRequest().indices(*indices.toTypedArray())
-        val mappingsResponse = monitorCtx.client!!.suspendUntil { admin().indices().getMappings(mappingsRequest, it) }
-        val containsTimestampField = containsTimestampField(mappingsResponse)
-        logger.info("contains field: $containsTimestampField")
-
-        val lookbackPeriodStart = periodEnd.minus(pplMonitor.lookBackWindow.millis, ChronoUnit.MILLIS)
-        val timeFilteredQuery = if (containsTimestampField(mappingsResponse)) {
-            // only query data between now and the last PPL Monitor execution
-            // unless a look back window is specified, in which case use that instead,
-            // then inject a time filter where statement into PPL Monitor query.
-            // if the given monitor query already has any time check whatsoever, this
-            // simply returns the original query itself
-            val timeFilteredQuery = addTimeFilter(pplMonitor.query, lookbackPeriodStart, periodEnd, pplMonitor.lookBackWindow)
+        val timeFilteredQuery = if (pplMonitor.lookBackWindow != null) {
+            // if lookback window is specified, inject a top level lookback window time filter
+            // into the PPL query
+            val lookBackWindow = pplMonitor.lookBackWindow!!
+            val lookbackPeriodStart = periodEnd.minus(lookBackWindow.millis, ChronoUnit.MILLIS)
+            val timeFilteredQuery = addTimeFilter(pplMonitor.query, lookbackPeriodStart, periodEnd, pplMonitor.timestampField!!)
             logger.info("time filtered query: $timeFilteredQuery")
             timeFilteredQuery
         } else {
-            logger.info("ignoring lookback window, proceeding with query: ${pplMonitor.query}")
+            logger.info("look back window not specified, proceeding with query: ${pplMonitor.query}")
+            // otherwise, don't inject any time filter whatsoever
+            // unless the query itself has user-specified time filters, this query
+            // will return all applicable data in the cluster
             pplMonitor.query
         }
 
@@ -216,8 +205,6 @@ object PPLMonitorRunner : MonitorV2Runner {
                         for (queryResult in preparedQueryResults) {
                             val pplTriggerExecutionContext = PPLTriggerExecutionContext(
                                 pplMonitor,
-                                periodStart,
-                                periodEnd,
                                 null,
                                 pplTrigger,
                                 queryResult
@@ -264,35 +251,9 @@ object PPLMonitorRunner : MonitorV2Runner {
         return PPLMonitorRunResult(
             pplMonitor.name,
             null,
-            lookbackPeriodStart,
-            periodEnd,
             triggerResults,
             pplQueryResults
         )
-    }
-
-    private fun containsTimestampField(getMappingsResponse: GetMappingsResponse): Boolean {
-        val metadataMap = getMappingsResponse.mappings
-        try {
-            for (index in metadataMap.keys) {
-                val metadata = metadataMap[index]!!.sourceAsMap["properties"] as Map<String, Any>
-                if (!metadata.keys.contains(TIMESTAMP_FIELD)) {
-                    logger.info("query indices don't contain timestamp field: $TIMESTAMP_FIELD, ignoring lookback window")
-                    return false
-                }
-                val typeInfo = metadata["timestamp"] as Map<String, String>
-                if (typeInfo["type"] != "date") {
-                    logger.info("timestamp field: $TIMESTAMP_FIELD is present but not of type date, ignoring lookback window")
-                    return false
-                }
-            }
-        } catch (e: Exception) {
-            logger.info("failed to read query indices' fields, ignoring lookback window")
-            return false
-        }
-
-        logger.info("all query indices contain timestamp field: $TIMESTAMP_FIELD of type date, using lookback window")
-        return true
     }
 
     // returns true if the pplTrigger should be suppressed
@@ -319,26 +280,15 @@ object PPLMonitorRunner : MonitorV2Runner {
     // periodStart: the lower bound of the initially computed query interval based on monitor schedule
     // periodEnd: the upper bound of the initially computed query interval based on monitor schedule
     // lookBackWindow: customer's desired query look back window, overrides [periodStart, periodEnd] if not null
-    private fun addTimeFilter(query: String, lookbackPeriodStart: Instant, periodEnd: Instant, lookBackWindow: TimeValue): String {
-        // inject time filter into PPL query to only query for data within the (periodStart, periodEnd) interval
-        // TODO: if query contains "_time", "span", "earliest", "latest", skip adding filter
-        // pending https://github.com/opensearch-project/sql/issues/3969
-        // for now assume TIMESTAMP_FIELD field is always present in customer data
-
-        // if the raw query contained any time check whatsoever, skip adding a time filter internally
-        // and return query as is, customer's in-query time checks instantly and automatically overrides
-//        if (query.contains(TIMESTAMP_FIELD)) {
-//            return query
-//        }
-
+    private fun addTimeFilter(query: String, lookbackPeriodStart: Instant, periodEnd: Instant, timestampField: String): String {
         // PPL plugin only accepts timestamp strings in this format
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(UTC)
 
         val periodStartPplTimestamp = formatter.format(lookbackPeriodStart)
         val periodEndPplTimeStamp = formatter.format(periodEnd)
 
-        val timeFilterAppend = "| where $TIMESTAMP_FIELD > TIMESTAMP('$periodStartPplTimestamp') and " +
-            "$TIMESTAMP_FIELD < TIMESTAMP('$periodEndPplTimeStamp')"
+        val timeFilterAppend = "| where $timestampField > TIMESTAMP('$periodStartPplTimestamp') and " +
+            "$timestampField < TIMESTAMP('$periodEndPplTimeStamp')"
         val timeFilterReplace = "$timeFilterAppend |"
 
         val timeFilteredQuery: String = if (query.contains("|")) {
@@ -741,20 +691,5 @@ object PPLMonitorRunner : MonitorV2Runner {
         }
 
         return evalResultVarIdx
-    }
-
-    private fun getIndicesFromPplQuery(pplQuery: String): List<String> {
-        // captures comma-separated concrete indices, index patterns, and index aliases
-        val indicesRegex = """(?i)source(?:\s*)=(?:\s*)([-\w.*'+]+(?:\*)?(?:\s*,\s*[-\w.*'+]+\*?)*)\s*\|*""".toRegex()
-
-        // use find() instead of findAll() because a PPL query only ever has one source statement
-        // the only capture group specified in the regex captures the comma separated list of indices/index patterns
-        val indices = indicesRegex.find(pplQuery)?.groupValues?.get(1)?.split(",")?.map { it.trim() }
-            ?: throw IllegalStateException(
-                "Could not find indices that PPL Monitor query searches even " +
-                    "after validating the query through SQL/PPL plugin"
-            )
-
-        return indices
     }
 }

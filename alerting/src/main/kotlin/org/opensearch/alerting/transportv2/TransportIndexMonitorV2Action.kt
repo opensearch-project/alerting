@@ -14,6 +14,7 @@ import org.opensearch.action.admin.cluster.health.ClusterHealthAction
 import org.opensearch.action.admin.cluster.health.ClusterHealthRequest
 import org.opensearch.action.admin.cluster.health.ClusterHealthResponse
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
+import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.index.IndexRequest
@@ -23,6 +24,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.clustermanager.AcknowledgedResponse
+import org.opensearch.alerting.AlertingV2Utils.getIndicesFromPplQuery
 import org.opensearch.alerting.AlertingV2Utils.validateMonitorV2
 import org.opensearch.alerting.PPLMonitorRunner.appendCustomCondition
 import org.opensearch.alerting.PPLMonitorRunner.executePplQuery
@@ -168,10 +170,19 @@ class TransportIndexMonitorV2Action @Inject constructor(
                 withContext(singleThreadContext) {
                     it.restore()
 
-                    checkUser(user, validationListener, indexMonitorV2Request)
-                    log.info("done checking user")
-
                     val pplMonitor = indexMonitorV2Request.monitorV2 as PPLMonitor
+
+                    // first check the user for basic permissions
+                    val userHasPermissions = checkUser(user, validationListener, indexMonitorV2Request)
+                    if (!userHasPermissions) {
+                        return@withContext
+                    }
+
+                    // now check that given timestamp field is valid
+                    val timestampFieldValid = checkPplQueryIndicesForTimestampField(pplMonitor, validationListener)
+                    if (!timestampFieldValid) {
+                        return@withContext
+                    }
 
                     try {
                         val nodeClient = client as NodeClient
@@ -187,6 +198,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
                                 continue
                             }
 
+                            // TODO: move these functions to the AlertingV2Utils object
                             val evalResultVar = findEvalResultVar(pplTrigger.customCondition!!)
 
                             val queryWithCustomCondition = appendCustomCondition(pplMonitor.query, pplTrigger.customCondition!!)
@@ -229,12 +241,12 @@ class TransportIndexMonitorV2Action @Inject constructor(
 
     private fun checkUser(
         user: User?,
-        actionListener: ActionListener<Unit>,
+        validationListener: ActionListener<Unit>,
         indexMonitorV2Request: IndexMonitorV2Request,
-    ) {
+    ): Boolean {
         /* check initial user permissions */
-        if (!validateUserBackendRoles(user, actionListener)) {
-            return
+        if (!validateUserBackendRoles(user, validationListener)) {
+            return false
         }
 
         if (
@@ -247,29 +259,89 @@ class TransportIndexMonitorV2Action @Inject constructor(
                     "User specified backend roles, ${indexMonitorV2Request.rbacRoles}, " +
                         "that they don't have access to. User backend roles: ${user.backendRoles}"
                 )
-                actionListener.onFailure(
+                validationListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException(
                             "User specified backend roles that they don't have access to. Contact administrator", RestStatus.FORBIDDEN
                         )
                     )
                 )
-                return
+                return false
             } else if (indexMonitorV2Request.rbacRoles.isEmpty()) {
                 log.debug(
                     "Non-admin user are not allowed to specify an empty set of backend roles. " +
                         "Please don't pass in the parameter or pass in at least one backend role."
                 )
-                actionListener.onFailure(
+                validationListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException(
                             "Non-admin user are not allowed to specify an empty set of backend roles.", RestStatus.FORBIDDEN
                         )
                     )
                 )
-                return
+                return false
             }
         }
+
+        return true
+    }
+
+    // if look back window is specified, all the indices that the PPL query searches
+    // must contain the timestamp field specified in the PPL Monitor, and they must
+    // all be of OpenSearch data type "date"
+    private suspend fun checkPplQueryIndicesForTimestampField(
+        pplMonitor: PPLMonitor,
+        validationListener: ActionListener<Unit>
+    ): Boolean {
+        if (pplMonitor.lookBackWindow == null) {
+            // if no look back window was specified, no need
+            // to check for timestamp field in PPL query indices
+            return true
+        }
+
+        val pplQuery = pplMonitor.query
+        val timestampField = pplMonitor.timestampField
+
+        val indices = getIndicesFromPplQuery(pplQuery)
+        val getMappingsRequest = GetMappingsRequest().indices(*indices.toTypedArray())
+        val getMappingsResponse = client.suspendUntil { admin().indices().getMappings(getMappingsRequest, it) }
+
+        val metadataMap = getMappingsResponse.mappings
+        try {
+            for (index in metadataMap.keys) {
+                val metadata = metadataMap[index]!!.sourceAsMap["properties"] as Map<String, Any>
+                if (!metadata.keys.contains(timestampField)) {
+                    validationListener.onFailure(
+                        AlertingException.wrap(
+                            IllegalArgumentException("Query index $index don't contain given timestamp field: $timestampField")
+                        )
+                    )
+                    return false
+                }
+                val typeInfo = metadata[timestampField] as Map<String, String>
+                val type = typeInfo["type"]
+                if (type != "date") {
+                    validationListener.onFailure(
+                        AlertingException.wrap(
+                            IllegalArgumentException(
+                                "Timestamp field: $timestampField is present in index $index but is of type $type instead of type date"
+                            )
+                        )
+                    )
+                    return false
+                }
+            }
+        } catch (e: Exception) {
+            log.error("failed to read query indices' fields when checking for timestamp field: $timestampField")
+            validationListener.onFailure(
+                AlertingException.wrap(
+                    IllegalArgumentException("failed to read query indices' fields when checking for timestamp field: $timestampField", e)
+                )
+            )
+            return false
+        }
+
+        return true
     }
 
     private fun checkScheduledJobIndex(

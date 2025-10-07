@@ -28,7 +28,8 @@ interface MonitorV2 : ScheduledJob {
     val user: User?
     val triggers: List<TriggerV2>
     val schemaVersion: Int // for updating monitors
-    val lookBackWindow: TimeValue // how far back to look when querying data during monitor execution
+    val lookBackWindow: TimeValue? // how far back to look when querying data during monitor execution
+    val timestampField: String? // field that will be used to inject lookback window time filter
 
     fun asTemplateArg(): Map<String, Any?>
 
@@ -45,7 +46,8 @@ interface MonitorV2 : ScheduledJob {
         user: User? = this.user,
         // not supporting overriding triggers in copy
         schemaVersion: Int = this.schemaVersion,
-        lookBackWindow: TimeValue = this.lookBackWindow
+        lookBackWindow: TimeValue? = this.lookBackWindow,
+        timestampField: String? = this.timestampField
     ): MonitorV2
 
     enum class MonitorV2Type(val value: String) {
@@ -74,8 +76,9 @@ interface MonitorV2 : ScheduledJob {
         const val ENABLED_TIME_FIELD = "enabled_time"
         const val USER_FIELD = "user"
         const val TRIGGERS_FIELD = "triggers"
-        const val LOOK_BACK_WINDOW_FIELD = "look_back_window"
         const val SCHEMA_VERSION_FIELD = "schema_version"
+        const val LOOK_BACK_WINDOW_FIELD = "look_back_window"
+        const val TIMESTAMP_FIELD = "timestamp_field"
 
         // default values
         const val NO_ID = ""
