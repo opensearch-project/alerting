@@ -10,4 +10,3 @@ Compatible with OpenSearch and OpenSearch Dashboards version 3.3.0
 
 ### Maintenance
 * [AUTO] Increment version to 3.3.0-SNAPSHOT ([#1918](https://github.com/opensearch-project/alerting/pull/1918))
-* Adding toepkerd to MAINTAINERS.md ([#1935](https://github.com/opensearch-project/alerting/pull/1935))
