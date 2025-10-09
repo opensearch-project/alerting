@@ -28,14 +28,14 @@ ext {
 }
 
 repositories {
-    mavenLocal()
-    maven { 
-        url "https://central.sonatype.com/repository/maven-snapshots/"
-        mavenContent {
-            snapshotsOnly()
+    maven {
+        name = "Snapshots"
+        url = "https://central.sonatype.com/repository/maven-snapshots/"
+        credentials {
+            username System.getenv("SONATYPE_USERNAME")
+            password System.getenv("SONATYPE_PASSWORD")
         }
     }
-    mavenCentral()
 }
 
 configurations {
