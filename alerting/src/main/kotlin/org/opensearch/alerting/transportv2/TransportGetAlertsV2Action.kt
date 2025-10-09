@@ -23,8 +23,10 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.Alert.Companion.MONITOR_USER_FIELD
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.authuser.User.BACKEND_ROLES_FIELD
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -143,7 +145,7 @@ class TransportGetAlertsV2Action @Inject constructor(
             if (user != null && doFilterForUser(user)) {
                 // if security is enabled and filterby is enabled, add search filter
                 log.info("Filtering result by: ${user.backendRoles}")
-                addFilter(user, searchSourceBuilder, "monitor.user.backend_roles.keyword")
+                addFilter(user, searchSourceBuilder, "$MONITOR_USER_FIELD.$BACKEND_ROLES_FIELD.keyword")
             }
 
             search(alertIndex, searchSourceBuilder, actionListener)

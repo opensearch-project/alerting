@@ -1,5 +1,7 @@
 package org.opensearch.alerting
 
+import org.json.JSONArray
+import org.json.JSONObject
 import org.opensearch.alerting.core.modelv2.MonitorV2
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
@@ -41,5 +43,40 @@ object AlertingV2Utils {
             )
 
         return indices
+    }
+
+    fun capPplQueryResultsSize(pplQueryResults: JSONObject, maxSize: Long): JSONObject {
+        /*
+        the query results JSON object schema:
+        schema: an array of objects storing the data types of each value of the query result rows, in order
+        datarows: an array of arrays storing the query results themselves
+        total: total number of results / data rows
+        size: same as total, redundant field
+         */
+
+        // estimate byte size with serialized string length
+        // if query results size are already under the limit, do nothing
+        // and return the query results as is
+        val pplQueryResultsSize = pplQueryResults.toString().length
+        if (pplQueryResultsSize <= maxSize) {
+            return pplQueryResults
+        }
+
+        // if the query results exceed the limit, we need to replace the query results
+        // with a message that says the results were too large, but still retain the other
+        // ppl query response fields like schema, total, and size
+        val limitExceedMessageQueryResults = JSONObject()
+
+        val schema = JSONArray(pplQueryResults.getJSONArray("schema").toList())
+        val datarows = JSONArray().put(JSONArray(listOf("The PPL Query results were too large and thus excluded")))
+        val total = pplQueryResults.getInt("total")
+        val size = pplQueryResults.getInt("size")
+
+        limitExceedMessageQueryResults.put("schema", schema)
+        limitExceedMessageQueryResults.put("datarows", datarows)
+        limitExceedMessageQueryResults.put("total", total)
+        limitExceedMessageQueryResults.put("size", size)
+
+        return limitExceedMessageQueryResults
     }
 }

@@ -97,6 +97,24 @@
     },
     "query": {
       "type": "text"
+    },
+    "query_results":  {
+      "type": "nested",
+      "properties": {
+        "schema": {
+          "type": "nested",
+          "dynamic": true
+        },
+        "datarows": {
+          "type": "text"
+        },
+        "total": {
+          "type": "integer"
+        },
+        "size": {
+          "type": "integer"
+        }
+      }
     }
   }
 }

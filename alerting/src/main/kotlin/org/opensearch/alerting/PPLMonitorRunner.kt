@@ -10,6 +10,7 @@ import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.AlertingV2Utils.capPplQueryResultsSize
 import org.opensearch.alerting.QueryLevelMonitorRunner.getConfigAndSendNotification
 import org.opensearch.alerting.alertsv2.AlertV2Indices
 import org.opensearch.alerting.core.modelv2.AlertV2
@@ -149,42 +150,45 @@ object PPLMonitorRunner : MonitorV2Runner {
                 }
                 logger.info("query execution results for trigger ${pplTrigger.name}: $queryResponseJson")
 
-                // retrieve deep copies of only the relevant query response rows.
-                // for num_results triggers, that's the entire response
-                // for custom triggers, that's only rows that evaluated to true
-                val relevantQueryResultRows = if (pplTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) {
-                    // number of results trigger
-                    getQueryResponseWithoutSize(queryResponseJson)
-                } else {
-                    // custom condition trigger
-                    collectCustomConditionResults(queryResponseJson, pplTrigger)
-                }
+                // store the query results for Execute Monitor API response
+                // unlike the query results stored in alerts and notifications, which must be size capped
+                // (because they will be stored in the OpenSearch cluster or sent as notification) and based
+                // on only the query results that met the trigger condition (because alerts should generate
+                // on query results that met trigger condition, not those that didn't), the pplQueryResults
+                // here will be returned as part of the Execute Monitor API response. This will return the original,
+                // untouched set of query results, and whether this causes size exceed errors is deferred
+                // to HTTP's response size limits
+                pplQueryResults[pplTrigger.id] = queryResponseJson.toMap()
 
                 // retrieve the number of results
                 // for number of results triggers, this is simply the number of PPL query results
                 // for custom triggers, this is the number of rows in the query response's eval result column that evaluated to true
-                val numResults = relevantQueryResultRows.getLong("total")
-                logger.info("number of results: $numResults")
+
+                logger.info("number of results: ${queryResponseJson.getLong("total")}")
 
                 // determine if the trigger condition has been met
                 val triggered = if (pplTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number of results trigger
-                    evaluateNumResultsTrigger(numResults, pplTrigger.numResultsCondition!!, pplTrigger.numResultsValue!!)
+                    evaluateNumResultsTrigger(queryResponseJson, pplTrigger.numResultsCondition!!, pplTrigger.numResultsValue!!)
                 } else { // custom condition trigger
-                    numResults > 0 // if any of the query results satisfied the custom condition, the trigger counts as triggered
+                    evaluateCustomTrigger(queryResponseJson, pplTrigger.customCondition!!)
                 }
 
                 logger.info("PPLTrigger ${pplTrigger.name} triggered: $triggered")
 
-                // store the trigger execution and ppl query results for
-                // trigger execution response and notification message context
+                // store the trigger execution results for Execute Monitor API response
                 triggerResults[pplTrigger.id] = PPLTriggerRunResult(pplTrigger.name, triggered, null)
-                pplQueryResults[pplTrigger.id] = queryResponseJson.toMap()
 
                 if (triggered) {
+                    // retrieve some limits from settings
+                    val maxQueryResultsSize =
+                        monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERT_V2_QUERY_RESULTS_MAX_SIZE)
+                    val maxAlerts =
+                        monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERT_V2_PER_RESULT_TRIGGER_MAX_ALERTS)
+
                     // if trigger is on result set mode, this list will have exactly 1 element
                     // if trigger is on per result mode, this list will have as many elements as the query results had rows
                     // up to the max number of alerts a per result trigger can generate
-                    val preparedQueryResults = prepareQueryResults(relevantQueryResultRows, pplTrigger.mode, monitorCtx)
+                    val preparedQueryResults = splitUpQueryResults(pplTrigger, queryResponseJson, maxQueryResultsSize, maxAlerts)
 
                     // generate alerts based on trigger mode
                     // if this trigger is on result_set mode, this list contains exactly 1 alert
@@ -305,7 +309,12 @@ object PPLMonitorRunner : MonitorV2Runner {
         return timeFilteredQuery
     }
 
-    private fun evaluateNumResultsTrigger(numResults: Long, numResultsCondition: NumResultsCondition, numResultsValue: Long): Boolean {
+    private fun evaluateNumResultsTrigger(
+        pplQueryResponse: JSONObject,
+        numResultsCondition: NumResultsCondition,
+        numResultsValue: Long
+    ): Boolean {
+        val numResults = pplQueryResponse.getLong("total")
         return when (numResultsCondition) {
             NumResultsCondition.GREATER_THAN -> numResults > numResultsValue
             NumResultsCondition.GREATER_THAN_EQUAL -> numResults >= numResultsValue
@@ -316,110 +325,91 @@ object PPLMonitorRunner : MonitorV2Runner {
         }
     }
 
-    private fun getQueryResponseWithoutSize(queryResponseJson: JSONObject): JSONObject {
-        // this will eventually store a deep copy of just the rows that triggered the custom condition
-        val queryResponseDeepCopy = JSONObject()
-
-        // first add a deep copy of the schema
-        queryResponseDeepCopy.put("schema", JSONArray(queryResponseJson.getJSONArray("schema").toList()))
-
-        // append empty datarows list, to be populated later
-        queryResponseDeepCopy.put("datarows", JSONArray())
-
-        val dataRowList = queryResponseJson.getJSONArray("datarows")
-        for (i in 0 until dataRowList.length()) {
-            val dataRow = dataRowList.getJSONArray(i)
-            queryResponseDeepCopy.getJSONArray("datarows").put(JSONArray(dataRow.toList()))
-        }
-
-        // include the total but not the size field of the PPL Query response
-        queryResponseDeepCopy.put("total", queryResponseJson.getLong("total"))
-
-        return queryResponseDeepCopy
-    }
-
-    private fun collectCustomConditionResults(customConditionQueryResponse: JSONObject, pplTrigger: PPLTrigger): JSONObject {
-        // a PPL query with custom condition returning 0 results should imply a valid but not useful query.
-        // do not trigger alert, but warn that query likely is not functioning as user intended
-        if (customConditionQueryResponse.getLong("total") == 0L) {
-            logger.warn(
-                "During execution of PPL Trigger ${pplTrigger.name}, PPL query with custom " +
-                    "condition returned no results. Proceeding without generating alert."
-            )
-            return customConditionQueryResponse
-        }
-
-        // this will eventually store a deep copy of just the rows that triggered the custom condition
-        val relevantQueryResultRows = JSONObject()
-
-        // first add a deep copy of the schema
-        relevantQueryResultRows.put("schema", JSONArray(customConditionQueryResponse.getJSONArray("schema").toList()))
-
-        // append empty datarows list, to be populated later
-        relevantQueryResultRows.put("datarows", JSONArray())
-
+    private fun evaluateCustomTrigger(pplQueryResponse: JSONObject, customCondition: String): Boolean {
         // find the name of the eval result variable defined in custom condition
-        val evalResultVarName = findEvalResultVar(pplTrigger.customCondition!!)
+        val evalResultVarName = findEvalResultVar(customCondition)
 
         // find the index eval statement result variable in the PPL query response schema
-        val evalResultVarIdx = findEvalResultVarIdxInSchema(customConditionQueryResponse, evalResultVarName)
+        val evalResultVarIdx = findEvalResultVarIdxInSchema(pplQueryResponse, evalResultVarName)
 
-        val dataRowList = customConditionQueryResponse.getJSONArray("datarows")
+        val dataRowList = pplQueryResponse.getJSONArray("datarows")
         for (i in 0 until dataRowList.length()) {
             val dataRow = dataRowList.getJSONArray(i)
             val evalResult = dataRow.getBoolean(evalResultVarIdx)
             if (evalResult) {
-                // if the row triggered the custom condition
-                // add it to the relevant results deep copy
-                relevantQueryResultRows.getJSONArray("datarows").put(JSONArray(dataRow.toList()))
+                return true
             }
         }
 
-        // include the total but not the size field of the PPL Query response
-        relevantQueryResultRows.put("total", relevantQueryResultRows.getJSONArray("datarows").length())
-
-        // return only the rows that triggered the custom condition
-        return relevantQueryResultRows
+        return false
     }
 
     // prepares the query results to be passed into alerts and notifications based on trigger mode
-    // if result set, alert and notification simply stores all query results
-    // if per result, each alert and notification stores a single row of the query results
-    private fun prepareQueryResults(
-        relevantQueryResultRows: JSONObject,
-        triggerMode: TriggerMode,
-        monitorCtx: MonitorRunnerExecutionContext
+    // if result set, alert and notification simply stores all query results.
+    // if per result, each alert and notification stores a single row of the query results.
+    // this function then ensures that only a capped number of results are returned to generate alerts
+    // and notifications based on. it also caps the size of the query results themselves.
+    private fun splitUpQueryResults(
+        pplTrigger: PPLTrigger,
+        pplQueryResults: JSONObject,
+        maxQueryResultsSize: Long,
+        maxAlerts: Int
     ): List<JSONObject> {
         // case: result set
         // return the results as a single set of all the results
-        if (triggerMode == TriggerMode.RESULT_SET) {
-            return listOf(relevantQueryResultRows)
+        if (pplTrigger.mode == TriggerMode.RESULT_SET) {
+            val sizeCappedRelevantQueryResultRows = capPplQueryResultsSize(pplQueryResults, maxQueryResultsSize)
+            return listOf(sizeCappedRelevantQueryResultRows)
         }
 
         // case: per result
-        // prepare to generate an alert for each query result row
+        // prepare to generate an alert for each relevant query result row
         val individualRows = mutableListOf<JSONObject>()
-        val numAlertsToGenerate = relevantQueryResultRows.getInt("total")
-        for (i in 0 until numAlertsToGenerate) {
-            val individualRow = JSONObject()
-            individualRow.put("schema", JSONArray(relevantQueryResultRows.getJSONArray("schema").toList()))
-            individualRow.put(
-                "datarows",
-                JSONArray().put(
-                    JSONArray(relevantQueryResultRows.getJSONArray("datarows").getJSONArray(i).toList())
-                )
-            )
-            individualRows.add(individualRow)
+        if (pplTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // nested case: number_of_results
+            val numAlertsToGenerate = pplQueryResults.getInt("total")
+            for (i in 0 until numAlertsToGenerate) {
+                addRowToList(individualRows, pplQueryResults, i, maxQueryResultsSize)
+            }
+        } else { // nested case: custom
+            val evalResultVarName = findEvalResultVar(pplTrigger.customCondition!!)
+            val evalResultVarIdx = findEvalResultVarIdxInSchema(pplQueryResults, evalResultVarName)
+            val dataRowList = pplQueryResults.getJSONArray("datarows")
+            for (i in 0 until dataRowList.length()) {
+                val dataRow = dataRowList.getJSONArray(i)
+                val evalResult = dataRow.getBoolean(evalResultVarIdx)
+                if (evalResult) {
+                    addRowToList(individualRows, pplQueryResults, i, maxQueryResultsSize)
+                }
+            }
         }
 
         logger.info("individualRows: $individualRows")
 
         // there may be many query result rows, and generating an alert for each of them could lead to cluster issues,
         // so limit the number of per_result alerts that are generated
-        val maxAlerts = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERT_V2_PER_RESULT_TRIGGER_MAX_ALERTS)
-        val reducedIndividualRows = individualRows.take(maxAlerts)
+        val cappedIndividualRows = individualRows.take(maxAlerts)
 
-        return reducedIndividualRows
+        return cappedIndividualRows
+    }
+
+    private fun addRowToList(
+        individualRows: MutableList<JSONObject>,
+        pplQueryResults: JSONObject,
+        i: Int,
+        maxQueryResultsSize: Long
+    ) {
+        val individualRow = JSONObject()
+        individualRow.put("total", 1) // set the size explicitly to 1 for consistency
+        individualRow.put("size", 1)
+        individualRow.put("schema", JSONArray(pplQueryResults.getJSONArray("schema").toList()))
+        individualRow.put(
+            "datarows",
+            JSONArray().put(
+                JSONArray(pplQueryResults.getJSONArray("datarows").getJSONArray(i).toList())
+            )
+        )
+        val sizeCappedIndividualRow = capPplQueryResultsSize(individualRow, maxQueryResultsSize)
+        individualRows.add(sizeCappedIndividualRow)
     }
 
     private fun generateAlerts(
@@ -441,6 +431,7 @@ object PPLMonitorRunner : MonitorV2Runner {
                 triggerId = pplTrigger.id,
                 triggerName = pplTrigger.name,
                 query = pplMonitor.query,
+                queryResults = queryResult.toMap(),
                 triggeredTime = timeOfCurrentExecution,
                 expirationTime = expirationTime,
                 severity = pplTrigger.severity,
@@ -473,6 +464,7 @@ object PPLMonitorRunner : MonitorV2Runner {
             triggerId = pplTrigger.id,
             triggerName = pplTrigger.name,
             query = pplMonitor.query,
+            queryResults = mapOf(), // TODO: decouple alerts and notifs errors
             triggeredTime = timeOfCurrentExecution,
             expirationTime = expirationTime,
             errorMessage = obfuscatedErrorMessage,
@@ -547,40 +539,6 @@ object PPLMonitorRunner : MonitorV2Runner {
         // this function can throw an exception, which is caught by the try
         // catch in runMonitor() to generate an error alert
 
-        // these are the full query results we got from the monitor's
-        // query execution
-        val pplQueryFullResults = triggerCtx.pplQueryResults
-
-        // make a deep copy of the original query results with only a single data row
-        // do this by serializing the full results into a string, then creating a new JSONObject from the string,
-        // then remove all but one row in the deep copy's datarows
-        val pplQueryResultsSingleRow = JSONObject(pplQueryFullResults.toString())
-        pplQueryResultsSingleRow.getJSONArray("datarows").apply {
-            for (i in length() - 1 downTo 1) {
-                remove(i)
-            }
-        }
-
-        // estimate byte size with string length
-        val size = pplQueryFullResults.toString().length
-        val oneRowSize = pplQueryResultsSingleRow.toString().length
-
-        logger.info("pplQueryFullResults: $pplQueryFullResults")
-        logger.info("pplQueryResultsSingleRow: $pplQueryResultsSingleRow")
-
-        // retrieve the size limit from cluster settings
-        val maxSize = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERT_V2_NOTIF_QUERY_RESULTS_MAX_SIZE)
-
-        var truncatedToSingleRow = false
-        var truncatedEntirely = false
-        if (size > maxSize && oneRowSize <= maxSize) {
-            triggerCtx.pplQueryResults = pplQueryResultsSingleRow
-            truncatedToSingleRow = true
-        } else if (size > maxSize && oneRowSize > maxSize) {
-            triggerCtx.pplQueryResults = JSONObject()
-            truncatedEntirely = true
-        }
-
         val notifSubject = if (action.subjectTemplate != null)
             MonitorRunnerService.compileTemplateV2(action.subjectTemplate!!, triggerCtx)
         else ""
@@ -588,14 +546,6 @@ object PPLMonitorRunner : MonitorV2Runner {
         var notifMessage = MonitorRunnerService.compileTemplateV2(action.messageTemplate, triggerCtx)
         if (Strings.isNullOrEmpty(notifMessage)) {
             throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
-        }
-
-        if (truncatedToSingleRow) {
-            notifMessage += "\n\n(Note from Alerting Plugin: the full query results were too large, " +
-                "only one query result row was passed into this notification)"
-        } else if (truncatedEntirely) {
-            notifMessage += "\n\n(Note from Alerting Plugin: the query results were too large, " +
-                "no query results were passed into this notification)"
         }
 
         if (!dryrun) {
@@ -660,12 +610,6 @@ object PPLMonitorRunner : MonitorV2Runner {
         val evalResultVar = regex.find(customCondition)?.groupValues?.get(1)
             ?: throw IllegalArgumentException("Given custom condition is invalid, could not find eval result variable")
         return evalResultVar
-
-//        val startOfEvalStatement = "eval "
-//
-//        val startIdx = customCondition.indexOf(startOfEvalStatement) + startOfEvalStatement.length
-//        val endIdx = startIdx + customCondition.substring(startIdx).indexOfFirst { it == ' ' || it == '=' }
-//        return customCondition.substring(startIdx, endIdx)
     }
 
     fun findEvalResultVarIdxInSchema(customConditionQueryResponse: JSONObject, evalResultVarName: String): Int {

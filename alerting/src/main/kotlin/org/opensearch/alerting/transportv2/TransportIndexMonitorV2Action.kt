@@ -43,7 +43,6 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_M
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_QUERY_LENGTH
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_SUPPRESSION_DURATION
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_TRIGGERS
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MIN_SUPPRESSION_DURATION
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.transport.SecureTransportAction
@@ -52,6 +51,7 @@ import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentHelper
@@ -74,6 +74,7 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 import org.opensearch.transport.client.node.NodeClient
+import java.util.concurrent.TimeUnit
 
 private val log = LogManager.getLogger(TransportIndexMonitorV2Action::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
@@ -92,19 +93,21 @@ class TransportIndexMonitorV2Action @Inject constructor(
 ),
     SecureTransportAction {
 
+    // adjustable limits (via settings)
     @Volatile private var maxMonitors = ALERTING_V2_MAX_MONITORS.get(settings)
     @Volatile private var maxTriggers = ALERTING_V2_MAX_TRIGGERS.get(settings)
-    @Volatile private var minSuppressDuration = ALERTING_V2_MIN_SUPPRESSION_DURATION.get(settings)
     @Volatile private var maxSuppressDuration = ALERTING_V2_MAX_SUPPRESSION_DURATION.get(settings)
     @Volatile private var maxQueryLength = ALERTING_V2_MAX_QUERY_LENGTH.get(settings)
     @Volatile private var requestTimeout = REQUEST_TIMEOUT.get(settings)
     @Volatile private var indexTimeout = INDEX_TIMEOUT.get(settings)
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
+    // hard, nonadjustable limits
+    private val minSuppressDuration = TimeValue(1L, TimeUnit.MINUTES)
+
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_MONITORS) { maxMonitors = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_TRIGGERS) { maxTriggers = it }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MIN_SUPPRESSION_DURATION) { minSuppressDuration = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_SUPPRESSION_DURATION) { maxSuppressDuration = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_QUERY_LENGTH) { maxQueryLength = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(REQUEST_TIMEOUT) { requestTimeout = it }
@@ -719,14 +722,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
         user: User?
     ) {
         var monitorV2 = indexMonitorRequest.monitorV2
-//        var monitorV2 = when (indexMonitorRequest.monitorV2) {
-//            is PPLMonitor -> {
-//                val pplMonitor = indexMonitorRequest.monitorV2 as PPLMonitor
-//                validatePplMonitor(pplMonitor)
-//                pplMonitor
-//            }
-//            else -> throw IllegalArgumentException("received unsupported monitor type to index: ${indexMonitorRequest.monitorV2.javaClass}")
-//        }
 
         if (user != null) {
             // Use the backend roles which is an intersection of the requested backend roles and the user's backend roles.
