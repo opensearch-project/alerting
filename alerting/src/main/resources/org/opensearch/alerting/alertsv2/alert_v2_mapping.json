@@ -106,7 +106,8 @@
           "dynamic": true
         },
         "datarows": {
-          "type": "text"
+          "type": "object",
+          "enabled": false
         },
         "total": {
           "type": "integer"

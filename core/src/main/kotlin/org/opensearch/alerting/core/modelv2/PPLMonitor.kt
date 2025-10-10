@@ -364,6 +364,8 @@ data class PPLMonitor(
             requireNotNull(lastUpdateTime) { "Last update time is null" }
             if (lookBackWindow != null) {
                 requireNotNull(timestampField) { "If look back window is specified, timestamp field must not be null" }
+            } else {
+                require(timestampField == null) { "If look back window is not specified, timestamp field must not be specified" }
             }
 
             if (queryLanguage == QueryLanguage.SQL) {
