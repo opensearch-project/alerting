@@ -19,6 +19,7 @@ import org.opensearch.alerting.model.AlertContext
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailEntry
 import org.opensearch.alerting.model.destination.email.EmailGroup
+import org.opensearch.alerting.resthandler.MonitorV2RestApiIT.Companion.TIMESTAMP_FIELD
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.Request
 import org.opensearch.client.RequestOptions
@@ -307,6 +308,7 @@ fun randomPPLMonitor(
     enabled: Boolean = randomBoolean(),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
     lookbackWindow: TimeValue = randomTimeValue(),
+    timestampField: String = TIMESTAMP_FIELD,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     triggers: List<PPLTrigger> = (1..randomInt(10)).map { randomPPLTrigger() },
@@ -319,6 +321,7 @@ fun randomPPLMonitor(
         enabled = enabled,
         schedule = schedule,
         lookBackWindow = lookbackWindow,
+        timestampField = timestampField,
         lastUpdateTime = lastUpdateTime,
         enabledTime = enabledTime,
         triggers = triggers,
