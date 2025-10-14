@@ -106,6 +106,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return NamedXContentRegistry(
             mutableListOf(
                 Monitor.XCONTENT_REGISTRY,
+                MonitorV2.XCONTENT_REGISTRY,
                 SearchInput.XCONTENT_REGISTRY,
                 DocLevelMonitorInput.XCONTENT_REGISTRY,
                 QueryLevelTrigger.XCONTENT_REGISTRY,
@@ -160,12 +161,19 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun createMonitorV2(monitorV2: MonitorV2): MonitorV2 {
         val client = client()
         val response = client.makeRequest("POST", MONITOR_V2_BASE_URI, emptyMap(), monitorV2.toHttpEntity())
-        assertEquals("Unable to create a new monitor", RestStatus.CREATED, response.restStatus())
+        assertEquals("Unable to create a new monitor", RestStatus.OK, response.restStatus())
 
         val monitorV2Json = jsonXContent.createParser(
             NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
             response.entity.content
         ).map()
+
+        val responseBody = response.asMap()
+        logger.info("response body: $responseBody")
+        val createdId = responseBody["_id"] as String
+        val createdVersion = responseBody["_version"] as Int
+        assertNotEquals("response is missing Id", MonitorV2.NO_ID, createdId)
+        assertTrue("incorrect version", createdVersion > 0)
 
         return getMonitorV2(monitorV2Id = monitorV2Json["_id"] as String)
     }
@@ -553,6 +561,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun createRandomPPLMonitor(): PPLMonitor {
         val pplMonitor = randomPPLMonitor()
+        logger.info("ppl monitor: $pplMonitor")
         val pplMonitorId = createMonitorV2(pplMonitor).id
         return getMonitorV2(monitorV2Id = pplMonitorId) as PPLMonitor
     }
@@ -677,7 +686,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             when (parser.currentName()) {
                 "_id" -> id = parser.text()
                 "_version" -> version = parser.longValue()
-                "monitor_v2" -> monitorV2 = MonitorV2.parse(parser)
+                "monitorV2" -> monitorV2 = MonitorV2.parse(parser)
             }
         }
 

@@ -311,7 +311,7 @@ fun randomPPLMonitor(
     timestampField: String = TIMESTAMP_FIELD,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
-    triggers: List<PPLTrigger> = (1..randomInt(10)).map { randomPPLTrigger() },
+    triggers: List<PPLTrigger> = List(randomIntBetween(1, 5)) { randomPPLTrigger() },
     user: User = randomUser(),
     queryLanguage: QueryLanguage = QueryLanguage.PPL,
     query: String = "source = index | head 10"
@@ -484,10 +484,8 @@ val TERM_DLS_QUERY = """{\"term\": { \"accessible\": true}}"""
 
 fun randomTimeValue(
     unit: TimeUnit = setOf(TimeUnit.MINUTES, TimeUnit.HOURS, TimeUnit.DAYS).random(),
-    value: Long = randomLongBetween(1, 50)
-): TimeValue {
-    return TimeValue(value, unit)
-}
+    value: Long = if (unit == TimeUnit.DAYS) randomLongBetween(1, 5) else randomLongBetween(1, 50)
+): TimeValue = TimeValue(value, unit)
 
 fun randomTemplateScript(
     source: String,

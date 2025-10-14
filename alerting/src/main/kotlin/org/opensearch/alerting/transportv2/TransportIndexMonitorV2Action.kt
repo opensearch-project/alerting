@@ -164,7 +164,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
         }
     }
 
-    // validates the PPL Monitor query and user's permissions to the indices it queries by submitting it to SQL/PPL plugin
+    // validates the PPL Monitor, its query, and user's permissions to the indices it queries by submitting it to SQL/PPL plugin
     private fun validatePplMonitorUserPermissionsAndQuery(
         indexMonitorV2Request: IndexMonitorV2Request,
         user: User?,
@@ -178,30 +178,15 @@ class TransportIndexMonitorV2Action @Inject constructor(
 
                     val pplMonitor = indexMonitorV2Request.monitorV2 as PPLMonitor
 
-                    // run basic validations against the PPL Monitor
-                    val pplMonitorValid = validatePplMonitor(pplMonitor, validationListener)
-                    if (!pplMonitorValid) {
-                        return@withContext
-                    }
-
-                    // check the user for basic permissions
-                    val userHasPermissions = checkUser(user, indexMonitorV2Request, validationListener)
-                    if (!userHasPermissions) {
-                        return@withContext
-                    }
-
-                    // check that given timestamp field is valid
-                    val timestampFieldValid = checkPplQueryIndicesForTimestampField(pplMonitor, validationListener)
-                    if (!timestampFieldValid) {
-                        return@withContext
-                    }
-
-                    // TODO: put this in a function just like above
+                    // TODO: put this in a function like the rest of the validations
+                    // first attempt to run the monitor query and all possible
+                    // extensions of it (from custom conditions)
                     try {
                         val nodeClient = client as NodeClient
 
-                        // first attempt to run the base query
-                        // if there are any PPL syntax errors, this will throw an exception
+                        // first run the base query as is.
+                        // if there are any PPL syntax or index not found or other errors,
+                        // this will throw an exception
                         executePplQuery(pplMonitor.query, nodeClient)
 
                         // now scan all the triggers with custom conditions, and ensure each query constructed
@@ -246,6 +231,25 @@ class TransportIndexMonitorV2Action @Inject constructor(
                                 IllegalArgumentException("Validation error for PPL Query in PPL Monitor: ${e.userErrorMessage()}")
                             )
                         )
+                        return@withContext
+                    }
+
+                    // run basic validations against the PPL Monitor
+                    val pplMonitorValid = validatePplMonitor(pplMonitor, validationListener)
+                    if (!pplMonitorValid) {
+                        return@withContext
+                    }
+
+                    // check the user for basic permissions
+                    val userHasPermissions = checkUser(user, indexMonitorV2Request, validationListener)
+                    if (!userHasPermissions) {
+                        return@withContext
+                    }
+
+                    // check that given timestamp field is valid
+                    val timestampFieldValid = checkPplQueryIndicesForTimestampField(pplMonitor, validationListener)
+                    if (!timestampFieldValid) {
+                        return@withContext
                     }
                 }
             }

@@ -27,9 +27,16 @@ class MonitorV2RestApiIT : AlertingRestTestCase() {
             }
         """.trimIndent()
 
-    fun `test parsing monitor v2 as a scheduled job`() {
+    fun `test create monitor v2, get monitor v2, then parsing monitor v2 as a scheduled job`() {
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, testIndexMappings)
 
+        // this util function calls the create monitor API, then the get
+        // monitor API so it can return the PPLMonitor object created.
+        // the util function already contains assertions for the create
+        // monitor flow. If its execution is successful, it means
+        // it was also able to successfully get the monitor it created.
+        // this test explicitly tests create monitor and get monitor
+        // for completeness
         val monitorV2 = createRandomPPLMonitor()
 
         val builder = monitorV2.toXContentWithUser(XContentBuilder.builder(XContentType.JSON.xContent()), USE_TYPED_KEYS)
