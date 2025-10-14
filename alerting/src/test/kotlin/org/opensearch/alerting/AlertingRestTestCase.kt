@@ -29,6 +29,8 @@ import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.Slack
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
+import org.opensearch.alerting.resthandler.MonitorV2RestApiIT.Companion.TEST_INDEX_MAPPINGS
+import org.opensearch.alerting.resthandler.MonitorV2RestApiIT.Companion.TEST_INDEX_NAME
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.DestinationType
@@ -173,7 +175,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val createdId = responseBody["_id"] as String
         val createdVersion = responseBody["_version"] as Int
         assertNotEquals("response is missing Id", MonitorV2.NO_ID, createdId)
-        assertTrue("incorrect version", createdVersion > 0)
+        assertEquals("incorrect version", 1, createdVersion)
 
         return getMonitorV2(monitorV2Id = monitorV2Json["_id"] as String)
     }
@@ -560,6 +562,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     protected fun createRandomPPLMonitor(): PPLMonitor {
+        // every random ppl monitor's query searches index TEST_INDEX_NAME,
+        // so create that first before creating the monitor
+        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         val pplMonitor = randomPPLMonitor()
         logger.info("ppl monitor: $pplMonitor")
         val pplMonitorId = createMonitorV2(pplMonitor).id

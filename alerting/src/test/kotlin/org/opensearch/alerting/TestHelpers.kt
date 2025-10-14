@@ -19,6 +19,7 @@ import org.opensearch.alerting.model.AlertContext
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailEntry
 import org.opensearch.alerting.model.destination.email.EmailGroup
+import org.opensearch.alerting.resthandler.MonitorV2RestApiIT.Companion.TEST_INDEX_NAME
 import org.opensearch.alerting.resthandler.MonitorV2RestApiIT.Companion.TIMESTAMP_FIELD
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.Request
@@ -307,14 +308,14 @@ fun randomPPLMonitor(
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     enabled: Boolean = randomBoolean(),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
-    lookbackWindow: TimeValue = randomTimeValue(),
-    timestampField: String = TIMESTAMP_FIELD,
+    lookbackWindow: TimeValue? = randomTimeValue(),
+    timestampField: String? = TIMESTAMP_FIELD,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     triggers: List<PPLTrigger> = List(randomIntBetween(1, 5)) { randomPPLTrigger() },
     user: User = randomUser(),
     queryLanguage: QueryLanguage = QueryLanguage.PPL,
-    query: String = "source = index | head 10"
+    query: String = "source = $TEST_INDEX_NAME | head 10"
 ): PPLMonitor {
     return PPLMonitor(
         name = name,
@@ -484,7 +485,7 @@ val TERM_DLS_QUERY = """{\"term\": { \"accessible\": true}}"""
 
 fun randomTimeValue(
     unit: TimeUnit = setOf(TimeUnit.MINUTES, TimeUnit.HOURS, TimeUnit.DAYS).random(),
-    value: Long = if (unit == TimeUnit.DAYS) randomLongBetween(1, 5) else randomLongBetween(1, 50)
+    value: Long = if (unit == TimeUnit.DAYS) randomLongBetween(1, 5) else randomLongBetween(1, 23)
 ): TimeValue = TimeValue(value, unit)
 
 fun randomTemplateScript(

@@ -138,7 +138,7 @@ data class PPLTrigger(
             NAME_FIELD to name,
             SEVERITY_FIELD to severity.value,
             SUPPRESS_FIELD to suppressDuration?.toHumanReadableString(0),
-            EXPIRE_FIELD to expireDuration?.toHumanReadableString(0),
+            EXPIRE_FIELD to expireDuration.toHumanReadableString(0),
             ACTIONS_FIELD to actions.map { it.asTemplateArg() },
             MODE_FIELD to mode.value,
             CONDITION_TYPE_FIELD to conditionType.value,
@@ -289,13 +289,11 @@ data class PPLTrigger(
                         }
                     }
                     SUPPRESS_FIELD -> {
-                        suppressDuration = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) {
-                            // if expire field is null, skip reading it and let it retain the default value
-                            null
-                        } else {
+                        // if suppress field is null, skip reading it and let it retain the default value
+                        if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
                             val input = xcp.text()
                             try {
-                                TimeValue.parseTimeValue(input, PLACEHOLDER_SUPPRESS_SETTING_NAME)
+                                suppressDuration = TimeValue.parseTimeValue(input, PLACEHOLDER_SUPPRESS_SETTING_NAME)
                             } catch (e: Exception) {
                                 throw AlertingException.wrap(
                                     IllegalArgumentException("Invalid value for field: $SUPPRESS_FIELD", e)

@@ -46,7 +46,6 @@ import java.util.concurrent.TimeUnit
  * @property enabled Boolean flag indicating whether the monitor is currently on or off.
  * @property schedule Defines when and how often the monitor should run. Can be a CRON or interval schedule.
  * @property lookBackWindow How far back each Monitor execution's query should look back when searching data.
- *                    Only applicable if Monitor uses CRON schedule. Optional even if CRON schedule is used.
  * @property lastUpdateTime Timestamp of the last update to this monitor.
  * @property enabledTime Timestamp when the monitor was last enabled. Null if never enabled.
  * @property triggers List of [PPLTrigger]s associated with this monitor.

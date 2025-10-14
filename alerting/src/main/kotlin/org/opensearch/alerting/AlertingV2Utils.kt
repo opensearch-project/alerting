@@ -35,7 +35,7 @@ object AlertingV2Utils {
         val indicesRegex = """(?i)source(?:\s*)=(?:\s*)([-\w.*'+]+(?:\*)?(?:\s*,\s*[-\w.*'+]+\*?)*)\s*\|*""".toRegex()
 
         // use find() instead of findAll() because a PPL query only ever has one source statement
-        // the only capture group specified in the regex captures the comma separated list of indices/index patterns
+        // the only capture group specified in the regex captures the comma separated string of indices/index patterns
         val indices = indicesRegex.find(pplQuery)?.groupValues?.get(1)?.split(",")?.map { it.trim() }
             ?: throw IllegalStateException(
                 "Could not find indices that PPL Monitor query searches even " +
