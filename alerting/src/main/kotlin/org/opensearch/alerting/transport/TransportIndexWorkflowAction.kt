@@ -5,9 +5,6 @@
 
 package org.opensearch.alerting.transport
 
-import java.util.Locale
-import java.util.UUID
-import java.util.stream.Collectors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -84,69 +81,59 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
+import java.util.Locale
+import java.util.UUID
+import java.util.stream.Collectors
 
 private val log = LogManager.getLogger(TransportIndexWorkflowAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
-class TransportIndexWorkflowAction
-@Inject
-constructor(
-        transportService: TransportService,
-        val client: Client,
-        actionFilters: ActionFilters,
-        val scheduledJobIndices: ScheduledJobIndices,
-        val clusterService: ClusterService,
-        val settings: Settings,
-        val xContentRegistry: NamedXContentRegistry,
-        val namedWriteableRegistry: NamedWriteableRegistry,
-) :
-        HandledTransportAction<ActionRequest, IndexWorkflowResponse>(
-                AlertingActions.INDEX_WORKFLOW_ACTION_NAME,
-                transportService,
-                actionFilters,
-                ::IndexWorkflowRequest
-        ),
-        SecureTransportAction {
+class TransportIndexWorkflowAction @Inject constructor(
+    transportService: TransportService,
+    val client: Client,
+    actionFilters: ActionFilters,
+    val scheduledJobIndices: ScheduledJobIndices,
+    val clusterService: ClusterService,
+    val settings: Settings,
+    val xContentRegistry: NamedXContentRegistry,
+    val namedWriteableRegistry: NamedWriteableRegistry,
+) : HandledTransportAction<ActionRequest, IndexWorkflowResponse>(
+    AlertingActions.INDEX_WORKFLOW_ACTION_NAME, transportService, actionFilters, ::IndexWorkflowRequest
+),
+    SecureTransportAction {
 
-    @Volatile private var maxMonitors = ALERTING_MAX_MONITORS.get(settings)
+    @Volatile
+    private var maxMonitors = ALERTING_MAX_MONITORS.get(settings)
 
-    @Volatile private var requestTimeout = REQUEST_TIMEOUT.get(settings)
+    @Volatile
+    private var requestTimeout = REQUEST_TIMEOUT.get(settings)
 
-    @Volatile private var indexTimeout = INDEX_TIMEOUT.get(settings)
+    @Volatile
+    private var indexTimeout = INDEX_TIMEOUT.get(settings)
 
-    @Volatile private var maxActionThrottle = MAX_ACTION_THROTTLE_VALUE.get(settings)
+    @Volatile
+    private var maxActionThrottle = MAX_ACTION_THROTTLE_VALUE.get(settings)
 
-    @Volatile private var allowList = ALLOW_LIST.get(settings)
+    @Volatile
+    private var allowList = ALLOW_LIST.get(settings)
 
-    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile
+    override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_MAX_MONITORS) {
-            maxMonitors = it
-        }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(REQUEST_TIMEOUT) {
-            requestTimeout = it
-        }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(INDEX_TIMEOUT) {
-            indexTimeout = it
-        }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_ACTION_THROTTLE_VALUE) {
-            maxActionThrottle = it
-        }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_MAX_MONITORS) { maxMonitors = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(REQUEST_TIMEOUT) { requestTimeout = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(INDEX_TIMEOUT) { indexTimeout = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_ACTION_THROTTLE_VALUE) { maxActionThrottle = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALLOW_LIST) { allowList = it }
         listenFilterBySettingChange(clusterService)
     }
 
-    override fun doExecute(
-            task: Task,
-            request: ActionRequest,
-            actionListener: ActionListener<IndexWorkflowResponse>
-    ) {
-        val transformedRequest =
-                request as? IndexWorkflowRequest
-                        ?: recreateObject(request, namedWriteableRegistry) {
-                            IndexWorkflowRequest(it)
-                        }
+    override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<IndexWorkflowResponse>) {
+        val transformedRequest = request as? IndexWorkflowRequest
+            ?: recreateObject(request, namedWriteableRegistry) {
+                IndexWorkflowRequest(it)
+            }
 
         val user = readUserFromThreadContext(client)
 
@@ -154,36 +141,37 @@ constructor(
             return
         }
 
-        if (user != null && !isAdmin(user) && transformedRequest.rbacRoles != null) {
-            if (transformedRequest.rbacRoles?.stream()?.allMatch {
-                        !user.backendRoles.contains(it)
-                    } == true
-            ) {
+        if (
+            user != null &&
+            !isAdmin(user) &&
+            transformedRequest.rbacRoles != null
+        ) {
+            if (transformedRequest.rbacRoles?.stream()?.anyMatch { !user.backendRoles.contains(it) } == true) {
                 log.error(
-                        "User specified backend roles, ${transformedRequest.rbacRoles}, " +
-                                "that they don' have access to. User backend roles: ${user.backendRoles}"
+                    "User specified backend roles, ${transformedRequest.rbacRoles}, " +
+                        "that they don' have access to. User backend roles: ${user.backendRoles}"
                 )
                 actionListener.onFailure(
-                        AlertingException.wrap(
-                                OpenSearchStatusException(
-                                        "User specified backend roles that they don't have access to. Contact administrator",
-                                        RestStatus.FORBIDDEN
-                                )
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "User specified backend roles that they don't have access to. Contact administrator",
+                            RestStatus.FORBIDDEN
                         )
+                    )
                 )
                 return
             } else if (transformedRequest.rbacRoles?.isEmpty() == true) {
                 log.error(
-                        "Non-admin user are not allowed to specify an empty set of backend roles. " +
-                                "Please don't pass in the parameter or pass in at least one backend role."
+                    "Non-admin user are not allowed to specify an empty set of backend roles. " +
+                        "Please don't pass in the parameter or pass in at least one backend role."
                 )
                 actionListener.onFailure(
-                        AlertingException.wrap(
-                                OpenSearchStatusException(
-                                        "Non-admin user are not allowed to specify an empty set of backend roles.",
-                                        RestStatus.FORBIDDEN
-                                )
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "Non-admin user are not allowed to specify an empty set of backend roles.",
+                            RestStatus.FORBIDDEN
                         )
+                    )
                 )
                 return
             }
@@ -192,34 +180,31 @@ constructor(
         scope.launch {
             try {
                 validateMonitorAccess(
-                        transformedRequest,
-                        user,
-                        client,
-                        object : ActionListener<AcknowledgedResponse> {
-                            override fun onResponse(response: AcknowledgedResponse) {
-                                // Stash the context and start the workflow creation
-                                client.threadPool().threadContext.stashContext().use {
-                                    IndexWorkflowHandler(
-                                                    client,
-                                                    actionListener,
-                                                    transformedRequest,
-                                                    user
-                                            )
-                                            .resolveUserAndStart()
-                                }
-                            }
-
-                            override fun onFailure(e: Exception) {
-                                log.error("Error indexing workflow", e)
-                                actionListener.onFailure(e)
+                    transformedRequest,
+                    user,
+                    client,
+                    object : ActionListener<AcknowledgedResponse> {
+                        override fun onResponse(response: AcknowledgedResponse) {
+                            // Stash the context and start the workflow creation
+                            client.threadPool().threadContext.stashContext().use {
+                                IndexWorkflowHandler(client, actionListener, transformedRequest, user).resolveUserAndStart()
                             }
                         }
+
+                        override fun onFailure(e: Exception) {
+                            log.error("Error indexing workflow", e)
+                            actionListener.onFailure(e)
+                        }
+                    }
                 )
             } catch (e: Exception) {
                 log.error("Failed to create workflow", e)
                 if (e is IndexNotFoundException) {
                     actionListener.onFailure(
-                            OpenSearchStatusException("Monitors not found", RestStatus.NOT_FOUND)
+                        OpenSearchStatusException(
+                            "Monitors not found",
+                            RestStatus.NOT_FOUND
+                        )
                     )
                 } else {
                     actionListener.onFailure(e)
@@ -229,10 +214,10 @@ constructor(
     }
 
     inner class IndexWorkflowHandler(
-            private val client: Client,
-            private val actionListener: ActionListener<IndexWorkflowResponse>,
-            private val request: IndexWorkflowRequest,
-            private val user: User?,
+        private val client: Client,
+        private val actionListener: ActionListener<IndexWorkflowResponse>,
+        private val request: IndexWorkflowRequest,
+        private val user: User?,
     ) {
         fun resolveUserAndStart() {
             scope.launch {
@@ -260,65 +245,51 @@ constructor(
 
         fun start() {
             if (!scheduledJobIndices.scheduledJobIndexExists()) {
-                scheduledJobIndices.initScheduledJobIndex(
-                        object : ActionListener<CreateIndexResponse> {
-                            override fun onResponse(response: CreateIndexResponse) {
-                                onCreateMappingsResponse(response.isAcknowledged)
-                            }
+                scheduledJobIndices.initScheduledJobIndex(object : ActionListener<CreateIndexResponse> {
+                    override fun onResponse(response: CreateIndexResponse) {
+                        onCreateMappingsResponse(response.isAcknowledged)
+                    }
 
-                            override fun onFailure(t: Exception) {
-                                // https://github.com/opensearch-project/alerting/issues/646
-                                if (ExceptionsHelper.unwrapCause(t) is
-                                                ResourceAlreadyExistsException
-                                ) {
-                                    scope.launch {
-                                        // Wait for the yellow status
-                                        val request =
-                                                ClusterHealthRequest()
-                                                        .indices(SCHEDULED_JOBS_INDEX)
-                                                        .waitForYellowStatus()
-                                        val response: ClusterHealthResponse =
-                                                client.suspendUntil {
-                                                    execute(
-                                                            ClusterHealthAction.INSTANCE,
-                                                            request,
-                                                            it
-                                                    )
-                                                }
-                                        if (response.isTimedOut) {
-                                            log.error("Workflow creation timeout", t)
-                                            actionListener.onFailure(
-                                                    OpenSearchException(
-                                                            "Cannot determine that the $SCHEDULED_JOBS_INDEX index is healthy"
-                                                    )
-                                            )
-                                        }
-                                        // Retry mapping of workflow
-                                        onCreateMappingsResponse(true)
-                                    }
-                                } else {
-                                    log.error("Failed to create workflow", t)
-                                    actionListener.onFailure(AlertingException.wrap(t))
+                    override fun onFailure(t: Exception) {
+                        // https://github.com/opensearch-project/alerting/issues/646
+                        if (ExceptionsHelper.unwrapCause(t) is ResourceAlreadyExistsException) {
+                            scope.launch {
+                                // Wait for the yellow status
+                                val request = ClusterHealthRequest()
+                                    .indices(SCHEDULED_JOBS_INDEX)
+                                    .waitForYellowStatus()
+                                val response: ClusterHealthResponse = client.suspendUntil {
+                                    execute(ClusterHealthAction.INSTANCE, request, it)
                                 }
+                                if (response.isTimedOut) {
+                                    log.error("Workflow creation timeout", t)
+                                    actionListener.onFailure(
+                                        OpenSearchException("Cannot determine that the $SCHEDULED_JOBS_INDEX index is healthy")
+                                    )
+                                }
+                                // Retry mapping of workflow
+                                onCreateMappingsResponse(true)
                             }
+                        } else {
+                            log.error("Failed to create workflow", t)
+                            actionListener.onFailure(AlertingException.wrap(t))
                         }
-                )
+                    }
+                })
             } else if (!IndexUtils.scheduledJobIndexUpdated) {
                 IndexUtils.updateIndexMapping(
-                        SCHEDULED_JOBS_INDEX,
-                        ScheduledJobIndices.scheduledJobMappings(),
-                        clusterService.state(),
-                        client.admin().indices(),
-                        object : ActionListener<AcknowledgedResponse> {
-                            override fun onResponse(response: AcknowledgedResponse) {
-                                onUpdateMappingsResponse(response)
-                            }
-
-                            override fun onFailure(t: Exception) {
-                                log.error("Failed to create workflow", t)
-                                actionListener.onFailure(AlertingException.wrap(t))
-                            }
+                    SCHEDULED_JOBS_INDEX,
+                    ScheduledJobIndices.scheduledJobMappings(), clusterService.state(), client.admin().indices(),
+                    object : ActionListener<AcknowledgedResponse> {
+                        override fun onResponse(response: AcknowledgedResponse) {
+                            onUpdateMappingsResponse(response)
                         }
+
+                        override fun onFailure(t: Exception) {
+                            log.error("Failed to create workflow", t)
+                            actionListener.onFailure(AlertingException.wrap(t))
+                        }
+                    }
                 )
             } else {
                 prepareWorkflowIndexing()
@@ -326,16 +297,19 @@ constructor(
         }
 
         /**
-         * This function prepares for indexing a new workflow. If this is an update request we can
-         * simply update the workflow. Otherwise we first check to see how many monitors already
-         * exist, and compare this to the [maxMonitorCount]. Requests that breach this threshold
-         * will be rejected.
+         * This function prepares for indexing a new workflow.
+         * If this is an update request we can simply update the workflow. Otherwise we first check to see how many monitors already exist,
+         * and compare this to the [maxMonitorCount]. Requests that breach this threshold will be rejected.
          */
         private fun prepareWorkflowIndexing() {
             if (request.method == RestRequest.Method.PUT) {
-                scope.launch { updateWorkflow() }
+                scope.launch {
+                    updateWorkflow()
+                }
             } else {
-                scope.launch { indexWorkflow() }
+                scope.launch {
+                    indexWorkflow()
+                }
             }
         }
 
@@ -347,12 +321,12 @@ constructor(
             } else {
                 log.error("Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged.")
                 actionListener.onFailure(
-                        AlertingException.wrap(
-                                OpenSearchStatusException(
-                                        "Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged",
-                                        RestStatus.INTERNAL_SERVER_ERROR
-                                )
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "Create $SCHEDULED_JOBS_INDEX mappings call not acknowledged",
+                            RestStatus.INTERNAL_SERVER_ERROR
                         )
+                    )
                 )
             }
         }
@@ -365,23 +339,21 @@ constructor(
             } else {
                 log.error("Update $SCHEDULED_JOBS_INDEX mappings call not acknowledged.")
                 actionListener.onFailure(
-                        AlertingException.wrap(
-                                OpenSearchStatusException(
-                                        "Updated $SCHEDULED_JOBS_INDEX mappings call not acknowledged.",
-                                        RestStatus.INTERNAL_SERVER_ERROR
-                                )
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "Updated $SCHEDULED_JOBS_INDEX mappings call not acknowledged.",
+                            RestStatus.INTERNAL_SERVER_ERROR
                         )
+                    )
                 )
             }
         }
 
         private suspend fun indexWorkflow() {
             if (user != null) {
-                val rbacRoles =
-                        if (request.rbacRoles == null) user.backendRoles.toSet()
-                        else if (!isAdmin(user))
-                                request.rbacRoles?.intersect(user.backendRoles)?.toSet()
-                        else request.rbacRoles
+                val rbacRoles = if (request.rbacRoles == null) user.backendRoles.toSet()
+                else if (!isAdmin(user)) request.rbacRoles?.intersect(user.backendRoles)?.toSet()
+                else request.rbacRoles
 
                 request.workflow =
                         request.workflow.copy(
@@ -396,91 +368,71 @@ constructor(
                 log.debug("Created workflow's backend roles: $rbacRoles")
             }
 
-            val indexRequest =
-                    IndexRequest(SCHEDULED_JOBS_INDEX)
-                            .setRefreshPolicy(request.refreshPolicy)
-                            .source(
-                                    request.workflow.toXContentWithUser(
-                                            jsonBuilder(),
-                                            ToXContent.MapParams(mapOf("with_type" to "true"))
-                                    )
-                            )
-                            .setIfSeqNo(request.seqNo)
-                            .setIfPrimaryTerm(request.primaryTerm)
-                            .timeout(indexTimeout)
+            val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
+                .setRefreshPolicy(request.refreshPolicy)
+                .source(
+                    request.workflow.toXContentWithUser(
+                        jsonBuilder(),
+                        ToXContent.MapParams(mapOf("with_type" to "true"))
+                    )
+                )
+                .setIfSeqNo(request.seqNo)
+                .setIfPrimaryTerm(request.primaryTerm)
+                .timeout(indexTimeout)
 
             try {
-                val indexResponse: IndexResponse =
-                        client.suspendUntil { client.index(indexRequest, it) }
+                val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
                 val failureReasons = checkShardsFailure(indexResponse)
                 if (failureReasons != null) {
                     log.error("Failed to create workflow: $failureReasons")
                     actionListener.onFailure(
-                            AlertingException.wrap(
-                                    OpenSearchStatusException(
-                                            failureReasons.toString(),
-                                            indexResponse.status()
-                                    )
+                        AlertingException.wrap(
+                            OpenSearchStatusException(
+                                failureReasons.toString(),
+                                indexResponse.status()
                             )
+                        )
                     )
                     return
                 }
 
                 val createdWorkflow = request.workflow.copy(id = indexResponse.id)
-                val executionId =
-                        CompositeWorkflowRunner.generateExecutionId(false, createdWorkflow)
+                val executionId = CompositeWorkflowRunner.generateExecutionId(false, createdWorkflow)
 
-                val (workflowMetadata, _) =
-                        WorkflowMetadataService.getOrCreateWorkflowMetadata(
-                                workflow = createdWorkflow,
-                                skipIndex = false,
-                                executionId = executionId
-                        )
+                val (workflowMetadata, _) = WorkflowMetadataService.getOrCreateWorkflowMetadata(
+                    workflow = createdWorkflow,
+                    skipIndex = false,
+                    executionId = executionId
+                )
 
-                val delegates =
-                        (createdWorkflow.inputs[0] as CompositeInput).sequence.delegates.sortedBy {
-                            it.order
-                        }
-                val monitors =
-                        monitorCtx.workflowService!!.getMonitorsById(
-                                delegates.map { it.monitorId },
-                                delegates.size
-                        )
+                val delegates = (createdWorkflow.inputs[0] as CompositeInput).sequence.delegates.sortedBy { it.order }
+                val monitors = monitorCtx.workflowService!!.getMonitorsById(delegates.map { it.monitorId }, delegates.size)
 
                 for (monitor in monitors) {
-                    var (monitorMetadata, created) =
-                            MonitorMetadataService.getOrCreateMetadata(
-                                    monitor = monitor,
-                                    createWithRunContext = true,
-                                    workflowMetadataId = workflowMetadata.id
-                            )
+                    var (monitorMetadata, created) = MonitorMetadataService.getOrCreateMetadata(
+                        monitor = monitor,
+                        createWithRunContext = true,
+                        workflowMetadataId = workflowMetadata.id
+                    )
 
                     if (created == false) {
                         log.warn("Metadata doc id:${monitorMetadata.id} exists, but it shouldn't!")
                     }
 
-                    if (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) ==
-                                    Monitor.MonitorType.DOC_LEVEL_MONITOR
+                    if (
+                        Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
                     ) {
                         val oldMonitorMetadata = MonitorMetadataService.getMetadata(monitor)
-                        monitorMetadata =
-                                monitorMetadata.copy(
-                                        sourceToQueryIndexMapping =
-                                                oldMonitorMetadata!!.sourceToQueryIndexMapping
-                                )
+                        monitorMetadata = monitorMetadata.copy(sourceToQueryIndexMapping = oldMonitorMetadata!!.sourceToQueryIndexMapping)
                     }
-                    // When inserting queries in queryIndex we could update
-                    // sourceToQueryIndexMapping
+                    // When inserting queries in queryIndex we could update sourceToQueryIndexMapping
                     MonitorMetadataService.upsertMetadata(monitorMetadata, updating = true)
                 }
                 actionListener.onResponse(
-                        IndexWorkflowResponse(
-                                indexResponse.id,
-                                indexResponse.version,
-                                indexResponse.seqNo,
-                                indexResponse.primaryTerm,
-                                request.workflow.copy(id = indexResponse.id)
-                        )
+                    IndexWorkflowResponse(
+                        indexResponse.id, indexResponse.version, indexResponse.seqNo,
+                        indexResponse.primaryTerm, request.workflow.copy(id = indexResponse.id)
+                    )
                 )
             } catch (t: Exception) {
                 log.error("Failed to index workflow", t)
@@ -494,24 +446,20 @@ constructor(
                 val getResponse: GetResponse = client.suspendUntil { client.get(getRequest, it) }
                 if (!getResponse.isExists) {
                     actionListener.onFailure(
-                            AlertingException.wrap(
-                                    OpenSearchStatusException(
-                                            "Workflow with ${request.workflowId} is not found",
-                                            RestStatus.NOT_FOUND
-                                    )
+                        AlertingException.wrap(
+                            OpenSearchStatusException(
+                                "Workflow with ${request.workflowId} is not found",
+                                RestStatus.NOT_FOUND
                             )
+                        )
                     )
                     return
                 }
-                val xcp =
-                        XContentHelper.createParser(
-                                xContentRegistry,
-                                LoggingDeprecationHandler.INSTANCE,
-                                getResponse.sourceAsBytesRef,
-                                XContentType.JSON
-                        )
-                val workflow =
-                        ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Workflow
+                val xcp = XContentHelper.createParser(
+                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                    getResponse.sourceAsBytesRef, XContentType.JSON
+                )
+                val workflow = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Workflow
                 onGetResponse(workflow)
             } catch (t: Exception) {
                 actionListener.onFailure(AlertingException.wrap(t))
@@ -520,38 +468,34 @@ constructor(
 
         private suspend fun onGetResponse(currentWorkflow: Workflow) {
             if (!checkUserPermissionsWithResource(
-                            user,
-                            currentWorkflow.user,
-                            actionListener,
-                            "workfklow",
-                            request.workflowId
-                    )
+                    user,
+                    currentWorkflow.user,
+                    actionListener,
+                    "workfklow",
+                    request.workflowId
+                )
             ) {
                 return
             }
 
-            // If both are enabled, use the current existing monitor enabled time, otherwise the
-            // next execution will be
+            // If both are enabled, use the current existing monitor enabled time, otherwise the next execution will be
             // incorrect.
             if (request.workflow.enabled && currentWorkflow.enabled)
-                    request.workflow =
-                            request.workflow.copy(enabledTime = currentWorkflow.enabledTime)
+                request.workflow = request.workflow.copy(enabledTime = currentWorkflow.enabledTime)
 
             /**
-             * On update workflow check which backend roles to associate to the workflow. Below are
-             * 2 examples of how the logic works
+             * On update workflow check which backend roles to associate to the workflow.
+             * Below are 2 examples of how the logic works
              *
              * Example 1, say we have a Workflow with backend roles [a, b, c, d] associated with it.
-             * If I'm User A (non-admin user) and I have backend roles [a, b, c] associated with me
-             * and I make a request to update the Workflow's backend roles to [a, b]. This would
-             * mean that the roles to remove are [c] and the roles to add are [a, b]. The Workflow's
-             * backend roles would then be [a, b, d].
+             * If I'm User A (non-admin user) and I have backend roles [a, b, c] associated with me and I make a request to update
+             * the Workflow's backend roles to [a, b]. This would mean that the roles to remove are [c] and the roles to add are [a, b].
+             * The Workflow's backend roles would then be [a, b, d].
              *
              * Example 2, say we have a Workflow with backend roles [a, b, c, d] associated with it.
-             * If I'm User A (admin user) and I have backend roles [a, b, c] associated with me and
-             * I make a request to update the Workflow's backend roles to [a, b]. This would mean
-             * that the roles to remove are [c, d] and the roles to add are [a, b]. The Workflow's
-             * backend roles would then be [a, b].
+             * If I'm User A (admin user) and I have backend roles [a, b, c] associated with me and I make a request to update
+             * the Workflow's backend roles to [a, b]. This would mean that the roles to remove are [c, d] and the roles to add are [a, b].
+             * The Workflow's backend roles would then be [a, b].
              */
             if (user != null) {
                 if (request.rbacRoles != null) {
@@ -569,8 +513,7 @@ constructor(
                     } else {
                         // rolesToRemove: these are the backend roles to remove from the monitor
                         val rolesToRemove = user.backendRoles - request.rbacRoles.orEmpty()
-                        // remove the monitor's roles with rolesToRemove and add any roles passed
-                        // into the request.rbacRoles
+                        // remove the monitor's roles with rolesToRemove and add any roles passed into the request.rbacRoles
                         val updatedRbac =
                                 currentWorkflow.user?.backendRoles.orEmpty() - rolesToRemove +
                                         request.rbacRoles.orEmpty()
@@ -596,64 +539,51 @@ constructor(
                                                     user.customAttNames
                                             )
                             )
+                        )
                 }
-                log.debug(
-                        "Update workflow backend roles to: ${request.workflow.user?.backendRoles}"
-                )
+                log.debug("Update workflow backend roles to: ${request.workflow.user?.backendRoles}")
             }
 
-            request.workflow =
-                    request.workflow.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
-            val indexRequest =
-                    IndexRequest(SCHEDULED_JOBS_INDEX)
-                            .setRefreshPolicy(request.refreshPolicy)
-                            .source(
-                                    request.workflow.toXContentWithUser(
-                                            jsonBuilder(),
-                                            ToXContent.MapParams(mapOf("with_type" to "true"))
-                                    )
-                            )
-                            .id(request.workflowId)
-                            .setIfSeqNo(request.seqNo)
-                            .setIfPrimaryTerm(request.primaryTerm)
-                            .timeout(indexTimeout)
+            request.workflow = request.workflow.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
+            val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
+                .setRefreshPolicy(request.refreshPolicy)
+                .source(
+                    request.workflow.toXContentWithUser(
+                        jsonBuilder(),
+                        ToXContent.MapParams(mapOf("with_type" to "true"))
+                    )
+                )
+                .id(request.workflowId)
+                .setIfSeqNo(request.seqNo)
+                .setIfPrimaryTerm(request.primaryTerm)
+                .timeout(indexTimeout)
 
             try {
-                val indexResponse: IndexResponse =
-                        client.suspendUntil { client.index(indexRequest, it) }
+                val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
                 val failureReasons = checkShardsFailure(indexResponse)
                 if (failureReasons != null) {
                     actionListener.onFailure(
-                            AlertingException.wrap(
-                                    OpenSearchStatusException(
-                                            failureReasons.toString(),
-                                            indexResponse.status()
-                                    )
+                        AlertingException.wrap(
+                            OpenSearchStatusException(
+                                failureReasons.toString(),
+                                indexResponse.status()
                             )
+                        )
                     )
                     return
                 }
 
                 val updatedWorkflow = request.workflow.copy(id = indexResponse.id)
-                val executionId =
-                        CompositeWorkflowRunner.generateExecutionId(false, updatedWorkflow)
+                val executionId = CompositeWorkflowRunner.generateExecutionId(false, updatedWorkflow)
 
-                val (workflowMetadata, _) =
-                        WorkflowMetadataService.getOrCreateWorkflowMetadata(
-                                workflow = updatedWorkflow,
-                                skipIndex = false,
-                                executionId = executionId
-                        )
+                val (workflowMetadata, _) = WorkflowMetadataService.getOrCreateWorkflowMetadata(
+                    workflow = updatedWorkflow,
+                    skipIndex = false,
+                    executionId = executionId
+                )
 
-                val delegates =
-                        (updatedWorkflow.inputs[0] as CompositeInput).sequence.delegates.sortedBy {
-                            it.order
-                        }
-                val monitors =
-                        monitorCtx.workflowService!!.getMonitorsById(
-                                delegates.map { it.monitorId },
-                                delegates.size
-                        )
+                val delegates = (updatedWorkflow.inputs[0] as CompositeInput).sequence.delegates.sortedBy { it.order }
+                val monitors = monitorCtx.workflowService!!.getMonitorsById(delegates.map { it.monitorId }, delegates.size)
 
                 for (monitor in monitors) {
                     var isWorkflowRestarted = false
@@ -662,38 +592,27 @@ constructor(
                         isWorkflowRestarted = true
                     }
 
-                    val (monitorMetadata, created) =
-                            MonitorMetadataService.getOrCreateMetadata(
-                                    monitor = monitor,
-                                    createWithRunContext = true,
-                                    workflowMetadataId = workflowMetadata.id,
-                                    forceCreateLastRunContext = isWorkflowRestarted
-                            )
+                    val (monitorMetadata, created) = MonitorMetadataService.getOrCreateMetadata(
+                        monitor = monitor,
+                        createWithRunContext = true,
+                        workflowMetadataId = workflowMetadata.id,
+                        forceCreateLastRunContext = isWorkflowRestarted
+                    )
 
                     if (!created &&
-                                    Monitor.MonitorType.valueOf(
-                                            monitor.monitorType.uppercase(Locale.ROOT)
-                                    ) == Monitor.MonitorType.DOC_LEVEL_MONITOR
+                        Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
                     ) {
-                        var updatedMetadata =
-                                MonitorMetadataService.recreateRunContext(monitorMetadata, monitor)
+                        var updatedMetadata = MonitorMetadataService.recreateRunContext(monitorMetadata, monitor)
                         val oldMonitorMetadata = MonitorMetadataService.getMetadata(monitor)
-                        updatedMetadata =
-                                updatedMetadata.copy(
-                                        sourceToQueryIndexMapping =
-                                                oldMonitorMetadata!!.sourceToQueryIndexMapping
-                                )
+                        updatedMetadata = updatedMetadata.copy(sourceToQueryIndexMapping = oldMonitorMetadata!!.sourceToQueryIndexMapping)
                         MonitorMetadataService.upsertMetadata(updatedMetadata, updating = true)
                     }
                 }
                 actionListener.onResponse(
-                        IndexWorkflowResponse(
-                                indexResponse.id,
-                                indexResponse.version,
-                                indexResponse.seqNo,
-                                indexResponse.primaryTerm,
-                                request.workflow.copy(id = currentWorkflow.id)
-                        )
+                    IndexWorkflowResponse(
+                        indexResponse.id, indexResponse.version, indexResponse.seqNo,
+                        indexResponse.primaryTerm, request.workflow.copy(id = currentWorkflow.id)
+                    )
                 )
             } catch (t: Exception) {
                 actionListener.onFailure(AlertingException.wrap(t))
@@ -712,22 +631,16 @@ constructor(
         }
     }
 
-    private fun validateChainedMonitorFindingsMonitors(
-            delegates: List<Delegate>,
-            monitorDelegates: List<Monitor>
-    ) {
+    private fun validateChainedMonitorFindingsMonitors(delegates: List<Delegate>, monitorDelegates: List<Monitor>) {
         infix fun <T> List<T>.equalsIgnoreOrder(other: List<T>) =
-                this.size == other.size && this.toSet() == other.toSet()
+            this.size == other.size && this.toSet() == other.toSet()
 
         val monitorsById = monitorDelegates.associateBy { it.id }
         delegates.forEach {
-            val delegateMonitor =
-                    monitorsById[it.monitorId]
-                            ?: throw AlertingException.wrap(
-                                    IllegalArgumentException(
-                                            "Delegate monitor ${it.monitorId} doesn't exist"
-                                    )
-                            )
+
+            val delegateMonitor = monitorsById[it.monitorId] ?: throw AlertingException.wrap(
+                IllegalArgumentException("Delegate monitor ${it.monitorId} doesn't exist")
+            )
             if (it.chainedMonitorFindings != null) {
                 val chainedMonitorIds: MutableList<String> = mutableListOf()
                 if (it.chainedMonitorFindings!!.monitorId.isNullOrBlank()) {
@@ -737,19 +650,12 @@ constructor(
                 }
                 chainedMonitorIds.forEach { chainedMonitorId ->
                     val chainedFindingMonitor =
-                            monitorsById[chainedMonitorId]
-                                    ?: throw AlertingException.wrap(
-                                            IllegalArgumentException(
-                                                    "Chained finding monitor $chainedMonitorId doesn't exist"
-                                            )
-                                    )
+                        monitorsById[chainedMonitorId] ?: throw AlertingException.wrap(
+                            IllegalArgumentException("Chained finding monitor $chainedMonitorId doesn't exist")
+                        )
 
                     if (chainedFindingMonitor.isQueryLevelMonitor()) {
-                        throw AlertingException.wrap(
-                                IllegalArgumentException(
-                                        "Query level monitor can't be part of chained findings"
-                                )
-                        )
+                        throw AlertingException.wrap(IllegalArgumentException("Query level monitor can't be part of chained findings"))
                     }
 
                     val delegateMonitorIndices = getMonitorIndices(delegateMonitor)
@@ -758,10 +664,10 @@ constructor(
 
                     if (!delegateMonitorIndices.containsAll(chainedMonitorIndices)) {
                         throw AlertingException.wrap(
-                                IllegalArgumentException(
-                                        "Delegate monitor indices ${delegateMonitorIndices.joinToString()} " +
-                                                "doesn't query all of chained findings monitor's indices ${chainedMonitorIndices.joinToString()}}"
-                                )
+                            IllegalArgumentException(
+                                "Delegate monitor indices ${delegateMonitorIndices.joinToString()} " +
+                                    "doesn't query all of chained findings monitor's indices ${chainedMonitorIndices.joinToString()}}"
+                            )
                         )
                     }
                 }
@@ -769,17 +675,16 @@ constructor(
         }
     }
 
-    /** Returns list of indices for the given monitor depending on it's type */
+    /**
+     * Returns list of indices for the given monitor depending on it's type
+     */
     private fun getMonitorIndices(monitor: Monitor): List<String> {
         if (monitor.isMonitorOfStandardType()) {
             return when (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT))) {
-                Monitor.MonitorType.DOC_LEVEL_MONITOR ->
-                        (monitor.inputs[0] as DocLevelMonitorInput).indices
-                Monitor.MonitorType.BUCKET_LEVEL_MONITOR ->
-                        monitor.inputs.flatMap { s -> (s as SearchInput).indices }
+                Monitor.MonitorType.DOC_LEVEL_MONITOR -> (monitor.inputs[0] as DocLevelMonitorInput).indices
+                Monitor.MonitorType.BUCKET_LEVEL_MONITOR -> monitor.inputs.flatMap { s -> (s as SearchInput).indices }
                 Monitor.MonitorType.QUERY_LEVEL_MONITOR -> {
-                    if (isADMonitor(monitor))
-                            monitor.inputs.flatMap { s -> (s as SearchInput).indices }
+                    if (isADMonitor(monitor)) monitor.inputs.flatMap { s -> (s as SearchInput).indices }
                     else {
                         val indices = mutableListOf<String>()
                         for (input in monitor.inputs) {
@@ -791,6 +696,7 @@ constructor(
                         indices
                     }
                 }
+
                 else -> emptyList()
             }
         } else {
@@ -799,40 +705,31 @@ constructor(
     }
 
     private fun validateDelegateMonitorsExist(
-            monitorIds: List<String>,
-            delegateMonitors: List<Monitor>,
+        monitorIds: List<String>,
+        delegateMonitors: List<Monitor>,
     ) {
         val reqMonitorIds: MutableList<String> = monitorIds as MutableList<String>
-        delegateMonitors.forEach { reqMonitorIds.remove(it.id) }
+        delegateMonitors.forEach {
+            reqMonitorIds.remove(it.id)
+        }
         if (reqMonitorIds.isNotEmpty()) {
-            throw AlertingException.wrap(
-                    IllegalArgumentException(
-                            ("${reqMonitorIds.joinToString()} are not valid monitor ids")
-                    )
-            )
+            throw AlertingException.wrap(IllegalArgumentException(("${reqMonitorIds.joinToString()} are not valid monitor ids")))
         }
     }
 
     /**
      * Validates monitor and indices access
-     * 1. Validates the monitor access (if the filterByEnabled is set to true - adds backend role
-     * filter) as admin
+     * 1. Validates the monitor access (if the filterByEnabled is set to true - adds backend role filter) as admin
      * 2. Unstashes the context and checks if the user can access the monitor indices
      */
     private suspend fun validateMonitorAccess(
-            request: IndexWorkflowRequest,
-            user: User?,
-            client: Client,
-            actionListener: ActionListener<AcknowledgedResponse>,
+        request: IndexWorkflowRequest,
+        user: User?,
+        client: Client,
+        actionListener: ActionListener<AcknowledgedResponse>,
     ) {
         val compositeInput = request.workflow.inputs[0] as CompositeInput
-        val monitorIds =
-                compositeInput
-                        .sequence
-                        .delegates
-                        .stream()
-                        .map { it.monitorId }
-                        .collect(Collectors.toList())
+        val monitorIds = compositeInput.sequence.delegates.stream().map { it.monitorId }.collect(Collectors.toList())
         val query = QueryBuilders.boolQuery().filter(QueryBuilders.termsQuery("_id", monitorIds))
         val searchSource = SearchSourceBuilder().query(query)
         val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
@@ -841,36 +738,29 @@ constructor(
             addFilter(user, searchRequest.source(), "monitor.user.backend_roles.keyword")
         }
 
-        val searchMonitorResponse: SearchResponse =
-                client.suspendUntil { client.search(searchRequest, it) }
+        val searchMonitorResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
 
         if (searchMonitorResponse.isTimedOut) {
-            throw OpenSearchException(
-                    "Cannot determine that the $SCHEDULED_JOBS_INDEX index is healthy"
-            )
+            throw OpenSearchException("Cannot determine that the $SCHEDULED_JOBS_INDEX index is healthy")
         }
         val monitors = mutableListOf<Monitor>()
         for (hit in searchMonitorResponse.hits) {
-            XContentType.JSON
-                    .xContent()
-                    .createParser(
-                            xContentRegistry,
-                            LoggingDeprecationHandler.INSTANCE,
-                            hit.sourceAsString
-                    )
-                    .use { hitsParser ->
-                        val monitor = ScheduledJob.parse(hitsParser, hit.id, hit.version) as Monitor
-                        monitors.add(monitor)
-                    }
+            XContentType.JSON.xContent().createParser(
+                xContentRegistry,
+                LoggingDeprecationHandler.INSTANCE, hit.sourceAsString
+            ).use { hitsParser ->
+                val monitor = ScheduledJob.parse(hitsParser, hit.id, hit.version) as Monitor
+                monitors.add(monitor)
+            }
         }
         if (monitors.isEmpty()) {
             actionListener.onFailure(
-                    AlertingException.wrap(
-                            OpenSearchStatusException(
-                                    "User doesn't have read permissions for one or more configured monitors ${monitorIds.joinToString()}",
-                                    RestStatus.FORBIDDEN
-                            )
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "User doesn't have read permissions for one or more configured monitors ${monitorIds.joinToString()}",
+                        RestStatus.FORBIDDEN
                     )
+                )
             )
             return
         }
@@ -884,75 +774,73 @@ constructor(
         }
         val indices = getMonitorIndices(monitors)
 
-        val indicesSearchRequest =
-                SearchRequest()
-                        .indices(*indices.toTypedArray())
-                        .source(
-                                SearchSourceBuilder.searchSource()
-                                        .size(1)
-                                        .query(QueryBuilders.matchAllQuery())
-                        )
+        val indicesSearchRequest = SearchRequest().indices(*indices.toTypedArray())
+            .source(SearchSourceBuilder.searchSource().size(1).query(QueryBuilders.matchAllQuery()))
 
         if (user != null && filterByEnabled) {
             // Unstash the context and check if user with specified roles has indices access
             withClosableContext(
-                    InjectorContextElement(
-                            user.name.plus(UUID.randomUUID().toString()),
-                            settings,
-                            client.threadPool().threadContext,
-                            user.roles,
-                            user
-                    )
-            ) { checkIndicesAccess(client, indicesSearchRequest, indices, actionListener) }
+                InjectorContextElement(
+                    user.name.plus(UUID.randomUUID().toString()),
+                    settings,
+                    client.threadPool().threadContext,
+                    user.roles,
+                    user
+                )
+            ) {
+                checkIndicesAccess(client, indicesSearchRequest, indices, actionListener)
+            }
         } else {
             checkIndicesAccess(client, indicesSearchRequest, indices, actionListener)
         }
     }
 
-    /** Checks if the client can access the given indices */
+    /**
+     * Checks if the client can access the given indices
+     */
     private fun checkIndicesAccess(
-            client: Client,
-            indicesSearchRequest: SearchRequest?,
-            indices: MutableList<String>,
-            actionListener: ActionListener<AcknowledgedResponse>,
+        client: Client,
+        indicesSearchRequest: SearchRequest?,
+        indices: MutableList<String>,
+        actionListener: ActionListener<AcknowledgedResponse>,
     ) {
         client.search(
-                indicesSearchRequest,
-                object : ActionListener<SearchResponse> {
-                    override fun onResponse(response: SearchResponse?) {
-                        actionListener.onResponse(AcknowledgedResponse(true))
-                    }
-
-                    override fun onFailure(e: Exception) {
-                        log.error("Error accessing the monitor indices", e)
-                        actionListener.onFailure(
-                                AlertingException.wrap(
-                                        OpenSearchStatusException(
-                                                "User doesn't have read permissions for one or more configured index ${indices.joinToString()}",
-                                                RestStatus.FORBIDDEN
-                                        )
-                                )
-                        )
-                    }
+            indicesSearchRequest,
+            object : ActionListener<SearchResponse> {
+                override fun onResponse(response: SearchResponse?) {
+                    actionListener.onResponse(AcknowledgedResponse(true))
                 }
+
+                override fun onFailure(e: Exception) {
+                    log.error("Error accessing the monitor indices", e)
+                    actionListener.onFailure(
+                        AlertingException.wrap(
+                            OpenSearchStatusException(
+                                "User doesn't have read permissions for one or more configured index ${indices.joinToString()}",
+                                RestStatus.FORBIDDEN
+                            )
+                        )
+                    )
+                }
+            }
         )
     }
 
-    /** Extract indices from monitors */
+    /**
+     * Extract indices from monitors
+     */
     private fun getMonitorIndices(monitors: List<Monitor>): MutableList<String> {
         val indices = mutableListOf<String>()
 
         val searchInputs =
-                monitors.flatMap { monitor ->
-                    monitor.inputs.filter {
-                        it.name() == SearchInput.SEARCH_FIELD ||
-                                it.name() == DocLevelMonitorInput.DOC_LEVEL_INPUT_FIELD
-                    }
+            monitors.flatMap { monitor ->
+                monitor.inputs.filter {
+                    it.name() == SearchInput.SEARCH_FIELD || it.name() == DocLevelMonitorInput.DOC_LEVEL_INPUT_FIELD
                 }
+            }
         searchInputs.forEach {
-            val inputIndices =
-                    if (it.name() == SearchInput.SEARCH_FIELD) (it as SearchInput).indices
-                    else (it as DocLevelMonitorInput).indices
+            val inputIndices = if (it.name() == SearchInput.SEARCH_FIELD) (it as SearchInput).indices
+            else (it as DocLevelMonitorInput).indices
             indices.addAll(inputIndices)
         }
         return indices
