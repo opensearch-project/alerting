@@ -1,7 +1,6 @@
 package org.opensearch.alerting.core.modelv2
 
 import org.opensearch.alerting.core.modelv2.PPLTrigger.Companion.PPL_TRIGGER_FIELD
-import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.notifications.model.BaseModel
 import java.time.Instant
@@ -11,8 +10,8 @@ interface TriggerV2 : BaseModel {
     val id: String
     val name: String
     val severity: Severity
-    val suppressDuration: TimeValue?
-    val expireDuration: TimeValue?
+    val suppressDuration: Long?
+    val expireDuration: Long
     var lastTriggeredTime: Instant?
     val actions: List<Action>
 

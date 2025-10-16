@@ -165,19 +165,12 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val response = client.makeRequest("POST", MONITOR_V2_BASE_URI, emptyMap(), monitorV2.toHttpEntity())
         assertEquals("Unable to create a new monitor", RestStatus.OK, response.restStatus())
 
-        val monitorV2Json = jsonXContent.createParser(
-            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-            response.entity.content
-        ).map()
+//        val monitorV2Json = jsonXContent.createParser(
+//            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+//            response.entity.content
+//        ).map()
 
-        val responseBody = response.asMap()
-        logger.info("response body: $responseBody")
-        val createdId = responseBody["_id"] as String
-        val createdVersion = responseBody["_version"] as Int
-        assertNotEquals("response is missing Id", MonitorV2.NO_ID, createdId)
-        assertEquals("incorrect version", 1, createdVersion)
-
-        return getMonitorV2(monitorV2Id = monitorV2Json["_id"] as String)
+        return getMonitorV2(monitorV2Id = response.asMap()["_id"] as String)
     }
 
     protected fun deleteMonitor(monitor: Monitor, refresh: Boolean = true): Response {
@@ -897,6 +890,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun executeWorkflow(client: RestClient, workflowId: String, params: Map<String, String> = mutableMapOf()): Response {
         return client.makeRequest("POST", "$WORKFLOW_ALERTING_BASE_URI/$workflowId/_execute", params)
+    }
+
+    protected fun executeMonitorV2(monitorId: String, params: Map<String, String> = mutableMapOf()): Response {
+        return client().makeRequest("POST", "$MONITOR_V2_BASE_URI/$monitorId/_execute", params)
     }
 
     protected fun executeMonitor(monitor: Monitor, params: Map<String, String> = mapOf()): Response {

@@ -2,7 +2,6 @@ package org.opensearch.alerting.core.modelv2
 
 import org.opensearch.alerting.core.modelv2.PPLMonitor.Companion.PPL_MONITOR_TYPE
 import org.opensearch.common.CheckedFunction
-import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.Schedule
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.authuser.User
@@ -28,7 +27,7 @@ interface MonitorV2 : ScheduledJob {
     val user: User?
     val triggers: List<TriggerV2>
     val schemaVersion: Int // for updating monitors
-    val lookBackWindow: TimeValue? // how far back to look when querying data during monitor execution
+    val lookBackWindow: Long? // how far back to look when querying data during monitor execution
     val timestampField: String? // field that will be used to inject lookback window time filter
 
     fun asTemplateArg(): Map<String, Any?>
@@ -46,7 +45,7 @@ interface MonitorV2 : ScheduledJob {
         user: User? = this.user,
         // not supporting overriding triggers in copy
         schemaVersion: Int = this.schemaVersion,
-        lookBackWindow: TimeValue? = this.lookBackWindow,
+        lookBackWindow: Long? = this.lookBackWindow,
         timestampField: String? = this.timestampField
     ): MonitorV2
 

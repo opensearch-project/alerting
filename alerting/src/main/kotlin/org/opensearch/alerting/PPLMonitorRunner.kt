@@ -101,7 +101,7 @@ object PPLMonitorRunner : MonitorV2Runner {
             // if lookback window is specified, inject a top level lookback window time filter
             // into the PPL query
             val lookBackWindow = pplMonitor.lookBackWindow!!
-            val lookbackPeriodStart = periodEnd.minus(lookBackWindow.millis, ChronoUnit.MILLIS)
+            val lookbackPeriodStart = periodEnd.minus(lookBackWindow, ChronoUnit.MINUTES)
             val timeFilteredQuery = addTimeFilter(pplMonitor.query, lookbackPeriodStart, periodEnd, pplMonitor.timestampField!!)
             logger.info("time filtered query: $timeFilteredQuery")
             timeFilteredQuery
@@ -270,7 +270,7 @@ object PPLMonitorRunner : MonitorV2Runner {
         // the interval between throttledTimeBound and now is the suppression window
         // i.e. any PPLTrigger whose last trigger time is in this window must be suppressed
         val suppressTimeBound = pplTrigger.suppressDuration?.let {
-            timeOfCurrentExecution.minus(pplTrigger.suppressDuration!!.millis, ChronoUnit.MILLIS)
+            timeOfCurrentExecution.minus(pplTrigger.suppressDuration!!, ChronoUnit.MINUTES)
         }
 
         // the trigger must be suppressed if...
@@ -419,7 +419,7 @@ object PPLMonitorRunner : MonitorV2Runner {
         executionId: String,
         timeOfCurrentExecution: Instant
     ): List<AlertV2> {
-        val expirationTime = pplTrigger.expireDuration.millis.let { timeOfCurrentExecution.plus(it, ChronoUnit.MILLIS) }
+        val expirationTime = timeOfCurrentExecution.plus(pplTrigger.expireDuration, ChronoUnit.MINUTES)
 
         val alertV2s = mutableListOf<AlertV2>()
         for (queryResult in preparedQueryResults) {
@@ -450,7 +450,7 @@ object PPLMonitorRunner : MonitorV2Runner {
         executionId: String,
         timeOfCurrentExecution: Instant
     ): List<AlertV2> {
-        val expirationTime = pplTrigger.expireDuration.millis.let { timeOfCurrentExecution.plus(it, ChronoUnit.MILLIS) }
+        val expirationTime = timeOfCurrentExecution.plus(pplTrigger.expireDuration, ChronoUnit.MILLIS)
 
         val errorMessage = "Failed to run PPL Trigger ${pplTrigger.name} from PPL Monitor ${pplMonitor.name}: " +
             exception.userErrorMessage()

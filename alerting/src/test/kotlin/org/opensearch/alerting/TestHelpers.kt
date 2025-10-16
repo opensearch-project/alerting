@@ -308,8 +308,8 @@ fun randomPPLMonitor(
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     enabled: Boolean = randomBoolean(),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
-    lookbackWindow: TimeValue? = randomTimeValue(),
-    timestampField: String? = TIMESTAMP_FIELD,
+    lookbackWindow: Long? = randomLongBetween(1, 100),
+    timestampField: String? = lookbackWindow?.let { TIMESTAMP_FIELD },
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     triggers: List<PPLTrigger> = List(randomIntBetween(1, 5)) { randomPPLTrigger() },
@@ -388,17 +388,26 @@ fun randomDocumentLevelTrigger(
     )
 }
 
+// random PPLTrigger defaults to a number_of_results trigger, because a custom condition
+// would require knowledge of the PPL Monitor's query
+// it is on the caller to pass in valid arguments that would create either
+// a valid PPL Monitor or one that intentionally throws an error.
+// e.g. to create a valid PPL Monitor, if conditionType is NUMBER_OF_RESULTS,
+// numResultsCondition and numResultsValue must be populated, while
+// customCondition must be null.
 fun randomPPLTrigger(
     id: String = UUIDs.base64UUID(),
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     severity: Severity = Severity.entries.random(),
-    suppressDuration: TimeValue = randomTimeValue(),
-    expireDuration: TimeValue = randomTimeValue(),
+    suppressDuration: Long? = randomLongBetween(1, 100),
+    expireDuration: Long = randomLongBetween(1, 100),
     actions: List<Action> = mutableListOf(),
-    mode: TriggerMode = TriggerMode.entries.random()
+    mode: TriggerMode = TriggerMode.entries.random(),
+    conditionType: ConditionType = ConditionType.NUMBER_OF_RESULTS,
+    numResultsCondition: NumResultsCondition = NumResultsCondition.entries.random(),
+    numResultsValue: Long = randomLongBetween(1L, 50L),
+    customCondition: String? = null
 ): PPLTrigger {
-    // random PPLTrigger will always be a number_of_results trigger, because a custom condition
-    // would require knowledge of the PPL Monitor's query
     return PPLTrigger(
         id = id,
         name = name,
@@ -408,10 +417,10 @@ fun randomPPLTrigger(
         lastTriggeredTime = null,
         actions = actions,
         mode = mode,
-        conditionType = ConditionType.NUMBER_OF_RESULTS,
-        numResultsCondition = NumResultsCondition.entries.random(),
-        numResultsValue = randomLongBetween(1L, 50L),
-        customCondition = null
+        conditionType = conditionType,
+        numResultsCondition = numResultsCondition,
+        numResultsValue = numResultsValue,
+        customCondition = customCondition
     )
 }
 

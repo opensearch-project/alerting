@@ -336,9 +336,9 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val ALERTING_V2_MAX_SUPPRESSION_DURATION = Setting.positiveTimeSetting(
+        val ALERTING_V2_MAX_SUPPRESSION_DURATION = Setting.longSetting(
             "plugins.alerting_v2.monitor.max_suppression_duration",
-            TimeValue(5, TimeUnit.DAYS),
+            7200, // 5 days, 7200 minutes
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 

@@ -6,6 +6,8 @@ import org.opensearch.alerting.core.modelv2.MonitorV2
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.index.IndexNotFoundException
+import org.opensearch.transport.RemoteTransportException
 
 object AlertingV2Utils {
     // Validates that the given scheduled job is a Monitor
@@ -78,5 +80,19 @@ object AlertingV2Utils {
         limitExceedMessageQueryResults.put("size", size)
 
         return limitExceedMessageQueryResults
+    }
+
+    // Checks if the exception is caused by an IndexNotFoundException (directly or nested).
+    fun isIndexNotFoundException(e: Exception): Boolean {
+        if (e is IndexNotFoundException) {
+            return true
+        }
+        if (e is RemoteTransportException) {
+            val cause = e.cause
+            if (cause is IndexNotFoundException) {
+                return true
+            }
+        }
+        return false
     }
 }

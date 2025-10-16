@@ -28,6 +28,10 @@ class RestGetMonitorV2Action : BaseRestHandler() {
             Route(
                 GET,
                 "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitorV2Id}"
+            ),
+            Route(
+                HEAD,
+                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitorV2Id}"
             )
         )
     }

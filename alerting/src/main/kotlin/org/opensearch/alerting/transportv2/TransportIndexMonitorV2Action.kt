@@ -51,7 +51,6 @@ import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
-import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentHelper
@@ -74,7 +73,6 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 import org.opensearch.transport.client.node.NodeClient
-import java.util.concurrent.TimeUnit
 
 private val log = LogManager.getLogger(TransportIndexMonitorV2Action::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
@@ -103,7 +101,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     // hard, nonadjustable limits
-    private val minSuppressDuration = TimeValue(1L, TimeUnit.MINUTES)
+    private val minSuppressDuration = 1 // one minute min duration to match scheduled job interval granularity
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_MONITORS) { maxMonitors = it }
