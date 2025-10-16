@@ -12,7 +12,7 @@ import java.io.IOException
 class ExecuteMonitorV2Request : ActionRequest {
     val dryrun: Boolean
     val manual: Boolean
-    val monitorId: String? // exactly one of monitorId or monitor must be non-null
+    val monitorV2Id: String? // exactly one of monitorId or monitor must be non-null
     val monitorV2: MonitorV2?
     val requestStart: TimeValue?
     val requestEnd: TimeValue
@@ -20,14 +20,14 @@ class ExecuteMonitorV2Request : ActionRequest {
     constructor(
         dryrun: Boolean,
         manual: Boolean, // if execute was called by user or by scheduled job
-        monitorId: String?,
+        monitorV2Id: String?,
         monitorV2: MonitorV2?,
         requestStart: TimeValue? = null,
         requestEnd: TimeValue
     ) : super() {
         this.dryrun = dryrun
         this.manual = manual
-        this.monitorId = monitorId
+        this.monitorV2Id = monitorV2Id
         this.monitorV2 = monitorV2
         this.requestStart = requestStart
         this.requestEnd = requestEnd
@@ -37,9 +37,9 @@ class ExecuteMonitorV2Request : ActionRequest {
     constructor(sin: StreamInput) : this(
         sin.readBoolean(), // dryrun
         sin.readBoolean(), // manual
-        sin.readOptionalString(), // monitorId
+        sin.readOptionalString(), // monitorV2Id
         if (sin.readBoolean()) {
-            MonitorV2.readFrom(sin) // monitor
+            MonitorV2.readFrom(sin) // monitorV2
         } else {
             null
         },
@@ -48,7 +48,7 @@ class ExecuteMonitorV2Request : ActionRequest {
     )
 
     override fun validate(): ActionRequestValidationException? =
-        if (monitorV2 == null && monitorId == null) {
+        if (monitorV2 == null && monitorV2Id == null) {
             ValidateActions.addValidationError("Neither a monitor ID nor monitor object was supplied", null)
         } else {
             null
@@ -58,7 +58,7 @@ class ExecuteMonitorV2Request : ActionRequest {
     override fun writeTo(out: StreamOutput) {
         out.writeBoolean(dryrun)
         out.writeBoolean(manual)
-        out.writeOptionalString(monitorId)
+        out.writeOptionalString(monitorV2Id)
         if (monitorV2 != null) {
             out.writeBoolean(true)
             monitorV2.writeTo(out)

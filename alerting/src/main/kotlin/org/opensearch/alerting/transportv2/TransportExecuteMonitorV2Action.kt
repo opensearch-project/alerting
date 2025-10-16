@@ -18,6 +18,7 @@ import org.opensearch.alerting.core.modelv2.MonitorV2
 import org.opensearch.alerting.core.modelv2.PPLMonitor
 import org.opensearch.alerting.core.modelv2.PPLMonitor.Companion.PPL_MONITOR_TYPE
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.transport.SecureTransportAction
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
@@ -48,8 +49,14 @@ class TransportExecuteMonitorV2Action @Inject constructor(
     private val settings: Settings
 ) : HandledTransportAction<ExecuteMonitorV2Request, ExecuteMonitorV2Response>(
     ExecuteMonitorV2Action.NAME, transportService, actionFilters, ::ExecuteMonitorV2Request
-) {
-    @Volatile private var indexTimeout = AlertingSettings.INDEX_TIMEOUT.get(settings)
+),
+    SecureTransportAction {
+
+    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+
+    init {
+        listenFilterBySettingChange(clusterService)
+    }
 
     override fun doExecute(
         task: Task,
@@ -107,16 +114,16 @@ class TransportExecuteMonitorV2Action @Inject constructor(
             /* now execute the MonitorV2 */
 
             // if both monitor_v2 id and object were passed in, ignore object and proceed with id
-            if (execMonitorV2Request.monitorId != null && execMonitorV2Request.monitorV2 != null) {
+            if (execMonitorV2Request.monitorV2Id != null && execMonitorV2Request.monitorV2 != null) {
                 log.info(
                     "Both a monitor_v2 id and monitor_v2 object were passed in to ExecuteMonitorV2" +
                         "request. Proceeding to execute by monitor_v2 ID and ignoring monitor_v2 object."
                 )
             }
 
-            if (execMonitorV2Request.monitorId != null) { // execute with monitor ID case
+            if (execMonitorV2Request.monitorV2Id != null) { // execute with monitor ID case
                 // search the alerting-config index for the MonitorV2 with this ID
-                val getMonitorV2Request = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX).id(execMonitorV2Request.monitorId)
+                val getMonitorV2Request = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX).id(execMonitorV2Request.monitorV2Id)
                 client.get(
                     getMonitorV2Request,
                     object : ActionListener<GetResponse> {
@@ -125,30 +132,58 @@ class TransportExecuteMonitorV2Action @Inject constructor(
                                 actionListener.onFailure(
                                     AlertingException.wrap(
                                         OpenSearchStatusException(
-                                            "Can't find monitorV2 with id: ${getMonitorV2Response.id}",
+                                            "Can't find monitorV2 with id: ${getMonitorV2Response.id} to execute",
                                             RestStatus.NOT_FOUND
                                         )
                                     )
                                 )
                                 return
                             }
-                            if (!getMonitorV2Response.isSourceEmpty) {
-                                XContentHelper.createParser(
-                                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                                    getMonitorV2Response.sourceAsBytesRef, XContentType.JSON
-                                ).use { xcp ->
-                                    val scheduledJob = ScheduledJob.parse(xcp, getMonitorV2Response.id, getMonitorV2Response.version)
-                                    validateMonitorV2(scheduledJob)?.let {
-                                        actionListener.onFailure(AlertingException.wrap(it))
-                                        return
-                                    }
-                                    val monitorV2 = scheduledJob as MonitorV2
-                                    try {
-                                        executeMonitorV2(monitorV2)
-                                    } catch (e: Exception) {
-                                        actionListener.onFailure(AlertingException.wrap(e))
-                                    }
-                                }
+
+                            if (getMonitorV2Response.isSourceEmpty) {
+                                actionListener.onFailure(
+                                    AlertingException.wrap(
+                                        OpenSearchStatusException(
+                                            "Found monitorV2 with id: ${getMonitorV2Response.id} but it was empty",
+                                            RestStatus.NO_CONTENT
+                                        )
+                                    )
+                                )
+                                return
+                            }
+
+                            val xcp = XContentHelper.createParser(
+                                xContentRegistry,
+                                LoggingDeprecationHandler.INSTANCE,
+                                getMonitorV2Response.sourceAsBytesRef,
+                                XContentType.JSON
+                            )
+
+                            val scheduledJob = ScheduledJob.parse(xcp, getMonitorV2Response.id, getMonitorV2Response.version)
+
+                            validateMonitorV2(scheduledJob)?.let {
+                                actionListener.onFailure(AlertingException.wrap(it))
+                                return
+                            }
+
+                            val monitorV2 = scheduledJob as MonitorV2
+
+                            // security is enabled and filterby is enabled
+                            if (!checkUserPermissionsWithResource(
+                                    user,
+                                    monitorV2.user,
+                                    actionListener,
+                                    "monitor",
+                                    execMonitorV2Request.monitorV2Id
+                                )
+                            ) {
+                                return
+                            }
+
+                            try {
+                                executeMonitorV2(monitorV2)
+                            } catch (e: Exception) {
+                                actionListener.onFailure(AlertingException.wrap(e))
                             }
                         }
 
