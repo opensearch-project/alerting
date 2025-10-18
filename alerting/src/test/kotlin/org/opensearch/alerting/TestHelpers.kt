@@ -19,8 +19,6 @@ import org.opensearch.alerting.model.AlertContext
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailEntry
 import org.opensearch.alerting.model.destination.email.EmailGroup
-import org.opensearch.alerting.resthandler.MonitorV2RestApiIT.Companion.TEST_INDEX_NAME
-import org.opensearch.alerting.resthandler.MonitorV2RestApiIT.Companion.TIMESTAMP_FIELD
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.Request
 import org.opensearch.client.RequestOptions
@@ -94,6 +92,12 @@ import org.opensearch.test.rest.OpenSearchRestTestCase
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.TimeUnit
+
+// constants for PPL Alerting tests
+const val TIMESTAMP_FIELD = "timestamp"
+const val TEST_INDEX_NAME = "index"
+const val TEST_INDEX_MAPPINGS =
+    """"properties":{"timestamp":{"type":"date"},"abc":{"type":"keyword"},"number":{"type":"integer"}}"""
 
 fun randomQueryLevelMonitor(
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
@@ -308,8 +312,8 @@ fun randomPPLMonitor(
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     enabled: Boolean = randomBoolean(),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
-    lookbackWindow: Long? = randomLongBetween(1, 100),
-    timestampField: String? = lookbackWindow?.let { TIMESTAMP_FIELD },
+    lookBackWindow: Long? = randomLongBetween(1, 100),
+    timestampField: String? = lookBackWindow?.let { TIMESTAMP_FIELD },
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     triggers: List<PPLTrigger> = List(randomIntBetween(1, 5)) { randomPPLTrigger() },
@@ -321,7 +325,7 @@ fun randomPPLMonitor(
         name = name,
         enabled = enabled,
         schedule = schedule,
-        lookBackWindow = lookbackWindow,
+        lookBackWindow = lookBackWindow,
         timestampField = timestampField,
         lastUpdateTime = lastUpdateTime,
         enabledTime = enabledTime,
@@ -390,11 +394,11 @@ fun randomDocumentLevelTrigger(
 
 // random PPLTrigger defaults to a number_of_results trigger, because a custom condition
 // would require knowledge of the PPL Monitor's query
-// it is on the caller to pass in valid arguments that would create either
+// it is on the caller to be explicit and pass in valid arguments that would create either
 // a valid PPL Monitor or one that intentionally throws an error.
-// e.g. to create a valid PPL Monitor, if conditionType is NUMBER_OF_RESULTS,
-// numResultsCondition and numResultsValue must be populated, while
-// customCondition must be null.
+// e.g. to create a valid PPL Monitor, if conditionType is CUSTOM,
+// numResultsCondition and numResultsValue must be null, while
+// customCondition must not be null.
 fun randomPPLTrigger(
     id: String = UUIDs.base64UUID(),
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
@@ -404,8 +408,8 @@ fun randomPPLTrigger(
     actions: List<Action> = mutableListOf(),
     mode: TriggerMode = TriggerMode.entries.random(),
     conditionType: ConditionType = ConditionType.NUMBER_OF_RESULTS,
-    numResultsCondition: NumResultsCondition = NumResultsCondition.entries.random(),
-    numResultsValue: Long = randomLongBetween(1L, 50L),
+    numResultsCondition: NumResultsCondition? = NumResultsCondition.entries.random(),
+    numResultsValue: Long? = randomLongBetween(1L, 50L),
     customCondition: String? = null
 ): PPLTrigger {
     return PPLTrigger(

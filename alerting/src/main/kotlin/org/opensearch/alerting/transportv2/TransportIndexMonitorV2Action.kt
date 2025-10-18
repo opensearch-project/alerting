@@ -102,6 +102,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
 
     // hard, nonadjustable limits
     private val minSuppressDuration = 1 // one minute min duration to match scheduled job interval granularity
+    private val minExpireDuration = 1 // one minute min duration to match scheduled job interval granularity
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_MONITORS) { maxMonitors = it }
@@ -221,8 +222,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
                                 return@withContext
                             }
                         }
-
-                        validationListener.onResponse(Unit)
                     } catch (e: Exception) {
                         validationListener.onFailure(
                             AlertingException.wrap(
@@ -249,6 +248,8 @@ class TransportIndexMonitorV2Action @Inject constructor(
                     if (!timestampFieldValid) {
                         return@withContext
                     }
+
+                    validationListener.onResponse(Unit)
                 }
             }
         }
@@ -267,7 +268,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
             return false
         }
 
-        // ensure the trigger suppress durations are valid
+        // ensure the trigger suppress and expire durations are valid
         pplMonitor.triggers.forEach { trigger ->
             trigger.suppressDuration?.let { suppressDuration ->
                 if (suppressDuration > maxSuppressDuration) {
@@ -290,6 +291,17 @@ class TransportIndexMonitorV2Action @Inject constructor(
                     )
                     return false
                 }
+            }
+
+            if (trigger.expireDuration < minExpireDuration) {
+                validationListener.onFailure(
+                    AlertingException.wrap(
+                        IllegalArgumentException(
+                            "Expire duration must be at least $minExpireDuration but was ${trigger.expireDuration}"
+                        )
+                    )
+                )
+                return false
             }
         }
 

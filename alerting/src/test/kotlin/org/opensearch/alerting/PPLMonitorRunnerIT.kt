@@ -3,103 +3,386 @@ package org.opensearch.alerting
 import org.opensearch.alerting.core.modelv2.PPLMonitor
 import org.opensearch.alerting.core.modelv2.PPLTrigger.ConditionType
 import org.opensearch.alerting.core.modelv2.PPLTrigger.NumResultsCondition
-import org.opensearch.alerting.resthandler.MonitorV2RestApiIT.Companion.TEST_INDEX_MAPPINGS
-import org.opensearch.alerting.resthandler.MonitorV2RestApiIT.Companion.TEST_INDEX_NAME
-import org.opensearch.alerting.resthandler.MonitorV2RestApiIT.Companion.TIMESTAMP_FIELD
+import org.opensearch.alerting.core.modelv2.PPLTrigger.TriggerMode
+import org.opensearch.client.Response
 import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.IntervalSchedule
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
-import java.time.temporal.ChronoUnit.MILLIS
+import org.opensearch.test.OpenSearchTestCase
 import java.time.temporal.ChronoUnit.MINUTES
+import java.util.concurrent.TimeUnit
 
 /***
  * These tests create various kinds of monitors and ensure they all generate alerts
  * under the expected circumstances
  */
 class PPLMonitorRunnerIT : AlertingRestTestCase() {
+
     /* Test Cases */
-    fun `test running basic ppl monitor`() {
+    fun `test running number of results condition and result set mode ppl monitor`() {
+        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(2, MINUTES, "abc", 5)
 
-        val pplMonitorConfig = randomPPLMonitor(
+        val pplMonitor = createRandomPPLMonitor(
             enabled = true,
             schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-            lookbackWindow = null,
+            lookBackWindow = null,
             triggers = listOf(
                 randomPPLTrigger(
                     suppressDuration = null,
                     expireDuration = 5,
+                    mode = TriggerMode.RESULT_SET,
                     conditionType = ConditionType.NUMBER_OF_RESULTS,
                     numResultsCondition = NumResultsCondition.GREATER_THAN,
-                    numResultsValue = 0L
+                    numResultsValue = 0L,
+                    customCondition = null
                 )
             ),
             query = "source = $TEST_INDEX_NAME | head 10"
         )
-        val pplMonitor = createMonitorV2(pplMonitorConfig) as PPLMonitor
 
-        val executeResponse = entityAsMap(executeMonitorV2(pplMonitor.id))
-
+        val executeResponse = executeMonitorV2(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
 
-        // TODO: implement getAlertsV2 in AlertingRestTestCase
+        val getAlertsResponse = getAlertV2s()
+        val alertsGenerated = numAlerts(getAlertsResponse) > 0
 
-        assert(triggered)
+        assert(triggered) { "Monitor should have triggered but it didn't" }
+        assert(alertsGenerated) { "Alerts should have been generated but they weren't" }
+    }
+
+    fun `test running number of results condition and per result mode ppl monitor`() {
+        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
+        indexDocFromSomeTimeAgo(1, MINUTES, "abc", 5)
+        indexDocFromSomeTimeAgo(2, MINUTES, "def", 10)
+        indexDocFromSomeTimeAgo(3, MINUTES, "ghi", 7)
+
+        val pplMonitor = createRandomPPLMonitor(
+            enabled = true,
+            schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+            lookBackWindow = null,
+            triggers = listOf(
+                randomPPLTrigger(
+                    suppressDuration = null,
+                    expireDuration = 5,
+                    mode = TriggerMode.PER_RESULT,
+                    conditionType = ConditionType.NUMBER_OF_RESULTS,
+                    numResultsCondition = NumResultsCondition.GREATER_THAN,
+                    numResultsValue = 0L,
+                    customCondition = null
+                )
+            ),
+            query = "source = $TEST_INDEX_NAME | head 10"
+        )
+
+        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val triggered = isTriggered(pplMonitor, executeResponse)
+
+        val getAlertsResponse = getAlertV2s()
+        val alertsGenerated = numAlerts(getAlertsResponse)
+
+        assert(triggered) { "Monitor should have triggered but it didn't" }
+        assertEquals(
+            "A number of alerts matching the number of docs ingested (3) should have been generated",
+            3, alertsGenerated
+        )
+    }
+
+    fun `test running custom condition and result set mode ppl monitor`() {
+        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
+        indexDocFromSomeTimeAgo(1, MINUTES, "abc", 1)
+        indexDocFromSomeTimeAgo(2, MINUTES, "abc", 2)
+        indexDocFromSomeTimeAgo(3, MINUTES, "abc", 3)
+        indexDocFromSomeTimeAgo(4, MINUTES, "def", 4)
+        indexDocFromSomeTimeAgo(5, MINUTES, "def", 5)
+        indexDocFromSomeTimeAgo(6, MINUTES, "def", 6)
+        indexDocFromSomeTimeAgo(7, MINUTES, "ghi", 7)
+        indexDocFromSomeTimeAgo(8, MINUTES, "ghi", 8)
+        indexDocFromSomeTimeAgo(9, MINUTES, "ghi", 9)
+
+        val pplMonitor = createRandomPPLMonitor(
+            enabled = true,
+            schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+            lookBackWindow = null,
+            triggers = listOf(
+                randomPPLTrigger(
+                    suppressDuration = null,
+                    expireDuration = 5,
+                    mode = TriggerMode.RESULT_SET,
+                    conditionType = ConditionType.CUSTOM,
+                    customCondition = "eval result = max_num > 5",
+                    numResultsCondition = null,
+                    numResultsValue = null
+                )
+            ),
+            query = "source = $TEST_INDEX_NAME | stats max(number) as max_num by abc"
+        )
+
+        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val triggered = isTriggered(pplMonitor, executeResponse)
+
+        val getAlertsResponse = getAlertV2s()
+        val alertsGenerated = numAlerts(getAlertsResponse) > 0
+
+        assert(triggered) { "Monitor should have triggered but it didn't" }
+        assert(alertsGenerated) { "Alerts should have been generated but they weren't" }
+    }
+
+    fun `test running custom condition and per result mode ppl monitor`() {
+        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
+        indexDocFromSomeTimeAgo(1, MINUTES, "abc", 1)
+        indexDocFromSomeTimeAgo(2, MINUTES, "abc", 2)
+        indexDocFromSomeTimeAgo(3, MINUTES, "abc", 3)
+        indexDocFromSomeTimeAgo(4, MINUTES, "def", 4)
+        indexDocFromSomeTimeAgo(5, MINUTES, "def", 5)
+        indexDocFromSomeTimeAgo(6, MINUTES, "def", 6)
+        indexDocFromSomeTimeAgo(7, MINUTES, "ghi", 7)
+        indexDocFromSomeTimeAgo(8, MINUTES, "ghi", 8)
+        indexDocFromSomeTimeAgo(9, MINUTES, "ghi", 9)
+
+        val pplMonitor = createRandomPPLMonitor(
+            enabled = true,
+            schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+            lookBackWindow = null,
+            triggers = listOf(
+                randomPPLTrigger(
+                    suppressDuration = null,
+                    expireDuration = 5,
+                    mode = TriggerMode.PER_RESULT,
+                    conditionType = ConditionType.CUSTOM,
+                    customCondition = "eval evaluation = max_num > 5",
+                    numResultsCondition = null,
+                    numResultsValue = null
+                )
+            ),
+            query = "source = $TEST_INDEX_NAME | stats max(number) as max_num by abc"
+        )
+
+        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val triggered = isTriggered(pplMonitor, executeResponse)
+
+        val getAlertsResponse = getAlertV2s()
+        val alertsGenerated = numAlerts(getAlertsResponse)
+
+        // when the indexed docs above are aggregated by field abc, we have:
+        // max("abc") = 3
+        // max("def") = 6
+        // max("ghi") = 9
+        // only 2 of these buckets satisfy the custom condition max_num > 5, so
+        // only 2 alerts should be generated
+
+        assert(triggered) { "Monitor should have triggered but it didn't" }
+        assertEquals(
+            "A number of alerts matching the number of docs ingested (2) should have been generated",
+            2, alertsGenerated
+        )
     }
 
     fun `test running ppl monitor with lookback window and doc within lookback window`() {
+        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(2, MINUTES, "abc", 5)
 
-        val pplMonitorConfig = randomPPLMonitor(
+        val pplMonitor = createRandomPPLMonitor(
             enabled = true,
             schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-            lookbackWindow = 5,
+            lookBackWindow = 5,
             timestampField = TIMESTAMP_FIELD,
             triggers = listOf(
                 randomPPLTrigger(
                     suppressDuration = null,
                     expireDuration = 5,
+                    mode = TriggerMode.RESULT_SET,
                     conditionType = ConditionType.NUMBER_OF_RESULTS,
                     numResultsCondition = NumResultsCondition.GREATER_THAN,
-                    numResultsValue = 0L
+                    numResultsValue = 0L,
+                    customCondition = null
                 )
             ),
             query = "source = $TEST_INDEX_NAME | head 10"
         )
-        val pplMonitor = createMonitorV2(pplMonitorConfig) as PPLMonitor
 
-        val executeResponse = entityAsMap(executeMonitorV2(pplMonitor.id))
-
+        val executeResponse = executeMonitorV2(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
 
-        assert(triggered)
+        val getAlertsResponse = getAlertV2s()
+        val alertsGenerated = numAlerts(getAlertsResponse) > 0
+
+        assert(triggered) { "Monitor should have triggered but it didn't" }
+        assert(alertsGenerated) { "Alerts should have been generated but they weren't" }
     }
 
-    // lookback window doc beyond lookback window not triggered
-    // manual monitor execute should bypass suppress
-    // auto monitor execute should honor suppress
+    fun `test running ppl monitor with lookback window and doc beyond lookback window`() {
+        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
+        indexDocFromSomeTimeAgo(10, MINUTES, "abc", 5)
+
+        val pplMonitor = createRandomPPLMonitor(
+            enabled = true,
+            schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+            lookBackWindow = 5,
+            timestampField = TIMESTAMP_FIELD,
+            triggers = listOf(
+                randomPPLTrigger(
+                    suppressDuration = null,
+                    expireDuration = 5,
+                    mode = TriggerMode.RESULT_SET,
+                    conditionType = ConditionType.NUMBER_OF_RESULTS,
+                    numResultsCondition = NumResultsCondition.GREATER_THAN,
+                    numResultsValue = 0L,
+                    customCondition = null
+                )
+            ),
+            query = "source = $TEST_INDEX_NAME | head 10"
+        )
+
+        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val triggered = isTriggered(pplMonitor, executeResponse)
+
+        val getAlertsResponse = getAlertV2s()
+        val alertsGenerated = numAlerts(getAlertsResponse) > 0
+
+        assert(!triggered) { "Monitor should not have triggered but it did" }
+        assert(!alertsGenerated) { "Alerts should not have been generated but they were" }
+    }
+
+    fun `test generated alert gets expired`() {
+        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
+        indexDocFromSomeTimeAgo(1, MINUTES, "abc", 5)
+
+        val pplMonitor = createRandomPPLMonitor(
+            enabled = true,
+            schedule = IntervalSchedule(interval = 20, unit = MINUTES),
+            triggers = listOf(
+                randomPPLTrigger(
+                    suppressDuration = null,
+                    expireDuration = 1,
+                    mode = TriggerMode.RESULT_SET,
+                    conditionType = ConditionType.NUMBER_OF_RESULTS,
+                    numResultsCondition = NumResultsCondition.GREATER_THAN,
+                    numResultsValue = 0L,
+                    customCondition = null
+                )
+            ),
+            query = "source = $TEST_INDEX_NAME | head 10"
+        )
+
+        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val triggered = isTriggered(pplMonitor, executeResponse)
+
+        val getAlertsResponsePreExpire = getAlertV2s()
+        val alertsGeneratedPreExpire = numAlerts(getAlertsResponsePreExpire) > 0
+
+        assert(triggered) { "Monitor should have triggered but it didn't" }
+        assert(alertsGeneratedPreExpire) { "Alerts should have been generated but they weren't" }
+
+        // sleep briefly so alert mover can expire the alert
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil false
+        }, 2, TimeUnit.MINUTES)
+
+        val getAlertsResponsePostExpire = getAlertV2s()
+        val alertsGeneratedPostExpire = numAlerts(getAlertsResponsePostExpire) > 0
+        assert(!alertsGeneratedPostExpire)
+    }
+
+    fun `test scheduled job monitor execution gets suppressed`() {
+        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
+        indexDocFromSomeTimeAgo(1, MINUTES, "abc", 5)
+
+        val pplMonitor = createRandomPPLMonitor(
+            enabled = true,
+            schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+            triggers = listOf(
+                randomPPLTrigger(
+                    suppressDuration = 10,
+                    expireDuration = 5,
+                    mode = TriggerMode.RESULT_SET,
+                    conditionType = ConditionType.NUMBER_OF_RESULTS,
+                    numResultsCondition = NumResultsCondition.GREATER_THAN,
+                    numResultsValue = 0L,
+                    customCondition = null
+                )
+            ),
+            query = "source = $TEST_INDEX_NAME | head 10"
+        )
+
+        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val triggered = isTriggered(pplMonitor, executeResponse)
+
+        val getAlertsResponsePreSuppress = getAlertV2s()
+        val numAlertsPreSuppress = numAlerts(getAlertsResponsePreSuppress)
+
+        assert(triggered) { "Monitor should have triggered but it didn't" }
+        assertEquals("Alerts should have been generated but they weren't", 1, numAlertsPreSuppress)
+
+        // sleep briefly to give the monitor to execute again
+        // automatically and get suppressed
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil false
+        }, 2, TimeUnit.MINUTES)
+
+        val getAlertsResponsePostSuppress = getAlertV2s()
+        val numAlertsPostSuppress = numAlerts(getAlertsResponsePostSuppress)
+        assertEquals("A new alert was generated when it should have been suppressed", 1, numAlertsPostSuppress)
+    }
+
+    fun `test manual monitor execution bypasses suppression`() {
+        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
+        indexDocFromSomeTimeAgo(1, MINUTES, "abc", 5)
+
+        val pplMonitor = createRandomPPLMonitor(
+            enabled = true,
+            schedule = IntervalSchedule(interval = 30, unit = MINUTES),
+            triggers = listOf(
+                randomPPLTrigger(
+                    suppressDuration = 20,
+                    expireDuration = 5,
+                    mode = TriggerMode.RESULT_SET,
+                    conditionType = ConditionType.NUMBER_OF_RESULTS,
+                    numResultsCondition = NumResultsCondition.GREATER_THAN,
+                    numResultsValue = 0L,
+                    customCondition = null
+                )
+            ),
+            query = "source = $TEST_INDEX_NAME | head 10"
+        )
+
+        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val triggered = isTriggered(pplMonitor, executeResponse)
+
+        val getAlertsResponse = getAlertV2s()
+        val numAlerts = numAlerts(getAlertsResponse)
+
+        assert(triggered) { "Monitor should have triggered but it didn't" }
+        assertEquals("Alerts should have been generated but they weren't", 1, numAlerts)
+
+        // sleep briefly to get comfortable inside
+        // the suppress window
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil false
+        }, 10, TimeUnit.SECONDS)
+
+        val executeAgainResponse = executeMonitorV2(pplMonitor.id)
+        val triggeredAgain = isTriggered(pplMonitor, executeAgainResponse)
+
+        val getAlertsAgainResponse = getAlertV2s()
+        val numAlertsAgain = numAlerts(getAlertsAgainResponse)
+
+        assert(triggeredAgain) { "Monitor should have triggered again but it didn't" }
+        assertEquals("A new alert should have been generated but was instead suppressed", 2, numAlertsAgain)
+    }
 
     /* Utils */
 
-    // creates index TEST_INDEX_NAME with TEST_INDEX_MAPPINGS, then
-    // indexes into it a doc from some time ago.
-    // this function only works on the TEST_INDEX_NAME index which has fields
-    // "timestamp" (date), "abc" (string), "number" (integer)
-    private fun indexDocFromSomeTimeAgo(timeValue: Long, timeUnit: ChronoUnit, abc: String, number: Int) {
-        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
-        val someTimeAgo = ZonedDateTime.now().minus(timeValue, timeUnit).truncatedTo(MILLIS)
-        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(someTimeAgo) // the timestamp string is given a random timezone offset
-        val testDoc = """{ "timestamp" : "$testTime", "abc": "$abc", "number" : "$number" }"""
-        logger.info("test time: $testTime")
-        indexDoc(TEST_INDEX_NAME, "1", testDoc)
-    }
-
     // takes in an execute monitor API response and returns true if the
     // trigger condition was met. assumes the monitor executed only had 1 trigger
-    private fun isTriggered(pplMonitor: PPLMonitor, executeResponse: Map<String, Any>): Boolean {
-        val triggerResultsObj = (executeResponse["trigger_results"] as Map<String, Any>)[pplMonitor.triggers[0].id] as Map<String, Any>
+    private fun isTriggered(pplMonitor: PPLMonitor, executeResponse: Response): Boolean {
+        val executeResponseMap = entityAsMap(executeResponse)
+        val triggerResultsObj = (executeResponseMap["trigger_results"] as Map<String, Any>)[pplMonitor.triggers[0].id] as Map<String, Any>
         return triggerResultsObj["triggered"] as Boolean
+    }
+
+    // takes in a get alerts API response and returns the current number of active alerts
+    private fun numAlerts(getAlertsResponse: Response): Int {
+        logger.info("get alerts response: ${entityAsMap(getAlertsResponse)}")
+        return entityAsMap(getAlertsResponse)["totalAlertV2s"] as Int
     }
 }

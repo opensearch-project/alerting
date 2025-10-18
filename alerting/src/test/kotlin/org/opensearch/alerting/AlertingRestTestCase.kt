@@ -22,6 +22,8 @@ import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRITE_INDEX
 import org.opensearch.alerting.core.modelv2.MonitorV2
 import org.opensearch.alerting.core.modelv2.PPLMonitor
+import org.opensearch.alerting.core.modelv2.PPLMonitor.QueryLanguage
+import org.opensearch.alerting.core.modelv2.PPLTrigger
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.CustomWebhook
@@ -29,8 +31,6 @@ import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.Slack
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
-import org.opensearch.alerting.resthandler.MonitorV2RestApiIT.Companion.TEST_INDEX_MAPPINGS
-import org.opensearch.alerting.resthandler.MonitorV2RestApiIT.Companion.TEST_INDEX_NAME
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.DestinationType
@@ -58,8 +58,10 @@ import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.FindingWithDocs
+import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
+import org.opensearch.commons.alerting.model.Schedule
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.Workflow
@@ -79,6 +81,7 @@ import java.time.Instant
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import java.time.temporal.ChronoUnit.MILLIS
 import java.util.Locale
 import java.util.UUID
 import java.util.stream.Collectors
@@ -164,11 +167,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val client = client()
         val response = client.makeRequest("POST", MONITOR_V2_BASE_URI, emptyMap(), monitorV2.toHttpEntity())
         assertEquals("Unable to create a new monitor", RestStatus.OK, response.restStatus())
-
-//        val monitorV2Json = jsonXContent.createParser(
-//            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-//            response.entity.content
-//        ).map()
 
         return getMonitorV2(monitorV2Id = response.asMap()["_id"] as String)
     }
@@ -554,11 +552,38 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return getMonitor(monitorId = monitorId)
     }
 
-    protected fun createRandomPPLMonitor(): PPLMonitor {
-        // every random ppl monitor's query searches index TEST_INDEX_NAME,
-        // so create that first before creating the monitor
-        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
-        val pplMonitor = randomPPLMonitor()
+    protected fun createRandomPPLMonitor(
+        name: String = randomAlphaOfLength(10),
+        enabled: Boolean = randomBoolean(),
+        schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
+        lookBackWindow: Long? = randomLongBetween(1, 100),
+        timestampField: String? = lookBackWindow?.let { TIMESTAMP_FIELD },
+        lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+        enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
+        triggers: List<PPLTrigger> = List(randomIntBetween(1, 5)) { randomPPLTrigger() },
+        user: User = randomUser(),
+        queryLanguage: QueryLanguage = QueryLanguage.PPL,
+        query: String = "source = $TEST_INDEX_NAME | head 10"
+    ): PPLMonitor {
+        // every random ppl monitor's query searches index TEST_INDEX_NAME
+        // by default, so create that first before creating the monitor
+        val indexExistsResponse = client().makeRequest("HEAD", TEST_INDEX_NAME)
+        if (indexExistsResponse.restStatus() == RestStatus.NOT_FOUND) {
+            createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
+        }
+        val pplMonitor = PPLMonitor(
+            name = name,
+            enabled = enabled,
+            schedule = schedule,
+            lookBackWindow = lookBackWindow,
+            timestampField = timestampField,
+            lastUpdateTime = lastUpdateTime,
+            enabledTime = enabledTime,
+            triggers = triggers,
+            user = user,
+            queryLanguage = queryLanguage,
+            query = query
+        )
         logger.info("ppl monitor: $pplMonitor")
         val pplMonitorId = createMonitorV2(pplMonitor).id
         return getMonitorV2(monitorV2Id = pplMonitorId) as PPLMonitor
@@ -836,6 +861,17 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
     ): Response {
         return getAlerts(client(), dataMap, header)
+    }
+
+    protected fun getAlertV2s(): Response {
+        val response = client().makeRequest(
+            "GET",
+            "$MONITOR_V2_BASE_URI/alerts?",
+            null,
+            BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        )
+        assertEquals("Get call failed.", RestStatus.OK, response.restStatus())
+        return response
     }
 
     protected fun refreshIndex(index: String): Response {
@@ -2083,5 +2119,19 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val deletedCommentId = deleteResponseBody["_id"] as String
 
         return deletedCommentId
+    }
+
+    // this function is used for PPL Alerting testing.
+    // precondition: TEST_INDEX_NAME must be created before calling this
+    // indexes a doc from some time ago into index TEST_INDEX_NAME.
+    // this function only works on the TEST_INDEX_NAME index created
+    // specifically for this IT suite. It has fields
+    // "timestamp" (date), "abc" (string), "number" (integer)
+    protected fun indexDocFromSomeTimeAgo(timeValue: Long, timeUnit: ChronoUnit, abc: String, number: Int) {
+        val someTimeAgo = ZonedDateTime.now().minus(timeValue, timeUnit).truncatedTo(MILLIS)
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(someTimeAgo) // the timestamp string is given a random timezone offset
+        val testDoc = """{ "timestamp" : "$testTime", "abc": "$abc", "number" : "$number" }"""
+        logger.info("test time: $testTime")
+        indexDoc(TEST_INDEX_NAME, UUID.randomUUID().toString(), testDoc)
     }
 }

@@ -489,6 +489,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.ALERTING_V2_MAX_MONITORS,
             AlertingSettings.ALERTING_V2_MAX_TRIGGERS,
             AlertingSettings.ALERTING_V2_MAX_SUPPRESSION_DURATION,
+            AlertingSettings.ALERTING_V2_MAX_EXPIRE_DURATION,
             AlertingSettings.ALERTING_V2_MAX_QUERY_LENGTH,
             AlertingSettings.ALERT_V2_QUERY_RESULTS_MAX_SIZE,
             AlertingSettings.ALERT_V2_PER_RESULT_TRIGGER_MAX_ALERTS
