@@ -1,5 +1,12 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package org.opensearch.alerting.core.modelv2
 
+import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.MONITOR_V2_MIN_EXPIRE_DURATION_MINUTES
+import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.MONITOR_V2_MIN_SUPPRESS_DURATION_MINUTES
 import org.opensearch.alerting.core.modelv2.TriggerV2.Companion.ACTIONS_FIELD
 import org.opensearch.alerting.core.modelv2.TriggerV2.Companion.EXPIRE_FIELD
 import org.opensearch.alerting.core.modelv2.TriggerV2.Companion.ID_FIELD
@@ -71,6 +78,11 @@ data class PPLTrigger(
     val numResultsValue: Long?,
     val customCondition: String?
 ) : TriggerV2 {
+
+    init {
+        require(this.expireDuration > MONITOR_V2_MIN_EXPIRE_DURATION_MINUTES)
+        this.suppressDuration?.let { require(it > MONITOR_V2_MIN_SUPPRESS_DURATION_MINUTES) }
+    }
 
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
@@ -185,12 +197,6 @@ data class PPLTrigger(
 
         // default fallback values of fields if none are passed in
         private const val DEFAULT_EXPIRE_DURATION = (7 * 24 * 60 * 60 * 1000).toLong() // 7 days in milliseconds
-
-        // mock setting name used when parsing TimeValue
-        // TimeValue class is usually reserved for declaring settings, but we're using it
-        // outside that use case here, which is why we need these placeholders
-        private const val PLACEHOLDER_SUPPRESS_SETTING_NAME = "ppl_trigger_suppress_duration"
-        private const val PLACEHOLDER_EXPIRE_SETTING_NAME = "ppl_trigger_expire_duration"
 
         val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(
             TriggerV2::class.java,

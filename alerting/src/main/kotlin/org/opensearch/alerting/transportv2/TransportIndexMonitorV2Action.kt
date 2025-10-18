@@ -1,3 +1,8 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package org.opensearch.alerting.transportv2
 
 import kotlinx.coroutines.CoroutineScope
@@ -42,7 +47,6 @@ import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_MONITORS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_QUERY_LENGTH
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_SUPPRESSION_DURATION
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_TRIGGERS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.transport.SecureTransportAction
@@ -93,20 +97,14 @@ class TransportIndexMonitorV2Action @Inject constructor(
 
     // adjustable limits (via settings)
     @Volatile private var maxMonitors = ALERTING_V2_MAX_MONITORS.get(settings)
-    @Volatile private var maxTriggers = ALERTING_V2_MAX_TRIGGERS.get(settings)
     @Volatile private var maxSuppressDuration = ALERTING_V2_MAX_SUPPRESSION_DURATION.get(settings)
     @Volatile private var maxQueryLength = ALERTING_V2_MAX_QUERY_LENGTH.get(settings)
     @Volatile private var requestTimeout = REQUEST_TIMEOUT.get(settings)
     @Volatile private var indexTimeout = INDEX_TIMEOUT.get(settings)
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
-    // hard, nonadjustable limits
-    private val minSuppressDuration = 1 // one minute min duration to match scheduled job interval granularity
-    private val minExpireDuration = 1 // one minute min duration to match scheduled job interval granularity
-
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_MONITORS) { maxMonitors = it }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_TRIGGERS) { maxTriggers = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_SUPPRESSION_DURATION) { maxSuppressDuration = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_QUERY_LENGTH) { maxQueryLength = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(REQUEST_TIMEOUT) { requestTimeout = it }
@@ -256,18 +254,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
     }
 
     private fun validatePplMonitor(pplMonitor: PPLMonitor, validationListener: ActionListener<Unit>): Boolean {
-        // ensure the PPL Monitor only has up to the max number of triggers
-        if (pplMonitor.triggers.size > maxTriggers) {
-            validationListener.onFailure(
-                AlertingException.wrap(
-                    IllegalArgumentException(
-                        "PPL Monitor exceeds the maximum allowed number of triggers"
-                    )
-                )
-            )
-            return false
-        }
-
         // ensure the trigger suppress and expire durations are valid
         pplMonitor.triggers.forEach { trigger ->
             trigger.suppressDuration?.let { suppressDuration ->
@@ -281,27 +267,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
                     )
                     return false
                 }
-                if (suppressDuration < minSuppressDuration) {
-                    validationListener.onFailure(
-                        AlertingException.wrap(
-                            IllegalArgumentException(
-                                "Suppress duration must be at least $minSuppressDuration but was $suppressDuration"
-                            )
-                        )
-                    )
-                    return false
-                }
-            }
-
-            if (trigger.expireDuration < minExpireDuration) {
-                validationListener.onFailure(
-                    AlertingException.wrap(
-                        IllegalArgumentException(
-                            "Expire duration must be at least $minExpireDuration but was ${trigger.expireDuration}"
-                        )
-                    )
-                )
-                return false
             }
         }
 

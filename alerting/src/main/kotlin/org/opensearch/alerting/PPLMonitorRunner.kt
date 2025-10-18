@@ -1,3 +1,8 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
@@ -47,6 +52,7 @@ import java.time.Instant
 import java.time.ZoneOffset.UTC
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import java.util.Locale
 
 object PPLMonitorRunner : MonitorV2Runner {
     private val logger = LogManager.getLogger(javaClass)
@@ -286,7 +292,7 @@ object PPLMonitorRunner : MonitorV2Runner {
     // lookBackWindow: customer's desired query look back window, overrides [periodStart, periodEnd] if not null
     private fun addTimeFilter(query: String, lookbackPeriodStart: Instant, periodEnd: Instant, timestampField: String): String {
         // PPL plugin only accepts timestamp strings in this format
-        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(UTC)
+        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ROOT).withZone(UTC)
 
         val periodStartPplTimestamp = formatter.format(lookbackPeriodStart)
         val periodEndPplTimeStamp = formatter.format(periodEnd)

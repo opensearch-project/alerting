@@ -1,10 +1,15 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package org.opensearch.alerting.core.modelv2
 
-import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.ENABLED_FIELD
 import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.ENABLED_TIME_FIELD
 import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.LAST_UPDATE_TIME_FIELD
 import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.LOOK_BACK_WINDOW_FIELD
+import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.MONITOR_V2_MAX_TRIGGERS
 import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.NAME_FIELD
 import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.NO_ID
 import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.NO_VERSION
@@ -14,7 +19,6 @@ import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.TIMESTAMP_FIELD
 import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.TRIGGERS_FIELD
 import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.USER_FIELD
 import org.opensearch.alerting.core.util.nonOptionalTimeField
-import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.CronSchedule
 import org.opensearch.commons.alerting.model.Schedule
 import org.opensearch.commons.alerting.util.AlertingException
@@ -31,9 +35,6 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import java.io.IOException
 import java.time.Instant
-import java.util.concurrent.TimeUnit
-
-private val log = LogManager.getLogger(PPLMonitor::class.java)
 
 // TODO: probably change this to be called PPLSQLMonitor. A PPL Monitor and SQL Monitor
 // would have the exact same functionality, except the choice of language
@@ -95,6 +96,8 @@ data class PPLMonitor(
         } else {
             require(enabledTime == null)
         }
+
+        require(triggers.size <= MONITOR_V2_MAX_TRIGGERS) { "Monitors can only have $MONITOR_V2_MAX_TRIGGERS triggers" }
     }
 
     @Throws(IOException::class)
@@ -261,14 +264,6 @@ data class PPLMonitor(
         const val QUERY_LANGUAGE_FIELD = "query_language"
         const val QUERY_FIELD = "query"
 
-        // default fallback values of fields if none are passed in
-        val DEFAULT_LOOK_BACK_WINDOW = TimeValue(1L, TimeUnit.HOURS)
-
-        // mock setting name used when parsing TimeValue
-        // TimeValue class is usually reserved for declaring settings, but we're using it
-        // outside that use case here, which is why we need these placeholders
-        private const val PLACEHOLDER_LOOK_BACK_WINDOW_SETTING_NAME = "ppl_monitor_look_back_window"
-
         @JvmStatic
         @JvmOverloads
         @Throws(IOException::class)
@@ -300,16 +295,6 @@ data class PPLMonitor(
                         if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
                             lookBackWindow = xcp.longValue()
                         }
-//                        if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
-//                            val input = xcp.text()
-//                            try {
-//                                lookBackWindow = TimeValue.parseTimeValue(input, PLACEHOLDER_LOOK_BACK_WINDOW_SETTING_NAME).millis
-//                            } catch (e: Exception) {
-//                                throw AlertingException.wrap(
-//                                    IllegalArgumentException("Invalid value for field $LOOK_BACK_WINDOW_FIELD", e)
-//                                )
-//                            }
-//                        }
                     }
                     TIMESTAMP_FIELD -> timestampField = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) null else xcp.text()
                     LAST_UPDATE_TIME_FIELD -> lastUpdateTime = xcp.instant()

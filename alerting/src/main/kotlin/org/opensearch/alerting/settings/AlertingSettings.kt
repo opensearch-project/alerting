@@ -331,12 +331,6 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val ALERTING_V2_MAX_TRIGGERS = Setting.intSetting(
-            "plugins.alerting_v2.monitor.max_triggers",
-            10,
-            Setting.Property.NodeScope, Setting.Property.Dynamic
-        )
-
         val ALERTING_V2_MAX_SUPPRESSION_DURATION = Setting.longSetting(
             "plugins.alerting_v2.monitor.max_suppression_duration",
             7200L, // 5 days, 7200 minutes

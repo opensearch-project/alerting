@@ -1,3 +1,8 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package org.opensearch.alerting.resthandler
 
 import org.apache.hc.core5.http.ContentType
@@ -17,7 +22,6 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_M
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_MONITORS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_QUERY_LENGTH
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_SUPPRESSION_DURATION
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_TRIGGERS
 import org.opensearch.client.ResponseException
 import org.opensearch.common.UUIDs
 import org.opensearch.common.settings.Settings
@@ -184,43 +188,6 @@ class MonitorV2RestApiIT : AlertingRestTestCase() {
         ensureNumMonitors(1)
     }
 
-    fun `test create ppl monitor with more than max allowed triggers fails`() {
-        adminClient().updateSettings(ALERTING_V2_MAX_TRIGGERS.key, 1)
-
-        // ensure the request fails
-        try {
-            createRandomPPLMonitor(
-                triggers = listOf(
-                    randomPPLTrigger(),
-                    randomPPLTrigger()
-                )
-            )
-            fail("Expected request to fail with BAD_REQUEST but it succeeded")
-        } catch (e: ResponseException) {
-            assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())
-        }
-
-        // ensure no monitor was created
-        ensureNumMonitors(0)
-    }
-
-    fun `test create ppl monitor with suppress less than one minute fails`() {
-        // ensure the request fails
-        try {
-            createRandomPPLMonitor(
-                triggers = listOf(
-                    randomPPLTrigger(suppressDuration = 0)
-                )
-            )
-            fail("Expected request to fail with BAD_REQUEST but it succeeded")
-        } catch (e: ResponseException) {
-            assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())
-        }
-
-        // ensure no monitor was created
-        ensureNumMonitors(0)
-    }
-
     fun `test create ppl monitor with suppress more than default max fails`() {
         val maxSuppressDuration = 60L
         client().updateSettings(ALERTING_V2_MAX_SUPPRESSION_DURATION.key, maxSuppressDuration)
@@ -230,23 +197,6 @@ class MonitorV2RestApiIT : AlertingRestTestCase() {
             createRandomPPLMonitor(
                 triggers = listOf(
                     randomPPLTrigger(suppressDuration = maxSuppressDuration + 10)
-                )
-            )
-            fail("Expected request to fail with BAD_REQUEST but it succeeded")
-        } catch (e: ResponseException) {
-            assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())
-        }
-
-        // ensure no monitor was created
-        ensureNumMonitors(0)
-    }
-
-    fun `test create ppl monitor with expire less than one minute fails`() {
-        // ensure the request fails
-        try {
-            createRandomPPLMonitor(
-                triggers = listOf(
-                    randomPPLTrigger(expireDuration = 0)
                 )
             )
             fail("Expected request to fail with BAD_REQUEST but it succeeded")
