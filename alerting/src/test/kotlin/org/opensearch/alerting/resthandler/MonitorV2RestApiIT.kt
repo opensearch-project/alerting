@@ -176,6 +176,19 @@ class MonitorV2RestApiIT : AlertingRestTestCase() {
 
         createRandomPPLMonitor()
 
+        val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
+        val searchResponse = client().makeRequest(
+            "POST", "$MONITOR_V2_BASE_URI/_search",
+            emptyMap(), StringEntity(search, ContentType.APPLICATION_JSON)
+        )
+
+        assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
+        val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
+        val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+        val numberDocsFound = hits["total"]?.get("value")
+
+        logger.info("num monitors: $numberDocsFound")
+
         // ensure the request fails
         try {
             createRandomPPLMonitor()
@@ -339,6 +352,8 @@ class MonitorV2RestApiIT : AlertingRestTestCase() {
         }
     }
 
+    /* Alerting V1 V2 Coexistence */
+
     /* Utils */
     private fun assertPplMonitorsEqual(pplMonitor1: PPLMonitor, pplMonitor2: PPLMonitor) {
         assertEquals("Monitor enabled fields not equal", pplMonitor1.enabled, pplMonitor2.enabled)
@@ -417,7 +432,7 @@ class MonitorV2RestApiIT : AlertingRestTestCase() {
         // workflows incorrectly create whatever monitors it will
         OpenSearchTestCase.waitUntil({
             return@waitUntil false
-        }, 20, TimeUnit.SECONDS)
+        }, 10, TimeUnit.SECONDS)
 
         val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
         val searchResponse = client().makeRequest(

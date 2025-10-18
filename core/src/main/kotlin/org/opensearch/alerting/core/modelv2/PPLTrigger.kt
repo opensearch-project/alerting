@@ -80,8 +80,14 @@ data class PPLTrigger(
 ) : TriggerV2 {
 
     init {
-        require(this.expireDuration > MONITOR_V2_MIN_EXPIRE_DURATION_MINUTES)
-        this.suppressDuration?.let { require(it > MONITOR_V2_MIN_SUPPRESS_DURATION_MINUTES) }
+        require(this.expireDuration >= MONITOR_V2_MIN_EXPIRE_DURATION_MINUTES) {
+            "expire duration cannot be less than $MONITOR_V2_MIN_EXPIRE_DURATION_MINUTES, was $expireDuration"
+        }
+        this.suppressDuration?.let {
+            require(it >= MONITOR_V2_MIN_SUPPRESS_DURATION_MINUTES) {
+                "suppress duration cannot be less than $MONITOR_V2_MIN_SUPPRESS_DURATION_MINUTES, was $suppressDuration"
+            }
+        }
     }
 
     @Throws(IOException::class)
