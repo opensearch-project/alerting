@@ -280,9 +280,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
                 }
             }
 
-            logger.info("trigger expire duration: ${trigger.expireDuration}")
-            logger.info("max expire duration: $maxExpireDuration")
-
             if (trigger.expireDuration > maxExpireDuration) {
                 validationListener.onFailure(
                     AlertingException.wrap(

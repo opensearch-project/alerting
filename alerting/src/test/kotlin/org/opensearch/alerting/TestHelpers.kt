@@ -317,7 +317,7 @@ fun randomPPLMonitor(
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     triggers: List<PPLTrigger> = List(randomIntBetween(1, 5)) { randomPPLTrigger() },
-    user: User = randomUser(),
+    user: User? = randomUser(),
     queryLanguage: QueryLanguage = QueryLanguage.PPL,
     query: String = "source = $TEST_INDEX_NAME | head 10"
 ): PPLMonitor {
