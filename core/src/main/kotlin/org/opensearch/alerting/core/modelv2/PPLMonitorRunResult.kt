@@ -1,3 +1,8 @@
+/*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package org.opensearch.alerting.core.modelv2
 
 import org.opensearch.alerting.core.modelv2.AlertV2.Companion.MONITOR_V2_NAME_FIELD
