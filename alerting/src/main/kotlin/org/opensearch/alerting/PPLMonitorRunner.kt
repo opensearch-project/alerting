@@ -122,18 +122,18 @@ object PPLMonitorRunner : MonitorV2Runner {
         // run each trigger
         for (pplTrigger in pplMonitor.triggers) {
             try {
-                // check for suppression and skip execution
+                // check for throttle and skip execution
                 // before even running the trigger itself
-                val suppressed = checkForSuppress(pplTrigger, timeOfCurrentExecution, manual)
-                if (suppressed) {
-                    logger.info("suppressing trigger ${pplTrigger.name} from monitor ${pplMonitor.name}")
+                val throttled = checkForThrottle(pplTrigger, timeOfCurrentExecution, manual)
+                if (throttled) {
+                    logger.info("throttling trigger ${pplTrigger.name} from monitor ${pplMonitor.name}")
 
-                    // automatically set this trigger to untriggered
+                    // automatically return that this trigger is untriggered
                     triggerResults[pplTrigger.id] = PPLTriggerRunResult(pplTrigger.name, false, null)
 
                     continue
                 }
-                logger.info("suppression check passed, executing trigger ${pplTrigger.name} from monitor ${pplMonitor.name}")
+                logger.info("throttle check passed, executing trigger ${pplTrigger.name} from monitor ${pplMonitor.name}")
 
                 // if trigger uses custom condition, append the custom condition to query, otherwise simply proceed
                 val queryToExecute = if (pplTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number of results trigger
@@ -211,7 +211,7 @@ object PPLMonitorRunner : MonitorV2Runner {
                         timeOfCurrentExecution
                     )
 
-                    // update the trigger's last execution time for future suppression checks
+                    // update the trigger's last execution time for future throttle checks
                     pplTrigger.lastTriggeredTime = timeOfCurrentExecution
 
                     // send alert notifications
@@ -256,7 +256,7 @@ object PPLMonitorRunner : MonitorV2Runner {
             }
         }
 
-        // for suppression checking purposes, reindex the PPL Monitor into the alerting-config index
+        // for throttle checking purposes, reindex the PPL Monitor into the alerting-config index
         // with updated last triggered times for each of its triggers
         if (triggerResults.any { it.value.triggered }) {
             updateMonitorWithLastTriggeredTimes(pplMonitor, nodeClient)
@@ -270,23 +270,23 @@ object PPLMonitorRunner : MonitorV2Runner {
         )
     }
 
-    // returns true if the pplTrigger should be suppressed
-    private fun checkForSuppress(pplTrigger: PPLTrigger, timeOfCurrentExecution: Instant, manual: Boolean): Boolean {
-        // manual calls from the user to execute a monitor should never be suppressed
+    // returns true if the pplTrigger should be throttled
+    private fun checkForThrottle(pplTrigger: PPLTrigger, timeOfCurrentExecution: Instant, manual: Boolean): Boolean {
+        // manual calls from the user to execute a monitor should never be throttled
         if (manual) {
             return false
         }
 
-        // the interval between throttledTimeBound and now is the suppression window
-        // i.e. any PPLTrigger whose last trigger time is in this window must be suppressed
-        val suppressTimeBound = pplTrigger.suppressDuration?.let {
-            timeOfCurrentExecution.minus(pplTrigger.suppressDuration!!, ChronoUnit.MINUTES)
+        // the interval between throttledTimeBound and now is the throttle window
+        // i.e. any PPLTrigger whose last trigger time is in this window must be throttled
+        val throttleTimeBound = pplTrigger.throttleDuration?.let {
+            timeOfCurrentExecution.minus(pplTrigger.throttleDuration!!, ChronoUnit.MINUTES)
         }
 
-        // the trigger must be suppressed if...
-        return pplTrigger.suppressDuration != null && // suppression is enabled on the PPLTrigger
+        // the trigger must be throttled if...
+        return pplTrigger.throttleDuration != null && // throttling is enabled on the PPLTrigger
             pplTrigger.lastTriggeredTime != null && // and it has triggered before at least once
-            pplTrigger.lastTriggeredTime!!.isAfter(suppressTimeBound!!) // and it's not yet out of the suppression window
+            pplTrigger.lastTriggeredTime!!.isAfter(throttleTimeBound!!) // and it's not yet out of the throttle window
     }
 
     // adds monitor schedule-based time filter

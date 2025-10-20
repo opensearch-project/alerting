@@ -89,8 +89,6 @@ interface MonitorV2 : ScheduledJob {
         const val NO_VERSION = 1L
 
         // hard, nonadjustable limits
-        const val MONITOR_V2_MIN_SUPPRESS_DURATION_MINUTES = 1 // one minute min duration to match scheduled job interval granularity
-        const val MONITOR_V2_MIN_EXPIRE_DURATION_MINUTES = 1 // one minute min duration to match scheduled job interval granularity
         const val MONITOR_V2_MAX_TRIGGERS = 10
 
         val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(

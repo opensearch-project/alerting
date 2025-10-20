@@ -331,8 +331,8 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val ALERTING_V2_MAX_SUPPRESSION_DURATION = Setting.longSetting(
-            "plugins.alerting_v2.monitor.max_suppression_duration",
+        val ALERTING_V2_MAX_THROTTLE_DURATION = Setting.longSetting(
+            "plugins.alerting_v2.monitor.max_throttle_duration",
             7200L, // 5 days, 7200 minutes
             2L,
             Setting.Property.NodeScope, Setting.Property.Dynamic

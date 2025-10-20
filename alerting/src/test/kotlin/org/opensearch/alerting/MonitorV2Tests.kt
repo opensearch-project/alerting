@@ -28,7 +28,7 @@ class MonitorV2Tests : OpenSearchTestCase() {
 
     fun `test max triggers`() {
         val tooManyTriggers = mutableListOf<PPLTrigger>()
-        for (i in 0..11) {
+        for (i in 0..10) { // 11 times
             tooManyTriggers.add(randomPPLTrigger())
         }
 
@@ -38,10 +38,10 @@ class MonitorV2Tests : OpenSearchTestCase() {
         } catch (_: IllegalArgumentException) {}
     }
 
-    fun `test min suppress duration`() {
+    fun `test min throttle duration`() {
         try {
-            randomPPLTrigger(suppressDuration = 0)
-            fail("Trigger with suppress duration less than 1 should be rejected")
+            randomPPLTrigger(throttleDuration = 0)
+            fail("Trigger with throttle duration less than 1 should be rejected")
         } catch (_: IllegalArgumentException) {}
     }
 

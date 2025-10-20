@@ -48,7 +48,7 @@ import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_EXPIRE_DURATION
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_MONITORS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_QUERY_LENGTH
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_SUPPRESSION_DURATION
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_THROTTLE_DURATION
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.transport.SecureTransportAction
@@ -98,7 +98,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
 
     // adjustable limits (via settings)
     @Volatile private var maxMonitors = ALERTING_V2_MAX_MONITORS.get(settings)
-    @Volatile private var maxSuppressDuration = ALERTING_V2_MAX_SUPPRESSION_DURATION.get(settings)
+    @Volatile private var maxThrottleDuration = ALERTING_V2_MAX_THROTTLE_DURATION.get(settings)
     @Volatile private var maxExpireDuration = ALERTING_V2_MAX_EXPIRE_DURATION.get(settings)
     @Volatile private var maxQueryLength = ALERTING_V2_MAX_QUERY_LENGTH.get(settings)
     @Volatile private var requestTimeout = REQUEST_TIMEOUT.get(settings)
@@ -107,7 +107,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_MONITORS) { maxMonitors = it }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_SUPPRESSION_DURATION) { maxSuppressDuration = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_THROTTLE_DURATION) { maxThrottleDuration = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_EXPIRE_DURATION) { maxExpireDuration = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_QUERY_LENGTH) { maxQueryLength = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(REQUEST_TIMEOUT) { requestTimeout = it }
@@ -265,14 +265,14 @@ class TransportIndexMonitorV2Action @Inject constructor(
     }
 
     private fun validatePplMonitor(pplMonitor: PPLMonitor, validationListener: ActionListener<Unit>): Boolean {
-        // ensure the trigger suppress and expire durations are valid
+        // ensure the trigger throttle and expire durations are valid
         pplMonitor.triggers.forEach { trigger ->
-            trigger.suppressDuration?.let { suppressDuration ->
-                if (suppressDuration > maxSuppressDuration) {
+            trigger.throttleDuration?.let { throttleDuration ->
+                if (throttleDuration > maxThrottleDuration) {
                     validationListener.onFailure(
                         AlertingException.wrap(
                             IllegalArgumentException(
-                                "Suppress duration must be at most $maxSuppressDuration but was $suppressDuration"
+                                "Throttle duration must be at most $maxThrottleDuration but was $throttleDuration"
                             )
                         )
                     )

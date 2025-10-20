@@ -5,15 +5,15 @@
 
 package org.opensearch.alerting.core.modelv2
 
-import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.MONITOR_V2_MIN_EXPIRE_DURATION_MINUTES
-import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.MONITOR_V2_MIN_SUPPRESS_DURATION_MINUTES
 import org.opensearch.alerting.core.modelv2.TriggerV2.Companion.ACTIONS_FIELD
 import org.opensearch.alerting.core.modelv2.TriggerV2.Companion.EXPIRE_FIELD
 import org.opensearch.alerting.core.modelv2.TriggerV2.Companion.ID_FIELD
 import org.opensearch.alerting.core.modelv2.TriggerV2.Companion.LAST_TRIGGERED_FIELD
+import org.opensearch.alerting.core.modelv2.TriggerV2.Companion.MONITOR_V2_MIN_EXPIRE_DURATION_MINUTES
+import org.opensearch.alerting.core.modelv2.TriggerV2.Companion.MONITOR_V2_MIN_THROTTLE_DURATION_MINUTES
 import org.opensearch.alerting.core.modelv2.TriggerV2.Companion.NAME_FIELD
 import org.opensearch.alerting.core.modelv2.TriggerV2.Companion.SEVERITY_FIELD
-import org.opensearch.alerting.core.modelv2.TriggerV2.Companion.SUPPRESS_FIELD
+import org.opensearch.alerting.core.modelv2.TriggerV2.Companion.THROTTLE_FIELD
 import org.opensearch.alerting.core.modelv2.TriggerV2.Severity
 import org.opensearch.common.CheckedFunction
 import org.opensearch.common.UUIDs
@@ -48,9 +48,9 @@ import java.time.Instant
  * @property id Trigger ID, defaults to a base64 UUID.
  * @property name Display name of the Trigger.
  * @property severity The severity level of the Trigger.
- * @property suppressDuration Optional duration for which alerts from this Trigger should be suppressed.
- *                           Null indicates no suppression.
- * @property expireDuration Duration after which alerts from this Trigger should be deleted permanently.
+ * @property throttleDuration Optional duration (in minutes) for which alerts from this Trigger should be throttled/suppressed.
+ *                            Null indicates no throttling.
+ * @property expireDuration Duration (in minutes) after which alerts from this Trigger should be deleted permanently.
  * @property lastTriggeredTime The last time this Trigger generated an Alert. Null if Trigger hasn't generated an Alert yet.
  * @property actions List of notification-sending actions to run when the Trigger condition is met.
  * @property mode Specifies whether the trigger evaluates the entire result set or each result individually.
@@ -68,7 +68,7 @@ data class PPLTrigger(
     override val id: String = UUIDs.base64UUID(),
     override val name: String,
     override val severity: Severity,
-    override val suppressDuration: Long?,
+    override val throttleDuration: Long?,
     override val expireDuration: Long = DEFAULT_EXPIRE_DURATION,
     override var lastTriggeredTime: Instant?,
     override val actions: List<Action>,
@@ -83,9 +83,9 @@ data class PPLTrigger(
         require(this.expireDuration >= MONITOR_V2_MIN_EXPIRE_DURATION_MINUTES) {
             "expire duration cannot be less than $MONITOR_V2_MIN_EXPIRE_DURATION_MINUTES, was $expireDuration"
         }
-        this.suppressDuration?.let {
-            require(it >= MONITOR_V2_MIN_SUPPRESS_DURATION_MINUTES) {
-                "suppress duration cannot be less than $MONITOR_V2_MIN_SUPPRESS_DURATION_MINUTES, was $suppressDuration"
+        this.throttleDuration?.let {
+            require(it >= MONITOR_V2_MIN_THROTTLE_DURATION_MINUTES) {
+                "throttle duration cannot be less than $MONITOR_V2_MIN_THROTTLE_DURATION_MINUTES, was $throttleDuration"
             }
         }
     }
@@ -95,7 +95,7 @@ data class PPLTrigger(
         sin.readString(), // id
         sin.readString(), // name
         sin.readEnum(Severity::class.java), // severity
-        sin.readOptionalLong(), // suppressDuration
+        sin.readOptionalLong(), // throttleDuration
         sin.readLong(), // expireDuration
         sin.readOptionalInstant(), // lastTriggeredTime
         sin.readList(::Action), // actions
@@ -111,7 +111,7 @@ data class PPLTrigger(
         out.writeString(id)
         out.writeString(name)
         out.writeEnum(severity)
-        out.writeOptionalLong(suppressDuration)
+        out.writeOptionalLong(throttleDuration)
         out.writeLong(expireDuration)
         out.writeOptionalInstant(lastTriggeredTime)
         out.writeCollection(actions)
@@ -130,7 +130,7 @@ data class PPLTrigger(
         builder.field(ID_FIELD, id)
         builder.field(NAME_FIELD, name)
         builder.field(SEVERITY_FIELD, severity.value)
-        suppressDuration?.let { builder.field(SUPPRESS_FIELD, suppressDuration) }
+        throttleDuration?.let { builder.field(THROTTLE_FIELD, throttleDuration) }
         builder.field(EXPIRE_FIELD, expireDuration)
         builder.optionalTimeField(LAST_TRIGGERED_FIELD, lastTriggeredTime)
         builder.field(ACTIONS_FIELD, actions.toTypedArray())
@@ -148,7 +148,7 @@ data class PPLTrigger(
             ID_FIELD to id,
             NAME_FIELD to name,
             SEVERITY_FIELD to severity.value,
-            SUPPRESS_FIELD to suppressDuration,
+            THROTTLE_FIELD to throttleDuration,
             EXPIRE_FIELD to expireDuration,
             ACTIONS_FIELD to actions.map { it.asTemplateArg() },
             MODE_FIELD to mode.value,
@@ -202,7 +202,7 @@ data class PPLTrigger(
         const val CUSTOM_CONDITION_FIELD = "custom_condition"
 
         // default fallback values of fields if none are passed in
-        private const val DEFAULT_EXPIRE_DURATION = (7 * 24 * 60 * 60 * 1000).toLong() // 7 days in milliseconds
+        private const val DEFAULT_EXPIRE_DURATION = (7 * 24 * 60).toLong() // 7 days in minutes
 
         val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(
             TriggerV2::class.java,
@@ -216,7 +216,7 @@ data class PPLTrigger(
             var id = UUIDs.base64UUID() // assign a default triggerId if one is not specified
             var name: String? = null
             var severity: Severity? = null
-            var suppressDuration: Long? = null
+            var throttleDuration: Long? = null
             var expireDuration: Long = DEFAULT_EXPIRE_DURATION
             var lastTriggeredTime: Instant? = null
             val actions: MutableList<Action> = mutableListOf()
@@ -287,35 +287,15 @@ data class PPLTrigger(
                             customCondition = xcp.text()
                         }
                     }
-                    SUPPRESS_FIELD -> {
+                    THROTTLE_FIELD -> {
                         if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
-                            suppressDuration = xcp.longValue()
+                            throttleDuration = xcp.longValue()
                         }
-//                        if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
-//                            val input = xcp.text()
-//                            try {
-//                                suppressDuration = TimeValue.parseTimeValue(input, PLACEHOLDER_SUPPRESS_SETTING_NAME).millis
-//                            } catch (e: Exception) {
-//                                throw AlertingException.wrap(
-//                                    IllegalArgumentException("Invalid value for field: $SUPPRESS_FIELD", e)
-//                                )
-//                            }
-//                        }
                     }
                     EXPIRE_FIELD -> {
                         if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
                             expireDuration = xcp.longValue()
                         }
-//                        if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
-//                            val input = xcp.text()
-//                            try {
-//                                expireDuration = TimeValue.parseTimeValue(input, PLACEHOLDER_EXPIRE_SETTING_NAME).millis
-//                            } catch (e: Exception) {
-//                                throw AlertingException.wrap(
-//                                    IllegalArgumentException("Invalid value for field: $EXPIRE_FIELD", e)
-//                                )
-//                            }
-//                        }
                     }
                     LAST_TRIGGERED_FIELD -> lastTriggeredTime = xcp.instant()
                     ACTIONS_FIELD -> {
@@ -374,7 +354,7 @@ data class PPLTrigger(
                 id,
                 name,
                 severity,
-                suppressDuration,
+                throttleDuration,
                 expireDuration,
                 lastTriggeredTime,
                 actions,

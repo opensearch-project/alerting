@@ -37,8 +37,6 @@ class RestGetAlertsV2Action : BaseRestHandler() {
         )
     }
 
-    // TODO: this is an Get Alerts V2 rest handler that points to the Get Alerts V1 Transport action
-    // TODO: for now for playground, separate the 2 for GA
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
         log.debug("${request.method()} ${AlertingPlugin.MONITOR_V2_BASE_URI}/alerts")
 

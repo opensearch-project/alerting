@@ -38,7 +38,7 @@ class PPLMonitorRunnerIT : AlertingRestTestCase() {
                 lookBackWindow = null,
                 triggers = listOf(
                     randomPPLTrigger(
-                        suppressDuration = null,
+                        throttleDuration = null,
                         expireDuration = 5,
                         mode = TriggerMode.RESULT_SET,
                         conditionType = ConditionType.NUMBER_OF_RESULTS,
@@ -74,7 +74,7 @@ class PPLMonitorRunnerIT : AlertingRestTestCase() {
                 lookBackWindow = null,
                 triggers = listOf(
                     randomPPLTrigger(
-                        suppressDuration = null,
+                        throttleDuration = null,
                         expireDuration = 5,
                         mode = TriggerMode.PER_RESULT,
                         conditionType = ConditionType.NUMBER_OF_RESULTS,
@@ -119,7 +119,7 @@ class PPLMonitorRunnerIT : AlertingRestTestCase() {
                 lookBackWindow = null,
                 triggers = listOf(
                     randomPPLTrigger(
-                        suppressDuration = null,
+                        throttleDuration = null,
                         expireDuration = 5,
                         mode = TriggerMode.RESULT_SET,
                         conditionType = ConditionType.CUSTOM,
@@ -161,7 +161,7 @@ class PPLMonitorRunnerIT : AlertingRestTestCase() {
                 lookBackWindow = null,
                 triggers = listOf(
                     randomPPLTrigger(
-                        suppressDuration = null,
+                        throttleDuration = null,
                         expireDuration = 5,
                         mode = TriggerMode.PER_RESULT,
                         conditionType = ConditionType.CUSTOM,
@@ -206,7 +206,7 @@ class PPLMonitorRunnerIT : AlertingRestTestCase() {
                 timestampField = TIMESTAMP_FIELD,
                 triggers = listOf(
                     randomPPLTrigger(
-                        suppressDuration = null,
+                        throttleDuration = null,
                         expireDuration = 5,
                         mode = TriggerMode.RESULT_SET,
                         conditionType = ConditionType.NUMBER_OF_RESULTS,
@@ -241,7 +241,7 @@ class PPLMonitorRunnerIT : AlertingRestTestCase() {
                 timestampField = TIMESTAMP_FIELD,
                 triggers = listOf(
                     randomPPLTrigger(
-                        suppressDuration = null,
+                        throttleDuration = null,
                         expireDuration = 5,
                         mode = TriggerMode.RESULT_SET,
                         conditionType = ConditionType.NUMBER_OF_RESULTS,
@@ -274,7 +274,7 @@ class PPLMonitorRunnerIT : AlertingRestTestCase() {
                 schedule = IntervalSchedule(interval = 20, unit = MINUTES),
                 triggers = listOf(
                     randomPPLTrigger(
-                        suppressDuration = null,
+                        throttleDuration = null,
                         expireDuration = 1,
                         mode = TriggerMode.RESULT_SET,
                         conditionType = ConditionType.NUMBER_OF_RESULTS,
@@ -306,7 +306,7 @@ class PPLMonitorRunnerIT : AlertingRestTestCase() {
         assert(!alertsGeneratedPostExpire)
     }
 
-    fun `test scheduled job monitor execution gets suppressed`() {
+    fun `test scheduled job monitor execution gets throttled`() {
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(1, MINUTES, "abc", 5)
 
@@ -316,7 +316,7 @@ class PPLMonitorRunnerIT : AlertingRestTestCase() {
                 schedule = IntervalSchedule(interval = 1, unit = MINUTES),
                 triggers = listOf(
                     randomPPLTrigger(
-                        suppressDuration = 10,
+                        throttleDuration = 10,
                         expireDuration = 5,
                         mode = TriggerMode.RESULT_SET,
                         conditionType = ConditionType.NUMBER_OF_RESULTS,
@@ -332,24 +332,24 @@ class PPLMonitorRunnerIT : AlertingRestTestCase() {
         val executeResponse = executeMonitorV2(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
 
-        val getAlertsResponsePreSuppress = getAlertV2s()
-        val numAlertsPreSuppress = numAlerts(getAlertsResponsePreSuppress)
+        val getAlertsResponsePreThrottle = getAlertV2s()
+        val numAlertsPreThrottle = numAlerts(getAlertsResponsePreThrottle)
 
         assert(triggered) { "Monitor should have triggered but it didn't" }
-        assertEquals("Alerts should have been generated but they weren't", 1, numAlertsPreSuppress)
+        assertEquals("Alerts should have been generated but they weren't", 1, numAlertsPreThrottle)
 
         // sleep briefly to give the monitor to execute again
-        // automatically and get suppressed
+        // automatically and get throttled
         OpenSearchTestCase.waitUntil({
             return@waitUntil false
         }, 2, TimeUnit.MINUTES)
 
-        val getAlertsResponsePostSuppress = getAlertV2s()
-        val numAlertsPostSuppress = numAlerts(getAlertsResponsePostSuppress)
-        assertEquals("A new alert was generated when it should have been suppressed", 1, numAlertsPostSuppress)
+        val getAlertsResponsePostThrottled = getAlertV2s()
+        val numAlertsPostThrottled = numAlerts(getAlertsResponsePostThrottled)
+        assertEquals("A new alert was generated when it should have been throttled", 1, numAlertsPostThrottled)
     }
 
-    fun `test manual monitor execution bypasses suppression`() {
+    fun `test manual monitor execution bypasses throttle`() {
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(1, MINUTES, "abc", 5)
 
@@ -359,7 +359,7 @@ class PPLMonitorRunnerIT : AlertingRestTestCase() {
                 schedule = IntervalSchedule(interval = 30, unit = MINUTES),
                 triggers = listOf(
                     randomPPLTrigger(
-                        suppressDuration = 20,
+                        throttleDuration = 20,
                         expireDuration = 5,
                         mode = TriggerMode.RESULT_SET,
                         conditionType = ConditionType.NUMBER_OF_RESULTS,
@@ -382,7 +382,7 @@ class PPLMonitorRunnerIT : AlertingRestTestCase() {
         assertEquals("Alerts should have been generated but they weren't", 1, numAlerts)
 
         // sleep briefly to get comfortable inside
-        // the suppress window
+        // the throttle window
         OpenSearchTestCase.waitUntil({
             return@waitUntil false
         }, 10, TimeUnit.SECONDS)
@@ -394,7 +394,7 @@ class PPLMonitorRunnerIT : AlertingRestTestCase() {
         val numAlertsAgain = numAlerts(getAlertsAgainResponse)
 
         assert(triggeredAgain) { "Monitor should have triggered again but it didn't" }
-        assertEquals("A new alert should have been generated but was instead suppressed", 2, numAlertsAgain)
+        assertEquals("A new alert should have been generated but was instead throttled", 2, numAlertsAgain)
     }
 
     /* Utils */

@@ -21,7 +21,7 @@ import org.opensearch.alerting.resthandler.MonitorRestApiIT.Companion.USE_TYPED_
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_EXPIRE_DURATION
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_MONITORS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_QUERY_LENGTH
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_SUPPRESSION_DURATION
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_THROTTLE_DURATION
 import org.opensearch.client.ResponseException
 import org.opensearch.common.UUIDs
 import org.opensearch.common.settings.Settings
@@ -220,16 +220,16 @@ class MonitorV2RestApiIT : AlertingRestTestCase() {
         ensureNumMonitorV2s(1)
     }
 
-    fun `test create ppl monitor with suppress more than default max fails`() {
-        val maxSuppressDuration = 60L
-        client().updateSettings(ALERTING_V2_MAX_SUPPRESSION_DURATION.key, maxSuppressDuration)
+    fun `test create ppl monitor with throttle more than default max fails`() {
+        val maxThrottleDuration = 60L
+        client().updateSettings(ALERTING_V2_MAX_THROTTLE_DURATION.key, maxThrottleDuration)
 
         // ensure the request fails
         try {
             createRandomPPLMonitor(
                 randomPPLMonitor(
                     triggers = listOf(
-                        randomPPLTrigger(suppressDuration = maxSuppressDuration + 10)
+                        randomPPLTrigger(throttleDuration = maxThrottleDuration + 10)
                     )
                 )
             )
@@ -417,9 +417,9 @@ class MonitorV2RestApiIT : AlertingRestTestCase() {
                 sortedTriggers2[i].severity
             )
             assertEquals(
-                "Monitor trigger $id suppress durations not equal",
-                sortedTriggers1[i].suppressDuration,
-                sortedTriggers2[i].suppressDuration
+                "Monitor trigger $id throttle durations not equal",
+                sortedTriggers1[i].throttleDuration,
+                sortedTriggers2[i].throttleDuration
             )
             assertEquals(
                 "Monitor trigger $id expire durations not equal",
