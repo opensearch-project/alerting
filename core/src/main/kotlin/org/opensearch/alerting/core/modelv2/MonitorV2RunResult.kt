@@ -15,7 +15,6 @@ interface MonitorV2RunResult<out TriggerV2Result : TriggerV2RunResult> : Writeab
     }
 
     companion object {
-        const val MONITOR_V2_NAME_FIELD = "monitor_v2_name"
         const val ERROR_FIELD = "error"
         const val TRIGGER_RESULTS_FIELD = "trigger_results"
 

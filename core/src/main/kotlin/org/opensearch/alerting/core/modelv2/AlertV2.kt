@@ -3,21 +3,6 @@ package org.opensearch.alerting.core.modelv2
 import org.opensearch.alerting.core.modelv2.TriggerV2.Severity
 import org.opensearch.alerting.core.util.nonOptionalTimeField
 import org.opensearch.common.lucene.uid.Versions
-import org.opensearch.commons.alerting.model.Alert.Companion.ALERT_ID_FIELD
-import org.opensearch.commons.alerting.model.Alert.Companion.ALERT_VERSION_FIELD
-import org.opensearch.commons.alerting.model.Alert.Companion.ERROR_MESSAGE_FIELD
-import org.opensearch.commons.alerting.model.Alert.Companion.EXECUTION_ID_FIELD
-import org.opensearch.commons.alerting.model.Alert.Companion.MONITOR_ID_FIELD
-import org.opensearch.commons.alerting.model.Alert.Companion.MONITOR_NAME_FIELD
-import org.opensearch.commons.alerting.model.Alert.Companion.MONITOR_USER_FIELD
-import org.opensearch.commons.alerting.model.Alert.Companion.MONITOR_VERSION_FIELD
-import org.opensearch.commons.alerting.model.Alert.Companion.NO_ID
-import org.opensearch.commons.alerting.model.Alert.Companion.NO_VERSION
-import org.opensearch.commons.alerting.model.Alert.Companion.SCHEMA_VERSION_FIELD
-import org.opensearch.commons.alerting.model.Alert.Companion.SEVERITY_FIELD
-import org.opensearch.commons.alerting.model.Alert.Companion.TRIGGER_ID_FIELD
-import org.opensearch.commons.alerting.model.Alert.Companion.TRIGGER_NAME_FIELD
-import org.opensearch.commons.alerting.util.IndexUtils.Companion.NO_SCHEMA_VERSION
 import org.opensearch.commons.alerting.util.instant
 import org.opensearch.commons.alerting.util.optionalUserField
 import org.opensearch.commons.authuser.User
@@ -41,12 +26,11 @@ import java.time.Instant
  * @property monitorId ID of the Monitor that generated this Alert.
  * @property monitorName Name of the Monitor that generated this Alert.
  * @property monitorVersion Version of the Monitor at the time it generated this Alert.
- * @property triggerId ID of the specific Trigger that generated this alert.
- * @property triggerName Name of the trigger that generated this alert.
+ * @property triggerId ID of the Trigger in the Monitor that generated this alert.
+ * @property triggerName Name of the trigger in the Monitor that generated this alert.
  * @property queryResults Results from the Monitor's query that caused the Trigger to fire.
- *                       Stored as a map of field names to their values.
- * @property triggeredTime Timestamp when the Alert was generated.
- * @property expirationTime Timestamp when the Alert should be considered expired.
+ * @property triggeredTime Timestamp for when the Alert was generated.
+ * @property expirationTime Timestamp for when the Alert should be expired.
  * @property errorMessage Optional error message if there were issues during Trigger execution.
  *                       Null indicates no errors occurred.
  * @property severity Severity level of the alert (e.g., "HIGH", "MEDIUM", "LOW").
@@ -56,9 +40,10 @@ import java.time.Instant
  * @see TriggerV2 For the trigger conditions that create alerts
  *
  * Lifecycle:
- * 1. Created when a TriggerV2's condition is met. The TriggerV2 fires and forgets the Alert.
- * 2. Stored in the alerts index. AlertV2s are stateless. (e.g. they are never ACTIVE or COMPLETED)
- * 3. Alert is permanently deleted at [expirationTime]
+ * 1. AlertV2 is generated when a TriggerV2's condition is met. The TriggerV2 fires and forgets the AlertV2.
+ * 2. AlertV2 is stored in the alerts index. AlertV2s are stateless. (e.g. they are never ACTIVE or COMPLETED)
+ * 3. AlertV2 is soft deleted at [expirationTime], and archived in an alert history index
+ * 4. Based on the alert history retention period, the AlertV2 is permanently deleted
  */
 data class AlertV2(
     val id: String = NO_ID,
@@ -133,15 +118,15 @@ data class AlertV2(
 
     private fun createXContentBuilder(builder: XContentBuilder, withUser: Boolean): XContentBuilder {
         builder.startObject()
-            .field(ALERT_ID_FIELD, id)
-            .field(ALERT_VERSION_FIELD, version)
-            .field(MONITOR_ID_FIELD, monitorId)
+            .field(ALERT_V2_ID_FIELD, id)
+            .field(ALERT_V2_VERSION_FIELD, version)
+            .field(MONITOR_V2_ID_FIELD, monitorId)
             .field(SCHEMA_VERSION_FIELD, schemaVersion)
-            .field(MONITOR_VERSION_FIELD, monitorVersion)
-            .field(MONITOR_NAME_FIELD, monitorName)
+            .field(MONITOR_V2_VERSION_FIELD, monitorVersion)
+            .field(MONITOR_V2_NAME_FIELD, monitorName)
             .field(EXECUTION_ID_FIELD, executionId)
-            .field(TRIGGER_ID_FIELD, triggerId)
-            .field(TRIGGER_NAME_FIELD, triggerName)
+            .field(TRIGGER_V2_ID_FIELD, triggerId)
+            .field(TRIGGER_V2_NAME_FIELD, triggerName)
             .field(QUERY_FIELD, query)
             .field(QUERY_RESULTS_FIELD, queryResults)
             .field(ERROR_MESSAGE_FIELD, errorMessage)
@@ -150,7 +135,7 @@ data class AlertV2(
             .nonOptionalTimeField(EXPIRATION_TIME_FIELD, expirationTime)
 
         if (withUser) {
-            builder.optionalUserField(MONITOR_USER_FIELD, monitorUser)
+            builder.optionalUserField(MONITOR_V2_USER_FIELD, monitorUser)
         }
 
         builder.endObject()
@@ -160,20 +145,36 @@ data class AlertV2(
 
     fun asTemplateArg(): Map<String, Any?> {
         return mapOf(
-            ALERT_ID_FIELD to id,
-            ALERT_VERSION_FIELD to version,
+            ALERT_V2_ID_FIELD to id,
+            ALERT_V2_VERSION_FIELD to version,
             ERROR_MESSAGE_FIELD to errorMessage,
             EXECUTION_ID_FIELD to executionId,
-            EXPIRATION_TIME_FIELD to expirationTime?.toEpochMilli(),
+            EXPIRATION_TIME_FIELD to expirationTime.toEpochMilli(),
             SEVERITY_FIELD to severity
         )
     }
 
     companion object {
+        const val ALERT_V2_ID_FIELD = "id"
+        const val ALERT_V2_VERSION_FIELD = "version"
+        const val MONITOR_V2_ID_FIELD = "monitor_v2_id"
+        const val MONITOR_V2_VERSION_FIELD = "monitor_v2_version"
+        const val MONITOR_V2_NAME_FIELD = "monitor_v2_name"
+        const val MONITOR_V2_USER_FIELD = "monitor_v2_user"
+        const val TRIGGER_V2_ID_FIELD = "trigger_v2_id"
+        const val TRIGGER_V2_NAME_FIELD = "trigger_v2_name"
         const val TRIGGERED_TIME_FIELD = "triggered_time"
         const val EXPIRATION_TIME_FIELD = "expiration_time"
         const val QUERY_FIELD = "query"
         const val QUERY_RESULTS_FIELD = "query_results"
+        const val ERROR_MESSAGE_FIELD = "error_message"
+        const val EXECUTION_ID_FIELD = "execution_id"
+        const val SEVERITY_FIELD = "severity"
+        const val SCHEMA_VERSION_FIELD = "schema_version"
+
+        const val NO_ID = ""
+        const val NO_VERSION = Versions.NOT_FOUND
+        const val NO_SCHEMA_VERSION = 0
 
         @JvmStatic
         @JvmOverloads
@@ -200,18 +201,18 @@ data class AlertV2(
                 xcp.nextToken()
 
                 when (fieldName) {
-                    MONITOR_ID_FIELD -> monitorId = xcp.text()
+                    MONITOR_V2_ID_FIELD -> monitorId = xcp.text()
                     SCHEMA_VERSION_FIELD -> schemaVersion = xcp.intValue()
-                    MONITOR_NAME_FIELD -> monitorName = xcp.text()
-                    MONITOR_VERSION_FIELD -> monitorVersion = xcp.longValue()
-                    MONITOR_USER_FIELD ->
+                    MONITOR_V2_NAME_FIELD -> monitorName = xcp.text()
+                    MONITOR_V2_VERSION_FIELD -> monitorVersion = xcp.longValue()
+                    MONITOR_V2_USER_FIELD ->
                         monitorUser = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) {
                             null
                         } else {
                             User.parse(xcp)
                         }
-                    TRIGGER_ID_FIELD -> triggerId = xcp.text()
-                    TRIGGER_NAME_FIELD -> triggerName = xcp.text()
+                    TRIGGER_V2_ID_FIELD -> triggerId = xcp.text()
+                    TRIGGER_V2_NAME_FIELD -> triggerName = xcp.text()
                     QUERY_FIELD -> query = xcp.text()
                     QUERY_RESULTS_FIELD -> queryResults = xcp.map()
                     TRIGGERED_TIME_FIELD -> triggeredTime = xcp.instant()

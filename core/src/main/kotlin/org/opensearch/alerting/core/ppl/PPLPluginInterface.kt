@@ -10,7 +10,7 @@ import org.opensearch.sql.plugin.transport.TransportPPLQueryResponse
 import org.opensearch.transport.client.node.NodeClient
 
 /**
- * Various transport action plugin interfaces for the SQL/PPL plugin
+ * Transport action plugin interfaces for the SQL/PPL plugin
  */
 object PPLPluginInterface {
     fun executeQuery(

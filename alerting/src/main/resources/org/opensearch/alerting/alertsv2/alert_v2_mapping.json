@@ -10,10 +10,10 @@
     "schema_version": {
       "type": "integer"
     },
-    "monitor_id": {
+    "monitor_v2_id": {
       "type": "keyword"
     },
-    "monitor_version": {
+    "monitor_v2_version": {
       "type": "long"
     },
     "id": {
@@ -25,7 +25,7 @@
     "severity": {
       "type": "keyword"
     },
-    "monitor_name": {
+    "monitor_v2_name": {
       "type": "text",
       "fields": {
         "keyword": {
@@ -34,7 +34,7 @@
         }
       }
     },
-    "monitor_user": {
+    "monitor_v2_user": {
       "properties": {
         "name": {
           "type": "text",
@@ -74,10 +74,10 @@
     "execution_id": {
       "type": "keyword"
     },
-    "trigger_id": {
+    "trigger_v2_id": {
       "type": "keyword"
     },
-    "trigger_name": {
+    "trigger_v2_name": {
       "type": "text",
       "fields": {
         "keyword": {

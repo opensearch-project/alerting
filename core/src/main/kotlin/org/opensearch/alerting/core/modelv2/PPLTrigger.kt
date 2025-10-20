@@ -6,6 +6,7 @@
 package org.opensearch.alerting.core.modelv2
 
 import org.opensearch.alerting.core.modelv2.TriggerV2.Companion.ACTIONS_FIELD
+import org.opensearch.alerting.core.modelv2.TriggerV2.Companion.DEFAULT_EXPIRE_DURATION
 import org.opensearch.alerting.core.modelv2.TriggerV2.Companion.EXPIRE_FIELD
 import org.opensearch.alerting.core.modelv2.TriggerV2.Companion.ID_FIELD
 import org.opensearch.alerting.core.modelv2.TriggerV2.Companion.LAST_TRIGGERED_FIELD
@@ -34,12 +35,10 @@ import java.time.Instant
 /**
  * The PPL Trigger for PPL Monitors
  *
- * There are two types of PPLTrigger conditions: NUMBER_OF_RESULT and CUSTOM
- * NUMBER_OF_RESULTS: triggers based on if the number of query results returned by the PPLMonitor
- * query meets some threshold
- * CUSTOM: triggers based on a custom condition that user specifies
- * This trigger can operate in either result set or per-result mode and supports
- * both numeric result conditions and custom conditions.
+ * There are two types of PPLTrigger conditions: NUMBER_OF_RESULTS and CUSTOM
+ * NUMBER_OF_RESULTS: triggers based on whether the number of query results returned by the PPLMonitor
+ *                    query meets some threshold
+ * CUSTOM: triggers based on a custom condition that user specifies (a single ppl eval statement)
  *
  * PPLTriggers can run on two modes: RESULT_SET and PER_RESULT
  * RESULT_SET: exactly one Alert is generated when the Trigger condition is met
@@ -58,11 +57,11 @@ import java.time.Instant
  * @property conditionType The type of condition to evaluate.
  *               Can be either [ConditionType.NUMBER_OF_RESULTS] or [ConditionType.CUSTOM].
  * @property numResultsCondition The comparison operator for NUMBER_OF_RESULTS conditions. Required if using NUMBER_OF_RESULTS conditions,
- *                              null otherwise.
+ *                               required to be null otherwise.
  * @property numResultsValue The threshold value for NUMBER_OF_RESULTS conditions. Required if using NUMBER_OF_RESULTS conditions,
- *                          null otherwise.
+ *                           required to be null otherwise.
  * @property customCondition A custom condition expression. Required if using CUSTOM conditions,
- *                          null otherwise.
+ *                           required to be null otherwise.
  */
 data class PPLTrigger(
     override val id: String = UUIDs.base64UUID(),
@@ -72,8 +71,8 @@ data class PPLTrigger(
     override val expireDuration: Long = DEFAULT_EXPIRE_DURATION,
     override var lastTriggeredTime: Instant?,
     override val actions: List<Action>,
-    val mode: TriggerMode, // result_set or per_result
-    val conditionType: ConditionType,
+    val mode: TriggerMode, // RESULT_SET or PER_RESULT
+    val conditionType: ConditionType, // NUMBER_OF_RESULTS or CUSTOM
     val numResultsCondition: NumResultsCondition?,
     val numResultsValue: Long?,
     val customCondition: String?
@@ -200,9 +199,6 @@ data class PPLTrigger(
         const val NUM_RESULTS_CONDITION_FIELD = "num_results_condition"
         const val NUM_RESULTS_VALUE_FIELD = "num_results_value"
         const val CUSTOM_CONDITION_FIELD = "custom_condition"
-
-        // default fallback values of fields if none are passed in
-        private const val DEFAULT_EXPIRE_DURATION = (7 * 24 * 60).toLong() // 7 days in minutes
 
         val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(
             TriggerV2::class.java,

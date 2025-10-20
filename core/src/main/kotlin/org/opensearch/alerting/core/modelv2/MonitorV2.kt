@@ -48,7 +48,7 @@ interface MonitorV2 : ScheduledJob {
         lastUpdateTime: Instant = this.lastUpdateTime,
         enabledTime: Instant? = this.enabledTime,
         user: User? = this.user,
-        // not supporting overriding triggers in copy
+        // no support for overriding triggers in copy
         schemaVersion: Int = this.schemaVersion,
         lookBackWindow: Long? = this.lookBackWindow,
         timestampField: String? = this.timestampField

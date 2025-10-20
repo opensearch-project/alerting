@@ -6,7 +6,6 @@
 package org.opensearch.alerting.core.resthandler
 
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsAction
-import org.opensearch.alerting.core.action.node.ScheduledJobsStatsRequest
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.RestHandler
@@ -20,15 +19,6 @@ import org.opensearch.transport.client.node.NodeClient
  * RestScheduledJobStatsHandler is handler for getting ScheduledJob Stats.
  */
 class RestScheduledJobStatsHandler(private val path: String) : BaseRestHandler() {
-
-    companion object {
-        const val JOB_SCHEDULING_METRICS: String = "job_scheduling_metrics"
-        const val JOBS_INFO: String = "jobs_info"
-        val METRICS = mapOf<String, (ScheduledJobsStatsRequest) -> Unit>(
-            JOB_SCHEDULING_METRICS to { it -> it.jobSchedulingMetrics = true },
-            JOBS_INFO to { it -> it.jobsInfo = true }
-        )
-    }
 
     override fun getName(): String {
         return "${path}_jobs_stats"

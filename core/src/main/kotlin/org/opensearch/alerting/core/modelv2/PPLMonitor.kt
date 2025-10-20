@@ -36,7 +36,8 @@ import org.opensearch.core.xcontent.XContentParserUtils
 import java.io.IOException
 import java.time.Instant
 
-// TODO: probably change this to be called PPLSQLMonitor. A PPL Monitor and SQL Monitor
+// TODO: eventually change this to be called PPLSQLMonitor.
+//  A PPL Monitor and SQL Monitor
 // would have the exact same functionality, except the choice of language
 // when calling PPL/SQL plugin's execute API would be different.
 // we dont need 2 different monitor types for that, just a simple if check

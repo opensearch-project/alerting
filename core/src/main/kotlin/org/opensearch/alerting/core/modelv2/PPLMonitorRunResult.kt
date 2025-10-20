@@ -1,7 +1,7 @@
 package org.opensearch.alerting.core.modelv2
 
+import org.opensearch.alerting.core.modelv2.AlertV2.Companion.MONITOR_V2_NAME_FIELD
 import org.opensearch.alerting.core.modelv2.MonitorV2RunResult.Companion.ERROR_FIELD
-import org.opensearch.alerting.core.modelv2.MonitorV2RunResult.Companion.MONITOR_V2_NAME_FIELD
 import org.opensearch.alerting.core.modelv2.MonitorV2RunResult.Companion.TRIGGER_RESULTS_FIELD
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.common.io.stream.StreamOutput
