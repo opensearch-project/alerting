@@ -352,6 +352,16 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        // max data rows to retrieve when executing PPL query against
+        // SQL/PPL plugin during monitor execution
+        val ALERT_V2_QUERY_RESULTS_MAX_DATAROWS = Setting.longSetting(
+            "plugins.alerting_v2.query_results_max_datarows",
+            1000L,
+            1L,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        // max size of query results to store in alerts and notifications
         val ALERT_V2_QUERY_RESULTS_MAX_SIZE = Setting.longSetting(
             "plugins.alerting_v2.query_results_max_size",
             3000L,

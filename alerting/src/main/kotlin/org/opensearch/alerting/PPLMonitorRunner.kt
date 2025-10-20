@@ -142,6 +142,10 @@ object PPLMonitorRunner : MonitorV2Runner {
                     appendCustomCondition(timeFilteredQuery, pplTrigger.customCondition!!)
                 }
 
+                // limit the number of PPL query result data rows returned
+                val dataRowsLimit = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERT_V2_QUERY_RESULTS_MAX_DATAROWS)
+                val limitedQueryToExecute = appendDataRowsLimit(queryToExecute, dataRowsLimit)
+
                 // execute the PPL query
                 val queryResponseJson = withClosableContext(
                     InjectorContextElement(
@@ -152,7 +156,7 @@ object PPLMonitorRunner : MonitorV2Runner {
                         pplMonitor.user
                     )
                 ) {
-                    executePplQuery(queryToExecute, nodeClient)
+                    executePplQuery(limitedQueryToExecute, nodeClient)
                 }
                 logger.info("query execution results for trigger ${pplTrigger.name}: $queryResponseJson")
 
@@ -581,6 +585,10 @@ object PPLMonitorRunner : MonitorV2Runner {
     // appends user-defined custom trigger condition to PPL query, only for custom condition Triggers
     fun appendCustomCondition(query: String, customCondition: String): String {
         return "$query | $customCondition"
+    }
+
+    fun appendDataRowsLimit(query: String, maxDataRows: Long): String {
+        return "$query | head $maxDataRows"
     }
 
     // returns PPL query response as parsable JSONObject
