@@ -28,7 +28,6 @@ import org.opensearch.client.RestClient
 import org.opensearch.client.WarningsHandler
 import org.opensearch.common.UUIDs
 import org.opensearch.common.settings.Settings
-import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
@@ -497,11 +496,6 @@ val TEST_HR_BACKEND_ROLE = "HR"
 // in the request made using triple-quote strings (i.e. createIndexRoleWithDocLevelSecurity).
 // Removing the escape slash in the request causes the security API role request to fail with parsing exception.
 val TERM_DLS_QUERY = """{\"term\": { \"accessible\": true}}"""
-
-fun randomTimeValue(
-    unit: TimeUnit = setOf(TimeUnit.MINUTES, TimeUnit.HOURS, TimeUnit.DAYS).random(),
-    value: Long = if (unit == TimeUnit.DAYS) randomLongBetween(1, 5) else randomLongBetween(1, 23)
-): TimeValue = TimeValue(value, unit)
 
 fun randomTemplateScript(
     source: String,
