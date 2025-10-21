@@ -90,6 +90,7 @@ interface MonitorV2 : ScheduledJob {
 
         // hard, nonadjustable limits
         const val MONITOR_V2_MAX_TRIGGERS = 10
+        const val MONITOR_V2_MIN_LOOK_BACK_WINDOW = 1 // 1 minute
 
         val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(
             ScheduledJob::class.java,

@@ -35,6 +35,7 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import java.io.IOException
 import java.time.Instant
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.MONITOR_V2_MIN_LOOK_BACK_WINDOW
 
 // TODO: eventually change this to be called PPLSQLMonitor.
 //  A PPL Monitor and SQL Monitor
@@ -99,6 +100,12 @@ data class PPLMonitor(
         }
 
         require(triggers.size <= MONITOR_V2_MAX_TRIGGERS) { "Monitors can only have $MONITOR_V2_MAX_TRIGGERS triggers" }
+
+        lookBackWindow?.let {
+            require(lookBackWindow >= MONITOR_V2_MIN_LOOK_BACK_WINDOW) {
+                "Monitors look back windows must be at least $MONITOR_V2_MIN_LOOK_BACK_WINDOW minute"
+            }
+        }
     }
 
     @Throws(IOException::class)
@@ -179,11 +186,13 @@ data class PPLMonitor(
         out.writeLong(version)
         out.writeString(name)
         out.writeBoolean(enabled)
+
         if (schedule is CronSchedule) {
             out.writeEnum(Schedule.TYPE.CRON)
         } else {
             out.writeEnum(Schedule.TYPE.INTERVAL)
         }
+        schedule.writeTo(out)
 
         out.writeOptionalLong(lookBackWindow)
         out.writeOptionalString(timestampField)
@@ -210,8 +219,6 @@ data class PPLMonitor(
             LOOK_BACK_WINDOW_FIELD to lookBackWindow,
             LAST_UPDATE_TIME_FIELD to lastUpdateTime.toEpochMilli(),
             ENABLED_TIME_FIELD to enabledTime?.toEpochMilli(),
-            TRIGGERS_FIELD to triggers,
-            QUERY_LANGUAGE_FIELD to queryLanguage.value,
             QUERY_FIELD to query
         )
     }
@@ -299,8 +306,6 @@ data class PPLMonitor(
                     }
                     TIMESTAMP_FIELD -> timestampField = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) null else xcp.text()
                     LAST_UPDATE_TIME_FIELD -> lastUpdateTime = xcp.instant()
-                    ENABLED_TIME_FIELD -> enabledTime = xcp.instant()
-                    USER_FIELD -> user = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) null else User.parse(xcp)
                     TRIGGERS_FIELD -> {
                         XContentParserUtils.ensureExpectedToken(
                             XContentParser.Token.START_ARRAY,

@@ -89,6 +89,7 @@ import org.opensearch.test.OpenSearchTestCase.randomInt
 import org.opensearch.test.OpenSearchTestCase.randomIntBetween
 import org.opensearch.test.OpenSearchTestCase.randomLongBetween
 import org.opensearch.test.rest.OpenSearchRestTestCase
+import org.opensearch.test.rest.OpenSearchRestTestCase.assertEquals
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.TimeUnit
@@ -894,4 +895,76 @@ fun randomAlertContext(
 /** helper that returns a field in a json map whose values are all json objects */
 fun Map<String, Any>.objectMap(key: String): Map<String, Map<String, Any>> {
     return this[key] as Map<String, Map<String, Any>>
+}
+
+fun assertPplMonitorsEqual(pplMonitor1: PPLMonitor, pplMonitor2: PPLMonitor) {
+    assertEquals("Monitor enabled fields not equal", pplMonitor1.enabled, pplMonitor2.enabled)
+    assertEquals("Monitor schedules not equal", pplMonitor1.schedule, pplMonitor2.schedule)
+    assertEquals("Monitor lookback windows not equal", pplMonitor1.lookBackWindow, pplMonitor2.lookBackWindow)
+    assertEquals("Monitor timestamp fields not equal", pplMonitor1.timestampField, pplMonitor2.timestampField)
+    assertEquals("Monitor query languages not equal", pplMonitor1.queryLanguage, pplMonitor2.queryLanguage)
+    assertEquals("Monitor queries not equal", pplMonitor1.query, pplMonitor2.query)
+    assertEquals("Number of triggers in monitor not equal", pplMonitor1.triggers.size, pplMonitor2.triggers.size)
+
+    val sortedTriggers1 = pplMonitor1.triggers.sortedBy { it.id }
+    val sortedTriggers2 = pplMonitor2.triggers.sortedBy { it.id }
+    for (i in sortedTriggers1.indices) {
+        assertPplTriggersEqual(sortedTriggers1[i], sortedTriggers2[i])
+    }
+}
+
+fun assertPplTriggersEqual(pplTrigger1: PPLTrigger, pplTrigger2: PPLTrigger) {
+    assertEquals(
+        "Monitor trigger IDs not equal",
+        pplTrigger1.id,
+        pplTrigger2.id
+    )
+
+    val id = pplTrigger1.id
+
+    assertEquals(
+        "Monitor trigger $id names not equal",
+        pplTrigger1.name,
+        pplTrigger2.name
+    )
+    assertEquals(
+        "Monitor trigger $id severities not equal",
+        pplTrigger1.severity,
+        pplTrigger2.severity
+    )
+    assertEquals(
+        "Monitor trigger $id throttle durations not equal",
+        pplTrigger1.throttleDuration,
+        pplTrigger2.throttleDuration
+    )
+    assertEquals(
+        "Monitor trigger $id expire durations not equal",
+        pplTrigger1.expireDuration,
+        pplTrigger2.expireDuration
+    )
+    assertEquals(
+        "Monitor trigger $id modes not equal",
+        pplTrigger1.mode,
+        pplTrigger2.mode
+    )
+    assertEquals(
+        "Monitor trigger $id condition types not equal",
+        pplTrigger1.conditionType,
+        pplTrigger2.conditionType
+    )
+    assertEquals(
+        "Monitor trigger $id number_of_results conditions not equal",
+        pplTrigger1.numResultsCondition,
+        pplTrigger2.numResultsCondition
+    )
+    assertEquals(
+        "Monitor trigger $id number_of_results values not equal",
+        pplTrigger1.numResultsValue,
+        pplTrigger2.numResultsValue
+    )
+    assertEquals(
+        "Monitor trigger $id custom conditions not equal",
+        pplTrigger1.customCondition,
+        pplTrigger2.customCondition
+    )
 }

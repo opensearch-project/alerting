@@ -46,6 +46,7 @@ import org.opensearch.alerting.modelv2.PPLTrigger.ConditionType
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_EXPIRE_DURATION
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_LOOK_BACK_WINDOW
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_MONITORS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_QUERY_LENGTH
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_THROTTLE_DURATION
@@ -100,6 +101,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
     @Volatile private var maxMonitors = ALERTING_V2_MAX_MONITORS.get(settings)
     @Volatile private var maxThrottleDuration = ALERTING_V2_MAX_THROTTLE_DURATION.get(settings)
     @Volatile private var maxExpireDuration = ALERTING_V2_MAX_EXPIRE_DURATION.get(settings)
+    @Volatile private var maxLookBackWindow = ALERTING_V2_MAX_LOOK_BACK_WINDOW.get(settings)
     @Volatile private var maxQueryLength = ALERTING_V2_MAX_QUERY_LENGTH.get(settings)
     @Volatile private var requestTimeout = REQUEST_TIMEOUT.get(settings)
     @Volatile private var indexTimeout = INDEX_TIMEOUT.get(settings)
@@ -109,6 +111,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_MONITORS) { maxMonitors = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_THROTTLE_DURATION) { maxThrottleDuration = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_EXPIRE_DURATION) { maxExpireDuration = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_LOOK_BACK_WINDOW) { maxLookBackWindow = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_QUERY_LENGTH) { maxQueryLength = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(REQUEST_TIMEOUT) { requestTimeout = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(INDEX_TIMEOUT) { indexTimeout = it }
@@ -302,6 +305,20 @@ class TransportIndexMonitorV2Action @Inject constructor(
                 )
             )
             return false
+        }
+
+        // ensure the look back window doesn't exceed the limit
+        pplMonitor.lookBackWindow?.let {
+            if (pplMonitor.lookBackWindow > maxLookBackWindow) {
+                validationListener.onFailure(
+                    AlertingException.wrap(
+                        IllegalArgumentException(
+                            "Look back window must be at most $maxLookBackWindow minutes but was ${pplMonitor.lookBackWindow}"
+                        )
+                    )
+                )
+                return false
+            }
         }
 
         return true
