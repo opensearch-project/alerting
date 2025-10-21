@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting.core.modelv2
+package org.opensearch.alerting.modelv2
 
-import org.opensearch.alerting.core.modelv2.PPLTrigger.Companion.PPL_TRIGGER_FIELD
+import org.opensearch.alerting.modelv2.PPLTrigger.Companion.PPL_TRIGGER_FIELD
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.notifications.model.BaseModel
 import java.time.Instant

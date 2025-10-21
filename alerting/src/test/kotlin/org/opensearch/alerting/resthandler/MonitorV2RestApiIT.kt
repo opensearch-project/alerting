@@ -11,10 +11,10 @@ import org.opensearch.alerting.AlertingPlugin.Companion.MONITOR_V2_BASE_URI
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.TEST_INDEX_MAPPINGS
 import org.opensearch.alerting.TEST_INDEX_NAME
-import org.opensearch.alerting.core.modelv2.MonitorV2
-import org.opensearch.alerting.core.modelv2.PPLMonitor
-import org.opensearch.alerting.core.modelv2.PPLTrigger.ConditionType
 import org.opensearch.alerting.makeRequest
+import org.opensearch.alerting.modelv2.MonitorV2
+import org.opensearch.alerting.modelv2.PPLMonitor
+import org.opensearch.alerting.modelv2.PPLTrigger.ConditionType
 import org.opensearch.alerting.randomPPLMonitor
 import org.opensearch.alerting.randomPPLTrigger
 import org.opensearch.alerting.resthandler.MonitorRestApiIT.Companion.USE_TYPED_KEYS

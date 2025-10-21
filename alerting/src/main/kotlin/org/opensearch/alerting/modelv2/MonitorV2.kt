@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting.core.modelv2
+package org.opensearch.alerting.modelv2
 
-import org.opensearch.alerting.core.modelv2.PPLMonitor.Companion.PPL_MONITOR_TYPE
+import org.opensearch.alerting.modelv2.PPLMonitor.Companion.PPL_MONITOR_TYPE
 import org.opensearch.common.CheckedFunction
 import org.opensearch.commons.alerting.model.Schedule
 import org.opensearch.commons.alerting.model.ScheduledJob

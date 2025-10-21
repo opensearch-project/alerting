@@ -3,11 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting.core.modelv2
+package org.opensearch.alerting.modelv2
 
-import org.opensearch.alerting.core.modelv2.TriggerV2RunResult.Companion.ERROR_FIELD
-import org.opensearch.alerting.core.modelv2.TriggerV2RunResult.Companion.NAME_FIELD
-import org.opensearch.alerting.core.modelv2.TriggerV2RunResult.Companion.TRIGGERED_FIELD
+import org.opensearch.alerting.modelv2.TriggerV2RunResult.Companion.ERROR_FIELD
+import org.opensearch.alerting.modelv2.TriggerV2RunResult.Companion.NAME_FIELD
+import org.opensearch.alerting.modelv2.TriggerV2RunResult.Companion.TRIGGERED_FIELD
 import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.TriggerRunResult
 import org.opensearch.core.common.io.stream.StreamInput

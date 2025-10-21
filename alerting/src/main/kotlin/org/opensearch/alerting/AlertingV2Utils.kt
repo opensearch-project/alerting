@@ -11,7 +11,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.search.ShardSearchFailure
-import org.opensearch.alerting.core.modelv2.MonitorV2
+import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.Workflow

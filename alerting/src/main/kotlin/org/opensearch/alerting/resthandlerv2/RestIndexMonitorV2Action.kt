@@ -10,7 +10,7 @@ import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.actionv2.IndexMonitorV2Action
 import org.opensearch.alerting.actionv2.IndexMonitorV2Request
-import org.opensearch.alerting.core.modelv2.MonitorV2
+import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.alerting.util.IF_PRIMARY_TERM
 import org.opensearch.alerting.util.IF_SEQ_NO
 import org.opensearch.alerting.util.REFRESH

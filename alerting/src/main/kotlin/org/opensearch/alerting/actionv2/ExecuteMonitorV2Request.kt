@@ -8,7 +8,7 @@ package org.opensearch.alerting.actionv2
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.ActionRequestValidationException
 import org.opensearch.action.ValidateActions
-import org.opensearch.alerting.core.modelv2.MonitorV2
+import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.common.io.stream.StreamOutput

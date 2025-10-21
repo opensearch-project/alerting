@@ -5,7 +5,7 @@
 
 package org.opensearch.alerting.actionv2
 
-import org.opensearch.alerting.core.modelv2.AlertV2
+import org.opensearch.alerting.modelv2.AlertV2
 import org.opensearch.commons.notifications.action.BaseResponse
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.common.io.stream.StreamOutput

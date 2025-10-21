@@ -9,7 +9,7 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.actionv2.ExecuteMonitorV2Action
 import org.opensearch.alerting.actionv2.ExecuteMonitorV2Request
-import org.opensearch.alerting.core.modelv2.MonitorV2
+import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.xcontent.XContentParser.Token.START_OBJECT

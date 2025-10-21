@@ -31,12 +31,12 @@ import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsAction
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsTransportAction
 import org.opensearch.alerting.core.lock.LockService
-import org.opensearch.alerting.core.modelv2.MonitorV2
 import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler
 import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsV2Handler
 import org.opensearch.alerting.core.schedule.JobScheduler
 import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSettings
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
+import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.alerting.remote.monitors.RemoteMonitorRegistry
 import org.opensearch.alerting.resthandler.RestAcknowledgeAlertAction
 import org.opensearch.alerting.resthandler.RestAcknowledgeChainedAlertAction

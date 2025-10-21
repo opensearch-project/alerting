@@ -5,10 +5,10 @@
 
 package org.opensearch.alerting
 
-import org.opensearch.alerting.core.modelv2.PPLMonitor
-import org.opensearch.alerting.core.modelv2.PPLTrigger.ConditionType
-import org.opensearch.alerting.core.modelv2.PPLTrigger.NumResultsCondition
-import org.opensearch.alerting.core.modelv2.PPLTrigger.TriggerMode
+import org.opensearch.alerting.modelv2.PPLMonitor
+import org.opensearch.alerting.modelv2.PPLTrigger.ConditionType
+import org.opensearch.alerting.modelv2.PPLTrigger.NumResultsCondition
+import org.opensearch.alerting.modelv2.PPLTrigger.TriggerMode
 import org.opensearch.client.Response
 import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.IntervalSchedule

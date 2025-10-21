@@ -5,7 +5,7 @@
 
 package org.opensearch.alerting.script
 
-import org.opensearch.alerting.core.modelv2.MonitorV2
+import org.opensearch.alerting.modelv2.MonitorV2
 
 abstract class TriggerV2ExecutionContext(
     open val monitorV2: MonitorV2,

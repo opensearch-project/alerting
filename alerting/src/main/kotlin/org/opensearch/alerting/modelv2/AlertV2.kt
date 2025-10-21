@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting.core.modelv2
+package org.opensearch.alerting.modelv2
 
-import org.opensearch.alerting.core.modelv2.TriggerV2.Severity
 import org.opensearch.alerting.core.util.nonOptionalTimeField
+import org.opensearch.alerting.modelv2.TriggerV2.Severity
 import org.opensearch.common.lucene.uid.Versions
 import org.opensearch.commons.alerting.util.instant
 import org.opensearch.commons.alerting.util.optionalUserField

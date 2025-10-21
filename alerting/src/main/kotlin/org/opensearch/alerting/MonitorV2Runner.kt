@@ -5,8 +5,8 @@
 
 package org.opensearch.alerting
 
-import org.opensearch.alerting.core.modelv2.MonitorV2
-import org.opensearch.alerting.core.modelv2.MonitorV2RunResult
+import org.opensearch.alerting.modelv2.MonitorV2
+import org.opensearch.alerting.modelv2.MonitorV2RunResult
 import org.opensearch.transport.TransportService
 import java.time.Instant
 

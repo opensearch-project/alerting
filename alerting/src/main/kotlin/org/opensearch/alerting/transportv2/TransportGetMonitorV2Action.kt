@@ -18,7 +18,7 @@ import org.opensearch.alerting.AlertingV2Utils.validateMonitorV2
 import org.opensearch.alerting.actionv2.GetMonitorV2Action
 import org.opensearch.alerting.actionv2.GetMonitorV2Request
 import org.opensearch.alerting.actionv2.GetMonitorV2Response
-import org.opensearch.alerting.core.modelv2.MonitorV2
+import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.transport.SecureTransportAction
 import org.opensearch.alerting.transport.TransportGetMonitorAction

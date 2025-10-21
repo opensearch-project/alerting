@@ -15,7 +15,7 @@ import org.opensearch.action.delete.DeleteRequest
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.alerting.core.modelv2.AlertV2
+import org.opensearch.alerting.modelv2.AlertV2
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_V2_HISTORY_ENABLED
 import org.opensearch.cluster.ClusterChangedEvent

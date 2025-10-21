@@ -5,7 +5,7 @@
 
 package org.opensearch.alerting.actionv2
 
-import org.opensearch.alerting.core.modelv2.MonitorV2
+import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.commons.alerting.util.IndexUtils.Companion._ID
 import org.opensearch.commons.alerting.util.IndexUtils.Companion._PRIMARY_TERM
 import org.opensearch.commons.alerting.util.IndexUtils.Companion._SEQ_NO

@@ -6,10 +6,10 @@
 package org.opensearch.alerting.script
 
 import org.json.JSONObject
-import org.opensearch.alerting.core.modelv2.PPLMonitor
-import org.opensearch.alerting.core.modelv2.PPLMonitorRunResult.Companion.PPL_QUERY_RESULTS_FIELD
-import org.opensearch.alerting.core.modelv2.PPLTrigger
-import org.opensearch.alerting.core.modelv2.PPLTrigger.Companion.PPL_TRIGGER_FIELD
+import org.opensearch.alerting.modelv2.PPLMonitor
+import org.opensearch.alerting.modelv2.PPLMonitorRunResult.Companion.PPL_QUERY_RESULTS_FIELD
+import org.opensearch.alerting.modelv2.PPLTrigger
+import org.opensearch.alerting.modelv2.PPLTrigger.Companion.PPL_TRIGGER_FIELD
 
 data class PPLTriggerExecutionContext(
     override val monitorV2: PPLMonitor,

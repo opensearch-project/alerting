@@ -39,10 +39,10 @@ import org.opensearch.alerting.actionv2.IndexMonitorV2Action
 import org.opensearch.alerting.actionv2.IndexMonitorV2Request
 import org.opensearch.alerting.actionv2.IndexMonitorV2Response
 import org.opensearch.alerting.core.ScheduledJobIndices
-import org.opensearch.alerting.core.modelv2.MonitorV2
-import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.MONITOR_V2_TYPE
-import org.opensearch.alerting.core.modelv2.PPLMonitor
-import org.opensearch.alerting.core.modelv2.PPLTrigger.ConditionType
+import org.opensearch.alerting.modelv2.MonitorV2
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.MONITOR_V2_TYPE
+import org.opensearch.alerting.modelv2.PPLMonitor
+import org.opensearch.alerting.modelv2.PPLTrigger.ConditionType
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_EXPIRE_DURATION

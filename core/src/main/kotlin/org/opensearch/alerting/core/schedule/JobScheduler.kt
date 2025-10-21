@@ -7,7 +7,6 @@ package org.opensearch.alerting.core.schedule
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.core.JobRunner
-import org.opensearch.alerting.core.modelv2.MonitorV2
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.threadpool.Scheduler
@@ -30,6 +29,12 @@ class JobScheduler(private val threadPool: ThreadPool, private val jobRunner: Jo
      * Map of ScheduledJobName to Info of the ScheduledJob.
      */
     private val scheduledJobIdToInfo = ConcurrentHashMap<String, ScheduledJobInfo>()
+
+    /**
+     * The scheduled job type of Monitor V2s, for filtering
+     * out V1 vs V2 Monitors when collecting Monitor Stats
+     */
+    private val monitorV2Type = "monitor_v2"
 
     /**
      * Schedules the jobs in [jobsToSchedule] for execution.
@@ -193,7 +198,7 @@ class JobScheduler(private val threadPool: ThreadPool, private val jobRunner: Jo
     }
 
     fun getJobSchedulerMetric(): List<JobSchedulerMetrics> {
-        return scheduledJobIdToInfo.entries.filter { it.value.scheduledJob !is MonitorV2 }
+        return scheduledJobIdToInfo.entries.filter { it.value.scheduledJob.type != monitorV2Type }
             .stream()
             .map { entry ->
                 JobSchedulerMetrics(
@@ -206,7 +211,7 @@ class JobScheduler(private val threadPool: ThreadPool, private val jobRunner: Jo
     }
 
     fun getJobSchedulerV2Metric(): List<JobSchedulerMetrics> {
-        return scheduledJobIdToInfo.entries.filter { it.value.scheduledJob is MonitorV2 }
+        return scheduledJobIdToInfo.entries.filter { it.value.scheduledJob.type == monitorV2Type }
             .stream()
             .map { entry ->
                 JobSchedulerMetrics(

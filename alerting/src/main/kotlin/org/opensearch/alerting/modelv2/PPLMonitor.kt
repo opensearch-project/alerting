@@ -3,22 +3,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.alerting.core.modelv2
+package org.opensearch.alerting.modelv2
 
-import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.ENABLED_FIELD
-import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.ENABLED_TIME_FIELD
-import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.LAST_UPDATE_TIME_FIELD
-import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.LOOK_BACK_WINDOW_FIELD
-import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.MONITOR_V2_MAX_TRIGGERS
-import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.NAME_FIELD
-import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.NO_ID
-import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.NO_VERSION
-import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.SCHEDULE_FIELD
-import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.SCHEMA_VERSION_FIELD
-import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.TIMESTAMP_FIELD
-import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.TRIGGERS_FIELD
-import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.USER_FIELD
 import org.opensearch.alerting.core.util.nonOptionalTimeField
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.ENABLED_FIELD
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.ENABLED_TIME_FIELD
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.LAST_UPDATE_TIME_FIELD
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.LOOK_BACK_WINDOW_FIELD
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.MONITOR_V2_MAX_TRIGGERS
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.NAME_FIELD
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.NO_ID
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.NO_VERSION
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.SCHEDULE_FIELD
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.SCHEMA_VERSION_FIELD
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.TIMESTAMP_FIELD
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.TRIGGERS_FIELD
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.USER_FIELD
 import org.opensearch.commons.alerting.model.CronSchedule
 import org.opensearch.commons.alerting.model.Schedule
 import org.opensearch.commons.alerting.util.AlertingException
@@ -117,7 +117,7 @@ data class PPLMonitor(
         } else {
             null
         },
-        triggers = sin.readList(PPLTrigger::readFrom),
+        triggers = sin.readList(PPLTrigger.Companion::readFrom),
         schemaVersion = sin.readInt(),
         queryLanguage = sin.readEnum(QueryLanguage::class.java),
         query = sin.readString()

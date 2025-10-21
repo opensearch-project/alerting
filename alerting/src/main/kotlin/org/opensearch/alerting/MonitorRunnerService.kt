@@ -31,11 +31,11 @@ import org.opensearch.alerting.core.JobRunner
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.lock.LockModel
 import org.opensearch.alerting.core.lock.LockService
-import org.opensearch.alerting.core.modelv2.MonitorV2
-import org.opensearch.alerting.core.modelv2.MonitorV2RunResult
-import org.opensearch.alerting.core.modelv2.PPLMonitor
-import org.opensearch.alerting.core.modelv2.PPLMonitor.Companion.PPL_MONITOR_TYPE
 import org.opensearch.alerting.model.destination.DestinationContextFactory
+import org.opensearch.alerting.modelv2.MonitorV2
+import org.opensearch.alerting.modelv2.MonitorV2RunResult
+import org.opensearch.alerting.modelv2.PPLMonitor
+import org.opensearch.alerting.modelv2.PPLMonitor.Companion.PPL_MONITOR_TYPE
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.remote.monitors.RemoteDocumentLevelMonitorRunner

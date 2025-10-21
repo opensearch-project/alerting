@@ -18,7 +18,7 @@ import org.opensearch.alerting.AlertingV2Utils
 import org.opensearch.alerting.actionv2.DeleteMonitorV2Action
 import org.opensearch.alerting.actionv2.DeleteMonitorV2Request
 import org.opensearch.alerting.actionv2.DeleteMonitorV2Response
-import org.opensearch.alerting.core.modelv2.MonitorV2
+import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings

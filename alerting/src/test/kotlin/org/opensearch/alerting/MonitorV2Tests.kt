@@ -5,7 +5,7 @@
 
 package org.opensearch.alerting
 
-import org.opensearch.alerting.core.modelv2.PPLTrigger
+import org.opensearch.alerting.modelv2.PPLTrigger
 import org.opensearch.test.OpenSearchTestCase
 import java.lang.IllegalArgumentException
 import java.time.Instant

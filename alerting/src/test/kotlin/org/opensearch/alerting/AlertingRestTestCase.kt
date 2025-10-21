@@ -20,8 +20,6 @@ import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.MONITOR_V2_BASE_URI
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRITE_INDEX
-import org.opensearch.alerting.core.modelv2.MonitorV2
-import org.opensearch.alerting.core.modelv2.PPLMonitor
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.CustomWebhook
@@ -29,6 +27,8 @@ import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.Slack
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
+import org.opensearch.alerting.modelv2.MonitorV2
+import org.opensearch.alerting.modelv2.PPLMonitor
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.DestinationType

@@ -19,9 +19,9 @@ import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.actionv2.ExecuteMonitorV2Action
 import org.opensearch.alerting.actionv2.ExecuteMonitorV2Request
 import org.opensearch.alerting.actionv2.ExecuteMonitorV2Response
-import org.opensearch.alerting.core.modelv2.MonitorV2
-import org.opensearch.alerting.core.modelv2.PPLMonitor
-import org.opensearch.alerting.core.modelv2.PPLMonitor.Companion.PPL_MONITOR_TYPE
+import org.opensearch.alerting.modelv2.MonitorV2
+import org.opensearch.alerting.modelv2.PPLMonitor
+import org.opensearch.alerting.modelv2.PPLMonitor.Companion.PPL_MONITOR_TYPE
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.transport.SecureTransportAction
 import org.opensearch.cluster.service.ClusterService

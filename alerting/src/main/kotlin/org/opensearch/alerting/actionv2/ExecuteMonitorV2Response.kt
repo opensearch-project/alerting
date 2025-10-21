@@ -5,7 +5,7 @@
 
 package org.opensearch.alerting.actionv2
 
-import org.opensearch.alerting.core.modelv2.MonitorV2RunResult
+import org.opensearch.alerting.modelv2.MonitorV2RunResult
 import org.opensearch.core.action.ActionResponse
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.common.io.stream.StreamOutput

@@ -13,7 +13,7 @@ import org.opensearch.alerting.AlertingV2Utils.getEmptySearchResponse
 import org.opensearch.alerting.AlertingV2Utils.isIndexNotFoundException
 import org.opensearch.alerting.actionv2.SearchMonitorV2Action
 import org.opensearch.alerting.actionv2.SearchMonitorV2Request
-import org.opensearch.alerting.core.modelv2.MonitorV2.Companion.MONITOR_V2_TYPE
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.MONITOR_V2_TYPE
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.transport.SecureTransportAction
