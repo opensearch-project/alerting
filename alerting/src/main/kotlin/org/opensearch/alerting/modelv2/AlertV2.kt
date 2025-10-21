@@ -155,7 +155,7 @@ data class AlertV2(
             ERROR_MESSAGE_FIELD to errorMessage,
             EXECUTION_ID_FIELD to executionId,
             EXPIRATION_TIME_FIELD to expirationTime.toEpochMilli(),
-            SEVERITY_FIELD to severity
+            SEVERITY_FIELD to severity.value
         )
     }
 

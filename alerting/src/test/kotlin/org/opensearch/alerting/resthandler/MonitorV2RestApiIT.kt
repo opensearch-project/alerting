@@ -20,6 +20,7 @@ import org.opensearch.alerting.randomPPLMonitor
 import org.opensearch.alerting.randomPPLTrigger
 import org.opensearch.alerting.resthandler.MonitorRestApiIT.Companion.USE_TYPED_KEYS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_EXPIRE_DURATION
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_LOOK_BACK_WINDOW
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_MONITORS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_QUERY_LENGTH
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_THROTTLE_DURATION
@@ -37,8 +38,6 @@ import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.junit.annotations.TestLogging
 import java.time.temporal.ChronoUnit.MINUTES
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_LOOK_BACK_WINDOW
-import kotlin.math.max
 
 /***
  * Tests Alerting V2 CRUD and validations

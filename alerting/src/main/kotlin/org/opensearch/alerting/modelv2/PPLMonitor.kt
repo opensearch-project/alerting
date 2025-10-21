@@ -11,6 +11,7 @@ import org.opensearch.alerting.modelv2.MonitorV2.Companion.ENABLED_TIME_FIELD
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.LAST_UPDATE_TIME_FIELD
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.LOOK_BACK_WINDOW_FIELD
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.MONITOR_V2_MAX_TRIGGERS
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.MONITOR_V2_MIN_LOOK_BACK_WINDOW
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.NAME_FIELD
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.NO_ID
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.NO_VERSION
@@ -35,7 +36,6 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import java.io.IOException
 import java.time.Instant
-import org.opensearch.alerting.modelv2.MonitorV2.Companion.MONITOR_V2_MIN_LOOK_BACK_WINDOW
 
 // TODO: eventually change this to be called PPLSQLMonitor.
 //  A PPL Monitor and SQL Monitor
