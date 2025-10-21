@@ -112,7 +112,8 @@ interface MonitorV2 : ScheduledJob {
             XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp) // monitor type field name
             val monitorTypeText = xcp.currentName()
             val monitorType = MonitorV2Type.enumFromString(monitorTypeText)
-                ?: throw IllegalStateException("when parsing MonitorV2, received invalid monitor type: $monitorTypeText")
+                ?: throw IllegalStateException("when parsing MonitorV2, received invalid monitor type: $monitorTypeText. " +
+                    "Please ensure monitor object is wrapped in an outer ppl_monitor object")
 
             XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp) // inner monitor object start
 
