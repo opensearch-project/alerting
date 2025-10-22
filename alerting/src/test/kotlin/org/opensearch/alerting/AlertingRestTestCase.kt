@@ -1567,6 +1567,12 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return responseMap
     }
 
+    fun getAlertingV2Stats(metrics: String = ""): Map<String, Any> {
+        val monitorStatsResponse = client().makeRequest("GET", "/_plugins/_alerting/v2/stats$metrics")
+        val responseMap = createParser(XContentType.JSON.xContent(), monitorStatsResponse.entity.content).map()
+        return responseMap
+    }
+
     fun enableScheduledJob(): Response {
         val updateResponse = client().makeRequest(
             "PUT", "_cluster/settings",
@@ -2176,6 +2182,19 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val deletedCommentId = deleteResponseBody["_id"] as String
 
         return deletedCommentId
+    }
+
+    protected fun isMonitorScheduled(monitorId: String, alertingStatsResponse: Map<String, Any>): Boolean {
+        val nodesInfo = alertingStatsResponse["nodes"] as Map<String, Any>
+        for (nodeId in nodesInfo.keys) {
+            val nodeInfo = nodesInfo[nodeId] as Map<String, Any>
+            val jobsInfo = nodeInfo["jobs_info"] as Map<String, Any>
+            if (jobsInfo.keys.contains(monitorId)) {
+                return true
+            }
+        }
+
+        return false
     }
 
     // this function is used for PPL Alerting testing.

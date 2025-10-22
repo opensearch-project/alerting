@@ -1536,19 +1536,6 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("More than $numberOfNodes successful node", numberOfNodes, nodesResponse["successful"])
     }
 
-    private fun isMonitorScheduled(monitorId: String, alertingStatsResponse: Map<String, Any>): Boolean {
-        val nodesInfo = alertingStatsResponse["nodes"] as Map<String, Any>
-        for (nodeId in nodesInfo.keys) {
-            val nodeInfo = nodesInfo[nodeId] as Map<String, Any>
-            val jobsInfo = nodeInfo["jobs_info"] as Map<String, Any>
-            if (jobsInfo.keys.contains(monitorId)) {
-                return true
-            }
-        }
-
-        return false
-    }
-
     private fun assertAlertingStatsSweeperEnabled(alertingStatsResponse: Map<String, Any>, expected: Boolean) {
         assertEquals(
             "Legacy scheduled job enabled field is not set to $expected",
