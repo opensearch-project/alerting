@@ -48,7 +48,7 @@ import java.time.Instant
  * 1. AlertV2 is generated when a TriggerV2's condition is met. The TriggerV2 fires and forgets the AlertV2.
  * 2. AlertV2 is stored in the alerts index. AlertV2s are stateless. (e.g. they are never ACTIVE or COMPLETED)
  * 3. AlertV2 is soft deleted at [expirationTime], and archived in an alert history index
- * 4. Based on the alert history retention period, the AlertV2 is permanently deleted
+ * 4. Based on the alert v2 history retention period, the AlertV2 is permanently deleted
  */
 data class AlertV2(
     val id: String = NO_ID,
