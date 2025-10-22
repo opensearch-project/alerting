@@ -51,6 +51,8 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_M
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_QUERY_LENGTH
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_THROTTLE_DURATION
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
+import org.opensearch.alerting.settings.AlertingSettings.Companion.NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH
+import org.opensearch.alerting.settings.AlertingSettings.Companion.NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.transport.SecureTransportAction
 import org.opensearch.alerting.util.IndexUtils
@@ -103,6 +105,8 @@ class TransportIndexMonitorV2Action @Inject constructor(
     @Volatile private var maxExpireDuration = ALERTING_V2_MAX_EXPIRE_DURATION.get(settings)
     @Volatile private var maxLookBackWindow = ALERTING_V2_MAX_LOOK_BACK_WINDOW.get(settings)
     @Volatile private var maxQueryLength = ALERTING_V2_MAX_QUERY_LENGTH.get(settings)
+    @Volatile private var notificationSubjectMaxLength = NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH.get(settings)
+    @Volatile private var notificationMessageMaxLength = NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH.get(settings)
     @Volatile private var requestTimeout = REQUEST_TIMEOUT.get(settings)
     @Volatile private var indexTimeout = INDEX_TIMEOUT.get(settings)
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
@@ -113,6 +117,12 @@ class TransportIndexMonitorV2Action @Inject constructor(
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_EXPIRE_DURATION) { maxExpireDuration = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_LOOK_BACK_WINDOW) { maxLookBackWindow = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_QUERY_LENGTH) { maxQueryLength = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH) {
+            notificationSubjectMaxLength = it
+        }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH) {
+            notificationMessageMaxLength = it
+        }
         clusterService.clusterSettings.addSettingsUpdateConsumer(REQUEST_TIMEOUT) { requestTimeout = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(INDEX_TIMEOUT) { indexTimeout = it }
         listenFilterBySettingChange(clusterService)
@@ -292,6 +302,30 @@ class TransportIndexMonitorV2Action @Inject constructor(
                     )
                 )
                 return false
+            }
+
+            trigger.actions.forEach { action ->
+                if (action.subjectTemplate?.idOrCode?.length!! > notificationSubjectMaxLength) {
+                    validationListener.onFailure(
+                        AlertingException.wrap(
+                            IllegalArgumentException(
+                                "Notification subject source cannot exceed length: $notificationSubjectMaxLength"
+                            )
+                        )
+                    )
+                    return false
+                }
+
+                if (action.messageTemplate.idOrCode.length > notificationMessageMaxLength) {
+                    validationListener.onFailure(
+                        AlertingException.wrap(
+                            IllegalArgumentException(
+                                "Notification message source cannot exceed length: $notificationMessageMaxLength"
+                            )
+                        )
+                    )
+                    return false
+                }
             }
         }
 
@@ -621,8 +655,8 @@ class TransportIndexMonitorV2Action @Inject constructor(
 
         var newMonitorV2 = indexMonitorRequest.monitorV2
 
-        // If both are enabled, use the current existing monitor enabled time, otherwise the next execution will be
-        // incorrect.
+        // If both are enabled, use the current existing monitor enabled time,
+        // otherwise the next execution will be incorrect.
         if (newMonitorV2.enabled && existingMonitorV2.enabled) {
             newMonitorV2 = newMonitorV2.makeCopy(enabledTime = existingMonitorV2.enabledTime)
         }

@@ -54,8 +54,8 @@ interface TriggerV2 : BaseModel {
         const val ACTIONS_FIELD = "actions"
 
         // hard, nonadjustable limits
-        const val MONITOR_V2_MIN_THROTTLE_DURATION_MINUTES = 1 // one minute min duration to match scheduled job interval granularity
-        const val MONITOR_V2_MIN_EXPIRE_DURATION_MINUTES = 1 // one minute min duration to match scheduled job interval granularity
+        const val MONITOR_V2_MIN_THROTTLE_DURATION_MINUTES = 1L // one minute min duration to match scheduled job interval granularity
+        const val MONITOR_V2_MIN_EXPIRE_DURATION_MINUTES = 1L // one minute min duration to match scheduled job interval granularity
 
         // default fallback values of fields if none are passed in
         const val DEFAULT_EXPIRE_DURATION = (7 * 24 * 60).toLong() // 7 days in minutes

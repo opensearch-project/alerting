@@ -5,6 +5,9 @@
 
 package org.opensearch.alerting.modelv2
 
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.ALERTING_V2_MAX_NAME_LENGTH
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.NOTIFICATIONS_ID_MAX_LENGTH
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.UUID_LENGTH
 import org.opensearch.alerting.modelv2.TriggerV2.Companion.ACTIONS_FIELD
 import org.opensearch.alerting.modelv2.TriggerV2.Companion.DEFAULT_EXPIRE_DURATION
 import org.opensearch.alerting.modelv2.TriggerV2.Companion.EXPIRE_FIELD
@@ -79,12 +82,66 @@ data class PPLTrigger(
 ) : TriggerV2 {
 
     init {
+        requireNotNull(this.name) { "Trigger name must be included" }
+        requireNotNull(this.severity) { "Trigger severity must be included" }
+        requireNotNull(this.mode) { "Trigger mode must be included" }
+        requireNotNull(this.conditionType) { "Trigger condition type must be included" }
+
+        require(this.id.length <= UUID_LENGTH) {
+            "Trigger ID too long, length must be less than $UUID_LENGTH"
+        }
+
+        require(this.name.length <= ALERTING_V2_MAX_NAME_LENGTH) {
+            "Trigger name too long, length must be less than $ALERTING_V2_MAX_NAME_LENGTH"
+        }
+
         require(this.expireDuration >= MONITOR_V2_MIN_EXPIRE_DURATION_MINUTES) {
             "expire duration cannot be less than $MONITOR_V2_MIN_EXPIRE_DURATION_MINUTES, was $expireDuration"
         }
+
         this.throttleDuration?.let {
             require(it >= MONITOR_V2_MIN_THROTTLE_DURATION_MINUTES) {
-                "throttle duration cannot be less than $MONITOR_V2_MIN_THROTTLE_DURATION_MINUTES, was $throttleDuration"
+                "Throttle duration cannot be less than $MONITOR_V2_MIN_THROTTLE_DURATION_MINUTES, was $throttleDuration"
+            }
+        }
+
+        this.actions.forEach {
+            require(it.name.length <= ALERTING_V2_MAX_NAME_LENGTH) {
+                "Name of action with ID ${it.id} too long, length must be less than $ALERTING_V2_MAX_NAME_LENGTH"
+            }
+            require(it.destinationId.length <= NOTIFICATIONS_ID_MAX_LENGTH) {
+                "Channel ID of action with ID ${it.id} too long, length must be less than $NOTIFICATIONS_ID_MAX_LENGTH"
+            }
+        }
+
+        when (this.conditionType) {
+            ConditionType.NUMBER_OF_RESULTS -> {
+                requireNotNull(this.numResultsCondition) {
+                    "if trigger condition is of type ${ConditionType.NUMBER_OF_RESULTS.value}," +
+                        "$NUM_RESULTS_CONDITION_FIELD must be included"
+                }
+                requireNotNull(this.numResultsValue) {
+                    "if trigger condition is of type ${ConditionType.NUMBER_OF_RESULTS.value}," +
+                        "$NUM_RESULTS_VALUE_FIELD must be included"
+                }
+                require(this.customCondition == null) {
+                    "if trigger condition is of type ${ConditionType.NUMBER_OF_RESULTS.value}," +
+                        "$CUSTOM_CONDITION_FIELD must not be included"
+                }
+            }
+            ConditionType.CUSTOM -> {
+                requireNotNull(this.customCondition) {
+                    "if trigger condition is of type ${ConditionType.CUSTOM.value}," +
+                        "$CUSTOM_CONDITION_FIELD must be included"
+                }
+                require(this.numResultsCondition == null) {
+                    "if trigger condition is of type ${ConditionType.CUSTOM.value}," +
+                        "$NUM_RESULTS_CONDITION_FIELD must not be included"
+                }
+                require(this.numResultsValue == null) {
+                    "if trigger condition is of type ${ConditionType.CUSTOM.value}," +
+                        "$NUM_RESULTS_VALUE_FIELD must not be included"
+                }
             }
         }
     }
@@ -313,37 +370,6 @@ data class PPLTrigger(
             requireNotNull(severity) { "Trigger severity must be included" }
             requireNotNull(mode) { "Trigger mode must be included" }
             requireNotNull(conditionType) { "Trigger condition type must be included" }
-
-            when (conditionType) {
-                ConditionType.NUMBER_OF_RESULTS -> {
-                    requireNotNull(numResultsCondition) {
-                        "if trigger condition is of type ${ConditionType.NUMBER_OF_RESULTS.value}," +
-                            "$NUM_RESULTS_CONDITION_FIELD must be included"
-                    }
-                    requireNotNull(numResultsValue) {
-                        "if trigger condition is of type ${ConditionType.NUMBER_OF_RESULTS.value}," +
-                            "$NUM_RESULTS_VALUE_FIELD must be included"
-                    }
-                    require(customCondition == null) {
-                        "if trigger condition is of type ${ConditionType.NUMBER_OF_RESULTS.value}," +
-                            "$CUSTOM_CONDITION_FIELD must not be included"
-                    }
-                }
-                ConditionType.CUSTOM -> {
-                    requireNotNull(customCondition) {
-                        "if trigger condition is of type ${ConditionType.CUSTOM.value}," +
-                            "$CUSTOM_CONDITION_FIELD must be included"
-                    }
-                    require(numResultsCondition == null) {
-                        "if trigger condition is of type ${ConditionType.CUSTOM.value}," +
-                            "$NUM_RESULTS_CONDITION_FIELD must not be included"
-                    }
-                    require(numResultsValue == null) {
-                        "if trigger condition is of type ${ConditionType.CUSTOM.value}," +
-                            "$NUM_RESULTS_VALUE_FIELD must not be included"
-                    }
-                }
-            }
 
             // 3. prepare and return PPLTrigger object
             return PPLTrigger(

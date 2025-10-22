@@ -6,10 +6,12 @@
 package org.opensearch.alerting.modelv2
 
 import org.opensearch.alerting.assertPplMonitorsEqual
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.ALERTING_V2_MAX_NAME_LENGTH
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.ENABLED_FIELD
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.ENABLED_TIME_FIELD
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.LAST_UPDATE_TIME_FIELD
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.LOOK_BACK_WINDOW_FIELD
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.MONITOR_V2_MIN_LOOK_BACK_WINDOW
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.NAME_FIELD
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.SCHEDULE_FIELD
 import org.opensearch.alerting.modelv2.PPLMonitor.Companion.QUERY_FIELD
@@ -48,6 +50,27 @@ class MonitorV2Tests : OpenSearchTestCase() {
         try {
             randomPPLMonitor(triggers = tooManyTriggers)
             fail("Monitor with too many triggers should be rejected.")
+        } catch (_: IllegalArgumentException) {}
+    }
+
+    fun `test monitor name too long`() {
+        var monitorName = ""
+        for (i in 0 until ALERTING_V2_MAX_NAME_LENGTH + 1) {
+            monitorName += "a"
+        }
+
+        try {
+            randomPPLMonitor(name = monitorName)
+            fail("Monitor with too long a name should be rejected.")
+        } catch (_: IllegalArgumentException) {}
+    }
+
+    fun `test monitor min look back window`() {
+        try {
+            randomPPLMonitor(
+                lookBackWindow = MONITOR_V2_MIN_LOOK_BACK_WINDOW - 1
+            )
+            fail("Monitor with too long a name should be rejected.")
         } catch (_: IllegalArgumentException) {}
     }
 
@@ -97,7 +120,7 @@ class MonitorV2Tests : OpenSearchTestCase() {
         )
         assertEquals(
             "Template args field $ENABLED_TIME_FIELD doesn't match",
-            pplMonitor.enabledTime,
+            pplMonitor.enabledTime?.toEpochMilli(),
             templateArgs[ENABLED_TIME_FIELD]
         )
         assertEquals(

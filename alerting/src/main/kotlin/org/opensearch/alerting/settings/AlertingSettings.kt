@@ -382,5 +382,19 @@ class AlertingSettings {
             1,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+
+        val NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH = Setting.intSetting(
+            "plugins.alerting_v2.notification_subject_source_max_length",
+            1000,
+            100,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH = Setting.intSetting(
+            "plugins.alerting_v2.notification_message_source_max_length",
+            3000,
+            1000,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
     }
 }

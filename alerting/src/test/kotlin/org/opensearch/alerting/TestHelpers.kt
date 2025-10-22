@@ -92,7 +92,6 @@ import org.opensearch.test.rest.OpenSearchRestTestCase
 import org.opensearch.test.rest.OpenSearchRestTestCase.assertEquals
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util.concurrent.TimeUnit
 
 // constants for PPL Alerting tests
 const val TIMESTAMP_FIELD = "timestamp"
@@ -505,10 +504,11 @@ fun randomTemplateScript(
 fun randomAction(
     name: String = OpenSearchRestTestCase.randomUnicodeOfLength(10),
     template: Script = randomTemplateScript("Hello World"),
+    subjectTemplate: Script = template,
     destinationId: String = "",
     throttleEnabled: Boolean = false,
     throttle: Throttle = randomThrottle()
-) = Action(name, destinationId, template, template, throttleEnabled, throttle, actionExecutionPolicy = null)
+) = Action(name, destinationId, subjectTemplate, template, throttleEnabled, throttle, actionExecutionPolicy = null)
 
 fun randomActionWithPolicy(
     name: String = OpenSearchRestTestCase.randomUnicodeOfLength(10),
@@ -949,13 +949,18 @@ fun Map<String, Any>.objectMap(key: String): Map<String, Map<String, Any>> {
 }
 
 fun assertPplMonitorsEqual(pplMonitor1: PPLMonitor, pplMonitor2: PPLMonitor) {
+    // note: Get and Search Monitor responses do not include User information by
+    // design, so that check is skipped
+
+    // note: Update Monitor API intentionally overrides the enabledTime of the new given monitor
+    // with the enabledTime of the existing monitor being updated to ensure execution correctness,
+    // so that check is skipped
+
     assertEquals("Monitor enabled fields not equal", pplMonitor1.enabled, pplMonitor2.enabled)
     assertEquals("Monitor schedules not equal", pplMonitor1.schedule, pplMonitor2.schedule)
     assertEquals("Monitor lookback windows not equal", pplMonitor1.lookBackWindow, pplMonitor2.lookBackWindow)
     assertEquals("Monitor timestamp fields not equal", pplMonitor1.timestampField, pplMonitor2.timestampField)
-    assertEquals("Monitor enabled times are not equal", pplMonitor1.enabledTime, pplMonitor2.enabledTime)
     assertEquals("Monitor last updated times are not equal", pplMonitor1.lastUpdateTime, pplMonitor2.lastUpdateTime)
-    assertEquals("Monitor users are not equal", pplMonitor1.user.toString(), pplMonitor2.user.toString())
     assertEquals("Monitor query languages not equal", pplMonitor1.queryLanguage, pplMonitor2.queryLanguage)
     assertEquals("Monitor queries not equal", pplMonitor1.query, pplMonitor2.query)
     assertEquals("Number of triggers in monitor not equal", pplMonitor1.triggers.size, pplMonitor2.triggers.size)

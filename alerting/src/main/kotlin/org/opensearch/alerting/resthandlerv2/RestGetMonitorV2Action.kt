@@ -9,6 +9,7 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.actionv2.GetMonitorV2Action
 import org.opensearch.alerting.actionv2.GetMonitorV2Request
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.UUID_LENGTH
 import org.opensearch.alerting.util.context
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.RestHandler.Route
@@ -47,6 +48,10 @@ class RestGetMonitorV2Action : BaseRestHandler() {
         val monitorV2Id = request.param("monitorV2Id")
         if (monitorV2Id == null || monitorV2Id.isEmpty()) {
             throw IllegalArgumentException("No MonitorV2 ID provided")
+        }
+
+        if (monitorV2Id.length != UUID_LENGTH) {
+            throw IllegalArgumentException("MonitorV2 ID provided does not have correct length")
         }
 
         var srcContext = context(request)

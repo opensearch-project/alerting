@@ -6,6 +6,7 @@
 package org.opensearch.alerting.modelv2
 
 import org.opensearch.alerting.core.util.nonOptionalTimeField
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.ALERTING_V2_MAX_NAME_LENGTH
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.ENABLED_FIELD
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.ENABLED_TIME_FIELD
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.LAST_UPDATE_TIME_FIELD
@@ -87,24 +88,28 @@ data class PPLMonitor(
             throw IllegalStateException("Monitors with SQL queries are not supported")
         }
 
+        require(this.name.length <= ALERTING_V2_MAX_NAME_LENGTH) {
+            "Monitor name too long, length must be less than $ALERTING_V2_MAX_NAME_LENGTH"
+        }
+
+        require(this.triggers.size <= MONITOR_V2_MAX_TRIGGERS) { "Monitors can only have $MONITOR_V2_MAX_TRIGGERS triggers" }
+
+        lookBackWindow?.let {
+            require(this.lookBackWindow >= MONITOR_V2_MIN_LOOK_BACK_WINDOW) {
+                "Monitors look back windows must be at least $MONITOR_V2_MIN_LOOK_BACK_WINDOW minute"
+            }
+        }
+
         // for checking trigger ID uniqueness
         val triggerIds = mutableSetOf<String>()
-        triggers.forEach { trigger ->
+        this.triggers.forEach { trigger ->
             require(triggerIds.add(trigger.id)) { "Duplicate trigger id: ${trigger.id}. Trigger ids must be unique." }
         }
 
-        if (enabled) {
-            requireNotNull(enabledTime)
+        if (this.enabled) {
+            requireNotNull(this.enabledTime)
         } else {
-            require(enabledTime == null)
-        }
-
-        require(triggers.size <= MONITOR_V2_MAX_TRIGGERS) { "Monitors can only have $MONITOR_V2_MAX_TRIGGERS triggers" }
-
-        lookBackWindow?.let {
-            require(lookBackWindow >= MONITOR_V2_MIN_LOOK_BACK_WINDOW) {
-                "Monitors look back windows must be at least $MONITOR_V2_MIN_LOOK_BACK_WINDOW minute"
-            }
+            require(this.enabledTime == null)
         }
     }
 
@@ -306,6 +311,8 @@ data class PPLMonitor(
                     }
                     TIMESTAMP_FIELD -> timestampField = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) null else xcp.text()
                     LAST_UPDATE_TIME_FIELD -> lastUpdateTime = xcp.instant()
+                    ENABLED_TIME_FIELD -> enabledTime = xcp.instant()
+                    USER_FIELD -> user = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) null else User.parse(xcp)
                     TRIGGERS_FIELD -> {
                         XContentParserUtils.ensureExpectedToken(
                             XContentParser.Token.START_ARRAY,
