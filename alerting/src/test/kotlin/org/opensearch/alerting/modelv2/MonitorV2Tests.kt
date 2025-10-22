@@ -74,6 +74,35 @@ class MonitorV2Tests : OpenSearchTestCase() {
         } catch (_: IllegalArgumentException) {}
     }
 
+    fun `test monitor no triggers`() {
+        try {
+            randomPPLMonitor(
+                triggers = listOf()
+            )
+            fail("Monitor without triggers be rejected.")
+        } catch (_: IllegalArgumentException) {}
+    }
+
+    fun `test monitor with look back window without timestamp field`() {
+        try {
+            randomPPLMonitor(
+                lookBackWindow = randomLongBetween(1, 10),
+                timestampField = null
+            )
+            fail("Monitor with look back window but without timestamp field be rejected.")
+        } catch (_: IllegalArgumentException) {}
+    }
+
+    fun `test monitor without look back window with timestamp field`() {
+        try {
+            randomPPLMonitor(
+                lookBackWindow = null,
+                timestampField = "some_timestamp_field"
+            )
+            fail("Monitor without look back window but with timestamp field be rejected.")
+        } catch (_: IllegalArgumentException) {}
+    }
+
     fun `test ppl monitor as stream`() {
         val pplMonitor = randomPPLMonitor()
         val out = BytesStreamOutput()

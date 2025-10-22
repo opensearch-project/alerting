@@ -56,6 +56,7 @@ interface TriggerV2 : BaseModel {
         // hard, nonadjustable limits
         const val MONITOR_V2_MIN_THROTTLE_DURATION_MINUTES = 1L // one minute min duration to match scheduled job interval granularity
         const val MONITOR_V2_MIN_EXPIRE_DURATION_MINUTES = 1L // one minute min duration to match scheduled job interval granularity
+        const val NOTIFICATIONS_ID_MAX_LENGTH = 512 // length limit for notifications channel custom ID at channel creation time
 
         // default fallback values of fields if none are passed in
         const val DEFAULT_EXPIRE_DURATION = (7 * 24 * 60).toLong() // 7 days in minutes

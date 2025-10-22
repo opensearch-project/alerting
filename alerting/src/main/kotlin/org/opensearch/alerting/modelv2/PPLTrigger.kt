@@ -6,7 +6,6 @@
 package org.opensearch.alerting.modelv2
 
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.ALERTING_V2_MAX_NAME_LENGTH
-import org.opensearch.alerting.modelv2.MonitorV2.Companion.NOTIFICATIONS_ID_MAX_LENGTH
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.UUID_LENGTH
 import org.opensearch.alerting.modelv2.TriggerV2.Companion.ACTIONS_FIELD
 import org.opensearch.alerting.modelv2.TriggerV2.Companion.DEFAULT_EXPIRE_DURATION
@@ -16,6 +15,7 @@ import org.opensearch.alerting.modelv2.TriggerV2.Companion.LAST_TRIGGERED_FIELD
 import org.opensearch.alerting.modelv2.TriggerV2.Companion.MONITOR_V2_MIN_EXPIRE_DURATION_MINUTES
 import org.opensearch.alerting.modelv2.TriggerV2.Companion.MONITOR_V2_MIN_THROTTLE_DURATION_MINUTES
 import org.opensearch.alerting.modelv2.TriggerV2.Companion.NAME_FIELD
+import org.opensearch.alerting.modelv2.TriggerV2.Companion.NOTIFICATIONS_ID_MAX_LENGTH
 import org.opensearch.alerting.modelv2.TriggerV2.Companion.SEVERITY_FIELD
 import org.opensearch.alerting.modelv2.TriggerV2.Companion.THROTTLE_FIELD
 import org.opensearch.alerting.modelv2.TriggerV2.Severity

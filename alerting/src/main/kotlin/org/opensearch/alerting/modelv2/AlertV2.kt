@@ -227,7 +227,7 @@ data class AlertV2(
                     TriggerV2.SEVERITY_FIELD -> {
                         val input = xcp.text()
                         val enumMatchResult = Severity.enumFromString(input)
-                            ?: throw IllegalStateException(
+                            ?: throw IllegalArgumentException(
                                 "Invalid value for ${TriggerV2.SEVERITY_FIELD}: $input. " +
                                     "Supported values are ${Severity.entries.map { it.value }}"
                             )

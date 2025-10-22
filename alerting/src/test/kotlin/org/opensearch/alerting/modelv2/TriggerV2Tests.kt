@@ -7,7 +7,6 @@ package org.opensearch.alerting.modelv2
 
 import org.opensearch.alerting.assertPplTriggersEqual
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.ALERTING_V2_MAX_NAME_LENGTH
-import org.opensearch.alerting.modelv2.MonitorV2.Companion.NOTIFICATIONS_ID_MAX_LENGTH
 import org.opensearch.alerting.modelv2.PPLTrigger.Companion.CONDITION_TYPE_FIELD
 import org.opensearch.alerting.modelv2.PPLTrigger.Companion.CUSTOM_CONDITION_FIELD
 import org.opensearch.alerting.modelv2.PPLTrigger.Companion.MODE_FIELD
@@ -21,6 +20,7 @@ import org.opensearch.alerting.modelv2.TriggerV2.Companion.ID_FIELD
 import org.opensearch.alerting.modelv2.TriggerV2.Companion.MONITOR_V2_MIN_EXPIRE_DURATION_MINUTES
 import org.opensearch.alerting.modelv2.TriggerV2.Companion.MONITOR_V2_MIN_THROTTLE_DURATION_MINUTES
 import org.opensearch.alerting.modelv2.TriggerV2.Companion.NAME_FIELD
+import org.opensearch.alerting.modelv2.TriggerV2.Companion.NOTIFICATIONS_ID_MAX_LENGTH
 import org.opensearch.alerting.modelv2.TriggerV2.Companion.SEVERITY_FIELD
 import org.opensearch.alerting.modelv2.TriggerV2.Companion.THROTTLE_FIELD
 import org.opensearch.alerting.randomAction

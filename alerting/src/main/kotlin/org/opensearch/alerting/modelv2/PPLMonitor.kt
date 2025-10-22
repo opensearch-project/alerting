@@ -84,14 +84,21 @@ data class PPLMonitor(
 
     init {
         // SQL monitors are not yet supported
-        if (this.queryLanguage == QueryLanguage.SQL) {
-            throw IllegalStateException("Monitors with SQL queries are not supported")
+        if (queryLanguage == QueryLanguage.SQL) {
+            throw IllegalArgumentException("SQL queries are not supported. Please use a PPL query.")
         }
 
         require(this.name.length <= ALERTING_V2_MAX_NAME_LENGTH) {
             "Monitor name too long, length must be less than $ALERTING_V2_MAX_NAME_LENGTH"
         }
 
+        if (lookBackWindow != null) {
+            requireNotNull(timestampField) { "If look back window is specified, timestamp field must not be null" }
+        } else {
+            require(timestampField == null) { "If look back window is not specified, timestamp field must not be specified" }
+        }
+
+        require(triggers.isNotEmpty()) { "Monitor must include at least 1 trigger" }
         require(this.triggers.size <= MONITOR_V2_MAX_TRIGGERS) { "Monitors can only have $MONITOR_V2_MAX_TRIGGERS triggers" }
 
         lookBackWindow?.let {
@@ -342,11 +349,6 @@ data class PPLMonitor(
 
             /* validations */
 
-            // ensure there's at least 1 trigger
-            if (triggers.isEmpty()) {
-                throw IllegalArgumentException("Monitor must include at least 1 trigger")
-            }
-
             // if enabled, set time of MonitorV2 creation/update is set as enable time
             if (enabled && enabledTime == null) {
                 enabledTime = Instant.now()
@@ -361,15 +363,6 @@ data class PPLMonitor(
             requireNotNull(schedule) { "Schedule is null" }
             requireNotNull(query) { "Query is null" }
             requireNotNull(lastUpdateTime) { "Last update time is null" }
-            if (lookBackWindow != null) {
-                requireNotNull(timestampField) { "If look back window is specified, timestamp field must not be null" }
-            } else {
-                require(timestampField == null) { "If look back window is not specified, timestamp field must not be specified" }
-            }
-
-            if (queryLanguage == QueryLanguage.SQL) {
-                throw IllegalArgumentException("SQL queries are not supported. Please use a PPL query.")
-            }
 
             /* return PPLMonitor */
             return PPLMonitor(
