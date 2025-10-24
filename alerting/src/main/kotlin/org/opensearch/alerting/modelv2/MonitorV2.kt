@@ -5,7 +5,7 @@
 
 package org.opensearch.alerting.modelv2
 
-import org.opensearch.alerting.modelv2.PPLMonitor.Companion.PPL_MONITOR_TYPE
+import org.opensearch.alerting.modelv2.PPLSQLMonitor.Companion.PPL_SQL_MONITOR_TYPE
 import org.opensearch.common.CheckedFunction
 import org.opensearch.commons.alerting.model.Schedule
 import org.opensearch.commons.alerting.model.ScheduledJob
@@ -55,7 +55,7 @@ interface MonitorV2 : ScheduledJob {
     ): MonitorV2
 
     enum class MonitorV2Type(val value: String) {
-        PPL_MONITOR(PPL_MONITOR_TYPE);
+        PPL_MONITOR(PPL_SQL_MONITOR_TYPE);
 
         override fun toString(): String {
             return value
@@ -81,7 +81,7 @@ interface MonitorV2 : ScheduledJob {
         const val USER_FIELD = "user"
         const val TRIGGERS_FIELD = "triggers"
         const val SCHEMA_VERSION_FIELD = "schema_version"
-        const val LOOK_BACK_WINDOW_FIELD = "look_back_window"
+        const val LOOK_BACK_WINDOW_FIELD = "look_back_window_minutes"
         const val TIMESTAMP_FIELD = "timestamp_field"
 
         // default values
@@ -122,20 +122,20 @@ interface MonitorV2 : ScheduledJob {
             XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp) // inner monitor object start
 
             return when (monitorType) {
-                MonitorV2Type.PPL_MONITOR -> PPLMonitor.parse(xcp)
+                MonitorV2Type.PPL_MONITOR -> PPLSQLMonitor.parse(xcp)
             }
         }
 
         fun readFrom(sin: StreamInput): MonitorV2 {
             return when (val monitorType = sin.readEnum(MonitorV2Type::class.java)) {
-                MonitorV2Type.PPL_MONITOR -> PPLMonitor(sin)
+                MonitorV2Type.PPL_MONITOR -> PPLSQLMonitor(sin)
                 else -> throw IllegalStateException("Unexpected input \"$monitorType\" when reading MonitorV2")
             }
         }
 
         fun writeTo(out: StreamOutput, monitorV2: MonitorV2) {
             when (monitorV2) {
-                is PPLMonitor -> {
+                is PPLSQLMonitor -> {
                     out.writeEnum(MonitorV2Type.PPL_MONITOR)
                     monitorV2.writeTo(out)
                 }

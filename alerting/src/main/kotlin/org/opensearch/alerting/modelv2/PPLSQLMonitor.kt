@@ -38,14 +38,8 @@ import org.opensearch.core.xcontent.XContentParserUtils
 import java.io.IOException
 import java.time.Instant
 
-// TODO: eventually change this to be called PPLSQLMonitor.
-//  A PPL Monitor and SQL Monitor
-// would have the exact same functionality, except the choice of language
-// when calling PPL/SQL plugin's execute API would be different.
-// we dont need 2 different monitor types for that, just a simple if check
-// for query language at monitor execution time
 /**
- * PPL (Piped Processing Language) Monitor for OpenSearch Alerting V2
+ * PPL/SQL Monitor for OpenSearch Alerting V2
  *
  * @property id Monitor ID. Defaults to [NO_ID].
  * @property version Version number of the monitor. Defaults to [NO_VERSION].
@@ -58,9 +52,9 @@ import java.time.Instant
  * @property triggers List of [PPLTrigger]s associated with this monitor.
  * @property schemaVersion Version of the alerting-config index schema used when this Monitor was indexed. Defaults to [NO_SCHEMA_VERSION].
  * @property queryLanguage The query language used. Defaults to [QueryLanguage.PPL].
- * @property query The PPL query string to be executed by this monitor.
+ * @property query The query string to be executed by this monitor.
  */
-data class PPLMonitor(
+data class PPLSQLMonitor(
     override val id: String = NO_ID,
     override val version: Long = NO_VERSION,
     override val name: String,
@@ -71,7 +65,7 @@ data class PPLMonitor(
     override val lastUpdateTime: Instant,
     override val enabledTime: Instant?,
     override val user: User?,
-    override val triggers: List<PPLTrigger>,
+    override val triggers: List<PPLSQLTrigger>,
     override val schemaVersion: Int = IndexUtils.NO_SCHEMA_VERSION,
     val queryLanguage: QueryLanguage = QueryLanguage.PPL, // default to PPL, SQL not currently supported
     val query: String
@@ -80,7 +74,7 @@ data class PPLMonitor(
     // specify scheduled job type
     override val type = MonitorV2.MONITOR_V2_TYPE
 
-    override fun fromDocument(id: String, version: Long): PPLMonitor = copy(id = id, version = version)
+    override fun fromDocument(id: String, version: Long): PPLSQLMonitor = copy(id = id, version = version)
 
     init {
         // SQL monitors are not yet supported
@@ -136,7 +130,7 @@ data class PPLMonitor(
         } else {
             null
         },
-        triggers = sin.readList(PPLTrigger.Companion::readFrom),
+        triggers = sin.readList(PPLSQLTrigger.Companion::readFrom),
         schemaVersion = sin.readInt(),
         queryLanguage = sin.readEnum(QueryLanguage::class.java),
         query = sin.readString()
@@ -159,10 +153,10 @@ data class PPLMonitor(
             builder.startObject(MonitorV2.MONITOR_V2_TYPE)
         }
 
-        // wrap PPLMonitor in outer object named after its monitor type
+        // wrap PPLSQLMonitor in outer object named after its monitor type
         // required for MonitorV2 XContentParser to first encounter this,
         // read in monitor type, then delegate to correct parse() function
-        builder.startObject(PPL_MONITOR_TYPE) // monitor type start object
+        builder.startObject(PPL_SQL_MONITOR_TYPE) // monitor type start object
 
         builder.field(NAME_FIELD, name)
         builder.field(SCHEDULE_FIELD, schedule)
@@ -247,7 +241,7 @@ data class PPLMonitor(
         schemaVersion: Int,
         lookBackWindow: Long?,
         timestampField: String?
-    ): PPLMonitor {
+    ): PPLSQLMonitor {
         return copy(
             id = id,
             version = version,
@@ -274,7 +268,7 @@ data class PPLMonitor(
 
     companion object {
         // monitor type name
-        const val PPL_MONITOR_TYPE = "ppl_monitor" // TODO: eventually change to SQL_PPL_MONITOR_TYPE
+        const val PPL_SQL_MONITOR_TYPE = "ppl_sql_monitor"
 
         // query languages
         const val PPL_QUERY_LANGUAGE = "ppl"
@@ -287,7 +281,7 @@ data class PPLMonitor(
         @JvmStatic
         @JvmOverloads
         @Throws(IOException::class)
-        fun parse(xcp: XContentParser, id: String = NO_ID, version: Long = NO_VERSION): PPLMonitor {
+        fun parse(xcp: XContentParser, id: String = NO_ID, version: Long = NO_VERSION): PPLSQLMonitor {
             var name: String? = null
             var enabled = true
             var schedule: Schedule? = null
@@ -296,7 +290,7 @@ data class PPLMonitor(
             var lastUpdateTime: Instant? = null
             var enabledTime: Instant? = null
             var user: User? = null
-            val triggers: MutableList<PPLTrigger> = mutableListOf()
+            val triggers: MutableList<PPLSQLTrigger> = mutableListOf()
             var schemaVersion = IndexUtils.NO_SCHEMA_VERSION
             var queryLanguage: QueryLanguage = QueryLanguage.PPL // default to PPL
             var query: String? = null
@@ -327,7 +321,7 @@ data class PPLMonitor(
                             xcp
                         )
                         while (xcp.nextToken() != XContentParser.Token.END_ARRAY) {
-                            triggers.add(PPLTrigger.parseInner(xcp))
+                            triggers.add(PPLSQLTrigger.parseInner(xcp))
                         }
                     }
                     SCHEMA_VERSION_FIELD -> schemaVersion = xcp.intValue()
@@ -364,8 +358,8 @@ data class PPLMonitor(
             requireNotNull(query) { "Query is null" }
             requireNotNull(lastUpdateTime) { "Last update time is null" }
 
-            /* return PPLMonitor */
-            return PPLMonitor(
+            /* return PPLSQLMonitor */
+            return PPLSQLMonitor(
                 id,
                 version,
                 name,

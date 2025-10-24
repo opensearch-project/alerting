@@ -5,7 +5,7 @@
 
 package org.opensearch.alerting.modelv2
 
-import org.opensearch.alerting.modelv2.PPLTrigger.Companion.PPL_TRIGGER_FIELD
+import org.opensearch.alerting.modelv2.PPLSQLTrigger.Companion.PPL_SQL_TRIGGER_FIELD
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.notifications.model.BaseModel
 import java.time.Instant
@@ -21,7 +21,7 @@ interface TriggerV2 : BaseModel {
     val actions: List<Action>
 
     enum class TriggerV2Type(val value: String) {
-        PPL_TRIGGER(PPL_TRIGGER_FIELD);
+        PPL_TRIGGER(PPL_SQL_TRIGGER_FIELD);
 
         override fun toString(): String {
             return value
@@ -48,9 +48,9 @@ interface TriggerV2 : BaseModel {
         const val ID_FIELD = "id"
         const val NAME_FIELD = "name"
         const val SEVERITY_FIELD = "severity"
-        const val THROTTLE_FIELD = "throttle"
+        const val THROTTLE_FIELD = "throttle_minutes"
         const val LAST_TRIGGERED_FIELD = "last_triggered_time"
-        const val EXPIRE_FIELD = "expires"
+        const val EXPIRE_FIELD = "expires_minutes"
         const val ACTIONS_FIELD = "actions"
 
         // hard, nonadjustable limits
