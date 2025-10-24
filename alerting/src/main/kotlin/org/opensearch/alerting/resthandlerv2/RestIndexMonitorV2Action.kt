@@ -63,7 +63,7 @@ class RestIndexMonitorV2Action : BaseRestHandler() {
             monitorV2 = MonitorV2.parse(xcp)
             rbacRoles = request.contentParser().map()["rbac_roles"] as List<String>?
         } catch (e: Exception) {
-            throw AlertingException.wrap(e)
+            throw AlertingException.wrap(IllegalArgumentException("request body contains invalid JSON"))
         }
 
         val id = request.param("monitorV2Id", MonitorV2.NO_ID)
