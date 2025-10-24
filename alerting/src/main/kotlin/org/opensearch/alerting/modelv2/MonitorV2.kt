@@ -111,7 +111,8 @@ interface MonitorV2 : ScheduledJob {
                 xcp
             )
 
-            XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp) // monitor type field name
+            // monitor type field name
+            XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
             val monitorTypeText = xcp.currentName()
             val monitorType = MonitorV2Type.enumFromString(monitorTypeText)
                 ?: throw IllegalStateException(
@@ -119,7 +120,8 @@ interface MonitorV2 : ScheduledJob {
                         "Please ensure monitor object is wrapped in an outer ppl_monitor object"
                 )
 
-            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp) // inner monitor object start
+            // inner monitor object start
+            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
 
             return when (monitorType) {
                 MonitorV2Type.PPL_MONITOR -> PPLSQLMonitor.parse(xcp)
