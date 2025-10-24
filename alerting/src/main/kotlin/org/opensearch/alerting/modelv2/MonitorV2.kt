@@ -81,7 +81,7 @@ interface MonitorV2 : ScheduledJob {
         const val USER_FIELD = "user"
         const val TRIGGERS_FIELD = "triggers"
         const val SCHEMA_VERSION_FIELD = "schema_version"
-        const val LOOK_BACK_WINDOW_FIELD = "look_back_window"
+        const val LOOK_BACK_WINDOW_FIELD = "look_back_window_minutes"
         const val TIMESTAMP_FIELD = "timestamp_field"
 
         // default values

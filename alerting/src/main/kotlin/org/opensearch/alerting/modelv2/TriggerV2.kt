@@ -48,9 +48,9 @@ interface TriggerV2 : BaseModel {
         const val ID_FIELD = "id"
         const val NAME_FIELD = "name"
         const val SEVERITY_FIELD = "severity"
-        const val THROTTLE_FIELD = "throttle"
+        const val THROTTLE_FIELD = "throttle_minutes"
         const val LAST_TRIGGERED_FIELD = "last_triggered_time"
-        const val EXPIRE_FIELD = "expires"
+        const val EXPIRE_FIELD = "expires_minutes"
         const val ACTIONS_FIELD = "actions"
 
         // hard, nonadjustable limits
