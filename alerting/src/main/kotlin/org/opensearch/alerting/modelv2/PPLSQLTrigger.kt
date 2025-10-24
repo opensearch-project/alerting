@@ -36,10 +36,10 @@ import java.io.IOException
 import java.time.Instant
 
 /**
- * The PPL Trigger for PPL Monitors
+ * The PPL/SQL Trigger for PPL/SQL Monitors
  *
  * There are two types of PPLTrigger conditions: NUMBER_OF_RESULTS and CUSTOM
- * NUMBER_OF_RESULTS: triggers based on whether the number of query results returned by the PPLMonitor
+ * NUMBER_OF_RESULTS: triggers based on whether the number of query results returned by the PPLSQLMonitor
  *                    query meets some threshold
  * CUSTOM: triggers based on a custom condition that user specifies (a single ppl eval statement)
  *
@@ -66,7 +66,7 @@ import java.time.Instant
  * @property customCondition A custom condition expression. Required if using CUSTOM conditions,
  *                           required to be null otherwise.
  */
-data class PPLTrigger(
+data class PPLSQLTrigger(
     override val id: String = UUIDs.base64UUID(),
     override val name: String,
     override val severity: Severity,
@@ -248,7 +248,7 @@ data class PPLTrigger(
 
     companion object {
         // trigger wrapper object field name
-        const val PPL_TRIGGER_FIELD = "ppl_trigger"
+        const val PPL_SQL_TRIGGER_FIELD = "ppl_sql_trigger"
 
         // field names
         const val MODE_FIELD = "mode"
@@ -259,13 +259,13 @@ data class PPLTrigger(
 
         val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(
             TriggerV2::class.java,
-            ParseField(PPL_TRIGGER_FIELD),
+            ParseField(PPL_SQL_TRIGGER_FIELD),
             CheckedFunction { parseInner(it) }
         )
 
         @JvmStatic
         @Throws(IOException::class)
-        fun parseInner(xcp: XContentParser): PPLTrigger {
+        fun parseInner(xcp: XContentParser): PPLSQLTrigger {
             var id = UUIDs.base64UUID() // assign a default triggerId if one is not specified
             var name: String? = null
             var severity: Severity? = null
@@ -372,7 +372,7 @@ data class PPLTrigger(
             requireNotNull(conditionType) { "Trigger condition type must be included" }
 
             // 3. prepare and return PPLTrigger object
-            return PPLTrigger(
+            return PPLSQLTrigger(
                 id,
                 name,
                 severity,
@@ -390,8 +390,8 @@ data class PPLTrigger(
 
         @JvmStatic
         @Throws(IOException::class)
-        fun readFrom(sin: StreamInput): PPLTrigger {
-            return PPLTrigger(sin)
+        fun readFrom(sin: StreamInput): PPLSQLTrigger {
+            return PPLSQLTrigger(sin)
         }
     }
 }

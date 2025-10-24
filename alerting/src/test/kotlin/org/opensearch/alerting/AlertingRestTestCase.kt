@@ -28,7 +28,7 @@ import org.opensearch.alerting.model.destination.Slack
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
 import org.opensearch.alerting.modelv2.MonitorV2
-import org.opensearch.alerting.modelv2.PPLMonitor
+import org.opensearch.alerting.modelv2.PPLSQLMonitor
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.DestinationType
@@ -590,7 +590,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return getMonitor(monitorId = monitorId)
     }
 
-    protected fun createRandomPPLMonitor(pplMonitorConfig: PPLMonitor = randomPPLMonitor()): PPLMonitor {
+    protected fun createRandomPPLMonitor(pplMonitorConfig: PPLSQLMonitor = randomPPLMonitor()): PPLSQLMonitor {
         // every random ppl monitor's query searches index TEST_INDEX_NAME
         // by default, so create that first before creating the monitor
         val indexExistsResponse = adminClient().makeRequest("HEAD", TEST_INDEX_NAME)
@@ -599,7 +599,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         }
         logger.info("ppl monitor: $pplMonitorConfig")
         val pplMonitorId = createMonitorV2(pplMonitorConfig).id
-        return getMonitorV2(monitorV2Id = pplMonitorId) as PPLMonitor
+        return getMonitorV2(monitorV2Id = pplMonitorId) as PPLSQLMonitor
     }
 
     protected fun createRandomDocumentMonitor(refresh: Boolean = false, withMetadata: Boolean = false): Monitor {

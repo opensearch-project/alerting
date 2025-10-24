@@ -13,12 +13,12 @@ import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailEntry
 import org.opensearch.alerting.model.destination.email.EmailGroup
 import org.opensearch.alerting.modelv2.AlertV2
-import org.opensearch.alerting.modelv2.PPLMonitor
-import org.opensearch.alerting.modelv2.PPLMonitor.QueryLanguage
-import org.opensearch.alerting.modelv2.PPLTrigger
-import org.opensearch.alerting.modelv2.PPLTrigger.ConditionType
-import org.opensearch.alerting.modelv2.PPLTrigger.NumResultsCondition
-import org.opensearch.alerting.modelv2.PPLTrigger.TriggerMode
+import org.opensearch.alerting.modelv2.PPLSQLMonitor
+import org.opensearch.alerting.modelv2.PPLSQLMonitor.QueryLanguage
+import org.opensearch.alerting.modelv2.PPLSQLTrigger
+import org.opensearch.alerting.modelv2.PPLSQLTrigger.ConditionType
+import org.opensearch.alerting.modelv2.PPLSQLTrigger.NumResultsCondition
+import org.opensearch.alerting.modelv2.PPLSQLTrigger.TriggerMode
 import org.opensearch.alerting.modelv2.TriggerV2.Severity
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.Request
@@ -316,12 +316,12 @@ fun randomPPLMonitor(
     timestampField: String? = lookBackWindow?.let { TIMESTAMP_FIELD },
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
-    triggers: List<PPLTrigger> = List(randomIntBetween(1, 5)) { randomPPLTrigger() },
+    triggers: List<PPLSQLTrigger> = List(randomIntBetween(1, 5)) { randomPPLTrigger() },
     user: User? = randomUser(),
     queryLanguage: QueryLanguage = QueryLanguage.PPL,
     query: String = "source = $TEST_INDEX_NAME | head 10"
-): PPLMonitor {
-    return PPLMonitor(
+): PPLSQLMonitor {
+    return PPLSQLMonitor(
         name = name,
         enabled = enabled,
         schedule = schedule,
@@ -411,8 +411,8 @@ fun randomPPLTrigger(
     numResultsCondition: NumResultsCondition? = NumResultsCondition.entries.random(),
     numResultsValue: Long? = randomLongBetween(1L, 50L),
     customCondition: String? = null
-): PPLTrigger {
-    return PPLTrigger(
+): PPLSQLTrigger {
+    return PPLSQLTrigger(
         id = id,
         name = name,
         severity = severity,
@@ -948,7 +948,7 @@ fun Map<String, Any>.objectMap(key: String): Map<String, Map<String, Any>> {
     return this[key] as Map<String, Map<String, Any>>
 }
 
-fun assertPplMonitorsEqual(pplMonitor1: PPLMonitor, pplMonitor2: PPLMonitor) {
+fun assertPplMonitorsEqual(pplMonitor1: PPLSQLMonitor, pplMonitor2: PPLSQLMonitor) {
     // note: Get and Search Monitor responses do not include User information by
     // design, so that check is skipped
 
@@ -972,7 +972,7 @@ fun assertPplMonitorsEqual(pplMonitor1: PPLMonitor, pplMonitor2: PPLMonitor) {
     }
 }
 
-fun assertPplTriggersEqual(pplTrigger1: PPLTrigger, pplTrigger2: PPLTrigger) {
+fun assertPplTriggersEqual(pplTrigger1: PPLSQLTrigger, pplTrigger2: PPLSQLTrigger) {
     assertEquals(
         "Monitor trigger IDs not equal",
         pplTrigger1.id,

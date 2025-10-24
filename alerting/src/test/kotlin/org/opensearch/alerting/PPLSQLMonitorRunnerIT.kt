@@ -5,10 +5,10 @@
 
 package org.opensearch.alerting
 
-import org.opensearch.alerting.modelv2.PPLMonitor
-import org.opensearch.alerting.modelv2.PPLTrigger.ConditionType
-import org.opensearch.alerting.modelv2.PPLTrigger.NumResultsCondition
-import org.opensearch.alerting.modelv2.PPLTrigger.TriggerMode
+import org.opensearch.alerting.modelv2.PPLSQLMonitor
+import org.opensearch.alerting.modelv2.PPLSQLTrigger.ConditionType
+import org.opensearch.alerting.modelv2.PPLSQLTrigger.NumResultsCondition
+import org.opensearch.alerting.modelv2.PPLSQLTrigger.TriggerMode
 import org.opensearch.client.Response
 import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.IntervalSchedule
@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
  * ./gradlew :alerting:integTest -Dhttps=true -Dsecurity=true -Duser=admin -Dpassword=admin \
  * --tests "org.opensearch.alerting.PPLMonitorRunnerIT"
  */
-class PPLMonitorRunnerIT : AlertingRestTestCase() {
+class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
 
     /* Test Cases */
     fun `test running number of results condition and result set mode ppl monitor`() {
@@ -401,7 +401,7 @@ class PPLMonitorRunnerIT : AlertingRestTestCase() {
 
     // takes in an execute monitor API response and returns true if the
     // trigger condition was met. assumes the monitor executed only had 1 trigger
-    private fun isTriggered(pplMonitor: PPLMonitor, executeResponse: Response): Boolean {
+    private fun isTriggered(pplMonitor: PPLSQLMonitor, executeResponse: Response): Boolean {
         val executeResponseMap = entityAsMap(executeResponse)
         val triggerResultsObj = (executeResponseMap["trigger_results"] as Map<String, Any>)[pplMonitor.triggers[0].id] as Map<String, Any>
         return triggerResultsObj["triggered"] as Boolean

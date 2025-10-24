@@ -20,8 +20,8 @@ import org.opensearch.alerting.actionv2.ExecuteMonitorV2Action
 import org.opensearch.alerting.actionv2.ExecuteMonitorV2Request
 import org.opensearch.alerting.actionv2.ExecuteMonitorV2Response
 import org.opensearch.alerting.modelv2.MonitorV2
-import org.opensearch.alerting.modelv2.PPLMonitor
-import org.opensearch.alerting.modelv2.PPLMonitor.Companion.PPL_MONITOR_TYPE
+import org.opensearch.alerting.modelv2.PPLSQLMonitor
+import org.opensearch.alerting.modelv2.PPLSQLMonitor.Companion.PPL_SQL_MONITOR_TYPE
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.transport.SecureTransportAction
 import org.opensearch.cluster.service.ClusterService
@@ -89,7 +89,7 @@ class TransportExecuteMonitorV2Action @Inject constructor(
                     // call the MonitorRunnerService to execute the MonitorV2
                     try {
                         val monitorV2Type = when (monitorV2) {
-                            is PPLMonitor -> PPL_MONITOR_TYPE
+                            is PPLSQLMonitor -> PPL_SQL_MONITOR_TYPE
                             else -> throw IllegalStateException("Unexpected MonitorV2 type: ${monitorV2.javaClass.name}")
                         }
                         log.info(
@@ -203,12 +203,6 @@ class TransportExecuteMonitorV2Action @Inject constructor(
                 )
             } else { // execute with monitor object case
                 try {
-//                    val monitorV2 = when (execMonitorV2Request.monitorV2) {
-//                        is PPLMonitor -> execMonitorV2Request.monitorV2.copy(user = user)
-//                        else -> throw IllegalStateException(
-//                            "unexpected MonitorV2 type: ${execMonitorV2Request.monitorV2!!.javaClass.name}"
-//                        )
-//                    }
                     val monitorV2 = execMonitorV2Request.monitorV2!!.makeCopy(user = user)
                     executeMonitorV2(monitorV2)
                 } catch (e: Exception) {

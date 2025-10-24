@@ -14,7 +14,7 @@ import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentBuilder
 import java.io.IOException
 
-data class PPLTriggerRunResult(
+data class PPLSQLTriggerRunResult(
     override var triggerName: String,
     override var triggered: Boolean,
     override var error: Exception?,
@@ -48,7 +48,7 @@ data class PPLTriggerRunResult(
         @JvmStatic
         @Throws(IOException::class)
         fun readFrom(sin: StreamInput): TriggerV2RunResult {
-            return PPLTriggerRunResult(sin)
+            return PPLSQLTriggerRunResult(sin)
         }
     }
 }

@@ -14,7 +14,7 @@ import org.opensearch.alerting.modelv2.MonitorV2.Companion.LOOK_BACK_WINDOW_FIEL
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.MONITOR_V2_MIN_LOOK_BACK_WINDOW
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.NAME_FIELD
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.SCHEDULE_FIELD
-import org.opensearch.alerting.modelv2.PPLMonitor.Companion.QUERY_FIELD
+import org.opensearch.alerting.modelv2.PPLSQLMonitor.Companion.QUERY_FIELD
 import org.opensearch.alerting.randomPPLMonitor
 import org.opensearch.alerting.randomPPLTrigger
 import org.opensearch.common.io.stream.BytesStreamOutput
@@ -42,7 +42,7 @@ class MonitorV2Tests : OpenSearchTestCase() {
     }
 
     fun `test max triggers`() {
-        val tooManyTriggers = mutableListOf<PPLTrigger>()
+        val tooManyTriggers = mutableListOf<PPLSQLTrigger>()
         for (i in 0..10) { // 11 times
             tooManyTriggers.add(randomPPLTrigger())
         }
@@ -108,7 +108,7 @@ class MonitorV2Tests : OpenSearchTestCase() {
         val out = BytesStreamOutput()
         pplMonitor.writeTo(out)
         val sin = StreamInput.wrap(out.bytes().toBytesRef().bytes)
-        val newPplMonitor = PPLMonitor(sin)
+        val newPplMonitor = PPLSQLMonitor(sin)
         assertPplMonitorsEqual(pplMonitor, newPplMonitor)
     }
 

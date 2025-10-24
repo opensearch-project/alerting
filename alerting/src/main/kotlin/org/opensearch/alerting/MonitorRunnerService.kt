@@ -34,8 +34,8 @@ import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.alerting.modelv2.MonitorV2RunResult
-import org.opensearch.alerting.modelv2.PPLMonitor
-import org.opensearch.alerting.modelv2.PPLMonitor.Companion.PPL_MONITOR_TYPE
+import org.opensearch.alerting.modelv2.PPLSQLMonitor
+import org.opensearch.alerting.modelv2.PPLSQLMonitor.Companion.PPL_SQL_MONITOR_TYPE
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.remote.monitors.RemoteDocumentLevelMonitorRunner
@@ -428,7 +428,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 }
             }
             is MonitorV2 -> {
-                if (job !is PPLMonitor) {
+                if (job !is PPLSQLMonitor) {
                     throw IllegalStateException("Unexpected invalid MonitorV2 type: ${job.javaClass.name}")
                 }
 
@@ -440,7 +440,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                         } ?: return@launch
                         logger.debug("lock ${monitorLock!!.lockId} acquired")
                         logger.debug(
-                            "PERF_DEBUG: executing $PPL_MONITOR_TYPE ${job.id} on node " +
+                            "PERF_DEBUG: executing $PPL_SQL_MONITOR_TYPE ${job.id} on node " +
                                 monitorCtx.clusterService!!.state().nodes().localNode.id
                         )
                         val executeMonitorV2Request = ExecuteMonitorV2Request(
@@ -585,8 +585,8 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     }
 
     // after the above JobRunner interface override runJob calls ExecuteMonitorV2 API,
-    // the ExecuteMonitorV2 transport action calls this function to call the PPLMonitorRunner,
-    // where the core PPL Monitor execution logic resides
+    // the ExecuteMonitorV2 transport action calls this function to call the PPLSQLMonitorRunner,
+    // where the core PPL/SQL Monitor execution logic resides
     suspend fun runJobV2(
         monitorV2: MonitorV2,
         periodStart: Instant,
@@ -599,7 +599,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
         val executionId = "${monitorV2.id}_${LocalDateTime.now(ZoneOffset.UTC)}_${UUID.randomUUID()}"
         val monitorV2Type = when (monitorV2) {
-            is PPLMonitor -> PPL_MONITOR_TYPE
+            is PPLSQLMonitor -> PPL_SQL_MONITOR_TYPE
             else -> throw IllegalStateException("Unexpected MonitorV2 type: ${monitorV2.javaClass.name}")
         }
 
@@ -608,10 +608,10 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 "periodEnd: $periodEnd, dryrun: $dryrun, manual: $manual, executionId: $executionId"
         )
 
-        // for now, always call PPLMonitorRunner since only PPL Monitors are initially supported
+        // for now, always call PPLSQLMonitorRunner since only PPL Monitors are initially supported
         // to introduce new MonitorV2 type, create its MonitorRunner, and if/else branch
-        // to the corresponding MonitorRunners based on type. For now, default to PPLMonitorRunner
-        val runResult = PPLMonitorRunner.runMonitorV2(
+        // to the corresponding MonitorRunners based on type. For now, default to PPLSQLMonitorRunner
+        val runResult = PPLSQLMonitorRunner.runMonitorV2(
             monitorV2,
             monitorCtx,
             periodStart,

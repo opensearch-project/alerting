@@ -14,6 +14,7 @@ import org.opensearch.alerting.AlertingV2Utils.isIndexNotFoundException
 import org.opensearch.alerting.actionv2.SearchMonitorV2Action
 import org.opensearch.alerting.actionv2.SearchMonitorV2Request
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.MONITOR_V2_TYPE
+import org.opensearch.alerting.modelv2.PPLSQLMonitor.Companion.PPL_SQL_MONITOR_TYPE
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.transport.SecureTransportAction
@@ -70,7 +71,7 @@ class TransportSearchMonitorV2Action @Inject constructor(
             // if doFilterForUser() is false, security is enabled but filterby is disabled
             if (user != null && doFilterForUser(user)) {
                 log.info("Filtering result by: ${user.backendRoles}")
-                addFilter(user, request.searchRequest.source(), "monitor_v2.ppl_monitor.user.backend_roles.keyword")
+                addFilter(user, request.searchRequest.source(), "$MONITOR_V2_TYPE.$PPL_SQL_MONITOR_TYPE.user.backend_roles.keyword")
             }
 
             client.search(

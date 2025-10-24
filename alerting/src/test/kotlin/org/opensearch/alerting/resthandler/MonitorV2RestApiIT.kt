@@ -14,8 +14,8 @@ import org.opensearch.alerting.TEST_INDEX_NAME
 import org.opensearch.alerting.assertPplMonitorsEqual
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.modelv2.MonitorV2
-import org.opensearch.alerting.modelv2.PPLMonitor
-import org.opensearch.alerting.modelv2.PPLTrigger.ConditionType
+import org.opensearch.alerting.modelv2.PPLSQLMonitor
+import org.opensearch.alerting.modelv2.PPLSQLTrigger.ConditionType
 import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomPPLMonitor
 import org.opensearch.alerting.randomPPLTrigger
@@ -86,7 +86,7 @@ class MonitorV2RestApiIT : AlertingRestTestCase() {
         assertEquals("Updated monitor id doesn't match", originalMonitor.id, responseBody["_id"] as String)
         assertEquals("Version not incremented", (originalMonitor.version + 1).toInt(), responseBody["_version"] as Int)
 
-        val updatedMonitor = getMonitorV2(originalMonitor.id) as PPLMonitor
+        val updatedMonitor = getMonitorV2(originalMonitor.id) as PPLSQLMonitor
         assertPplMonitorsEqual(newMonitor, updatedMonitor)
     }
 
@@ -111,7 +111,7 @@ class MonitorV2RestApiIT : AlertingRestTestCase() {
 
         lateinit var id: String
         var version: Long = 0
-        lateinit var storedPplMonitor: PPLMonitor
+        lateinit var storedPplMonitor: PPLSQLMonitor
 
         while (parser.nextToken() != XContentParser.Token.END_OBJECT) {
             parser.nextToken()
@@ -119,7 +119,7 @@ class MonitorV2RestApiIT : AlertingRestTestCase() {
             when (parser.currentName()) {
                 "_id" -> id = parser.text()
                 "_version" -> version = parser.longValue()
-                "monitorV2" -> storedPplMonitor = MonitorV2.parse(parser) as PPLMonitor
+                "monitorV2" -> storedPplMonitor = MonitorV2.parse(parser) as PPLSQLMonitor
             }
         }
 

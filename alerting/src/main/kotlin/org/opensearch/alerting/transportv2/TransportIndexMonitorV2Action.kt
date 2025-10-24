@@ -31,18 +31,18 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.clustermanager.AcknowledgedResponse
 import org.opensearch.alerting.AlertingV2Utils.getIndicesFromPplQuery
 import org.opensearch.alerting.AlertingV2Utils.validateMonitorV2
-import org.opensearch.alerting.PPLMonitorRunner.appendCustomCondition
-import org.opensearch.alerting.PPLMonitorRunner.executePplQuery
-import org.opensearch.alerting.PPLMonitorRunner.findEvalResultVar
-import org.opensearch.alerting.PPLMonitorRunner.findEvalResultVarIdxInSchema
+import org.opensearch.alerting.PPLSQLMonitorRunner.appendCustomCondition
+import org.opensearch.alerting.PPLSQLMonitorRunner.executePplQuery
+import org.opensearch.alerting.PPLSQLMonitorRunner.findEvalResultVar
+import org.opensearch.alerting.PPLSQLMonitorRunner.findEvalResultVarIdxInSchema
 import org.opensearch.alerting.actionv2.IndexMonitorV2Action
 import org.opensearch.alerting.actionv2.IndexMonitorV2Request
 import org.opensearch.alerting.actionv2.IndexMonitorV2Response
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.MONITOR_V2_TYPE
-import org.opensearch.alerting.modelv2.PPLMonitor
-import org.opensearch.alerting.modelv2.PPLTrigger.ConditionType
+import org.opensearch.alerting.modelv2.PPLSQLMonitor
+import org.opensearch.alerting.modelv2.PPLSQLTrigger.ConditionType
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_EXPIRE_DURATION
@@ -139,7 +139,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
 
         // validate the MonitorV2 based on its type
         when (indexMonitorV2Request.monitorV2) {
-            is PPLMonitor -> validatePplMonitorUserPermissionsAndQuery(
+            is PPLSQLMonitor -> validatePplSqlMonitorUserPermissionsAndQuery(
                 indexMonitorV2Request,
                 user,
                 object : ActionListener<Unit> { // validationListener
@@ -150,12 +150,12 @@ class TransportIndexMonitorV2Action @Inject constructor(
                         // index as the user. pass the user object itself so backend
                         // roles can be matched and checked downstream
                         client.threadPool().threadContext.stashContext().use {
-                            val pplMonitor = indexMonitorV2Request.monitorV2 as PPLMonitor
+                            val pplSqlMonitor = indexMonitorV2Request.monitorV2 as PPLSQLMonitor
                             if (user == null) {
-                                indexMonitorV2Request.monitorV2 = pplMonitor
+                                indexMonitorV2Request.monitorV2 = pplSqlMonitor
                                     .copy(user = User("", listOf(), listOf(), mapOf()))
                             } else {
-                                indexMonitorV2Request.monitorV2 = pplMonitor
+                                indexMonitorV2Request.monitorV2 = pplSqlMonitor
                                     .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttributes))
                             }
                             checkScheduledJobIndex(indexMonitorV2Request, actionListener, user)
@@ -178,7 +178,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
     }
 
     // validates the PPL Monitor, its query, and user's permissions to the indices it queries by submitting it to SQL/PPL plugin
-    private fun validatePplMonitorUserPermissionsAndQuery(
+    private fun validatePplSqlMonitorUserPermissionsAndQuery(
         indexMonitorV2Request: IndexMonitorV2Request,
         user: User?,
         validationListener: ActionListener<Unit>
@@ -189,16 +189,16 @@ class TransportIndexMonitorV2Action @Inject constructor(
                 withContext(singleThreadContext) {
                     it.restore()
 
-                    val pplMonitor = indexMonitorV2Request.monitorV2 as PPLMonitor
+                    val pplSqlMonitor = indexMonitorV2Request.monitorV2 as PPLSQLMonitor
 
-                    val pplQueryValid = validatePplQuery(pplMonitor, validationListener)
+                    val pplQueryValid = validatePplSqlQuery(pplSqlMonitor, validationListener)
                     if (!pplQueryValid) {
                         return@withContext
                     }
 
-                    // run basic validations against the PPL Monitor
-                    val pplMonitorValid = validatePplMonitor(pplMonitor, validationListener)
-                    if (!pplMonitorValid) {
+                    // run basic validations against the PPL/SQL Monitor
+                    val pplSqlMonitorValid = validatePplSqlMonitor(pplSqlMonitor, validationListener)
+                    if (!pplSqlMonitorValid) {
                         return@withContext
                     }
 
@@ -209,7 +209,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
                     }
 
                     // check that given timestamp field is valid
-                    val timestampFieldValid = checkPplQueryIndicesForTimestampField(pplMonitor, validationListener)
+                    val timestampFieldValid = checkPplQueryIndicesForTimestampField(pplSqlMonitor, validationListener)
                     if (!timestampFieldValid) {
                         return@withContext
                     }
@@ -220,7 +220,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
         }
     }
 
-    private suspend fun validatePplQuery(pplMonitor: PPLMonitor, validationListener: ActionListener<Unit>): Boolean {
+    private suspend fun validatePplSqlQuery(pplSqlMonitor: PPLSQLMonitor, validationListener: ActionListener<Unit>): Boolean {
         // first attempt to run the monitor query and all possible
         // extensions of it (from custom conditions)
         try {
@@ -229,11 +229,11 @@ class TransportIndexMonitorV2Action @Inject constructor(
             // first run the base query as is.
             // if there are any PPL syntax or index not found or other errors,
             // this will throw an exception
-            executePplQuery(pplMonitor.query, nodeClient)
+            executePplQuery(pplSqlMonitor.query, nodeClient)
 
             // now scan all the triggers with custom conditions, and ensure each query constructed
             // from the base query + custom condition is valid
-            for (pplTrigger in pplMonitor.triggers) {
+            for (pplTrigger in pplSqlMonitor.triggers) {
                 if (pplTrigger.conditionType != ConditionType.CUSTOM) {
                     continue
                 }
@@ -241,7 +241,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
                 // TODO: move these functions to the AlertingV2Utils object
                 val evalResultVar = findEvalResultVar(pplTrigger.customCondition!!)
 
-                val queryWithCustomCondition = appendCustomCondition(pplMonitor.query, pplTrigger.customCondition!!)
+                val queryWithCustomCondition = appendCustomCondition(pplSqlMonitor.query, pplTrigger.customCondition!!)
 
                 val executePplQueryResponse = executePplQuery(queryWithCustomCondition, nodeClient)
 
@@ -277,9 +277,9 @@ class TransportIndexMonitorV2Action @Inject constructor(
         return true
     }
 
-    private fun validatePplMonitor(pplMonitor: PPLMonitor, validationListener: ActionListener<Unit>): Boolean {
+    private fun validatePplSqlMonitor(pplSqlMonitor: PPLSQLMonitor, validationListener: ActionListener<Unit>): Boolean {
         // ensure the trigger throttle and expire durations are valid
-        pplMonitor.triggers.forEach { trigger ->
+        pplSqlMonitor.triggers.forEach { trigger ->
             trigger.throttleDuration?.let { throttleDuration ->
                 if (throttleDuration > maxThrottleDuration) {
                     validationListener.onFailure(
@@ -330,11 +330,11 @@ class TransportIndexMonitorV2Action @Inject constructor(
         }
 
         // ensure the query length doesn't exceed the limit
-        if (pplMonitor.query.length > maxQueryLength) {
+        if (pplSqlMonitor.query.length > maxQueryLength) {
             validationListener.onFailure(
                 AlertingException.wrap(
                     IllegalArgumentException(
-                        "PPL Query length must be at most $maxQueryLength but was ${pplMonitor.query.length}"
+                        "PPL Query length must be at most $maxQueryLength but was ${pplSqlMonitor.query.length}"
                     )
                 )
             )
@@ -342,12 +342,12 @@ class TransportIndexMonitorV2Action @Inject constructor(
         }
 
         // ensure the look back window doesn't exceed the limit
-        pplMonitor.lookBackWindow?.let {
-            if (pplMonitor.lookBackWindow > maxLookBackWindow) {
+        pplSqlMonitor.lookBackWindow?.let {
+            if (pplSqlMonitor.lookBackWindow > maxLookBackWindow) {
                 validationListener.onFailure(
                     AlertingException.wrap(
                         IllegalArgumentException(
-                            "Look back window must be at most $maxLookBackWindow minutes but was ${pplMonitor.lookBackWindow}"
+                            "Look back window must be at most $maxLookBackWindow minutes but was ${pplSqlMonitor.lookBackWindow}"
                         )
                     )
                 )
@@ -409,17 +409,17 @@ class TransportIndexMonitorV2Action @Inject constructor(
     // must contain the timestamp field specified in the PPL Monitor, and they must
     // all be of OpenSearch data type "date"
     private suspend fun checkPplQueryIndicesForTimestampField(
-        pplMonitor: PPLMonitor,
+        pplSqlMonitor: PPLSQLMonitor,
         validationListener: ActionListener<Unit>
     ): Boolean {
-        if (pplMonitor.lookBackWindow == null) {
+        if (pplSqlMonitor.lookBackWindow == null) {
             // if no look back window was specified, no need
             // to check for timestamp field in PPL query indices
             return true
         }
 
-        val pplQuery = pplMonitor.query
-        val timestampField = pplMonitor.timestampField
+        val pplQuery = pplSqlMonitor.query
+        val timestampField = pplSqlMonitor.timestampField
 
         val indices = getIndicesFromPplQuery(pplQuery)
         val getMappingsRequest = GetMappingsRequest().indices(*indices.toTypedArray())
@@ -785,7 +785,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
             log.debug("Created monitor's backend roles: $rbacRoles")
         }
 
-        // TODO: only works because monitorV2 is always of type PPLMonitor, not extensible to other potential MonitorV2 types
         val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
             .setRefreshPolicy(indexMonitorRequest.refreshPolicy)
             .source(monitorV2.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))

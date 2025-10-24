@@ -340,20 +340,20 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
 
         // getUser should have access to the monitor above created by user
         val searchUser = "searchUser"
-        val getUserCustomRole = "custom_role_2" // different role from the one created before to avoid conflicts
+        val searchUserCustomRole = "custom_role_2" // different role from the one created before to avoid conflicts
         createUserWithAdminLevelCustomRole(
             searchUser,
             listOf("backend_role_a"),
-            getUserCustomRole
+            searchUserCustomRole
         )
 
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), searchUser, password)
+        val searchUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), searchUser, password)
             .setSocketTimeout(60000)
             .setConnectionRequestTimeout(180000)
             .build()
 
         val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
-        val searchMonitorResponse = getUserClient!!.makeRequest(
+        val searchMonitorResponse = searchUserClient!!.makeRequest(
             "POST",
             "$MONITOR_V2_BASE_URI/_search",
             StringEntity(search, ContentType.APPLICATION_JSON),
@@ -361,13 +361,15 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         )
         assertEquals("Search monitorV2 failed", RestStatus.OK, searchMonitorResponse.restStatus())
 
-        val xcp = createParser(XContentType.JSON.xContent(), searchMonitorResponse.entity.content)
-        val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
-        val numberDocsFound = hits["total"]?.get("value")
-        assertEquals("Created PPL Monitor should be visible but was not", 1, numberDocsFound)
+        createParser(XContentType.JSON.xContent(), searchMonitorResponse.entity.content).use { xcp ->
+            val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+            logger.info("hits: $hits")
+            val numberDocsFound = hits["total"]?.get("value")
+            assertEquals("Created PPL Monitor should be visible but was not", 1, numberDocsFound)
+        }
 
         // cleanup
-        getUserClient.close()
+        searchUserClient.close()
     }
 
     fun `test RBAC search monitorV2 as user without correct backend roles returns no results`() {
@@ -409,10 +411,11 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         )
         assertEquals("Search monitorV2 failed", RestStatus.OK, searchMonitorResponse.restStatus())
 
-        val xcp = createParser(XContentType.JSON.xContent(), searchMonitorResponse.entity.content)
-        val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
-        val numberDocsFound = hits["total"]?.get("value")
-        assertEquals("Created PPL Monitor should be visible but was not", 0, numberDocsFound)
+        createParser(XContentType.JSON.xContent(), searchMonitorResponse.entity.content).use { xcp ->
+            val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
+            val numberDocsFound = hits["total"]?.get("value")
+            assertEquals("Created PPL Monitor should be visible but was not", 0, numberDocsFound)
+        }
 
         // cleanup
         getUserClient.close()
