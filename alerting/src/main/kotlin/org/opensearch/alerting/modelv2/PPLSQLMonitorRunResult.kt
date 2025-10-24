@@ -14,19 +14,19 @@ import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentBuilder
 import java.io.IOException
 
-data class PPLMonitorRunResult(
+data class PPLSQLMonitorRunResult(
     override val monitorName: String,
     override val error: Exception?,
-    override val triggerResults: Map<String, PPLTriggerRunResult>,
+    override val triggerResults: Map<String, PPLSQLTriggerRunResult>,
     val pplQueryResults: Map<String, Map<String, Any?>> // key: trigger id, value: query results
-) : MonitorV2RunResult<PPLTriggerRunResult> {
+) : MonitorV2RunResult<PPLSQLTriggerRunResult> {
 
     @Throws(IOException::class)
     @Suppress("UNCHECKED_CAST")
     constructor(sin: StreamInput) : this(
         sin.readString(), // monitorName
         sin.readException(), // error
-        sin.readMap() as Map<String, PPLTriggerRunResult>, // triggerResults
+        sin.readMap() as Map<String, PPLSQLTriggerRunResult>, // triggerResults
         sin.readMap() as Map<String, Map<String, Any?>> // pplQueryResults
     )
 

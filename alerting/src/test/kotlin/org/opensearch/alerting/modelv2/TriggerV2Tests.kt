@@ -7,13 +7,13 @@ package org.opensearch.alerting.modelv2
 
 import org.opensearch.alerting.assertPplTriggersEqual
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.ALERTING_V2_MAX_NAME_LENGTH
-import org.opensearch.alerting.modelv2.PPLTrigger.Companion.CONDITION_TYPE_FIELD
-import org.opensearch.alerting.modelv2.PPLTrigger.Companion.CUSTOM_CONDITION_FIELD
-import org.opensearch.alerting.modelv2.PPLTrigger.Companion.MODE_FIELD
-import org.opensearch.alerting.modelv2.PPLTrigger.Companion.NUM_RESULTS_CONDITION_FIELD
-import org.opensearch.alerting.modelv2.PPLTrigger.Companion.NUM_RESULTS_VALUE_FIELD
-import org.opensearch.alerting.modelv2.PPLTrigger.ConditionType
-import org.opensearch.alerting.modelv2.PPLTrigger.NumResultsCondition
+import org.opensearch.alerting.modelv2.PPLSQLTrigger.Companion.CONDITION_TYPE_FIELD
+import org.opensearch.alerting.modelv2.PPLSQLTrigger.Companion.CUSTOM_CONDITION_FIELD
+import org.opensearch.alerting.modelv2.PPLSQLTrigger.Companion.MODE_FIELD
+import org.opensearch.alerting.modelv2.PPLSQLTrigger.Companion.NUM_RESULTS_CONDITION_FIELD
+import org.opensearch.alerting.modelv2.PPLSQLTrigger.Companion.NUM_RESULTS_VALUE_FIELD
+import org.opensearch.alerting.modelv2.PPLSQLTrigger.ConditionType
+import org.opensearch.alerting.modelv2.PPLSQLTrigger.NumResultsCondition
 import org.opensearch.alerting.modelv2.TriggerV2.Companion.ACTIONS_FIELD
 import org.opensearch.alerting.modelv2.TriggerV2.Companion.EXPIRE_FIELD
 import org.opensearch.alerting.modelv2.TriggerV2.Companion.ID_FIELD
@@ -174,7 +174,7 @@ class TriggerV2Tests : OpenSearchTestCase() {
         val out = BytesStreamOutput()
         pplTrigger.writeTo(out)
         val sin = StreamInput.wrap(out.bytes().toBytesRef().bytes)
-        val newPplTrigger = PPLTrigger(sin)
+        val newPplTrigger = PPLSQLTrigger(sin)
         assertPplTriggersEqual(pplTrigger, newPplTrigger)
     }
 
