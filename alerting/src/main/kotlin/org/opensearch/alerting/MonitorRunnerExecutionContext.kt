@@ -7,6 +7,7 @@ package org.opensearch.alerting
 
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.alertsv2.AlertV2Indices
 import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.model.destination.DestinationContextFactory
 import org.opensearch.alerting.remote.monitors.RemoteMonitorRegistry
@@ -35,6 +36,7 @@ data class MonitorRunnerExecutionContext(
     var settings: Settings? = null,
     var threadPool: ThreadPool? = null,
     var alertIndices: AlertIndices? = null,
+    var alertV2Indices: AlertV2Indices? = null,
     var inputService: InputService? = null,
     var triggerService: TriggerService? = null,
     var alertService: AlertService? = null,

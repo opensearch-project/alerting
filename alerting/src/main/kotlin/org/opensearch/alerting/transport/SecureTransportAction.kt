@@ -45,7 +45,7 @@ interface SecureTransportAction {
 
     fun readUserFromThreadContext(client: Client): User? {
         val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
-        log.debug("User and roles string from thread context: $userStr")
+        log.info("User and roles string from thread context: $userStr")
         return User.parse(userStr)
     }
 
