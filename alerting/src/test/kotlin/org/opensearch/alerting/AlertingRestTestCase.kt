@@ -2207,7 +2207,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val someTimeAgo = ZonedDateTime.now().minus(timeValue, timeUnit).truncatedTo(MILLIS)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(someTimeAgo) // the timestamp string is given a random timezone offset
         val testDoc = """{ "timestamp" : "$testTime", "abc": "$abc", "number" : "$number" }"""
-        logger.info("test time: $testTime")
         indexDoc(TEST_INDEX_NAME, UUID.randomUUID().toString(), testDoc)
     }
 
