@@ -7,6 +7,8 @@ package org.opensearch.alerting.modelv2
 
 import org.opensearch.alerting.core.util.nonOptionalTimeField
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.ALERTING_V2_MAX_NAME_LENGTH
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.DESCRIPTION_FIELD
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.DESCRIPTION_MAX_LENGTH
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.ENABLED_FIELD
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.ENABLED_TIME_FIELD
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.LAST_UPDATE_TIME_FIELD
@@ -64,6 +66,7 @@ data class PPLSQLMonitor(
     override val timestampField: String?,
     override val lastUpdateTime: Instant,
     override val enabledTime: Instant?,
+    override val description: String?,
     override val user: User?,
     override val triggers: List<PPLSQLTrigger>,
     override val schemaVersion: Int = IndexUtils.NO_SCHEMA_VERSION,
@@ -78,7 +81,7 @@ data class PPLSQLMonitor(
 
     init {
         // SQL monitors are not yet supported
-        if (queryLanguage == QueryLanguage.SQL) {
+        if (this.queryLanguage == QueryLanguage.SQL) {
             throw IllegalArgumentException("SQL queries are not supported. Please use a PPL query.")
         }
 
@@ -86,13 +89,13 @@ data class PPLSQLMonitor(
             "Monitor name too long, length must be less than $ALERTING_V2_MAX_NAME_LENGTH"
         }
 
-        if (lookBackWindow != null) {
-            requireNotNull(timestampField) { "If look back window is specified, timestamp field must not be null" }
+        if (this.lookBackWindow != null) {
+            requireNotNull(this.timestampField) { "If look back window is specified, timestamp field must not be null" }
         } else {
-            require(timestampField == null) { "If look back window is not specified, timestamp field must not be specified" }
+            require(this.timestampField == null) { "If look back window is not specified, timestamp field must not be specified" }
         }
 
-        require(triggers.isNotEmpty()) { "Monitor must include at least 1 trigger" }
+        require(this.triggers.isNotEmpty()) { "Monitor must include at least 1 trigger" }
         require(this.triggers.size <= MONITOR_V2_MAX_TRIGGERS) { "Monitors can only have $MONITOR_V2_MAX_TRIGGERS triggers" }
 
         lookBackWindow?.let {
@@ -101,10 +104,12 @@ data class PPLSQLMonitor(
             }
         }
 
+        require(this.description?.length!! <= DESCRIPTION_MAX_LENGTH) { "Description must be under $DESCRIPTION_MAX_LENGTH characters" }
+
         // for checking trigger ID uniqueness
         val triggerIds = mutableSetOf<String>()
         this.triggers.forEach { trigger ->
-            require(triggerIds.add(trigger.id)) { "Duplicate trigger id: ${trigger.id}. Trigger ids must be unique." }
+            require(triggerIds.add(trigger.id)) { "Duplicate trigger id: ${trigger.id}. Trigger ids must be unique" }
         }
 
         if (this.enabled) {
@@ -125,6 +130,7 @@ data class PPLSQLMonitor(
         timestampField = sin.readOptionalString(),
         lastUpdateTime = sin.readInstant(),
         enabledTime = sin.readOptionalInstant(),
+        description = sin.readOptionalString(),
         user = if (sin.readBoolean()) {
             User(sin)
         } else {
@@ -165,6 +171,7 @@ data class PPLSQLMonitor(
         builder.field(ENABLED_FIELD, enabled)
         builder.nonOptionalTimeField(LAST_UPDATE_TIME_FIELD, lastUpdateTime)
         builder.optionalTimeField(ENABLED_TIME_FIELD, enabledTime)
+        builder.field(DESCRIPTION_FIELD, description)
         builder.field(TRIGGERS_FIELD, triggers.toTypedArray())
         builder.field(SCHEMA_VERSION_FIELD, schemaVersion)
         builder.field(QUERY_LANGUAGE_FIELD, queryLanguage.value)
@@ -204,6 +211,7 @@ data class PPLSQLMonitor(
         out.writeOptionalString(timestampField)
         out.writeInstant(lastUpdateTime)
         out.writeOptionalInstant(enabledTime)
+        out.writeOptionalString(description)
 
         out.writeBoolean(user != null)
         user?.writeTo(out)
@@ -237,6 +245,7 @@ data class PPLSQLMonitor(
         schedule: Schedule,
         lastUpdateTime: Instant,
         enabledTime: Instant?,
+        description: String?,
         user: User?,
         schemaVersion: Int,
         lookBackWindow: Long?,
@@ -250,6 +259,7 @@ data class PPLSQLMonitor(
             schedule = schedule,
             lastUpdateTime = lastUpdateTime,
             enabledTime = enabledTime,
+            description = description,
             user = user,
             schemaVersion = schemaVersion,
             lookBackWindow = lookBackWindow,
@@ -289,6 +299,7 @@ data class PPLSQLMonitor(
             var timestampField: String? = null
             var lastUpdateTime: Instant? = null
             var enabledTime: Instant? = null
+            var description: String? = null
             var user: User? = null
             val triggers: MutableList<PPLSQLTrigger> = mutableListOf()
             var schemaVersion = IndexUtils.NO_SCHEMA_VERSION
@@ -313,6 +324,7 @@ data class PPLSQLMonitor(
                     TIMESTAMP_FIELD -> timestampField = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) null else xcp.text()
                     LAST_UPDATE_TIME_FIELD -> lastUpdateTime = xcp.instant()
                     ENABLED_TIME_FIELD -> enabledTime = xcp.instant()
+                    DESCRIPTION_FIELD -> description = xcp.text()
                     USER_FIELD -> user = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) null else User.parse(xcp)
                     TRIGGERS_FIELD -> {
                         XContentParserUtils.ensureExpectedToken(
@@ -369,6 +381,7 @@ data class PPLSQLMonitor(
                 timestampField,
                 lastUpdateTime,
                 enabledTime,
+                description,
                 user,
                 triggers,
                 schemaVersion,
