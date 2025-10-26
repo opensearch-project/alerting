@@ -50,7 +50,8 @@ interface MonitorV2 : ScheduledJob {
         enabledTime: Instant? = this.enabledTime,
         description: String? = this.description,
         user: User? = this.user,
-        // no support for overriding triggers in copy
+        // no support for overriding triggers in interface-level makeCopy(),
+        // triggers can be copied at instance-level data class copy()
         schemaVersion: Int = this.schemaVersion,
         lookBackWindow: Long? = this.lookBackWindow,
         timestampField: String? = this.timestampField
@@ -106,7 +107,7 @@ interface MonitorV2 : ScheduledJob {
 
         @JvmStatic
         @Throws(IOException::class)
-        fun parse(xcp: XContentParser): MonitorV2 {
+        fun parse(xcp: XContentParser, id: String = NO_ID, version: Long = NO_VERSION): MonitorV2 {
             /* parse outer object for monitorV2 type, then delegate to correct monitorV2 parser */
 
             XContentParserUtils.ensureExpectedToken( // outer monitor object start
@@ -121,14 +122,14 @@ interface MonitorV2 : ScheduledJob {
             val monitorType = MonitorV2Type.enumFromString(monitorTypeText)
                 ?: throw IllegalStateException(
                     "when parsing MonitorV2, received invalid monitor type: $monitorTypeText. " +
-                        "Please ensure monitor object is wrapped in an outer ppl_monitor object"
+                        "Please ensure monitor object is wrapped in an outer ppl_sql_monitor object"
                 )
 
             // inner monitor object start
             XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
 
             return when (monitorType) {
-                MonitorV2Type.PPL_MONITOR -> PPLSQLMonitor.parse(xcp)
+                MonitorV2Type.PPL_MONITOR -> PPLSQLMonitor.parse(xcp, id, version)
             }
         }
 

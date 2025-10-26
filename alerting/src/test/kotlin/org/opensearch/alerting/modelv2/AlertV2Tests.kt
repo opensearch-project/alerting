@@ -10,7 +10,6 @@ import org.opensearch.alerting.modelv2.AlertV2.Companion.ALERT_V2_ID_FIELD
 import org.opensearch.alerting.modelv2.AlertV2.Companion.ALERT_V2_VERSION_FIELD
 import org.opensearch.alerting.modelv2.AlertV2.Companion.ERROR_MESSAGE_FIELD
 import org.opensearch.alerting.modelv2.AlertV2.Companion.EXECUTION_ID_FIELD
-import org.opensearch.alerting.modelv2.AlertV2.Companion.EXPIRATION_TIME_FIELD
 import org.opensearch.alerting.modelv2.AlertV2.Companion.SEVERITY_FIELD
 import org.opensearch.alerting.randomAlertV2
 import org.opensearch.common.io.stream.BytesStreamOutput
@@ -50,11 +49,6 @@ class AlertV2Tests : OpenSearchTestCase() {
             "Template args field $EXECUTION_ID_FIELD doesn't match",
             alertV2.executionId,
             templateArgs[EXECUTION_ID_FIELD]
-        )
-        assertEquals(
-            "Template args field $EXPIRATION_TIME_FIELD doesn't match",
-            alertV2.expirationTime.toEpochMilli(),
-            templateArgs[EXPIRATION_TIME_FIELD]
         )
         assertEquals(
             "Template args field $SEVERITY_FIELD doesn't match",

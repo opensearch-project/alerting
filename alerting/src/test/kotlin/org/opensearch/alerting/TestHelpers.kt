@@ -312,11 +312,11 @@ fun randomPPLMonitor(
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     enabled: Boolean = randomBoolean(),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
-    lookBackWindow: Long? = randomLongBetween(1, 100),
+    lookBackWindow: Long? = randomLongBetween(10, 100),
     timestampField: String? = lookBackWindow?.let { TIMESTAMP_FIELD },
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
-    description: String? = "some description",
+    description: String? = if (randomBoolean()) "some description" else null,
     triggers: List<PPLSQLTrigger> = List(randomIntBetween(1, 5)) { randomPPLTrigger() },
     user: User? = randomUser(),
     queryLanguage: QueryLanguage = QueryLanguage.PPL,
@@ -555,24 +555,6 @@ fun randomAlert(monitor: Monitor = randomQueryLevelMonitor()): Alert {
     )
 }
 
-/*
-val id: String = NO_ID,
-val version: Long = NO_VERSION,
-val schemaVersion: Int = NO_SCHEMA_VERSION,
-val monitorId: String,
-val monitorName: String,
-val monitorVersion: Long,
-val monitorUser: User?,
-val triggerId: String,
-val triggerName: String,
-val query: String,
-val queryResults: Map<String, Any>,
-val triggeredTime: Instant,
-val expirationTime: Instant,
-val errorMessage: String? = null,
-val severity: Severity,
-val executionId: String? = null
- */
 fun randomAlertV2(
     id: String = UUIDs.base64UUID(),
     version: Long = randomLongBetween(1, 10),
@@ -586,7 +568,6 @@ fun randomAlertV2(
     query: String = "source = $TEST_INDEX_NAME | head 10",
     queryResults: Map<String, Any> = mapOf(),
     triggeredTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
-    expirationTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     errorMessage: String? = "sample error message",
     severity: Severity = Severity.entries.random(),
     executionId: String? = UUIDs.base64UUID()
@@ -604,7 +585,6 @@ fun randomAlertV2(
         query = query,
         queryResults = queryResults,
         triggeredTime = triggeredTime,
-        expirationTime = expirationTime,
         errorMessage = errorMessage,
         severity = severity,
         executionId = executionId,
@@ -1090,11 +1070,6 @@ fun assertAlertV2sEqual(alert1: AlertV2, alert2: AlertV2) {
         "AlertV2 triggered times are not equal",
         alert1.triggeredTime,
         alert2.triggeredTime
-    )
-    assertEquals(
-        "AlertV2 expiration times are not equal",
-        alert1.expirationTime,
-        alert2.expirationTime
     )
     assertEquals(
         "AlertV2 error messages are not equal",

@@ -35,7 +35,6 @@ import java.time.Instant
  * @property triggerName Name of the trigger in the Monitor that generated this alert.
  * @property queryResults Results from the Monitor's query that caused the Trigger to fire.
  * @property triggeredTime Timestamp for when the Alert was generated.
- * @property expirationTime Timestamp for when the Alert should be expired.
  * @property errorMessage Optional error message if there were issues during Trigger execution.
  *                       Null indicates no errors occurred.
  * @property severity Severity level of the alert (e.g., "HIGH", "MEDIUM", "LOW").
@@ -47,7 +46,7 @@ import java.time.Instant
  * Lifecycle:
  * 1. AlertV2 is generated when a TriggerV2's condition is met. The TriggerV2 fires and forgets the AlertV2.
  * 2. AlertV2 is stored in the alerts index. AlertV2s are stateless. (e.g. they are never ACTIVE or COMPLETED)
- * 3. AlertV2 is soft deleted at [expirationTime], and archived in an alert history index
+ * 3. AlertV2 is soft deleted after its expire duration (determined by its trigger), and archived in an alert history index
  * 4. Based on the alert v2 history retention period, the AlertV2 is permanently deleted
  */
 data class AlertV2(
@@ -63,7 +62,6 @@ data class AlertV2(
     val query: String,
     val queryResults: Map<String, Any>,
     val triggeredTime: Instant,
-    val expirationTime: Instant,
     val errorMessage: String? = null,
     val severity: Severity,
     val executionId: String? = null
@@ -86,7 +84,6 @@ data class AlertV2(
         query = sin.readString(),
         queryResults = sin.readMap(),
         triggeredTime = sin.readInstant(),
-        expirationTime = sin.readInstant(),
         errorMessage = sin.readOptionalString(),
         severity = sin.readEnum(Severity::class.java),
         executionId = sin.readOptionalString()
@@ -107,7 +104,6 @@ data class AlertV2(
         out.writeString(query)
         out.writeMap(queryResults)
         out.writeInstant(triggeredTime)
-        out.writeInstant(expirationTime)
         out.writeOptionalString(errorMessage)
         out.writeEnum(severity)
         out.writeOptionalString(executionId)
@@ -137,7 +133,6 @@ data class AlertV2(
             .field(ERROR_MESSAGE_FIELD, errorMessage)
             .field(SEVERITY_FIELD, severity.value)
             .nonOptionalTimeField(TRIGGERED_TIME_FIELD, triggeredTime)
-            .nonOptionalTimeField(EXPIRATION_TIME_FIELD, expirationTime)
 
         if (withUser) {
             builder.optionalUserField(MONITOR_V2_USER_FIELD, monitorUser)
@@ -154,7 +149,6 @@ data class AlertV2(
             ALERT_V2_VERSION_FIELD to version,
             ERROR_MESSAGE_FIELD to errorMessage,
             EXECUTION_ID_FIELD to executionId,
-            EXPIRATION_TIME_FIELD to expirationTime.toEpochMilli(),
             SEVERITY_FIELD to severity.value
         )
     }
@@ -169,7 +163,6 @@ data class AlertV2(
         const val TRIGGER_V2_ID_FIELD = "trigger_v2_id"
         const val TRIGGER_V2_NAME_FIELD = "trigger_v2_name"
         const val TRIGGERED_TIME_FIELD = "triggered_time"
-        const val EXPIRATION_TIME_FIELD = "expiration_time"
         const val QUERY_FIELD = "query"
         const val QUERY_RESULTS_FIELD = "query_results"
         const val ERROR_MESSAGE_FIELD = "error_message"
@@ -196,7 +189,6 @@ data class AlertV2(
             var queryResults: Map<String, Any> = mapOf()
             lateinit var severity: Severity
             var triggeredTime: Instant? = null
-            var expirationTime: Instant? = null
             var errorMessage: String? = null
             var executionId: String? = null
 
@@ -221,7 +213,6 @@ data class AlertV2(
                     QUERY_FIELD -> query = xcp.text()
                     QUERY_RESULTS_FIELD -> queryResults = xcp.map()
                     TRIGGERED_TIME_FIELD -> triggeredTime = xcp.instant()
-                    EXPIRATION_TIME_FIELD -> expirationTime = xcp.instant()
                     ERROR_MESSAGE_FIELD -> errorMessage = xcp.textOrNull()
                     EXECUTION_ID_FIELD -> executionId = xcp.textOrNull()
                     TriggerV2.SEVERITY_FIELD -> {
@@ -249,7 +240,6 @@ data class AlertV2(
                 query = requireNotNull(query),
                 queryResults = requireNotNull(queryResults),
                 triggeredTime = requireNotNull(triggeredTime),
-                expirationTime = requireNotNull(expirationTime),
                 errorMessage = errorMessage,
                 severity = severity,
                 executionId = executionId

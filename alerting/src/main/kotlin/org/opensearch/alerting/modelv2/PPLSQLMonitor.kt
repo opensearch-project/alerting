@@ -105,7 +105,9 @@ data class PPLSQLMonitor(
             }
         }
 
-        require(this.description?.length!! <= DESCRIPTION_MAX_LENGTH) { "Description must be under $DESCRIPTION_MAX_LENGTH characters" }
+        this.description?.let {
+            require(this.description.length <= DESCRIPTION_MAX_LENGTH) { "Description must be under $DESCRIPTION_MAX_LENGTH characters" }
+        }
 
         // for checking trigger ID uniqueness
         val triggerIds = mutableSetOf<String>()
@@ -322,11 +324,23 @@ data class PPLSQLMonitor(
                             lookBackWindow = xcp.longValue()
                         }
                     }
-                    TIMESTAMP_FIELD -> timestampField = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) null else xcp.text()
+                    TIMESTAMP_FIELD -> {
+                        if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
+                            timestampField = xcp.text()
+                        }
+                    }
                     LAST_UPDATE_TIME_FIELD -> lastUpdateTime = xcp.instant()
                     ENABLED_TIME_FIELD -> enabledTime = xcp.instant()
-                    DESCRIPTION_FIELD -> description = xcp.text()
-                    USER_FIELD -> user = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) null else User.parse(xcp)
+                    DESCRIPTION_FIELD -> {
+                        if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
+                            description = xcp.text()
+                        }
+                    }
+                    USER_FIELD -> {
+                        if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
+                            user = User.parse(xcp)
+                        }
+                    }
                     TRIGGERS_FIELD -> {
                         XContentParserUtils.ensureExpectedToken(
                             XContentParser.Token.START_ARRAY,
@@ -350,7 +364,7 @@ data class PPLSQLMonitor(
                         queryLanguage = enumMatchResult
                     }
                     QUERY_FIELD -> query = xcp.text()
-                    else -> throw IllegalArgumentException("Unexpected field when parsing PPL Monitor: $fieldName")
+                    else -> throw IllegalArgumentException("Unexpected field when parsing PPL/SQL Monitor: $fieldName")
                 }
             }
 
