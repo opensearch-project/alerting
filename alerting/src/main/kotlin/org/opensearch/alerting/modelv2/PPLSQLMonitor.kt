@@ -96,7 +96,7 @@ data class PPLSQLMonitor(
             require(this.timestampField == null) { "If look back window is not specified, timestamp field must not be specified." }
         }
 
-        require(this.triggers.isNotEmpty()) { "Monitor must include at least 1 trigger" }
+        require(this.triggers.isNotEmpty()) { "Monitor must include at least 1 trigger." }
         require(this.triggers.size <= MONITOR_V2_MAX_TRIGGERS) { "Monitors can only have $MONITOR_V2_MAX_TRIGGERS triggers." }
 
         lookBackWindow?.let {
