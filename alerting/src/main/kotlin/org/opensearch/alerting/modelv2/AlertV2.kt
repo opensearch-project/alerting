@@ -192,7 +192,7 @@ data class AlertV2(
             var errorMessage: String? = null
             var executionId: String? = null
 
-            ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.currentToken(), xcp)
+            ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
             while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
                 val fieldName = xcp.currentName()
                 xcp.nextToken()
