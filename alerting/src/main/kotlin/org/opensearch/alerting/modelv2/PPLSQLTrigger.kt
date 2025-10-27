@@ -144,6 +144,10 @@ data class PPLSQLTrigger(
                 }
             }
         }
+
+        if (conditionType == ConditionType.NUMBER_OF_RESULTS) {
+            require(this.numResultsValue!! >= 0L) { "Number of results to check for cannot be negative" }
+        }
     }
 
     @Throws(IOException::class)
