@@ -127,7 +127,7 @@ configurations {
 // This flag indicates the existence of security plugin
 def securityEnabled = System.getProperty("security", "false") == "true" || System.getProperty("https", "false") == "true"
 
-// Always be minimumCompatibilityVersion of current opensearch version(3.3.1)
+// Always be minimumCompatibilityVersion of current opensearch version(3.3.2)
 // get latest 3.x version from OpenSearch
 static def fetchVersionProperties() {
     def url = 'https://raw.githubusercontent.com/opensearch-project/OpenSearch/refs/heads/3.2/buildSrc/version.properties'
