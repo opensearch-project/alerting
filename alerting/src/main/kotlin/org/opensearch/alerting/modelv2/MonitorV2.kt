@@ -58,7 +58,7 @@ interface MonitorV2 : ScheduledJob {
     ): MonitorV2
 
     enum class MonitorV2Type(val value: String) {
-        PPL_MONITOR(PPL_SQL_MONITOR_TYPE);
+        PPL_SQL_MONITOR(PPL_SQL_MONITOR_TYPE);
 
         override fun toString(): String {
             return value
@@ -129,13 +129,13 @@ interface MonitorV2 : ScheduledJob {
             XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
 
             return when (monitorType) {
-                MonitorV2Type.PPL_MONITOR -> PPLSQLMonitor.parse(xcp, id, version)
+                MonitorV2Type.PPL_SQL_MONITOR -> PPLSQLMonitor.parse(xcp, id, version)
             }
         }
 
         fun readFrom(sin: StreamInput): MonitorV2 {
             return when (val monitorType = sin.readEnum(MonitorV2Type::class.java)) {
-                MonitorV2Type.PPL_MONITOR -> PPLSQLMonitor(sin)
+                MonitorV2Type.PPL_SQL_MONITOR -> PPLSQLMonitor(sin)
                 else -> throw IllegalStateException("Unexpected input \"$monitorType\" when reading MonitorV2")
             }
         }
@@ -143,7 +143,7 @@ interface MonitorV2 : ScheduledJob {
         fun writeTo(out: StreamOutput, monitorV2: MonitorV2) {
             when (monitorV2) {
                 is PPLSQLMonitor -> {
-                    out.writeEnum(MonitorV2Type.PPL_MONITOR)
+                    out.writeEnum(MonitorV2Type.PPL_SQL_MONITOR)
                     monitorV2.writeTo(out)
                 }
             }

@@ -16,7 +16,7 @@ interface MonitorV2RunResult<out TriggerV2Result : TriggerV2RunResult> : Writeab
     val triggerResults: Map<String, TriggerV2Result>
 
     enum class MonitorV2RunResultType() {
-        PPL_MONITOR_RUN_RESULT;
+        PPL_SQL_MONITOR_RUN_RESULT;
     }
 
     companion object {
@@ -26,7 +26,7 @@ interface MonitorV2RunResult<out TriggerV2Result : TriggerV2RunResult> : Writeab
         fun readFrom(sin: StreamInput): MonitorV2RunResult<TriggerV2RunResult> {
             val monitorRunResultType = sin.readEnum(MonitorV2RunResultType::class.java)
             return when (monitorRunResultType) {
-                MonitorV2RunResultType.PPL_MONITOR_RUN_RESULT -> PPLSQLMonitorRunResult(sin)
+                MonitorV2RunResultType.PPL_SQL_MONITOR_RUN_RESULT -> PPLSQLMonitorRunResult(sin)
                 else -> throw IllegalStateException("Unexpected input [$monitorRunResultType] when reading MonitorV2RunResult")
             }
         }
@@ -34,7 +34,7 @@ interface MonitorV2RunResult<out TriggerV2Result : TriggerV2RunResult> : Writeab
         fun writeTo(out: StreamOutput, monitorV2RunResult: MonitorV2RunResult<TriggerV2RunResult>) {
             when (monitorV2RunResult) {
                 is PPLSQLMonitorRunResult -> {
-                    out.writeEnum(MonitorV2RunResultType.PPL_MONITOR_RUN_RESULT)
+                    out.writeEnum(MonitorV2RunResultType.PPL_SQL_MONITOR_RUN_RESULT)
                     monitorV2RunResult.writeTo(out)
                 }
             }
