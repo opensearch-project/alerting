@@ -361,7 +361,7 @@ class AlertingSettings {
 
         // max data rows to retrieve when executing PPL query against
         // SQL/PPL plugin during monitor execution
-        val ALERT_V2_QUERY_RESULTS_MAX_DATAROWS = Setting.longSetting(
+        val ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS = Setting.longSetting(
             "plugins.alerting_v2.query_results_max_datarows",
             1000L,
             1L,

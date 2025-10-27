@@ -50,6 +50,7 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_M
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_MONITORS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_QUERY_LENGTH
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_THROTTLE_DURATION
+import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH
 import org.opensearch.alerting.settings.AlertingSettings.Companion.NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH
@@ -105,6 +106,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
     @Volatile private var maxExpireDuration = ALERTING_V2_MAX_EXPIRE_DURATION.get(settings)
     @Volatile private var maxLookBackWindow = ALERTING_V2_MAX_LOOK_BACK_WINDOW.get(settings)
     @Volatile private var maxQueryLength = ALERTING_V2_MAX_QUERY_LENGTH.get(settings)
+    @Volatile private var maxQueryResults = ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS.get(settings)
     @Volatile private var notificationSubjectMaxLength = NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH.get(settings)
     @Volatile private var notificationMessageMaxLength = NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH.get(settings)
     @Volatile private var requestTimeout = REQUEST_TIMEOUT.get(settings)
@@ -117,6 +119,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_EXPIRE_DURATION) { maxExpireDuration = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_LOOK_BACK_WINDOW) { maxLookBackWindow = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_QUERY_LENGTH) { maxQueryLength = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS) { maxQueryResults = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH) {
             notificationSubjectMaxLength = it
         }
@@ -297,6 +300,22 @@ class TransportIndexMonitorV2Action @Inject constructor(
                     AlertingException.wrap(
                         IllegalArgumentException(
                             "Expire duration must be at most $maxExpireDuration but was ${trigger.expireDuration}"
+                        )
+                    )
+                )
+                return false
+            }
+
+            if (trigger.conditionType == ConditionType.NUMBER_OF_RESULTS &&
+                trigger.numResultsValue!! > maxQueryResults
+            ) {
+                validationListener.onFailure(
+                    AlertingException.wrap(
+                        IllegalArgumentException(
+                            "Trigger ${trigger.id} checks for number of results threshold of ${trigger.numResultsValue}, " +
+                                "but Alerting V2 is configured only to retrieve $maxQueryResults query results maximum. " +
+                                "Please lower the number of results value to one below this maximum value, or adjust the cluster " +
+                                "setting: $ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS.key}"
                         )
                     )
                 )
