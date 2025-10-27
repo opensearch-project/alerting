@@ -163,7 +163,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         )
     }
 
-    private fun createIndex(
+    override fun createIndex(
         index: String?,
         settings: Settings?,
         mappings: XContentBuilder?,
