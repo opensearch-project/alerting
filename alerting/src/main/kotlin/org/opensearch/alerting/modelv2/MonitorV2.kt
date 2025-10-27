@@ -122,7 +122,7 @@ interface MonitorV2 : ScheduledJob {
             val monitorType = MonitorV2Type.enumFromString(monitorTypeText)
                 ?: throw IllegalStateException(
                     "when parsing MonitorV2, received invalid monitor type: $monitorTypeText. " +
-                        "Please ensure monitor object is wrapped in an outer ppl_sql_monitor object"
+                        "Please ensure monitor object is wrapped in an outer $PPL_SQL_MONITOR_TYPE object"
                 )
 
             // inner monitor object start

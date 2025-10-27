@@ -281,7 +281,7 @@ data class PPLSQLMonitor(
 
     companion object {
         // monitor type name
-        const val PPL_SQL_MONITOR_TYPE = "ppl_sql_monitor"
+        const val PPL_SQL_MONITOR_TYPE = "ppl_monitor"
 
         // query languages
         const val PPL_QUERY_LANGUAGE = "ppl"
