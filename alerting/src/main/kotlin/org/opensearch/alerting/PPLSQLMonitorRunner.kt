@@ -21,7 +21,6 @@ import org.opensearch.alerting.AlertingV2Utils.capPplQueryResultsSize
 import org.opensearch.alerting.AlertingV2Utils.executePplQuery
 import org.opensearch.alerting.AlertingV2Utils.findEvalResultVar
 import org.opensearch.alerting.AlertingV2Utils.findEvalResultVarIdxInSchema
-import org.opensearch.alerting.QueryLevelMonitorRunner.getConfigAndSendNotification
 import org.opensearch.alerting.alertsv2.AlertV2Indices
 import org.opensearch.alerting.modelv2.AlertV2
 import org.opensearch.alerting.modelv2.MonitorV2
@@ -147,8 +146,14 @@ object PPLSQLMonitorRunner : MonitorV2Runner() {
                 }
 
                 // limit the number of PPL query result data rows returned
-                val dataRowsLimit = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERT_V2_QUERY_RESULTS_MAX_DATAROWS)
+                val dataRowsLimit = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS)
                 val limitedQueryToExecute = appendDataRowsLimit(queryToExecute, dataRowsLimit)
+
+                // TODO: after getting ppl query results, see if the number of results
+                // retrieved equals the max allowed number of query results. this implies
+                // query results might have been excluded, in which case a warning message
+                // in the alert and notification must be added that results were excluded
+                // and an alert that should have been generated might not have been
 
                 // execute the PPL query
                 val queryResponseJson = withClosableContext(
