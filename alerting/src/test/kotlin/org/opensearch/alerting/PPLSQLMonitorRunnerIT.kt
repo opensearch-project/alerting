@@ -306,13 +306,15 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(1, MINUTES, "abc", 5)
 
+        // the monitor should generate 1 alert, then not generate
+        // any alerts for the rest of the test
         createRandomPPLMonitor(
             randomPPLMonitor(
                 enabled = true,
                 schedule = IntervalSchedule(interval = 1, unit = MINUTES),
                 triggers = listOf(
                     randomPPLTrigger(
-                        throttleDuration = null,
+                        throttleDuration = 100L,
                         expireDuration = 1L,
                         mode = TriggerMode.RESULT_SET,
                         conditionType = ConditionType.NUMBER_OF_RESULTS,
@@ -340,7 +342,10 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             return@waitUntil false
         }, 2, TimeUnit.MINUTES)
 
+//        client().updateSettings(AlertingSettings.COMMENTS_HISTORY_ROLLOVER_PERIOD.key, "17h")
+
         val getAlertsResponsePostExpire = getAlertV2s()
+        logger.info("num alerts: ${numAlerts(getAlertsResponsePostExpire)}")
         val alertsGeneratedPostExpire = numAlerts(getAlertsResponsePostExpire) > 0
         assert(!alertsGeneratedPostExpire)
     }
