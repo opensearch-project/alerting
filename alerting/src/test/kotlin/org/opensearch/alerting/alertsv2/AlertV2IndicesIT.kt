@@ -267,7 +267,8 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         assert(triggered) { "Monitor should have triggered but it didn't" }
         assert(alertsGeneratedPreExpire) { "Alerts should have been generated but they weren't" }
 
-        // update the monitor to any new config
+        // update the monitor to any new config,
+        // and more importantly, updated triggers
         updateMonitorV2(randomPPLMonitor().makeCopy(pplMonitor.id, pplMonitor.version))
 
         // sleep so postIndex can expire the generated alert
