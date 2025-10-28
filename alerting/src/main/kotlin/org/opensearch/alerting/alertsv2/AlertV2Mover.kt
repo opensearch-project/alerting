@@ -78,11 +78,15 @@ class AlertV2Mover(
     private val checkForExpirationInterval = TimeValue(1L, TimeUnit.MINUTES)
 
     override fun clusterChanged(event: ClusterChangedEvent) {
+        logger.info("in cluster changed")
         if (this.isClusterManager != event.localNodeClusterManager()) {
+            logger.info("isClusterManager not equal to even local node cluster manager")
             this.isClusterManager = event.localNodeClusterManager()
             if (this.isClusterManager) {
+                logger.info("on manager")
                 onManager()
             } else {
+                logger.info("off manager")
                 offManager()
             }
         }
