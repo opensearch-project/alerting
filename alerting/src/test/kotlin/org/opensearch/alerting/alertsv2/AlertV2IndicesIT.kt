@@ -48,7 +48,7 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
 
         putAlertV2Mappings(
             AlertV2Indices.alertV2Mapping().trimStart('{').trimEnd('}')
-                .replace("\"schema_version\": 5", "\"schema_version\": 0")
+                .replace("\"schema_version\": 1", "\"schema_version\": 0")
         )
         assertIndexExists(AlertV2Indices.ALERT_V2_INDEX)
         assertIndexExists(AlertV2Indices.ALERT_V2_HISTORY_WRITE_INDEX)
@@ -60,9 +60,9 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         generateAlertV2s()
         assertIndexExists(AlertV2Indices.ALERT_V2_INDEX)
         assertIndexExists(AlertV2Indices.ALERT_V2_HISTORY_WRITE_INDEX)
-        verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 8)
-        verifyIndexSchemaVersion(AlertV2Indices.ALERT_V2_INDEX, 5)
-        verifyIndexSchemaVersion(AlertV2Indices.ALERT_V2_HISTORY_WRITE_INDEX, 5)
+        verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 9)
+        verifyIndexSchemaVersion(AlertV2Indices.ALERT_V2_INDEX, 1)
+        verifyIndexSchemaVersion(AlertV2Indices.ALERT_V2_HISTORY_WRITE_INDEX, 1)
     }
 
     fun `test alert v2 index gets recreated automatically if deleted`() {

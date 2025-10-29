@@ -132,7 +132,7 @@ class AlertV2Mover(
                 deleteResponse = deleteExpiredAlerts(expiredAlerts)
             } else {
                 copyResponse = copyExpiredAlerts(expiredAlerts)
-                deleteResponse = deleteExpiredAlertsThatWereCopied(copyResponse)
+                deleteResponse = deleteExpiredAlertsThatWereCopied(copyResponse, expiredAlerts)
             }
             checkForFailures(copyResponse)
             checkForFailures(deleteResponse)
@@ -218,6 +218,7 @@ class AlertV2Mover(
 
         val deleteRequests = expiredAlerts.map {
             DeleteRequest(ALERT_V2_INDEX, it.id)
+                .routing(it.monitorId)
                 .version(it.version)
                 .versionType(VersionType.EXTERNAL_GTE)
         }
@@ -236,6 +237,7 @@ class AlertV2Mover(
 
         val indexRequests = expiredAlerts.map {
             IndexRequest(ALERT_V2_HISTORY_WRITE_INDEX)
+                .routing(it.monitorId)
                 .source(it.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
                 .version(it.version)
                 .versionType(VersionType.EXTERNAL_GTE)
@@ -248,14 +250,19 @@ class AlertV2Mover(
         return copyResponse
     }
 
-    private suspend fun deleteExpiredAlertsThatWereCopied(copyResponse: BulkResponse?): BulkResponse? {
+    private suspend fun deleteExpiredAlertsThatWereCopied(copyResponse: BulkResponse?, expiredAlerts: List<AlertV2>): BulkResponse? {
         // if there were no expired alerts to copy, skip deleting anything
         if (copyResponse == null) {
             return null
         }
 
+        // pre-index the alerts so retrieving their
+        // monitor IDs for routing is easier
+        val alertsById: Map<String, AlertV2> = expiredAlerts.associateBy { it.id }
+
         val deleteRequests = copyResponse.items.filterNot { it.isFailed }.map {
             DeleteRequest(ALERT_V2_INDEX, it.id)
+                .routing(alertsById[it.id]!!.monitorId)
                 .version(it.version)
                 .versionType(VersionType.EXTERNAL_GTE)
         }
@@ -340,6 +347,24 @@ class AlertV2Mover(
             // If no alerts are found, simply return
             if (searchAlertsResponse.hits.totalHits?.value == 0L) return
 
+            val activeAlerts = mutableListOf<AlertV2>()
+            searchAlertsResponse.hits.forEach { hit ->
+                activeAlerts.add(
+                    AlertV2.parse(
+                        XContentHelper.createParser(
+                            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+                            hit.sourceRef, XContentType.JSON
+                        ),
+                        hit.id,
+                        hit.version
+                    )
+                )
+            }
+
+            // pre-index the alerts so retrieving their
+            // monitor IDs for routing is easier
+            val alertsById: Map<String, AlertV2> = activeAlerts.associateBy { it.id }
+
             val alertV2HistoryEnabled = monitorCtx.clusterService!!.clusterSettings.get(ALERT_V2_HISTORY_ENABLED)
 
             // if alert v2 history is enabled, migrate the relevant alerts
@@ -384,6 +409,7 @@ class AlertV2Mover(
                 // that were successfully copied over
                 copyResponse!!.items.filterNot { it.isFailed }.map {
                     DeleteRequest(ALERT_V2_INDEX, it.id)
+                        .routing(alertsById[it.id]!!.monitorId)
                         .version(it.version)
                         .versionType(VersionType.EXTERNAL_GTE)
                 }
@@ -392,6 +418,7 @@ class AlertV2Mover(
                 // set of alerts
                 searchAlertsResponse.hits.map { hit ->
                     DeleteRequest(ALERT_V2_INDEX, hit.id)
+                        .routing(alertsById[hit.id]!!.monitorId)
                         .version(hit.version)
                         .versionType(VersionType.EXTERNAL_GTE)
                 }
