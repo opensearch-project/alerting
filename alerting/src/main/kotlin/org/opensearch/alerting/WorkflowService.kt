@@ -11,7 +11,7 @@ import org.opensearch.action.admin.indices.exists.indices.IndicesExistsRequest
 import org.opensearch.action.admin.indices.exists.indices.IndicesExistsResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.alerting.AlertingV2Utils.validateMonitorV1
+import org.opensearch.alerting.AlertingV1Utils.validateMonitorV1
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType

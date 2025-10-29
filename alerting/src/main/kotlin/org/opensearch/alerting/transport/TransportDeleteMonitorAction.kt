@@ -16,7 +16,7 @@ import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
-import org.opensearch.alerting.AlertingV2Utils.validateMonitorV1
+import org.opensearch.alerting.AlertingV1Utils.validateMonitorV1
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings

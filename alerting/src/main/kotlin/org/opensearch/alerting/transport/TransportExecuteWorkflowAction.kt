@@ -14,7 +14,7 @@ import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.alerting.AlertingV2Utils.validateMonitorV1
+import org.opensearch.alerting.AlertingV1Utils.validateMonitorV1
 import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest

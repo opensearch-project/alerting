@@ -169,7 +169,7 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         assertEquals(1, getAlertV2HistoryDocCount())
 
         // update rollover check and max docs as well as decreasing the retention period
-        client().updateSettings(AlertingSettings.ALERT_V2_HISTORY_ROLLOVER_PERIOD.key, "1s")
+        client().updateSettings(AlertingSettings.ALERT_V2_HISTORY_ROLLOVER_PERIOD.key, "3s")
         client().updateSettings(AlertingSettings.ALERT_V2_HISTORY_MAX_DOCS.key, 1)
         client().updateSettings(AlertingSettings.ALERT_V2_HISTORY_RETENTION_PERIOD.key, "1s")
 

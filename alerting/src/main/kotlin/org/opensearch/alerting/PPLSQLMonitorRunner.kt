@@ -15,12 +15,12 @@ import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.support.WriteRequest
-import org.opensearch.alerting.AlertingV2Utils.appendCustomCondition
-import org.opensearch.alerting.AlertingV2Utils.appendDataRowsLimit
-import org.opensearch.alerting.AlertingV2Utils.capPplQueryResultsSize
-import org.opensearch.alerting.AlertingV2Utils.executePplQuery
-import org.opensearch.alerting.AlertingV2Utils.findEvalResultVar
-import org.opensearch.alerting.AlertingV2Utils.findEvalResultVarIdxInSchema
+import org.opensearch.alerting.PPLUtils.appendCustomCondition
+import org.opensearch.alerting.PPLUtils.appendDataRowsLimit
+import org.opensearch.alerting.PPLUtils.capPPLQueryResultsSize
+import org.opensearch.alerting.PPLUtils.executePplQuery
+import org.opensearch.alerting.PPLUtils.findEvalResultVar
+import org.opensearch.alerting.PPLUtils.findEvalResultVarIdxInSchema
 import org.opensearch.alerting.alertsv2.AlertV2Indices
 import org.opensearch.alerting.modelv2.AlertV2
 import org.opensearch.alerting.modelv2.MonitorV2
@@ -372,7 +372,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner() {
         // case: result set
         // return the results as a single set of all the results
         if (pplTrigger.mode == TriggerMode.RESULT_SET) {
-            val sizeCappedRelevantQueryResultRows = capPplQueryResultsSize(pplQueryResults, maxQueryResultsSize)
+            val sizeCappedRelevantQueryResultRows = capPPLQueryResultsSize(pplQueryResults, maxQueryResultsSize)
             return listOf(sizeCappedRelevantQueryResultRows)
         }
 
@@ -424,7 +424,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner() {
                 JSONArray(pplQueryResults.getJSONArray("datarows").getJSONArray(i).toList())
             )
         )
-        val sizeCappedIndividualRow = capPplQueryResultsSize(individualRow, maxQueryResultsSize)
+        val sizeCappedIndividualRow = capPPLQueryResultsSize(individualRow, maxQueryResultsSize)
         individualRows.add(sizeCappedIndividualRow)
     }
 

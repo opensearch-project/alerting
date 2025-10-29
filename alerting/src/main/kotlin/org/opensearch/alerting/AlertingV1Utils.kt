@@ -9,6 +9,10 @@ import org.apache.lucene.search.TotalHits
 import org.apache.lucene.search.TotalHits.Relation
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.search.ShardSearchFailure
+import org.opensearch.alerting.modelv2.MonitorV2
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.index.IndexNotFoundException
 import org.opensearch.search.SearchHits
 import org.opensearch.search.aggregations.InternalAggregations
@@ -23,6 +27,17 @@ import java.util.Collections
  * both Alerting V1 and V2
  */
 object AlertingV1Utils {
+    // Validates that the given scheduled job is a Monitor
+    // returns the exception to pass into actionListener.onFailure if not.
+    fun validateMonitorV1(scheduledJob: ScheduledJob): Exception? {
+        if (scheduledJob is MonitorV2) {
+            return IllegalStateException("The ID given corresponds to a V2 Monitor, but a V1 Monitor was expected")
+        } else if (scheduledJob !is Monitor && scheduledJob !is Workflow) {
+            return IllegalStateException("The ID given corresponds to a scheduled job of unknown type: ${scheduledJob.javaClass.name}")
+        }
+        return null
+    }
+
     // Checks if the exception is caused by an IndexNotFoundException (directly or nested).
     // Used in Get and Search monitor functionalities to determine whether a "no results"
     // response should be returned
