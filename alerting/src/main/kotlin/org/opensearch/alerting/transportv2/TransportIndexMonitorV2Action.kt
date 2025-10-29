@@ -29,12 +29,12 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.clustermanager.AcknowledgedResponse
-import org.opensearch.alerting.AlertingV2Utils.appendCustomCondition
-import org.opensearch.alerting.AlertingV2Utils.executePplQuery
-import org.opensearch.alerting.AlertingV2Utils.findEvalResultVar
-import org.opensearch.alerting.AlertingV2Utils.findEvalResultVarIdxInSchema
-import org.opensearch.alerting.AlertingV2Utils.getIndicesFromPplQuery
 import org.opensearch.alerting.AlertingV2Utils.validateMonitorV2
+import org.opensearch.alerting.PPLUtils.appendCustomCondition
+import org.opensearch.alerting.PPLUtils.executePplQuery
+import org.opensearch.alerting.PPLUtils.findEvalResultVar
+import org.opensearch.alerting.PPLUtils.findEvalResultVarIdxInSchema
+import org.opensearch.alerting.PPLUtils.getIndicesFromPplQuery
 import org.opensearch.alerting.actionv2.IndexMonitorV2Action
 import org.opensearch.alerting.actionv2.IndexMonitorV2Request
 import org.opensearch.alerting.actionv2.IndexMonitorV2Response
@@ -765,7 +765,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
         user: User?
     ) {
         val totalHits = monitorCountSearchResponse.hits.totalHits?.value
-        log.info("total hits: $totalHits")
         if (totalHits != null && totalHits >= maxMonitors) {
             log.info("This request would create more than the allowed monitors [$maxMonitors].")
             actionListener.onFailure(
