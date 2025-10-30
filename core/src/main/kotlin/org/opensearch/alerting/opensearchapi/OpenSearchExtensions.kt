@@ -14,6 +14,7 @@ import org.opensearch.OpenSearchException
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.search.ShardSearchFailure
+import org.opensearch.alerting.core.ppl.PPLPluginInterface
 import org.opensearch.client.OpenSearchClient
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.util.concurrent.ThreadContext
@@ -162,6 +163,20 @@ suspend fun <C : OpenSearchClient, T> C.suspendUntil(block: C.(ActionListener<T>
  * @param block - a block of code that is passed an [ActionListener] that should be passed to the NotificationsPluginInterface API.
  */
 suspend fun <T> NotificationsPluginInterface.suspendUntil(block: NotificationsPluginInterface.(ActionListener<T>) -> Unit): T =
+    suspendCoroutine { cont ->
+        block(object : ActionListener<T> {
+            override fun onResponse(response: T) = cont.resume(response)
+
+            override fun onFailure(e: Exception) = cont.resumeWithException(e)
+        })
+    }
+
+/**
+ * Converts [PPLPluginInterface] methods that take a callback into a kotlin suspending function.
+ *
+ * @param block - a block of code that is passed an [ActionListener] that should be passed to the PPLPluginInterface API.
+ */
+suspend fun <T> PPLPluginInterface.suspendUntil(block: PPLPluginInterface.(ActionListener<T>) -> Unit): T =
     suspendCoroutine { cont ->
         block(object : ActionListener<T> {
             override fun onResponse(response: T) = cont.resume(response)
