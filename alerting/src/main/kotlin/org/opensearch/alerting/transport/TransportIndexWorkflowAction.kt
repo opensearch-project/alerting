@@ -27,7 +27,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.clustermanager.AcknowledgedResponse
-import org.opensearch.alerting.AlertingV1Utils.validateMonitorV1
+import org.opensearch.alerting.AlertingV2Utils.validateMonitorV1
 import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.MonitorRunnerService.monitorCtx
 import org.opensearch.alerting.WorkflowMetadataService

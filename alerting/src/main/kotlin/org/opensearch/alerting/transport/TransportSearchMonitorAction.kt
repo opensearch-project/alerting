@@ -11,8 +11,8 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.alerting.AlertingV1Utils.getEmptySearchResponse
-import org.opensearch.alerting.AlertingV1Utils.isIndexNotFoundException
+import org.opensearch.alerting.AlertingV2Utils.getEmptySearchResponse
+import org.opensearch.alerting.AlertingV2Utils.isIndexNotFoundException
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.use
