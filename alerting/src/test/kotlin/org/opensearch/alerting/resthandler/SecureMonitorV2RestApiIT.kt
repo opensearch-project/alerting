@@ -17,6 +17,7 @@ import org.opensearch.alerting.ALL_ACCESS_ROLE
 import org.opensearch.alerting.AlertingPlugin.Companion.MONITOR_V2_BASE_URI
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.PPL_FULL_ACCESS_ROLE
+import org.opensearch.alerting.ROLE_TO_PERMISSION_MAPPING
 import org.opensearch.alerting.TEST_INDEX_NAME
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.randomPPLMonitor
@@ -124,6 +125,74 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         }
 
         ensureNumMonitorV2s(0)
+    }
+
+    fun `test update monitor that queries index user doesn't have access to fails`() {
+        if (!isHttps()) {
+            return
+        }
+
+        // RBAC is out of scope for this test, so give all users and requests the same one
+        val backendRole = "backend_role_a"
+
+        val pplMonitorConfig = randomPPLMonitor()
+
+        // first create the monitor with a user that has access to all indices
+        // (the FULL_ACCESS_ROLEs include full index permissions)
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
+            listOf(backendRole),
+            false
+        )
+
+        // this function automatically creates index TEST_INDEX_NAME, then a monitor that queries it
+        val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf(backendRole))
+
+        /*
+        user: String,
+        index: String,
+        role: String,
+        backendRoles: List<String>,
+        clusterPermissions: String?,
+         */
+
+        // prepare a user that has full access to all cluster actions,
+        // but only access to a specific unrelated index
+        val noIndicesUser = "noIndicesUser"
+        createUserWithTestDataAndCustomRole(
+            noIndicesUser,
+            "unrelated_index",
+            "unrelated_role",
+            listOf(backendRole),
+            listOf(ROLE_TO_PERMISSION_MAPPING[ALL_ACCESS_ROLE])
+        )
+
+        val noIndicesUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), noIndicesUser, password)
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
+
+        // update some field that isn't the PPL query and the index it's querying
+        val newMonitor = pplMonitorConfig.makeCopy(name = "some_random_name")
+
+        try {
+            // noIndicesUser, who only has access to index unrelated_index, should be blocked
+            // from updating a monitor that queries index TEST_INDEX_NAME because noIndicesUser
+            // has no access to TEST_INDEX_NAME
+            noIndicesUserClient!!.makeRequest(
+                "PUT",
+                "$MONITOR_V2_BASE_URI/${pplMonitor.id}",
+                newMonitor.toHttpEntity(),
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+            )
+            fail("Expected update monitor to fail as user does not have permissions to index that monitor queries")
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected error status", RestStatus.BAD_REQUEST.status, e.response.statusLine.statusCode)
+        }
+
+        // cleanup
+        noIndicesUserClient.close()
     }
 
     fun `test RBAC create monitor with backend roles user has access to succeeds`() {
