@@ -93,7 +93,12 @@ class ScheduledJobsStatsTransportAction : TransportNodesAction<ScheduledJobsStat
         scheduledJobsStatusRequest: ScheduledJobsStatsRequest
     ): ScheduledJobStats {
         val jobSweeperMetrics = jobSweeper.getJobSweeperMetrics()
-        val jobSchedulerMetrics = jobScheduler.getJobSchedulerMetric()
+
+        val jobSchedulerMetrics = if (scheduledJobsStatusRequest.showAlertingV2ScheduledJobs) { // show V2 scheduled jobs
+            jobScheduler.getJobSchedulerV2Metric()
+        } else { // show V1 scheduled jobs
+            jobScheduler.getJobSchedulerMetric()
+        }
 
         val status: ScheduledJobStats.ScheduleStatus = evaluateStatus(jobSchedulerMetrics, jobSweeperMetrics)
         return ScheduledJobStats(

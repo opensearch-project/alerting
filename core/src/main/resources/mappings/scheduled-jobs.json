@@ -1,6 +1,6 @@
 {
   "_meta" : {
-    "schema_version": 8
+    "schema_version": 9
   },
   "properties": {
     "monitor": {
@@ -445,6 +445,201 @@
             "keyword": {
               "type": "keyword",
               "ignore_above": 256
+            }
+          }
+        }
+      }
+    },
+    "monitor_v2": {
+      "dynamic": "false",
+      "properties": {
+        "ppl_monitor": {
+          "dynamic": "false",
+          "properties": {
+            "schema_version": {
+              "type": "integer"
+            },
+            "name": {
+              "type": "text",
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "ignore_above": 256
+                }
+              }
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "schedule": {
+              "properties": {
+                "period": {
+                  "properties": {
+                    "interval": {
+                      "type": "integer"
+                    },
+                    "unit": {
+                      "type": "keyword"
+                    }
+                  }
+                },
+                "cron": {
+                  "properties": {
+                    "expression": {
+                      "type": "text"
+                    },
+                    "timezone": {
+                      "type": "keyword"
+                    }
+                  }
+                }
+              }
+            },
+            "look_back_window_minutes": {
+              "type": "long"
+            },
+            "timestamp_field": {
+              "type": "text",
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "ignore_above": 256
+                }
+              }
+            },
+            "last_update_time": {
+              "type": "date",
+              "format": "strict_date_time||epoch_millis"
+            },
+            "enabled_time": {
+              "type": "date",
+              "format": "strict_date_time||epoch_millis"
+            },
+            "description": {
+              "type": "text"
+            },
+            "user": {
+              "properties": {
+                "name": {
+                  "type": "text",
+                  "fields": {
+                    "keyword": {
+                      "type": "keyword",
+                      "ignore_above": 256
+                    }
+                  }
+                },
+                "backend_roles": {
+                  "type" : "text",
+                  "fields" : {
+                    "keyword" : {
+                      "type" : "keyword"
+                    }
+                  }
+                },
+                "roles": {
+                  "type" : "text",
+                  "fields" : {
+                    "keyword" : {
+                      "type" : "keyword"
+                    }
+                  }
+                },
+                "custom_attribute_names": {
+                  "type" : "text",
+                  "fields" : {
+                    "keyword" : {
+                      "type" : "keyword"
+                    }
+                  }
+                }
+              }
+            },
+            "query_language": {
+              "type": "keyword"
+            },
+            "query": {
+              "type": "text"
+            },
+            "triggers": {
+              "type": "nested",
+              "properties": {
+                "name": {
+                  "type": "text",
+                  "fields": {
+                    "keyword": {
+                      "type": "keyword",
+                      "ignore_above": 256
+                    }
+                  }
+                },
+                "severity": {
+                  "type": "keyword"
+                },
+                "throttle_minutes": {
+                  "type": "long"
+                },
+                "expires_minutes": {
+                  "type": "long"
+                },
+                "last_triggered_time": {
+                  "type": "date",
+                  "format": "strict_date_time||epoch_millis"
+                },
+                "mode": {
+                  "type": "keyword"
+                },
+                "type": {
+                  "type": "keyword"
+                },
+                "num_results_condition": {
+                  "type": "keyword"
+                },
+                "num_results_value": {
+                  "type": "long"
+                },
+                "custom_condition": {
+                  "type": "text"
+                },
+                "actions": {
+                  "type": "nested",
+                  "properties": {
+                    "name": {
+                      "type": "text",
+                      "fields": {
+                        "keyword": {
+                          "type": "keyword",
+                          "ignore_above": 256
+                        }
+                      }
+                    },
+                    "destination_id": {
+                      "type": "keyword"
+                    },
+                    "subject_template": {
+                      "type": "object",
+                      "enabled": false
+                    },
+                    "message_template": {
+                      "type": "object",
+                      "enabled": false
+                    },
+                    "throttle_enabled": {
+                      "type": "boolean"
+                    },
+                    "throttle": {
+                      "properties": {
+                        "value": {
+                          "type": "integer"
+                        },
+                        "unit": {
+                          "type": "keyword"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         }
