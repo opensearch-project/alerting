@@ -151,6 +151,8 @@ dependencies {
     // Needed for integ tests
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-notifications-core', version: "${opensearch_build}"
     zipArchive group: 'org.opensearch.plugin', name:'notifications', version: "${opensearch_build}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-job-scheduler', version: "${opensearch_build}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${opensearch_build}"
 
     // Needed for security tests
     if (securityEnabled) {
@@ -168,7 +170,10 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-common:${kotlin_version}"
     implementation "org.jetbrains:annotations:13.0"
 
+    // SQL/PPL plugin dependencies are included in alerting-core
     api project(":alerting-core")
+    implementation 'org.json:json:20240303'
+
     implementation "com.github.seancfoley:ipaddress:5.4.1"
     implementation project(path: ":alerting-spi", configuration: 'shadow')
 
@@ -241,6 +246,28 @@ testClusters.integTest {
             File getAsFile() {
                 return configurations.zipArchive.asFileTree.matching {
                     include '**/notifications*'
+                }.singleFile
+            }
+        }
+    }))
+
+    plugin(provider({
+        new RegularFile() {
+            @Override
+            File getAsFile() {
+                return configurations.zipArchive.asFileTree.matching {
+                    include '**/opensearch-job-scheduler*'
+                }.singleFile
+            }
+        }
+    }))
+
+    plugin(provider({
+        new RegularFile() {
+            @Override
+            File getAsFile() {
+                return configurations.zipArchive.asFileTree.matching {
+                    include '**/opensearch-sql-plugin*'
                 }.singleFile
             }
         }
