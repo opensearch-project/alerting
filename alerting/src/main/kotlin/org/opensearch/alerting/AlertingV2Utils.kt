@@ -9,6 +9,8 @@ import org.apache.lucene.search.TotalHits
 import org.apache.lucene.search.TotalHits.Relation
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.search.ShardSearchFailure
+import org.opensearch.alerting.AlertingPlugin.Companion.MONITOR_BASE_URI
+import org.opensearch.alerting.AlertingPlugin.Companion.MONITOR_V2_BASE_URI
 import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
@@ -27,9 +29,16 @@ object AlertingV2Utils {
     // returns the exception to pass into actionListener.onFailure if not.
     fun validateMonitorV1(scheduledJob: ScheduledJob): Exception? {
         if (scheduledJob is MonitorV2) {
-            return IllegalStateException("The ID given corresponds to a V2 Monitor, but a V1 Monitor was expected")
+            return IllegalStateException(
+                "The ID given corresponds to an Alerting V2 Monitor, but a V1 Monitor was expected. " +
+                    "If you wish to operate on a V1 Monitor (e.g. Per Query, Per Document, etc), please use " +
+                    "the Alerting V1 APIs with endpoint prefix: $MONITOR_BASE_URI."
+            )
         } else if (scheduledJob !is Monitor && scheduledJob !is Workflow) {
-            return IllegalStateException("The ID given corresponds to a scheduled job of unknown type: ${scheduledJob.javaClass.name}")
+            return IllegalStateException(
+                "The ID given corresponds to a scheduled job of unknown type: ${scheduledJob.javaClass.name}. " +
+                    "Please validate the ID and ensure it corresponds to a valid Monitor."
+            )
         }
         return null
     }
@@ -38,9 +47,16 @@ object AlertingV2Utils {
     // returns the exception to pass into actionListener.onFailure if not.
     fun validateMonitorV2(scheduledJob: ScheduledJob): Exception? {
         if (scheduledJob is Monitor || scheduledJob is Workflow) {
-            return IllegalStateException("The ID given corresponds to a V1 Monitor, but a V2 Monitor was expected")
+            return IllegalStateException(
+                "The ID given corresponds to an Alerting V1 Monitor, but a V2 Monitor was expected. " +
+                    "If you wish to operate on a V2 Monitor (e.g. PPL Monitor), please use " +
+                    "the Alerting V2 APIs with endpoint prefix: $MONITOR_V2_BASE_URI."
+            )
         } else if (scheduledJob !is MonitorV2) {
-            return IllegalStateException("The ID given corresponds to a scheduled job of unknown type: ${scheduledJob.javaClass.name}")
+            return IllegalStateException(
+                "The ID given corresponds to a scheduled job of unknown type: ${scheduledJob.javaClass.name}. " +
+                    "Please validate the ID and ensure it corresponds to a valid Monitor."
+            )
         }
         return null
     }

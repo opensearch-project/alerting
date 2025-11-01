@@ -23,6 +23,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
+import org.opensearch.alerting.AlertingV2Utils.validateMonitorV1
 import org.opensearch.alerting.core.lock.LockModel
 import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.opensearchapi.addFilter
@@ -297,7 +298,13 @@ class TransportDeleteWorkflowAction @Inject constructor(
                     xContentRegistry,
                     LoggingDeprecationHandler.INSTANCE, hit.sourceAsString
                 ).use { hitsParser ->
-                    val monitor = ScheduledJob.parse(hitsParser, hit.id, hit.version) as Monitor
+                    val scheduledJob = ScheduledJob.parse(hitsParser, hit.id, hit.version)
+
+                    validateMonitorV1(scheduledJob)?.let {
+                        throw OpenSearchException(it)
+                    }
+
+                    val monitor = scheduledJob as Monitor
                     deletableMonitors.add(monitor)
                 }
             }
@@ -325,12 +332,17 @@ class TransportDeleteWorkflowAction @Inject constructor(
             )
         }
 
-        private fun parseWorkflow(getResponse: GetResponse): Workflow {
+        private fun parseWorkflow(getResponse: GetResponse): Workflow? {
             val xcp = XContentHelper.createParser(
                 xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                 getResponse.sourceAsBytesRef, XContentType.JSON
             )
-            return ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Workflow
+            val scheduledJob = ScheduledJob.parse(xcp, getResponse.id, getResponse.version)
+            validateMonitorV1(scheduledJob)?.let {
+                actionListener.onFailure(AlertingException.wrap(it))
+                return null
+            }
+            return scheduledJob as Workflow
         }
 
         private suspend fun deleteWorkflow(deleteRequest: DeleteRequest): DeleteResponse {
