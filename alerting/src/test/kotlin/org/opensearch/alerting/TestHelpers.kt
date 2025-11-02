@@ -507,7 +507,7 @@ fun randomAction(
     name: String = OpenSearchRestTestCase.randomUnicodeOfLength(10),
     template: Script = randomTemplateScript("Hello World"),
     subjectTemplate: Script = template,
-    destinationId: String = "",
+    destinationId: String = "abc",
     throttleEnabled: Boolean = false,
     throttle: Throttle = randomThrottle()
 ) = Action(name, destinationId, subjectTemplate, template, throttleEnabled, throttle, actionExecutionPolicy = null)
