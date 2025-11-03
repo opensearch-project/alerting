@@ -10,7 +10,7 @@ class AlertingV2Settings {
     companion object {
         val ALERTING_V2_ENABLED = Setting.boolSetting(
             "plugins.alerting_v2.enabled",
-            false,
+            true,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
     }
