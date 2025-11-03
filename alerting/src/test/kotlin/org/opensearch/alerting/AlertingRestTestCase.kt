@@ -2275,20 +2275,4 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         assertEquals("Request to get alert v2 history failed", RestStatus.OK, response.restStatus())
         return SearchResponse.fromXContent(createParser(jsonXContent, response.entity.content)).hits.totalHits!!.value
     }
-
-    protected fun getAlertV2HistoryDocCount(): Long {
-        val request = """
-            {
-                "query": {
-                    "match_all": {}
-                }
-            }
-        """.trimIndent()
-        val response = adminClient().makeRequest(
-            "POST", "${AlertV2Indices.ALERT_V2_HISTORY_ALL}/_search", emptyMap(),
-            StringEntity(request, APPLICATION_JSON)
-        )
-        assertEquals("Request to get alert v2 history failed", RestStatus.OK, response.restStatus())
-        return SearchResponse.fromXContent(createParser(jsonXContent, response.entity.content)).hits.totalHits!!.value
-    }
 }
