@@ -44,8 +44,8 @@ class GetAlertsV2Response : BaseResponse {
     @Throws(IOException::class)
     override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
         builder.startObject()
-            .field("alertV2s", alertV2s)
-            .field("totalAlertV2s", totalAlertV2s)
+            .field("alerts_v2", alertV2s)
+            .field("total_alerts_v2", totalAlertV2s)
 
         return builder.endObject()
     }
