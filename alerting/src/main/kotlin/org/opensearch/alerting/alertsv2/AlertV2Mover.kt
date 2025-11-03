@@ -385,7 +385,6 @@ class AlertV2Mover(
                 val copyRequest = BulkRequest().add(indexRequests)
                 copyResponse = client.suspendUntil { bulk(copyRequest, it) }
 
-                // retry any likely transient failures
                 if (copyResponse!!.hasFailures()) {
                     val retryCause = copyResponse.items.filter { it.isFailed }
                         .firstOrNull { it.status() == RestStatus.TOO_MANY_REQUESTS }
@@ -423,7 +422,6 @@ class AlertV2Mover(
             val deleteRequest = BulkRequest().add(deleteRequests)
             val deleteResponse: BulkResponse = client.suspendUntil { bulk(deleteRequest, it) }
 
-            // retry any likely transient failures
             if (deleteResponse.hasFailures()) {
                 val retryCause = deleteResponse.items.filter { it.isFailed }
                     .firstOrNull { it.status() == RestStatus.TOO_MANY_REQUESTS }
