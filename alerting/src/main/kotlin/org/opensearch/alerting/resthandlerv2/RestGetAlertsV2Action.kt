@@ -57,7 +57,11 @@ class RestGetAlertsV2Action : BaseRestHandler() {
             searchString
         )
 
-        val getAlertsV2Request = GetAlertsV2Request(table, severityLevel, monitorId, null)
+        val getAlertsV2Request = GetAlertsV2Request(
+            table,
+            severityLevel,
+            monitorId?.let { listOf(monitorId) }
+        )
         return RestChannelConsumer {
                 channel ->
             client.execute(GetAlertsV2Action.INSTANCE, getAlertsV2Request, RestToXContentListener(channel))

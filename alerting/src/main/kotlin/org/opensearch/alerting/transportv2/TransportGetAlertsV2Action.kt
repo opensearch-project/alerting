@@ -107,19 +107,13 @@ class TransportGetAlertsV2Action @Inject constructor(
             sortBuilder.missing(tableProp.missing)
         }
 
-        val queryBuilder = getAlertsV2Request.boolQueryBuilder ?: QueryBuilders.boolQuery()
+        val queryBuilder = QueryBuilders.boolQuery()
 
         if (getAlertsV2Request.severityLevel != "ALL") {
             queryBuilder.filter(QueryBuilders.termQuery("severity", getAlertsV2Request.severityLevel))
         }
 
-        if (!getAlertsV2Request.alertV2Ids.isNullOrEmpty()) {
-            queryBuilder.filter(QueryBuilders.termsQuery("_id", getAlertsV2Request.alertV2Ids))
-        }
-
-        if (getAlertsV2Request.monitorV2Id != null) {
-            queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getAlertsV2Request.monitorV2Id))
-        } else if (!getAlertsV2Request.monitorV2Ids.isNullOrEmpty()) {
+        if (!getAlertsV2Request.monitorV2Ids.isNullOrEmpty()) {
             queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getAlertsV2Request.monitorV2Ids))
         }
 

@@ -2236,7 +2236,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
         val searchResponse = client().makeRequest(
             "POST", "$MONITOR_V2_BASE_URI/_search",
-            StringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, APPLICATION_JSON)
         )
 
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
@@ -2257,7 +2257,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     // takes in a get alerts API response and returns the current number of active alerts
     protected fun numAlerts(getAlertsResponse: Response): Int {
         logger.info("get alerts response: ${entityAsMap(getAlertsResponse)}")
-        return entityAsMap(getAlertsResponse)["totalAlertV2s"] as Int
+        return entityAsMap(getAlertsResponse)["total_alerts_v2"] as Int
     }
 
     protected fun getAlertV2HistoryDocCount(): Long {
