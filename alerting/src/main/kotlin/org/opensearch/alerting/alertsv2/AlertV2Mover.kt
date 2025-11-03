@@ -23,6 +23,7 @@ import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.MONITOR_V2_TYPE
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_V2_HISTORY_ENABLED
+import org.opensearch.alerting.util.MAX_SEARCH_SIZE
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.service.ClusterService
@@ -138,7 +139,7 @@ class AlertV2Mover(
         // first collect all active alerts
         val allAlertsSearchQuery = SearchSourceBuilder.searchSource()
             .query(QueryBuilders.matchAllQuery())
-            .size(10000)
+            .size(MAX_SEARCH_SIZE)
             .version(true)
         val activeAlertsRequest = SearchRequest(ALERT_V2_INDEX)
             .source(allAlertsSearchQuery)
@@ -154,7 +155,7 @@ class AlertV2Mover(
         // now collect all triggers and their expire durations
         val monitorV2sSearchQuery = SearchSourceBuilder.searchSource()
             .query(QueryBuilders.existsQuery(MONITOR_V2_TYPE))
-            .size(10000)
+            .size(MAX_SEARCH_SIZE)
             .version(true)
         val monitorV2sRequest = SearchRequest(SCHEDULED_JOBS_INDEX)
             .source(monitorV2sSearchQuery)
@@ -333,7 +334,7 @@ class AlertV2Mover(
 
             val alertsSearchQuery = SearchSourceBuilder.searchSource()
                 .query(boolQuery)
-                .size(10000)
+                .size(MAX_SEARCH_SIZE)
                 .version(true)
             val activeAlertsRequest = SearchRequest(ALERT_V2_INDEX)
                 .source(alertsSearchQuery)

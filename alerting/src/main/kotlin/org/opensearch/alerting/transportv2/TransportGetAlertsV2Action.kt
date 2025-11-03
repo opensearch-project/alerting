@@ -21,6 +21,7 @@ import org.opensearch.alerting.alertsv2.AlertV2Indices
 import org.opensearch.alerting.core.settings.AlertingV2Settings.Companion.ALERTING_V2_ENABLED
 import org.opensearch.alerting.modelv2.AlertV2
 import org.opensearch.alerting.modelv2.AlertV2.Companion.MONITOR_V2_NAME_FIELD
+import org.opensearch.alerting.modelv2.AlertV2.Companion.MONITOR_V2_USER_FIELD
 import org.opensearch.alerting.modelv2.AlertV2.Companion.TRIGGER_V2_NAME_FIELD
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
@@ -32,7 +33,6 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.alerting.model.Alert.Companion.MONITOR_USER_FIELD
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.authuser.User.BACKEND_ROLES_FIELD
@@ -163,7 +163,7 @@ class TransportGetAlertsV2Action @Inject constructor(
             if (user != null && doFilterForUser(user)) {
                 // if security is enabled and filterby is enabled, add search filter
                 log.info("Filtering result by: ${user.backendRoles}")
-                addFilter(user, searchSourceBuilder, "$MONITOR_USER_FIELD.$BACKEND_ROLES_FIELD.keyword")
+                addFilter(user, searchSourceBuilder, "$MONITOR_V2_USER_FIELD.$BACKEND_ROLES_FIELD.keyword")
             }
 
             search(alertIndex, searchSourceBuilder, actionListener)

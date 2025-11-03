@@ -929,7 +929,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun getAlertV2s(): Response {
         val response = client().makeRequest(
             "GET",
-            "$MONITOR_V2_BASE_URI/alerts?",
+            "$MONITOR_V2_BASE_URI/alerts",
             null,
             BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
         )
