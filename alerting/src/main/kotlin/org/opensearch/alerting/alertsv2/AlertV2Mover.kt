@@ -19,8 +19,14 @@ import org.opensearch.alerting.MonitorRunnerExecutionContext
 import org.opensearch.alerting.alertsv2.AlertV2Indices.Companion.ALERT_V2_HISTORY_WRITE_INDEX
 import org.opensearch.alerting.alertsv2.AlertV2Indices.Companion.ALERT_V2_INDEX
 import org.opensearch.alerting.modelv2.AlertV2
+import org.opensearch.alerting.modelv2.AlertV2.Companion.TRIGGERED_TIME_FIELD
+import org.opensearch.alerting.modelv2.AlertV2.Companion.TRIGGER_V2_ID_FIELD
 import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.MONITOR_V2_TYPE
+import org.opensearch.alerting.modelv2.MonitorV2.Companion.TRIGGERS_FIELD
+import org.opensearch.alerting.modelv2.PPLSQLMonitor.Companion.PPL_SQL_MONITOR_TYPE
+import org.opensearch.alerting.modelv2.TriggerV2.Companion.EXPIRE_FIELD
+import org.opensearch.alerting.modelv2.TriggerV2.Companion.ID_FIELD
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_V2_HISTORY_ENABLED
 import org.opensearch.alerting.util.MAX_SEARCH_SIZE
@@ -33,7 +39,6 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.core.common.bytes.BytesReference
 import org.opensearch.core.rest.RestStatus
@@ -136,74 +141,90 @@ class AlertV2Mover(
     }
 
     private suspend fun searchForExpiredAlerts(): List<AlertV2> {
-        // first collect all active alerts
-        val allAlertsSearchQuery = SearchSourceBuilder.searchSource()
-            .query(QueryBuilders.matchAllQuery())
-            .size(MAX_SEARCH_SIZE)
-            .version(true)
-        val activeAlertsRequest = SearchRequest(ALERT_V2_INDEX)
-            .source(allAlertsSearchQuery)
-        val searchAlertsResponse: SearchResponse = client.suspendUntil { search(activeAlertsRequest, it) }
-
-        val allAlertV2s = mutableListOf<AlertV2>()
-        searchAlertsResponse.hits.forEach { hit ->
-            allAlertV2s.add(
-                AlertV2.parse(alertV2ContentParser(hit.sourceRef), hit.id, hit.version)
-            )
-        }
-
-        // now collect all triggers and their expire durations
+        /* first collect all triggers and their expire durations */
+        // when searching the alerting-config index, only trigger IDs and their expire durations are needed
         val monitorV2sSearchQuery = SearchSourceBuilder.searchSource()
             .query(QueryBuilders.existsQuery(MONITOR_V2_TYPE))
+            .fetchSource(
+                arrayOf(
+                    "$MONITOR_V2_TYPE.$PPL_SQL_MONITOR_TYPE.$TRIGGERS_FIELD.$ID_FIELD",
+                    "$MONITOR_V2_TYPE.$PPL_SQL_MONITOR_TYPE.$TRIGGERS_FIELD.$EXPIRE_FIELD"
+                ),
+                null
+            )
             .size(MAX_SEARCH_SIZE)
             .version(true)
         val monitorV2sRequest = SearchRequest(SCHEDULED_JOBS_INDEX)
             .source(monitorV2sSearchQuery)
         val searchMonitorV2sResponse: SearchResponse = client.suspendUntil { search(monitorV2sRequest, it) }
 
+        // construct a map that stores each trigger's expiration time
+        // TODO: create XContent parser specifically for responses to the above search to avoid casting
         val triggerToExpireDuration = mutableMapOf<String, Long>()
         searchMonitorV2sResponse.hits.forEach { hit ->
-            val monitorV2 = ScheduledJob.parse(scheduledJobContentParser(hit.sourceRef), hit.id, hit.version) as MonitorV2
-            monitorV2.triggers.forEach { trigger ->
-                triggerToExpireDuration.put(trigger.id, trigger.expireDuration)
+            val monitorV2Obj = hit.sourceAsMap[MONITOR_V2_TYPE] as Map<String, Any>
+            val pplMonitorObj = monitorV2Obj[PPL_SQL_MONITOR_TYPE] as Map<String, Any>
+            val triggers = pplMonitorObj[TRIGGERS_FIELD] as List<Map<String, Any>>
+            triggers.forEach { trigger ->
+                val triggerId = trigger[ID_FIELD] as String
+                val expireDuration = (trigger[EXPIRE_FIELD] as Int).toLong()
+                triggerToExpireDuration[triggerId] = expireDuration
             }
         }
 
+        /* now collect all expired alerts */
         val now = Instant.now().toEpochMilli()
 
-        // collect all alerts that are now expired
-        val expiredAlerts = mutableListOf<AlertV2>()
-        for (alertV2 in allAlertV2s) {
-            val triggerV2Id = alertV2.triggerId
-            val triggeredTime = alertV2.triggeredTime.toEpochMilli()
+        val expiredAlertsBoolQuery = QueryBuilders.boolQuery()
 
-            val expireDuration = triggerToExpireDuration[triggerV2Id]
-
-            // if the ID of the trigger that generated this alert can't
-            // be found from the search monitor response, it means one of two things:
-            // 1) the monitor was deleted
-            // 2) the trigger ID (and possibly more) was edited
-            // in both cases, we want to expire this alert to retain
-            // only alerts that were generated by triggers
-            // who currently exist and retain their config from
-            // when they generated the alert
-            // note: this is a redundancy with MonitorRunnerService's
-            // postIndex and postDelete, which handles moving alerts in response
-            // to a monitor update or delete event. this cleanly handles the case
-            // that even with those measures in place, the trigger that generated
-            // this alert somehow couldn't be found
-            if (expireDuration == null) {
-                expiredAlerts.add(alertV2)
-                continue
-            }
-
+        // collect, in an overarching should clause, each trigger and its expiration time.
+        // any alert that matches both the trigger ID and the expiration time check should
+        // be returned by the search query
+        triggerToExpireDuration.forEach { (triggerId, expireDuration) ->
             val expireDurationMillis = expireDuration * 60 * 1000
-            if (now - triggeredTime >= expireDurationMillis) {
-                expiredAlerts.add(alertV2)
-            }
+            val maxValidTime = now - expireDurationMillis
+
+            expiredAlertsBoolQuery.should(
+                QueryBuilders.boolQuery()
+                    .must(QueryBuilders.termQuery(TRIGGER_V2_ID_FIELD, triggerId))
+                    .must(QueryBuilders.rangeQuery(TRIGGERED_TIME_FIELD).lte(maxValidTime))
+            )
         }
 
-        return expiredAlerts
+        // add orphaned alerts to should clause as well (i.e. alerts whose trigger IDs cannot
+        // be found in the list of currently existent triggers), since orphaned alerts should be expired.
+        // note: this is a redundancy with MonitorRunnerService's
+        // postIndex and postDelete, which handles moving alerts in response
+        // to a monitor update or delete event. this cleanly handles the case
+        // that even with those measures in place, an alert that came from a
+        // now nonexistent trigger was somehow found
+        expiredAlertsBoolQuery.should(
+            QueryBuilders.boolQuery()
+                .mustNot(QueryBuilders.termsQuery(TRIGGER_V2_ID_FIELD, triggerToExpireDuration.keys.toList()))
+        )
+
+        // Explicitly specify that at least one should clause must match
+        expiredAlertsBoolQuery.minimumShouldMatch(1)
+
+        // only alerts' monitor IDs should be fetched, the ID of the alert
+        // itself will be the document ID, which is part of the doc's metadata,
+        // not the doc's source, so it doesn't need to be fetched in the query
+        val expiredAlertsSearchQuery = SearchSourceBuilder.searchSource()
+            .query(expiredAlertsBoolQuery)
+            .size(MAX_SEARCH_SIZE)
+            .version(true)
+        val expiredAlertsRequest = SearchRequest(ALERT_V2_INDEX)
+            .source(expiredAlertsSearchQuery)
+        val expiredAlertsResponse: SearchResponse = client.suspendUntil { search(expiredAlertsRequest, it) }
+
+        val expiredAlertV2s = mutableListOf<AlertV2>()
+        expiredAlertsResponse.hits.forEach { hit ->
+            expiredAlertV2s.add(
+                AlertV2.parse(alertV2ContentParser(hit.sourceRef), hit.id, hit.version)
+            )
+        }
+
+        return expiredAlertV2s
     }
 
     private suspend fun deleteExpiredAlerts(expiredAlerts: List<AlertV2>): BulkResponse? {
@@ -274,9 +295,8 @@ class AlertV2Mover(
                 val retryCause = bulkResponse.items.filter { it.isFailed }
                     .firstOrNull { it.status() == RestStatus.TOO_MANY_REQUESTS }
                     ?.failure?.cause
-                throw RuntimeException(
-                    "Failed to move or delete alert v2s: " +
-                        bulkResponse.buildFailureMessage(),
+                logger.error(
+                    "Failed to move or delete alert v2s: ${bulkResponse.buildFailureMessage()}",
                     retryCause
                 )
             }
@@ -329,7 +349,7 @@ class AlertV2Mover(
              meaning this logic will pick up those updated triggers and correctly move/delete the alerts
             */
             if (monitorV2 != null) {
-                boolQuery.mustNot(QueryBuilders.termsQuery(AlertV2.TRIGGER_V2_ID_FIELD, monitorV2.triggers.map { it.id }))
+                boolQuery.mustNot(QueryBuilders.termsQuery(TRIGGER_V2_ID_FIELD, monitorV2.triggers.map { it.id }))
             }
 
             val alertsSearchQuery = SearchSourceBuilder.searchSource()

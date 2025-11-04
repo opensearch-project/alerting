@@ -9,7 +9,7 @@ import org.opensearch.common.settings.Setting
 class AlertingV2Settings {
     companion object {
         val ALERTING_V2_ENABLED = Setting.boolSetting(
-            "plugins.alerting_v2.enabled",
+            "plugins.alerting.v2.enabled",
             true,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )

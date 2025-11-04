@@ -125,11 +125,7 @@ class AlertV2Indices(
             scheduledAlertV2Rollover = threadPool
                 .scheduleWithFixedDelay({ rolloverAndDeleteAlertV2HistoryIndices() }, alertV2HistoryRolloverPeriod, executorName())
         } catch (e: Exception) {
-            logger.error(
-                "Error creating alert/finding indices. " +
-                    "Alerts/Findings can't be recorded until clustermanager node is restarted.",
-                e
-            )
+            logger.error("Error rolling over alerts v2 history index.", e)
         }
     }
 
@@ -386,7 +382,7 @@ class AlertV2Indices(
                         }
                     }
                     override fun onFailure(e: Exception) {
-                        logger.error("Delete for Alerting V2 History Indices $indicesToDelete Failed. Retrying one By one.")
+                        logger.error("Delete for Alerting V2 History Indices $indicesToDelete Failed. Retrying one by one.")
                         deleteOldHistoryIndex(indicesToDelete)
                     }
                 }
@@ -408,7 +404,7 @@ class AlertV2Indices(
                         }
                     }
                     override fun onFailure(e: Exception) {
-                        logger.debug("Exception ${e.message} while deleting the index $index")
+                        logger.error("Exception ${e.message} while deleting the index $index")
                     }
                 }
             )
