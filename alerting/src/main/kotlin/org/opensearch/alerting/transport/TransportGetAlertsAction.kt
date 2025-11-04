@@ -16,6 +16,7 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.AlertingV2Utils.validateMonitorV1
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -210,7 +211,11 @@ class TransportGetAlertsAction @Inject constructor(
                 xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                 getResponse.sourceAsBytesRef, XContentType.JSON
             )
-            return ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
+            val scheduledJob = ScheduledJob.parse(xcp, getResponse.id, getResponse.version)
+            validateMonitorV1(scheduledJob)?.let {
+                throw it
+            }
+            return scheduledJob as Monitor
         } catch (t: Exception) {
             log.error("Failure in fetching monitor ${getAlertsRequest.monitorId} to resolve alert index in get alerts action", t)
             return null
