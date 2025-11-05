@@ -18,7 +18,7 @@ class RunResultV2Tests : OpenSearchTestCase() {
         assertEquals(runResult.triggerName, newRunResult.triggerName)
     }
 
-    fun `test monitor v2 run result as stream`() {
+    fun `test ppl sql monitor run result as monitor v2 run result as stream`() {
         val monitorRunResult = PPLSQLMonitorRunResult(
             monitorName = "some-monitor",
             error = IllegalArgumentException("some-error"),
