@@ -169,12 +169,16 @@ class AlertV2Mover(
             logger.info("ppl monitor obj: $pplMonitorObj")
             val triggers = pplMonitorObj[TRIGGERS_FIELD] as List<Map<String, Any>>
             logger.info("triggers: $triggers")
-            triggers.forEach { trigger ->
+            for (trigger in triggers) {
                 logger.info("individual trigger: $trigger")
                 logger.info("triggerId: ${trigger[ID_FIELD] as String}")
-                logger.info("triggerId: ${trigger[EXPIRE_FIELD] as String}")
+                logger.info("triggerExpires: ${trigger[EXPIRE_FIELD] as Int?}")
                 val triggerId = trigger[ID_FIELD] as String
-                val expireDuration = (trigger[EXPIRE_FIELD] as Int).toLong()
+                val expireDuration = (trigger[EXPIRE_FIELD] as Int?)?.toLong()
+                if (expireDuration == null) {
+                    logger.info("trigger $triggerId has no expire duration, skipping")
+                    continue
+                }
                 triggerToExpireDuration[triggerId] = expireDuration
             }
         }
