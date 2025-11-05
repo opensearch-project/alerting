@@ -29,7 +29,6 @@ class ExecuteMonitorV2Response : ActionResponse, ToXContentObject {
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {
         MonitorV2RunResult.writeTo(out, monitorV2RunResult)
-//        monitorV2RunResult.writeTo(out)
     }
 
     @Throws(IOException::class)
