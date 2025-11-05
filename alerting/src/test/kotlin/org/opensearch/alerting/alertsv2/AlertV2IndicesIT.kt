@@ -176,14 +176,14 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         assertEquals(1, getAlertV2HistoryDocCount())
 
         // update rollover check and max docs as well as decreasing the retention period
-        client().updateSettings(AlertingSettings.ALERT_V2_HISTORY_ROLLOVER_PERIOD.key, "1s")
+        client().updateSettings(AlertingSettings.ALERT_V2_HISTORY_ROLLOVER_PERIOD.key, "3s")
         client().updateSettings(AlertingSettings.ALERT_V2_HISTORY_MAX_DOCS.key, 1)
         client().updateSettings(AlertingSettings.ALERT_V2_HISTORY_RETENTION_PERIOD.key, "1s")
 
         // give some time for newly updated settings to take effect
         OpenSearchTestCase.waitUntil({
-            return@waitUntil false
-        }, 20, TimeUnit.SECONDS)
+            return@waitUntil getAlertV2HistoryDocCount() == 0L
+        }, 40, TimeUnit.SECONDS)
 
         // Given the max_docs and retention settings above, the history index will rollover and the non-write index will be deleted.
         // This leaves two indices: active alerts index and an empty history write index
@@ -418,8 +418,7 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         return indices
     }
 
-    // generates alerts by creating then executing a monitor,
-    // returns the execute monitor response
+    // generates alerts by creating then executing a monitor
     private fun generateAlertV2s(
         pplMonitorConfig: PPLSQLMonitor = randomPPLMonitor(
             query = "source = $TEST_INDEX_NAME | head 3",
@@ -444,7 +443,7 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         // ensure execute call succeeded
         val xcp = createParser(XContentType.JSON.xContent(), executeResponse.entity.content)
         val output = xcp.map()
-        assertNull("Error running a monitor after wiping alert indices", output["error"])
+        assertNull("Error running monitor v2", output["error"])
 
         return pplMonitor.id
     }

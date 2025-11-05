@@ -47,7 +47,7 @@ data class PPLSQLTriggerRunResult(
     companion object {
         @JvmStatic
         @Throws(IOException::class)
-        fun readFrom(sin: StreamInput): TriggerV2RunResult {
+        fun readFrom(sin: StreamInput): PPLSQLTriggerRunResult {
             return PPLSQLTriggerRunResult(sin)
         }
     }
