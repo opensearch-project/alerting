@@ -473,7 +473,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
                 }
                 val typeInfo = metadata[timestampField] as Map<String, String>
                 val type = typeInfo["type"]
-                if (type != "date") {
+                if (type == null || !type.contains("date")) {
                     validationListener.onFailure(
                         AlertingException.wrap(
                             IllegalArgumentException(
