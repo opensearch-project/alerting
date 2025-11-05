@@ -31,8 +31,8 @@ object AlertingV2Utils {
         if (scheduledJob is MonitorV2) {
             return IllegalStateException(
                 "The ID given corresponds to an Alerting V2 Monitor, but a V1 Monitor was expected. " +
-                    "If you wish to operate on a V1 Monitor (e.g. Per Query, Per Document, etc), please use " +
-                    "the Alerting V1 APIs with endpoint prefix: $MONITOR_BASE_URI."
+                    "If you wish to operate on a V2 Monitor (e.g. PPL Monitor), please use " +
+                    "the Alerting V2 APIs with endpoint prefix: $MONITOR_V2_BASE_URI."
             )
         } else if (scheduledJob !is Monitor && scheduledJob !is Workflow) {
             return IllegalStateException(
@@ -49,8 +49,8 @@ object AlertingV2Utils {
         if (scheduledJob is Monitor || scheduledJob is Workflow) {
             return IllegalStateException(
                 "The ID given corresponds to an Alerting V1 Monitor, but a V2 Monitor was expected. " +
-                    "If you wish to operate on a V2 Monitor (e.g. PPL Monitor), please use " +
-                    "the Alerting V2 APIs with endpoint prefix: $MONITOR_V2_BASE_URI."
+                    "If you wish to operate on a V1 Monitor (e.g. Per Query, Per Document, etc), please use " +
+                    "the Alerting V1 APIs with endpoint prefix: $MONITOR_BASE_URI."
             )
         } else if (scheduledJob !is MonitorV2) {
             return IllegalStateException(

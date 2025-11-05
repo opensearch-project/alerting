@@ -349,8 +349,6 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             return@waitUntil false
         }, 2, TimeUnit.MINUTES)
 
-//        client().updateSettings(AlertingSettings.COMMENTS_HISTORY_ROLLOVER_PERIOD.key, "17h")
-
         val getAlertsResponsePostExpire = getAlertV2s()
         logger.info("num alerts: ${numAlerts(getAlertsResponsePostExpire)}")
         val alertsGeneratedPostExpire = numAlerts(getAlertsResponsePostExpire) > 0

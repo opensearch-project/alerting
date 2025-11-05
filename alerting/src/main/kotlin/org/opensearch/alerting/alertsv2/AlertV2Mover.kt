@@ -162,19 +162,14 @@ class AlertV2Mover(
         // TODO: create XContent parser specifically for responses to the above search to avoid casting
         val triggerToExpireDuration = mutableMapOf<String, Long>()
         searchMonitorV2sResponse.hits.forEach { hit ->
-            logger.info("source as map: ${hit.sourceAsMap}")
             val monitorV2Obj = hit.sourceAsMap[MONITOR_V2_TYPE] as Map<String, Any>
-            logger.info("monitor v2 obj: $monitorV2Obj")
             val pplMonitorObj = monitorV2Obj[PPL_SQL_MONITOR_TYPE] as Map<String, Any>
-            logger.info("ppl monitor obj: $pplMonitorObj")
             val triggers = pplMonitorObj[TRIGGERS_FIELD] as List<Map<String, Any>>
-            logger.info("triggers: $triggers")
             for (trigger in triggers) {
-                logger.info("individual trigger: $trigger")
-                logger.info("triggerId: ${trigger[ID_FIELD] as String}")
-                logger.info("triggerExpires: ${trigger[EXPIRE_FIELD] as Int?}")
                 val triggerId = trigger[ID_FIELD] as String
                 val expireDuration = (trigger[EXPIRE_FIELD] as Int).toLong()
+                logger.debug("triggerId: $triggerId")
+                logger.debug("triggerExpires: $expireDuration")
                 triggerToExpireDuration[triggerId] = expireDuration
             }
         }
