@@ -174,11 +174,7 @@ class AlertV2Mover(
                 logger.info("triggerId: ${trigger[ID_FIELD] as String}")
                 logger.info("triggerExpires: ${trigger[EXPIRE_FIELD] as Int?}")
                 val triggerId = trigger[ID_FIELD] as String
-                val expireDuration = (trigger[EXPIRE_FIELD] as Int?)?.toLong()
-                if (expireDuration == null) {
-                    logger.info("trigger $triggerId has no expire duration, skipping")
-                    continue
-                }
+                val expireDuration = (trigger[EXPIRE_FIELD] as Int).toLong()
                 triggerToExpireDuration[triggerId] = expireDuration
             }
         }
