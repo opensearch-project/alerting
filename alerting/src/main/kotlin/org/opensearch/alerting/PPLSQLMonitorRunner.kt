@@ -126,14 +126,14 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                 // before even running the trigger itself
                 val throttled = checkForThrottle(pplSqlTrigger, timeOfCurrentExecution, manual)
                 if (throttled) {
-                    logger.info("throttling trigger ${pplSqlTrigger.name} from monitor ${pplSqlMonitor.name}")
+                    logger.info("throttling trigger ${pplSqlTrigger.id} from monitor ${pplSqlMonitor.id}")
 
                     // automatically return that this trigger is untriggered
                     triggerResults[pplSqlTrigger.id] = PPLSQLTriggerRunResult(pplSqlTrigger.name, false, null)
 
                     continue
                 }
-                logger.debug("throttle check passed, executing trigger ${pplSqlTrigger.name} from monitor ${pplSqlMonitor.name}")
+                logger.debug("throttle check passed, executing trigger ${pplSqlTrigger.id} from monitor ${pplSqlMonitor.id}")
 
                 logger.debug("checking if custom condition is used and appending to base query")
                 // if trigger uses custom condition, append the custom condition to query, otherwise simply proceed
@@ -166,7 +166,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                 ) {
                     executePplQuery(limitedQueryToExecute, nodeClient)
                 }
-                logger.debug("query results for trigger ${pplSqlTrigger.name}: $queryResponseJson")
+                logger.debug("query results for trigger ${pplSqlTrigger.id}: $queryResponseJson")
 
                 // store the query results for Execute Monitor API response
                 // unlike the query results stored in alerts and notifications, which must be size capped
@@ -244,7 +244,11 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                     }
                 }
             } catch (e: Exception) {
-                logger.error("failed to run PPL Trigger ${pplSqlTrigger.name} from PPL Monitor ${pplSqlMonitor.name}", e)
+                logger.error(
+                    "failed to run PPL Trigger ${pplSqlTrigger.name} (id: ${pplSqlTrigger.id} " +
+                        "from PPL Monitor ${pplSqlMonitor.name} (id: ${pplSqlMonitor.id}",
+                    e
+                )
 
                 // generate an alert with an error message
                 monitorCtx.retryPolicy?.let {
