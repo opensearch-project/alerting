@@ -473,11 +473,14 @@ class TransportIndexMonitorV2Action @Inject constructor(
                 }
                 val typeInfo = metadata[timestampField] as Map<String, String>
                 val type = typeInfo["type"]
-                if (type == null || !type.contains("date")) {
+                val dateType = "date"
+                val dateNanosType = "date_nanos"
+                if (type != dateType && type != dateNanosType) {
                     validationListener.onFailure(
                         AlertingException.wrap(
                             IllegalArgumentException(
-                                "Timestamp field: $timestampField is present in index $index but is of type $type instead of type date"
+                                "Timestamp field: $timestampField is present in index $index " +
+                                    "but is type $type instead of $dateType or $dateNanosType"
                             )
                         )
                     )

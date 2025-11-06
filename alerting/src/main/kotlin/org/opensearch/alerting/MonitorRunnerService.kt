@@ -446,7 +446,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             }
             is MonitorV2 -> {
                 if (job !is PPLSQLMonitor) {
-                    throw IllegalStateException("Unexpected invalid MonitorV2 type: ${job.javaClass.name}")
+                    throw IllegalStateException("Invalid MonitorV2 type: ${job.javaClass.name}")
                 }
 
                 launch {

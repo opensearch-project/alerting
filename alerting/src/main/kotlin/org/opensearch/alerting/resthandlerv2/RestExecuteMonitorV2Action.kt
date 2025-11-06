@@ -32,7 +32,7 @@ class RestExecuteMonitorV2Action : BaseRestHandler() {
         return listOf(
             Route(
                 POST,
-                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitorV2Id}/_execute"
+                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitor_id}/_execute"
             ),
             Route(
                 POST,
@@ -48,8 +48,8 @@ class RestExecuteMonitorV2Action : BaseRestHandler() {
             val dryrun = request.paramAsBoolean("dryrun", false)
             val requestEnd = request.paramAsTime("period_end", TimeValue(Instant.now().toEpochMilli()))
 
-            if (request.hasParam("monitorV2Id")) {
-                val monitorV2Id = request.param("monitorV2Id")
+            if (request.hasParam("monitor_id")) {
+                val monitorV2Id = request.param("monitor_id")
                 val execMonitorV2Request = ExecuteMonitorV2Request(dryrun, true, monitorV2Id, null, requestEnd)
                 client.execute(ExecuteMonitorV2Action.INSTANCE, execMonitorV2Request, RestToXContentListener(channel))
             } else {
@@ -70,6 +70,6 @@ class RestExecuteMonitorV2Action : BaseRestHandler() {
     }
 
     override fun responseParams(): Set<String> {
-        return setOf("dryrun", "period_end", "monitorV2Id")
+        return setOf("dryrun", "period_end", "monitor_id")
     }
 }

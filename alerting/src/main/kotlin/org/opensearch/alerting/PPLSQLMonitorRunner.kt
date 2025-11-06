@@ -15,6 +15,7 @@ import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
 import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.AlertingV2Utils.getConfigAndSendNotification
 import org.opensearch.alerting.PPLUtils.appendCustomCondition
 import org.opensearch.alerting.PPLUtils.appendDataRowsLimit
 import org.opensearch.alerting.PPLUtils.capPPLQueryResultsSize
@@ -57,7 +58,7 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.min
 
-object PPLSQLMonitorRunner : MonitorV2Runner() {
+object PPLSQLMonitorRunner : MonitorV2Runner {
     private val logger = LogManager.getLogger(javaClass)
 
     override suspend fun runMonitorV2(
@@ -77,7 +78,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner() {
             throw IllegalStateException("Received PPL Monitor to execute that unexpectedly has no ID")
         }
 
-        logger.debug("Running PPL Monitor: ${monitorV2.name}. Thread: ${Thread.currentThread().name}")
+        logger.debug("Running PPL Monitor: ${monitorV2.id}. Thread: ${Thread.currentThread().name}")
 
         val pplSqlMonitor = monitorV2
         val nodeClient = monitorCtx.client as NodeClient
@@ -102,6 +103,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner() {
         }
 
         val timeFilteredQuery = if (pplSqlMonitor.lookBackWindow != null) {
+            logger.debug("look back window specified for PPL Monitor: ${monitorV2.id}, injecting look back window time filter")
             // if lookback window is specified, inject a top level lookback window time filter
             // into the PPL query
             val lookBackWindow = pplSqlMonitor.lookBackWindow!!
@@ -110,7 +112,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner() {
             logger.debug("time filtered query: $timeFilteredQuery")
             timeFilteredQuery
         } else {
-            logger.debug("look back window not specified, proceeding with query: ${pplSqlMonitor.query}")
+            logger.debug("look back window not specified for PPL Monitor: ${monitorV2.id}, proceeding with original base query")
             // otherwise, don't inject any time filter whatsoever
             // unless the query itself has user-specified time filters, this query
             // will return all applicable data in the cluster
@@ -124,7 +126,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner() {
                 // before even running the trigger itself
                 val throttled = checkForThrottle(pplSqlTrigger, timeOfCurrentExecution, manual)
                 if (throttled) {
-                    logger.debug("throttling trigger ${pplSqlTrigger.name} from monitor ${pplSqlMonitor.name}")
+                    logger.info("throttling trigger ${pplSqlTrigger.name} from monitor ${pplSqlMonitor.name}")
 
                     // automatically return that this trigger is untriggered
                     triggerResults[pplSqlTrigger.id] = PPLSQLTriggerRunResult(pplSqlTrigger.name, false, null)
@@ -133,6 +135,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner() {
                 }
                 logger.debug("throttle check passed, executing trigger ${pplSqlTrigger.name} from monitor ${pplSqlMonitor.name}")
 
+                logger.debug("checking if custom condition is used and appending to base query")
                 // if trigger uses custom condition, append the custom condition to query, otherwise simply proceed
                 val queryToExecute = if (pplSqlTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number of results trigger
                     timeFilteredQuery
@@ -150,6 +153,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner() {
                 // in the alert and notification must be added that results were excluded
                 // and an alert that should have been generated might not have been
 
+                logger.debug("executing the PPL query of monitor: ${monitorV2.id}")
                 // execute the PPL query
                 val queryResponseJson = withClosableContext(
                     InjectorContextElement(
@@ -181,12 +185,13 @@ object PPLSQLMonitorRunner : MonitorV2Runner() {
                     evaluateCustomTrigger(queryResponseJson, pplSqlTrigger.customCondition!!)
                 }
 
-                logger.debug("PPLTrigger ${pplSqlTrigger.name} triggered: $triggered")
+                logger.debug("PPLTrigger ${pplSqlTrigger.name} with ID ${pplSqlTrigger.id} triggered: $triggered")
 
                 // store the trigger execution results for Execute Monitor API response
                 triggerResults[pplSqlTrigger.id] = PPLSQLTriggerRunResult(pplSqlTrigger.name, triggered, null)
 
                 if (triggered) {
+                    logger.debug("generating alerts for PPLTrigger ${pplSqlTrigger.name} with ID ${pplSqlTrigger.id}")
                     // retrieve some limits from settings
                     val maxQueryResultsSize =
                         monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERT_V2_QUERY_RESULTS_MAX_SIZE)

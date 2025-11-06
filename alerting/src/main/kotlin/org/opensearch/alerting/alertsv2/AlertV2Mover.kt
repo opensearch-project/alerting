@@ -141,6 +141,7 @@ class AlertV2Mover(
     }
 
     private suspend fun searchForExpiredAlerts(): List<AlertV2> {
+        logger.debug("beginning search for expired alerts")
         /* first collect all triggers and their expire durations */
         // when searching the alerting-config index, only trigger IDs and their expire durations are needed
         val monitorV2sSearchQuery = SearchSourceBuilder.searchSource()
@@ -158,6 +159,7 @@ class AlertV2Mover(
             .source(monitorV2sSearchQuery)
         val searchMonitorV2sResponse: SearchResponse = client.suspendUntil { search(monitorV2sRequest, it) }
 
+        logger.debug("searching triggers for their expire durations")
         // construct a map that stores each trigger's expiration time
         // TODO: create XContent parser specifically for responses to the above search to avoid casting
         val triggerToExpireDuration = mutableMapOf<String, Long>()
@@ -174,7 +176,11 @@ class AlertV2Mover(
             }
         }
 
+        logger.debug("trigger to expire duration map: $triggerToExpireDuration")
+
         /* now collect all expired alerts */
+        logger.debug("searching active alerts index for expired alerts")
+
         val now = Instant.now().toEpochMilli()
 
         val expiredAlertsBoolQuery = QueryBuilders.boolQuery()
@@ -226,10 +232,13 @@ class AlertV2Mover(
             )
         }
 
+        logger.debug("expired alerts: $expiredAlertV2s")
+
         return expiredAlertV2s
     }
 
     private suspend fun deleteExpiredAlerts(expiredAlerts: List<AlertV2>): BulkResponse? {
+        logger.debug("beginning to hard delete expired alerts permanently")
         // If no expired alerts are found, simply return
         if (expiredAlerts.isEmpty()) {
             return null
@@ -249,6 +258,7 @@ class AlertV2Mover(
     }
 
     private suspend fun copyExpiredAlerts(expiredAlerts: List<AlertV2>): BulkResponse? {
+        logger.debug("beginning to copy expired alerts to history write index")
         // If no expired alerts are found, simply return
         if (expiredAlerts.isEmpty()) {
             return null
@@ -270,6 +280,7 @@ class AlertV2Mover(
     }
 
     private suspend fun deleteExpiredAlertsThatWereCopied(copyResponse: BulkResponse?, expiredAlerts: List<AlertV2>): BulkResponse? {
+        logger.debug("beginning to delete expired alerts that were copied to history write index")
         // if there were no expired alerts to copy, skip deleting anything
         if (copyResponse == null) {
             return null
@@ -311,12 +322,6 @@ class AlertV2Mover(
             bytesReference, XContentType.JSON
         )
     }
-    private fun scheduledJobContentParser(bytesReference: BytesReference): XContentParser {
-        return XContentHelper.createParser(
-            xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-            bytesReference, XContentType.JSON
-        )
-    }
 
     private fun areAlertV2IndicesPresent(): Boolean {
         return alertV2IndexInitialized && alertV2HistoryIndexInitialized
@@ -329,6 +334,7 @@ class AlertV2Mover(
         // a monitor in response to the event that the monitor gets updated
         // or deleted
         suspend fun moveAlertV2s(monitorV2Id: String, monitorV2: MonitorV2?, monitorCtx: MonitorRunnerExecutionContext) {
+            logger.debug("beginning to move alerts for postIndex or postDelete of monitor: $monitorV2Id")
             val client = monitorCtx.client!!
 
             // first collect all alerts that came from this updated or deleted monitor
@@ -389,6 +395,7 @@ class AlertV2Mover(
             // to the alert v2 history index pattern instead of hard deleting them
             var copyResponse: BulkResponse? = null
             if (alertV2HistoryEnabled) {
+                logger.debug("alert v2 history enabled, copying alerts to history write index")
                 val indexRequests = searchAlertsResponse.hits.map { hit ->
                     val xcp = XContentHelper.createParser(
                         NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
@@ -419,6 +426,8 @@ class AlertV2Mover(
                     )
                 }
             }
+
+            logger.debug("deleting alerts related to monitor: $monitorV2Id")
 
             // prepare deletion request
             val deleteRequests = if (alertV2HistoryEnabled) {
