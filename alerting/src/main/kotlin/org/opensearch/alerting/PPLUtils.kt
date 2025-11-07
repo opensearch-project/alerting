@@ -208,7 +208,8 @@ object PPLUtils {
     fun getIndicesFromPplQuery(pplQuery: String): List<String> {
         // captures comma-separated concrete indices, index patterns, and index aliases
         // TODO: these are in-house PPL query parsers, find a PPL plugin dependency that does this for us
-        val indicesRegex = """(?i)source(?:\s*)=(?:\s*)([-\w.*'+]+(?:\*)?(?:\s*,\s*[-\w.*'+]+\*?)*)\s*\|*""".toRegex()
+        val indicesRegex = """(?i)source(?:\s*)=(?:\s*)((?:`[^`]+`|[-\w.*'+]+(?:\*)?)(?:\s*,\s*(?:`[^`]+`|[-\w.*'+]+\*?))*)\s*\|*"""
+            .toRegex()
 
         // use find() instead of findAll() because a PPL query only ever has one source statement
         // the only capture group specified in the regex captures the comma separated string of indices/index patterns
@@ -218,7 +219,17 @@ object PPLUtils {
                     "after validating the query through SQL/PPL plugin."
             )
 
-        return indices
+        // remove any backticks that might have been read in
+        val unBackTickedIndices = mutableListOf<String>()
+        indices.forEach {
+            if (it.startsWith("`") && it.endsWith("`")) {
+                unBackTickedIndices.add(it.substring(1, it.length - 1))
+            } else {
+                unBackTickedIndices.add(it)
+            }
+        }
+
+        return unBackTickedIndices.toList()
     }
 
     /**
