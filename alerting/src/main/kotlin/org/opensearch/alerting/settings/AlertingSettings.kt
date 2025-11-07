@@ -363,7 +363,7 @@ class AlertingSettings {
         // SQL/PPL plugin during monitor execution
         val ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS = Setting.longSetting(
             "plugins.alerting.v2.query_results_max_datarows",
-            1000L,
+            10000L,
             1L,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
