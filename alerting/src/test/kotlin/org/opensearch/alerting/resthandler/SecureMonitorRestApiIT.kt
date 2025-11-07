@@ -1274,6 +1274,24 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    fun `test ack alert with enabled filter by`() {
+        enableFilterBy()
+        putAlertMappings()
+        val adminUser = User(ADMIN, listOf(ADMIN), listOf(ALL_ACCESS_ROLE), listOf())
+        val monitor = createRandomMonitor(refresh = true).copy(user = adminUser)
+        val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
+
+        val inputMap = HashMap<String, Any>()
+        inputMap["missing"] = "_last"
+        inputMap["monitorId"] = monitor.id
+
+        // search as "admin" - must get 4 docs
+        val adminResponseMap = getAlerts(client(), inputMap).asMap()
+        assertEquals(1, adminResponseMap["totalAlerts"])
+
+        acknowledgeAlerts(monitor, alert)
+    }
+
     fun `test get alerts with an user with get alerts role`() {
 
         putAlertMappings()
