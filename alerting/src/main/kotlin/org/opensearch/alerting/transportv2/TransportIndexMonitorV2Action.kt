@@ -455,12 +455,13 @@ class TransportIndexMonitorV2Action @Inject constructor(
         val pplQuery = pplSqlMonitor.query
         val timestampField = pplSqlMonitor.timestampField
 
-        val indices = getIndicesFromPplQuery(pplQuery)
-        val getMappingsRequest = GetMappingsRequest().indices(*indices.toTypedArray())
-        val getMappingsResponse = client.suspendUntil { admin().indices().getMappings(getMappingsRequest, it) }
-
-        val metadataMap = getMappingsResponse.mappings
         try {
+            val indices = getIndicesFromPplQuery(pplQuery)
+            val getMappingsRequest = GetMappingsRequest().indices(*indices.toTypedArray())
+            val getMappingsResponse = client.suspendUntil { admin().indices().getMappings(getMappingsRequest, it) }
+
+            val metadataMap = getMappingsResponse.mappings
+
             for (index in metadataMap.keys) {
                 val metadata = metadataMap[index]!!.sourceAsMap["properties"] as Map<String, Any>
                 if (!metadata.keys.contains(timestampField)) {
