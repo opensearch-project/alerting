@@ -5,6 +5,8 @@
 
 package org.opensearch.alerting
 
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 import org.apache.logging.log4j.LogManager
 import org.json.JSONArray
 import org.json.JSONObject
@@ -51,12 +53,14 @@ import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.node.NodeClient
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset.UTC
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.min
+import kotlin.time.measureTimedValue
 
 object PPLSQLMonitorRunner : MonitorV2Runner {
     private val logger = LogManager.getLogger(javaClass)
@@ -79,6 +83,9 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
         }
 
         logger.debug("Running PPL Monitor: ${monitorV2.id}. Thread: ${Thread.currentThread().name}")
+
+        // time the monitor execution run for informational logging
+        val monitorRunStart = Instant.now()
 
         val pplSqlMonitor = monitorV2
         val nodeClient = monitorCtx.client as NodeClient
@@ -120,6 +127,68 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
         }
 
         // run each trigger
+        try {
+            withTimeout(4 * 60 * 1000) {
+                runTriggers(
+                    pplSqlMonitor,
+                    timeFilteredQuery,
+                    timeOfCurrentExecution,
+                    manual,
+                    dryRun,
+                    triggerResults,
+                    pplSqlQueryResults,
+                    executionId,
+                    monitorCtx,
+                    nodeClient
+                )
+            }
+        } catch (e: TimeoutCancellationException) {
+            // generate an alert that the monitor's triggers took
+            // too long to run. this error alert is generated
+            // even if some triggers managed to run successfully within
+            // the above time frame and generate their own alerts
+            monitorCtx.retryPolicy?.let {
+                saveAlertsV2(
+                    generateErrorAlert(null, pplSqlMonitor, e, executionId, timeOfCurrentExecution),
+                    pplSqlMonitor,
+                    it,
+                    nodeClient
+                )
+            }
+        }
+
+        // for throttle checking purposes, reindex the PPL Monitor into the alerting-config index
+        // with updated last triggered times for each of its triggers
+        if (triggerResults.any { it.value.triggered }) {
+            updateMonitorWithLastTriggeredTimes(pplSqlMonitor, nodeClient)
+        }
+
+        val monitorRunEnd = Instant.now()
+
+        val monitorRunTime = Duration.between(monitorRunStart, monitorRunEnd)
+
+        logger.info("monitor ${pplSqlMonitor.id} execution $executionId run time: $monitorRunTime")
+
+        return PPLSQLMonitorRunResult(
+            pplSqlMonitor.name,
+            null,
+            triggerResults,
+            pplSqlQueryResults
+        )
+    }
+
+    private suspend fun runTriggers(
+        pplSqlMonitor: PPLSQLMonitor,
+        timeFilteredQuery: String,
+        timeOfCurrentExecution: Instant,
+        manual: Boolean,
+        dryRun: Boolean,
+        triggerResults: MutableMap<String, PPLSQLTriggerRunResult>,
+        pplSqlQueryResults: MutableMap<String, Map<String, Any>>,
+        executionId: String,
+        monitorCtx: MonitorRunnerExecutionContext,
+        nodeClient: NodeClient,
+    ) {
         for (pplSqlTrigger in pplSqlMonitor.triggers) {
             try {
                 // check for throttle and skip execution
@@ -153,20 +222,23 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                 // in the alert and notification must be added that results were excluded
                 // and an alert that should have been generated might not have been
 
-                logger.debug("executing the PPL query of monitor: ${monitorV2.id}")
+                logger.debug("executing the PPL query of monitor: ${pplSqlMonitor.id}")
                 // execute the PPL query
-                val queryResponseJson = withClosableContext(
-                    InjectorContextElement(
-                        pplSqlMonitor.id,
-                        monitorCtx.settings!!,
-                        monitorCtx.threadPool!!.threadContext,
-                        pplSqlMonitor.user?.roles,
-                        pplSqlMonitor.user
-                    )
-                ) {
-                    executePplQuery(limitedQueryToExecute, nodeClient)
+                val (queryResponseJson, timeTaken) = measureTimedValue {
+                    withClosableContext(
+                        InjectorContextElement(
+                            pplSqlMonitor.id,
+                            monitorCtx.settings!!,
+                            monitorCtx.threadPool!!.threadContext,
+                            pplSqlMonitor.user?.roles,
+                            pplSqlMonitor.user
+                        )
+                    ) {
+                        executePplQuery(limitedQueryToExecute, nodeClient)
+                    }
                 }
                 logger.debug("query results for trigger ${pplSqlTrigger.id}: $queryResponseJson")
+                logger.debug("time taken to execute query against sql/ppl plugin: $timeTaken")
 
                 // store the query results for Execute Monitor API response
                 // unlike the query results stored in alerts and notifications, which must be size capped
@@ -215,7 +287,8 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                         timeOfCurrentExecution
                     )
 
-                    // update the trigger's last execution time for future throttle checks
+                    // for future throttle checks, update the trigger's last execution time
+                    // in the monitor object stored in memory
                     pplSqlTrigger.lastTriggeredTime = timeOfCurrentExecution
 
                     // send alert notifications
@@ -242,6 +315,8 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                     monitorCtx.retryPolicy?.let {
                         saveAlertsV2(thisTriggersGeneratedAlerts, pplSqlMonitor, it, nodeClient)
                     }
+
+                    logger.debug("PPL Trigger ${pplSqlTrigger.id} executed successfully")
                 }
             } catch (e: Exception) {
                 logger.error(
@@ -263,19 +338,6 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                 continue
             }
         }
-
-        // for throttle checking purposes, reindex the PPL Monitor into the alerting-config index
-        // with updated last triggered times for each of its triggers
-        if (triggerResults.any { it.value.triggered }) {
-            updateMonitorWithLastTriggeredTimes(pplSqlMonitor, nodeClient)
-        }
-
-        return PPLSQLMonitorRunResult(
-            pplSqlMonitor.name,
-            null,
-            triggerResults,
-            pplSqlQueryResults
-        )
     }
 
     // returns true if the pplTrigger should be throttled
@@ -461,13 +523,13 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
     }
 
     private fun generateErrorAlert(
-        pplSqlTrigger: PPLSQLTrigger,
+        pplSqlTrigger: PPLSQLTrigger?,
         pplSqlMonitor: PPLSQLMonitor,
         exception: Exception,
         executionId: String,
         timeOfCurrentExecution: Instant
     ): List<AlertV2> {
-        val errorMessage = "Failed to run PPL Trigger ${pplSqlTrigger.name} from PPL Monitor ${pplSqlMonitor.name}: " +
+        val errorMessage = "Failed to run PPL Monitor ${pplSqlMonitor.id}, PPL Trigger ${pplSqlTrigger?.id}: " +
             exception.userErrorMessage()
         val obfuscatedErrorMessage = AlertError.obfuscateIPAddresses(errorMessage)
 
@@ -476,8 +538,8 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
             monitorName = pplSqlMonitor.name,
             monitorVersion = pplSqlMonitor.version,
             monitorUser = pplSqlMonitor.user,
-            triggerId = pplSqlTrigger.id,
-            triggerName = pplSqlTrigger.name,
+            triggerId = pplSqlTrigger?.id ?: "",
+            triggerName = pplSqlTrigger?.name ?: "",
             query = pplSqlMonitor.query,
             queryResults = mapOf(),
             triggeredTime = timeOfCurrentExecution,
@@ -525,6 +587,9 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
         }
     }
 
+    // during monitor execution, the ppl sql monitor object stored in memory had its triggers updated
+    // with their last trigger times. this function simply indexes those updated triggers into the
+    // alerting-config index
     private suspend fun updateMonitorWithLastTriggeredTimes(pplSqlMonitor: PPLSQLMonitor, client: NodeClient) {
         val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
             .id(pplSqlMonitor.id)
