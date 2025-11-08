@@ -6,6 +6,7 @@
 package org.opensearch.alerting.util
 
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
+import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.master.AcknowledgedResponse
 import org.opensearch.alerting.alerts.AlertIndices
@@ -47,6 +48,7 @@ class IndexUtils {
             private set
         var commentsIndexUpdated: Boolean = false
             private set
+
         var lastUpdatedAlertHistoryIndex: String? = null
         var lastUpdatedFindingHistoryIndex: String? = null
         var lastUpdatedCommentsHistoryIndex: String? = null
@@ -205,6 +207,19 @@ class IndexUtils {
         @JvmStatic
         fun getCreationDateForIndex(index: String, clusterState: ClusterState): Long {
             return clusterState.metadata.index(index).creationDate
+        }
+
+        @JvmStatic
+        fun checkShardsFailure(response: IndexResponse): String? {
+            val failureReasons = StringBuilder()
+            if (response.shardInfo.failed > 0) {
+                response.shardInfo.failures.forEach {
+                        entry ->
+                    failureReasons.append(entry.reason())
+                }
+                return failureReasons.toString()
+            }
+            return null
         }
     }
 }
