@@ -171,6 +171,16 @@ class MonitorV2RestApiIT : AlertingRestTestCase() {
         assertEquals("PPL Monitor not found during search", 1, numberDocsFound)
     }
 
+    fun `test delete ppl monitor`() {
+        val pplMonitor = createRandomPPLMonitor()
+
+        val deleteResponse = client().makeRequest("DELETE", "$MONITOR_V2_BASE_URI/${pplMonitor.id}")
+        assertEquals("Delete failed", RestStatus.OK, deleteResponse.restStatus())
+
+        val getResponse = client().makeRequest("HEAD", "$MONITOR_V2_BASE_URI/${pplMonitor.id}")
+        assertEquals("Deleted monitor still exists", RestStatus.NOT_FOUND, getResponse.restStatus())
+    }
+
     fun `test parsing ppl monitor as a scheduled job`() {
         val monitorV2 = createRandomPPLMonitor()
 
@@ -464,6 +474,17 @@ class MonitorV2RestApiIT : AlertingRestTestCase() {
 
         try {
             client().makeRequest("PUT", "$MONITOR_V2_BASE_URI/$randomId", emptyMap(), monitorV2.toHttpEntity())
+            fail("Expected request to fail with NOT_FOUND but it succeeded")
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.NOT_FOUND, e.response.restStatus())
+        }
+    }
+
+    fun `test delete nonexistent ppl monitor fails`() {
+        val randomId = UUIDs.base64UUID()
+
+        try {
+            client().makeRequest("DELETE", "$MONITOR_V2_BASE_URI/$randomId")
             fail("Expected request to fail with NOT_FOUND but it succeeded")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.NOT_FOUND, e.response.restStatus())
