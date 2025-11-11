@@ -126,9 +126,14 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
             pplSqlMonitor.query
         }
 
+        val monitorExecutionDuration = monitorCtx
+            .clusterService!!
+            .clusterSettings
+            .get(AlertingSettings.ALERT_V2_MONITOR_EXECUTION_MAX_DURATION)
+
         // run each trigger
         try {
-            withTimeout(4 * 60 * 1000) {
+            withTimeout(monitorExecutionDuration.millis) {
                 runTriggers(
                     pplSqlMonitor,
                     timeFilteredQuery,
@@ -156,6 +161,13 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                     nodeClient
                 )
             }
+
+            return PPLSQLMonitorRunResult(
+                pplSqlMonitor.name,
+                e,
+                triggerResults,
+                pplSqlQueryResults
+            )
         }
 
         // for throttle checking purposes, reindex the PPL Monitor into the alerting-config index
@@ -178,7 +190,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
         )
     }
 
-    private suspend fun runTriggers(
+    suspend fun runTriggers(
         pplSqlMonitor: PPLSQLMonitor,
         timeFilteredQuery: String,
         timeOfCurrentExecution: Instant,
@@ -340,8 +352,6 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                         nodeClient
                     )
                 }
-
-                continue
             }
         }
     }

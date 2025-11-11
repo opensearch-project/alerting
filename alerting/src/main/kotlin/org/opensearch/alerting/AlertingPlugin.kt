@@ -488,6 +488,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.ALERT_V2_HISTORY_INDEX_MAX_AGE,
             AlertingSettings.ALERT_V2_HISTORY_MAX_DOCS,
             AlertingSettings.ALERT_V2_HISTORY_RETENTION_PERIOD,
+            AlertingSettings.ALERT_V2_MONITOR_EXECUTION_MAX_DURATION,
             AlertingSettings.ALERTING_V2_MAX_MONITORS,
             AlertingSettings.ALERTING_V2_MAX_THROTTLE_DURATION,
             AlertingSettings.ALERTING_V2_MAX_EXPIRE_DURATION,

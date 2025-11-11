@@ -10,7 +10,9 @@ import org.opensearch.alerting.core.settings.AlertingV2Settings
 import org.opensearch.alerting.modelv2.PPLSQLTrigger.ConditionType
 import org.opensearch.alerting.modelv2.PPLSQLTrigger.NumResultsCondition
 import org.opensearch.alerting.modelv2.PPLSQLTrigger.TriggerMode
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.test.OpenSearchTestCase
 import java.time.temporal.ChronoUnit.MINUTES
@@ -28,6 +30,45 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
     @Before
     fun enableAlertingV2() {
         client().updateSettings(AlertingV2Settings.ALERTING_V2_ENABLED.key, "true")
+    }
+
+    fun `test monitor execution timeout generates error alert`() {
+        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
+        indexDocFromSomeTimeAgo(2, MINUTES, "abc", 5)
+
+        val pplMonitor = createRandomPPLMonitor(
+            randomPPLMonitor(
+                enabled = true,
+                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                lookBackWindow = null,
+                triggers = listOf(
+                    randomPPLTrigger(
+                        throttleDuration = null,
+                        expireDuration = 5,
+                        mode = TriggerMode.RESULT_SET,
+                        conditionType = ConditionType.NUMBER_OF_RESULTS,
+                        numResultsCondition = NumResultsCondition.GREATER_THAN,
+                        numResultsValue = 0L,
+                        customCondition = null
+                    )
+                ),
+                query = "source = $TEST_INDEX_NAME | head 10"
+            )
+        )
+
+        // set the monitor execution timebox to 1 nanosecond to guarantee a timeout
+        client().updateSettings(AlertingSettings.ALERT_V2_MONITOR_EXECUTION_MAX_DURATION.key, TimeValue.timeValueNanos(1L))
+
+        val executeMonitorResponse = executeMonitorV2(pplMonitor.id)
+
+        val getAlertsResponse = getAlertV2s()
+        val alertsGenerated = numAlerts(getAlertsResponse) > 0
+        val containsErrorAlert = containsErrorAlert(getAlertsResponse)
+        val executeResponseContainsError = (entityAsMap(executeMonitorResponse)["error"] as String?) != null
+
+        assert(alertsGenerated) { "Alerts should have been generated but they weren't" }
+        assert(containsErrorAlert) { "Error alert should have been generated for timeout but wasn't" }
+        assert(executeResponseContainsError) { "Execute monitor response should've included an error message but didn't" }
     }
 
     fun `test running number of results condition and result set mode ppl monitor`() {

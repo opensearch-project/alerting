@@ -324,6 +324,12 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        val ALERT_V2_MONITOR_EXECUTION_MAX_DURATION = Setting.positiveTimeSetting(
+            "plugins.alerting.v2.alert_monitor_execution_max_duration",
+            TimeValue(4, TimeUnit.MINUTES),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
         val ALERTING_V2_MAX_MONITORS = Setting.intSetting(
             "plugins.alerting.v2.monitor.max_monitors",
             1000,

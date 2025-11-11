@@ -2260,6 +2260,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return entityAsMap(getAlertsResponse)["total_alerts_v2"] as Int
     }
 
+    protected fun containsErrorAlert(getAlertsResponse: Response): Boolean {
+        val getAlertsMap = entityAsMap(getAlertsResponse)
+        val alertsList = getAlertsMap["alerts_v2"] as List<Map<String, Any>>
+        alertsList.forEach { alert ->
+            val errorMessage = alert["error_message"] as String?
+            if (errorMessage != null) return true
+        }
+        return false
+    }
+
     protected fun getAlertV2HistoryDocCount(): Long {
         val request = """
             {
