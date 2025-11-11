@@ -9,8 +9,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.opensearch.alerting.core.ppl.PPLPluginInterface
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.cluster.node.DiscoveryNode
 import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest
-import org.opensearch.transport.client.node.NodeClient
+import org.opensearch.transport.TransportService
 
 object PPLUtils {
     /**
@@ -77,7 +78,11 @@ object PPLUtils {
      * @note The response format follows the PPL plugin's Execute API response structure with
      *       "schema", "datarows", "total", and "size" fields.
      */
-    suspend fun executePplQuery(query: String, client: NodeClient): JSONObject {
+    suspend fun executePplQuery(
+        query: String,
+        localNode: DiscoveryNode,
+        transportService: TransportService
+    ): JSONObject {
         // call PPL plugin to execute query
         val transportPplQueryRequest = TransportPPLQueryRequest(
             query,
@@ -87,7 +92,8 @@ object PPLUtils {
 
         val transportPplQueryResponse = PPLPluginInterface.suspendUntil {
             this.executeQuery(
-                client,
+                transportService,
+                localNode,
                 transportPplQueryRequest,
                 it
             )

@@ -139,7 +139,8 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                     pplSqlQueryResults,
                     executionId,
                     monitorCtx,
-                    nodeClient
+                    nodeClient,
+                    transportService
                 )
             }
         } catch (e: TimeoutCancellationException) {
@@ -188,6 +189,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
         executionId: String,
         monitorCtx: MonitorRunnerExecutionContext,
         nodeClient: NodeClient,
+        transportService: TransportService
     ) {
         for (pplSqlTrigger in pplSqlMonitor.triggers) {
             try {
@@ -234,7 +236,11 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                             pplSqlMonitor.user
                         )
                     ) {
-                        executePplQuery(limitedQueryToExecute, nodeClient)
+                        executePplQuery(
+                            limitedQueryToExecute,
+                            monitorCtx.clusterService!!.state().nodes.localNode,
+                            transportService
+                        )
                     }
                 }
                 logger.debug("query results for trigger ${pplSqlTrigger.id}: $queryResponseJson")
