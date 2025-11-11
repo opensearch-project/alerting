@@ -19,6 +19,7 @@ import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.PPL_FULL_ACCESS_ROLE
 import org.opensearch.alerting.ROLE_TO_PERMISSION_MAPPING
 import org.opensearch.alerting.TEST_INDEX_NAME
+import org.opensearch.alerting.core.settings.AlertingV2Settings
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.randomPPLMonitor
 import org.opensearch.client.ResponseException
@@ -52,6 +53,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
 
     @Before
     fun create() {
+        client().updateSettings(AlertingV2Settings.ALERTING_V2_ENABLED.key, "true")
         if (userClient == null) {
             createUser(user, arrayOf())
             userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, password)

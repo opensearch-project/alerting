@@ -23,11 +23,14 @@ import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.alerting.action.ExecuteWorkflowResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertMover.Companion.moveAlerts
+import org.opensearch.alerting.alertsv2.AlertV2Indices
+import org.opensearch.alerting.alertsv2.AlertV2Mover.Companion.moveAlertV2s
 import org.opensearch.alerting.core.JobRunner
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.lock.LockModel
 import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.model.destination.DestinationContextFactory
+import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.remote.monitors.RemoteDocumentLevelMonitorRunner
@@ -134,6 +137,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
     fun registerAlertIndices(alertIndices: AlertIndices): MonitorRunnerService {
         this.monitorCtx.alertIndices = alertIndices
+        return this
+    }
+
+    fun registerAlertV2Indices(alertV2Indices: AlertV2Indices): MonitorRunnerService {
+        this.monitorCtx.alertV2Indices = alertV2Indices
         return this
     }
 
@@ -316,6 +324,18 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                     logger.error("Failed to move active alerts for monitor [${job.id}].", e)
                 }
             }
+        } else if (job is MonitorV2) {
+            launch {
+                try {
+                    monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
+                        if (monitorCtx.alertV2Indices!!.isAlertV2Initialized()) {
+                            moveAlertV2s(job.id, job, monitorCtx)
+                        }
+                    }
+                } catch (e: Exception) {
+                    logger.error("Failed to move active alertV2s for monitorV2 [${job.id}].", e)
+                }
+            }
         } else {
             throw IllegalArgumentException("Invalid job type")
         }
@@ -338,6 +358,15 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 }
             } catch (e: Exception) {
                 logger.error("Failed to move active alerts for monitor [$jobId].", e)
+            }
+            try {
+                monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
+                    if (monitorCtx.alertV2Indices!!.isAlertV2Initialized()) {
+                        moveAlertV2s(jobId, null, monitorCtx)
+                    }
+                }
+            } catch (e: Exception) {
+                logger.error("Failed to move active alertV2s for monitorV2 [$jobId].", e)
             }
         }
     }
@@ -433,20 +462,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     ): MonitorRunResult<*> {
         // Updating the scheduled job index at the start of monitor execution runs for when there is an upgrade the the schema mapping
         // has not been updated.
-        if (!IndexUtils.scheduledJobIndexUpdated && monitorCtx.clusterService != null && monitorCtx.client != null) {
-            IndexUtils.updateIndexMapping(
-                ScheduledJob.SCHEDULED_JOBS_INDEX,
-                ScheduledJobIndices.scheduledJobMappings(), monitorCtx.clusterService!!.state(), monitorCtx.client!!.admin().indices(),
-                object : ActionListener<AcknowledgedResponse> {
-                    override fun onResponse(response: AcknowledgedResponse) {
-                    }
-
-                    override fun onFailure(t: Exception) {
-                        logger.error("Failed to update config index schema", t)
-                    }
-                }
-            )
-        }
+        updateAlertingConfigIndexSchema()
 
         if (job is Workflow) {
             logger.info("Executing scheduled workflow - id: ${job.id}, periodStart: $periodStart, periodEnd: $periodEnd, dryrun: $dryrun")
@@ -581,5 +597,22 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         return monitorCtx.scriptService!!.compile(template, TemplateScript.CONTEXT)
             .newInstance(template.params + mapOf("ctx" to ctx.asTemplateArg()))
             .execute()
+    }
+
+    private fun updateAlertingConfigIndexSchema() {
+        if (!IndexUtils.scheduledJobIndexUpdated && monitorCtx.clusterService != null && monitorCtx.client != null) {
+            IndexUtils.updateIndexMapping(
+                ScheduledJob.SCHEDULED_JOBS_INDEX,
+                ScheduledJobIndices.scheduledJobMappings(), monitorCtx.clusterService!!.state(), monitorCtx.client!!.admin().indices(),
+                object : ActionListener<AcknowledgedResponse> {
+                    override fun onResponse(response: AcknowledgedResponse) {
+                    }
+
+                    override fun onFailure(t: Exception) {
+                        logger.error("Failed to update config index schema", t)
+                    }
+                }
+            )
+        }
     }
 }

@@ -20,6 +20,7 @@ import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.MONITOR_V2_BASE_URI
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRITE_INDEX
+import org.opensearch.alerting.alertsv2.AlertV2Indices
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.CustomWebhook
@@ -27,6 +28,7 @@ import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.Slack
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
+import org.opensearch.alerting.modelv2.AlertV2
 import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.alerting.modelv2.PPLSQLMonitor
 import org.opensearch.alerting.settings.AlertingSettings
@@ -860,6 +862,35 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         }
     }
 
+    protected fun searchAlertV2s(
+        monitorV2Id: String,
+        indices: String = AlertV2Indices.ALERT_V2_INDEX,
+        refresh: Boolean = true
+    ): List<AlertV2> {
+        try {
+            if (refresh) refreshIndex(indices)
+        } catch (e: Exception) {
+            logger.warn("Could not refresh index $indices because: ${e.message}")
+            return emptyList()
+        }
+
+        // If this is a test monitor (it doesn't have an ID) and no alerts will be saved for it.
+        val searchParams = if (monitorV2Id != MonitorV2.NO_ID) mapOf("routing" to monitorV2Id) else mapOf()
+        val request = """
+                { "version" : true,
+                  "query" : { "term" : { "${AlertV2.MONITOR_V2_ID_FIELD}" : "$monitorV2Id" } }
+                }
+        """.trimIndent()
+        val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", searchParams, StringEntity(request, APPLICATION_JSON))
+        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
+
+        val searchResponse = SearchResponse.fromXContent(createParser(jsonXContent, httpResponse.entity.content))
+        return searchResponse.hits.hits.map {
+            val xcp = createParser(jsonXContent, it.sourceRef)
+            AlertV2.parse(xcp, it.id, it.version)
+        }
+    }
+
     protected fun acknowledgeAlerts(monitor: Monitor, vararg alerts: Alert): Response {
         val request = XContentFactory.jsonBuilder().startObject()
             .array("alerts", *alerts.map { it.id }.toTypedArray())
@@ -917,7 +948,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun getAlertV2s(): Response {
         val response = client().makeRequest(
             "GET",
-            "$MONITOR_V2_BASE_URI/alerts?",
+            "$MONITOR_V2_BASE_URI/alerts",
             null,
             BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
         )
@@ -1427,6 +1458,14 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val settings = Settings.builder().put("index.hidden", true).build()
 //        createIndex(AlertIndices.FINDING_HISTORY_WRITE_INDEX, settings, mappingHack)
         createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertIndices.FINDING_HISTORY_WRITE_INDEX}\" : {}")
+    }
+
+    fun putAlertV2Mappings(mapping: String? = null) {
+        val mappingHack = if (mapping != null) mapping else AlertV2Indices.alertV2Mapping().trimStart('{').trimEnd('}')
+        val encodedHistoryIndex = URLEncoder.encode(AlertV2Indices.ALERT_V2_HISTORY_INDEX_PATTERN, Charsets.UTF_8.toString())
+        val settings = Settings.builder().put("index.hidden", true).build()
+        createIndex(AlertV2Indices.ALERT_V2_INDEX, settings, mappingHack)
+        createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertV2Indices.ALERT_V2_HISTORY_WRITE_INDEX}\" : {}")
     }
 
     fun scheduledJobMappings(): String {
@@ -2214,7 +2253,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
         val searchResponse = client().makeRequest(
             "POST", "$MONITOR_V2_BASE_URI/_search",
-            StringEntity(search, ContentType.APPLICATION_JSON)
+            StringEntity(search, APPLICATION_JSON)
         )
 
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
@@ -2235,6 +2274,22 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     // takes in a get alerts API response and returns the current number of active alerts
     protected fun numAlerts(getAlertsResponse: Response): Int {
         logger.info("get alerts response: ${entityAsMap(getAlertsResponse)}")
-        return entityAsMap(getAlertsResponse)["totalAlertV2s"] as Int
+        return entityAsMap(getAlertsResponse)["total_alerts_v2"] as Int
+    }
+
+    protected fun getAlertV2HistoryDocCount(): Long {
+        val request = """
+            {
+                "query": {
+                    "match_all": {}
+                }
+            }
+        """.trimIndent()
+        val response = adminClient().makeRequest(
+            "POST", "${AlertV2Indices.ALERT_V2_HISTORY_ALL}/_search", emptyMap(),
+            StringEntity(request, APPLICATION_JSON)
+        )
+        assertEquals("Request to get alert v2 history failed", RestStatus.OK, response.restStatus())
+        return SearchResponse.fromXContent(createParser(jsonXContent, response.entity.content)).hits.totalHits!!.value
     }
 }
