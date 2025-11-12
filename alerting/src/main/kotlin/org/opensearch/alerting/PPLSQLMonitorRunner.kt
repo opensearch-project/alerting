@@ -131,6 +131,10 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
             .clusterSettings
             .get(AlertingSettings.ALERT_V2_MONITOR_EXECUTION_MAX_DURATION)
 
+        // for storing any exception that may or may not happen
+        // while executing monitor
+        var exception: Exception? = null
+
         // run each trigger
         try {
             withTimeout(monitorExecutionDuration.millis) {
@@ -162,12 +166,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                 )
             }
 
-            return PPLSQLMonitorRunResult(
-                pplSqlMonitor.name,
-                e,
-                triggerResults,
-                pplSqlQueryResults
-            )
+            exception = e
         }
 
         // for throttle checking purposes, reindex the PPL Monitor into the alerting-config index
@@ -184,7 +183,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
 
         return PPLSQLMonitorRunResult(
             pplSqlMonitor.name,
-            null,
+            exception,
             triggerResults,
             pplSqlQueryResults
         )
