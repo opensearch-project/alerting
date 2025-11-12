@@ -115,7 +115,7 @@ data class PPLSQLTrigger(
             require(it.destinationId.isNotEmpty()) {
                 "Channel ID should not be empty."
             }
-            require(it.destinationId.matches(Regex("^[a-zA-Z0-9_-]+$"))) {
+            require(it.destinationId.matches(validCharsRegex)) {
                 "Channel ID should only have alphanumeric characters, dashes, and underscores."
             }
         }
@@ -266,6 +266,10 @@ data class PPLSQLTrigger(
         const val NUM_RESULTS_CONDITION_FIELD = "num_results_condition"
         const val NUM_RESULTS_VALUE_FIELD = "num_results_value"
         const val CUSTOM_CONDITION_FIELD = "custom_condition"
+
+        // regular expression for validating that a string contains
+        // only valid chars (letters, numbers, -, _)
+        private val validCharsRegex = """^[a-zA-Z0-9_-]+$""".toRegex()
 
         val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(
             TriggerV2::class.java,

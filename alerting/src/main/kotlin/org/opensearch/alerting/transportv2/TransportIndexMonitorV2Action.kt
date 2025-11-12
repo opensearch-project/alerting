@@ -245,8 +245,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
         // first attempt to run the monitor query and all possible
         // extensions of it (from custom conditions)
         try {
-//            val nodeClient = client as NodeClient
-
             // first run the base query as is.
             // if there are any PPL syntax or index not found or other errors,
             // this will throw an exception
