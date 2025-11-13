@@ -258,7 +258,7 @@ data class PPLSQLTrigger(
 
     companion object {
         // trigger wrapper object field name
-        const val PPL_SQL_TRIGGER_FIELD = "ppl_sql_trigger"
+        const val PPL_SQL_TRIGGER_FIELD = "ppl_trigger"
 
         // field names
         const val MODE_FIELD = "mode"

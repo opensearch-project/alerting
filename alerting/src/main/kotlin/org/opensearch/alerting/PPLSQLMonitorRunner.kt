@@ -51,6 +51,7 @@ import org.opensearch.commons.alerting.model.userErrorMessage
 import org.opensearch.core.common.Strings
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent
+import org.opensearch.index.VersionType
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.node.NodeClient
 import java.time.Duration
@@ -617,6 +618,9 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                 )
             )
             .routing(pplSqlMonitor.id)
+            .version(pplSqlMonitor.version)
+            .versionType(VersionType.EXTERNAL_GTE)
+
         val indexResponse = client.suspendUntil { index(indexRequest, it) }
 
         logger.debug("PPLSQLMonitor update with last execution times index response: ${indexResponse.result}")

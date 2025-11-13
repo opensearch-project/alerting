@@ -609,6 +609,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         }
         logger.info("ppl monitor: $pplMonitorConfig")
+
         val pplMonitorId = createMonitorV2(pplMonitorConfig).id
         return getMonitorV2(monitorV2Id = pplMonitorId) as PPLSQLMonitor
     }

@@ -95,6 +95,8 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             )
         )
 
+        val versionBefore = pplMonitor.version
+
         val executeResponse = executeMonitorV2(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
 
@@ -103,6 +105,11 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
 
         assert(triggered) { "Monitor should have triggered but it didn't" }
         assert(alertsGenerated) { "Alerts should have been generated but they weren't" }
+
+        val pplMonitorAfter = getMonitorV2(pplMonitor.id)
+        val versionAfter = pplMonitorAfter.version
+
+        assert(versionBefore == versionAfter) { "Monitor version changed after monitor execution" }
     }
 
     fun `test running number of results condition and per result mode ppl monitor`() {
