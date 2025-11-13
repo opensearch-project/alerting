@@ -14,7 +14,6 @@ import org.opensearch.alerting.core.JobSweeperMetrics
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.schedule.JobScheduler
 import org.opensearch.alerting.core.schedule.JobSchedulerMetrics
-import org.opensearch.alerting.core.settings.AlertingV2Settings.Companion.ALERTING_V2_ENABLED
 import org.opensearch.cluster.health.ClusterIndexHealth
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -95,19 +94,7 @@ class ScheduledJobsStatsTransportAction : TransportNodesAction<ScheduledJobsStat
     ): ScheduledJobStats {
         val jobSweeperMetrics = jobSweeper.getJobSweeperMetrics()
 
-        val alertingV2Enabled = clusterService.clusterSettings.get(ALERTING_V2_ENABLED)
-        if (scheduledJobsStatusRequest.showAlertingV2ScheduledJobs && !alertingV2Enabled) {
-            throw IllegalArgumentException(
-                "Alerting V2 is currently disabled, please enable it with the " +
-                    "cluster setting: ${ALERTING_V2_ENABLED.key}."
-            )
-        }
-
-        val jobSchedulerMetrics = if (scheduledJobsStatusRequest.showAlertingV2ScheduledJobs) { // show V2 scheduled jobs
-            jobScheduler.getJobSchedulerV2Metric()
-        } else { // show V1 scheduled jobs
-            jobScheduler.getJobSchedulerMetric()
-        }
+        val jobSchedulerMetrics = jobScheduler.getJobSchedulerMetric(scheduledJobsStatusRequest.showAlertingV2ScheduledJobs)
 
         val status: ScheduledJobStats.ScheduleStatus = evaluateStatus(jobSchedulerMetrics, jobSweeperMetrics)
         return ScheduledJobStats(

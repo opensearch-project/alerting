@@ -58,7 +58,14 @@ class RestScheduledJobStatsHandler(private val path: String) : BaseRestHandler()
     }
 
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        val scheduledJobNodesStatsRequest = StatsRequestUtils.getStatsRequest(request, false, this::unrecognized)
+        val alertingVersion = request.param("version")
+        if (alertingVersion != null && alertingVersion !in listOf("v1", "v2")) {
+            throw IllegalArgumentException("Version parameter must be one of v1 or v2")
+        }
+
+        val showV2ScheduledJobs: Boolean? = alertingVersion?.let { it == "v2" }
+
+        val scheduledJobNodesStatsRequest = StatsRequestUtils.getStatsRequest(request, showV2ScheduledJobs, this::unrecognized)
         return RestChannelConsumer { channel ->
             client.execute(
                 ScheduledJobsStatsAction.INSTANCE,

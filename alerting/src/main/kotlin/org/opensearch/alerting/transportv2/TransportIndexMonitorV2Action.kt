@@ -745,8 +745,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
             .source(newMonitorV2.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
             .id(indexMonitorRequest.monitorId)
             .routing(indexMonitorRequest.monitorId)
-            .setIfSeqNo(indexMonitorRequest.seqNo)
-            .setIfPrimaryTerm(indexMonitorRequest.primaryTerm)
             .timeout(indexTimeout)
 
         log.info(

@@ -1618,14 +1618,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return map[key]
     }
 
-    fun getAlertingStats(metrics: String = ""): Map<String, Any> {
-        val monitorStatsResponse = client().makeRequest("GET", "/_plugins/_alerting/stats$metrics")
-        val responseMap = createParser(XContentType.JSON.xContent(), monitorStatsResponse.entity.content).map()
-        return responseMap
-    }
-
-    fun getAlertingV2Stats(metrics: String = ""): Map<String, Any> {
-        val monitorStatsResponse = client().makeRequest("GET", "/_plugins/_alerting/v2/stats$metrics")
+    fun getAlertingStats(metrics: String = "", alertingVersion: String? = null): Map<String, Any> {
+        val endpoint = "/_plugins/_alerting/stats$metrics${alertingVersion?.let { "?version=$it" }.orEmpty()}"
+        val monitorStatsResponse = client().makeRequest("GET", endpoint)
         val responseMap = createParser(XContentType.JSON.xContent(), monitorStatsResponse.entity.content).map()
         return responseMap
     }

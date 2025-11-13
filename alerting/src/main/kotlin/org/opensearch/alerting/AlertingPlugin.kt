@@ -33,7 +33,6 @@ import org.opensearch.alerting.core.action.node.ScheduledJobsStatsAction
 import org.opensearch.alerting.core.action.node.ScheduledJobsStatsTransportAction
 import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler
-import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsV2Handler
 import org.opensearch.alerting.core.schedule.JobScheduler
 import org.opensearch.alerting.core.settings.AlertingV2Settings
 import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSettings
@@ -253,8 +252,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestDeleteMonitorV2Action(),
             RestGetMonitorV2Action(),
             RestSearchMonitorV2Action(settings, clusterService),
-            RestGetAlertsV2Action(),
-            RestScheduledJobStatsV2Handler()
+            RestGetAlertsV2Action()
         )
     }
 

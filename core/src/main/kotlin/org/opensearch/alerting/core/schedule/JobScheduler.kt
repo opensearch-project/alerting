@@ -197,22 +197,19 @@ class JobScheduler(private val threadPool: ThreadPool, private val jobRunner: Jo
         return true
     }
 
-    fun getJobSchedulerMetric(): List<JobSchedulerMetrics> {
-        return scheduledJobIdToInfo.entries.filter { it.value.scheduledJob.type != monitorV2Type }
-            .stream()
-            .map { entry ->
-                JobSchedulerMetrics(
-                    entry.value.scheduledJobId,
-                    entry.value.actualPreviousExecutionTime?.toEpochMilli(),
-                    entry.value.scheduledJob.schedule.runningOnTime(entry.value.actualPreviousExecutionTime)
-                )
-            }
-            .collect(Collectors.toList())
-    }
+    fun getJobSchedulerMetric(showAlertingV2ScheduledJobs: Boolean?): List<JobSchedulerMetrics> {
+        val scheduledJobEntries = scheduledJobIdToInfo.entries
 
-    fun getJobSchedulerV2Metric(): List<JobSchedulerMetrics> {
-        return scheduledJobIdToInfo.entries.filter { it.value.scheduledJob.type == monitorV2Type }
-            .stream()
+        val filteredScheduledJobEntries = if (showAlertingV2ScheduledJobs == null) {
+            // if no alerting version was specified, do not filter
+            scheduledJobEntries
+        } else if (showAlertingV2ScheduledJobs) {
+            scheduledJobEntries.filter { it.value.scheduledJob.type == monitorV2Type }
+        } else {
+            scheduledJobEntries.filter { it.value.scheduledJob.type != monitorV2Type }
+        }
+
+        return filteredScheduledJobEntries.stream()
             .map { entry ->
                 JobSchedulerMetrics(
                     entry.value.scheduledJobId,

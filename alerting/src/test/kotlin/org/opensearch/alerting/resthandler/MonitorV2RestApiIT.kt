@@ -198,6 +198,30 @@ class MonitorV2RestApiIT : AlertingRestTestCase() {
         assertEquals(monitorV2, scheduledJob)
     }
 
+    fun `test monitor stats v1 and v2 only return stats for their respective monitors`() {
+        enableScheduledJob()
+
+        val monitorV1Id = createMonitor(randomQueryLevelMonitor(enabled = true)).id
+        val monitorV2Id = createRandomPPLMonitor(randomPPLMonitor(enabled = true)).id
+
+        val statsAllResponse = getAlertingStats(alertingVersion = null)
+        val statsV1Response = getAlertingStats(alertingVersion = "v1")
+        val statsV2Response = getAlertingStats(alertingVersion = "v2")
+
+        logger.info("all stats: $statsAllResponse")
+        logger.info("v1 stats: $statsV1Response")
+        logger.info("v2 stats: $statsV2Response")
+
+        assertTrue("All stats does not contain V1 Monitor", isMonitorScheduled(monitorV1Id, statsAllResponse))
+        assertTrue("All stats does not contain V2 Monitor", isMonitorScheduled(monitorV2Id, statsAllResponse))
+
+        assertTrue("V1 stats does not contain V1 Monitor", isMonitorScheduled(monitorV1Id, statsV1Response))
+        assertFalse("V1 stats contains V2 Monitor", isMonitorScheduled(monitorV2Id, statsV1Response))
+
+        assertTrue("V2 stats does not contain V2 Monitor", isMonitorScheduled(monitorV2Id, statsV2Response))
+        assertFalse("V2 stats contains V1 Monitor", isMonitorScheduled(monitorV1Id, statsV2Response))
+    }
+
     /* Validation Tests */
     fun `test create ppl monitor that queries nonexistent index fails`() {
         val pplMonitorConfig = randomPPLMonitor(
@@ -496,23 +520,5 @@ class MonitorV2RestApiIT : AlertingRestTestCase() {
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.NOT_FOUND, e.response.restStatus())
         }
-    }
-
-    fun `test monitor stats v1 and v2 only return stats for their respective monitors`() {
-        enableScheduledJob()
-
-        val monitorV1Id = createMonitor(randomQueryLevelMonitor(enabled = true)).id
-        val monitorV2Id = createRandomPPLMonitor(randomPPLMonitor(enabled = true)).id
-
-        val statsV1Response = getAlertingStats()
-        val statsV2Response = getAlertingV2Stats()
-
-        logger.info("v1 stats: $statsV1Response")
-        logger.info("v2 stats: $statsV2Response")
-
-        assertTrue("V1 stats does not contain V1 Monitor", isMonitorScheduled(monitorV1Id, statsV1Response))
-        assertTrue("V2 stats does not contain V2 Monitor", isMonitorScheduled(monitorV2Id, statsV2Response))
-        assertFalse("V2 stats contains V1 Monitor", isMonitorScheduled(monitorV1Id, statsV2Response))
-        assertFalse("V1 stats contains V2 Monitor", isMonitorScheduled(monitorV2Id, statsV1Response))
     }
 }

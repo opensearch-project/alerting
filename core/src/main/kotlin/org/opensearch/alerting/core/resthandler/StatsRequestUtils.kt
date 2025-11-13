@@ -17,12 +17,15 @@ internal object StatsRequestUtils {
 
     fun getStatsRequest(
         request: RestRequest,
-        showAlertingV2ScheduledJobs: Boolean,
+        showAlertingV2ScheduledJobs: Boolean?,
         unrecognizedFn: (RestRequest, Set<String>, Set<String>, String) -> String
     ): ScheduledJobsStatsRequest {
         val nodesIds = Strings.splitStringByCommaToArray(request.param("nodeId"))
         val metrics = Strings.tokenizeByCommaToSet(request.param("metric"))
-        val scheduledJobsStatsRequest = ScheduledJobsStatsRequest(nodeIds = nodesIds, showAlertingV2ScheduledJobs)
+        val scheduledJobsStatsRequest = ScheduledJobsStatsRequest(
+            nodeIds = nodesIds,
+            showAlertingV2ScheduledJobs = showAlertingV2ScheduledJobs
+        )
         scheduledJobsStatsRequest.timeout(request.param("timeout"))
 
         if (metrics.isEmpty()) {
