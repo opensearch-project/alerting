@@ -55,6 +55,11 @@ import java.io.IOException
 private val log = LogManager.getLogger(TransportGetAlertsV2Action::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
+/**
+ * Transport action that contains the core logic for retrieving v2 alerts.
+ *
+ * @opensearch.experimental
+ */
 class TransportGetAlertsV2Action @Inject constructor(
     transportService: TransportService,
     val client: Client,

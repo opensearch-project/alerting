@@ -57,6 +57,14 @@ import java.util.concurrent.TimeUnit
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 private val logger = LogManager.getLogger(AlertV2Mover::class.java)
 
+/**
+ * This class handles sweeping the active v2 alerts index for expired alerts, and
+ * either moving them to v2 alerts history index (if alert v2 history enabled) or
+ * permanently deleting them (if alert v2 history disabled). It also contains the
+ * logic for moving alerts in response to a monitor update or deletion.
+ *
+ * @opensearch.experimental
+ */
 class AlertV2Mover(
     settings: Settings,
     private val client: Client,

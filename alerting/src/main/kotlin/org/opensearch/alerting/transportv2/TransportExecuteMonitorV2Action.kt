@@ -45,6 +45,11 @@ import java.time.Instant
 
 private val log = LogManager.getLogger(TransportExecuteMonitorV2Action::class.java)
 
+/**
+ * Transport action for executing monitor V2s by calling the respective monitor V2 runners.
+ *
+ * @opensearch.experimental
+ */
 class TransportExecuteMonitorV2Action @Inject constructor(
     private val transportService: TransportService,
     private val client: Client,

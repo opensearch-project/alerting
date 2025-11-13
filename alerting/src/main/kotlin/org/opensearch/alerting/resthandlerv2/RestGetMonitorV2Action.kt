@@ -23,6 +23,11 @@ import org.opensearch.transport.client.node.NodeClient
 
 private val log = LogManager.getLogger(RestGetMonitorV2Action::class.java)
 
+/**
+ * This class consists of the REST handler to retrieve a V2 monitor by its ID.
+ *
+ * @opensearch.experimental
+ */
 class RestGetMonitorV2Action : BaseRestHandler() {
 
     override fun getName(): String {

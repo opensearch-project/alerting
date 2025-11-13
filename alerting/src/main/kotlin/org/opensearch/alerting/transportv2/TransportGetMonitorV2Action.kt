@@ -41,6 +41,11 @@ import org.opensearch.transport.client.Client
 private val log = LogManager.getLogger(TransportGetMonitorAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
+/**
+ * Transport action that contains the core logic for getting a monitor v2 by its ID.
+ *
+ * @opensearch.experimental
+ */
 class TransportGetMonitorV2Action @Inject constructor(
     transportService: TransportService,
     val client: Client,

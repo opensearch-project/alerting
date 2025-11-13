@@ -65,6 +65,8 @@ import java.time.Instant
  *                           required to be null otherwise.
  * @property customCondition A custom condition expression. Required if using CUSTOM conditions,
  *                           required to be null otherwise.
+ *
+ * @opensearch.experimental
  */
 data class PPLSQLTrigger(
     override val id: String = UUIDs.base64UUID(),

@@ -22,6 +22,14 @@ import java.io.IOException
 
 private val log: Logger = LogManager.getLogger(RestDeleteMonitorV2Action::class.java)
 
+/**
+ * This class consists of the REST handler to delete V2 monitors.
+ * When a monitor is deleted, all alerts are moved to the alert history index if alerting v2 history is enabled,
+ * or permanently deleted if alerting v2 history is disabled.
+ * If this process fails the monitor is not deleted.
+ *
+ * @opensearch.experimental
+ */
 class RestDeleteMonitorV2Action : BaseRestHandler() {
 
     override fun getName(): String {

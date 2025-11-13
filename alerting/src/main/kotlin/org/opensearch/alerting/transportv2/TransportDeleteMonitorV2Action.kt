@@ -42,6 +42,11 @@ import org.opensearch.transport.client.Client
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 private val log = LogManager.getLogger(TransportDeleteMonitorV2Action::class.java)
 
+/**
+ * Transport action that contains the core logic for deleting monitor V2s.
+ *
+ * @opensearch.experimental
+ */
 class TransportDeleteMonitorV2Action @Inject constructor(
     transportService: TransportService,
     val client: Client,

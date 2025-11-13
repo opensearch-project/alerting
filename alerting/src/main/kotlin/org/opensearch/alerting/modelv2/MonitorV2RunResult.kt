@@ -10,6 +10,12 @@ import org.opensearch.core.common.io.stream.StreamOutput
 import org.opensearch.core.common.io.stream.Writeable
 import org.opensearch.core.xcontent.ToXContent
 
+/**
+ * Monitor V2 run result interface. All classes that store the results
+ * of a monitor v2 run must implement this interface
+ *
+ * @opensearch.experimental
+ */
 interface MonitorV2RunResult<TriggerV2Result : TriggerV2RunResult> : Writeable, ToXContent {
     val monitorName: String
     val error: Exception?

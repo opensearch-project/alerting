@@ -30,7 +30,9 @@ import java.io.IOException
 private val log = LogManager.getLogger(RestIndexMonitorV2Action::class.java)
 
 /**
- * Rest handlers to create and update V2 Monitors like PPL Monitors
+ * Rest handlers to create and update V2 monitors
+ *
+ * @opensearch.experimental
  */
 class RestIndexMonitorV2Action : BaseRestHandler() {
     override fun getName(): String {

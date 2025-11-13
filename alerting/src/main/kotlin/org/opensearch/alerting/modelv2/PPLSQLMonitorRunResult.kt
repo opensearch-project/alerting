@@ -17,6 +17,11 @@ import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentBuilder
 import java.io.IOException
 
+/**
+ * A class that stores the run results of a PPL/SQL Monitor
+ *
+ * @opensearch.experimental
+ */
 data class PPLSQLMonitorRunResult(
     override val monitorName: String,
     override val error: Exception?,

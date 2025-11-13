@@ -24,6 +24,13 @@ import java.time.Instant
 
 private val log = LogManager.getLogger(RestExecuteMonitorV2Action::class.java)
 
+/**
+ * This class consists of the REST handler to execute V2 monitors manually.
+ * In addition to monitors running on their scheduled jobs, this API allows users
+ * to execute the monitor themselves to generate alerts and send notifications accordingly
+ *
+ * @opensearch.experimental
+ */
 class RestExecuteMonitorV2Action : BaseRestHandler() {
 
     override fun getName(): String = "execute_monitor_v2_action"

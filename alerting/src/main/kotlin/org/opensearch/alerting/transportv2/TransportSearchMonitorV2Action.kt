@@ -35,6 +35,11 @@ import org.opensearch.transport.client.Client
 
 private val log = LogManager.getLogger(TransportSearchMonitorV2Action::class.java)
 
+/**
+ * Transport action that contains the core logic for searching monitor V2s via an OpenSearch search query.
+ *
+ * @opensearch.experimental
+ */
 class TransportSearchMonitorV2Action @Inject constructor(
     transportService: TransportService,
     val settings: Settings,

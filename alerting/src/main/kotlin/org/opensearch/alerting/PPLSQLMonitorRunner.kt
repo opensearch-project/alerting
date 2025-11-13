@@ -63,6 +63,16 @@ import java.util.Locale
 import kotlin.math.min
 import kotlin.time.measureTimedValue
 
+/**
+ * This class contains the core logic for running a PPLSQLMonitor.
+ * The logic for checking throttles, executing the PPL Query, evaluating
+ * the results against the trigger condition, generating alerts, sending
+ * notifications, and updating the monitor document with last triggered
+ * time, are all here.
+ *
+ * @opensearch.experimental
+ */
+
 object PPLSQLMonitorRunner : MonitorV2Runner {
     private val logger = LogManager.getLogger(javaClass)
 
