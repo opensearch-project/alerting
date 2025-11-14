@@ -14,6 +14,7 @@ import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.AlertingV2Utils.validateMonitorV1
 import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
@@ -118,7 +119,12 @@ class TransportExecuteWorkflowAction @Inject constructor(
                                     xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                                     response.sourceAsBytesRef, XContentType.JSON
                                 ).use { xcp ->
-                                    val workflow = ScheduledJob.parse(xcp, response.id, response.version) as Workflow
+                                    val scheduledJob = ScheduledJob.parse(xcp, response.id, response.version)
+                                    validateMonitorV1(scheduledJob)?.let {
+                                        actionListener.onFailure(AlertingException.wrap(it))
+                                        return
+                                    }
+                                    val workflow = scheduledJob as Workflow
                                     executeWorkflow(workflow)
                                 }
                             }

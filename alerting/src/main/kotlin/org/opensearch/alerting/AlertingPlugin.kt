@@ -15,6 +15,7 @@ import org.opensearch.alerting.action.GetRemoteIndexesAction
 import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
 import org.opensearch.alerting.actionv2.DeleteMonitorV2Action
+import org.opensearch.alerting.actionv2.ExecuteMonitorV2Action
 import org.opensearch.alerting.actionv2.GetAlertsV2Action
 import org.opensearch.alerting.actionv2.GetMonitorV2Action
 import org.opensearch.alerting.actionv2.IndexMonitorV2Action
@@ -62,6 +63,7 @@ import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
 import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
 import org.opensearch.alerting.resthandler.RestSearchMonitorAction
 import org.opensearch.alerting.resthandlerv2.RestDeleteMonitorV2Action
+import org.opensearch.alerting.resthandlerv2.RestExecuteMonitorV2Action
 import org.opensearch.alerting.resthandlerv2.RestGetAlertsV2Action
 import org.opensearch.alerting.resthandlerv2.RestGetMonitorV2Action
 import org.opensearch.alerting.resthandlerv2.RestIndexMonitorV2Action
@@ -99,6 +101,7 @@ import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
 import org.opensearch.alerting.transportv2.TransportDeleteMonitorV2Action
+import org.opensearch.alerting.transportv2.TransportExecuteMonitorV2Action
 import org.opensearch.alerting.transportv2.TransportGetAlertsV2Action
 import org.opensearch.alerting.transportv2.TransportGetMonitorV2Action
 import org.opensearch.alerting.transportv2.TransportIndexMonitorV2Action
@@ -254,10 +257,11 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
 
             // Alerting V2
             RestIndexMonitorV2Action(),
+            RestExecuteMonitorV2Action(),
             RestDeleteMonitorV2Action(),
             RestGetMonitorV2Action(),
             RestSearchMonitorV2Action(settings, clusterService),
-            RestGetAlertsV2Action(),
+            RestGetAlertsV2Action()
         )
     }
 
@@ -297,6 +301,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(GetMonitorV2Action.INSTANCE, TransportGetMonitorV2Action::class.java),
             ActionPlugin.ActionHandler(SearchMonitorV2Action.INSTANCE, TransportSearchMonitorV2Action::class.java),
             ActionPlugin.ActionHandler(DeleteMonitorV2Action.INSTANCE, TransportDeleteMonitorV2Action::class.java),
+            ActionPlugin.ActionHandler(ExecuteMonitorV2Action.INSTANCE, TransportExecuteMonitorV2Action::class.java),
             ActionPlugin.ActionHandler(GetAlertsV2Action.INSTANCE, TransportGetAlertsV2Action::class.java)
         )
     }
@@ -490,6 +495,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.ALERT_V2_HISTORY_INDEX_MAX_AGE,
             AlertingSettings.ALERT_V2_HISTORY_MAX_DOCS,
             AlertingSettings.ALERT_V2_HISTORY_RETENTION_PERIOD,
+            AlertingSettings.ALERT_V2_MONITOR_EXECUTION_MAX_DURATION,
             AlertingSettings.ALERTING_V2_MAX_MONITORS,
             AlertingSettings.ALERTING_V2_MAX_THROTTLE_DURATION,
             AlertingSettings.ALERTING_V2_MAX_EXPIRE_DURATION,

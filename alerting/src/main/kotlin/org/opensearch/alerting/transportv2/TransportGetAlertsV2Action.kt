@@ -20,8 +20,10 @@ import org.opensearch.alerting.actionv2.GetAlertsV2Response
 import org.opensearch.alerting.alertsv2.AlertV2Indices
 import org.opensearch.alerting.core.settings.AlertingV2Settings.Companion.ALERTING_V2_ENABLED
 import org.opensearch.alerting.modelv2.AlertV2
+import org.opensearch.alerting.modelv2.AlertV2.Companion.MONITOR_V2_ID_FIELD
 import org.opensearch.alerting.modelv2.AlertV2.Companion.MONITOR_V2_NAME_FIELD
 import org.opensearch.alerting.modelv2.AlertV2.Companion.MONITOR_V2_USER_FIELD
+import org.opensearch.alerting.modelv2.AlertV2.Companion.SEVERITY_FIELD
 import org.opensearch.alerting.modelv2.AlertV2.Companion.TRIGGER_V2_NAME_FIELD
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
@@ -52,6 +54,11 @@ import java.io.IOException
 private val log = LogManager.getLogger(TransportGetAlertsV2Action::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
+/**
+ * Transport action that contains the core logic for retrieving v2 alerts.
+ *
+ * @opensearch.experimental
+ */
 class TransportGetAlertsV2Action @Inject constructor(
     transportService: TransportService,
     val client: Client,
@@ -109,11 +116,11 @@ class TransportGetAlertsV2Action @Inject constructor(
         val queryBuilder = QueryBuilders.boolQuery()
 
         if (getAlertsV2Request.severityLevel != "ALL") {
-            queryBuilder.filter(QueryBuilders.termQuery("severity", getAlertsV2Request.severityLevel))
+            queryBuilder.filter(QueryBuilders.termQuery(SEVERITY_FIELD, getAlertsV2Request.severityLevel))
         }
 
         if (!getAlertsV2Request.monitorV2Ids.isNullOrEmpty()) {
-            queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getAlertsV2Request.monitorV2Ids))
+            queryBuilder.filter(QueryBuilders.termsQuery(MONITOR_V2_ID_FIELD, getAlertsV2Request.monitorV2Ids))
         }
 
         if (!tableProp.searchString.isNullOrBlank()) {

@@ -30,7 +30,9 @@ import java.io.IOException
 private val log = LogManager.getLogger(RestIndexMonitorV2Action::class.java)
 
 /**
- * Rest handlers to create and update V2 Monitors like PPL Monitors
+ * Rest handlers to create and update V2 monitors
+ *
+ * @opensearch.experimental
  */
 class RestIndexMonitorV2Action : BaseRestHandler() {
     override fun getName(): String {
@@ -45,7 +47,7 @@ class RestIndexMonitorV2Action : BaseRestHandler() {
             ),
             Route(
                 PUT,
-                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitorV2Id}"
+                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitor_id}"
             )
         )
     }
@@ -66,7 +68,7 @@ class RestIndexMonitorV2Action : BaseRestHandler() {
             throw AlertingException.wrap(IllegalArgumentException(e.localizedMessage))
         }
 
-        val id = request.param("monitorV2Id", MonitorV2.NO_ID)
+        val id = request.param("monitor_id", MonitorV2.NO_ID)
         val seqNo = request.paramAsLong(IF_SEQ_NO, SequenceNumbers.UNASSIGNED_SEQ_NO)
         val primaryTerm = request.paramAsLong(IF_PRIMARY_TERM, SequenceNumbers.UNASSIGNED_PRIMARY_TERM)
         val refreshPolicy = if (request.hasParam(REFRESH)) {

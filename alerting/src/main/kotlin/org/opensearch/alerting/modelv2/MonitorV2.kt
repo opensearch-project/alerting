@@ -21,6 +21,11 @@ import org.opensearch.core.xcontent.XContentParserUtils
 import java.io.IOException
 import java.time.Instant
 
+/**
+ * Monitor V2 interface. All v2 monitors of different types must implement this interface.
+ *
+ * @opensearch.experimental
+ */
 interface MonitorV2 : ScheduledJob {
     override val id: String
     override val version: Long

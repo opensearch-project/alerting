@@ -10,6 +10,12 @@ import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.commons.notifications.model.BaseModel
 import java.time.Instant
 
+/**
+ * Trigger V2 interface. All triggers of different v2 monitor
+ * types must implement this interface
+ *
+ * @opensearch.experimental
+ */
 interface TriggerV2 : BaseModel {
 
     val id: String

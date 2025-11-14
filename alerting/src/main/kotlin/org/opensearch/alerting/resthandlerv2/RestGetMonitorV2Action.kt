@@ -23,6 +23,11 @@ import org.opensearch.search.fetch.subphase.FetchSourceContext
 
 private val log = LogManager.getLogger(RestGetMonitorV2Action::class.java)
 
+/**
+ * This class consists of the REST handler to retrieve a V2 monitor by its ID.
+ *
+ * @opensearch.experimental
+ */
 class RestGetMonitorV2Action : BaseRestHandler() {
 
     override fun getName(): String {
@@ -33,19 +38,19 @@ class RestGetMonitorV2Action : BaseRestHandler() {
         return listOf(
             Route(
                 GET,
-                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitorV2Id}"
+                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitor_id}"
             ),
             Route(
                 HEAD,
-                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitorV2Id}"
+                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitor_id}"
             )
         )
     }
 
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        log.debug("${request.method()} ${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitorV2Id}")
+        log.debug("${request.method()} ${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitor_id}")
 
-        val monitorV2Id = request.param("monitorV2Id")
+        val monitorV2Id = request.param("monitor_id")
         if (monitorV2Id == null || monitorV2Id.isEmpty()) {
             throw IllegalArgumentException("No MonitorV2 ID provided")
         }
