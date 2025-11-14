@@ -323,6 +323,12 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        val ALERT_V2_MONITOR_EXECUTION_MAX_DURATION = Setting.positiveTimeSetting(
+            "plugins.alerting.v2.alert_monitor_execution_max_duration",
+            TimeValue(4, TimeUnit.MINUTES),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
         val ALERTING_V2_MAX_MONITORS = Setting.intSetting(
             "plugins.alerting.v2.monitor.max_monitors",
             1000,
@@ -362,7 +368,7 @@ class AlertingSettings {
         // SQL/PPL plugin during monitor execution
         val ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS = Setting.longSetting(
             "plugins.alerting.v2.query_results_max_datarows",
-            1000L,
+            10000L,
             1L,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )

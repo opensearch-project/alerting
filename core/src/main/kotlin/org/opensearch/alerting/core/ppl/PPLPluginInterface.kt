@@ -1,6 +1,8 @@
 package org.opensearch.alerting.core.ppl
 
-import org.opensearch.client.node.NodeClient
+import org.opensearch.action.ActionListenerResponseHandler
+import org.opensearch.cluster.node.DiscoveryNode
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.action.ActionResponse
@@ -8,43 +10,56 @@ import org.opensearch.core.common.io.stream.Writeable
 import org.opensearch.sql.plugin.transport.PPLQueryAction
 import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest
 import org.opensearch.sql.plugin.transport.TransportPPLQueryResponse
+import org.opensearch.transport.TransportException
+import org.opensearch.transport.TransportRequestOptions
+import org.opensearch.transport.TransportService
 
 /**
  * Transport action plugin interfaces for the SQL/PPL plugin
  */
 object PPLPluginInterface {
     fun executeQuery(
-        client: NodeClient,
+        transportService: TransportService,
+        localNode: DiscoveryNode,
         request: TransportPPLQueryRequest,
-        listener: ActionListener<TransportPPLQueryResponse>
+        listener: ActionListener<TransportPPLQueryResponse>,
     ) {
-        client.execute(
-            PPLQueryAction.INSTANCE,
-            request,
-            wrapActionListener(listener) { response -> recreateObject(response) { TransportPPLQueryResponse(it) } }
-        )
-    }
 
-    /**
-     * Wrap action listener on concrete response class by a new created one on ActionResponse.
-     * This is required because the response may be loaded by different classloader across plugins.
-     * The onResponse(ActionResponse) avoids type cast exception and give a chance to recreate
-     * the response object.
-     */
-    @Suppress("UNCHECKED_CAST")
-    private fun <Response : ActionResponse> wrapActionListener(
-        listener: ActionListener<Response>,
-        recreate: (Writeable) -> Response
-    ): ActionListener<Response> {
-        return object : ActionListener<ActionResponse> {
+        val responseReader = Writeable.Reader<ActionResponse> {
+            TransportPPLQueryResponse(it)
+        }
+
+        val wrappedListener = object : ActionListener<ActionResponse> {
             override fun onResponse(response: ActionResponse) {
-                val recreated = recreate(response)
+                val recreated = recreateObject(response) { TransportPPLQueryResponse(it) }
                 listener.onResponse(recreated)
             }
 
-            override fun onFailure(exception: java.lang.Exception) {
+            override fun onFailure(exception: Exception) {
                 listener.onFailure(exception)
             }
-        } as ActionListener<Response>
+        }
+
+        transportService.sendRequest(
+            localNode,
+            PPLQueryAction.NAME,
+            request,
+            TransportRequestOptions
+                .builder()
+                .withTimeout(TimeValue.timeValueMinutes(1))
+                .build(),
+            object : ActionListenerResponseHandler<ActionResponse>(
+                wrappedListener,
+                responseReader
+            ) {
+                override fun handleResponse(response: ActionResponse) {
+                    wrappedListener.onResponse(response)
+                }
+
+                override fun handleException(e: TransportException) {
+                    wrappedListener.onFailure(e)
+                }
+            }
+        )
     }
 }
