@@ -11,7 +11,7 @@ import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.test.OpenSearchTestCase
 
 class GetAlertsV2RequestTests : OpenSearchTestCase() {
-    fun `test get alerts request`() {
+    fun `test get alerts request as stream`() {
         val table = Table("asc", "sortString", null, 1, 0, "")
 
         val req = GetAlertsV2Request(
@@ -32,7 +32,7 @@ class GetAlertsV2RequestTests : OpenSearchTestCase() {
         assertTrue(newReq.monitorV2Ids!!.contains("2"))
     }
 
-    fun `test get alerts request with filter`() {
+    fun `test get alerts request with filter as stream`() {
         val table = Table("asc", "sortString", null, 1, 0, "")
         val req = GetAlertsV2Request(table, "1", null)
         assertNotNull(req)

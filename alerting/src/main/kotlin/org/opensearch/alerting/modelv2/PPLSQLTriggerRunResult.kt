@@ -14,6 +14,12 @@ import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentBuilder
 import java.io.IOException
 
+/**
+ * A class that stores the run results of an individual
+ * PPL/SQL trigger within a PPL/SQL monitor
+ *
+ * @opensearch.experimental
+ */
 data class PPLSQLTriggerRunResult(
     override var triggerName: String,
     override var triggered: Boolean,
@@ -47,7 +53,7 @@ data class PPLSQLTriggerRunResult(
     companion object {
         @JvmStatic
         @Throws(IOException::class)
-        fun readFrom(sin: StreamInput): TriggerV2RunResult {
+        fun readFrom(sin: StreamInput): PPLSQLTriggerRunResult {
             return PPLSQLTriggerRunResult(sin)
         }
     }

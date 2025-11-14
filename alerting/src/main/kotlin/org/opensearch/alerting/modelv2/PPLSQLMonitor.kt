@@ -56,6 +56,8 @@ import java.time.Instant
  * @property schemaVersion Version of the alerting-config index schema used when this Monitor was indexed. Defaults to [NO_SCHEMA_VERSION].
  * @property queryLanguage The query language used. Defaults to [QueryLanguage.PPL].
  * @property query The query string to be executed by this monitor.
+ *
+ * @opensearch.experimental
  */
 data class PPLSQLMonitor(
     override val id: String = NO_ID,
