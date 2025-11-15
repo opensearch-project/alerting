@@ -18,6 +18,7 @@ import org.opensearch.alerting.AlertingV2Utils.validateMonitorV2
 import org.opensearch.alerting.actionv2.GetMonitorV2Action
 import org.opensearch.alerting.actionv2.GetMonitorV2Request
 import org.opensearch.alerting.actionv2.GetMonitorV2Response
+import org.opensearch.alerting.core.settings.AlertingV2Settings.Companion.ALERTING_V2_ENABLED
 import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.transport.SecureTransportAction
@@ -40,6 +41,11 @@ import org.opensearch.transport.TransportService
 private val log = LogManager.getLogger(TransportGetMonitorAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
+/**
+ * Transport action that contains the core logic for getting a monitor v2 by its ID.
+ *
+ * @opensearch.experimental
+ */
 class TransportGetMonitorV2Action @Inject constructor(
     transportService: TransportService,
     val client: Client,
@@ -55,13 +61,29 @@ class TransportGetMonitorV2Action @Inject constructor(
 ),
     SecureTransportAction {
 
+    @Volatile private var alertingV2Enabled = ALERTING_V2_ENABLED.get(settings)
+
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_ENABLED) { alertingV2Enabled = it }
         listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(task: Task, request: GetMonitorV2Request, actionListener: ActionListener<GetMonitorV2Response>) {
+        if (!alertingV2Enabled) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "Alerting V2 is currently disabled, please enable it with the " +
+                            "cluster setting: ${ALERTING_V2_ENABLED.key}",
+                        RestStatus.FORBIDDEN
+                    ),
+                )
+            )
+            return
+        }
+
         val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, request.monitorV2Id)
             .version(request.version)
             .fetchSourceContext(request.srcContext)

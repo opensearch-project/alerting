@@ -39,6 +39,7 @@ import org.opensearch.alerting.actionv2.IndexMonitorV2Action
 import org.opensearch.alerting.actionv2.IndexMonitorV2Request
 import org.opensearch.alerting.actionv2.IndexMonitorV2Response
 import org.opensearch.alerting.core.ScheduledJobIndices
+import org.opensearch.alerting.core.settings.AlertingV2Settings.Companion.ALERTING_V2_ENABLED
 import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.alerting.modelv2.MonitorV2.Companion.MONITOR_V2_TYPE
 import org.opensearch.alerting.modelv2.PPLSQLMonitor
@@ -58,7 +59,6 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEO
 import org.opensearch.alerting.transport.SecureTransportAction
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.client.Client
-import org.opensearch.client.node.NodeClient
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
@@ -85,8 +85,13 @@ import org.opensearch.transport.TransportService
 private val log = LogManager.getLogger(TransportIndexMonitorV2Action::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
+/**
+ * Transport action that contains the core logic for creating and updating v2 monitors.
+ *
+ * @opensearch.experimental
+ */
 class TransportIndexMonitorV2Action @Inject constructor(
-    transportService: TransportService,
+    val transportService: TransportService,
     val client: Client,
     actionFilters: ActionFilters,
     val scheduledJobIndices: ScheduledJobIndices,
@@ -100,6 +105,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
     SecureTransportAction {
 
     // adjustable limits (via settings)
+    @Volatile private var alertingV2Enabled = ALERTING_V2_ENABLED.get(settings)
     @Volatile private var maxMonitors = ALERTING_V2_MAX_MONITORS.get(settings)
     @Volatile private var maxThrottleDuration = ALERTING_V2_MAX_THROTTLE_DURATION.get(settings)
     @Volatile private var maxExpireDuration = ALERTING_V2_MAX_EXPIRE_DURATION.get(settings)
@@ -113,6 +119,7 @@ class TransportIndexMonitorV2Action @Inject constructor(
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
+        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_ENABLED) { alertingV2Enabled = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_MONITORS) { maxMonitors = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_THROTTLE_DURATION) { maxThrottleDuration = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_EXPIRE_DURATION) { maxExpireDuration = it }
@@ -135,6 +142,19 @@ class TransportIndexMonitorV2Action @Inject constructor(
         indexMonitorV2Request: IndexMonitorV2Request,
         actionListener: ActionListener<IndexMonitorV2Response>
     ) {
+        if (!alertingV2Enabled) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "Alerting V2 is currently disabled, please enable it with the " +
+                            "cluster setting: ${ALERTING_V2_ENABLED.key}",
+                        RestStatus.FORBIDDEN
+                    ),
+                )
+            )
+            return
+        }
+
         // read the user from thread context immediately, before
         // downstream flows spin up new threads with fresh context
         val user = readUserFromThreadContext(client)
@@ -222,16 +242,17 @@ class TransportIndexMonitorV2Action @Inject constructor(
         }
     }
 
-    private suspend fun validatePplSqlQuery(pplSqlMonitor: PPLSQLMonitor, validationListener: ActionListener<Unit>): Boolean {
+    private suspend fun validatePplSqlQuery(
+        pplSqlMonitor: PPLSQLMonitor,
+        validationListener: ActionListener<Unit>
+    ): Boolean {
         // first attempt to run the monitor query and all possible
         // extensions of it (from custom conditions)
         try {
-            val nodeClient = client as NodeClient
-
             // first run the base query as is.
             // if there are any PPL syntax or index not found or other errors,
             // this will throw an exception
-            executePplQuery(pplSqlMonitor.query, nodeClient)
+            executePplQuery(pplSqlMonitor.query, clusterService.state().nodes.localNode, transportService)
 
             // now scan all the triggers with custom conditions, and ensure each query constructed
             // from the base query + custom condition is valid
@@ -244,7 +265,11 @@ class TransportIndexMonitorV2Action @Inject constructor(
 
                 val queryWithCustomCondition = appendCustomCondition(pplSqlMonitor.query, pplTrigger.customCondition!!)
 
-                val executePplQueryResponse = executePplQuery(queryWithCustomCondition, nodeClient)
+                val executePplQueryResponse = executePplQuery(
+                    queryWithCustomCondition,
+                    clusterService.state().nodes.localNode,
+                    transportService
+                )
 
                 val evalResultVarIdx = findEvalResultVarIdxInSchema(executePplQueryResponse, evalResultVar)
 
@@ -438,12 +463,13 @@ class TransportIndexMonitorV2Action @Inject constructor(
         val pplQuery = pplSqlMonitor.query
         val timestampField = pplSqlMonitor.timestampField
 
-        val indices = getIndicesFromPplQuery(pplQuery)
-        val getMappingsRequest = GetMappingsRequest().indices(*indices.toTypedArray())
-        val getMappingsResponse = client.suspendUntil { admin().indices().getMappings(getMappingsRequest, it) }
-
-        val metadataMap = getMappingsResponse.mappings
         try {
+            val indices = getIndicesFromPplQuery(pplQuery)
+            val getMappingsRequest = GetMappingsRequest().indices(*indices.toTypedArray())
+            val getMappingsResponse = client.suspendUntil { admin().indices().getMappings(getMappingsRequest, it) }
+
+            val metadataMap = getMappingsResponse.mappings
+
             for (index in metadataMap.keys) {
                 val metadata = metadataMap[index]!!.sourceAsMap["properties"] as Map<String, Any>
                 if (!metadata.keys.contains(timestampField)) {
@@ -456,11 +482,14 @@ class TransportIndexMonitorV2Action @Inject constructor(
                 }
                 val typeInfo = metadata[timestampField] as Map<String, String>
                 val type = typeInfo["type"]
-                if (type != "date") {
+                val dateType = "date"
+                val dateNanosType = "date_nanos"
+                if (type != dateType && type != dateNanosType) {
                     validationListener.onFailure(
                         AlertingException.wrap(
                             IllegalArgumentException(
-                                "Timestamp field: $timestampField is present in index $index but is of type $type instead of type date"
+                                "Timestamp field: $timestampField is present in index $index " +
+                                    "but is type $type instead of $dateType or $dateNanosType"
                             )
                         )
                     )
@@ -720,8 +749,6 @@ class TransportIndexMonitorV2Action @Inject constructor(
             .source(newMonitorV2.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
             .id(indexMonitorRequest.monitorId)
             .routing(indexMonitorRequest.monitorId)
-            .setIfSeqNo(indexMonitorRequest.seqNo)
-            .setIfPrimaryTerm(indexMonitorRequest.primaryTerm)
             .timeout(indexTimeout)
 
         log.info(
