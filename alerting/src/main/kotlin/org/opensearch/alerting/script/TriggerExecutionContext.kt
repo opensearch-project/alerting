@@ -20,7 +20,7 @@ abstract class TriggerExecutionContext(
 
     constructor(monitor: Monitor, trigger: Trigger, monitorRunResult: MonitorRunResult<*>) :
         this(
-            monitor, monitorRunResult.inputResults.results, monitorRunResult.periodStart,
+            monitor, listOf(), monitorRunResult.periodStart,
             monitorRunResult.periodEnd, monitorRunResult.scriptContextError(trigger)
         )
 
@@ -31,7 +31,7 @@ abstract class TriggerExecutionContext(
     open fun asTemplateArg(): Map<String, Any?> {
         return mapOf(
             "monitor" to monitor.asTemplateArg(),
-            // "results" to results,
+            "results" to results,
             "periodStart" to periodStart,
             "periodEnd" to periodEnd,
             "error" to error
