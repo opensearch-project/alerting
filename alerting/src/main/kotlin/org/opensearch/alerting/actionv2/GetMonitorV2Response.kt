@@ -59,7 +59,7 @@ class GetMonitorV2Response : BaseResponse {
         out.writeLong(primaryTerm)
         if (monitorV2 != null) {
             out.writeBoolean(true)
-            monitorV2?.writeTo(out)
+            MonitorV2.writeTo(out, monitorV2!!)
         } else {
             out.writeBoolean(false)
         }

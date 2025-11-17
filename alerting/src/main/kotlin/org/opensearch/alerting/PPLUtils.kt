@@ -9,10 +9,25 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.opensearch.alerting.core.ppl.PPLPluginInterface
 import org.opensearch.alerting.opensearchapi.suspendUntil
-import org.opensearch.client.node.NodeClient
+import org.opensearch.cluster.node.DiscoveryNode
 import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest
+import org.opensearch.transport.TransportService
 
 object PPLUtils {
+
+    // TODO: these are in-house PPL query parsers, find a PPL plugin dependency that does this for us
+    /* Regular Expressions */
+    // captures the name of the result variable in a PPL monitor's custom condition
+    // e.g. custom condition: `eval apple = avg_latency > 100`
+    // captures: "apple"
+    private val evalResultVarRegex = """\beval\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=""".toRegex()
+
+    // captures the list of indices and index patterns that a given PPL query searches
+    // e.g. PPL query: search source = index_1,index_pattern*,index_3 | where responseCode = 500 | head 10
+    // captures: index_1,index_pattern*,index_3
+    private val indicesListRegex =
+        """(?i)source(?:\s*)=(?:\s*)((?:`[^`]+`|[-\w.*'+]+(?:\*)?)(?:\s*,\s*(?:`[^`]+`|[-\w.*'+]+\*?))*)\s*\|*""".toRegex()
+
     /**
      * Appends a user-defined custom condition to a PPL query.
      *
@@ -77,7 +92,11 @@ object PPLUtils {
      * @note The response format follows the PPL plugin's Execute API response structure with
      *       "schema", "datarows", "total", and "size" fields.
      */
-    suspend fun executePplQuery(query: String, client: NodeClient): JSONObject {
+    suspend fun executePplQuery(
+        query: String,
+        localNode: DiscoveryNode,
+        transportService: TransportService
+    ): JSONObject {
         // call PPL plugin to execute query
         val transportPplQueryRequest = TransportPPLQueryRequest(
             query,
@@ -87,7 +106,8 @@ object PPLUtils {
 
         val transportPplQueryResponse = PPLPluginInterface.suspendUntil {
             this.executeQuery(
-                client,
+                transportService,
+                localNode,
                 transportPplQueryRequest,
                 it
             )
@@ -128,8 +148,7 @@ object PPLUtils {
      */
     fun findEvalResultVar(customCondition: String): String {
         // TODO: these are in-house PPL query parsers, find a PPL plugin dependency that does this for us
-        val regex = """\beval\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=""".toRegex()
-        val evalResultVar = regex.find(customCondition)?.groupValues?.get(1)
+        val evalResultVar = evalResultVarRegex.find(customCondition)?.groupValues?.get(1)
             ?: throw IllegalArgumentException("Given custom condition is invalid, could not find eval result variable")
         return evalResultVar
     }
@@ -206,19 +225,25 @@ object PPLUtils {
      *
      */
     fun getIndicesFromPplQuery(pplQuery: String): List<String> {
-        // captures comma-separated concrete indices, index patterns, and index aliases
-        // TODO: these are in-house PPL query parsers, find a PPL plugin dependency that does this for us
-        val indicesRegex = """(?i)source(?:\s*)=(?:\s*)([-\w.*'+]+(?:\*)?(?:\s*,\s*[-\w.*'+]+\*?)*)\s*\|*""".toRegex()
-
         // use find() instead of findAll() because a PPL query only ever has one source statement
         // the only capture group specified in the regex captures the comma separated string of indices/index patterns
-        val indices = indicesRegex.find(pplQuery)?.groupValues?.get(1)?.split(",")?.map { it.trim() }
+        val indices = indicesListRegex.find(pplQuery)?.groupValues?.get(1)?.split(",")?.map { it.trim() }
             ?: throw IllegalStateException(
                 "Could not find indices that PPL Monitor query searches even " +
                     "after validating the query through SQL/PPL plugin."
             )
 
-        return indices
+        // remove any backticks that might have been read in
+        val unBackTickedIndices = mutableListOf<String>()
+        indices.forEach {
+            if (it.startsWith("`") && it.endsWith("`")) {
+                unBackTickedIndices.add(it.substring(1, it.length - 1))
+            } else {
+                unBackTickedIndices.add(it)
+            }
+        }
+
+        return unBackTickedIndices.toList()
     }
 
     /**
