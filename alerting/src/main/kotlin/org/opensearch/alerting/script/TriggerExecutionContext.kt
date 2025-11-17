@@ -31,7 +31,7 @@ abstract class TriggerExecutionContext(
     open fun asTemplateArg(): Map<String, Any?> {
         return mapOf(
             "monitor" to monitor.asTemplateArg(),
-            "results" to results,
+            // "results" to results,
             "periodStart" to periodStart,
             "periodEnd" to periodEnd,
             "error" to error
