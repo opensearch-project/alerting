@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.script
 
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorRunResult
 import org.opensearch.commons.alerting.model.Trigger
@@ -15,13 +16,28 @@ abstract class TriggerExecutionContext(
     open val results: List<Map<String, Any>>,
     open val periodStart: Instant,
     open val periodEnd: Instant,
-    open val error: Exception? = null
+    open val error: Exception? = null,
+    open val clusterSettings: ClusterSettings
 ) {
+    val results: List<Map<String, Any>>
+        get() = {
+            val resultsAllowedRoles = clusterSettings.get(
+                AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES
+            )
+            if (resultsAllowedRoles.isEmpty() || resultsAllowedRoles.intersect(monitor.user!!.roles).isNotEmpty()) {
+                return monitorRunResult.inputResults.results
+            }
+            return listOf()
+        }
 
-    constructor(monitor: Monitor, trigger: Trigger, monitorRunResult: MonitorRunResult<*>) :
+    constructor(monitor: Monitor, trigger: Trigger, monitorRunResult: MonitorRunResult<*>, clusterSettings) :
         this(
-            monitor, listOf(), monitorRunResult.periodStart,
-            monitorRunResult.periodEnd, monitorRunResult.scriptContextError(trigger)
+            monitor,
+            monitorRunResult.inputResults.results,
+            monitorRunResult.periodStart,
+            monitorRunResult.periodEnd,
+            monitorRunResult.scriptContextError(trigger),
+            clusterSettings
         )
 
     /**

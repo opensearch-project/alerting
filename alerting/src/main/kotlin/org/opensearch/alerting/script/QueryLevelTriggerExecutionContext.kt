@@ -6,6 +6,7 @@
 package org.opensearch.alerting.script
 
 import org.opensearch.alerting.model.AlertContext
+import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorRunResult
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
@@ -19,17 +20,25 @@ data class QueryLevelTriggerExecutionContext(
     override val periodStart: Instant,
     override val periodEnd: Instant,
     val alert: AlertContext? = null,
-    override val error: Exception? = null
-) : TriggerExecutionContext(monitor, results, periodStart, periodEnd, error) {
+    override val error: Exception? = null,
+    override val clusterSettings: ClusterSettings
+) : TriggerExecutionContext(monitor, results, periodStart, periodEnd, error, clusterSettings) {
 
     constructor(
         monitor: Monitor,
         trigger: QueryLevelTrigger,
         monitorRunResult: MonitorRunResult<QueryLevelTriggerRunResult>,
-        alertContext: AlertContext? = null
+        alertContext: AlertContext? = null,
+        clusterSettings: ClusterSettings
     ) : this(
-        monitor, trigger, monitorRunResult.inputResults.results, monitorRunResult.periodStart, monitorRunResult.periodEnd,
-        alertContext, monitorRunResult.scriptContextError(trigger)
+        monitor,
+        trigger,
+        monitorRunResult.inputResults.results,
+        monitorRunResult.periodStart,
+        monitorRunResult.periodEnd,
+        alertContext,
+        monitorRunResult.scriptContextError(trigger),
+        clusterSettings
     )
 
     /**
