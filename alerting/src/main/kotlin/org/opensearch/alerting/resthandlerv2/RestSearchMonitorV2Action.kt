@@ -38,6 +38,11 @@ import java.io.IOException
 
 private val log = LogManager.getLogger(RestSearchMonitorV2Action::class.java)
 
+/**
+ * This class consists of the REST handler to search for v2 monitors with some OpenSearch search query.
+ *
+ * @opensearch.experimental
+ */
 class RestSearchMonitorV2Action(
     val settings: Settings,
     clusterService: ClusterService,

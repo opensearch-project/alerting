@@ -609,6 +609,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         }
         logger.info("ppl monitor: $pplMonitorConfig")
+
         val pplMonitorId = createMonitorV2(pplMonitorConfig).id
         return getMonitorV2(monitorV2Id = pplMonitorId) as PPLSQLMonitor
     }
@@ -1617,14 +1618,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return map[key]
     }
 
-    fun getAlertingStats(metrics: String = ""): Map<String, Any> {
-        val monitorStatsResponse = client().makeRequest("GET", "/_plugins/_alerting/stats$metrics")
-        val responseMap = createParser(XContentType.JSON.xContent(), monitorStatsResponse.entity.content).map()
-        return responseMap
-    }
-
-    fun getAlertingV2Stats(metrics: String = ""): Map<String, Any> {
-        val monitorStatsResponse = client().makeRequest("GET", "/_plugins/_alerting/v2/stats$metrics")
+    fun getAlertingStats(metrics: String = "", alertingVersion: String? = null): Map<String, Any> {
+        val endpoint = "/_plugins/_alerting/stats$metrics${alertingVersion?.let { "?version=$it" }.orEmpty()}"
+        val monitorStatsResponse = client().makeRequest("GET", endpoint)
         val responseMap = createParser(XContentType.JSON.xContent(), monitorStatsResponse.entity.content).map()
         return responseMap
     }
@@ -2258,6 +2254,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun numAlerts(getAlertsResponse: Response): Int {
         logger.info("get alerts response: ${entityAsMap(getAlertsResponse)}")
         return entityAsMap(getAlertsResponse)["total_alerts_v2"] as Int
+    }
+
+    protected fun containsErrorAlert(getAlertsResponse: Response): Boolean {
+        val getAlertsMap = entityAsMap(getAlertsResponse)
+        val alertsList = getAlertsMap["alerts_v2"] as List<Map<String, Any>>
+        alertsList.forEach { alert ->
+            val errorMessage = alert["error_message"] as String?
+            if (errorMessage != null) return true
+        }
+        return false
     }
 
     protected fun getAlertV2HistoryDocCount(): Long {

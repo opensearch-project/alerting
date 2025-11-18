@@ -65,6 +65,8 @@ import java.time.Instant
  *                           required to be null otherwise.
  * @property customCondition A custom condition expression. Required if using CUSTOM conditions,
  *                           required to be null otherwise.
+ *
+ * @opensearch.experimental
  */
 data class PPLSQLTrigger(
     override val id: String = UUIDs.base64UUID(),
@@ -111,6 +113,12 @@ data class PPLSQLTrigger(
             }
             require(it.destinationId.length <= NOTIFICATIONS_ID_MAX_LENGTH) {
                 "Channel ID of action with ID ${it.id} too long, length must be less than $NOTIFICATIONS_ID_MAX_LENGTH."
+            }
+            require(it.destinationId.isNotEmpty()) {
+                "Channel ID should not be empty."
+            }
+            require(it.destinationId.matches(validCharsRegex)) {
+                "Channel ID should only have alphanumeric characters, dashes, and underscores."
             }
         }
 
@@ -252,7 +260,7 @@ data class PPLSQLTrigger(
 
     companion object {
         // trigger wrapper object field name
-        const val PPL_SQL_TRIGGER_FIELD = "ppl_sql_trigger"
+        const val PPL_SQL_TRIGGER_FIELD = "ppl_trigger"
 
         // field names
         const val MODE_FIELD = "mode"
@@ -260,6 +268,10 @@ data class PPLSQLTrigger(
         const val NUM_RESULTS_CONDITION_FIELD = "num_results_condition"
         const val NUM_RESULTS_VALUE_FIELD = "num_results_value"
         const val CUSTOM_CONDITION_FIELD = "custom_condition"
+
+        // regular expression for validating that a string contains
+        // only valid chars (letters, numbers, -, _)
+        private val validCharsRegex = """^[a-zA-Z0-9_-]+$""".toRegex()
 
         val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(
             TriggerV2::class.java,
