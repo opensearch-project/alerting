@@ -103,6 +103,17 @@ class MonitorV2Tests : OpenSearchTestCase() {
         } catch (_: IllegalArgumentException) {}
     }
 
+    fun `test monitor v2 as stream`() {
+        val pplMonitor = randomPPLMonitor()
+        val monitorV2 = pplMonitor as MonitorV2
+        val out = BytesStreamOutput()
+        MonitorV2.writeTo(out, monitorV2)
+        val sin = StreamInput.wrap(out.bytes().toBytesRef().bytes)
+        val newMonitorV2 = MonitorV2.readFrom(sin)
+        val newPplMonitor = newMonitorV2 as PPLSQLMonitor
+        assertPplMonitorsEqual(pplMonitor, newPplMonitor)
+    }
+
     fun `test ppl monitor as stream`() {
         val pplMonitor = randomPPLMonitor()
         val out = BytesStreamOutput()
