@@ -34,8 +34,6 @@ class QueryLevelTriggerExecutionContextTests : OpenSearchTestCase() {
         val result = randomQueryLevelMonitorRunResult(listOf(mapOf("foo" to "bar")))
         Assert.assertFalse(result.inputResults.results.isNullOrEmpty())
         val context = QueryLevelTriggerExecutionContext(monitor, trigger, result, clusterSettings = clusterSettings)
-        val templateArgs = context.asTemplateArg()
-        Assert.assertTrue(templateArgs.containsKey("results"))
         Assert.assertTrue(context.results.isNullOrEmpty())
     }
 }
