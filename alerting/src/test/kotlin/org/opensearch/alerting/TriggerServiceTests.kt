@@ -8,6 +8,9 @@ package org.opensearch.alerting
 import org.junit.Before
 import org.mockito.Mockito
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
+import org.opensearch.common.settings.ClusterSettings
+import org.opensearch.common.settings.Setting
+import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.InputRunResults
@@ -21,11 +24,15 @@ import java.time.Instant
 class TriggerServiceTests : OpenSearchTestCase() {
     private lateinit var scriptService: ScriptService
     private lateinit var triggerService: TriggerService
+    private lateinit var clusterSettings: ClusterSettings
 
     @Before
     fun setup() {
         scriptService = Mockito.mock(ScriptService::class.java)
         triggerService = TriggerService(scriptService)
+        val settings = Settings.builder().build()
+        val settingSet = hashSetOf<Setting<*>>()
+        clusterSettings = ClusterSettings(settings, settingSet)
     }
 
     fun `test run bucket level trigger with bucket key as int`() {
@@ -111,7 +118,7 @@ class TriggerServiceTests : OpenSearchTestCase() {
 
         var monitorRunResult = MonitorRunResult<BucketLevelTriggerRunResult>(monitor.name, Instant.now(), Instant.now())
         monitorRunResult = monitorRunResult.copy(inputResults = InputRunResults(listOf(inputResults)))
-        val triggerCtx = BucketLevelTriggerExecutionContext(monitor, trigger, monitorRunResult)
+        val triggerCtx = BucketLevelTriggerExecutionContext(monitor, trigger, monitorRunResult, clusterSettings = clusterSettings)
 
         val bucketLevelTriggerRunResult = triggerService.runBucketLevelTrigger(monitor, trigger, triggerCtx)
         assertNull(bucketLevelTriggerRunResult.error)
@@ -252,7 +259,7 @@ class TriggerServiceTests : OpenSearchTestCase() {
 
         var monitorRunResult = MonitorRunResult<BucketLevelTriggerRunResult>(monitor.name, Instant.now(), Instant.now())
         monitorRunResult = monitorRunResult.copy(inputResults = InputRunResults(listOf(inputResults)))
-        val triggerCtx = BucketLevelTriggerExecutionContext(monitor, trigger, monitorRunResult)
+        val triggerCtx = BucketLevelTriggerExecutionContext(monitor, trigger, monitorRunResult, clusterSettings = clusterSettings)
 
         val bucketLevelTriggerRunResult = triggerService.runBucketLevelTrigger(monitor, trigger, triggerCtx)
         assertNull(bucketLevelTriggerRunResult.error)

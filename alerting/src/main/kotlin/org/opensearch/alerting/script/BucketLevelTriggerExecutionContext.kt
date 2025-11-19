@@ -7,6 +7,7 @@ package org.opensearch.alerting.script
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.model.AlertContext
+import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.BucketLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.Monitor
@@ -18,14 +19,15 @@ private val logger = LogManager.getLogger(BucketLevelTriggerExecutionContext::cl
 data class BucketLevelTriggerExecutionContext(
     override val monitor: Monitor,
     val trigger: BucketLevelTrigger,
-    override val results: List<Map<String, Any>>,
+    override val _results: List<Map<String, Any>>,
     override val periodStart: Instant,
     override val periodEnd: Instant,
     val dedupedAlerts: List<AlertContext> = listOf(),
     val newAlerts: List<AlertContext> = listOf(),
     val completedAlerts: List<AlertContext> = listOf(),
-    override val error: Exception? = null
-) : TriggerExecutionContext(monitor, results, periodStart, periodEnd, error) {
+    override val error: Exception? = null,
+    override val clusterSettings: ClusterSettings
+) : TriggerExecutionContext(monitor, _results, periodStart, periodEnd, error, clusterSettings) {
 
     constructor(
         monitor: Monitor,
@@ -33,10 +35,19 @@ data class BucketLevelTriggerExecutionContext(
         monitorRunResult: MonitorRunResult<BucketLevelTriggerRunResult>,
         dedupedAlerts: List<AlertContext> = listOf(),
         newAlerts: List<AlertContext> = listOf(),
-        completedAlerts: List<AlertContext> = listOf()
+        completedAlerts: List<AlertContext> = listOf(),
+        clusterSettings: ClusterSettings
     ) : this(
-        monitor, trigger, monitorRunResult.inputResults.results, monitorRunResult.periodStart, monitorRunResult.periodEnd,
-        dedupedAlerts, newAlerts, completedAlerts, monitorRunResult.scriptContextError(trigger)
+        monitor,
+        trigger,
+        monitorRunResult.inputResults.results,
+        monitorRunResult.periodStart,
+        monitorRunResult.periodEnd,
+        dedupedAlerts,
+        newAlerts,
+        completedAlerts,
+        monitorRunResult.scriptContextError(trigger),
+        clusterSettings
     )
 
     /**
