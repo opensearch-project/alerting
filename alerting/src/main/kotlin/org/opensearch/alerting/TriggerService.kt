@@ -97,7 +97,7 @@ class TriggerService(val scriptService: ScriptService) {
             if (CrossClusterMonitorUtils.isRemoteMonitor(monitor, clusterService)) {
                 inputResults.forEach { clusterResult ->
                     // Reducing the inputResults to only include results from 1 cluster at a time
-                    val clusterTriggerCtx = ctx.copy(results = listOf(mapOf(clusterResult.toPair())))
+                    val clusterTriggerCtx = ctx.copy(_results = listOf(mapOf(clusterResult.toPair())))
 
                     val clusterTriggered = scriptService.compile(trigger.condition, TriggerScript.CONTEXT)
                         .newInstance(trigger.condition.params)
