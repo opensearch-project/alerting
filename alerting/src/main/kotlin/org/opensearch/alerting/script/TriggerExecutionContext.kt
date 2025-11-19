@@ -28,11 +28,11 @@ abstract class TriggerExecutionContext(
 
             val userRoles = monitor.user!!.roles
 
-            return if (resultsAllowedRoles.isEmpty() ||
-                resultsAllowedRoles.intersect(userRoles).isNotEmpty()
-            ) {
+            return if (resultsAllowedRoles.intersect(userRoles).isNotEmpty()) {
+                System.out.println("has access")
                 _results
             } else {
+                System.out.println("no access")
                 emptyList()
             }
         }
