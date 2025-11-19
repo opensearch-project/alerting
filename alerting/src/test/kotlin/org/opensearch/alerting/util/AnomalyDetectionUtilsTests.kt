@@ -103,8 +103,10 @@ class AnomalyDetectionUtilsTests : OpenSearchTestCase() {
         val searchSourceBuilder = SearchSourceBuilder()
         addUserBackendRolesFilter(
             User(
-                randomAlphaOfLength(5), null, listOf(randomAlphaOfLength(5)),
-                listOf(randomAlphaOfLength(5))
+                randomAlphaOfLength(5),
+                null,
+                listOf(randomAlphaOfLength(5)),
+                listOf("${randomAlphaOfLength(5)}=${randomAlphaOfLength(5)}")
             ),
             searchSourceBuilder
         )
@@ -124,7 +126,7 @@ class AnomalyDetectionUtilsTests : OpenSearchTestCase() {
                 randomAlphaOfLength(5),
                 listOf(),
                 listOf(randomAlphaOfLength(5)),
-                listOf(randomAlphaOfLength(5))
+                listOf("${randomAlphaOfLength(5)}=${randomAlphaOfLength(5)}")
             ),
             searchSourceBuilder
         )
@@ -143,8 +145,10 @@ class AnomalyDetectionUtilsTests : OpenSearchTestCase() {
         val backendRole2 = randomAlphaOfLength(5)
         addUserBackendRolesFilter(
             User(
-                randomAlphaOfLength(5), listOf(backendRole1, backendRole2), listOf(randomAlphaOfLength(5)),
-                listOf(randomAlphaOfLength(5))
+                randomAlphaOfLength(5),
+                listOf(backendRole1, backendRole2),
+                listOf(randomAlphaOfLength(5)),
+                listOf("${randomAlphaOfLength(5)}=${randomAlphaOfLength(5)}")
             ),
             searchSourceBuilder
         )
