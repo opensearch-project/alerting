@@ -8,6 +8,7 @@ package org.opensearch.alerting
 import org.junit.Before
 import org.mockito.Mockito
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
@@ -32,6 +33,7 @@ class TriggerServiceTests : OpenSearchTestCase() {
         triggerService = TriggerService(scriptService)
         val settings = Settings.builder().build()
         val settingSet = hashSetOf<Setting<*>>()
+        settingSet.add(AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES)
         clusterSettings = ClusterSettings(settings, settingSet)
     }
 

@@ -121,7 +121,9 @@ class AnomalyDetectionUtilsTests : OpenSearchTestCase() {
         val searchSourceBuilder = SearchSourceBuilder()
         addUserBackendRolesFilter(
             User(
-                randomAlphaOfLength(5), listOf(), listOf(randomAlphaOfLength(5)),
+                randomAlphaOfLength(5),
+                listOf(),
+                listOf(randomAlphaOfLength(5)),
                 listOf(randomAlphaOfLength(5))
             ),
             searchSourceBuilder
