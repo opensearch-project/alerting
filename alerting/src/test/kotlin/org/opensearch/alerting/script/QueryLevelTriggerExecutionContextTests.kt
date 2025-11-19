@@ -31,7 +31,8 @@ class QueryLevelTriggerExecutionContextTests : OpenSearchTestCase() {
     fun `test results are excluded from query-level context when allowed roles is empty`() {
         val monitor = randomQueryLevelMonitor()
         val trigger = randomQueryLevelTrigger()
-        val result = randomQueryLevelMonitorRunResult()
+        val result = randomQueryLevelMonitorRunResult(listOf(mapOf("foo" to "bar")))
+        Assert.assertFalse(result.inputResults.results.isNullOrEmpty())
         val context = QueryLevelTriggerExecutionContext(monitor, trigger, result, clusterSettings = clusterSettings)
         val templateArgs = context.asTemplateArg()
         Assert.assertTrue(templateArgs.containsKey("results"))

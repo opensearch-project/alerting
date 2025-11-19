@@ -654,7 +654,7 @@ fun randomActionExecutionResult(
     throttledCount: Int = randomInt()
 ) = ActionExecutionResult(actionId, lastExecutionTime, throttledCount)
 
-fun randomQueryLevelMonitorRunResult(): MonitorRunResult<QueryLevelTriggerRunResult> {
+fun randomQueryLevelMonitorRunResult(results: List<Map<String, Any>> = listOf()): MonitorRunResult<QueryLevelTriggerRunResult> {
     val triggerResults = mutableMapOf<String, QueryLevelTriggerRunResult>()
     val triggerRunResult = randomQueryLevelTriggerRunResult()
     triggerResults.plus(Pair("test", triggerRunResult))
@@ -664,7 +664,7 @@ fun randomQueryLevelMonitorRunResult(): MonitorRunResult<QueryLevelTriggerRunRes
         Instant.now(),
         Instant.now(),
         null,
-        randomInputRunResults(),
+        randomInputRunResults(results),
         triggerResults
     )
 }
@@ -699,8 +699,8 @@ fun randomDocumentLevelMonitorRunResult(): MonitorRunResult<DocumentLevelTrigger
     )
 }
 
-fun randomInputRunResults(): InputRunResults {
-    return InputRunResults(listOf(), null)
+fun randomInputRunResults(results: List<Map<String, Any>> = listOf()): InputRunResults {
+    return InputRunResults(results, null)
 }
 
 fun randomQueryLevelTriggerRunResult(): QueryLevelTriggerRunResult {
