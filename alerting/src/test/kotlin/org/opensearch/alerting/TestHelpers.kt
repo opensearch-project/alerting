@@ -775,14 +775,14 @@ fun Alert.toJsonString(): String {
     return this.toXContent(builder, ToXContent.EMPTY_PARAMS).string()
 }
 
-fun randomUser(): User {
+fun randomUser(roles: List<String> = listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), ALL_ACCESS_ROLE)): User {
     return User(
         OpenSearchRestTestCase.randomAlphaOfLength(10),
         listOf(
             OpenSearchRestTestCase.randomAlphaOfLength(10),
             OpenSearchRestTestCase.randomAlphaOfLength(10)
         ),
-        listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), ALL_ACCESS_ROLE),
+        roles,
         mapOf("test_attr" to "test"),
     )
 }
