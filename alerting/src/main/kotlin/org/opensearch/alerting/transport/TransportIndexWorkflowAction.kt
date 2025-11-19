@@ -222,22 +222,13 @@ class TransportIndexWorkflowAction @Inject constructor(
         fun resolveUserAndStart() {
             scope.launch {
                 if (user == null) {
-                    // Security is disabled, add empty user to Workflow. user is null for older
-                    // versions.
-                    request.workflow =
-                            request.workflow.copy(user = User("", listOf(), listOf(), listOf()))
+                    // Security is disabled, add empty user to Workflow. user is null for older versions.
+                    request.workflow = request.workflow
+                        .copy(user = User("", listOf(), listOf(), mapOf()))
                     start()
                 } else {
-                    request.workflow =
-                            request.workflow.copy(
-                                    user =
-                                            User(
-                                                    user.name,
-                                                    user.backendRoles,
-                                                    user.roles,
-                                                    user.customAttNames
-                                            )
-                            )
+                    request.workflow = request.workflow
+                        .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttributes))
                     start()
                 }
             }
@@ -355,16 +346,9 @@ class TransportIndexWorkflowAction @Inject constructor(
                 else if (!isAdmin(user)) request.rbacRoles?.intersect(user.backendRoles)?.toSet()
                 else request.rbacRoles
 
-                request.workflow =
-                        request.workflow.copy(
-                                user =
-                                        User(
-                                                user.name,
-                                                rbacRoles.orEmpty().toList(),
-                                                user.roles,
-                                                user.customAttNames
-                                        )
-                        )
+                request.workflow = request.workflow.copy(
+                    user = User(user.name, rbacRoles.orEmpty().toList(), user.roles, user.customAttributes)
+                )
                 log.debug("Created workflow's backend roles: $rbacRoles")
             }
 
@@ -459,7 +443,12 @@ class TransportIndexWorkflowAction @Inject constructor(
                     xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                     getResponse.sourceAsBytesRef, XContentType.JSON
                 )
-                val workflow = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Workflow
+                val scheduledJob = ScheduledJob.parse(xcp, getResponse.id, getResponse.version)
+                validateMonitorV1(scheduledJob)?.let {
+                    actionListener.onFailure(AlertingException.wrap(it))
+                    return
+                }
+                val workflow = scheduledJob as Workflow
                 onGetResponse(workflow)
             } catch (t: Exception) {
                 actionListener.onFailure(AlertingException.wrap(t))
@@ -471,7 +460,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                     user,
                     currentWorkflow.user,
                     actionListener,
-                    "workfklow",
+                    "workflow",
                     request.workflowId
                 )
             ) {
@@ -500,44 +489,27 @@ class TransportIndexWorkflowAction @Inject constructor(
             if (user != null) {
                 if (request.rbacRoles != null) {
                     if (isAdmin(user)) {
-                        request.workflow =
-                                request.workflow.copy(
-                                        user =
-                                                User(
-                                                        user.name,
-                                                        request.rbacRoles,
-                                                        user.roles,
-                                                        user.customAttNames
-                                                )
-                                )
+                        request.workflow = request.workflow.copy(
+                            user = User(user.name, request.rbacRoles, user.roles, user.customAttributes)
+                        )
                     } else {
                         // rolesToRemove: these are the backend roles to remove from the monitor
                         val rolesToRemove = user.backendRoles - request.rbacRoles.orEmpty()
                         // remove the monitor's roles with rolesToRemove and add any roles passed into the request.rbacRoles
                         val updatedRbac =
-                                currentWorkflow.user?.backendRoles.orEmpty() - rolesToRemove +
-                                        request.rbacRoles.orEmpty()
-                        request.workflow =
-                                request.workflow.copy(
-                                        user =
-                                                User(
-                                                        user.name,
-                                                        updatedRbac,
-                                                        user.roles,
-                                                        user.customAttNames
-                                                )
-                                )
+                            currentWorkflow.user?.backendRoles.orEmpty() - rolesToRemove + request.rbacRoles.orEmpty()
+                        request.workflow = request.workflow.copy(
+                            user = User(user.name, updatedRbac, user.roles, user.customAttributes)
+                        )
                     }
                 } else {
-                    request.workflow =
-                            request.workflow.copy(
-                                    user =
-                                            User(
-                                                    user.name,
-                                                    currentWorkflow.user!!.backendRoles,
-                                                    user.roles,
-                                                    user.customAttNames
-                                            )
+                    request.workflow = request.workflow
+                        .copy(
+                            user = User(
+                                user.name,
+                                currentWorkflow.user!!.backendRoles,
+                                user.roles,
+                                user.customAttributes
                             )
                         )
                 }
@@ -749,7 +721,11 @@ class TransportIndexWorkflowAction @Inject constructor(
                 xContentRegistry,
                 LoggingDeprecationHandler.INSTANCE, hit.sourceAsString
             ).use { hitsParser ->
-                val monitor = ScheduledJob.parse(hitsParser, hit.id, hit.version) as Monitor
+                val scheduledJob = ScheduledJob.parse(hitsParser, hit.id, hit.version)
+                validateMonitorV1(scheduledJob)?.let {
+                    throw OpenSearchException(it)
+                }
+                val monitor = scheduledJob as Monitor
                 monitors.add(monitor)
             }
         }
