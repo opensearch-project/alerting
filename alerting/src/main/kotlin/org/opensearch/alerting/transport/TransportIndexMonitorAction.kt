@@ -267,20 +267,12 @@ class TransportIndexMonitorAction @Inject constructor(
         fun resolveUserAndStart() {
             if (user == null) {
                 // Security is disabled, add empty user to Monitor. user is null for older versions.
-                request.monitor =
-                        request.monitor.copy(user = User("", listOf(), listOf(), listOf()))
+                request.monitor = request.monitor
+                    .copy(user = User("", listOf(), listOf(), mapOf()))
                 start()
             } else {
-                request.monitor =
-                        request.monitor.copy(
-                                user =
-                                        User(
-                                                user.name,
-                                                user.backendRoles,
-                                                user.roles,
-                                                user.customAttNames
-                                        )
-                        )
+                request.monitor = request.monitor
+                    .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttributes))
                 start()
             }
         }
@@ -288,21 +280,13 @@ class TransportIndexMonitorAction @Inject constructor(
         fun resolveUserAndStartForAD() {
             if (user == null) {
                 // Security is disabled, add empty user to Monitor. user is null for older versions.
-                request.monitor =
-                        request.monitor.copy(user = User("", listOf(), listOf(), listOf()))
+                request.monitor = request.monitor
+                    .copy(user = User("", listOf(), listOf(), mapOf()))
                 start()
             } else {
                 try {
-                    request.monitor =
-                            request.monitor.copy(
-                                    user =
-                                            User(
-                                                    user.name,
-                                                    user.backendRoles,
-                                                    user.roles,
-                                                    user.customAttNames
-                                            )
-                            )
+                    request.monitor = request.monitor
+                        .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttributes))
                     val searchSourceBuilder = SearchSourceBuilder().size(0)
                     if (getRoleFilterEnabled(clusterService, settings, "plugins.anomaly_detection.filter_by_backend_roles")) {
                         addUserBackendRolesFilter(user, searchSourceBuilder)
@@ -507,16 +491,9 @@ class TransportIndexMonitorAction @Inject constructor(
                 else if (!isAdmin(user)) request.rbacRoles?.intersect(user.backendRoles)?.toSet()
                 else request.rbacRoles
 
-                request.monitor =
-                        request.monitor.copy(
-                                user =
-                                        User(
-                                                user.name,
-                                                rbacRoles.orEmpty().toList(),
-                                                user.roles,
-                                                user.customAttNames
-                                        )
-                        )
+                request.monitor = request.monitor.copy(
+                    user = User(user.name, rbacRoles.orEmpty().toList(), user.roles, user.customAttributes)
+                )
                 log.debug("Created monitor's backend roles: $rbacRoles")
             }
 
@@ -638,7 +615,15 @@ class TransportIndexMonitorAction @Inject constructor(
                     xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                     getResponse.sourceAsBytesRef, XContentType.JSON
                 )
-                val monitor = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
+                val scheduledJob = ScheduledJob.parse(xcp, getResponse.id, getResponse.version)
+
+                validateMonitorV1(scheduledJob)?.let {
+                    actionListener.onFailure(AlertingException.wrap(it))
+                    return
+                }
+
+                val monitor = scheduledJob as Monitor
+
                 onGetResponse(monitor)
             } catch (t: Exception) {
                 actionListener.onFailure(AlertingException.wrap(t))
@@ -672,46 +657,21 @@ class TransportIndexMonitorAction @Inject constructor(
             if (user != null) {
                 if (request.rbacRoles != null) {
                     if (isAdmin(user)) {
-                        request.monitor =
-                                request.monitor.copy(
-                                        user =
-                                                User(
-                                                        user.name,
-                                                        request.rbacRoles,
-                                                        user.roles,
-                                                        user.customAttNames
-                                                )
-                                )
+                        request.monitor = request.monitor.copy(
+                            user = User(user.name, request.rbacRoles, user.roles, user.customAttributes)
+                        )
                     } else {
                         // rolesToRemove: these are the backend roles to remove from the monitor
                         val rolesToRemove = user.backendRoles - request.rbacRoles.orEmpty()
-                        // remove the monitor's roles with rolesToRemove and add any roles passed
-                        // into the request.rbacRoles
-                        val updatedRbac =
-                                currentMonitor.user?.backendRoles.orEmpty() - rolesToRemove +
-                                        request.rbacRoles.orEmpty()
-                        request.monitor =
-                                request.monitor.copy(
-                                        user =
-                                                User(
-                                                        user.name,
-                                                        updatedRbac,
-                                                        user.roles,
-                                                        user.customAttNames
-                                                )
-                                )
+                        // remove the monitor's roles with rolesToRemove and add any roles passed into the request.rbacRoles
+                        val updatedRbac = currentMonitor.user?.backendRoles.orEmpty() - rolesToRemove + request.rbacRoles.orEmpty()
+                        request.monitor = request.monitor.copy(
+                            user = User(user.name, updatedRbac, user.roles, user.customAttributes)
+                        )
                     }
                 } else {
-                    request.monitor =
-                            request.monitor.copy(
-                                    user =
-                                            User(
-                                                    user.name,
-                                                    currentMonitor.user!!.backendRoles,
-                                                    user.roles,
-                                                    user.customAttNames
-                                            )
-                            )
+                    request.monitor = request.monitor
+                        .copy(user = User(user.name, currentMonitor.user!!.backendRoles, user.roles, user.customAttributes))
                 }
                 log.debug("Update monitor backend roles to: ${request.monitor.user?.backendRoles}")
             }
