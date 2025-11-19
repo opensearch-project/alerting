@@ -154,7 +154,12 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             for (trigger in monitor.triggers) {
                 // The currentAlerts map is formed by iterating over the Monitor's Triggers as keys so null should not be returned here
                 val currentAlertsForTrigger = currentAlerts[trigger]!!
-                val triggerCtx = BucketLevelTriggerExecutionContext(monitor, trigger as BucketLevelTrigger, monitorResult)
+                val triggerCtx = BucketLevelTriggerExecutionContext(
+                    monitor,
+                    trigger as BucketLevelTrigger,
+                    monitorResult,
+                    clusterSettings = monitorCtx.clusterService!!.clusterSettings
+                )
                 triggerContexts[trigger.id] = triggerCtx
                 val triggerResult = monitorCtx.triggerService!!.runBucketLevelTrigger(monitor, trigger, triggerCtx)
                 triggerResults[trigger.id] = triggerResult.getCombinedTriggerRunResult(triggerResults[trigger.id])
