@@ -209,7 +209,7 @@ fun randomDocumentLevelMonitor(
     inputs: List<Input> = listOf(DocLevelMonitorInput("description", listOf("index"), emptyList())),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
     enabled: Boolean = randomBoolean(),
-    triggers: List<Trigger> = (1..randomInt(10)).map { randomQueryLevelTrigger() },
+    triggers: List<Trigger> = (1..randomInt(10)).map { randomDocumentLevelTrigger() },
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     withMetadata: Boolean = false
@@ -227,7 +227,7 @@ fun randomDocumentLevelMonitor(
     inputs: List<Input> = listOf(DocLevelMonitorInput("description", listOf("index"), emptyList())),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
     enabled: Boolean = randomBoolean(),
-    triggers: List<Trigger> = (1..randomInt(10)).map { randomQueryLevelTrigger() },
+    triggers: List<Trigger> = (1..randomInt(10)).map { randomDocumentLevelTrigger() },
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     withMetadata: Boolean = false,
@@ -669,7 +669,7 @@ fun randomQueryLevelMonitorRunResult(results: List<Map<String, Any>> = listOf())
     )
 }
 
-fun randomBucketLevelMonitorRunResult(): MonitorRunResult<BucketLevelTriggerRunResult> {
+fun randomBucketLevelMonitorRunResult(results: List<Map<String, Any>> = listOf()): MonitorRunResult<BucketLevelTriggerRunResult> {
     val triggerResults = mutableMapOf<String, BucketLevelTriggerRunResult>()
     val triggerRunResult = randomBucketLevelTriggerRunResult()
     triggerResults.plus(Pair("test", triggerRunResult))
@@ -679,12 +679,12 @@ fun randomBucketLevelMonitorRunResult(): MonitorRunResult<BucketLevelTriggerRunR
         Instant.now(),
         Instant.now(),
         null,
-        randomInputRunResults(),
+        randomInputRunResults(results),
         triggerResults
     )
 }
 
-fun randomDocumentLevelMonitorRunResult(): MonitorRunResult<DocumentLevelTriggerRunResult> {
+fun randomDocumentLevelMonitorRunResult(results: List<Map<String, Any>> = listOf()): MonitorRunResult<DocumentLevelTriggerRunResult> {
     val triggerResults = mutableMapOf<String, DocumentLevelTriggerRunResult>()
     val triggerRunResult = randomDocumentLevelTriggerRunResult()
     triggerResults.plus(Pair("test", triggerRunResult))
@@ -694,7 +694,7 @@ fun randomDocumentLevelMonitorRunResult(): MonitorRunResult<DocumentLevelTrigger
         Instant.now(),
         Instant.now(),
         null,
-        randomInputRunResults(),
+        randomInputRunResults(results),
         triggerResults
     )
 }
