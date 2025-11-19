@@ -6,6 +6,12 @@
 package org.opensearch.alerting.script
 
 import org.junit.Assert
+import org.opensearch.alerting.randomBucketLevelMonitor
+import org.opensearch.alerting.randomBucketLevelMonitorRunResult
+import org.opensearch.alerting.randomBucketLevelTrigger
+import org.opensearch.alerting.randomDocumentLevelMonitor
+import org.opensearch.alerting.randomDocumentLevelMonitorRunResult
+import org.opensearch.alerting.randomDocumentLevelTrigger
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelMonitorRunResult
 import org.opensearch.alerting.randomQueryLevelTrigger
@@ -34,7 +40,7 @@ class QueryLevelTriggerExecutionContextTests : OpenSearchTestCase() {
         Assert.assertTrue(context.results.isNullOrEmpty())
     }
 
-    fun `test results are included in query-level context when allowed roles include monitor roles`() {
+    fun `test results are included in query-level context when allowed roles intersect monitor roles`() {
         val settings = Settings
             .builder()
             .putList("plugins.alerting.notification_context_results_allowed_roles", listOf("role1", "role2"))
@@ -49,5 +55,67 @@ class QueryLevelTriggerExecutionContextTests : OpenSearchTestCase() {
         Assert.assertFalse(result.inputResults.results.isNullOrEmpty())
         val context = QueryLevelTriggerExecutionContext(monitor, trigger, result, clusterSettings = clusterSettings)
         Assert.assertFalse(context.results.isNullOrEmpty())
+    }
+
+    fun `test results are excluded from bucket-level context when allowed roles is empty`() {
+        val settings = Settings.builder().build()
+        val settingSet = hashSetOf<Setting<*>>()
+        settingSet.add(AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES)
+        clusterSettings = ClusterSettings(settings, settingSet)
+
+        val monitor = randomBucketLevelMonitor()
+        val trigger = randomBucketLevelTrigger()
+        val result = randomBucketLevelMonitorRunResult(listOf(mapOf("foo" to "bar")))
+        Assert.assertFalse(result.inputResults.results.isNullOrEmpty())
+        val context = BucketLevelTriggerExecutionContext(monitor, trigger, result, clusterSettings = clusterSettings)
+        Assert.assertTrue(context.results.isNullOrEmpty())
+    }
+
+    fun `test results are included in bucket-level context when allowed roles intersect monitor roles`() {
+        val settings = Settings
+            .builder()
+            .putList("plugins.alerting.notification_context_results_allowed_roles", listOf("role1", "role2"))
+            .build()
+        val settingSet = hashSetOf<Setting<*>>()
+        settingSet.add(AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES)
+        clusterSettings = ClusterSettings(settings, settingSet)
+
+        val monitor = randomBucketLevelMonitor(user = randomUser(listOf("role1")))
+        val trigger = randomBucketLevelTrigger()
+        val result = randomBucketLevelMonitorRunResult(listOf(mapOf("foo" to "bar")))
+        Assert.assertFalse(result.inputResults.results.isNullOrEmpty())
+        val context = BucketLevelTriggerExecutionContext(monitor, trigger, result, clusterSettings = clusterSettings)
+        Assert.assertFalse(context.results.isNullOrEmpty())
+    }
+
+    fun `test results are excluded from document-level context when allowed roles is empty`() {
+        val settings = Settings.builder().build()
+        val settingSet = hashSetOf<Setting<*>>()
+        settingSet.add(AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES)
+        clusterSettings = ClusterSettings(settings, settingSet)
+
+        val monitor = randomDocumentLevelMonitor()
+        val trigger = randomDocumentLevelTrigger()
+        val result = randomDocumentLevelMonitorRunResult(listOf(mapOf("foo" to "bar")))
+        Assert.assertFalse(result.inputResults.results.isNullOrEmpty())
+        val context = DocumentLevelTriggerExecutionContext(monitor, trigger, clusterSettings = clusterSettings)
+        Assert.assertTrue(context.results.isNullOrEmpty())
+    }
+
+    fun `test results are excluded in document-level context even when allowed roles intersect monitor roles`() {
+        val settings = Settings
+            .builder()
+            .putList("plugins.alerting.notification_context_results_allowed_roles", listOf("role1", "role2"))
+            .build()
+        val settingSet = hashSetOf<Setting<*>>()
+        settingSet.add(AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES)
+        clusterSettings = ClusterSettings(settings, settingSet)
+
+        val monitor = randomDocumentLevelMonitor(user = randomUser(listOf("role1")))
+        val trigger = randomDocumentLevelTrigger()
+        val result = randomDocumentLevelMonitorRunResult(listOf(mapOf("foo" to "bar")))
+        Assert.assertFalse(result.inputResults.results.isNullOrEmpty())
+        val context = DocumentLevelTriggerExecutionContext(monitor, trigger, clusterSettings = clusterSettings)
+        Assert.assertTrue(context.results.isNullOrEmpty())
     }
 }
