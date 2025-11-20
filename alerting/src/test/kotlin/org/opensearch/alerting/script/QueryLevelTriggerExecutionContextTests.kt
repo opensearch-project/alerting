@@ -20,7 +20,7 @@ import org.opensearch.test.OpenSearchTestCase
 class QueryLevelTriggerExecutionContextTests : OpenSearchTestCase() {
     private lateinit var clusterSettings: ClusterSettings
 
-    fun `test results are excluded from query-level context when allowed roles are not set`() {
+    fun `test results are included for query-level context when allowed roles are not set`() {
         val settings = Settings.builder().build()
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.add(AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES)
