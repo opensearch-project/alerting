@@ -497,7 +497,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.ALERT_V2_PER_RESULT_TRIGGER_MAX_ALERTS,
             AlertingSettings.NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH,
             AlertingSettings.NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH,
-            AlertingV2Settings.ALERTING_V2_ENABLED
+            AlertingV2Settings.ALERTING_V2_ENABLED,
+            AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES
         )
     }
 
