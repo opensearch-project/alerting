@@ -22,9 +22,16 @@ abstract class TriggerExecutionContext(
 ) {
     val results: List<Map<String, Any>>
         get() {
-            val resultsAllowedRoles = clusterSettings.get(
+            // If the setting is not configured, null will be returned
+            val resultsAllowedRoles = clusterSettings.getOrNull(
                 AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES
             )
+
+            // If the value is null, the setting was not configured. In that case
+            // preserve original behavior of returning results for context
+            if (resultsAllowedRoles == null) {
+                return _results
+            }
 
             val userRoles = monitor.user!!.roles
 
