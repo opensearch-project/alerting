@@ -15,6 +15,7 @@ import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.assertIs
 
 @Suppress("UNCHECKED_CAST")
 class QueryLevelTriggerExecutionContextTests : OpenSearchTestCase() {
@@ -25,13 +26,19 @@ class QueryLevelTriggerExecutionContextTests : OpenSearchTestCase() {
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.add(AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES)
         clusterSettings = ClusterSettings(settings, settingSet)
-
         val monitor = randomQueryLevelMonitor()
         val trigger = randomQueryLevelTrigger()
         val result = randomQueryLevelMonitorRunResult(listOf(mapOf("foo" to "bar")))
+
         Assert.assertFalse(result.inputResults.results.isNullOrEmpty())
+
         val context = QueryLevelTriggerExecutionContext(monitor, trigger, result, clusterSettings = clusterSettings)
         Assert.assertFalse(context.results.isNullOrEmpty())
+
+        val templateArgs = context.asTemplateArg()
+        val templateResults = templateArgs["results"]
+        assertIs<List<Map<String, Any>>>(templateResults)
+        Assert.assertFalse(templateResults.isEmpty())
     }
 
     fun `test results are excluded from query-level context when allowed roles do not intersect monitor roles`() {
@@ -42,13 +49,19 @@ class QueryLevelTriggerExecutionContextTests : OpenSearchTestCase() {
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.add(AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES)
         clusterSettings = ClusterSettings(settings, settingSet)
-
         val monitor = randomQueryLevelMonitor(user = randomUser(listOf("role2")))
         val trigger = randomQueryLevelTrigger()
         val result = randomQueryLevelMonitorRunResult(listOf(mapOf("foo" to "bar")))
+
         Assert.assertFalse(result.inputResults.results.isNullOrEmpty())
+
         val context = QueryLevelTriggerExecutionContext(monitor, trigger, result, clusterSettings = clusterSettings)
-        Assert.assertTrue(context.results.isNullOrEmpty())
+        Assert.assertFalse(context.results.isNullOrEmpty())
+
+        val templateArgs = context.asTemplateArg()
+        val templateResults = templateArgs["results"]
+        assertIs<List<Map<String, Any>>>(templateResults)
+        Assert.assertTrue(templateResults.isEmpty())
     }
 
     fun `test results are included in query-level context when allowed roles intersect monitor roles`() {
@@ -59,12 +72,18 @@ class QueryLevelTriggerExecutionContextTests : OpenSearchTestCase() {
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.add(AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES)
         clusterSettings = ClusterSettings(settings, settingSet)
-
         val monitor = randomQueryLevelMonitor(user = randomUser(listOf("role1")))
         val trigger = randomQueryLevelTrigger()
         val result = randomQueryLevelMonitorRunResult(listOf(mapOf("foo" to "bar")))
+
         Assert.assertFalse(result.inputResults.results.isNullOrEmpty())
+
         val context = QueryLevelTriggerExecutionContext(monitor, trigger, result, clusterSettings = clusterSettings)
         Assert.assertFalse(context.results.isNullOrEmpty())
+
+        val templateArgs = context.asTemplateArg()
+        val templateResults = templateArgs["results"]
+        assertIs<List<Map<String, Any>>>(templateResults)
+        Assert.assertFalse(templateResults.isEmpty())
     }
 }

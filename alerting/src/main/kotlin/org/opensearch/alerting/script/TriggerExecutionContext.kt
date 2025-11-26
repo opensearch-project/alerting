@@ -14,13 +14,13 @@ import java.time.Instant
 
 abstract class TriggerExecutionContext(
     open val monitor: Monitor,
-    open val _results: List<Map<String, Any>>,
+    open val results: List<Map<String, Any>>,
     open val periodStart: Instant,
     open val periodEnd: Instant,
     open val error: Exception? = null,
     open val clusterSettings: ClusterSettings
 ) {
-    val results: List<Map<String, Any>>
+    val templateResults: List<Map<String, Any>>
         get() {
             // If the setting is not configured, null will be returned
             val resultsAllowedRoles = clusterSettings.getOrNull(
@@ -30,13 +30,13 @@ abstract class TriggerExecutionContext(
             // If the value is null, the setting was not configured. In that case
             // preserve original behavior of returning results for context
             if (resultsAllowedRoles == null) {
-                return _results
+                return results
             }
 
             val userRoles = monitor.user!!.roles
 
             return if (resultsAllowedRoles.intersect(userRoles).isNotEmpty()) {
-                _results
+                results
             } else {
                 emptyList()
             }
@@ -59,7 +59,7 @@ abstract class TriggerExecutionContext(
     open fun asTemplateArg(): Map<String, Any?> {
         return mapOf(
             "monitor" to monitor.asTemplateArg(),
-            "results" to results,
+            "results" to templateResults,
             "periodStart" to periodStart,
             "periodEnd" to periodEnd,
             "error" to error

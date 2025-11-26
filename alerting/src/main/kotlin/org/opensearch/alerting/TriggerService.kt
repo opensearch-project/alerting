@@ -97,7 +97,7 @@ class TriggerService(val scriptService: ScriptService) {
             if (CrossClusterMonitorUtils.isRemoteMonitor(monitor, clusterService)) {
                 inputResults.forEach { clusterResult ->
                     // Reducing the inputResults to only include results from 1 cluster at a time
-                    val clusterTriggerCtx = ctx.copy(_results = listOf(mapOf(clusterResult.toPair())))
+                    val clusterTriggerCtx = ctx.copy(results = listOf(mapOf(clusterResult.toPair())))
 
                     val clusterTriggered = scriptService.compile(trigger.condition, TriggerScript.CONTEXT)
                         .newInstance(trigger.condition.params)
@@ -189,16 +189,16 @@ class TriggerService(val scriptService: ScriptService) {
     ): BucketLevelTriggerRunResult {
         return try {
             val bucketIndices = (
-                (ctx._results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
+                (ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
                     .get(trigger.id) as HashMap<*, *>
                 )[BUCKET_INDICES] as List<*>
             val parentBucketPath = (
-                (ctx._results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
+                (ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
                     .get(trigger.id) as HashMap<*, *>
                 )[PARENT_BUCKET_PATH] as String
             val aggregationPath = AggregationPath.parse(parentBucketPath)
             // TODO test this part by passing sub-aggregation path
-            var parentAgg = (ctx._results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
+            var parentAgg = (ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
             aggregationPath.pathElementsAsStringList.forEach { sub_agg ->
                 parentAgg = (parentAgg[sub_agg] as HashMap<*, *>)
             }

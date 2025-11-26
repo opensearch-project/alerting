@@ -14,7 +14,7 @@ import java.time.Instant
 data class DocumentLevelTriggerExecutionContext(
     override val monitor: Monitor,
     val trigger: DocumentLevelTrigger,
-    override val _results: List<Map<String, Any>>,
+    override val results: List<Map<String, Any>>,
     override val periodStart: Instant,
     override val periodEnd: Instant,
     val alerts: List<AlertContext> = listOf(),
@@ -22,7 +22,7 @@ data class DocumentLevelTriggerExecutionContext(
     val relatedFindings: List<String>,
     override val error: Exception? = null,
     override val clusterSettings: ClusterSettings
-) : TriggerExecutionContext(monitor, _results, periodStart, periodEnd, error, clusterSettings) {
+) : TriggerExecutionContext(monitor, results, periodStart, periodEnd, error, clusterSettings) {
 
     constructor(
         monitor: Monitor,
