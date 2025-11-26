@@ -387,15 +387,17 @@ String baseName = "alertingBwcCluster"
             testDistribution = "ARCHIVE"
             versions = [bwcOpenSearchVersion, opensearch_version]
             numberOfNodes = 3
-            plugin(provider(new Callable<RegularFile>(){
+            plugin(provider(new Callable<RegularFile>() {
                 @Override
                 RegularFile call() throws Exception {
                     return new RegularFile() {
                         @Override
                         File getAsFile() {
-                            return configurations.zipArchive.asFileTree.matching {
-                                include '**/alerting*'
-                            }.singleFile
+                            return configurations.opensearchPlugin.resolvedConfiguration.resolvedArtifacts
+                                    .find { ResolvedArtifact f ->
+                                        f.name.startsWith("alerting")
+                                    }
+                                    .file
                         }
                     }
                 }
