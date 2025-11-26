@@ -16,13 +16,13 @@ import java.time.Instant
 data class QueryLevelTriggerExecutionContext(
     override val monitor: Monitor,
     val trigger: QueryLevelTrigger,
-    override val _results: List<Map<String, Any>>,
+    override val results: List<Map<String, Any>>,
     override val periodStart: Instant,
     override val periodEnd: Instant,
     val alert: AlertContext? = null,
     override val error: Exception? = null,
     override val clusterSettings: ClusterSettings
-) : TriggerExecutionContext(monitor, _results, periodStart, periodEnd, error, clusterSettings) {
+) : TriggerExecutionContext(monitor, results, periodStart, periodEnd, error, clusterSettings) {
 
     constructor(
         monitor: Monitor,

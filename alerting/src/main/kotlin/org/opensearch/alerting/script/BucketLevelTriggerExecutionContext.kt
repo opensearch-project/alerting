@@ -19,7 +19,7 @@ private val logger = LogManager.getLogger(BucketLevelTriggerExecutionContext::cl
 data class BucketLevelTriggerExecutionContext(
     override val monitor: Monitor,
     val trigger: BucketLevelTrigger,
-    override val _results: List<Map<String, Any>>,
+    override val results: List<Map<String, Any>>,
     override val periodStart: Instant,
     override val periodEnd: Instant,
     val dedupedAlerts: List<AlertContext> = listOf(),
@@ -27,7 +27,7 @@ data class BucketLevelTriggerExecutionContext(
     val completedAlerts: List<AlertContext> = listOf(),
     override val error: Exception? = null,
     override val clusterSettings: ClusterSettings
-) : TriggerExecutionContext(monitor, _results, periodStart, periodEnd, error, clusterSettings) {
+) : TriggerExecutionContext(monitor, results, periodStart, periodEnd, error, clusterSettings) {
 
     constructor(
         monitor: Monitor,
@@ -60,7 +60,7 @@ data class BucketLevelTriggerExecutionContext(
         tempArg[DEDUPED_ALERTS_FIELD] = dedupedAlerts.map { it.asTemplateArg() }
         tempArg[NEW_ALERTS_FIELD] = newAlerts.map { it.asTemplateArg() }
         tempArg[COMPLETED_ALERTS_FIELD] = completedAlerts.map { it.asTemplateArg() }
-        tempArg[RESULTS_FIELD] = results
+        tempArg[RESULTS_FIELD] = templateResults
         return tempArg
     }
 
