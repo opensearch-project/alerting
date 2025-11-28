@@ -94,6 +94,16 @@ allprojects {
 
     apply from: "$rootDir/build-tools/repositories.gradle"
 
+    configurations.all {
+        resolutionStrategy {
+            force "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
+            force "org.jetbrains.kotlin:kotlin-stdlib-common:${kotlin_version}"
+            force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlin_version}"
+            force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:${kotlin_version}"
+            force "org.jetbrains.kotlin:kotlin-reflect:${kotlin_version}"
+        }
+    }
+
     tasks.withType(JavaCompile) {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
