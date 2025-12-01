@@ -23,7 +23,7 @@ buildscript {
         }
         opensearch_no_snapshot = opensearch_version.replace("-SNAPSHOT","")
         common_utils_version = System.getProperty("common_utils.version", opensearch_build)
-        kotlin_version = '1.9.25'
+        kotlin_version = '2.2.0'
     }
 
     repositories {
@@ -93,6 +93,16 @@ allprojects {
     version = "${opensearch_build}"
 
     apply from: "$rootDir/build-tools/repositories.gradle"
+
+    configurations.all {
+        resolutionStrategy {
+            force "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
+            force "org.jetbrains.kotlin:kotlin-stdlib-common:${kotlin_version}"
+            force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlin_version}"
+            force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:${kotlin_version}"
+            force "org.jetbrains.kotlin:kotlin-reflect:${kotlin_version}"
+        }
+    }
 
     tasks.withType(JavaCompile) {
         sourceCompatibility = JavaVersion.VERSION_21
