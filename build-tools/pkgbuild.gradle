@@ -8,7 +8,7 @@ afterEvaluate {
         version = "${project.version}" - "-SNAPSHOT"
 
         into '/usr/share/opensearch/plugins'
-        from(zipTree(bundlePlugin.archiveFile)) {
+        from(zipTree(bundlePlugin.archiveFile.get().asFile)) {
             into opensearchplugin.name
         }
 

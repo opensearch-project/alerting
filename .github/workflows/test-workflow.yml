@@ -20,7 +20,7 @@ jobs:
       # This setting says that all jobs should finish, even if one fails
       fail-fast: false
       matrix:
-        java: [ 21, 24 ]
+        java: [ 21, 25 ]
         os:
           - ubuntu-24.04-arm  # arm64-preview
           - ubuntu-24.04  # x64

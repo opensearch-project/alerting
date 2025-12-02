@@ -55,13 +55,27 @@ apply plugin: 'jacoco'
 apply plugin: 'opensearch.java-agent'
 apply from: 'build-tools/merged-coverage.gradle'
 
+// Add explicit repository configuration for ktlint
+repositories {
+    mavenCentral()
+}
+
+// Configure ktlint with explicit repository
 configurations {
     ktlint {
-      resolutionStrategy {
-          force "ch.qos.logback:logback-classic:1.5.16"
-          force "ch.qos.logback:logback-core:1.5.16"
-      }
-   }
+        resolutionStrategy {
+            force "ch.qos.logback:logback-classic:1.5.16"
+            force "ch.qos.logback:logback-core:1.5.16"
+        }
+    }
+}
+
+// Add repository ONLY for ktlint resolution
+configurations.ktlint.incoming.beforeResolve {
+    repositories.clear()
+    repositories {
+        mavenCentral()
+    }
 }
 
 dependencies {
@@ -74,16 +88,26 @@ dependencies {
 
 task ktlint(type: JavaExec, group: "verification") {
     description = "Check Kotlin code style."
-    main = "com.pinterest.ktlint.Main"
+    mainClass = "com.pinterest.ktlint.Main"
     classpath = configurations.ktlint
     args "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
+    
+    // Skip on JDK 25
+    onlyIf {
+        JavaVersion.current() < JavaVersion.VERSION_25
+    }
 }
 
 task ktlintFormat(type: JavaExec, group: "formatting") {
     description = "Fix Kotlin code style deviations."
-    main = "com.pinterest.ktlint.Main"
+    mainClass = "com.pinterest.ktlint.Main"
     classpath = configurations.ktlint
     args "-F", "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
+    
+    // Skip on JDK 25 until ktlint fully supports it
+    onlyIf {
+        JavaVersion.current() < JavaVersion.VERSION_25
+    }
 }
 
 check.dependsOn ktlint
