@@ -79,7 +79,7 @@ configurations.ktlint.incoming.beforeResolve {
 }
 
 dependencies {
-    add("ktlint", "com.pinterest:ktlint:1.2.1") {
+    add("ktlint", "com.pinterest:ktlint:0.45.1") {
         attributes {
             attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling, Bundling.EXTERNAL))
         }
@@ -92,7 +92,7 @@ task ktlint(type: JavaExec, group: "verification") {
     classpath = configurations.ktlint
     args "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
     
-    // Skip on JDK 25 until ktlint fully supports it
+    // Skip on JDK 25
     onlyIf {
         JavaVersion.current() < JavaVersion.VERSION_25
     }
