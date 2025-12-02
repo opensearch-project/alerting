@@ -60,12 +60,21 @@ repositories {
     mavenCentral()
 }
 
+// Configure ktlint with explicit repository
 configurations {
     ktlint {
         resolutionStrategy {
             force "ch.qos.logback:logback-classic:1.5.16"
             force "ch.qos.logback:logback-core:1.5.16"
         }
+    }
+}
+
+// Add repository ONLY for ktlint resolution
+configurations.ktlint.incoming.beforeResolve {
+    repositories.clear()
+    repositories {
+        mavenCentral()
     }
 }
 
@@ -82,6 +91,11 @@ task ktlint(type: JavaExec, group: "verification") {
     mainClass = "com.pinterest.ktlint.Main"
     classpath = configurations.ktlint
     args "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
+    
+    // Skip on JDK 25 until ktlint fully supports it
+    onlyIf {
+        JavaVersion.current() < JavaVersion.VERSION_25
+    }
 }
 
 task ktlintFormat(type: JavaExec, group: "formatting") {
@@ -89,6 +103,11 @@ task ktlintFormat(type: JavaExec, group: "formatting") {
     mainClass = "com.pinterest.ktlint.Main"
     classpath = configurations.ktlint
     args "-F", "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
+    
+    // Skip on JDK 25 until ktlint fully supports it
+    onlyIf {
+        JavaVersion.current() < JavaVersion.VERSION_25
+    }
 }
 
 check.dependsOn ktlint
