@@ -1910,7 +1910,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         createTestIndex(index)
         createCustomIndexRole(role, index, clusterPermissions)
         createUserRolesMapping(role, arrayOf(user))
-        Thread.sleep(1000) // Allow security changes to propagate
     }
 
     fun createUserWithRoles(
@@ -1927,7 +1926,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                 createUserRolesMapping(role, arrayOf(user))
             }
         }
-        Thread.sleep(1000) // Allow security changes to propagate
     }
 
     fun createUserWithDocLevelSecurityTestData(
