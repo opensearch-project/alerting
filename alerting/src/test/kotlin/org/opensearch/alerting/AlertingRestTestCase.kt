@@ -176,8 +176,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     ): MonitorV2 {
         // every random ppl monitor's query searches index TEST_INDEX_NAME
         // by default, so create that first before creating the monitor
-        val indexExistsResponse = client().makeRequest("HEAD", TEST_INDEX_NAME)
-        if (indexExistsResponse.restStatus() == RestStatus.NOT_FOUND) {
+        if (!indexExists(TEST_INDEX_NAME)) {
             createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         }
 
@@ -1911,6 +1910,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         createTestIndex(index)
         createCustomIndexRole(role, index, clusterPermissions)
         createUserRolesMapping(role, arrayOf(user))
+        Thread.sleep(1000) // Allow security changes to propagate
     }
 
     fun createUserWithRoles(
@@ -1927,6 +1927,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                 createUserRolesMapping(role, arrayOf(user))
             }
         }
+        Thread.sleep(1000) // Allow security changes to propagate
     }
 
     fun createUserWithDocLevelSecurityTestData(
