@@ -62,8 +62,10 @@ class DestinationMigrationCoordinator(
                 runningLock = false
             }
         } else if (!event.localNodeClusterManager()) {
-            logger.info("Cancelling the migration process.")
-            scheduledMigration?.cancel()
+            if (scheduledMigration != null && !scheduledMigration!!.isCancelled) {
+                logger.info("Cancelling the migration process.")
+                scheduledMigration?.cancel()
+            }
         }
     }
 
