@@ -8,13 +8,16 @@ package org.opensearch.alerting.actionv2
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class DeleteMonitorV2ResponseTests : OpenSearchTestCase() {
+    @Test
     fun `test get monitor v2 request as stream`() {
-        val req = DeleteMonitorV2Response(
-            id = "abc",
-            version = 3L
-        )
+        val req =
+            DeleteMonitorV2Response(
+                id = "abc",
+                version = 3L,
+            )
         assertNotNull(req)
 
         val out = BytesStreamOutput()

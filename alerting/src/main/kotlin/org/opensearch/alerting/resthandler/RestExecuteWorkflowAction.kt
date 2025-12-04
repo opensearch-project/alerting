@@ -23,16 +23,17 @@ import java.time.Instant
 private val log = LogManager.getLogger(RestExecuteWorkflowAction::class.java)
 
 class RestExecuteWorkflowAction : BaseRestHandler() {
-
     override fun getName(): String = "execute_workflow_action"
 
-    override fun routes(): List<RestHandler.Route> {
-        return listOf(
-            RestHandler.Route(RestRequest.Method.POST, "${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowID}/_execute")
+    override fun routes(): List<RestHandler.Route> =
+        listOf(
+            RestHandler.Route(RestRequest.Method.POST, "${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowID}/_execute"),
         )
-    }
 
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.debug("${request.method()} ${AlertingPlugin.WORKFLOW_BASE_URI}/_execute")
 
         return RestChannelConsumer { channel ->
@@ -53,7 +54,5 @@ class RestExecuteWorkflowAction : BaseRestHandler() {
         }
     }
 
-    override fun responseParams(): Set<String> {
-        return setOf("dryrun", "period_end", "workflowID")
-    }
+    override fun responseParams(): Set<String> = setOf("dryrun", "period_end", "workflowID")
 }

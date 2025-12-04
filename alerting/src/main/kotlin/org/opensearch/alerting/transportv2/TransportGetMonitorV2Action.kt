@@ -46,127 +46,140 @@ private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
  *
  * @opensearch.experimental
  */
-class TransportGetMonitorV2Action @Inject constructor(
-    transportService: TransportService,
-    val client: Client,
-    actionFilters: ActionFilters,
-    val xContentRegistry: NamedXContentRegistry,
-    val clusterService: ClusterService,
-    settings: Settings,
-) : HandledTransportAction<GetMonitorV2Request, GetMonitorV2Response>(
-    GetMonitorV2Action.NAME,
-    transportService,
-    actionFilters,
-    ::GetMonitorV2Request
-),
-    SecureTransportAction {
+class TransportGetMonitorV2Action
+    @Inject
+    constructor(
+        transportService: TransportService,
+        val client: Client,
+        actionFilters: ActionFilters,
+        val xContentRegistry: NamedXContentRegistry,
+        val clusterService: ClusterService,
+        settings: Settings,
+    ) : HandledTransportAction<GetMonitorV2Request, GetMonitorV2Response>(
+            GetMonitorV2Action.NAME,
+            transportService,
+            actionFilters,
+            ::GetMonitorV2Request,
+        ),
+        SecureTransportAction {
+        @Volatile private var alertingV2Enabled = ALERTING_V2_ENABLED.get(settings)
 
-    @Volatile private var alertingV2Enabled = ALERTING_V2_ENABLED.get(settings)
+        @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
-    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+        init {
+            clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_ENABLED) { alertingV2Enabled = it }
+            listenFilterBySettingChange(clusterService)
+        }
 
-    init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_ENABLED) { alertingV2Enabled = it }
-        listenFilterBySettingChange(clusterService)
-    }
-
-    override fun doExecute(task: Task, request: GetMonitorV2Request, actionListener: ActionListener<GetMonitorV2Response>) {
-        if (!alertingV2Enabled) {
-            actionListener.onFailure(
-                AlertingException.wrap(
-                    OpenSearchStatusException(
-                        "Alerting V2 is currently disabled, please enable it with the " +
-                            "cluster setting: ${ALERTING_V2_ENABLED.key}",
-                        RestStatus.FORBIDDEN
+        override fun doExecute(
+            task: Task,
+            request: GetMonitorV2Request,
+            actionListener: ActionListener<GetMonitorV2Response>,
+        ) {
+            if (!alertingV2Enabled) {
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "Alerting V2 is currently disabled, please enable it with the " +
+                                "cluster setting: ${ALERTING_V2_ENABLED.key}",
+                            RestStatus.FORBIDDEN,
+                        ),
                     ),
                 )
-            )
-            return
-        }
+                return
+            }
 
-        val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, request.monitorV2Id)
-            .version(request.version)
-            .fetchSourceContext(request.srcContext)
+            val getRequest =
+                GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, request.monitorV2Id)
+                    .version(request.version)
+                    .fetchSourceContext(request.srcContext)
 
-        val user = readUserFromThreadContext(client)
+            val user = readUserFromThreadContext(client)
 
-        if (!validateUserBackendRoles(user, actionListener)) {
-            return
-        }
+            if (!validateUserBackendRoles(user, actionListener)) {
+                return
+            }
 
-        client.threadPool().threadContext.stashContext().use {
-            client.get(
-                getRequest,
-                object : ActionListener<GetResponse> {
-                    override fun onResponse(response: GetResponse) {
-                        if (!response.isExists) {
-                            actionListener.onFailure(
-                                AlertingException.wrap(OpenSearchStatusException("MonitorV2 not found.", RestStatus.NOT_FOUND))
-                            )
-                            return
-                        }
-
-                        if (response.isSourceEmpty) {
-                            actionListener.onFailure(
-                                AlertingException.wrap(OpenSearchStatusException("MonitorV2 found but was empty.", RestStatus.NO_CONTENT))
-                            )
-                            return
-                        }
-
-                        val xcp = XContentHelper.createParser(
-                            xContentRegistry,
-                            LoggingDeprecationHandler.INSTANCE,
-                            response.sourceAsBytesRef,
-                            XContentType.JSON
-                        )
-
-                        val scheduledJob = ScheduledJob.parse(xcp, response.id, response.version)
-
-                        validateMonitorV2(scheduledJob)?.let {
-                            actionListener.onFailure(AlertingException.wrap(it))
-                            return
-                        }
-
-                        val monitorV2 = scheduledJob as MonitorV2
-
-                        // security is enabled and filterby is enabled
-                        if (!checkUserPermissionsWithResource(
-                                user,
-                                monitorV2.user,
-                                actionListener,
-                                "monitor",
-                                request.monitorV2Id
-                            )
-                        ) {
-                            return
-                        }
-
-                        actionListener.onResponse(
-                            GetMonitorV2Response(
-                                response.id,
-                                response.version,
-                                response.seqNo,
-                                response.primaryTerm,
-                                monitorV2
-                            )
-                        )
-                    }
-
-                    override fun onFailure(e: Exception) {
-                        if (isIndexNotFoundException(e)) {
-                            log.error("Index not found while getting monitor V2", e)
-                            actionListener.onFailure(
-                                AlertingException.wrap(
-                                    OpenSearchStatusException("Monitor V2 not found. Backing index is missing.", RestStatus.NOT_FOUND, e)
+            client.threadPool().threadContext.stashContext().use {
+                client.get(
+                    getRequest,
+                    object : ActionListener<GetResponse> {
+                        override fun onResponse(response: GetResponse) {
+                            if (!response.isExists) {
+                                actionListener.onFailure(
+                                    AlertingException.wrap(OpenSearchStatusException("MonitorV2 not found.", RestStatus.NOT_FOUND)),
                                 )
+                                return
+                            }
+
+                            if (response.isSourceEmpty) {
+                                actionListener.onFailure(
+                                    AlertingException.wrap(
+                                        OpenSearchStatusException("MonitorV2 found but was empty.", RestStatus.NO_CONTENT),
+                                    ),
+                                )
+                                return
+                            }
+
+                            val xcp =
+                                XContentHelper.createParser(
+                                    xContentRegistry,
+                                    LoggingDeprecationHandler.INSTANCE,
+                                    response.sourceAsBytesRef,
+                                    XContentType.JSON,
+                                )
+
+                            val scheduledJob = ScheduledJob.parse(xcp, response.id, response.version)
+
+                            validateMonitorV2(scheduledJob)?.let {
+                                actionListener.onFailure(AlertingException.wrap(it))
+                                return
+                            }
+
+                            val monitorV2 = scheduledJob as MonitorV2
+
+                            // security is enabled and filterby is enabled
+                            if (!checkUserPermissionsWithResource(
+                                    user,
+                                    monitorV2.user,
+                                    actionListener,
+                                    "monitor",
+                                    request.monitorV2Id,
+                                )
+                            ) {
+                                return
+                            }
+
+                            actionListener.onResponse(
+                                GetMonitorV2Response(
+                                    response.id,
+                                    response.version,
+                                    response.seqNo,
+                                    response.primaryTerm,
+                                    monitorV2,
+                                ),
                             )
-                        } else {
-                            log.error("Unexpected error while getting monitor", e)
-                            actionListener.onFailure(AlertingException.wrap(e))
                         }
-                    }
-                }
-            )
+
+                        override fun onFailure(e: Exception) {
+                            if (isIndexNotFoundException(e)) {
+                                log.error("Index not found while getting monitor V2", e)
+                                actionListener.onFailure(
+                                    AlertingException.wrap(
+                                        OpenSearchStatusException(
+                                            "Monitor V2 not found. Backing index is missing.",
+                                            RestStatus.NOT_FOUND,
+                                            e,
+                                        ),
+                                    ),
+                                )
+                            } else {
+                                log.error("Unexpected error while getting monitor", e)
+                                actionListener.onFailure(AlertingException.wrap(e))
+                            }
+                        }
+                    },
+                )
+            }
         }
     }
-}

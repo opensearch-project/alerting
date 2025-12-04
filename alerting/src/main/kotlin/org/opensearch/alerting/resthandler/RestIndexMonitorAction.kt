@@ -43,7 +43,7 @@ import org.opensearch.rest.action.RestResponseListener
 import org.opensearch.transport.client.node.NodeClient
 import java.io.IOException
 import java.time.Instant
-import java.util.*
+import java.util.Locale
 
 private val log = LogManager.getLogger(RestIndexMonitorAction::class.java)
 
@@ -51,34 +51,31 @@ private val log = LogManager.getLogger(RestIndexMonitorAction::class.java)
  * Rest handlers to create and update monitors.
  */
 class RestIndexMonitorAction : BaseRestHandler() {
+    override fun getName(): String = "index_monitor_action"
 
-    override fun getName(): String {
-        return "index_monitor_action"
-    }
+    override fun routes(): List<Route> = listOf()
 
-    override fun routes(): List<Route> {
-        return listOf()
-    }
-
-    override fun replacedRoutes(): MutableList<ReplacedRoute> {
-        return mutableListOf(
+    override fun replacedRoutes(): MutableList<ReplacedRoute> =
+        mutableListOf(
             ReplacedRoute(
                 POST,
                 AlertingPlugin.MONITOR_BASE_URI,
                 POST,
-                AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI
+                AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI,
             ),
             ReplacedRoute(
                 PUT,
                 "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}",
                 PUT,
-                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/{monitorID}"
-            )
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/{monitorID}",
+            ),
         )
-    }
 
     @Throws(IOException::class)
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}")
 
         val id = request.param("monitorID", Monitor.NO_ID)
@@ -143,11 +140,12 @@ class RestIndexMonitorAction : BaseRestHandler() {
 
         val seqNo = request.paramAsLong(IF_SEQ_NO, SequenceNumbers.UNASSIGNED_SEQ_NO)
         val primaryTerm = request.paramAsLong(IF_PRIMARY_TERM, SequenceNumbers.UNASSIGNED_PRIMARY_TERM)
-        val refreshPolicy = if (request.hasParam(REFRESH)) {
-            WriteRequest.RefreshPolicy.parse(request.param(REFRESH))
-        } else {
-            WriteRequest.RefreshPolicy.IMMEDIATE
-        }
+        val refreshPolicy =
+            if (request.hasParam(REFRESH)) {
+                WriteRequest.RefreshPolicy.parse(request.param(REFRESH))
+            } else {
+                WriteRequest.RefreshPolicy.IMMEDIATE
+            }
         val indexMonitorRequest = IndexMonitorRequest(id, seqNo, primaryTerm, refreshPolicy, request.method(), monitor, rbacRoles)
 
         return RestChannelConsumer { channel ->
@@ -161,7 +159,7 @@ class RestIndexMonitorAction : BaseRestHandler() {
                 if (!isValidName(dlq.name)) {
                     throw IllegalArgumentException(
                         "Doc level query name may not start with [_, +, -], contain '..', or contain: " +
-                            getInvalidNameChars().replace("\\", "")
+                            getInvalidNameChars().replace("\\", ""),
                     )
                 }
             }
@@ -180,14 +178,17 @@ class RestIndexMonitorAction : BaseRestHandler() {
         }
     }
 
-    private fun indexMonitorResponse(channel: RestChannel, restMethod: RestRequest.Method):
-        RestResponseListener<IndexMonitorResponse> {
+    private fun indexMonitorResponse(
+        channel: RestChannel,
+        restMethod: RestRequest.Method,
+    ): RestResponseListener<IndexMonitorResponse> {
         return object : RestResponseListener<IndexMonitorResponse>(channel) {
             @Throws(Exception::class)
             override fun buildResponse(response: IndexMonitorResponse): RestResponse {
                 var returnStatus = RestStatus.CREATED
-                if (restMethod == RestRequest.Method.PUT)
+                if (restMethod == RestRequest.Method.PUT) {
                     returnStatus = RestStatus.OK
+                }
 
                 val restResponse = BytesRestResponse(returnStatus, response.toXContent(channel.newBuilder(), ToXContent.EMPTY_PARAMS))
                 if (returnStatus == RestStatus.CREATED) {

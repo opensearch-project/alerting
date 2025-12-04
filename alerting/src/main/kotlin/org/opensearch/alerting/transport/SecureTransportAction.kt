@@ -36,7 +36,6 @@ private val log = LogManager.getLogger(SecureTransportAction::class.java)
  *      c) Users can edit and save the monitors to associate their backend_roles.
  */
 interface SecureTransportAction {
-
     var filterByEnabled: Boolean
 
     fun listenFilterBySettingChange(clusterService: ClusterService) {
@@ -61,29 +60,34 @@ interface SecureTransportAction {
     /**
      *  'all_access' role users are treated as admins.
      */
-    fun isAdmin(user: User?): Boolean {
-        return when {
+    fun isAdmin(user: User?): Boolean =
+        when {
             user == null -> {
                 false
             }
+
             user.roles?.isNullOrEmpty() == true -> {
                 false
             }
+
             else -> {
                 user.roles?.contains("all_access") == true
             }
         }
-    }
 
-    fun <T : Any> validateUserBackendRoles(user: User?, actionListener: ActionListener<T>): Boolean {
+    fun <T : Any> validateUserBackendRoles(
+        user: User?,
+        actionListener: ActionListener<T>,
+    ): Boolean {
         if (filterByEnabled) {
             if (user == null) {
                 actionListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException(
-                            "Filter by user backend roles is enabled with security disabled.", RestStatus.FORBIDDEN
-                        )
-                    )
+                            "Filter by user backend roles is enabled with security disabled.",
+                            RestStatus.FORBIDDEN,
+                        ),
+                    ),
                 )
                 return false
             } else if (isAdmin(user)) {
@@ -91,8 +95,11 @@ interface SecureTransportAction {
             } else if (user.backendRoles.isNullOrEmpty()) {
                 actionListener.onFailure(
                     AlertingException.wrap(
-                        OpenSearchStatusException("User doesn't have backend roles configured. Contact administrator", RestStatus.FORBIDDEN)
-                    )
+                        OpenSearchStatusException(
+                            "User doesn't have backend roles configured. Contact administrator",
+                            RestStatus.FORBIDDEN,
+                        ),
+                    ),
                 )
                 return false
             }
@@ -111,9 +118,8 @@ interface SecureTransportAction {
         resourceUser: User?,
         actionListener: ActionListener<T>,
         resourceType: String,
-        resourceId: String
+        resourceId: String,
     ): Boolean {
-
         if (!doFilterForUser(requesterUser)) return true
 
         val resourceBackendRoles = resourceUser?.backendRoles
@@ -128,9 +134,9 @@ interface SecureTransportAction {
                 AlertingException.wrap(
                     OpenSearchStatusException(
                         "Do not have permissions to resource, $resourceType, with id, $resourceId",
-                        RestStatus.FORBIDDEN
-                    )
-                )
+                        RestStatus.FORBIDDEN,
+                    ),
+                ),
             )
             return false
         }

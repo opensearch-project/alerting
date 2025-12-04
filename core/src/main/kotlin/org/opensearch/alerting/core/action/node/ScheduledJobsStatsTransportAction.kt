@@ -26,9 +26,13 @@ import java.io.IOException
 
 private val log = LogManager.getLogger(ScheduledJobsStatsTransportAction::class.java)
 
-class ScheduledJobsStatsTransportAction : TransportNodesAction<ScheduledJobsStatsRequest, ScheduledJobsStatsResponse,
-        ScheduledJobsStatsTransportAction.ScheduledJobStatusRequest, ScheduledJobStats> {
-
+class ScheduledJobsStatsTransportAction :
+    TransportNodesAction<
+        ScheduledJobsStatsRequest,
+        ScheduledJobsStatsResponse,
+        ScheduledJobsStatsTransportAction.ScheduledJobStatusRequest,
+        ScheduledJobStats,
+    > {
     private val jobSweeper: JobSweeper
     private val jobScheduler: JobScheduler
     private val scheduledJobIndices: ScheduledJobIndices
@@ -41,7 +45,7 @@ class ScheduledJobsStatsTransportAction : TransportNodesAction<ScheduledJobsStat
         actionFilters: ActionFilters,
         jobSweeper: JobSweeper,
         jobScheduler: JobScheduler,
-        scheduledJobIndices: ScheduledJobIndices
+        scheduledJobIndices: ScheduledJobIndices,
     ) : super(
         ScheduledJobsStatsAction.NAME,
         threadPool,
@@ -51,25 +55,21 @@ class ScheduledJobsStatsTransportAction : TransportNodesAction<ScheduledJobsStat
         { ScheduledJobsStatsRequest(it) },
         { ScheduledJobStatusRequest(it) },
         ThreadPool.Names.MANAGEMENT,
-        ScheduledJobStats::class.java
+        ScheduledJobStats::class.java,
     ) {
         this.jobSweeper = jobSweeper
         this.jobScheduler = jobScheduler
         this.scheduledJobIndices = scheduledJobIndices
     }
 
-    override fun newNodeRequest(request: ScheduledJobsStatsRequest): ScheduledJobStatusRequest {
-        return ScheduledJobStatusRequest(request)
-    }
+    override fun newNodeRequest(request: ScheduledJobsStatsRequest): ScheduledJobStatusRequest = ScheduledJobStatusRequest(request)
 
-    override fun newNodeResponse(si: StreamInput): ScheduledJobStats {
-        return ScheduledJobStats(si)
-    }
+    override fun newNodeResponse(si: StreamInput): ScheduledJobStats = ScheduledJobStats(si)
 
     override fun newResponse(
         request: ScheduledJobsStatsRequest,
         responses: MutableList<ScheduledJobStats>,
-        failures: MutableList<FailedNodeException>
+        failures: MutableList<FailedNodeException>,
     ): ScheduledJobsStatsResponse {
         val scheduledJobEnabled = jobSweeper.isSweepingEnabled()
         val scheduledJobIndexExist = scheduledJobIndices.scheduledJobIndexExists()
@@ -81,17 +81,13 @@ class ScheduledJobsStatsTransportAction : TransportNodesAction<ScheduledJobsStat
             failures,
             scheduledJobEnabled,
             scheduledJobIndexExist,
-            indexHealth
+            indexHealth,
         )
     }
 
-    override fun nodeOperation(request: ScheduledJobStatusRequest): ScheduledJobStats {
-        return createScheduledJobStatus(request.request)
-    }
+    override fun nodeOperation(request: ScheduledJobStatusRequest): ScheduledJobStats = createScheduledJobStatus(request.request)
 
-    private fun createScheduledJobStatus(
-        scheduledJobsStatusRequest: ScheduledJobsStatsRequest
-    ): ScheduledJobStats {
+    private fun createScheduledJobStatus(scheduledJobsStatusRequest: ScheduledJobsStatsRequest): ScheduledJobStats {
         val jobSweeperMetrics = jobSweeper.getJobSweeperMetrics()
 
         val jobSchedulerMetrics = jobScheduler.getJobSchedulerMetric(scheduledJobsStatusRequest.showAlertingV2ScheduledJobs)
@@ -101,13 +97,13 @@ class ScheduledJobsStatsTransportAction : TransportNodesAction<ScheduledJobsStat
             this.transportService.localNode,
             status,
             if (scheduledJobsStatusRequest.jobSchedulingMetrics) jobSweeperMetrics else null,
-            if (scheduledJobsStatusRequest.jobsInfo) jobSchedulerMetrics.toTypedArray() else null
+            if (scheduledJobsStatusRequest.jobsInfo) jobSchedulerMetrics.toTypedArray() else null,
         )
     }
 
     private fun evaluateStatus(
         jobsInfo: List<JobSchedulerMetrics>,
-        jobSweeperMetrics: JobSweeperMetrics
+        jobSweeperMetrics: JobSweeperMetrics,
     ): ScheduledJobStats.ScheduleStatus {
         val allJobsRunningOnTime = jobsInfo.all { it.runningOnTime }
         if (allJobsRunningOnTime && jobSweeperMetrics.fullSweepOnTime) {
@@ -118,7 +114,6 @@ class ScheduledJobsStatsTransportAction : TransportNodesAction<ScheduledJobsStat
     }
 
     class ScheduledJobStatusRequest : TransportRequest {
-
         lateinit var request: ScheduledJobsStatsRequest
 
         constructor() : super()

@@ -40,7 +40,7 @@ import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.alerting.remote.monitors.RemoteMonitorRegistry
 import org.opensearch.alerting.resthandler.RestAcknowledgeAlertAction
-import org.opensearch.alerting.resthandler.RestAcknowledgeChainedAlertAction
+import org.opensearch.alerting.resthandler.RestAcknowledgeChainedAlertsAction
 import org.opensearch.alerting.resthandler.RestDeleteAlertingCommentAction
 import org.opensearch.alerting.resthandler.RestDeleteMonitorAction
 import org.opensearch.alerting.resthandler.RestDeleteWorkflowAction
@@ -88,7 +88,7 @@ import org.opensearch.alerting.transport.TransportGetAlertsAction
 import org.opensearch.alerting.transport.TransportGetDestinationsAction
 import org.opensearch.alerting.transport.TransportGetEmailAccountAction
 import org.opensearch.alerting.transport.TransportGetEmailGroupAction
-import org.opensearch.alerting.transport.TransportGetFindingsSearchAction
+import org.opensearch.alerting.transport.TransportGetFindingsAction
 import org.opensearch.alerting.transport.TransportGetMonitorAction
 import org.opensearch.alerting.transport.TransportGetRemoteIndexesAction
 import org.opensearch.alerting.transport.TransportGetWorkflowAction
@@ -168,9 +168,14 @@ import java.util.function.Supplier
  * It also adds [Monitor.XCONTENT_REGISTRY], [SearchInput.XCONTENT_REGISTRY], [QueryLevelTrigger.XCONTENT_REGISTRY],
  * [BucketLevelTrigger.XCONTENT_REGISTRY], [ClusterMetricsInput.XCONTENT_REGISTRY] to the [NamedXContentRegistry] so that we are able to deserialize the custom named objects.
  */
-internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, ReloadablePlugin,
-    SearchPlugin, SystemIndexPlugin, PercolatorPluginExt() {
-
+internal class AlertingPlugin :
+    PercolatorPluginExt(),
+    PainlessExtension,
+    ActionPlugin,
+    ScriptPlugin,
+    ReloadablePlugin,
+    SearchPlugin,
+    SystemIndexPlugin {
     override fun getContextAllowlists(): Map<ScriptContext<*>, List<Allowlist>> {
         val whitelist = AllowlistLoader.loadFromResourceFiles(javaClass, "org.opensearch.alerting.txt")
         return mapOf(TriggerScript.CONTEXT to listOf(whitelist))
@@ -178,19 +183,33 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
 
     companion object {
         @JvmField val OPEN_SEARCH_DASHBOARDS_USER_AGENT = "OpenSearch-Dashboards"
+
         @JvmField val UI_METADATA_EXCLUDE = arrayOf("monitor.${Monitor.UI_METADATA_FIELD}")
+
         @JvmField val MONITOR_BASE_URI = "/_plugins/_alerting/monitors"
+
         @JvmField val MONITOR_V2_BASE_URI = "/_plugins/_alerting/v2/monitors"
+
         @JvmField val WORKFLOW_BASE_URI = "/_plugins/_alerting/workflows"
+
         @JvmField val REMOTE_BASE_URI = "/_plugins/_alerting/remote"
+
         @JvmField val DESTINATION_BASE_URI = "/_plugins/_alerting/destinations"
+
         @JvmField val LEGACY_OPENDISTRO_MONITOR_BASE_URI = "/_opendistro/_alerting/monitors"
+
         @JvmField val LEGACY_OPENDISTRO_DESTINATION_BASE_URI = "/_opendistro/_alerting/destinations"
+
         @JvmField val EMAIL_ACCOUNT_BASE_URI = "$DESTINATION_BASE_URI/email_accounts"
+
         @JvmField val EMAIL_GROUP_BASE_URI = "$DESTINATION_BASE_URI/email_groups"
+
         @JvmField val LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI = "$LEGACY_OPENDISTRO_DESTINATION_BASE_URI/email_accounts"
+
         @JvmField val LEGACY_OPENDISTRO_EMAIL_GROUP_BASE_URI = "$LEGACY_OPENDISTRO_DESTINATION_BASE_URI/email_groups"
+
         @JvmField val FINDING_BASE_URI = "/_plugins/_alerting/findings"
+
         @JvmField val COMMENTS_BASE_URI = "/_plugins/_alerting/comments"
 
         @JvmField val ALERTING_JOB_TYPES = listOf("monitor", "workflow", "monitor_v2")
@@ -217,9 +236,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         indexScopedSettings: IndexScopedSettings,
         settingsFilter: SettingsFilter,
         indexNameExpressionResolver: IndexNameExpressionResolver?,
-        nodesInCluster: Supplier<DiscoveryNodes>
-    ): List<RestHandler> {
-        return listOf(
+        nodesInCluster: Supplier<DiscoveryNodes>,
+    ): List<RestHandler> =
+        listOf(
             // Alerting V1
             RestGetMonitorAction(),
             RestDeleteMonitorAction(),
@@ -229,7 +248,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestExecuteMonitorAction(),
             RestExecuteWorkflowAction(),
             RestAcknowledgeAlertAction(),
-            RestAcknowledgeChainedAlertAction(),
+            RestAcknowledgeChainedAlertsAction(),
             RestScheduledJobStatsHandler("_alerting"),
             RestSearchEmailAccountAction(),
             RestGetEmailAccountAction(),
@@ -245,19 +264,17 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestIndexAlertingCommentAction(),
             RestSearchAlertingCommentAction(),
             RestDeleteAlertingCommentAction(),
-
             // Alerting V2
             RestIndexMonitorV2Action(),
             RestExecuteMonitorV2Action(),
             RestDeleteMonitorV2Action(),
             RestGetMonitorV2Action(),
             RestSearchMonitorV2Action(settings, clusterService),
-            RestGetAlertsV2Action()
+            RestGetAlertsV2Action(),
         )
-    }
 
-    override fun getActions(): List<ActionPlugin.ActionHandler<out ActionRequest, out ActionResponse>> {
-        return listOf(
+    override fun getActions(): List<ActionPlugin.ActionHandler<out ActionRequest, out ActionResponse>> =
+        listOf(
             // Alerting V1
             ActionPlugin.ActionHandler(ScheduledJobsStatsAction.INSTANCE, ScheduledJobsStatsTransportAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.INDEX_MONITOR_ACTION_TYPE, TransportIndexMonitorAction::class.java),
@@ -267,7 +284,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(AlertingActions.DELETE_MONITOR_ACTION_TYPE, TransportDeleteMonitorAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_TYPE, TransportAcknowledgeAlertAction::class.java),
             ActionPlugin.ActionHandler(
-                AlertingActions.ACKNOWLEDGE_CHAINED_ALERTS_ACTION_TYPE, TransportAcknowledgeChainedAlertAction::class.java
+                AlertingActions.ACKNOWLEDGE_CHAINED_ALERTS_ACTION_TYPE,
+                TransportAcknowledgeChainedAlertAction::class.java,
             ),
             ActionPlugin.ActionHandler(GetEmailAccountAction.INSTANCE, TransportGetEmailAccountAction::class.java),
             ActionPlugin.ActionHandler(SearchEmailAccountAction.INSTANCE, TransportSearchEmailAccountAction::class.java),
@@ -276,7 +294,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(GetDestinationsAction.INSTANCE, TransportGetDestinationsAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.GET_ALERTS_ACTION_TYPE, TransportGetAlertsAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.GET_WORKFLOW_ALERTS_ACTION_TYPE, TransportGetWorkflowAlertsAction::class.java),
-            ActionPlugin.ActionHandler(AlertingActions.GET_FINDINGS_ACTION_TYPE, TransportGetFindingsSearchAction::class.java),
+            ActionPlugin.ActionHandler(AlertingActions.GET_FINDINGS_ACTION_TYPE, TransportGetFindingsAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.INDEX_WORKFLOW_ACTION_TYPE, TransportIndexWorkflowAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.GET_WORKFLOW_ACTION_TYPE, TransportGetWorkflowAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.DELETE_WORKFLOW_ACTION_TYPE, TransportDeleteWorkflowAction::class.java),
@@ -286,19 +304,17 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(ExecuteWorkflowAction.INSTANCE, TransportExecuteWorkflowAction::class.java),
             ActionPlugin.ActionHandler(GetRemoteIndexesAction.INSTANCE, TransportGetRemoteIndexesAction::class.java),
             ActionPlugin.ActionHandler(DocLevelMonitorFanOutAction.INSTANCE, TransportDocLevelMonitorFanOutAction::class.java),
-
             // Alerting V2
             ActionPlugin.ActionHandler(IndexMonitorV2Action.INSTANCE, TransportIndexMonitorV2Action::class.java),
             ActionPlugin.ActionHandler(GetMonitorV2Action.INSTANCE, TransportGetMonitorV2Action::class.java),
             ActionPlugin.ActionHandler(SearchMonitorV2Action.INSTANCE, TransportSearchMonitorV2Action::class.java),
             ActionPlugin.ActionHandler(DeleteMonitorV2Action.INSTANCE, TransportDeleteMonitorV2Action::class.java),
             ActionPlugin.ActionHandler(ExecuteMonitorV2Action.INSTANCE, TransportExecuteMonitorV2Action::class.java),
-            ActionPlugin.ActionHandler(GetAlertsV2Action.INSTANCE, TransportGetAlertsV2Action::class.java)
+            ActionPlugin.ActionHandler(GetAlertsV2Action.INSTANCE, TransportGetAlertsV2Action::class.java),
         )
-    }
 
-    override fun getNamedXContent(): List<NamedXContentRegistry.Entry> {
-        return listOf(
+    override fun getNamedXContent(): List<NamedXContentRegistry.Entry> =
+        listOf(
             Monitor.XCONTENT_REGISTRY,
             MonitorV2.XCONTENT_REGISTRY,
             SearchInput.XCONTENT_REGISTRY,
@@ -309,9 +325,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             DocumentLevelTrigger.XCONTENT_REGISTRY,
             ChainedAlertTrigger.XCONTENT_REGISTRY,
             RemoteMonitorTrigger.XCONTENT_REGISTRY,
-            Workflow.XCONTENT_REGISTRY
+            Workflow.XCONTENT_REGISTRY,
         )
-    }
 
     override fun createComponents(
         client: Client,
@@ -324,7 +339,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         nodeEnvironment: NodeEnvironment,
         namedWriteableRegistry: NamedWriteableRegistry,
         indexNameExpressionResolver: IndexNameExpressionResolver,
-        repositoriesServiceSupplier: Supplier<RepositoriesService>
+        repositoriesServiceSupplier: Supplier<RepositoriesService>,
     ): Collection<Any> {
         // Need to figure out how to use the OpenSearch DI classes rather than handwiring things here.
         val settings = environment.settings()
@@ -333,36 +348,36 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         alertV2Indices = AlertV2Indices(settings, client, threadPool, clusterService)
         val alertService = AlertService(client, xContentRegistry, alertIndices)
         val triggerService = TriggerService(scriptService)
-        runner = MonitorRunnerService
-            .registerClusterService(clusterService)
-            .registerClient(client)
-            .registerNamedXContentRegistry(xContentRegistry)
-            .registerindexNameExpressionResolver(indexNameExpressionResolver)
-            .registerScriptService(scriptService)
-            .registerSettings(settings)
-            .registerThreadPool(threadPool)
-            .registerAlertIndices(alertIndices)
-            .registerAlertV2Indices(alertV2Indices)
-            .registerInputService(
-                InputService(
-                    client,
-                    scriptService,
-                    namedWriteableRegistry,
-                    xContentRegistry,
-                    clusterService,
-                    settings,
-                    indexNameExpressionResolver
-                )
-            )
-            .registerTriggerService(triggerService)
-            .registerAlertService(alertService)
-            .registerDocLevelMonitorQueries(DocLevelMonitorQueries(client, clusterService))
-            .registerJvmStats(JvmStats.jvmStats())
-            .registerWorkflowService(WorkflowService(client, xContentRegistry))
-            .registerLockService(lockService)
-            .registerConsumers()
-            .registerDestinationSettings()
-            .registerRemoteMonitors(monitorTypeToMonitorRunners)
+        runner =
+            MonitorRunnerService
+                .registerClusterService(clusterService)
+                .registerClient(client)
+                .registerNamedXContentRegistry(xContentRegistry)
+                .registerindexNameExpressionResolver(indexNameExpressionResolver)
+                .registerScriptService(scriptService)
+                .registerSettings(settings)
+                .registerThreadPool(threadPool)
+                .registerAlertIndices(alertIndices)
+                .registerAlertV2Indices(alertV2Indices)
+                .registerInputService(
+                    InputService(
+                        client,
+                        scriptService,
+                        namedWriteableRegistry,
+                        xContentRegistry,
+                        clusterService,
+                        settings,
+                        indexNameExpressionResolver,
+                    ),
+                ).registerTriggerService(triggerService)
+                .registerAlertService(alertService)
+                .registerDocLevelMonitorQueries(DocLevelMonitorQueries(client, clusterService))
+                .registerJvmStats(JvmStats.jvmStats())
+                .registerWorkflowService(WorkflowService(client, xContentRegistry))
+                .registerLockService(lockService)
+                .registerConsumers()
+                .registerDestinationSettings()
+                .registerRemoteMonitors(monitorTypeToMonitorRunners)
         scheduledJobIndices = ScheduledJobIndices(client.admin(), clusterService)
         commentsIndices = CommentsIndices(environment.settings(), client, threadPool, clusterService)
         docLevelMonitorQueries = DocLevelMonitorQueries(client, clusterService)
@@ -377,14 +392,14 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             client,
             clusterService,
             xContentRegistry,
-            settings
+            settings,
         )
 
         WorkflowMetadataService.initialize(
             client,
             clusterService,
             xContentRegistry,
-            settings
+            settings,
         )
 
         DeleteMonitorService.initialize(client, lockService)
@@ -400,12 +415,12 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             alertV2Mover,
             lockService,
             alertService,
-            triggerService
+            triggerService,
         )
     }
 
-    override fun getSettings(): List<Setting<*>> {
-        return listOf(
+    override fun getSettings(): List<Setting<*>> =
+        listOf(
             ScheduledJobSettings.REQUEST_TIMEOUT,
             ScheduledJobSettings.SWEEP_BACKOFF_MILLIS,
             ScheduledJobSettings.SWEEP_BACKOFF_RETRY_COUNT,
@@ -497,9 +512,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.ALERT_V2_PER_RESULT_TRIGGER_MAX_ALERTS,
             AlertingSettings.NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH,
             AlertingSettings.NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH,
-            AlertingV2Settings.ALERTING_V2_ENABLED
+            AlertingV2Settings.ALERTING_V2_ENABLED,
         )
-    }
 
     override fun onIndexModule(indexModule: IndexModule) {
         if (indexModule.index.name == ScheduledJob.SCHEDULED_JOBS_INDEX) {
@@ -507,32 +521,29 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         }
     }
 
-    override fun getContexts(): List<ScriptContext<*>> {
-        return listOf(TriggerScript.CONTEXT)
-    }
+    override fun getContexts(): List<ScriptContext<*>> = listOf(TriggerScript.CONTEXT)
 
-    override fun getSystemIndexDescriptors(settings: Settings): Collection<SystemIndexDescriptor> {
-        return listOf(
+    override fun getSystemIndexDescriptors(settings: Settings): Collection<SystemIndexDescriptor> =
+        listOf(
             SystemIndexDescriptor(ALL_ALERT_INDEX_PATTERN, "Alerting Plugin system index pattern"),
             SystemIndexDescriptor(SCHEDULED_JOBS_INDEX, "Alerting Plugin Configuration index"),
             SystemIndexDescriptor(ALL_COMMENTS_INDEX_PATTERN, "Alerting Comments system index pattern"),
-            SystemIndexDescriptor(ALL_ALERT_V2_INDEX_PATTERN, "Alerting V2 Alerts index pattern")
+            SystemIndexDescriptor(ALL_ALERT_V2_INDEX_PATTERN, "Alerting V2 Alerts index pattern"),
         )
-    }
 
     override fun reload(settings: Settings) {
         runner.reloadDestinationSettings(settings)
     }
 
-    override fun getPipelineAggregations(): List<SearchPlugin.PipelineAggregationSpec> {
-        return listOf(
-            SearchPlugin.PipelineAggregationSpec(
-                BucketSelectorExtAggregationBuilder.NAME,
-                { sin: StreamInput -> BucketSelectorExtAggregationBuilder(sin) },
-                { parser: XContentParser, agg_name: String -> BucketSelectorExtAggregationBuilder.parse(agg_name, parser) }
-            ).addResultReader({ sin: StreamInput -> BucketSelectorIndices(sin) })
+    override fun getPipelineAggregations(): List<SearchPlugin.PipelineAggregationSpec> =
+        listOf(
+            SearchPlugin
+                .PipelineAggregationSpec(
+                    BucketSelectorExtAggregationBuilder.NAME,
+                    { sin: StreamInput -> BucketSelectorExtAggregationBuilder(sin) },
+                    { parser: XContentParser, agg_name: String -> BucketSelectorExtAggregationBuilder.parse(agg_name, parser) },
+                ).addResultReader({ sin: StreamInput -> BucketSelectorIndices(sin) }),
         )
-    }
 
     override fun loadExtensions(loader: ExtensiblePlugin.ExtensionLoader) {
         for (monitorExtension in loader.loadExtensions(RemoteMonitorRunnerExtension::class.java)) {

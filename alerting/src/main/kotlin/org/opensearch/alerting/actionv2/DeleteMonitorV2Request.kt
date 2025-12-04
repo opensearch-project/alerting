@@ -24,12 +24,10 @@ class DeleteMonitorV2Request : ActionRequest {
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
         monitorV2Id = sin.readString(),
-        refreshPolicy = WriteRequest.RefreshPolicy.readFrom(sin)
+        refreshPolicy = WriteRequest.RefreshPolicy.readFrom(sin),
     )
 
-    override fun validate(): ActionRequestValidationException? {
-        return null
-    }
+    override fun validate(): ActionRequestValidationException? = null
 
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {

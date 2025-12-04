@@ -10,21 +10,26 @@ import org.opensearch.alerting.modelv2.PPLSQLTriggerRunResult
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class ExecuteMonitorV2ResponseTests : OpenSearchTestCase() {
+    @Test
     fun `test execute monitor response`() {
-        val monitorRunResult = PPLSQLMonitorRunResult(
-            monitorName = "some-monitor",
-            error = IllegalArgumentException("some-error"),
-            triggerResults = mapOf(
-                "some-trigger-id" to PPLSQLTriggerRunResult(
-                    triggerName = "some-trigger",
-                    triggered = true,
-                    error = IllegalArgumentException("some-error")
-                )
-            ),
-            pplQueryResults = mapOf("some-result" to mapOf("some-field" to 3))
-        )
+        val monitorRunResult =
+            PPLSQLMonitorRunResult(
+                monitorName = "some-monitor",
+                error = IllegalArgumentException("some-error"),
+                triggerResults =
+                    mapOf(
+                        "some-trigger-id" to
+                            PPLSQLTriggerRunResult(
+                                triggerName = "some-trigger",
+                                triggered = true,
+                                error = IllegalArgumentException("some-error"),
+                            ),
+                    ),
+                pplQueryResults = mapOf("some-result" to mapOf("some-field" to 3)),
+            )
         val response = ExecuteMonitorV2Response(monitorRunResult)
         assertNotNull(response)
 
@@ -39,19 +44,23 @@ class ExecuteMonitorV2ResponseTests : OpenSearchTestCase() {
         assert(newResponse.monitorV2RunResult.triggerResults.containsKey("some-trigger-id"))
         assertEquals(
             response.monitorV2RunResult.triggerResults["some-trigger-id"]!!.triggerName,
-            newResponse.monitorV2RunResult.triggerResults["some-trigger-id"]!!.triggerName
+            newResponse.monitorV2RunResult.triggerResults["some-trigger-id"]!!.triggerName,
         )
         assertEquals(
             response.monitorV2RunResult.triggerResults["some-trigger-id"]!!.triggered,
-            newResponse.monitorV2RunResult.triggerResults["some-trigger-id"]!!.triggered
+            newResponse.monitorV2RunResult.triggerResults["some-trigger-id"]!!.triggered,
         )
         assertEquals(
-            response.monitorV2RunResult.triggerResults["some-trigger-id"]!!.error?.message,
-            newResponse.monitorV2RunResult.triggerResults["some-trigger-id"]!!.error?.message
+            response.monitorV2RunResult.triggerResults["some-trigger-id"]!!
+                .error
+                ?.message,
+            newResponse.monitorV2RunResult.triggerResults["some-trigger-id"]!!
+                .error
+                ?.message,
         )
         assertEquals(
             (response.monitorV2RunResult as PPLSQLMonitorRunResult).pplQueryResults,
-            (newResponse.monitorV2RunResult as PPLSQLMonitorRunResult).pplQueryResults
+            (newResponse.monitorV2RunResult as PPLSQLMonitorRunResult).pplQueryResults,
         )
     }
 }

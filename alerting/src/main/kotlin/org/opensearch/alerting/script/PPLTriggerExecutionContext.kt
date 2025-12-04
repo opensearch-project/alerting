@@ -15,9 +15,8 @@ data class PPLTriggerExecutionContext(
     override val monitorV2: PPLSQLMonitor,
     override val error: Exception? = null,
     val pplTrigger: PPLSQLTrigger,
-    var pplQueryResults: JSONObject // can be a full set of PPL query results, or an individual result row
+    var pplQueryResults: JSONObject, // can be a full set of PPL query results, or an individual result row
 ) : TriggerV2ExecutionContext(monitorV2, error) {
-
     override fun asTemplateArg(): Map<String, Any?> {
         val templateArg = super.asTemplateArg().toMutableMap()
         templateArg[PPL_SQL_TRIGGER_FIELD] = pplTrigger.asTemplateArg()

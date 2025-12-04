@@ -17,6 +17,7 @@ import java.io.IOException
 class ScheduledJobsStatsRequest : BaseNodesRequest<ScheduledJobsStatsRequest> {
     var jobSchedulingMetrics: Boolean = true
     var jobsInfo: Boolean = true
+
     // show Alerting V2 scheduled jobs if true, Alerting V1 scheduled jobs if false, all scheduled jobs if null
     var showAlertingV2ScheduledJobs: Boolean? = null
 

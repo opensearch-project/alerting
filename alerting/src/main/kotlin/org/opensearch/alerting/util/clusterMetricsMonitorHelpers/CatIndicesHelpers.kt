@@ -34,7 +34,9 @@ import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.util.Locale
 
-class CatIndicesRequestWrapper(val pathParams: String = "") : ActionRequest() {
+class CatIndicesRequestWrapper(
+    val pathParams: String = "",
+) : ActionRequest() {
     val log = LogManager.getLogger(CatIndicesRequestWrapper::class.java)
 
     var clusterHealthRequest: ClusterHealthRequest =
@@ -66,11 +68,13 @@ class CatIndicesRequestWrapper(val pathParams: String = "") : ActionRequest() {
 
     override fun validate(): ActionRequestValidationException? {
         var exception: ActionRequestValidationException? = null
-        if (pathParams.isNotBlank() && indicesList.any { !VALID_INDEX_NAME_REGEX.containsMatchIn(it) })
-            exception = ValidateActions.addValidationError(
-                "The path parameters do not form a valid, comma-separated list of data streams, indices, or index aliases.",
-                exception
-            )
+        if (pathParams.isNotBlank() && indicesList.any { !VALID_INDEX_NAME_REGEX.containsMatchIn(it) }) {
+            exception =
+                ValidateActions.addValidationError(
+                    "The path parameters do not form a valid, comma-separated list of data streams, indices, or index aliases.",
+                    exception,
+                )
+        }
         return exception
     }
 }
@@ -79,17 +83,19 @@ class CatIndicesResponseWrapper(
     clusterHealthResponse: ClusterHealthResponse,
     clusterStateResponse: ClusterStateResponse,
     indexSettingsResponse: GetSettingsResponse,
-    indicesStatsResponse: IndicesStatsResponse
-) : ActionResponse(), ToXContentObject {
+    indicesStatsResponse: IndicesStatsResponse,
+) : ActionResponse(),
+    ToXContentObject {
     var indexInfoList: List<IndexInfo> = listOf()
 
     init {
-        indexInfoList = compileIndexInfo(
-            clusterHealthResponse,
-            clusterStateResponse,
-            indexSettingsResponse,
-            indicesStatsResponse
-        )
+        indexInfoList =
+            compileIndexInfo(
+                clusterHealthResponse,
+                clusterStateResponse,
+                indexSettingsResponse,
+                indicesStatsResponse,
+            )
     }
 
     companion object {
@@ -100,7 +106,10 @@ class CatIndicesResponseWrapper(
         out.writeList(indexInfoList)
     }
 
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder {
         builder.startObject()
         builder.startArray(WRAPPER_FIELD)
         indexInfoList.forEach { it.toXContent(builder, params) }
@@ -112,7 +121,7 @@ class CatIndicesResponseWrapper(
         clusterHealthResponse: ClusterHealthResponse,
         clusterStateResponse: ClusterStateResponse,
         indexSettingsResponse: GetSettingsResponse,
-        indicesStatsResponse: IndicesStatsResponse
+        indicesStatsResponse: IndicesStatsResponse,
     ): List<IndexInfo> {
         val list = mutableListOf<IndexInfo>()
 
@@ -159,8 +168,10 @@ class CatIndicesResponseWrapper(
                     docsCount = "${primaryStats?.getDocs()?.count}",
                     docsDeleted = "${primaryStats?.getDocs()?.deleted}",
                     creationDate = "${indexMetadata?.creationDate}",
-                    creationDateString = DateFormatter.forPattern("strict_date_time")
-                        .format(ZonedDateTime.ofInstant(Instant.ofEpochMilli(indexMetadata!!.creationDate), ZoneOffset.UTC)),
+                    creationDateString =
+                        DateFormatter
+                            .forPattern("strict_date_time")
+                            .format(ZonedDateTime.ofInstant(Instant.ofEpochMilli(indexMetadata!!.creationDate), ZoneOffset.UTC)),
                     storeSize = "${totalStats?.store?.size}",
                     priStoreSize = "${primaryStats?.store?.size}",
                     completionSize = "${totalStats?.completion?.size}",
@@ -288,7 +299,7 @@ class CatIndicesResponseWrapper(
                     memoryTotal = "${totalStats?.totalMemory}",
                     priMemoryTotal = "${primaryStats?.totalMemory}",
                     searchThrottled = "$searchThrottled",
-                )
+                ),
             )
         }
 
@@ -432,8 +443,9 @@ class CatIndicesResponseWrapper(
         val priSuggestTotal: String?,
         val memoryTotal: String?,
         val priMemoryTotal: String?,
-        val searchThrottled: String?
-    ) : ToXContentObject, Writeable {
+        val searchThrottled: String?,
+    ) : ToXContentObject,
+        Writeable {
         companion object {
             const val HEALTH_FIELD = "health"
             const val STATUS_FIELD = "status"
@@ -574,8 +586,12 @@ class CatIndicesResponseWrapper(
             const val SEARCH_THROTTLED_FIELD = "search.throttled"
         }
 
-        override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-            builder.startObject()
+        override fun toXContent(
+            builder: XContentBuilder,
+            params: ToXContent.Params,
+        ): XContentBuilder {
+            builder
+                .startObject()
                 .field(HEALTH_FIELD, health)
                 .field(STATUS_FIELD, status)
                 .field(INDEX_FIELD, index)

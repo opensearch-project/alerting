@@ -110,13 +110,14 @@ class AlertV2Mover(
             // try to sweep current AlertV2s for expiration immediately as we might be restarting the cluster
             moveOrDeleteAlertV2s()
             // schedule expiration checks and expirations to happen repeatedly at some interval
-            scheduledAlertsV2CheckAndExpire = threadPool
-                .scheduleWithFixedDelay({ moveOrDeleteAlertV2s() }, checkForExpirationInterval, executorName)
+            scheduledAlertsV2CheckAndExpire =
+                threadPool
+                    .scheduleWithFixedDelay({ moveOrDeleteAlertV2s() }, checkForExpirationInterval, executorName)
         } catch (e: Exception) {
             // This should be run on cluster startup
             logger.error(
                 "Error sweeping AlertV2s for expiration. This cannot be done until clustermanager node is restarted.",
-                e
+                e,
             )
         }
     }
@@ -150,21 +151,23 @@ class AlertV2Mover(
 
     private suspend fun searchForExpiredAlerts(): List<AlertV2> {
         logger.debug("beginning search for expired alerts")
-        /* first collect all triggers and their expire durations */
+        // first collect all triggers and their expire durations
         // when searching the alerting-config index, only trigger IDs and their expire durations are needed
-        val monitorV2sSearchQuery = SearchSourceBuilder.searchSource()
-            .query(QueryBuilders.existsQuery(MONITOR_V2_TYPE))
-            .fetchSource(
-                arrayOf(
-                    "$MONITOR_V2_TYPE.$PPL_SQL_MONITOR_TYPE.$TRIGGERS_FIELD.$ID_FIELD",
-                    "$MONITOR_V2_TYPE.$PPL_SQL_MONITOR_TYPE.$TRIGGERS_FIELD.$EXPIRE_FIELD"
-                ),
-                null
-            )
-            .size(MAX_SEARCH_SIZE)
-            .version(true)
-        val monitorV2sRequest = SearchRequest(SCHEDULED_JOBS_INDEX)
-            .source(monitorV2sSearchQuery)
+        val monitorV2sSearchQuery =
+            SearchSourceBuilder
+                .searchSource()
+                .query(QueryBuilders.existsQuery(MONITOR_V2_TYPE))
+                .fetchSource(
+                    arrayOf(
+                        "$MONITOR_V2_TYPE.$PPL_SQL_MONITOR_TYPE.$TRIGGERS_FIELD.$ID_FIELD",
+                        "$MONITOR_V2_TYPE.$PPL_SQL_MONITOR_TYPE.$TRIGGERS_FIELD.$EXPIRE_FIELD",
+                    ),
+                    null,
+                ).size(MAX_SEARCH_SIZE)
+                .version(true)
+        val monitorV2sRequest =
+            SearchRequest(SCHEDULED_JOBS_INDEX)
+                .source(monitorV2sSearchQuery)
         val searchMonitorV2sResponse: SearchResponse = client.suspendUntil { search(monitorV2sRequest, it) }
 
         logger.debug("searching triggers for their expire durations")
@@ -186,7 +189,7 @@ class AlertV2Mover(
 
         logger.debug("trigger to expire duration map: $triggerToExpireDuration")
 
-        /* now collect all expired alerts */
+        // now collect all expired alerts
         logger.debug("searching active alerts index for expired alerts")
 
         val now = Instant.now().toEpochMilli()
@@ -201,9 +204,10 @@ class AlertV2Mover(
             val maxValidTime = now - expireDurationMillis
 
             expiredAlertsBoolQuery.should(
-                QueryBuilders.boolQuery()
+                QueryBuilders
+                    .boolQuery()
                     .must(QueryBuilders.termQuery(TRIGGER_V2_ID_FIELD, triggerId))
-                    .must(QueryBuilders.rangeQuery(TRIGGERED_TIME_FIELD).lte(maxValidTime))
+                    .must(QueryBuilders.rangeQuery(TRIGGERED_TIME_FIELD).lte(maxValidTime)),
             )
         }
 
@@ -215,20 +219,24 @@ class AlertV2Mover(
         // that even with those measures in place, an alert that came from a
         // now nonexistent trigger was somehow found
         expiredAlertsBoolQuery.should(
-            QueryBuilders.boolQuery()
-                .mustNot(QueryBuilders.termsQuery(TRIGGER_V2_ID_FIELD, triggerToExpireDuration.keys.toList()))
+            QueryBuilders
+                .boolQuery()
+                .mustNot(QueryBuilders.termsQuery(TRIGGER_V2_ID_FIELD, triggerToExpireDuration.keys.toList())),
         )
 
         // Explicitly specify that at least one should clause must match
         expiredAlertsBoolQuery.minimumShouldMatch(1)
 
         // search for the expired alerts
-        val expiredAlertsSearchQuery = SearchSourceBuilder.searchSource()
-            .query(expiredAlertsBoolQuery)
-            .size(MAX_SEARCH_SIZE)
-            .version(true)
-        val expiredAlertsRequest = SearchRequest(ALERT_V2_INDEX)
-            .source(expiredAlertsSearchQuery)
+        val expiredAlertsSearchQuery =
+            SearchSourceBuilder
+                .searchSource()
+                .query(expiredAlertsBoolQuery)
+                .size(MAX_SEARCH_SIZE)
+                .version(true)
+        val expiredAlertsRequest =
+            SearchRequest(ALERT_V2_INDEX)
+                .source(expiredAlertsSearchQuery)
         val expiredAlertsResponse: SearchResponse = client.suspendUntil { search(expiredAlertsRequest, it) }
 
         // parse the search results into full alert docs, as they will need to be
@@ -236,7 +244,7 @@ class AlertV2Mover(
         val expiredAlertV2s = mutableListOf<AlertV2>()
         expiredAlertsResponse.hits.forEach { hit ->
             expiredAlertV2s.add(
-                AlertV2.parse(alertV2ContentParser(hit.sourceRef), hit.id, hit.version)
+                AlertV2.parse(alertV2ContentParser(hit.sourceRef), hit.id, hit.version),
             )
         }
 
@@ -252,12 +260,13 @@ class AlertV2Mover(
             return null
         }
 
-        val deleteRequests = expiredAlerts.map {
-            DeleteRequest(ALERT_V2_INDEX, it.id)
-                .routing(it.monitorId)
-                .version(it.version)
-                .versionType(VersionType.EXTERNAL_GTE)
-        }
+        val deleteRequests =
+            expiredAlerts.map {
+                DeleteRequest(ALERT_V2_INDEX, it.id)
+                    .routing(it.monitorId)
+                    .version(it.version)
+                    .versionType(VersionType.EXTERNAL_GTE)
+            }
 
         val deleteRequest = BulkRequest().add(deleteRequests)
         val deleteResponse: BulkResponse = client.suspendUntil { bulk(deleteRequest, it) }
@@ -272,14 +281,15 @@ class AlertV2Mover(
             return null
         }
 
-        val indexRequests = expiredAlerts.map {
-            IndexRequest(ALERT_V2_HISTORY_WRITE_INDEX)
-                .routing(it.monitorId)
-                .source(it.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
-                .version(it.version)
-                .versionType(VersionType.EXTERNAL_GTE)
-                .id(it.id)
-        }
+        val indexRequests =
+            expiredAlerts.map {
+                IndexRequest(ALERT_V2_HISTORY_WRITE_INDEX)
+                    .routing(it.monitorId)
+                    .source(it.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
+                    .version(it.version)
+                    .versionType(VersionType.EXTERNAL_GTE)
+                    .id(it.id)
+            }
 
         val copyRequest = BulkRequest().add(indexRequests)
         val copyResponse: BulkResponse = client.suspendUntil { bulk(copyRequest, it) }
@@ -287,7 +297,10 @@ class AlertV2Mover(
         return copyResponse
     }
 
-    private suspend fun deleteExpiredAlertsThatWereCopied(copyResponse: BulkResponse?, expiredAlerts: List<AlertV2>): BulkResponse? {
+    private suspend fun deleteExpiredAlertsThatWereCopied(
+        copyResponse: BulkResponse?,
+        expiredAlerts: List<AlertV2>,
+    ): BulkResponse? {
         logger.debug("beginning to delete expired alerts that were copied to history write index")
         // if there were no expired alerts to copy, skip deleting anything
         if (copyResponse == null) {
@@ -298,12 +311,13 @@ class AlertV2Mover(
         // monitor IDs for routing is easier
         val alertsById: Map<String, AlertV2> = expiredAlerts.associateBy { it.id }
 
-        val deleteRequests = copyResponse.items.filterNot { it.isFailed }.map {
-            DeleteRequest(ALERT_V2_INDEX, it.id)
-                .routing(alertsById[it.id]!!.monitorId)
-                .version(it.version)
-                .versionType(VersionType.EXTERNAL_GTE)
-        }
+        val deleteRequests =
+            copyResponse.items.filterNot { it.isFailed }.map {
+                DeleteRequest(ALERT_V2_INDEX, it.id)
+                    .routing(alertsById[it.id]!!.monitorId)
+                    .version(it.version)
+                    .versionType(VersionType.EXTERNAL_GTE)
+            }
         val deleteRequest = BulkRequest().add(deleteRequests)
         val deleteResponse: BulkResponse = client.suspendUntil { bulk(deleteRequest, it) }
 
@@ -313,27 +327,29 @@ class AlertV2Mover(
     private fun checkForFailures(bulkResponse: BulkResponse?) {
         bulkResponse?.let {
             if (bulkResponse.hasFailures()) {
-                val retryCause = bulkResponse.items.filter { it.isFailed }
-                    .firstOrNull { it.status() == RestStatus.TOO_MANY_REQUESTS }
-                    ?.failure?.cause
+                val retryCause =
+                    bulkResponse.items
+                        .filter { it.isFailed }
+                        .firstOrNull { it.status() == RestStatus.TOO_MANY_REQUESTS }
+                        ?.failure
+                        ?.cause
                 logger.error(
                     "Failed to move or delete alert v2s: ${bulkResponse.buildFailureMessage()}",
-                    retryCause
+                    retryCause,
                 )
             }
         }
     }
 
-    private fun alertV2ContentParser(bytesReference: BytesReference): XContentParser {
-        return XContentHelper.createParser(
-            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-            bytesReference, XContentType.JSON
+    private fun alertV2ContentParser(bytesReference: BytesReference): XContentParser =
+        XContentHelper.createParser(
+            NamedXContentRegistry.EMPTY,
+            LoggingDeprecationHandler.INSTANCE,
+            bytesReference,
+            XContentType.JSON,
         )
-    }
 
-    private fun areAlertV2IndicesPresent(): Boolean {
-        return alertV2IndexInitialized && alertV2HistoryIndexInitialized
-    }
+    private fun areAlertV2IndicesPresent(): Boolean = alertV2IndexInitialized && alertV2HistoryIndexInitialized
 
     companion object {
         // this method is used by MonitorRunnerService's postIndex and postDelete
@@ -341,13 +357,19 @@ class AlertV2Mover(
         // (in the case of alert v2 history disabled) the alerts generated by
         // a monitor in response to the event that the monitor gets updated
         // or deleted
-        suspend fun moveAlertV2s(monitorV2Id: String, monitorV2: MonitorV2?, monitorCtx: MonitorRunnerExecutionContext) {
+        suspend fun moveAlertV2s(
+            monitorV2Id: String,
+            monitorV2: MonitorV2?,
+            monitorCtx: MonitorRunnerExecutionContext,
+        ) {
             logger.debug("beginning to move alerts for postIndex or postDelete of monitor: $monitorV2Id")
             val client = monitorCtx.client!!
 
             // first collect all alerts that came from this updated or deleted monitor
-            val boolQuery = QueryBuilders.boolQuery()
-                .filter(QueryBuilders.termQuery(AlertV2.MONITOR_V2_ID_FIELD, monitorV2Id))
+            val boolQuery =
+                QueryBuilders
+                    .boolQuery()
+                    .filter(QueryBuilders.termQuery(AlertV2.MONITOR_V2_ID_FIELD, monitorV2Id))
 
             /*
              this monitorV2 != null case happens when this function is called by postIndex. if the monitor is updated,
@@ -363,17 +385,20 @@ class AlertV2Mover(
              likely won't explicitly pass in trigger IDs for their updated triggers that exactly match
              the IDs of the old triggers. this means Alerting will generate a new ID for the updated triggers by default,
              meaning this logic will pick up those updated triggers and correctly move/delete the alerts
-            */
+             */
             if (monitorV2 != null) {
                 boolQuery.mustNot(QueryBuilders.termsQuery(TRIGGER_V2_ID_FIELD, monitorV2.triggers.map { it.id }))
             }
 
-            val alertsSearchQuery = SearchSourceBuilder.searchSource()
-                .query(boolQuery)
-                .size(MAX_SEARCH_SIZE)
-                .version(true)
-            val activeAlertsRequest = SearchRequest(ALERT_V2_INDEX)
-                .source(alertsSearchQuery)
+            val alertsSearchQuery =
+                SearchSourceBuilder
+                    .searchSource()
+                    .query(boolQuery)
+                    .size(MAX_SEARCH_SIZE)
+                    .version(true)
+            val activeAlertsRequest =
+                SearchRequest(ALERT_V2_INDEX)
+                    .source(alertsSearchQuery)
             val searchAlertsResponse: SearchResponse = client.suspendUntil { search(activeAlertsRequest, it) }
 
             // If no alerts are found, simply return
@@ -384,12 +409,14 @@ class AlertV2Mover(
                 activeAlerts.add(
                     AlertV2.parse(
                         XContentHelper.createParser(
-                            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-                            hit.sourceRef, XContentType.JSON
+                            NamedXContentRegistry.EMPTY,
+                            LoggingDeprecationHandler.INSTANCE,
+                            hit.sourceRef,
+                            XContentType.JSON,
                         ),
                         hit.id,
-                        hit.version
-                    )
+                        hit.version,
+                    ),
                 )
             }
 
@@ -404,33 +431,40 @@ class AlertV2Mover(
             var copyResponse: BulkResponse? = null
             if (alertV2HistoryEnabled) {
                 logger.debug("alert v2 history enabled, copying alerts to history write index")
-                val indexRequests = searchAlertsResponse.hits.map { hit ->
-                    val xcp = XContentHelper.createParser(
-                        NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-                        hit.sourceRef, XContentType.JSON
-                    )
+                val indexRequests =
+                    searchAlertsResponse.hits.map { hit ->
+                        val xcp =
+                            XContentHelper.createParser(
+                                NamedXContentRegistry.EMPTY,
+                                LoggingDeprecationHandler.INSTANCE,
+                                hit.sourceRef,
+                                XContentType.JSON,
+                            )
 
-                    IndexRequest(ALERT_V2_HISTORY_WRITE_INDEX)
-                        .routing(monitorV2Id)
-                        .source(
-                            AlertV2.parse(xcp, hit.id, hit.version)
-                                .toXContentWithUser(XContentFactory.jsonBuilder())
-                        )
-                        .version(hit.version)
-                        .versionType(VersionType.EXTERNAL_GTE)
-                        .id(hit.id)
-                }
+                        IndexRequest(ALERT_V2_HISTORY_WRITE_INDEX)
+                            .routing(monitorV2Id)
+                            .source(
+                                AlertV2
+                                    .parse(xcp, hit.id, hit.version)
+                                    .toXContentWithUser(XContentFactory.jsonBuilder()),
+                            ).version(hit.version)
+                            .versionType(VersionType.EXTERNAL_GTE)
+                            .id(hit.id)
+                    }
                 val copyRequest = BulkRequest().add(indexRequests)
                 copyResponse = client.suspendUntil { bulk(copyRequest, it) }
 
                 if (copyResponse!!.hasFailures()) {
-                    val retryCause = copyResponse.items.filter { it.isFailed }
-                        .firstOrNull { it.status() == RestStatus.TOO_MANY_REQUESTS }
-                        ?.failure?.cause
+                    val retryCause =
+                        copyResponse.items
+                            .filter { it.isFailed }
+                            .firstOrNull { it.status() == RestStatus.TOO_MANY_REQUESTS }
+                            ?.failure
+                            ?.cause
                     throw RuntimeException(
                         "Failed to copy alertV2s for [$monitorV2Id, ${monitorV2?.triggers?.map { it.id }}]: " +
                             copyResponse.buildFailureMessage(),
-                        retryCause
+                        retryCause,
                     )
                 }
             }
@@ -438,38 +472,42 @@ class AlertV2Mover(
             logger.debug("deleting alerts related to monitor: $monitorV2Id")
 
             // prepare deletion request
-            val deleteRequests = if (alertV2HistoryEnabled) {
-                // if alerts were to be migrated, delete only the ones
-                // that were successfully copied over
-                copyResponse!!.items.filterNot { it.isFailed }.map {
-                    DeleteRequest(ALERT_V2_INDEX, it.id)
-                        .routing(alertsById[it.id]!!.monitorId)
-                        .version(it.version)
-                        .versionType(VersionType.EXTERNAL_GTE)
+            val deleteRequests =
+                if (alertV2HistoryEnabled) {
+                    // if alerts were to be migrated, delete only the ones
+                    // that were successfully copied over
+                    copyResponse!!.items.filterNot { it.isFailed }.map {
+                        DeleteRequest(ALERT_V2_INDEX, it.id)
+                            .routing(alertsById[it.id]!!.monitorId)
+                            .version(it.version)
+                            .versionType(VersionType.EXTERNAL_GTE)
+                    }
+                } else {
+                    // otherwise just directly get the original
+                    // set of alerts
+                    searchAlertsResponse.hits.map { hit ->
+                        DeleteRequest(ALERT_V2_INDEX, hit.id)
+                            .routing(alertsById[hit.id]!!.monitorId)
+                            .version(hit.version)
+                            .versionType(VersionType.EXTERNAL_GTE)
+                    }
                 }
-            } else {
-                // otherwise just directly get the original
-                // set of alerts
-                searchAlertsResponse.hits.map { hit ->
-                    DeleteRequest(ALERT_V2_INDEX, hit.id)
-                        .routing(alertsById[hit.id]!!.monitorId)
-                        .version(hit.version)
-                        .versionType(VersionType.EXTERNAL_GTE)
-                }
-            }
 
             // execute delete request
             val deleteRequest = BulkRequest().add(deleteRequests)
             val deleteResponse: BulkResponse = client.suspendUntil { bulk(deleteRequest, it) }
 
             if (deleteResponse.hasFailures()) {
-                val retryCause = deleteResponse.items.filter { it.isFailed }
-                    .firstOrNull { it.status() == RestStatus.TOO_MANY_REQUESTS }
-                    ?.failure?.cause
+                val retryCause =
+                    deleteResponse.items
+                        .filter { it.isFailed }
+                        .firstOrNull { it.status() == RestStatus.TOO_MANY_REQUESTS }
+                        ?.failure
+                        ?.cause
                 throw RuntimeException(
                     "Failed to delete alertV2s for [$monitorV2Id, ${monitorV2?.triggers?.map { it.id }}]: " +
                         deleteResponse.buildFailureMessage(),
-                    retryCause
+                    retryCause,
                 )
             }
         }

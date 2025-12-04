@@ -14,9 +14,10 @@ import org.opensearch.core.rest.RestStatus
 import org.opensearch.test.OpenSearchTestCase
 import java.time.Instant
 import java.util.Collections
+import kotlin.test.Test
 
 class GetDestinationsResponseTests : OpenSearchTestCase() {
-
+    @Test
     fun `test get destination response with no destinations`() {
         val req = GetDestinationsResponse(RestStatus.OK, 0, Collections.emptyList())
         assertNotNull(req)
@@ -30,23 +31,25 @@ class GetDestinationsResponseTests : OpenSearchTestCase() {
         assertEquals(RestStatus.OK, newReq.status)
     }
 
+    @Test
     fun `test get destination response with a destination`() {
         val slack = Slack("url")
-        val destination = Destination(
-            "id",
-            0L,
-            0,
-            0,
-            0,
-            DestinationType.SLACK,
-            "name",
-            null,
-            Instant.MIN,
-            null,
-            slack,
-            null,
-            null
-        )
+        val destination =
+            Destination(
+                "id",
+                0L,
+                0,
+                0,
+                0,
+                DestinationType.SLACK,
+                "name",
+                null,
+                Instant.MIN,
+                null,
+                slack,
+                null,
+                null,
+            )
 
         val req = GetDestinationsResponse(RestStatus.OK, 1, listOf(destination))
         assertNotNull(req)

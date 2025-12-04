@@ -29,7 +29,7 @@ abstract class WorkflowRunner {
         periodStart: Instant,
         periodEnd: Instant,
         dryRun: Boolean,
-        transportService: TransportService
+        transportService: TransportService,
     ): WorkflowRunResult
 
     suspend fun runAction(
@@ -37,16 +37,19 @@ abstract class WorkflowRunner {
         ctx: ChainedAlertTriggerExecutionContext,
         monitorCtx: MonitorRunnerExecutionContext,
         workflow: Workflow,
-        dryrun: Boolean
+        dryrun: Boolean,
     ): ActionRunResult {
         return try {
             if (!MonitorRunnerService.isActionActionable(action, ctx.alert)) {
                 return ActionRunResult(action.id, action.name, mapOf(), true, null, null)
             }
             val actionOutput = mutableMapOf<String, String>()
-            actionOutput[Action.SUBJECT] = if (action.subjectTemplate != null) {
-                compileTemplate(action.subjectTemplate!!, ctx)
-            } else ""
+            actionOutput[Action.SUBJECT] =
+                if (action.subjectTemplate != null) {
+                    compileTemplate(action.subjectTemplate!!, ctx)
+                } else {
+                    ""
+                }
             actionOutput[Action.MESSAGE] = compileTemplate(action.messageTemplate, ctx)
             if (Strings.isNullOrEmpty(actionOutput[Action.MESSAGE])) {
                 throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
@@ -60,15 +63,16 @@ abstract class WorkflowRunner {
                             monitorCtx.settings!!,
                             monitorCtx.threadPool!!.threadContext,
                             workflow.user?.roles,
-                            workflow.user
-                        )
+                            workflow.user,
+                        ),
                     ) {
-                        actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
-                            action,
-                            monitorCtx,
-                            actionOutput[Action.SUBJECT],
-                            actionOutput[Action.MESSAGE]!!
-                        )
+                        actionOutput[Action.MESSAGE_ID] =
+                            getConfigAndSendNotification(
+                                action,
+                                monitorCtx,
+                                actionOutput[Action.SUBJECT],
+                                actionOutput[Action.MESSAGE]!!,
+                            )
                     }
                 }
             }
@@ -78,9 +82,12 @@ abstract class WorkflowRunner {
         }
     }
 
-    internal fun compileTemplate(template: Script, ctx: ChainedAlertTriggerExecutionContext): String {
-        return MonitorRunnerService.monitorCtx.scriptService!!.compile(template, TemplateScript.CONTEXT)
+    internal fun compileTemplate(
+        template: Script,
+        ctx: ChainedAlertTriggerExecutionContext,
+    ): String =
+        MonitorRunnerService.monitorCtx.scriptService!!
+            .compile(template, TemplateScript.CONTEXT)
             .newInstance(template.params + mapOf("ctx" to ctx.asTemplateArg()))
             .execute()
-    }
 }

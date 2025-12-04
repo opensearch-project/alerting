@@ -45,157 +45,167 @@ import java.time.Instant
 private val log = LogManager.getLogger(TransportGetRemoteIndexesAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
-class TransportGetRemoteIndexesAction @Inject constructor(
-    val transportService: TransportService,
-    val client: Client,
-    actionFilters: ActionFilters,
-    val xContentRegistry: NamedXContentRegistry,
-    val clusterService: ClusterService,
-    settings: Settings,
-) : HandledTransportAction<GetRemoteIndexesRequest, GetRemoteIndexesResponse>(
-    GetRemoteIndexesAction.NAME,
-    transportService,
-    actionFilters,
-    ::GetRemoteIndexesRequest
-),
-    SecureTransportAction {
+class TransportGetRemoteIndexesAction
+    @Inject
+    constructor(
+        val transportService: TransportService,
+        val client: Client,
+        actionFilters: ActionFilters,
+        val xContentRegistry: NamedXContentRegistry,
+        val clusterService: ClusterService,
+        settings: Settings,
+    ) : HandledTransportAction<GetRemoteIndexesRequest, GetRemoteIndexesResponse>(
+            GetRemoteIndexesAction.NAME,
+            transportService,
+            actionFilters,
+            ::GetRemoteIndexesRequest,
+        ),
+        SecureTransportAction {
+        @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
-    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+        @Volatile private var remoteMonitoringEnabled = CROSS_CLUSTER_MONITORING_ENABLED.get(settings)
 
-    @Volatile private var remoteMonitoringEnabled = CROSS_CLUSTER_MONITORING_ENABLED.get(settings)
-
-    init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(CROSS_CLUSTER_MONITORING_ENABLED) { remoteMonitoringEnabled = it }
-        listenFilterBySettingChange(clusterService)
-    }
-
-    override fun doExecute(
-        task: Task,
-        request: GetRemoteIndexesRequest,
-        actionListener: ActionListener<GetRemoteIndexesResponse>
-    ) {
-        log.debug("Remote monitoring enabled: {}", remoteMonitoringEnabled)
-        if (!remoteMonitoringEnabled) {
-            actionListener.onFailure(
-                AlertingException.wrap(
-                    OpenSearchStatusException("Remote monitoring is not enabled.", RestStatus.FORBIDDEN)
-                )
-            )
-            return
+        init {
+            clusterService.clusterSettings.addSettingsUpdateConsumer(CROSS_CLUSTER_MONITORING_ENABLED) { remoteMonitoringEnabled = it }
+            listenFilterBySettingChange(clusterService)
         }
 
-        val user = readUserFromThreadContext(client)
-        if (!validateUserBackendRoles(user, actionListener)) return
-
-        if (!request.isValid()) {
-            actionListener.onFailure(
-                AlertingException.wrap(
-                    OpenSearchStatusException(GetRemoteIndexesRequest.INVALID_PATTERN_MESSAGE, RestStatus.BAD_REQUEST)
+        override fun doExecute(
+            task: Task,
+            request: GetRemoteIndexesRequest,
+            actionListener: ActionListener<GetRemoteIndexesResponse>,
+        ) {
+            log.debug("Remote monitoring enabled: {}", remoteMonitoringEnabled)
+            if (!remoteMonitoringEnabled) {
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException("Remote monitoring is not enabled.", RestStatus.FORBIDDEN),
+                    ),
                 )
-            )
-            return
-        }
+                return
+            }
 
-        client.threadPool().threadContext.stashContext().use {
-            scope.launch {
-                val singleThreadContext = newSingleThreadContext("GetRemoteIndexesActionThread")
-                withContext(singleThreadContext) {
-                    it.restore()
-                    val clusterIndexesList = mutableListOf<ClusterIndexes>()
+            val user = readUserFromThreadContext(client)
+            if (!validateUserBackendRoles(user, actionListener)) return
 
-                    var resolveIndexResponse: ResolveIndexAction.Response? = null
-                    try {
-                        resolveIndexResponse = getRemoteClusters(request.indexes)
-                    } catch (e: Exception) {
-                        log.error("Failed to retrieve indexes for request $request", e)
-                        actionListener.onFailure(AlertingException.wrap(e))
-                    }
+            if (!request.isValid()) {
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException(GetRemoteIndexesRequest.INVALID_PATTERN_MESSAGE, RestStatus.BAD_REQUEST),
+                    ),
+                )
+                return
+            }
 
-                    val resolvedIndexes: MutableList<String> = mutableListOf()
-                    if (resolveIndexResponse != null) {
-                        resolveIndexResponse.indices.forEach { resolvedIndexes.add(it.name) }
-                        resolveIndexResponse.aliases.forEach { resolvedIndexes.add(it.name) }
-                    }
+            client.threadPool().threadContext.stashContext().use {
+                scope.launch {
+                    val singleThreadContext = newSingleThreadContext("GetRemoteIndexesActionThread")
+                    withContext(singleThreadContext) {
+                        it.restore()
+                        val clusterIndexesList = mutableListOf<ClusterIndexes>()
 
-                    val clusterIndexesMap = CrossClusterMonitorUtils.separateClusterIndexes(resolvedIndexes, clusterService)
-
-                    clusterIndexesMap.forEach { (clusterName, indexes) ->
-                        val targetClient = CrossClusterMonitorUtils.getClientForCluster(clusterName, client, clusterService)
-
-                        val startTime = Instant.now()
-                        var clusterHealthResponse: ClusterHealthResponse? = null
+                        var resolveIndexResponse: ResolveIndexAction.Response? = null
                         try {
-                            clusterHealthResponse = getHealthStatuses(targetClient, indexes)
+                            resolveIndexResponse = getRemoteClusters(request.indexes)
                         } catch (e: Exception) {
-                            log.error("Failed to retrieve health statuses for request $request", e)
+                            log.error("Failed to retrieve indexes for request $request", e)
                             actionListener.onFailure(AlertingException.wrap(e))
                         }
-                        val endTime = Instant.now()
-                        val latency = Duration.between(startTime, endTime).toMillis()
 
-                        var mappingsResponse: GetMappingsResponse? = null
-                        if (request.includeMappings) {
+                        val resolvedIndexes: MutableList<String> = mutableListOf()
+                        if (resolveIndexResponse != null) {
+                            resolveIndexResponse.indices.forEach { resolvedIndexes.add(it.name) }
+                            resolveIndexResponse.aliases.forEach { resolvedIndexes.add(it.name) }
+                        }
+
+                        val clusterIndexesMap = CrossClusterMonitorUtils.separateClusterIndexes(resolvedIndexes, clusterService)
+
+                        clusterIndexesMap.forEach { (clusterName, indexes) ->
+                            val targetClient = CrossClusterMonitorUtils.getClientForCluster(clusterName, client, clusterService)
+
+                            val startTime = Instant.now()
+                            var clusterHealthResponse: ClusterHealthResponse? = null
                             try {
-                                mappingsResponse = getIndexMappings(targetClient, indexes)
+                                clusterHealthResponse = getHealthStatuses(targetClient, indexes)
                             } catch (e: Exception) {
-                                log.error("Failed to retrieve mappings for request $request", e)
+                                log.error("Failed to retrieve health statuses for request $request", e)
                                 actionListener.onFailure(AlertingException.wrap(e))
                             }
-                        }
+                            val endTime = Instant.now()
+                            val latency = Duration.between(startTime, endTime).toMillis()
 
-                        val clusterIndexList = mutableListOf<ClusterIndex>()
-                        if (clusterHealthResponse != null) {
-                            indexes.forEach {
-                                clusterIndexList.add(
-                                    ClusterIndex(
-                                        indexName = it,
-                                        indexHealth = clusterHealthResponse.indices[it]?.status,
-                                        mappings = mappingsResponse?.mappings?.get(it)
-                                    )
-                                )
+                            var mappingsResponse: GetMappingsResponse? = null
+                            if (request.includeMappings) {
+                                try {
+                                    mappingsResponse = getIndexMappings(targetClient, indexes)
+                                } catch (e: Exception) {
+                                    log.error("Failed to retrieve mappings for request $request", e)
+                                    actionListener.onFailure(AlertingException.wrap(e))
+                                }
                             }
-                        }
 
-                        clusterIndexesList.add(
-                            ClusterIndexes(
-                                clusterName = clusterName,
-                                clusterHealth = clusterHealthResponse?.status,
-                                hubCluster = clusterName == clusterService.clusterName.value(),
-                                indexes = clusterIndexList,
-                                latency = latency
+                            val clusterIndexList = mutableListOf<ClusterIndex>()
+                            if (clusterHealthResponse != null) {
+                                indexes.forEach {
+                                    clusterIndexList.add(
+                                        ClusterIndex(
+                                            indexName = it,
+                                            indexHealth = clusterHealthResponse.indices[it]?.status,
+                                            mappings = mappingsResponse?.mappings?.get(it),
+                                        ),
+                                    )
+                                }
+                            }
+
+                            clusterIndexesList.add(
+                                ClusterIndexes(
+                                    clusterName = clusterName,
+                                    clusterHealth = clusterHealthResponse?.status,
+                                    hubCluster = clusterName == clusterService.clusterName.value(),
+                                    indexes = clusterIndexList,
+                                    latency = latency,
+                                ),
                             )
-                        )
+                        }
+                        actionListener.onResponse(GetRemoteIndexesResponse(clusterIndexes = clusterIndexesList))
                     }
-                    actionListener.onResponse(GetRemoteIndexesResponse(clusterIndexes = clusterIndexesList))
                 }
             }
         }
-    }
 
-    private suspend fun getRemoteClusters(parsedIndexes: List<String>): ResolveIndexAction.Response {
-        val resolveRequest = ResolveIndexAction.Request(
-            parsedIndexes.toTypedArray(),
-            ResolveIndexAction.Request.DEFAULT_INDICES_OPTIONS
-        )
+        private suspend fun getRemoteClusters(parsedIndexes: List<String>): ResolveIndexAction.Response {
+            val resolveRequest =
+                ResolveIndexAction.Request(
+                    parsedIndexes.toTypedArray(),
+                    ResolveIndexAction.Request.DEFAULT_INDICES_OPTIONS,
+                )
 
-        return client.suspendUntil {
-            admin().indices().resolveIndex(resolveRequest, it)
+            return client.suspendUntil {
+                admin().indices().resolveIndex(resolveRequest, it)
+            }
+        }
+
+        private suspend fun getHealthStatuses(
+            targetClient: Client,
+            parsedIndexesNames: List<String>,
+        ): ClusterHealthResponse {
+            val clusterHealthRequest =
+                ClusterHealthRequest()
+                    .indices(*parsedIndexesNames.toTypedArray())
+                    .indicesOptions(IndicesOptions.lenientExpandHidden())
+
+            return targetClient.suspendUntil {
+                admin().cluster().health(clusterHealthRequest, it)
+            }
+        }
+
+        private suspend fun getIndexMappings(
+            targetClient: Client,
+            parsedIndexNames: List<String>,
+        ): GetMappingsResponse {
+            val getMappingsRequest = GetMappingsRequest().indices(*parsedIndexNames.toTypedArray())
+            return targetClient.suspendUntil {
+                admin().indices().getMappings(getMappingsRequest, it)
+            }
         }
     }
-    private suspend fun getHealthStatuses(targetClient: Client, parsedIndexesNames: List<String>): ClusterHealthResponse {
-        val clusterHealthRequest = ClusterHealthRequest()
-            .indices(*parsedIndexesNames.toTypedArray())
-            .indicesOptions(IndicesOptions.lenientExpandHidden())
-
-        return targetClient.suspendUntil {
-            admin().cluster().health(clusterHealthRequest, it)
-        }
-    }
-
-    private suspend fun getIndexMappings(targetClient: Client, parsedIndexNames: List<String>): GetMappingsResponse {
-        val getMappingsRequest = GetMappingsRequest().indices(*parsedIndexNames.toTypedArray())
-        return targetClient.suspendUntil {
-            admin().indices().getMappings(getMappingsRequest, it)
-        }
-    }
-}

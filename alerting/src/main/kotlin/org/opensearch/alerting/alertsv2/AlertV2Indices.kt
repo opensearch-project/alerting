@@ -58,9 +58,8 @@ class AlertV2Indices(
     settings: Settings,
     private val client: Client,
     private val threadPool: ThreadPool,
-    private val clusterService: ClusterService
+    private val clusterService: ClusterService,
 ) : ClusterStateListener {
-
     init {
         clusterService.addListener(this)
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERT_V2_HISTORY_ENABLED) { alertV2HistoryEnabled = it }
@@ -77,7 +76,6 @@ class AlertV2Indices(
     }
 
     companion object {
-
         /** The in progress alert history index. */
         const val ALERT_V2_INDEX = ".opensearch-alerting-v2-alerts"
 
@@ -94,8 +92,7 @@ class AlertV2Indices(
         const val ALL_ALERT_V2_INDEX_PATTERN = ".opensearch-alerting-v2-alert*"
 
         @JvmStatic
-        fun alertV2Mapping() =
-            AlertV2Indices::class.java.getResource("alert_v2_mapping.json").readText()
+        fun alertV2Mapping() = AlertV2Indices::class.java.getResource("alert_v2_mapping.json").readText()
     }
 
     @Volatile private var alertV2HistoryEnabled = ALERT_V2_HISTORY_ENABLED.get(settings)
@@ -127,8 +124,9 @@ class AlertV2Indices(
             rolloverAlertV2HistoryIndex()
 
             // schedule the next rollover for approx MAX_AGE later
-            scheduledAlertV2Rollover = threadPool
-                .scheduleWithFixedDelay({ rolloverAndDeleteAlertV2HistoryIndices() }, alertV2HistoryRolloverPeriod, executorName())
+            scheduledAlertV2Rollover =
+                threadPool
+                    .scheduleWithFixedDelay({ rolloverAndDeleteAlertV2HistoryIndices() }, alertV2HistoryRolloverPeriod, executorName())
         } catch (e: Exception) {
             logger.error("Error rolling over alerts v2 history index.", e)
         }
@@ -138,9 +136,7 @@ class AlertV2Indices(
         scheduledAlertV2Rollover?.cancel()
     }
 
-    private fun executorName(): String {
-        return ThreadPool.Names.MANAGEMENT
-    }
+    private fun executorName(): String = ThreadPool.Names.MANAGEMENT
 
     override fun clusterChanged(event: ClusterChangedEvent) {
         // Instead of using a LocalNodeClusterManagerListener to track clustermanager changes, this service will
@@ -163,8 +159,9 @@ class AlertV2Indices(
     private fun rescheduleAlertRollover() {
         if (clusterService.state().nodes.isLocalNodeElectedClusterManager) {
             scheduledAlertV2Rollover?.cancel()
-            scheduledAlertV2Rollover = threadPool
-                .scheduleWithFixedDelay({ rolloverAndDeleteAlertV2HistoryIndices() }, alertV2HistoryRolloverPeriod, executorName())
+            scheduledAlertV2Rollover =
+                threadPool
+                    .scheduleWithFixedDelay({ rolloverAndDeleteAlertV2HistoryIndices() }, alertV2HistoryRolloverPeriod, executorName())
         }
     }
 
@@ -181,39 +178,45 @@ class AlertV2Indices(
     suspend fun createOrUpdateInitialAlertV2HistoryIndex() {
         if (!alertV2HistoryIndexInitialized) {
             alertV2HistoryIndexInitialized = createIndex(ALERT_V2_HISTORY_INDEX_PATTERN, alertV2Mapping(), ALERT_V2_HISTORY_WRITE_INDEX)
-            if (alertV2HistoryIndexInitialized)
-                IndexUtils.lastUpdatedAlertV2HistoryIndex = IndexUtils.getIndexNameWithAlias(
-                    clusterService.state(),
-                    ALERT_V2_HISTORY_WRITE_INDEX
-                )
+            if (alertV2HistoryIndexInitialized) {
+                IndexUtils.lastUpdatedAlertV2HistoryIndex =
+                    IndexUtils.getIndexNameWithAlias(
+                        clusterService.state(),
+                        ALERT_V2_HISTORY_WRITE_INDEX,
+                    )
+            }
         } else {
             updateIndexMapping(ALERT_V2_HISTORY_WRITE_INDEX, alertV2Mapping(), true)
         }
         alertV2HistoryIndexInitialized
     }
 
-    fun isAlertV2Initialized(): Boolean {
-        return alertV2IndexInitialized && alertV2HistoryIndexInitialized
-    }
+    fun isAlertV2Initialized(): Boolean = alertV2IndexInitialized && alertV2HistoryIndexInitialized
 
     private fun rolloverAndDeleteAlertV2HistoryIndices() {
         if (alertV2HistoryEnabled) rolloverAlertV2HistoryIndex()
         deleteOldIndices("History", ALERT_V2_HISTORY_ALL)
     }
 
-    private suspend fun createIndex(index: String, schemaMapping: String, alias: String? = null): Boolean {
+    private suspend fun createIndex(
+        index: String,
+        schemaMapping: String,
+        alias: String? = null,
+    ): Boolean {
         // This should be a fast check of local cluster state. Should be exceedingly rare that the local cluster
         // state does not contain the index and multiple nodes concurrently try to create the index.
         // If it does happen that error is handled we catch the ResourceAlreadyExistsException
-        val existsResponse: IndicesExistsResponse = client.admin().indices().suspendUntil {
-            exists(IndicesExistsRequest(index).local(true), it)
-        }
+        val existsResponse: IndicesExistsResponse =
+            client.admin().indices().suspendUntil {
+                exists(IndicesExistsRequest(index).local(true), it)
+            }
         if (existsResponse.isExists) return true
 
         logger.debug("index: [$index] schema mappings: [$schemaMapping]")
-        val request = CreateIndexRequest(index)
-            .mapping(schemaMapping)
-            .settings(Settings.builder().put("index.hidden", true).build())
+        val request =
+            CreateIndexRequest(index)
+                .mapping(schemaMapping)
+                .settings(Settings.builder().put("index.hidden", true).build())
 
         if (alias != null) request.alias(Alias(alias))
         return try {
@@ -228,7 +231,11 @@ class AlertV2Indices(
         }
     }
 
-    private suspend fun updateIndexMapping(index: String, mapping: String, alias: Boolean = false) {
+    private suspend fun updateIndexMapping(
+        index: String,
+        mapping: String,
+        alias: Boolean = false,
+    ) {
         val clusterState = clusterService.state()
         var targetIndex = index
         if (alias) {
@@ -239,8 +246,9 @@ class AlertV2Indices(
             return
         }
 
-        val putMappingRequest: PutMappingRequest = PutMappingRequest(targetIndex)
-            .source(mapping, XContentType.JSON)
+        val putMappingRequest: PutMappingRequest =
+            PutMappingRequest(targetIndex)
+                .source(mapping, XContentType.JSON)
         val updateResponse: AcknowledgedResponse = client.admin().indices().suspendUntil { putMapping(putMappingRequest, it) }
         if (updateResponse.isAcknowledged) {
             logger.info("Index mapping of $targetIndex is updated")
@@ -250,7 +258,10 @@ class AlertV2Indices(
         }
     }
 
-    private fun setIndexUpdateFlag(index: String, targetIndex: String) {
+    private fun setIndexUpdateFlag(
+        index: String,
+        targetIndex: String,
+    ) {
         when (index) {
             ALERT_V2_INDEX -> IndexUtils.alertV2IndexUpdated()
             ALERT_V2_HISTORY_WRITE_INDEX -> IndexUtils.lastUpdatedAlertV2HistoryIndex = targetIndex
@@ -264,7 +275,7 @@ class AlertV2Indices(
         map: String,
         docsCondition: Long,
         ageCondition: TimeValue,
-        writeIndex: String
+        writeIndex: String,
     ) {
         if (!initialized) {
             return
@@ -272,7 +283,8 @@ class AlertV2Indices(
 
         // We have to pass null for newIndexName in order to get Elastic to increment the index count.
         val request = RolloverRequest(index, null)
-        request.createIndexRequest.index(pattern)
+        request.createIndexRequest
+            .index(pattern)
             .mapping(map)
             .settings(Settings.builder().put("index.hidden", true).build())
         request.addMaxIndexDocsCondition(docsCondition)
@@ -287,10 +299,11 @@ class AlertV2Indices(
                         lastRolloverTime = TimeValue.timeValueMillis(threadPool.absoluteTimeInMillis())
                     }
                 }
+
                 override fun onFailure(e: Exception) {
                     logger.error("$writeIndex not roll over failed.")
                 }
-            }
+            },
         )
     }
 
@@ -302,22 +315,28 @@ class AlertV2Indices(
             alertV2Mapping(),
             alertV2HistoryMaxDocs,
             alertV2HistoryMaxAge,
-            ALERT_V2_HISTORY_WRITE_INDEX
+            ALERT_V2_HISTORY_WRITE_INDEX,
         )
     }
 
-    private fun deleteOldIndices(tag: String, indices: String) {
-        val clusterStateRequest = ClusterStateRequest()
-            .clear()
-            .indices(indices)
-            .metadata(true)
-            .local(true)
-            .indicesOptions(IndicesOptions.strictExpand())
+    private fun deleteOldIndices(
+        tag: String,
+        indices: String,
+    ) {
+        val clusterStateRequest =
+            ClusterStateRequest()
+                .clear()
+                .indices(indices)
+                .metadata(true)
+                .local(true)
+                .indicesOptions(IndicesOptions.strictExpand())
         client.admin().cluster().state(
             clusterStateRequest,
             object : ActionListener<ClusterStateResponse> {
                 override fun onResponse(clusterStateResponse: ClusterStateResponse) {
-                    if (clusterStateResponse.state.metadata.indices.isNotEmpty()) {
+                    if (clusterStateResponse.state.metadata.indices
+                            .isNotEmpty()
+                    ) {
                         scope.launch {
                             val indicesToDelete = getIndicesToDelete(clusterStateResponse)
                             logger.info("Deleting old $tag indices viz $indicesToDelete")
@@ -327,10 +346,11 @@ class AlertV2Indices(
                         logger.info("No Old $tag Indices to delete")
                     }
                 }
+
                 override fun onFailure(e: Exception) {
                     logger.error("Error fetching cluster state")
                 }
-            }
+            },
         )
     }
 
@@ -342,7 +362,7 @@ class AlertV2Indices(
                 indexMetaData,
                 alertV2HistoryRetentionPeriod.millis,
                 ALERT_V2_HISTORY_WRITE_INDEX,
-                alertV2HistoryEnabled
+                alertV2HistoryEnabled,
             )?.let { indicesToDelete.add(it) }
         }
         return indicesToDelete
@@ -352,7 +372,7 @@ class AlertV2Indices(
         indexMetadata: IndexMetadata,
         retentionPeriodMillis: Long,
         writeIndex: String,
-        historyEnabled: Boolean
+        historyEnabled: Boolean,
     ): String? {
         val creationTime = indexMetadata.creationDate
         if ((Instant.now().toEpochMilli() - creationTime) > retentionPeriodMillis) {
@@ -381,16 +401,17 @@ class AlertV2Indices(
                     override fun onResponse(deleteIndicesResponse: AcknowledgedResponse) {
                         if (!deleteIndicesResponse.isAcknowledged) {
                             logger.error(
-                                "Could not delete one or more Alerting V2 history indices: $indicesToDelete. Retrying one by one."
+                                "Could not delete one or more Alerting V2 history indices: $indicesToDelete. Retrying one by one.",
                             )
                             deleteOldHistoryIndex(indicesToDelete)
                         }
                     }
+
                     override fun onFailure(e: Exception) {
                         logger.error("Delete for Alerting V2 History Indices $indicesToDelete Failed. Retrying one by one.")
                         deleteOldHistoryIndex(indicesToDelete)
                     }
-                }
+                },
             )
         }
     }
@@ -408,10 +429,11 @@ class AlertV2Indices(
                             }
                         }
                     }
+
                     override fun onFailure(e: Exception) {
                         logger.error("Exception ${e.message} while deleting the index $index")
                     }
-                }
+                },
             )
         }
     }

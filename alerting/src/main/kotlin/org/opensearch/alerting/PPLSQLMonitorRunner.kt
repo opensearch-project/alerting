@@ -120,27 +120,29 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
             return PPLSQLMonitorRunResult(pplSqlMonitor.name, e, mapOf(), mapOf())
         }
 
-        val timeFilteredQuery = if (pplSqlMonitor.lookBackWindow != null) {
-            logger.debug("look back window specified for PPL Monitor: ${monitorV2.id}, injecting look back window time filter")
-            // if lookback window is specified, inject a top level lookback window time filter
-            // into the PPL query
-            val lookBackWindow = pplSqlMonitor.lookBackWindow!!
-            val lookbackPeriodStart = periodEnd.minus(lookBackWindow, ChronoUnit.MINUTES)
-            val timeFilteredQuery = addTimeFilter(pplSqlMonitor.query, lookbackPeriodStart, periodEnd, pplSqlMonitor.timestampField!!)
-            logger.debug("time filtered query: $timeFilteredQuery")
-            timeFilteredQuery
-        } else {
-            logger.debug("look back window not specified for PPL Monitor: ${monitorV2.id}, proceeding with original base query")
-            // otherwise, don't inject any time filter whatsoever
-            // unless the query itself has user-specified time filters, this query
-            // will return all applicable data in the cluster
-            pplSqlMonitor.query
-        }
+        val timeFilteredQuery =
+            if (pplSqlMonitor.lookBackWindow != null) {
+                logger.debug("look back window specified for PPL Monitor: ${monitorV2.id}, injecting look back window time filter")
+                // if lookback window is specified, inject a top level lookback window time filter
+                // into the PPL query
+                val lookBackWindow = pplSqlMonitor.lookBackWindow!!
+                val lookbackPeriodStart = periodEnd.minus(lookBackWindow, ChronoUnit.MINUTES)
+                val timeFilteredQuery = addTimeFilter(pplSqlMonitor.query, lookbackPeriodStart, periodEnd, pplSqlMonitor.timestampField!!)
+                logger.debug("time filtered query: $timeFilteredQuery")
+                timeFilteredQuery
+            } else {
+                logger.debug("look back window not specified for PPL Monitor: ${monitorV2.id}, proceeding with original base query")
+                // otherwise, don't inject any time filter whatsoever
+                // unless the query itself has user-specified time filters, this query
+                // will return all applicable data in the cluster
+                pplSqlMonitor.query
+            }
 
-        val monitorExecutionDuration = monitorCtx
-            .clusterService!!
-            .clusterSettings
-            .get(AlertingSettings.ALERT_V2_MONITOR_EXECUTION_MAX_DURATION)
+        val monitorExecutionDuration =
+            monitorCtx
+                .clusterService!!
+                .clusterSettings
+                .get(AlertingSettings.ALERT_V2_MONITOR_EXECUTION_MAX_DURATION)
 
         // for storing any exception that may or may not happen
         // while executing monitor
@@ -160,7 +162,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                     executionId,
                     monitorCtx,
                     nodeClient,
-                    transportService
+                    transportService,
                 )
             }
         } catch (e: TimeoutCancellationException) {
@@ -173,7 +175,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                     generateErrorAlert(null, pplSqlMonitor, e, executionId, timeOfCurrentExecution),
                     pplSqlMonitor,
                     it,
-                    nodeClient
+                    nodeClient,
                 )
             }
 
@@ -196,7 +198,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
             pplSqlMonitor.name,
             exception,
             triggerResults,
-            pplSqlQueryResults
+            pplSqlQueryResults,
         )
     }
 
@@ -211,7 +213,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
         executionId: String,
         monitorCtx: MonitorRunnerExecutionContext,
         nodeClient: NodeClient,
-        transportService: TransportService
+        transportService: TransportService,
     ) {
         for (pplSqlTrigger in pplSqlMonitor.triggers) {
             try {
@@ -230,11 +232,12 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
 
                 logger.debug("checking if custom condition is used and appending to base query")
                 // if trigger uses custom condition, append the custom condition to query, otherwise simply proceed
-                val queryToExecute = if (pplSqlTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number of results trigger
-                    timeFilteredQuery
-                } else { // custom condition trigger
-                    appendCustomCondition(timeFilteredQuery, pplSqlTrigger.customCondition!!)
-                }
+                val queryToExecute =
+                    if (pplSqlTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number of results trigger
+                        timeFilteredQuery
+                    } else { // custom condition trigger
+                        appendCustomCondition(timeFilteredQuery, pplSqlTrigger.customCondition!!)
+                    }
 
                 // limit the number of PPL query result data rows returned
                 val dataRowsLimit = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS)
@@ -248,23 +251,26 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
 
                 logger.debug("executing the PPL query of monitor: ${pplSqlMonitor.id}")
                 // execute the PPL query
-                val (queryResponseJson, timeTaken) = measureTimedValue {
-                    withClosableContext(
-                        InjectorContextElement(
-                            pplSqlMonitor.id,
-                            monitorCtx.settings!!,
-                            monitorCtx.threadPool!!.threadContext,
-                            pplSqlMonitor.user?.roles,
-                            pplSqlMonitor.user
-                        )
-                    ) {
-                        executePplQuery(
-                            limitedQueryToExecute,
-                            monitorCtx.clusterService!!.state().nodes.localNode,
-                            transportService
-                        )
+                val (queryResponseJson, timeTaken) =
+                    measureTimedValue {
+                        withClosableContext(
+                            InjectorContextElement(
+                                pplSqlMonitor.id,
+                                monitorCtx.settings!!,
+                                monitorCtx.threadPool!!.threadContext,
+                                pplSqlMonitor.user?.roles,
+                                pplSqlMonitor.user,
+                            ),
+                        ) {
+                            executePplQuery(
+                                limitedQueryToExecute,
+                                monitorCtx.clusterService!!
+                                    .state()
+                                    .nodes.localNode,
+                                transportService,
+                            )
+                        }
                     }
-                }
                 logger.debug("query results for trigger ${pplSqlTrigger.id}: $queryResponseJson")
                 logger.debug("time taken to execute query against sql/ppl plugin: $timeTaken")
 
@@ -279,11 +285,12 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                 pplSqlQueryResults[pplSqlTrigger.id] = queryResponseJson.toMap()
 
                 // determine if the trigger condition has been met
-                val triggered = if (pplSqlTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number of results trigger
-                    evaluateNumResultsTrigger(queryResponseJson, pplSqlTrigger.numResultsCondition!!, pplSqlTrigger.numResultsValue!!)
-                } else { // custom condition trigger
-                    evaluateCustomTrigger(queryResponseJson, pplSqlTrigger.customCondition!!)
-                }
+                val triggered =
+                    if (pplSqlTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number of results trigger
+                        evaluateNumResultsTrigger(queryResponseJson, pplSqlTrigger.numResultsCondition!!, pplSqlTrigger.numResultsValue!!)
+                    } else { // custom condition trigger
+                        evaluateCustomTrigger(queryResponseJson, pplSqlTrigger.customCondition!!)
+                    }
 
                 logger.debug("PPLTrigger ${pplSqlTrigger.name} with ID ${pplSqlTrigger.id} triggered: $triggered")
 
@@ -307,13 +314,14 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                     // if this trigger is on result_set mode, this list contains exactly 1 alert
                     // if this trigger is on per_result mode, this list has as many alerts as there are
                     // trigger condition-meeting query results
-                    val thisTriggersGeneratedAlerts = generateAlerts(
-                        pplSqlTrigger,
-                        pplSqlMonitor,
-                        preparedQueryResults,
-                        executionId,
-                        timeOfCurrentExecution
-                    )
+                    val thisTriggersGeneratedAlerts =
+                        generateAlerts(
+                            pplSqlTrigger,
+                            pplSqlMonitor,
+                            preparedQueryResults,
+                            executionId,
+                            timeOfCurrentExecution,
+                        )
 
                     // for future throttle checks, update the trigger's last execution time
                     // in the monitor object stored in memory
@@ -322,19 +330,20 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                     // send alert notifications
                     for (action in pplSqlTrigger.actions) {
                         for (queryResult in preparedQueryResults) {
-                            val pplTriggerExecutionContext = PPLTriggerExecutionContext(
-                                pplSqlMonitor,
-                                null,
-                                pplSqlTrigger,
-                                queryResult
-                            )
+                            val pplTriggerExecutionContext =
+                                PPLTriggerExecutionContext(
+                                    pplSqlMonitor,
+                                    null,
+                                    pplSqlTrigger,
+                                    queryResult,
+                                )
 
                             runAction(
                                 action,
                                 pplTriggerExecutionContext,
                                 monitorCtx,
                                 pplSqlMonitor,
-                                dryRun
+                                dryRun,
                             )
                         }
                     }
@@ -350,7 +359,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                 logger.error(
                     "failed to run PPL Trigger ${pplSqlTrigger.name} (id: ${pplSqlTrigger.id} " +
                         "from PPL Monitor ${pplSqlMonitor.name} (id: ${pplSqlMonitor.id}",
-                    e
+                    e,
                 )
 
                 // generate an alert with an error message
@@ -359,7 +368,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                         generateErrorAlert(pplSqlTrigger, pplSqlMonitor, e, executionId, timeOfCurrentExecution),
                         pplSqlMonitor,
                         it,
-                        nodeClient
+                        nodeClient,
                     )
                 }
             }
@@ -367,7 +376,11 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
     }
 
     // returns true if the pplTrigger should be throttled
-    private fun checkForThrottle(pplTrigger: PPLSQLTrigger, timeOfCurrentExecution: Instant, manual: Boolean): Boolean {
+    private fun checkForThrottle(
+        pplTrigger: PPLSQLTrigger,
+        timeOfCurrentExecution: Instant,
+        manual: Boolean,
+    ): Boolean {
         // manual calls from the user to execute a monitor should never be throttled
         if (manual) {
             return false
@@ -375,9 +388,10 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
 
         // the interval between throttledTimeBound and now is the throttle window
         // i.e. any PPLTrigger whose last trigger time is in this window must be throttled
-        val throttleTimeBound = pplTrigger.throttleDuration?.let {
-            timeOfCurrentExecution.minus(pplTrigger.throttleDuration, ChronoUnit.MINUTES)
-        }
+        val throttleTimeBound =
+            pplTrigger.throttleDuration?.let {
+                timeOfCurrentExecution.minus(pplTrigger.throttleDuration, ChronoUnit.MINUTES)
+            }
 
         // the trigger must be throttled if...
         return pplTrigger.throttleDuration != null && // throttling is enabled on the PPLTrigger
@@ -390,27 +404,34 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
     // lookbackPeriodStart: the lower bound of the query interval based on monitor schedule and look back window
     // periodEnd: the upper bound of the initially computed query interval based on monitor schedule
     // timestampField: the timestamp field that will be used to time bound the query results
-    private fun addTimeFilter(query: String, lookbackPeriodStart: Instant, periodEnd: Instant, timestampField: String): String {
+    private fun addTimeFilter(
+        query: String,
+        lookbackPeriodStart: Instant,
+        periodEnd: Instant,
+        timestampField: String,
+    ): String {
         // PPL plugin only accepts timestamp strings in this format
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ROOT).withZone(UTC)
 
         val periodStartPplTimestamp = formatter.format(lookbackPeriodStart)
         val periodEndPplTimeStamp = formatter.format(periodEnd)
 
-        val timeFilterAppend = "| where $timestampField > TIMESTAMP('$periodStartPplTimestamp') and " +
-            "$timestampField < TIMESTAMP('$periodEndPplTimeStamp')"
+        val timeFilterAppend =
+            "| where $timestampField > TIMESTAMP('$periodStartPplTimestamp') and " +
+                "$timestampField < TIMESTAMP('$periodEndPplTimeStamp')"
         val timeFilterReplace = "$timeFilterAppend |"
 
-        val timeFilteredQuery: String = if (query.contains("|")) {
-            // if Monitor query contains piped statements, inject the time filter
-            // as the first piped statement (i.e. before more complex statements
-            // like aggregations can take effect later in the query)
-            query.replaceFirst("|", timeFilterReplace)
-        } else {
-            // otherwise the query contains no piped statements and is simply a
-            // `search source=<index>` statement, simply append time filter at the end
-            query + timeFilterAppend
-        }
+        val timeFilteredQuery: String =
+            if (query.contains("|")) {
+                // if Monitor query contains piped statements, inject the time filter
+                // as the first piped statement (i.e. before more complex statements
+                // like aggregations can take effect later in the query)
+                query.replaceFirst("|", timeFilterReplace)
+            } else {
+                // otherwise the query contains no piped statements and is simply a
+                // `search source=<index>` statement, simply append time filter at the end
+                query + timeFilterAppend
+            }
 
         return timeFilteredQuery
     }
@@ -418,7 +439,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
     private fun evaluateNumResultsTrigger(
         pplQueryResponse: JSONObject,
         numResultsCondition: NumResultsCondition,
-        numResultsValue: Long
+        numResultsValue: Long,
     ): Boolean {
         val numResults = pplQueryResponse.getLong("total")
         return when (numResultsCondition) {
@@ -431,7 +452,10 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
         }
     }
 
-    private fun evaluateCustomTrigger(pplQueryResponse: JSONObject, customCondition: String): Boolean {
+    private fun evaluateCustomTrigger(
+        pplQueryResponse: JSONObject,
+        customCondition: String,
+    ): Boolean {
         // find the name of the eval result variable defined in custom condition
         val evalResultVarName = findEvalResultVar(customCondition)
 
@@ -459,7 +483,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
         pplTrigger: PPLSQLTrigger,
         pplQueryResults: JSONObject,
         maxQueryResultsSize: Long,
-        maxAlerts: Int
+        maxAlerts: Int,
     ): List<JSONObject> {
         // case: result set
         // return the results as a single set of all the results
@@ -504,7 +528,7 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
         individualRows: MutableList<JSONObject>,
         pplQueryResults: JSONObject,
         i: Int,
-        maxQueryResultsSize: Long
+        maxQueryResultsSize: Long,
     ) {
         val individualRow = JSONObject()
         individualRow.put("total", 1) // set the size explicitly to 1 for consistency
@@ -513,8 +537,8 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
         individualRow.put(
             "datarows",
             JSONArray().put(
-                JSONArray(pplQueryResults.getJSONArray("datarows").getJSONArray(i).toList())
-            )
+                JSONArray(pplQueryResults.getJSONArray("datarows").getJSONArray(i).toList()),
+            ),
         )
         val sizeCappedIndividualRow = capPPLQueryResultsSize(individualRow, maxQueryResultsSize)
         individualRows.add(sizeCappedIndividualRow)
@@ -525,23 +549,24 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
         pplSqlMonitor: PPLSQLMonitor,
         preparedQueryResults: List<JSONObject>,
         executionId: String,
-        timeOfCurrentExecution: Instant
+        timeOfCurrentExecution: Instant,
     ): List<AlertV2> {
         val alertV2s = mutableListOf<AlertV2>()
         for (queryResult in preparedQueryResults) {
-            val alertV2 = AlertV2(
-                monitorId = pplSqlMonitor.id,
-                monitorName = pplSqlMonitor.name,
-                monitorVersion = pplSqlMonitor.version,
-                monitorUser = pplSqlMonitor.user,
-                triggerId = pplSqlTrigger.id,
-                triggerName = pplSqlTrigger.name,
-                query = pplSqlMonitor.query,
-                queryResults = queryResult.toMap(),
-                triggeredTime = timeOfCurrentExecution,
-                severity = pplSqlTrigger.severity,
-                executionId = executionId
-            )
+            val alertV2 =
+                AlertV2(
+                    monitorId = pplSqlMonitor.id,
+                    monitorName = pplSqlMonitor.name,
+                    monitorVersion = pplSqlMonitor.version,
+                    monitorUser = pplSqlMonitor.user,
+                    triggerId = pplSqlTrigger.id,
+                    triggerName = pplSqlTrigger.name,
+                    query = pplSqlMonitor.query,
+                    queryResults = queryResult.toMap(),
+                    triggeredTime = timeOfCurrentExecution,
+                    severity = pplSqlTrigger.severity,
+                    executionId = executionId,
+                )
             alertV2s.add(alertV2)
         }
 
@@ -553,26 +578,28 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
         pplSqlMonitor: PPLSQLMonitor,
         exception: Exception,
         executionId: String,
-        timeOfCurrentExecution: Instant
+        timeOfCurrentExecution: Instant,
     ): List<AlertV2> {
-        val errorMessage = "Failed to run PPL Monitor ${pplSqlMonitor.id}, PPL Trigger ${pplSqlTrigger?.id}: " +
-            exception.userErrorMessage()
+        val errorMessage =
+            "Failed to run PPL Monitor ${pplSqlMonitor.id}, PPL Trigger ${pplSqlTrigger?.id}: " +
+                exception.userErrorMessage()
         val obfuscatedErrorMessage = AlertError.obfuscateIPAddresses(errorMessage)
 
-        val alertV2 = AlertV2(
-            monitorId = pplSqlMonitor.id,
-            monitorName = pplSqlMonitor.name,
-            monitorVersion = pplSqlMonitor.version,
-            monitorUser = pplSqlMonitor.user,
-            triggerId = pplSqlTrigger?.id ?: "",
-            triggerName = pplSqlTrigger?.name ?: "",
-            query = pplSqlMonitor.query,
-            queryResults = mapOf(),
-            triggeredTime = timeOfCurrentExecution,
-            errorMessage = obfuscatedErrorMessage,
-            severity = Severity.ERROR,
-            executionId = executionId
-        )
+        val alertV2 =
+            AlertV2(
+                monitorId = pplSqlMonitor.id,
+                monitorName = pplSqlMonitor.name,
+                monitorVersion = pplSqlMonitor.version,
+                monitorUser = pplSqlMonitor.user,
+                triggerId = pplSqlTrigger?.id ?: "",
+                triggerName = pplSqlTrigger?.name ?: "",
+                query = pplSqlMonitor.query,
+                queryResults = mapOf(),
+                triggeredTime = timeOfCurrentExecution,
+                errorMessage = obfuscatedErrorMessage,
+                severity = Severity.ERROR,
+                executionId = executionId,
+            )
 
         return listOf(alertV2)
     }
@@ -581,18 +608,19 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
         alerts: List<AlertV2>,
         pplSqlMonitor: PPLSQLMonitor,
         retryPolicy: BackoffPolicy,
-        client: NodeClient
+        client: NodeClient,
     ) {
         logger.debug("received alerts: $alerts")
 
-        var requestsToRetry = alerts.flatMap { alert ->
-            listOf<DocWriteRequest<*>>(
-                IndexRequest(AlertV2Indices.ALERT_V2_INDEX)
-                    .routing(pplSqlMonitor.id) // set routing ID to PPL Monitor ID
-                    .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
-                    .id(if (alert.id != Alert.NO_ID) alert.id else null)
-            )
-        }
+        var requestsToRetry =
+            alerts.flatMap { alert ->
+                listOf<DocWriteRequest<*>>(
+                    IndexRequest(AlertV2Indices.ALERT_V2_INDEX)
+                        .routing(pplSqlMonitor.id) // set routing ID to PPL Monitor ID
+                        .source(alert.toXContentWithUser(XContentFactory.jsonBuilder()))
+                        .id(if (alert.id != Alert.NO_ID) alert.id else null),
+                )
+            }
 
         if (requestsToRetry.isEmpty()) return
         // Retry Bulk requests if there was any 429 response
@@ -603,8 +631,10 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
             failedResponses.forEach {
                 logger.debug("write alerts failed responses: ${it.failureMessage}")
             }
-            requestsToRetry = failedResponses.filter { it.status() == RestStatus.TOO_MANY_REQUESTS }
-                .map { bulkRequest.requests()[it.itemId] as IndexRequest }
+            requestsToRetry =
+                failedResponses
+                    .filter { it.status() == RestStatus.TOO_MANY_REQUESTS }
+                    .map { bulkRequest.requests()[it.itemId] as IndexRequest }
 
             if (requestsToRetry.isNotEmpty()) {
                 val retryCause = failedResponses.first { it.status() == RestStatus.TOO_MANY_REQUESTS }.failure.cause
@@ -616,20 +646,23 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
     // during monitor execution, the ppl sql monitor object stored in memory had its triggers updated
     // with their last trigger times. this function simply indexes those updated triggers into the
     // alerting-config index
-    private suspend fun updateMonitorWithLastTriggeredTimes(pplSqlMonitor: PPLSQLMonitor, client: NodeClient) {
-        val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
-            .id(pplSqlMonitor.id)
-            .source(
-                pplSqlMonitor.toXContentWithUser(
-                    XContentFactory.jsonBuilder(),
-                    ToXContent.MapParams(
-                        mapOf("with_type" to "true")
-                    )
-                )
-            )
-            .routing(pplSqlMonitor.id)
-            .version(pplSqlMonitor.version)
-            .versionType(VersionType.EXTERNAL_GTE)
+    private suspend fun updateMonitorWithLastTriggeredTimes(
+        pplSqlMonitor: PPLSQLMonitor,
+        client: NodeClient,
+    ) {
+        val indexRequest =
+            IndexRequest(SCHEDULED_JOBS_INDEX)
+                .id(pplSqlMonitor.id)
+                .source(
+                    pplSqlMonitor.toXContentWithUser(
+                        XContentFactory.jsonBuilder(),
+                        ToXContent.MapParams(
+                            mapOf("with_type" to "true"),
+                        ),
+                    ),
+                ).routing(pplSqlMonitor.id)
+                .version(pplSqlMonitor.version)
+                .versionType(VersionType.EXTERNAL_GTE)
 
         val indexResponse = client.suspendUntil { index(indexRequest, it) }
 
@@ -641,14 +674,17 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
         triggerCtx: PPLTriggerExecutionContext,
         monitorCtx: MonitorRunnerExecutionContext,
         pplSqlMonitor: PPLSQLMonitor,
-        dryrun: Boolean
+        dryrun: Boolean,
     ) {
         // this function can throw an exception, which is caught by the try
         // catch in runMonitor() to generate an error alert
 
-        val notifSubject = if (action.subjectTemplate != null)
-            MonitorRunnerService.compileTemplateV2(action.subjectTemplate!!, triggerCtx)
-        else ""
+        val notifSubject =
+            if (action.subjectTemplate != null) {
+                MonitorRunnerService.compileTemplateV2(action.subjectTemplate!!, triggerCtx)
+            } else {
+                ""
+            }
 
         var notifMessage = MonitorRunnerService.compileTemplateV2(action.messageTemplate, triggerCtx)
         if (Strings.isNullOrEmpty(notifMessage)) {
@@ -663,14 +699,14 @@ object PPLSQLMonitorRunner : MonitorV2Runner {
                         monitorCtx.settings!!,
                         monitorCtx.threadPool!!.threadContext,
                         pplSqlMonitor.user?.roles,
-                        pplSqlMonitor.user
-                    )
+                        pplSqlMonitor.user,
+                    ),
                 ) {
                     getConfigAndSendNotification(
                         action,
                         monitorCtx,
                         notifSubject,
-                        notifMessage
+                        notifMessage,
                     )
                 }
             }

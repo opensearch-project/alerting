@@ -58,7 +58,7 @@ object WorkflowMetadataService :
         client: Client,
         clusterService: ClusterService,
         xContentRegistry: NamedXContentRegistry,
-        settings: Settings
+        settings: Settings,
     ) {
         this.clusterService = clusterService
         this.client = client
@@ -69,14 +69,18 @@ object WorkflowMetadataService :
     }
 
     @Suppress("ComplexMethod", "ReturnCount")
-    suspend fun upsertWorkflowMetadata(metadata: WorkflowMetadata, updating: Boolean): WorkflowMetadata {
+    suspend fun upsertWorkflowMetadata(
+        metadata: WorkflowMetadata,
+        updating: Boolean,
+    ): WorkflowMetadata {
         try {
-            val indexRequest = IndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
-                .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-                .source(metadata.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-                .id(metadata.id)
-                .routing(metadata.workflowId)
-                .timeout(indexTimeout)
+            val indexRequest =
+                IndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
+                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+                    .source(metadata.toXContent(XContentFactory.jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
+                    .id(metadata.id)
+                    .routing(metadata.workflowId)
+                    .timeout(indexTimeout)
 
             if (updating) {
                 indexRequest.id(metadata.id)
@@ -90,6 +94,7 @@ object WorkflowMetadataService :
                     log.error(failureReason)
                     throw AlertingException(failureReason, RestStatus.INTERNAL_SERVER_ERROR, IllegalStateException(failureReason))
                 }
+
                 DocWriteResponse.Result.CREATED, DocWriteResponse.Result.UPDATED -> {
                     log.debug("Successfully upserted WorkflowMetadata:${metadata.id} ")
                 }
@@ -100,7 +105,7 @@ object WorkflowMetadataService :
             if (e is OpenSearchException && e.status() == RestStatus.CONFLICT && !updating) {
                 log.debug(
                     "Metadata with ${metadata.id} for workflow ${metadata.workflowId} already exist." +
-                        " Instead of creating new, updating existing metadata will be performed"
+                        " Instead of creating new, updating existing metadata will be performed",
                 )
                 return upsertWorkflowMetadata(metadata, true)
             }
@@ -112,7 +117,7 @@ object WorkflowMetadataService :
     suspend fun getOrCreateWorkflowMetadata(
         workflow: Workflow,
         skipIndex: Boolean = false,
-        executionId: String
+        executionId: String,
     ): Pair<WorkflowMetadata, Boolean> {
         try {
             val created = true
@@ -139,12 +144,13 @@ object WorkflowMetadataService :
 
             val getResponse: GetResponse = client.suspendUntil { get(getRequest, it) }
             return if (getResponse.isExists) {
-                val xcp = XContentHelper.createParser(
-                    xContentRegistry,
-                    LoggingDeprecationHandler.INSTANCE,
-                    getResponse.sourceAsBytesRef,
-                    XContentType.JSON
-                )
+                val xcp =
+                    XContentHelper.createParser(
+                        xContentRegistry,
+                        LoggingDeprecationHandler.INSTANCE,
+                        getResponse.sourceAsBytesRef,
+                        XContentType.JSON,
+                    )
                 XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
                 WorkflowMetadata.parse(xcp)
             } else {
@@ -159,7 +165,11 @@ object WorkflowMetadataService :
         }
     }
 
-    private fun createNewWorkflowMetadata(workflow: Workflow, executionId: String, isTempWorkflow: Boolean): WorkflowMetadata {
+    private fun createNewWorkflowMetadata(
+        workflow: Workflow,
+        executionId: String,
+        isTempWorkflow: Boolean,
+    ): WorkflowMetadata {
         // In the case of temp workflow (ie. workflow is in dry-run) use timestampWithUUID-metadata format
         // In the case of regular workflow execution, use the workflowId-metadata format
         val id = if (isTempWorkflow) "${LocalDateTime.now(ZoneOffset.UTC)}${UUID.randomUUID()}" else workflow.id
@@ -168,7 +178,7 @@ object WorkflowMetadataService :
             workflowId = workflow.id,
             monitorIds = (workflow.inputs[0] as CompositeInput).getMonitorIds(),
             latestRunTime = Instant.now(),
-            latestExecutionId = executionId
+            latestExecutionId = executionId,
         )
     }
 }

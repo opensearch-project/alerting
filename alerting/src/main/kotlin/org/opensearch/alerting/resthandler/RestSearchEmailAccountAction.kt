@@ -35,48 +35,48 @@ import java.io.IOException
  * Rest handlers to search for EmailAccount
  */
 class RestSearchEmailAccountAction : BaseRestHandler() {
+    override fun getName(): String = "search_email_account_action"
 
-    override fun getName(): String {
-        return "search_email_account_action"
-    }
+    override fun routes(): List<Route> = listOf()
 
-    override fun routes(): List<Route> {
-        return listOf()
-    }
-
-    override fun replacedRoutes(): MutableList<ReplacedRoute> {
-        return mutableListOf(
+    override fun replacedRoutes(): MutableList<ReplacedRoute> =
+        mutableListOf(
             ReplacedRoute(
                 RestRequest.Method.POST,
                 "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/_search",
                 RestRequest.Method.POST,
-                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI}/_search"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI}/_search",
             ),
             ReplacedRoute(
                 RestRequest.Method.GET,
                 "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/_search",
                 RestRequest.Method.GET,
-                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI}/_search"
-            )
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI}/_search",
+            ),
         )
-    }
 
     @Throws(IOException::class)
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         val searchSourceBuilder = SearchSourceBuilder()
         searchSourceBuilder.parseXContent(request.contentOrSourceParamParser())
         searchSourceBuilder.fetchSource(context(request))
 
         // An exists query is added on top of the user's query to ensure that only documents of email_account type
         // are searched
-        searchSourceBuilder.query(
-            QueryBuilders.boolQuery().must(searchSourceBuilder.query())
-                .filter(QueryBuilders.existsQuery(EmailAccount.EMAIL_ACCOUNT_TYPE))
-        )
-            .seqNoAndPrimaryTerm(true)
-        val searchRequest = SearchRequest()
-            .source(searchSourceBuilder)
-            .indices(SCHEDULED_JOBS_INDEX)
+        searchSourceBuilder
+            .query(
+                QueryBuilders
+                    .boolQuery()
+                    .must(searchSourceBuilder.query())
+                    .filter(QueryBuilders.existsQuery(EmailAccount.EMAIL_ACCOUNT_TYPE)),
+            ).seqNoAndPrimaryTerm(true)
+        val searchRequest =
+            SearchRequest()
+                .source(searchSourceBuilder)
+                .indices(SCHEDULED_JOBS_INDEX)
         return RestChannelConsumer { channel ->
             client.execute(SearchEmailAccountAction.INSTANCE, searchRequest, searchEmailAccountResponse(channel))
         }
@@ -91,14 +91,17 @@ class RestSearchEmailAccountAction : BaseRestHandler() {
                 }
 
                 for (hit in response.hits) {
-                    XContentType.JSON.xContent().createParser(
-                        channel.request().xContentRegistry,
-                        LoggingDeprecationHandler.INSTANCE, hit.sourceAsString
-                    ).use { hitsParser ->
-                        val emailAccount = EmailAccount.parseWithType(hitsParser, hit.id, hit.version)
-                        val xcb = emailAccount.toXContent(jsonBuilder(), EMPTY_PARAMS)
-                        hit.sourceRef(BytesReference.bytes(xcb))
-                    }
+                    XContentType.JSON
+                        .xContent()
+                        .createParser(
+                            channel.request().xContentRegistry,
+                            LoggingDeprecationHandler.INSTANCE,
+                            hit.sourceAsString,
+                        ).use { hitsParser ->
+                            val emailAccount = EmailAccount.parseWithType(hitsParser, hit.id, hit.version)
+                            val xcb = emailAccount.toXContent(jsonBuilder(), EMPTY_PARAMS)
+                            hit.sourceRef(BytesReference.bytes(xcb))
+                        }
                 }
                 return BytesRestResponse(RestStatus.OK, response.toXContent(channel.newBuilder(), EMPTY_PARAMS))
             }

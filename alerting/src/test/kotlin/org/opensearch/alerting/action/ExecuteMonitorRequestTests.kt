@@ -12,11 +12,11 @@ import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class ExecuteMonitorRequestTests : OpenSearchTestCase() {
-
+    @Test
     fun `test execute monitor request with id`() {
-
         val req = ExecuteMonitorRequest(false, TimeValue.timeValueSeconds(100L), "1234", null)
         assertNotNull(req)
 
@@ -30,6 +30,7 @@ class ExecuteMonitorRequestTests : OpenSearchTestCase() {
         assertEquals(req.monitor, newReq.monitor)
     }
 
+    @Test
     fun `test execute monitor request with monitor`() {
         val monitor = randomQueryLevelMonitor().copy(inputs = listOf(SearchInput(emptyList(), SearchSourceBuilder())))
         val req = ExecuteMonitorRequest(false, TimeValue.timeValueSeconds(100L), null, monitor)

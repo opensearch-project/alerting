@@ -9,9 +9,10 @@ import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.test.OpenSearchTestCase
 import java.lang.IllegalArgumentException
 import java.time.Instant
+import kotlin.test.Test
 
 class MonitorTests : OpenSearchTestCase() {
-
+    @Test
     fun `test enabled time`() {
         val monitor = randomQueryLevelMonitor()
         val enabledMonitor = monitor.copy(enabled = true, enabledTime = Instant.now())
@@ -30,6 +31,7 @@ class MonitorTests : OpenSearchTestCase() {
         }
     }
 
+    @Test
     fun `test max triggers`() {
         val monitor = randomQueryLevelMonitor()
 

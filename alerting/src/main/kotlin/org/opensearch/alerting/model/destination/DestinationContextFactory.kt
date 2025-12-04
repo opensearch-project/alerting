@@ -21,9 +21,8 @@ import org.opensearch.transport.client.Client
 class DestinationContextFactory(
     val client: Client,
     val xContentRegistry: NamedXContentRegistry,
-    private var destinationSettings: Map<String, SecureDestinationSettings>
+    private var destinationSettings: Map<String, SecureDestinationSettings>,
 ) {
-
     fun updateDestinationSettings(destinationSettings: Map<String, SecureDestinationSettings>) {
         this.destinationSettings = destinationSettings
     }
@@ -67,7 +66,10 @@ class DestinationContextFactory(
             when (recipient.type) {
                 // Recipient attributes are checked for being non-null based on type during initialization
                 // so non-null assertion calls are made here
-                Recipient.RecipientType.EMAIL -> uniqueRecipients.add(recipient.email!!)
+                Recipient.RecipientType.EMAIL -> {
+                    uniqueRecipients.add(recipient.email!!)
+                }
+
                 Recipient.RecipientType.EMAIL_GROUP -> {
                     val emailGroup = AlertingConfigAccessor.getEmailGroupInfo(client, xContentRegistry, recipient.emailGroupID!!)
                     emailGroup.getEmailsAsListOfString().map { uniqueRecipients.add(it) }

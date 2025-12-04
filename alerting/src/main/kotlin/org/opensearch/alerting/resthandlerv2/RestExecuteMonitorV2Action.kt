@@ -32,23 +32,24 @@ private val log = LogManager.getLogger(RestExecuteMonitorV2Action::class.java)
  * @opensearch.experimental
  */
 class RestExecuteMonitorV2Action : BaseRestHandler() {
-
     override fun getName(): String = "execute_monitor_v2_action"
 
-    override fun routes(): List<Route> {
-        return listOf(
+    override fun routes(): List<Route> =
+        listOf(
             Route(
                 POST,
-                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitor_id}/_execute"
+                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitor_id}/_execute",
             ),
             Route(
                 POST,
-                "${AlertingPlugin.MONITOR_V2_BASE_URI}/_execute"
-            )
+                "${AlertingPlugin.MONITOR_V2_BASE_URI}/_execute",
+            ),
         )
-    }
 
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.debug("${request.method()} ${AlertingPlugin.MONITOR_V2_BASE_URI}/_execute")
 
         return RestChannelConsumer { channel ->
@@ -76,7 +77,5 @@ class RestExecuteMonitorV2Action : BaseRestHandler() {
         }
     }
 
-    override fun responseParams(): Set<String> {
-        return setOf("dryrun", "period_end", "monitor_id")
-    }
+    override fun responseParams(): Set<String> = setOf("dryrun", "period_end", "monitor_id")
 }

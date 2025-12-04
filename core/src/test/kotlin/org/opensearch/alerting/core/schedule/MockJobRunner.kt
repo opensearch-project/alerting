@@ -25,7 +25,11 @@ class MockJobRunner : JobRunner {
         numberOfIndex++
     }
 
-    override fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant) {
+    override fun runJob(
+        job: ScheduledJob,
+        periodStart: Instant,
+        periodEnd: Instant,
+    ) {
         numberOfRun++
     }
 }

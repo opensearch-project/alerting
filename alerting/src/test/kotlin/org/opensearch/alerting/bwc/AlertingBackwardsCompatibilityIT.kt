@@ -30,9 +30,9 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.TimeUnit
+import kotlin.test.Test
 
 class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
-
     companion object {
         private val CLUSTER_TYPE = ClusterType.parse(System.getProperty("tests.rest.bwcsuite"))
         private val CLUSTER_NAME = System.getProperty("tests.clustername")
@@ -46,18 +46,19 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
 
     override fun preserveODFEIndicesAfterTest(): Boolean = true
 
-    override fun restClientSettings(): Settings {
-        return Settings.builder()
+    override fun restClientSettings(): Settings =
+        Settings
+            .builder()
             .put(super.restClientSettings())
             // increase the timeout here to 90 seconds to handle long waits for a green
             // cluster health. the waits for green need to be longer than a minute to
             // account for delayed shards
             .put(CLIENT_SOCKET_TIMEOUT, "90s")
             .build()
-    }
 
     @Throws(Exception::class)
     @Suppress("UNCHECKED_CAST")
+    @Test
     fun `test backwards compatibility`() {
         val uri = getPluginUri()
         val responseMap = getAsMap(uri)["nodes"] as Map<String, Map<String, Any>>
@@ -69,6 +70,7 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
                     assertTrue(pluginNames.contains("opensearch-alerting"))
                     createBasicMonitor()
                 }
+
                 ClusterType.MIXED -> {
                     assertTrue(pluginNames.contains("opensearch-alerting"))
                     verifyMonitorExists(ALERTING_BASE_URI)
@@ -76,6 +78,7 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
                     //  MONITOR_BASE_URI
                     verifyMonitorStats("/_plugins/_alerting")
                 }
+
                 ClusterType.UPGRADED -> {
                     assertTrue(pluginNames.contains("opensearch-alerting"))
                     verifyMonitorExists(ALERTING_BASE_URI)
@@ -106,6 +109,7 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
 
     @Throws(Exception::class)
     @Suppress("UNCHECKED_CAST")
+    @Test
     fun `test backwards compatibility for doc-level monitors`() {
         val uri = getPluginUri()
         val responseMap = getAsMap(uri)["nodes"] as Map<String, Map<String, Any>>
@@ -117,10 +121,12 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
                     assertTrue(pluginNames.contains("opensearch-alerting"))
                     createDocLevelMonitor()
                 }
+
                 ClusterType.MIXED -> {
                     assertTrue(pluginNames.contains("opensearch-alerting"))
                     verifyMonitorExecutionSuccess()
                 }
+
                 ClusterType.UPGRADED -> {
                     assertTrue(pluginNames.contains("opensearch-alerting"))
                     verifyMonitorExecutionSuccess()
@@ -133,23 +139,26 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
     private enum class ClusterType {
         OLD,
         MIXED,
-        UPGRADED;
+        UPGRADED,
+        ;
 
         companion object {
-            fun parse(value: String): ClusterType {
-                return when (value) {
+            fun parse(value: String): ClusterType =
+                when (value) {
                     "old_cluster" -> OLD
                     "mixed_cluster" -> MIXED
                     "upgraded_cluster" -> UPGRADED
                     else -> throw AssertionError("Unknown cluster type: $value")
                 }
-            }
         }
     }
 
-    private fun getPluginUri(): String {
-        return when (CLUSTER_TYPE) {
-            ClusterType.OLD -> "_nodes/$CLUSTER_NAME-0/plugins"
+    private fun getPluginUri(): String =
+        when (CLUSTER_TYPE) {
+            ClusterType.OLD -> {
+                "_nodes/$CLUSTER_NAME-0/plugins"
+            }
+
             ClusterType.MIXED -> {
                 when (System.getProperty("tests.rest.bwcsuite_round")) {
                     "second" -> "_nodes/$CLUSTER_NAME-1/plugins"
@@ -157,14 +166,17 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
                     else -> "_nodes/$CLUSTER_NAME-0/plugins"
                 }
             }
-            ClusterType.UPGRADED -> "_nodes/plugins"
+
+            ClusterType.UPGRADED -> {
+                "_nodes/plugins"
+            }
         }
-    }
 
     @Throws(Exception::class)
     private fun createBasicMonitor() {
         val indexName = "test_bwc_index"
-        val bwcMonitorString = """
+        val bwcMonitorString =
+            """
             {
               "owner": "alerting",
               "type": "monitor",
@@ -200,15 +212,16 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
                 "actions": []
               }]
             }
-        """.trimIndent()
+            """.trimIndent()
         createIndex(indexName, Settings.EMPTY)
 
-        val createResponse = client().makeRequest(
-            method = "POST",
-            endpoint = "$ALERTING_BASE_URI?refresh=true",
-            params = emptyMap(),
-            entity = StringEntity(bwcMonitorString, APPLICATION_JSON)
-        )
+        val createResponse =
+            client().makeRequest(
+                method = "POST",
+                endpoint = "$ALERTING_BASE_URI?refresh=true",
+                params = emptyMap(),
+                entity = StringEntity(bwcMonitorString, APPLICATION_JSON),
+            )
 
         assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
         val responseBody = createResponse.asMap()
@@ -224,15 +237,16 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        val monitor = createMonitor(
-            randomDocumentLevelMonitor(
-                name = "test-monitor",
-                inputs = listOf(docLevelInput),
-                triggers = listOf(trigger),
-                enabled = true,
-                schedule = IntervalSchedule(1, ChronoUnit.MINUTES)
+        val monitor =
+            createMonitor(
+                randomDocumentLevelMonitor(
+                    name = "test-monitor",
+                    inputs = listOf(docLevelInput),
+                    triggers = listOf(trigger),
+                    enabled = true,
+                    schedule = IntervalSchedule(1, ChronoUnit.MINUTES),
+                ),
             )
-        )
         assertNotNull(monitor.id)
         return Pair(monitor, testIndex)
     }
@@ -241,12 +255,13 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
     @Suppress("UNCHECKED_CAST")
     private fun verifyMonitorExists(uri: String) {
         val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
-        val searchResponse = client().makeRequest(
-            "GET",
-            "$uri/_search",
-            emptyMap(),
-            StringEntity(search, APPLICATION_JSON)
-        )
+        val searchResponse =
+            client().makeRequest(
+                "GET",
+                "$uri/_search",
+                emptyMap(),
+                StringEntity(search, APPLICATION_JSON),
+            )
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
@@ -256,16 +271,19 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
 
     @Throws(Exception::class)
     @Suppress("UNCHECKED_CAST")
-    /**
+    /*
      * Monitor stats will check if the Monitor scheduled job is running on time but does not necessarily mean that the
      * Monitor execution itself did not fail.
      */
-    private fun verifyMonitorStats(uri: String) {
-        val statsResponse = client().makeRequest(
-            "GET",
-            "$uri/stats",
-            emptyMap()
-        )
+    private fun verifyMonitorStats(
+        uri: String,
+    ) {
+        val statsResponse =
+            client().makeRequest(
+                "GET",
+                "$uri/stats",
+                emptyMap(),
+            )
         assertEquals("Monitor stats failed", RestStatus.OK, statsResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), statsResponse.entity.content)
         val responseMap = xcp.map()
@@ -297,7 +315,11 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
         val client = client()
         client.setNodes(nodes)
         val searchResponse = searchMonitors()
-        val monitorId = searchResponse.hits.hits.filter { it.sourceAsMap["name"] == "test-monitor" }.first().id
+        val monitorId =
+            searchResponse.hits.hits
+                .filter { it.sourceAsMap["name"] == "test-monitor" }
+                .first()
+                .id
         val testIndex = "test-index"
 
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS))
@@ -317,6 +339,7 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
                 assertEquals("test-monitor", output["monitor_name"])
                 @Suppress("UNCHECKED_CAST")
                 val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
                 @Suppress("UNCHECKED_CAST")
                 val matchingDocsToQuery = searchResult["4"] as List<String>
                 passed = matchingDocsToQuery.isNotEmpty()

@@ -39,100 +39,137 @@ import org.opensearch.transport.client.Client
 
 private val log = LogManager.getLogger(TransportSearchMonitorAction::class.java)
 
-class TransportSearchMonitorAction @Inject constructor(
-    transportService: TransportService,
-    val settings: Settings,
-    val client: Client,
-    clusterService: ClusterService,
-    actionFilters: ActionFilters,
-    val namedWriteableRegistry: NamedWriteableRegistry
-) : HandledTransportAction<ActionRequest, SearchResponse>(
-    AlertingActions.SEARCH_MONITORS_ACTION_NAME, transportService, actionFilters, ::SearchMonitorRequest
-),
-    SecureTransportAction {
-    @Volatile
-    override var filterByEnabled: Boolean = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
-    init {
-        listenFilterBySettingChange(clusterService)
-    }
+class TransportSearchMonitorAction
+    @Inject
+    constructor(
+        transportService: TransportService,
+        val settings: Settings,
+        val client: Client,
+        clusterService: ClusterService,
+        actionFilters: ActionFilters,
+        val namedWriteableRegistry: NamedWriteableRegistry,
+    ) : HandledTransportAction<ActionRequest, SearchResponse>(
+            AlertingActions.SEARCH_MONITORS_ACTION_NAME,
+            transportService,
+            actionFilters,
+            ::SearchMonitorRequest,
+        ),
+        SecureTransportAction {
+        @Volatile
+        override var filterByEnabled: Boolean = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
-    override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<SearchResponse>) {
-        val transformedRequest = request as? SearchMonitorRequest
-            ?: recreateObject(request, namedWriteableRegistry) {
-                SearchMonitorRequest(it)
-            }
-
-        val searchSourceBuilder = transformedRequest.searchRequest.source()
-            .seqNoAndPrimaryTerm(true)
-            .version(true)
-        val queryBuilder = if (searchSourceBuilder.query() == null) BoolQueryBuilder()
-        else QueryBuilders.boolQuery().must(searchSourceBuilder.query())
-
-        // The SearchMonitor API supports one 'index' parameter of either the SCHEDULED_JOBS_INDEX or ALL_ALERT_INDEX_PATTERN.
-        // When querying the ALL_ALERT_INDEX_PATTERN, we don't want to check whether the MONITOR_TYPE field exists
-        // because we're querying alert indexes.
-        if (transformedRequest.searchRequest.indices().contains(ScheduledJob.SCHEDULED_JOBS_INDEX)) {
-            val monitorWorkflowType = QueryBuilders.boolQuery().should(QueryBuilders.existsQuery(Monitor.MONITOR_TYPE))
-                .should(QueryBuilders.existsQuery(Workflow.WORKFLOW_TYPE))
-            queryBuilder.must(monitorWorkflowType)
+        init {
+            listenFilterBySettingChange(clusterService)
         }
 
-        searchSourceBuilder.query(queryBuilder)
-            .seqNoAndPrimaryTerm(true)
-            .version(true)
-        addOwnerFieldIfNotExists(transformedRequest.searchRequest)
-        val user = readUserFromThreadContext(client)
-        client.threadPool().threadContext.stashContext().use {
-            resolve(transformedRequest, actionListener, user)
-        }
-    }
-
-    fun resolve(searchMonitorRequest: SearchMonitorRequest, actionListener: ActionListener<SearchResponse>, user: User?) {
-        if (user == null) {
-            // user header is null when: 1/ security is disabled. 2/when user is super-admin.
-            search(searchMonitorRequest.searchRequest, actionListener)
-        } else if (!doFilterForUser(user)) {
-            // security is enabled and filterby is disabled.
-            search(searchMonitorRequest.searchRequest, actionListener)
-        } else {
-            // security is enabled and filterby is enabled.
-            log.info("Filtering result by: ${user.backendRoles}")
-            addFilter(user, searchMonitorRequest.searchRequest.source(), "monitor.user.backend_roles.keyword")
-            search(searchMonitorRequest.searchRequest, actionListener)
-        }
-    }
-
-    fun search(searchRequest: SearchRequest, actionListener: ActionListener<SearchResponse>) {
-        client.search(
-            searchRequest,
-            object : ActionListener<SearchResponse> {
-                override fun onResponse(response: SearchResponse) {
-                    actionListener.onResponse(response)
-                }
-
-                override fun onFailure(ex: Exception) {
-                    if (isIndexNotFoundException(ex)) {
-                        log.error("Index not found while searching monitor", ex)
-                        val emptyResponse = getEmptySearchResponse()
-                        actionListener.onResponse(emptyResponse)
-                    } else {
-                        log.error("Unexpected error while searching monitor", ex)
-                        actionListener.onFailure(AlertingException.wrap(ex))
+        override fun doExecute(
+            task: Task,
+            request: ActionRequest,
+            actionListener: ActionListener<SearchResponse>,
+        ) {
+            val transformedRequest =
+                request as? SearchMonitorRequest
+                    ?: recreateObject(request, namedWriteableRegistry) {
+                        SearchMonitorRequest(it)
                     }
-                }
-            }
-        )
-    }
 
-    private fun addOwnerFieldIfNotExists(searchRequest: SearchRequest) {
-        if (searchRequest.source().query() == null || searchRequest.source().query().toString().contains("monitor.owner") == false) {
-            var boolQueryBuilder: BoolQueryBuilder = if (searchRequest.source().query() == null) BoolQueryBuilder()
-            else QueryBuilders.boolQuery().must(searchRequest.source().query())
-            val bqb = BoolQueryBuilder()
-            bqb.should().add(BoolQueryBuilder().mustNot(ExistsQueryBuilder("monitor.owner")))
-            bqb.should().add(BoolQueryBuilder().must(MatchQueryBuilder("monitor.owner", "alerting")))
-            boolQueryBuilder.filter(bqb)
-            searchRequest.source().query(boolQueryBuilder)
+            val searchSourceBuilder =
+                transformedRequest.searchRequest
+                    .source()
+                    .seqNoAndPrimaryTerm(true)
+                    .version(true)
+            val queryBuilder =
+                if (searchSourceBuilder.query() == null) {
+                    BoolQueryBuilder()
+                } else {
+                    QueryBuilders.boolQuery().must(searchSourceBuilder.query())
+                }
+
+            // The SearchMonitor API supports one 'index' parameter of either the SCHEDULED_JOBS_INDEX or ALL_ALERT_INDEX_PATTERN.
+            // When querying the ALL_ALERT_INDEX_PATTERN, we don't want to check whether the MONITOR_TYPE field exists
+            // because we're querying alert indexes.
+            if (transformedRequest.searchRequest.indices().contains(ScheduledJob.SCHEDULED_JOBS_INDEX)) {
+                val monitorWorkflowType =
+                    QueryBuilders
+                        .boolQuery()
+                        .should(QueryBuilders.existsQuery(Monitor.MONITOR_TYPE))
+                        .should(QueryBuilders.existsQuery(Workflow.WORKFLOW_TYPE))
+                queryBuilder.must(monitorWorkflowType)
+            }
+
+            searchSourceBuilder
+                .query(queryBuilder)
+                .seqNoAndPrimaryTerm(true)
+                .version(true)
+            addOwnerFieldIfNotExists(transformedRequest.searchRequest)
+            val user = readUserFromThreadContext(client)
+            client.threadPool().threadContext.stashContext().use {
+                resolve(transformedRequest, actionListener, user)
+            }
+        }
+
+        fun resolve(
+            searchMonitorRequest: SearchMonitorRequest,
+            actionListener: ActionListener<SearchResponse>,
+            user: User?,
+        ) {
+            if (user == null) {
+                // user header is null when: 1/ security is disabled. 2/when user is super-admin.
+                search(searchMonitorRequest.searchRequest, actionListener)
+            } else if (!doFilterForUser(user)) {
+                // security is enabled and filterby is disabled.
+                search(searchMonitorRequest.searchRequest, actionListener)
+            } else {
+                // security is enabled and filterby is enabled.
+                log.info("Filtering result by: ${user.backendRoles}")
+                addFilter(user, searchMonitorRequest.searchRequest.source(), "monitor.user.backend_roles.keyword")
+                search(searchMonitorRequest.searchRequest, actionListener)
+            }
+        }
+
+        fun search(
+            searchRequest: SearchRequest,
+            actionListener: ActionListener<SearchResponse>,
+        ) {
+            client.search(
+                searchRequest,
+                object : ActionListener<SearchResponse> {
+                    override fun onResponse(response: SearchResponse) {
+                        actionListener.onResponse(response)
+                    }
+
+                    override fun onFailure(ex: Exception) {
+                        if (isIndexNotFoundException(ex)) {
+                            log.error("Index not found while searching monitor", ex)
+                            val emptyResponse = getEmptySearchResponse()
+                            actionListener.onResponse(emptyResponse)
+                        } else {
+                            log.error("Unexpected error while searching monitor", ex)
+                            actionListener.onFailure(AlertingException.wrap(ex))
+                        }
+                    }
+                },
+            )
+        }
+
+        private fun addOwnerFieldIfNotExists(searchRequest: SearchRequest) {
+            if (searchRequest.source().query() == null || searchRequest
+                    .source()
+                    .query()
+                    .toString()
+                    .contains("monitor.owner") == false
+            ) {
+                var boolQueryBuilder: BoolQueryBuilder =
+                    if (searchRequest.source().query() == null) {
+                        BoolQueryBuilder()
+                    } else {
+                        QueryBuilders.boolQuery().must(searchRequest.source().query())
+                    }
+                val bqb = BoolQueryBuilder()
+                bqb.should().add(BoolQueryBuilder().mustNot(ExistsQueryBuilder("monitor.owner")))
+                bqb.should().add(BoolQueryBuilder().must(MatchQueryBuilder("monitor.owner", "alerting")))
+                boolQueryBuilder.filter(bqb)
+                searchRequest.source().query(boolQueryBuilder)
+            }
         }
     }
-}

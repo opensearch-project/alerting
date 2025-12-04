@@ -41,7 +41,9 @@ import java.time.Instant
 import java.util.Locale
 import java.util.function.Function
 
-class CatShardsRequestWrapper(val pathParams: String = "") : ActionRequest() {
+class CatShardsRequestWrapper(
+    val pathParams: String = "",
+) : ActionRequest() {
     var clusterStateRequest: ClusterStateRequest =
         ClusterStateRequest().clear().nodes(true).routingTable(true)
     var indicesStatsRequest: IndicesStatsRequest =
@@ -63,19 +65,22 @@ class CatShardsRequestWrapper(val pathParams: String = "") : ActionRequest() {
 
     override fun validate(): ActionRequestValidationException? {
         var exception: ActionRequestValidationException? = null
-        if (pathParams.isNotBlank() && indicesList.any { !VALID_INDEX_NAME_REGEX.containsMatchIn(it) })
-            exception = ValidateActions.addValidationError(
-                "The path parameters do not form a valid, comma-separated list of data streams, indices, or index aliases.",
-                exception
-            )
+        if (pathParams.isNotBlank() && indicesList.any { !VALID_INDEX_NAME_REGEX.containsMatchIn(it) }) {
+            exception =
+                ValidateActions.addValidationError(
+                    "The path parameters do not form a valid, comma-separated list of data streams, indices, or index aliases.",
+                    exception,
+                )
+        }
         return exception
     }
 }
 
 class CatShardsResponseWrapper(
     stateResp: ClusterStateResponse,
-    indicesResp: IndicesStatsResponse
-) : ActionResponse(), ToXContentObject {
+    indicesResp: IndicesStatsResponse,
+) : ActionResponse(),
+    ToXContentObject {
     var shardInfoList: List<ShardInfo> = listOf()
 
     init {
@@ -90,7 +95,10 @@ class CatShardsResponseWrapper(
         out.writeList(shardInfoList)
     }
 
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder {
         builder.startObject()
         builder.startArray(WRAPPER_FIELD)
         shardInfoList.forEach { it.toXContent(builder, params) }
@@ -98,7 +106,11 @@ class CatShardsResponseWrapper(
         return builder.endObject()
     }
 
-    private fun <S, T> getOrNull(stats: S?, accessor: Function<S, T>, func: Function<T, Any>): Any? {
+    private fun <S, T> getOrNull(
+        stats: S?,
+        accessor: Function<S, T>,
+        func: Function<T, Any>,
+    ): Any? {
         if (stats != null) {
             val t: T? = accessor.apply(stats)
             if (t != null) {
@@ -110,7 +122,7 @@ class CatShardsResponseWrapper(
 
     private fun compileShardInfo(
         stateResp: ClusterStateResponse,
-        indicesResp: IndicesStatsResponse
+        indicesResp: IndicesStatsResponse,
     ): List<ShardInfo> {
         val list = mutableListOf<ShardInfo>()
 
@@ -123,107 +135,130 @@ class CatShardsResponseWrapper(
                 commitStats = shardStats.commitStats
             }
 
-            var shardInfo = ShardInfo(
-                index = shard.indexName,
-                shard = "${shard.id}",
-                primaryOrReplica = if (shard.primary()) "p" else "r",
-                state = shard.state().name,
-                docs = getOrNull(commonStats, CommonStats::getDocs, DocsStats::getCount)?.toString(),
-                store = getOrNull(commonStats, CommonStats::getStore, StoreStats::getSize)?.toString(),
-                id = null, // Added below
-                node = null, // Added below
-                completionSize = getOrNull(commonStats, CommonStats::getCompletion, CompletionStats::getSize)?.toString(),
-                fieldDataMemory = getOrNull(commonStats, CommonStats::getFieldData, FieldDataStats::getMemorySize)?.toString(),
-                fieldDataEvictions = getOrNull(commonStats, CommonStats::getFieldData, FieldDataStats::getEvictions)?.toString(),
-                flushTotal = getOrNull(commonStats, CommonStats::getFlush, FlushStats::getTotal)?.toString(),
-                flushTotalTime = getOrNull(commonStats, CommonStats::getFlush, FlushStats::getTotalTime)?.toString(),
-                getCurrent = getOrNull(commonStats, CommonStats::getGet, GetStats::current)?.toString(),
-                getTime = getOrNull(commonStats, CommonStats::getGet, GetStats::getTime)?.toString(),
-                getTotal = getOrNull(commonStats, CommonStats::getGet, GetStats::getCount)?.toString(),
-                getExistsTime = getOrNull(commonStats, CommonStats::getGet, GetStats::getExistsTime)?.toString(),
-                getExistsTotal = getOrNull(commonStats, CommonStats::getGet, GetStats::getExistsCount)?.toString(),
-                getMissingTime = getOrNull(commonStats, CommonStats::getGet, GetStats::getMissingTime)?.toString(),
-                getMissingTotal = getOrNull(commonStats, CommonStats::getGet, GetStats::getMissingCount)?.toString(),
-                indexingDeleteCurrent = getOrNull(commonStats, CommonStats::getIndexing, { it.total.deleteCurrent })?.toString(),
-                indexingDeleteTime = getOrNull(commonStats, CommonStats::getIndexing, { it.total.deleteTime })?.toString(),
-                indexingDeleteTotal = getOrNull(commonStats, CommonStats::getIndexing, { it.total.deleteCount })?.toString(),
-                indexingIndexCurrent = getOrNull(commonStats, CommonStats::getIndexing, { it.total.indexCurrent })?.toString(),
-                indexingIndexTime = getOrNull(commonStats, CommonStats::getIndexing, { it.total.indexTime })?.toString(),
-                indexingIndexTotal = getOrNull(commonStats, CommonStats::getIndexing, { it.total.indexCount })?.toString(),
-                indexingIndexFailed = getOrNull(commonStats, CommonStats::getIndexing, { it.total.indexFailedCount })?.toString(),
-                mergesCurrent = getOrNull(commonStats, CommonStats::getMerge, MergeStats::getCurrent)?.toString(),
-                mergesCurrentDocs = getOrNull(commonStats, CommonStats::getMerge, MergeStats::getCurrentNumDocs)?.toString(),
-                mergesCurrentSize = getOrNull(commonStats, CommonStats::getMerge, MergeStats::getCurrentSize)?.toString(),
-                mergesTotal = getOrNull(commonStats, CommonStats::getMerge, MergeStats::getTotal)?.toString(),
-                mergesTotalDocs = getOrNull(commonStats, CommonStats::getMerge, MergeStats::getTotalNumDocs)?.toString(),
-                mergesTotalSize = getOrNull(commonStats, CommonStats::getMerge, MergeStats::getTotalSize)?.toString(),
-                mergesTotalTime = getOrNull(commonStats, CommonStats::getMerge, MergeStats::getTotalTime)?.toString(),
-                queryCacheMemory = getOrNull(commonStats, CommonStats::getQueryCache, QueryCacheStats::getMemorySize)?.toString(),
-                queryCacheEvictions = getOrNull(commonStats, CommonStats::getQueryCache, QueryCacheStats::getEvictions)?.toString(),
-                recoverySourceType = null, // Added below
-                refreshTotal = getOrNull(commonStats, CommonStats::getRefresh, RefreshStats::getTotal)?.toString(),
-                refreshTime = getOrNull(commonStats, CommonStats::getRefresh, RefreshStats::getTotalTime)?.toString(),
-                searchFetchCurrent = getOrNull(commonStats, CommonStats::getSearch, { it.total.fetchCurrent })?.toString(),
-                searchFetchTime = getOrNull(commonStats, CommonStats::getSearch, { it.total.fetchTime })?.toString(),
-                searchFetchTotal = getOrNull(commonStats, CommonStats::getSearch, { it.total.fetchCount })?.toString(),
-                searchOpenContexts = getOrNull(commonStats, CommonStats::getSearch, SearchStats::getOpenContexts)?.toString(),
-                searchQueryCurrent = getOrNull(commonStats, CommonStats::getSearch, { it.total.queryCurrent })?.toString(),
-                searchQueryTime = getOrNull(commonStats, CommonStats::getSearch, { it.total.queryTime })?.toString(),
-                searchQueryTotal = getOrNull(commonStats, CommonStats::getSearch, { it.total.queryCount })?.toString(),
-                searchScrollCurrent = getOrNull(commonStats, CommonStats::getSearch, { it.total.scrollCurrent })?.toString(),
-                searchScrollTime = getOrNull(commonStats, CommonStats::getSearch, { it.total.scrollTime })?.toString(),
-                searchScrollTotal = getOrNull(commonStats, CommonStats::getSearch, { it.total.scrollCount })?.toString(),
-                segmentsCount = getOrNull(commonStats, CommonStats::getSegments, SegmentsStats::getCount)?.toString(),
-                segmentsMemory = getOrNull(commonStats, CommonStats::getSegments, SegmentsStats::getZeroMemory)?.toString(),
-                segmentsIndexWriterMemory =
-                getOrNull(commonStats, CommonStats::getSegments, SegmentsStats::getIndexWriterMemory)?.toString(),
-                segmentsVersionMapMemory = getOrNull(commonStats, CommonStats::getSegments, SegmentsStats::getVersionMapMemory)?.toString(),
-                fixedBitsetMemory = getOrNull(commonStats, CommonStats::getSegments, SegmentsStats::getBitsetMemory)?.toString(),
-                globalCheckpoint = getOrNull(shardStats, ShardStats::getSeqNoStats, SeqNoStats::getGlobalCheckpoint)?.toString(),
-                localCheckpoint = getOrNull(shardStats, ShardStats::getSeqNoStats, SeqNoStats::getLocalCheckpoint)?.toString(),
-                maxSeqNo = getOrNull(shardStats, ShardStats::getSeqNoStats, SeqNoStats::getMaxSeqNo)?.toString(),
-                syncId = commitStats?.userData?.get(Engine.SYNC_COMMIT_ID),
-                unassignedAt = null, // Added below
-                unassignedDetails = null, // Added below
-                unassignedFor = null, // Added below
-                unassignedReason = null // Added below
-            )
+            var shardInfo =
+                ShardInfo(
+                    index = shard.indexName,
+                    shard = "${shard.id}",
+                    primaryOrReplica = if (shard.primary()) "p" else "r",
+                    state = shard.state().name,
+                    docs = getOrNull(commonStats, CommonStats::getDocs, DocsStats::getCount)?.toString(),
+                    store = getOrNull(commonStats, CommonStats::getStore, StoreStats::getSize)?.toString(),
+                    id = null, // Added below
+                    node = null, // Added below
+                    completionSize = getOrNull(commonStats, CommonStats::getCompletion, CompletionStats::getSize)?.toString(),
+                    fieldDataMemory = getOrNull(commonStats, CommonStats::getFieldData, FieldDataStats::getMemorySize)?.toString(),
+                    fieldDataEvictions = getOrNull(commonStats, CommonStats::getFieldData, FieldDataStats::getEvictions)?.toString(),
+                    flushTotal = getOrNull(commonStats, CommonStats::getFlush, FlushStats::getTotal)?.toString(),
+                    flushTotalTime = getOrNull(commonStats, CommonStats::getFlush, FlushStats::getTotalTime)?.toString(),
+                    getCurrent = getOrNull(commonStats, CommonStats::getGet, GetStats::current)?.toString(),
+                    getTime = getOrNull(commonStats, CommonStats::getGet, GetStats::getTime)?.toString(),
+                    getTotal = getOrNull(commonStats, CommonStats::getGet, GetStats::getCount)?.toString(),
+                    getExistsTime = getOrNull(commonStats, CommonStats::getGet, GetStats::getExistsTime)?.toString(),
+                    getExistsTotal = getOrNull(commonStats, CommonStats::getGet, GetStats::getExistsCount)?.toString(),
+                    getMissingTime = getOrNull(commonStats, CommonStats::getGet, GetStats::getMissingTime)?.toString(),
+                    getMissingTotal = getOrNull(commonStats, CommonStats::getGet, GetStats::getMissingCount)?.toString(),
+                    indexingDeleteCurrent = getOrNull(commonStats, CommonStats::getIndexing, { it.total.deleteCurrent })?.toString(),
+                    indexingDeleteTime = getOrNull(commonStats, CommonStats::getIndexing, { it.total.deleteTime })?.toString(),
+                    indexingDeleteTotal = getOrNull(commonStats, CommonStats::getIndexing, { it.total.deleteCount })?.toString(),
+                    indexingIndexCurrent = getOrNull(commonStats, CommonStats::getIndexing, { it.total.indexCurrent })?.toString(),
+                    indexingIndexTime = getOrNull(commonStats, CommonStats::getIndexing, { it.total.indexTime })?.toString(),
+                    indexingIndexTotal = getOrNull(commonStats, CommonStats::getIndexing, { it.total.indexCount })?.toString(),
+                    indexingIndexFailed = getOrNull(commonStats, CommonStats::getIndexing, { it.total.indexFailedCount })?.toString(),
+                    mergesCurrent = getOrNull(commonStats, CommonStats::getMerge, MergeStats::getCurrent)?.toString(),
+                    mergesCurrentDocs = getOrNull(commonStats, CommonStats::getMerge, MergeStats::getCurrentNumDocs)?.toString(),
+                    mergesCurrentSize = getOrNull(commonStats, CommonStats::getMerge, MergeStats::getCurrentSize)?.toString(),
+                    mergesTotal = getOrNull(commonStats, CommonStats::getMerge, MergeStats::getTotal)?.toString(),
+                    mergesTotalDocs = getOrNull(commonStats, CommonStats::getMerge, MergeStats::getTotalNumDocs)?.toString(),
+                    mergesTotalSize = getOrNull(commonStats, CommonStats::getMerge, MergeStats::getTotalSize)?.toString(),
+                    mergesTotalTime = getOrNull(commonStats, CommonStats::getMerge, MergeStats::getTotalTime)?.toString(),
+                    queryCacheMemory = getOrNull(commonStats, CommonStats::getQueryCache, QueryCacheStats::getMemorySize)?.toString(),
+                    queryCacheEvictions = getOrNull(commonStats, CommonStats::getQueryCache, QueryCacheStats::getEvictions)?.toString(),
+                    recoverySourceType = null, // Added below
+                    refreshTotal = getOrNull(commonStats, CommonStats::getRefresh, RefreshStats::getTotal)?.toString(),
+                    refreshTime = getOrNull(commonStats, CommonStats::getRefresh, RefreshStats::getTotalTime)?.toString(),
+                    searchFetchCurrent = getOrNull(commonStats, CommonStats::getSearch, { it.total.fetchCurrent })?.toString(),
+                    searchFetchTime = getOrNull(commonStats, CommonStats::getSearch, { it.total.fetchTime })?.toString(),
+                    searchFetchTotal = getOrNull(commonStats, CommonStats::getSearch, { it.total.fetchCount })?.toString(),
+                    searchOpenContexts = getOrNull(commonStats, CommonStats::getSearch, SearchStats::getOpenContexts)?.toString(),
+                    searchQueryCurrent = getOrNull(commonStats, CommonStats::getSearch, { it.total.queryCurrent })?.toString(),
+                    searchQueryTime = getOrNull(commonStats, CommonStats::getSearch, { it.total.queryTime })?.toString(),
+                    searchQueryTotal = getOrNull(commonStats, CommonStats::getSearch, { it.total.queryCount })?.toString(),
+                    searchScrollCurrent = getOrNull(commonStats, CommonStats::getSearch, { it.total.scrollCurrent })?.toString(),
+                    searchScrollTime = getOrNull(commonStats, CommonStats::getSearch, { it.total.scrollTime })?.toString(),
+                    searchScrollTotal = getOrNull(commonStats, CommonStats::getSearch, { it.total.scrollCount })?.toString(),
+                    segmentsCount = getOrNull(commonStats, CommonStats::getSegments, SegmentsStats::getCount)?.toString(),
+                    segmentsMemory = getOrNull(commonStats, CommonStats::getSegments, SegmentsStats::getZeroMemory)?.toString(),
+                    segmentsIndexWriterMemory =
+                        getOrNull(commonStats, CommonStats::getSegments, SegmentsStats::getIndexWriterMemory)?.toString(),
+                    segmentsVersionMapMemory =
+                        getOrNull(
+                            commonStats,
+                            CommonStats::getSegments,
+                            SegmentsStats::getVersionMapMemory,
+                        )?.toString(),
+                    fixedBitsetMemory = getOrNull(commonStats, CommonStats::getSegments, SegmentsStats::getBitsetMemory)?.toString(),
+                    globalCheckpoint = getOrNull(shardStats, ShardStats::getSeqNoStats, SeqNoStats::getGlobalCheckpoint)?.toString(),
+                    localCheckpoint = getOrNull(shardStats, ShardStats::getSeqNoStats, SeqNoStats::getLocalCheckpoint)?.toString(),
+                    maxSeqNo = getOrNull(shardStats, ShardStats::getSeqNoStats, SeqNoStats::getMaxSeqNo)?.toString(),
+                    syncId = commitStats?.userData?.get(Engine.SYNC_COMMIT_ID),
+                    unassignedAt = null, // Added below
+                    unassignedDetails = null, // Added below
+                    unassignedFor = null, // Added below
+                    unassignedReason = null, // Added below
+                )
 
             if (shard.assignedToNode()) {
                 val id = shard.currentNodeId()
                 val node = StringBuilder()
-                node.append(stateResp.state.nodes().get(id).name)
+                node.append(
+                    stateResp.state
+                        .nodes()
+                        .get(id)
+                        .name,
+                )
 
                 if (shard.relocating()) {
                     val reloNodeId = shard.relocatingNodeId()
-                    val reloName = stateResp.state.nodes().get(reloNodeId).name
+                    val reloName =
+                        stateResp.state
+                            .nodes()
+                            .get(reloNodeId)
+                            .name
                     node.append(" -> ")
                     node.append(reloNodeId)
                     node.append(" ")
                     node.append(reloName)
                 }
 
-                shardInfo = shardInfo.copy(
-                    id = id,
-                    node = node.toString()
-                )
+                shardInfo =
+                    shardInfo.copy(
+                        id = id,
+                        node = node.toString(),
+                    )
             }
 
             if (shard.unassignedInfo() != null) {
                 val unassignedTime = Instant.ofEpochMilli(shard.unassignedInfo().unassignedTimeInMillis)
-                shardInfo = shardInfo.copy(
-                    unassignedReason = shard.unassignedInfo().reason.name,
-                    unassignedAt = UnassignedInfo.DATE_TIME_FORMATTER.format(unassignedTime),
-                    unassignedFor =
-                    TimeValue.timeValueMillis(System.currentTimeMillis() - shard.unassignedInfo().unassignedTimeInMillis).stringRep,
-                    unassignedDetails = shard.unassignedInfo().details
-                )
+                shardInfo =
+                    shardInfo.copy(
+                        unassignedReason = shard.unassignedInfo().reason.name,
+                        unassignedAt = UnassignedInfo.DATE_TIME_FORMATTER.format(unassignedTime),
+                        unassignedFor =
+                            TimeValue.timeValueMillis(System.currentTimeMillis() - shard.unassignedInfo().unassignedTimeInMillis).stringRep,
+                        unassignedDetails = shard.unassignedInfo().details,
+                    )
             }
 
             if (shard.recoverySource() != null) {
-                shardInfo = shardInfo.copy(
-                    recoverySourceType = shard.recoverySource().type.toString().lowercase(Locale.ROOT)
-                )
+                shardInfo =
+                    shardInfo.copy(
+                        recoverySourceType =
+                            shard
+                                .recoverySource()
+                                .type
+                                .toString()
+                                .lowercase(Locale.ROOT),
+                    )
             }
 
             list.add(shardInfo)
@@ -293,8 +328,9 @@ class CatShardsResponseWrapper(
         val unassignedAt: String?,
         val unassignedDetails: String?,
         val unassignedFor: String?,
-        val unassignedReason: String?
-    ) : ToXContentObject, Writeable {
+        val unassignedReason: String?,
+    ) : ToXContentObject,
+        Writeable {
         companion object {
             const val INDEX_FIELD = "index"
             const val SHARD_FIELD = "shard"
@@ -360,8 +396,12 @@ class CatShardsResponseWrapper(
             const val UNASSIGNED_REASON_FIELD = "unassigned.reason"
         }
 
-        override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-            builder.startObject()
+        override fun toXContent(
+            builder: XContentBuilder,
+            params: ToXContent.Params,
+        ): XContentBuilder {
+            builder
+                .startObject()
                 .field(INDEX_FIELD, index)
                 .field(SHARD_FIELD, shard)
                 .field(PRIMARY_OR_REPLICA_FIELD, primaryOrReplica)

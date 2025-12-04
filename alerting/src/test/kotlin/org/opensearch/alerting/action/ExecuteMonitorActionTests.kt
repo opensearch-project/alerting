@@ -5,9 +5,10 @@
 package org.opensearch.alerting.action
 
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class ExecuteMonitorActionTests : OpenSearchTestCase() {
-
+    @Test
     fun `test execute monitor action name`() {
         assertNotNull(ExecuteMonitorAction.INSTANCE.name())
         assertEquals(ExecuteMonitorAction.INSTANCE.name(), ExecuteMonitorAction.NAME)

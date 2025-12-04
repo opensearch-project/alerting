@@ -44,124 +44,143 @@ import java.io.IOException
 
 private val log = LogManager.getLogger(TransportGetDestinationsAction::class.java)
 
-class TransportGetDestinationsAction @Inject constructor(
-    transportService: TransportService,
-    val client: Client,
-    clusterService: ClusterService,
-    actionFilters: ActionFilters,
-    val settings: Settings,
-    val xContentRegistry: NamedXContentRegistry
-) : HandledTransportAction<GetDestinationsRequest, GetDestinationsResponse> (
-    GetDestinationsAction.NAME, transportService, actionFilters, ::GetDestinationsRequest
-),
-    SecureTransportAction {
+class TransportGetDestinationsAction
+    @Inject
+    constructor(
+        transportService: TransportService,
+        val client: Client,
+        clusterService: ClusterService,
+        actionFilters: ActionFilters,
+        val settings: Settings,
+        val xContentRegistry: NamedXContentRegistry,
+    ) : HandledTransportAction<GetDestinationsRequest, GetDestinationsResponse>(
+            GetDestinationsAction.NAME,
+            transportService,
+            actionFilters,
+            ::GetDestinationsRequest,
+        ),
+        SecureTransportAction {
+        @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
-    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
-
-    init {
-        listenFilterBySettingChange(clusterService)
-    }
-
-    override fun doExecute(
-        task: Task,
-        getDestinationsRequest: GetDestinationsRequest,
-        actionListener: ActionListener<GetDestinationsResponse>
-    ) {
-        val user = readUserFromThreadContext(client)
-        val tableProp = getDestinationsRequest.table
-
-        val sortBuilder = SortBuilders
-            .fieldSort(tableProp.sortString)
-            .order(SortOrder.fromString(tableProp.sortOrder))
-        if (!tableProp.missing.isNullOrBlank()) {
-            sortBuilder.missing(tableProp.missing)
+        init {
+            listenFilterBySettingChange(clusterService)
         }
 
-        val searchSourceBuilder = SearchSourceBuilder()
-            .sort(sortBuilder)
-            .size(tableProp.size)
-            .from(tableProp.startIndex)
-            .fetchSource(FetchSourceContext(true, Strings.EMPTY_ARRAY, Strings.EMPTY_ARRAY))
-            .seqNoAndPrimaryTerm(true)
-            .version(true)
-        val queryBuilder = QueryBuilders.boolQuery()
-            .must(QueryBuilders.existsQuery("destination"))
+        override fun doExecute(
+            task: Task,
+            getDestinationsRequest: GetDestinationsRequest,
+            actionListener: ActionListener<GetDestinationsResponse>,
+        ) {
+            val user = readUserFromThreadContext(client)
+            val tableProp = getDestinationsRequest.table
 
-        if (!getDestinationsRequest.destinationId.isNullOrBlank())
-            queryBuilder.filter(QueryBuilders.termQuery("_id", getDestinationsRequest.destinationId))
+            val sortBuilder =
+                SortBuilders
+                    .fieldSort(tableProp.sortString)
+                    .order(SortOrder.fromString(tableProp.sortOrder))
+            if (!tableProp.missing.isNullOrBlank()) {
+                sortBuilder.missing(tableProp.missing)
+            }
 
-        if (getDestinationsRequest.destinationType != "ALL")
-            queryBuilder.filter(QueryBuilders.termQuery("destination.type", getDestinationsRequest.destinationType))
+            val searchSourceBuilder =
+                SearchSourceBuilder()
+                    .sort(sortBuilder)
+                    .size(tableProp.size)
+                    .from(tableProp.startIndex)
+                    .fetchSource(FetchSourceContext(true, Strings.EMPTY_ARRAY, Strings.EMPTY_ARRAY))
+                    .seqNoAndPrimaryTerm(true)
+                    .version(true)
+            val queryBuilder =
+                QueryBuilders
+                    .boolQuery()
+                    .must(QueryBuilders.existsQuery("destination"))
 
-        if (!tableProp.searchString.isNullOrBlank()) {
-            queryBuilder
-                .must(
-                    QueryBuilders
-                        .queryStringQuery(tableProp.searchString)
-                        .defaultOperator(Operator.AND)
-                        .field("destination.type")
-                        .field("destination.name")
-                )
+            if (!getDestinationsRequest.destinationId.isNullOrBlank()) {
+                queryBuilder.filter(QueryBuilders.termQuery("_id", getDestinationsRequest.destinationId))
+            }
+
+            if (getDestinationsRequest.destinationType != "ALL") {
+                queryBuilder.filter(QueryBuilders.termQuery("destination.type", getDestinationsRequest.destinationType))
+            }
+
+            if (!tableProp.searchString.isNullOrBlank()) {
+                queryBuilder
+                    .must(
+                        QueryBuilders
+                            .queryStringQuery(tableProp.searchString)
+                            .defaultOperator(Operator.AND)
+                            .field("destination.type")
+                            .field("destination.name"),
+                    )
+            }
+            searchSourceBuilder.query(queryBuilder)
+
+            client.threadPool().threadContext.stashContext().use {
+                resolve(searchSourceBuilder, actionListener, user)
+            }
         }
-        searchSourceBuilder.query(queryBuilder)
 
-        client.threadPool().threadContext.stashContext().use {
-            resolve(searchSourceBuilder, actionListener, user)
-        }
-    }
-
-    fun resolve(
-        searchSourceBuilder: SearchSourceBuilder,
-        actionListener: ActionListener<GetDestinationsResponse>,
-        user: User?
-    ) {
-        if (user == null) {
-            // user is null when: 1/ security is disabled. 2/when user is super-admin.
-            search(searchSourceBuilder, actionListener)
-        } else if (!doFilterForUser(user)) {
-            // security is enabled and filterby is disabled.
-            search(searchSourceBuilder, actionListener)
-        } else {
-            // security is enabled and filterby is enabled.
-            try {
-                log.info("Filtering result by: ${user.backendRoles}")
-                addFilter(user, searchSourceBuilder, "destination.user.backend_roles.keyword")
+        fun resolve(
+            searchSourceBuilder: SearchSourceBuilder,
+            actionListener: ActionListener<GetDestinationsResponse>,
+            user: User?,
+        ) {
+            if (user == null) {
+                // user is null when: 1/ security is disabled. 2/when user is super-admin.
                 search(searchSourceBuilder, actionListener)
-            } catch (ex: IOException) {
-                actionListener.onFailure(AlertingException.wrap(ex))
+            } else if (!doFilterForUser(user)) {
+                // security is enabled and filterby is disabled.
+                search(searchSourceBuilder, actionListener)
+            } else {
+                // security is enabled and filterby is enabled.
+                try {
+                    log.info("Filtering result by: ${user.backendRoles}")
+                    addFilter(user, searchSourceBuilder, "destination.user.backend_roles.keyword")
+                    search(searchSourceBuilder, actionListener)
+                } catch (ex: IOException) {
+                    actionListener.onFailure(AlertingException.wrap(ex))
+                }
             }
         }
-    }
 
-    fun search(searchSourceBuilder: SearchSourceBuilder, actionListener: ActionListener<GetDestinationsResponse>) {
-        val searchRequest = SearchRequest()
-            .source(searchSourceBuilder)
-            .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
-        client.search(
-            searchRequest,
-            object : ActionListener<SearchResponse> {
-                override fun onResponse(response: SearchResponse) {
-                    val totalDestinationCount = response.hits.totalHits?.value?.toInt()
-                    val destinations = mutableListOf<Destination>()
-                    for (hit in response.hits) {
-                        val id = hit.id
-                        val version = hit.version
-                        val seqNo = hit.seqNo.toInt()
-                        val primaryTerm = hit.primaryTerm.toInt()
-                        val xcp = XContentType.JSON.xContent()
-                            .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
-                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
-                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                        destinations.add(Destination.parse(xcp, id, version, seqNo, primaryTerm))
+        fun search(
+            searchSourceBuilder: SearchSourceBuilder,
+            actionListener: ActionListener<GetDestinationsResponse>,
+        ) {
+            val searchRequest =
+                SearchRequest()
+                    .source(searchSourceBuilder)
+                    .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
+            client.search(
+                searchRequest,
+                object : ActionListener<SearchResponse> {
+                    override fun onResponse(response: SearchResponse) {
+                        val totalDestinationCount =
+                            response.hits.totalHits
+                                ?.value
+                                ?.toInt()
+                        val destinations = mutableListOf<Destination>()
+                        for (hit in response.hits) {
+                            val id = hit.id
+                            val version = hit.version
+                            val seqNo = hit.seqNo.toInt()
+                            val primaryTerm = hit.primaryTerm.toInt()
+                            val xcp =
+                                XContentType.JSON
+                                    .xContent()
+                                    .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
+                            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                            XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
+                            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                            destinations.add(Destination.parse(xcp, id, version, seqNo, primaryTerm))
+                        }
+                        actionListener.onResponse(GetDestinationsResponse(RestStatus.OK, totalDestinationCount, destinations))
                     }
-                    actionListener.onResponse(GetDestinationsResponse(RestStatus.OK, totalDestinationCount, destinations))
-                }
 
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
-                }
-            }
-        )
+                    override fun onFailure(t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                    }
+                },
+            )
+        }
     }
-}

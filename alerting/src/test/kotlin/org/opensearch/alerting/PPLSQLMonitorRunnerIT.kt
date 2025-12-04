@@ -36,25 +36,27 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(2, MINUTES, "abc", 5)
 
-        val pplMonitor = createRandomPPLMonitor(
-            randomPPLMonitor(
-                enabled = true,
-                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                lookBackWindow = null,
-                triggers = listOf(
-                    randomPPLTrigger(
-                        throttleDuration = null,
-                        expireDuration = 5,
-                        mode = TriggerMode.RESULT_SET,
-                        conditionType = ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = NumResultsCondition.GREATER_THAN,
-                        numResultsValue = 0L,
-                        customCondition = null
-                    )
+        val pplMonitor =
+            createRandomPPLMonitor(
+                randomPPLMonitor(
+                    enabled = true,
+                    schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                    lookBackWindow = null,
+                    triggers =
+                        listOf(
+                            randomPPLTrigger(
+                                throttleDuration = null,
+                                expireDuration = 5,
+                                mode = TriggerMode.RESULT_SET,
+                                conditionType = ConditionType.NUMBER_OF_RESULTS,
+                                numResultsCondition = NumResultsCondition.GREATER_THAN,
+                                numResultsValue = 0L,
+                                customCondition = null,
+                            ),
+                        ),
+                    query = "source = $TEST_INDEX_NAME | head 10",
                 ),
-                query = "source = $TEST_INDEX_NAME | head 10"
             )
-        )
 
         // set the monitor execution timebox to 1 nanosecond to guarantee a timeout
         client().updateSettings(AlertingSettings.ALERT_V2_MONITOR_EXECUTION_MAX_DURATION.key, TimeValue.timeValueNanos(1L))
@@ -75,25 +77,27 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(2, MINUTES, "abc", 5)
 
-        val pplMonitor = createRandomPPLMonitor(
-            randomPPLMonitor(
-                enabled = true,
-                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                lookBackWindow = null,
-                triggers = listOf(
-                    randomPPLTrigger(
-                        throttleDuration = null,
-                        expireDuration = 5,
-                        mode = TriggerMode.RESULT_SET,
-                        conditionType = ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = NumResultsCondition.GREATER_THAN,
-                        numResultsValue = 0L,
-                        customCondition = null
-                    )
+        val pplMonitor =
+            createRandomPPLMonitor(
+                randomPPLMonitor(
+                    enabled = true,
+                    schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                    lookBackWindow = null,
+                    triggers =
+                        listOf(
+                            randomPPLTrigger(
+                                throttleDuration = null,
+                                expireDuration = 5,
+                                mode = TriggerMode.RESULT_SET,
+                                conditionType = ConditionType.NUMBER_OF_RESULTS,
+                                numResultsCondition = NumResultsCondition.GREATER_THAN,
+                                numResultsValue = 0L,
+                                customCondition = null,
+                            ),
+                        ),
+                    query = "source = $TEST_INDEX_NAME | head 10",
                 ),
-                query = "source = $TEST_INDEX_NAME | head 10"
             )
-        )
 
         val versionBefore = pplMonitor.version
 
@@ -118,25 +122,27 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
         indexDocFromSomeTimeAgo(2, MINUTES, "def", 10)
         indexDocFromSomeTimeAgo(3, MINUTES, "ghi", 7)
 
-        val pplMonitor = createRandomPPLMonitor(
-            randomPPLMonitor(
-                enabled = true,
-                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                lookBackWindow = null,
-                triggers = listOf(
-                    randomPPLTrigger(
-                        throttleDuration = null,
-                        expireDuration = 5,
-                        mode = TriggerMode.PER_RESULT,
-                        conditionType = ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = NumResultsCondition.GREATER_THAN,
-                        numResultsValue = 0L,
-                        customCondition = null
-                    )
+        val pplMonitor =
+            createRandomPPLMonitor(
+                randomPPLMonitor(
+                    enabled = true,
+                    schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                    lookBackWindow = null,
+                    triggers =
+                        listOf(
+                            randomPPLTrigger(
+                                throttleDuration = null,
+                                expireDuration = 5,
+                                mode = TriggerMode.PER_RESULT,
+                                conditionType = ConditionType.NUMBER_OF_RESULTS,
+                                numResultsCondition = NumResultsCondition.GREATER_THAN,
+                                numResultsValue = 0L,
+                                customCondition = null,
+                            ),
+                        ),
+                    query = "source = $TEST_INDEX_NAME | head 10",
                 ),
-                query = "source = $TEST_INDEX_NAME | head 10"
             )
-        )
 
         val executeResponse = executeMonitorV2(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
@@ -147,7 +153,8 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
         assert(triggered) { "Monitor should have triggered but it didn't" }
         assertEquals(
             "A number of alerts matching the number of docs ingested (3) should have been generated",
-            3, alertsGenerated
+            3,
+            alertsGenerated,
         )
     }
 
@@ -163,25 +170,27 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
         indexDocFromSomeTimeAgo(8, MINUTES, "ghi", 8)
         indexDocFromSomeTimeAgo(9, MINUTES, "ghi", 9)
 
-        val pplMonitor = createRandomPPLMonitor(
-            randomPPLMonitor(
-                enabled = true,
-                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                lookBackWindow = null,
-                triggers = listOf(
-                    randomPPLTrigger(
-                        throttleDuration = null,
-                        expireDuration = 5,
-                        mode = TriggerMode.RESULT_SET,
-                        conditionType = ConditionType.CUSTOM,
-                        customCondition = "eval result = max_num > 5",
-                        numResultsCondition = null,
-                        numResultsValue = null
-                    )
+        val pplMonitor =
+            createRandomPPLMonitor(
+                randomPPLMonitor(
+                    enabled = true,
+                    schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                    lookBackWindow = null,
+                    triggers =
+                        listOf(
+                            randomPPLTrigger(
+                                throttleDuration = null,
+                                expireDuration = 5,
+                                mode = TriggerMode.RESULT_SET,
+                                conditionType = ConditionType.CUSTOM,
+                                customCondition = "eval result = max_num > 5",
+                                numResultsCondition = null,
+                                numResultsValue = null,
+                            ),
+                        ),
+                    query = "source = $TEST_INDEX_NAME | stats max(number) as max_num by abc",
                 ),
-                query = "source = $TEST_INDEX_NAME | stats max(number) as max_num by abc"
             )
-        )
 
         val executeResponse = executeMonitorV2(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
@@ -205,25 +214,27 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
         indexDocFromSomeTimeAgo(8, MINUTES, "ghi", 8)
         indexDocFromSomeTimeAgo(9, MINUTES, "ghi", 9)
 
-        val pplMonitor = createRandomPPLMonitor(
-            randomPPLMonitor(
-                enabled = true,
-                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                lookBackWindow = null,
-                triggers = listOf(
-                    randomPPLTrigger(
-                        throttleDuration = null,
-                        expireDuration = 5,
-                        mode = TriggerMode.PER_RESULT,
-                        conditionType = ConditionType.CUSTOM,
-                        customCondition = "eval evaluation = max_num > 5",
-                        numResultsCondition = null,
-                        numResultsValue = null
-                    )
+        val pplMonitor =
+            createRandomPPLMonitor(
+                randomPPLMonitor(
+                    enabled = true,
+                    schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                    lookBackWindow = null,
+                    triggers =
+                        listOf(
+                            randomPPLTrigger(
+                                throttleDuration = null,
+                                expireDuration = 5,
+                                mode = TriggerMode.PER_RESULT,
+                                conditionType = ConditionType.CUSTOM,
+                                customCondition = "eval evaluation = max_num > 5",
+                                numResultsCondition = null,
+                                numResultsValue = null,
+                            ),
+                        ),
+                    query = "source = $TEST_INDEX_NAME | stats max(number) as max_num by abc",
                 ),
-                query = "source = $TEST_INDEX_NAME | stats max(number) as max_num by abc"
             )
-        )
 
         val executeResponse = executeMonitorV2(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
@@ -241,7 +252,8 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
         assert(triggered) { "Monitor should have triggered but it didn't" }
         assertEquals(
             "A number of alerts matching the number of docs ingested (2) should have been generated",
-            2, alertsGenerated
+            2,
+            alertsGenerated,
         )
     }
 
@@ -249,26 +261,28 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(2, MINUTES, "abc", 5)
 
-        val pplMonitor = createRandomPPLMonitor(
-            randomPPLMonitor(
-                enabled = true,
-                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                lookBackWindow = 5,
-                timestampField = TIMESTAMP_FIELD,
-                triggers = listOf(
-                    randomPPLTrigger(
-                        throttleDuration = null,
-                        expireDuration = 5,
-                        mode = TriggerMode.RESULT_SET,
-                        conditionType = ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = NumResultsCondition.GREATER_THAN,
-                        numResultsValue = 0L,
-                        customCondition = null
-                    )
+        val pplMonitor =
+            createRandomPPLMonitor(
+                randomPPLMonitor(
+                    enabled = true,
+                    schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                    lookBackWindow = 5,
+                    timestampField = TIMESTAMP_FIELD,
+                    triggers =
+                        listOf(
+                            randomPPLTrigger(
+                                throttleDuration = null,
+                                expireDuration = 5,
+                                mode = TriggerMode.RESULT_SET,
+                                conditionType = ConditionType.NUMBER_OF_RESULTS,
+                                numResultsCondition = NumResultsCondition.GREATER_THAN,
+                                numResultsValue = 0L,
+                                customCondition = null,
+                            ),
+                        ),
+                    query = "source = $TEST_INDEX_NAME | head 10",
                 ),
-                query = "source = $TEST_INDEX_NAME | head 10"
             )
-        )
 
         val executeResponse = executeMonitorV2(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
@@ -284,26 +298,28 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(10, MINUTES, "abc", 5)
 
-        val pplMonitor = createRandomPPLMonitor(
-            randomPPLMonitor(
-                enabled = true,
-                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                lookBackWindow = 5,
-                timestampField = TIMESTAMP_FIELD,
-                triggers = listOf(
-                    randomPPLTrigger(
-                        throttleDuration = null,
-                        expireDuration = 5,
-                        mode = TriggerMode.RESULT_SET,
-                        conditionType = ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = NumResultsCondition.GREATER_THAN,
-                        numResultsValue = 0L,
-                        customCondition = null
-                    )
+        val pplMonitor =
+            createRandomPPLMonitor(
+                randomPPLMonitor(
+                    enabled = true,
+                    schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                    lookBackWindow = 5,
+                    timestampField = TIMESTAMP_FIELD,
+                    triggers =
+                        listOf(
+                            randomPPLTrigger(
+                                throttleDuration = null,
+                                expireDuration = 5,
+                                mode = TriggerMode.RESULT_SET,
+                                conditionType = ConditionType.NUMBER_OF_RESULTS,
+                                numResultsCondition = NumResultsCondition.GREATER_THAN,
+                                numResultsValue = 0L,
+                                customCondition = null,
+                            ),
+                        ),
+                    query = "source = $TEST_INDEX_NAME | head 10",
                 ),
-                query = "source = $TEST_INDEX_NAME | head 10"
             )
-        )
 
         val executeResponse = executeMonitorV2(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
@@ -319,24 +335,26 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(1, MINUTES, "abc", 5)
 
-        val pplMonitor = createRandomPPLMonitor(
-            randomPPLMonitor(
-                enabled = true,
-                schedule = IntervalSchedule(interval = 20, unit = MINUTES),
-                triggers = listOf(
-                    randomPPLTrigger(
-                        throttleDuration = null,
-                        expireDuration = 1L,
-                        mode = TriggerMode.RESULT_SET,
-                        conditionType = ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = NumResultsCondition.GREATER_THAN,
-                        numResultsValue = 0L,
-                        customCondition = null
-                    )
+        val pplMonitor =
+            createRandomPPLMonitor(
+                randomPPLMonitor(
+                    enabled = true,
+                    schedule = IntervalSchedule(interval = 20, unit = MINUTES),
+                    triggers =
+                        listOf(
+                            randomPPLTrigger(
+                                throttleDuration = null,
+                                expireDuration = 1L,
+                                mode = TriggerMode.RESULT_SET,
+                                conditionType = ConditionType.NUMBER_OF_RESULTS,
+                                numResultsCondition = NumResultsCondition.GREATER_THAN,
+                                numResultsValue = 0L,
+                                customCondition = null,
+                            ),
+                        ),
+                    query = "source = $TEST_INDEX_NAME | head 10",
                 ),
-                query = "source = $TEST_INDEX_NAME | head 10"
             )
-        )
 
         val executeResponse = executeMonitorV2(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
@@ -367,19 +385,20 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             randomPPLMonitor(
                 enabled = true,
                 schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                triggers = listOf(
-                    randomPPLTrigger(
-                        throttleDuration = 100L,
-                        expireDuration = 1L,
-                        mode = TriggerMode.RESULT_SET,
-                        conditionType = ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = NumResultsCondition.GREATER_THAN,
-                        numResultsValue = 0L,
-                        customCondition = null
-                    )
-                ),
-                query = "source = $TEST_INDEX_NAME | head 10"
-            )
+                triggers =
+                    listOf(
+                        randomPPLTrigger(
+                            throttleDuration = 100L,
+                            expireDuration = 1L,
+                            mode = TriggerMode.RESULT_SET,
+                            conditionType = ConditionType.NUMBER_OF_RESULTS,
+                            numResultsCondition = NumResultsCondition.GREATER_THAN,
+                            numResultsValue = 0L,
+                            customCondition = null,
+                        ),
+                    ),
+                query = "source = $TEST_INDEX_NAME | head 10",
+            ),
         )
 
         // sleep briefly so scheduled job can generate the alert
@@ -407,24 +426,26 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(1, MINUTES, "abc", 5)
 
-        val pplMonitor = createRandomPPLMonitor(
-            randomPPLMonitor(
-                enabled = true,
-                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                triggers = listOf(
-                    randomPPLTrigger(
-                        throttleDuration = 10,
-                        expireDuration = 5,
-                        mode = TriggerMode.RESULT_SET,
-                        conditionType = ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = NumResultsCondition.GREATER_THAN,
-                        numResultsValue = 0L,
-                        customCondition = null
-                    )
+        val pplMonitor =
+            createRandomPPLMonitor(
+                randomPPLMonitor(
+                    enabled = true,
+                    schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                    triggers =
+                        listOf(
+                            randomPPLTrigger(
+                                throttleDuration = 10,
+                                expireDuration = 5,
+                                mode = TriggerMode.RESULT_SET,
+                                conditionType = ConditionType.NUMBER_OF_RESULTS,
+                                numResultsCondition = NumResultsCondition.GREATER_THAN,
+                                numResultsValue = 0L,
+                                customCondition = null,
+                            ),
+                        ),
+                    query = "source = $TEST_INDEX_NAME | head 10",
                 ),
-                query = "source = $TEST_INDEX_NAME | head 10"
             )
-        )
 
         val executeResponse = executeMonitorV2(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
@@ -450,24 +471,26 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(1, MINUTES, "abc", 5)
 
-        val pplMonitor = createRandomPPLMonitor(
-            randomPPLMonitor(
-                enabled = true,
-                schedule = IntervalSchedule(interval = 30, unit = MINUTES),
-                triggers = listOf(
-                    randomPPLTrigger(
-                        throttleDuration = 20,
-                        expireDuration = 5,
-                        mode = TriggerMode.RESULT_SET,
-                        conditionType = ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = NumResultsCondition.GREATER_THAN,
-                        numResultsValue = 0L,
-                        customCondition = null
-                    )
+        val pplMonitor =
+            createRandomPPLMonitor(
+                randomPPLMonitor(
+                    enabled = true,
+                    schedule = IntervalSchedule(interval = 30, unit = MINUTES),
+                    triggers =
+                        listOf(
+                            randomPPLTrigger(
+                                throttleDuration = 20,
+                                expireDuration = 5,
+                                mode = TriggerMode.RESULT_SET,
+                                conditionType = ConditionType.NUMBER_OF_RESULTS,
+                                numResultsCondition = NumResultsCondition.GREATER_THAN,
+                                numResultsValue = 0L,
+                                customCondition = null,
+                            ),
+                        ),
+                    query = "source = $TEST_INDEX_NAME | head 10",
                 ),
-                query = "source = $TEST_INDEX_NAME | head 10"
             )
-        )
 
         val executeResponse = executeMonitorV2(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)

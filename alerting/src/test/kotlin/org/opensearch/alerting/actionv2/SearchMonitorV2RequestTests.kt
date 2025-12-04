@@ -14,8 +14,10 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.test.rest.OpenSearchRestTestCase
 import java.util.concurrent.TimeUnit
+import kotlin.test.Test
 
 class SearchMonitorV2RequestTests : OpenSearchTestCase() {
+    @Test
     fun `test search monitors request`() {
         val searchSourceBuilder = SearchSourceBuilder().from(0).size(100).timeout(TimeValue(60, TimeUnit.SECONDS))
         val searchRequest = SearchRequest().indices(OpenSearchRestTestCase.randomAlphaOfLength(10)).source(searchSourceBuilder)

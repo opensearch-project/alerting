@@ -9,9 +9,10 @@ import org.junit.Assert
 import org.opensearch.alerting.triggercondition.parsers.TriggerExpressionParser
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class TriggerExpressionResolverTests : OpenSearchTestCase() {
-
+    @Test
     fun `test trigger expression evaluation simple AND`() {
         val eqString = "(query[name=sigma-123] && query[name=sigma-456])"
         val equation = TriggerExpressionParser(eqString).parse()
@@ -22,6 +23,7 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
         Assert.assertEquals(mutableSetOf("1", "2", "3"), equation.evaluate(queryToDocIds))
     }
 
+    @Test
     fun `test trigger expression evaluation simple AND scenario2`() {
         val eqString = "(query[name=sigma-123] && query[id=id1456])"
         val equation = TriggerExpressionParser(eqString).parse()
@@ -32,6 +34,7 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
         Assert.assertEquals(mutableSetOf("3"), equation.evaluate(queryToDocIds))
     }
 
+    @Test
     fun `test trigger expression evaluation simple AND scenario3`() {
         val eqString = "(query[name=sigma-123] && query[tag=sev2])"
         val equation = TriggerExpressionParser(eqString).parse()
@@ -42,6 +45,7 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
         Assert.assertEquals(emptySet<String>(), equation.evaluate(queryToDocIds))
     }
 
+    @Test
     fun `test trigger expression evaluation simple OR`() {
         val eqString = "(query[name=sigma-123] || query[name=sigma-456])"
         val equation = TriggerExpressionParser(eqString).parse()
@@ -52,6 +56,7 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
         Assert.assertEquals(mutableSetOf("1", "2", "3"), equation.evaluate(queryToDocIds))
     }
 
+    @Test
     fun `test trigger expression evaluation simple OR scenario2`() {
         val eqString = "(query[name=sigma-123] || query[id=id1456])"
         val equation = TriggerExpressionParser(eqString).parse()
@@ -62,6 +67,7 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
         Assert.assertEquals(mutableSetOf("6", "3", "7", "1", "2", "3"), equation.evaluate(queryToDocIds))
     }
 
+    @Test
     fun `test trigger expression evaluation simple OR scenario3`() {
         val eqString = "(query[name=sigma-123] || query[tag=sev2])"
         val equation = TriggerExpressionParser(eqString).parse()
@@ -72,6 +78,7 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
         Assert.assertEquals(mutableSetOf("6", "8", "7"), equation.evaluate(queryToDocIds))
     }
 
+    @Test
     fun `test trigger expression evaluation simple NOT`() {
         val eqString = "!(query[name=sigma-456])"
         val equation = TriggerExpressionParser(eqString).parse()
@@ -82,6 +89,7 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
         Assert.assertEquals(mutableSetOf("1", "2", "3"), equation.evaluate(queryToDocIds))
     }
 
+    @Test
     fun `test trigger expression evaluation AND with NOT`() {
         val eqString = "(query[name=sigma-123] && !query[name=sigma-456])"
         val equation = TriggerExpressionParser(eqString).parse()
@@ -93,6 +101,7 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
         Assert.assertEquals(mutableSetOf("1", "2", "11"), equation.evaluate(queryToDocIds))
     }
 
+    @Test
     fun `test trigger expression evaluation OR with NOT`() {
         val eqString = "(query[name=sigma-123] || !query[id=id1456])"
         val equation = TriggerExpressionParser(eqString).parse()
@@ -104,6 +113,7 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
         Assert.assertEquals(mutableSetOf("6", "3", "7", "13"), equation.evaluate(queryToDocIds))
     }
 
+    @Test
     fun `test trigger expression evaluation with multiple operators with parenthesis`() {
         val eqString = "(query[name=sigma-123] && query[tag=sev1]) || !(!query[name=sigma-789] || query[id=id-2aw34])"
         val equation = TriggerExpressionParser(eqString).parse()
@@ -116,7 +126,7 @@ class TriggerExpressionResolverTests : OpenSearchTestCase() {
 
         Assert.assertEquals(
             "query[name=sigma-123] query[tag=sev1] && query[name=sigma-789] ! query[id=id-2aw34] || ! || ",
-            equation.toString()
+            equation.toString(),
         )
 
         Assert.assertEquals(mutableSetOf("2", "3", "11", "12"), equation.evaluate(queryToDocIds))

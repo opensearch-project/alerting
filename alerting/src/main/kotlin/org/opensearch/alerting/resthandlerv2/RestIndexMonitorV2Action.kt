@@ -35,25 +35,25 @@ private val log = LogManager.getLogger(RestIndexMonitorV2Action::class.java)
  * @opensearch.experimental
  */
 class RestIndexMonitorV2Action : BaseRestHandler() {
-    override fun getName(): String {
-        return "index_monitor_v2_action"
-    }
+    override fun getName(): String = "index_monitor_v2_action"
 
-    override fun routes(): List<Route> {
-        return listOf(
+    override fun routes(): List<Route> =
+        listOf(
             Route(
                 POST,
-                AlertingPlugin.MONITOR_V2_BASE_URI
+                AlertingPlugin.MONITOR_V2_BASE_URI,
             ),
             Route(
                 PUT,
-                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitor_id}"
-            )
+                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitor_id}",
+            ),
         )
-    }
 
     @Throws(IOException::class)
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.debug("${request.method()} ${request.path()}")
 
         val xcp = request.contentParser()
@@ -71,11 +71,12 @@ class RestIndexMonitorV2Action : BaseRestHandler() {
         val id = request.param("monitor_id", MonitorV2.NO_ID)
         val seqNo = request.paramAsLong(IF_SEQ_NO, SequenceNumbers.UNASSIGNED_SEQ_NO)
         val primaryTerm = request.paramAsLong(IF_PRIMARY_TERM, SequenceNumbers.UNASSIGNED_PRIMARY_TERM)
-        val refreshPolicy = if (request.hasParam(REFRESH)) {
-            WriteRequest.RefreshPolicy.parse(request.param(REFRESH))
-        } else {
-            WriteRequest.RefreshPolicy.IMMEDIATE
-        }
+        val refreshPolicy =
+            if (request.hasParam(REFRESH)) {
+                WriteRequest.RefreshPolicy.parse(request.param(REFRESH))
+            } else {
+                WriteRequest.RefreshPolicy.IMMEDIATE
+            }
 
         val indexMonitorV2Request = IndexMonitorV2Request(id, seqNo, primaryTerm, refreshPolicy, request.method(), monitorV2, rbacRoles)
 

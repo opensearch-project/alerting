@@ -12,11 +12,12 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.junit.annotations.TestLogging
+import kotlin.test.Test
 
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
 class AlertingCommentsRestApiIT : AlertingRestTestCase() {
-
+    @Test
     fun `test creating comment`() {
         client().updateSettings(ALERTING_COMMENTS_ENABLED.key, "true")
 
@@ -31,6 +32,7 @@ class AlertingCommentsRestApiIT : AlertingRestTestCase() {
         assertEquals("Comment does not have correct alert ID", alertId, comment.entityId)
     }
 
+    @Test
     fun `test updating comment`() {
         client().updateSettings(ALERTING_COMMENTS_ENABLED.key, "true")
 
@@ -47,6 +49,7 @@ class AlertingCommentsRestApiIT : AlertingRestTestCase() {
         assertEquals("Comment does not have correct content after update", updateContent, actualContent)
     }
 
+    @Test
     fun `test searching single comment by alert id`() {
         client().updateSettings(ALERTING_COMMENTS_ENABLED.key, "true")
 
@@ -72,6 +75,7 @@ class AlertingCommentsRestApiIT : AlertingRestTestCase() {
         assertEquals("returned Comment does not have expected content", commentContent, commentHit["content"])
     }
 
+    @Test
     fun `test deleting comments`() {
         client().updateSettings(ALERTING_COMMENTS_ENABLED.key, "true")
 
@@ -87,8 +91,8 @@ class AlertingCommentsRestApiIT : AlertingRestTestCase() {
         assertEquals("Deleted Comment ID does not match Comment ID in delete request", commentId, deletedCommentId)
     }
 
-    // TODO: test list
     /*
+    TODO: test list
     create comment with empty content should fail
     create without alert id should fail
     update without comment id should fail

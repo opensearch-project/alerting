@@ -40,9 +40,7 @@ import org.opensearch.transport.client.node.NodeClient
 import java.time.Instant
 
 class DestinationMigrationUtilService {
-
     companion object {
-
         private val logger = LogManager.getLogger(DestinationMigrationUtilService::class)
 
         @Volatile
@@ -72,7 +70,7 @@ class DestinationMigrationUtilService {
                     "Need to migrate ${emailAccountsToMigrate.size} email accounts, " +
                         "${emailGroupsToMigrate.size} email groups and " +
                         "${destinationsToMigrate.size} destinations " +
-                        "(${configsToMigrate.size} configs total)"
+                        "(${configsToMigrate.size} configs total)",
                 )
                 if (configsToMigrate.isEmpty()) {
                     finishFlag = true
@@ -88,7 +86,10 @@ class DestinationMigrationUtilService {
             }
         }
 
-        private suspend fun deleteOldDestinations(client: NodeClient, destinationIds: List<String>): List<String> {
+        private suspend fun deleteOldDestinations(
+            client: NodeClient,
+            destinationIds: List<String>,
+        ): List<String> {
             val bulkDeleteRequest = BulkRequest().setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
             destinationIds.forEach {
                 val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, it)
@@ -108,21 +109,24 @@ class DestinationMigrationUtilService {
 
         private suspend fun createNotificationChannelIfNotExists(
             client: NodeClient,
-            notificationConfigInfoList: List<Pair<NotificationConfigInfo, String>>
+            notificationConfigInfoList: List<Pair<NotificationConfigInfo, String>>,
         ): List<String> {
             val migratedNotificationConfigs = mutableListOf<String>()
             notificationConfigInfoList.forEach {
                 val notificationConfigInfo = it.first
                 val userStr = it.second
-                val createNotificationConfigRequest = CreateNotificationConfigRequest(
-                    notificationConfigInfo.notificationConfig,
-                    notificationConfigInfo.configId
-                )
+                val createNotificationConfigRequest =
+                    CreateNotificationConfigRequest(
+                        notificationConfigInfo.notificationConfig,
+                        notificationConfigInfo.configId,
+                    )
                 try {
                     // TODO: recreate user object to pass along the same permissions. Make sure this works when user based security is removed
                     client.threadPool().threadContext.stashContext().use {
                         if (userStr.isNotBlank()) {
-                            client.threadPool().threadContext
+                            client
+                                .threadPool()
+                                .threadContext
                                 .putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
                         }
                         val createResponse = createNotificationConfig(client, createNotificationConfigRequest)
@@ -136,7 +140,7 @@ class DestinationMigrationUtilService {
                         logger.warn(
                             "Failed to migrate over Destination ${notificationConfigInfo.configId} because failed to " +
                                 "create channel in Notification plugin.",
-                            e
+                            e,
                         )
                     }
                 }
@@ -144,26 +148,33 @@ class DestinationMigrationUtilService {
             return migratedNotificationConfigs
         }
 
-        private suspend fun retrieveConfigsToMigrate(client: NodeClient, configName: String): List<Pair<NotificationConfigInfo, String>> {
+        private suspend fun retrieveConfigsToMigrate(
+            client: NodeClient,
+            configName: String,
+        ): List<Pair<NotificationConfigInfo, String>> {
             var start = 0
             val size = 100
             val notificationConfigInfoList = mutableListOf<Pair<NotificationConfigInfo, String>>()
             var hasMoreResults = true
 
             while (hasMoreResults) {
-                val searchSourceBuilder = SearchSourceBuilder()
-                    .size(size)
-                    .from(start)
-                    .fetchSource(FetchSourceContext(true, Strings.EMPTY_ARRAY, Strings.EMPTY_ARRAY))
-                    .seqNoAndPrimaryTerm(true)
-                    .version(true)
-                val queryBuilder = QueryBuilders.boolQuery()
-                    .should(QueryBuilders.existsQuery(configName))
+                val searchSourceBuilder =
+                    SearchSourceBuilder()
+                        .size(size)
+                        .from(start)
+                        .fetchSource(FetchSourceContext(true, Strings.EMPTY_ARRAY, Strings.EMPTY_ARRAY))
+                        .seqNoAndPrimaryTerm(true)
+                        .version(true)
+                val queryBuilder =
+                    QueryBuilders
+                        .boolQuery()
+                        .should(QueryBuilders.existsQuery(configName))
                 searchSourceBuilder.query(queryBuilder)
 
-                val searchRequest = SearchRequest()
-                    .source(searchSourceBuilder)
-                    .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
+                val searchRequest =
+                    SearchRequest()
+                        .source(searchSourceBuilder)
+                        .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
                 val response: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
 
                 if (response.status() != RestStatus.OK) {
@@ -174,8 +185,10 @@ class DestinationMigrationUtilService {
                         hasMoreResults = false
                     }
                     for (hit in response.hits) {
-                        val xcp = XContentType.JSON.xContent()
-                            .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
+                        val xcp =
+                            XContentType.JSON
+                                .xContent()
+                                .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
                         var notificationConfig: NotificationConfig? = null
                         var userStr = ""
                         when (configName) {
@@ -183,39 +196,46 @@ class DestinationMigrationUtilService {
                                 val emailGroup = EmailGroup.parseWithType(xcp, hit.id, hit.version)
                                 notificationConfig = convertEmailGroupToNotificationConfig(emailGroup)
                             }
+
                             "email_account" -> {
                                 val emailAccount = EmailAccount.parseWithType(xcp, hit.id, hit.version)
                                 notificationConfig = convertEmailAccountToNotificationConfig(emailAccount)
                             }
+
                             "destination" -> {
                                 XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
                                 XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
                                 XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                                val destination = Destination.parse(
-                                    xcp,
-                                    hit.id,
-                                    hit.version,
-                                    hit.seqNo.toInt(),
-                                    hit.primaryTerm.toInt()
-                                )
+                                val destination =
+                                    Destination.parse(
+                                        xcp,
+                                        hit.id,
+                                        hit.version,
+                                        hit.seqNo.toInt(),
+                                        hit.primaryTerm.toInt(),
+                                    )
                                 userStr = destination.user.toString()
                                 notificationConfig = convertDestinationToNotificationConfig(destination)
                             }
-                            else -> logger.info("Unrecognized config name [$configName] to migrate")
+
+                            else -> {
+                                logger.info("Unrecognized config name [$configName] to migrate")
+                            }
                         }
 
-                        if (notificationConfig != null)
+                        if (notificationConfig != null) {
                             notificationConfigInfoList.add(
                                 Pair(
                                     NotificationConfigInfo(
                                         hit.id,
                                         Instant.now(),
                                         Instant.now(),
-                                        notificationConfig
+                                        notificationConfig,
                                     ),
-                                    userStr
-                                )
+                                    userStr,
+                                ),
                             )
+                        }
                     }
                 }
 

@@ -33,9 +33,7 @@ import org.opensearch.transport.client.Client
 import org.opensearch.transport.client.node.NodeClient
 
 class NotificationApiUtils {
-
     companion object {
-
         private val logger = LogManager.getLogger(NotificationApiUtils::class)
 
         private val defaultRetryPolicy =
@@ -44,8 +42,11 @@ class NotificationApiUtils {
         /**
          * Gets a NotificationConfigInfo object by ID if it exists.
          */
-        suspend fun getNotificationConfigInfo(client: NodeClient, id: String): NotificationConfigInfo? {
-            return try {
+        suspend fun getNotificationConfigInfo(
+            client: NodeClient,
+            id: String,
+        ): NotificationConfigInfo? =
+            try {
                 val res: GetNotificationConfigResponse = getNotificationConfig(client, GetNotificationConfigRequest(setOf(id)))
                 res.searchResult.objectList.firstOrNull()
             } catch (e: OpenSearchSecurityException) {
@@ -56,40 +57,44 @@ class NotificationApiUtils {
                 }
                 null
             }
-        }
 
         private suspend fun getNotificationConfig(
             client: NodeClient,
-            getNotificationConfigRequest: GetNotificationConfigRequest
+            getNotificationConfigRequest: GetNotificationConfigRequest,
         ): GetNotificationConfigResponse {
-            val getNotificationConfigResponse: GetNotificationConfigResponse = NotificationsPluginInterface.suspendUntil {
-                this.getNotificationConfig(
-                    client,
-                    getNotificationConfigRequest,
-                    it
-                )
-            }
+            val getNotificationConfigResponse: GetNotificationConfigResponse =
+                NotificationsPluginInterface.suspendUntil {
+                    this.getNotificationConfig(
+                        client,
+                        getNotificationConfigRequest,
+                        it,
+                    )
+                }
             return getNotificationConfigResponse
         }
 
         suspend fun createNotificationConfig(
             client: NodeClient,
             createNotificationConfigRequest: CreateNotificationConfigRequest,
-            retryPolicy: BackoffPolicy = defaultRetryPolicy
+            retryPolicy: BackoffPolicy = defaultRetryPolicy,
         ): CreateNotificationConfigResponse {
             lateinit var createNotificationConfigResponse: CreateNotificationConfigResponse
-            val userStr = client.threadPool().threadContext
-                .getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
+            val userStr =
+                client
+                    .threadPool()
+                    .threadContext
+                    .getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
             client.threadPool().threadContext.stashContext().use {
                 client.threadPool().threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
                 retryPolicy.retryForNotification(logger) {
-                    createNotificationConfigResponse = NotificationsPluginInterface.suspendUntil {
-                        this.createNotificationConfig(
-                            client,
-                            createNotificationConfigRequest,
-                            it
-                        )
-                    }
+                    createNotificationConfigResponse =
+                        NotificationsPluginInterface.suspendUntil {
+                            this.createNotificationConfig(
+                                client,
+                                createNotificationConfigRequest,
+                                it,
+                            )
+                        }
                 }
             }
             return createNotificationConfigResponse
@@ -107,13 +112,14 @@ class NotificationApiUtils {
  */
 suspend fun LegacyBaseMessage.publishLegacyNotification(client: Client): String {
     val baseMessage = this
-    val res: LegacyPublishNotificationResponse = NotificationsPluginInterface.suspendUntil {
-        this.publishLegacyNotification(
-            (client as NodeClient),
-            LegacyPublishNotificationRequest(baseMessage),
-            it
-        )
-    }
+    val res: LegacyPublishNotificationResponse =
+        NotificationsPluginInterface.suspendUntil {
+            this.publishLegacyNotification(
+                (client as NodeClient),
+                LegacyPublishNotificationRequest(baseMessage),
+                it,
+            )
+        }
     validateResponseStatus(RestStatus.fromCode(res.destinationResponse.statusCode), res.destinationResponse.responseContent)
     return res.destinationResponse.responseContent
 }
@@ -121,17 +127,22 @@ suspend fun LegacyBaseMessage.publishLegacyNotification(client: Client): String 
 /**
  * Extension function for publishing a notification to a channel in the Notification plugin.
  */
-suspend fun NotificationConfigInfo.sendNotification(client: Client, title: String, compiledMessage: String): String {
+suspend fun NotificationConfigInfo.sendNotification(
+    client: Client,
+    title: String,
+    compiledMessage: String,
+): String {
     val config = this
-    val res: SendNotificationResponse = NotificationsPluginInterface.suspendUntil {
-        this.sendNotification(
-            (client as NodeClient),
-            EventSource(title, config.configId, SeverityType.INFO),
-            ChannelMessage(compiledMessage, null, null),
-            listOf(config.configId),
-            it
-        )
-    }
+    val res: SendNotificationResponse =
+        NotificationsPluginInterface.suspendUntil {
+            this.sendNotification(
+                (client as NodeClient),
+                EventSource(title, config.configId, SeverityType.INFO),
+                ChannelMessage(compiledMessage, null, null),
+                listOf(config.configId),
+                it,
+            )
+        }
     validateResponseStatus(res.getStatus(), res.notificationEvent.toString())
     return res.notificationEvent.toString()
 }
@@ -147,15 +158,23 @@ fun NotificationConfigInfo.getTitle(subject: String?): String {
 /**
  * All valid response statuses.
  */
-private val VALID_RESPONSE_STATUS = setOf(
-    RestStatus.OK.status, RestStatus.CREATED.status, RestStatus.ACCEPTED.status,
-    RestStatus.NON_AUTHORITATIVE_INFORMATION.status, RestStatus.NO_CONTENT.status,
-    RestStatus.RESET_CONTENT.status, RestStatus.PARTIAL_CONTENT.status,
-    RestStatus.MULTI_STATUS.status
-)
+private val VALID_RESPONSE_STATUS =
+    setOf(
+        RestStatus.OK.status,
+        RestStatus.CREATED.status,
+        RestStatus.ACCEPTED.status,
+        RestStatus.NON_AUTHORITATIVE_INFORMATION.status,
+        RestStatus.NO_CONTENT.status,
+        RestStatus.RESET_CONTENT.status,
+        RestStatus.PARTIAL_CONTENT.status,
+        RestStatus.MULTI_STATUS.status,
+    )
 
 @Throws(OpenSearchStatusException::class)
-fun validateResponseStatus(restStatus: RestStatus, responseContent: String) {
+fun validateResponseStatus(
+    restStatus: RestStatus,
+    responseContent: String,
+) {
     if (!VALID_RESPONSE_STATUS.contains(restStatus.status)) {
         throw OpenSearchStatusException("Failed: $responseContent", restStatus)
     }
@@ -166,4 +185,7 @@ fun validateResponseStatus(restStatus: RestStatus, responseContent: String) {
  * This is used since an ID being referenced in a Monitor action could be either config depending on if
  * it's prior to or after migration.
  */
-data class NotificationActionConfigs(val destination: Destination?, val channel: NotificationConfigInfo?)
+data class NotificationActionConfigs(
+    val destination: Destination?,
+    val channel: NotificationConfigInfo?,
+)

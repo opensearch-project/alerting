@@ -21,9 +21,9 @@ import org.opensearch.commons.rest.SecureRestClientBuilder
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
+import kotlin.test.Test
 
 class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
-
     companion object {
         @BeforeClass
         @JvmStatic fun setup() {
@@ -41,15 +41,17 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
     fun create() {
         if (userAClient == null) {
             createUser(userA, arrayOf())
-            userAClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), userA, password)
-                .setSocketTimeout(60000)
-                .build()
+            userAClient =
+                SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), userA, password)
+                    .setSocketTimeout(60000)
+                    .build()
         }
         if (userBClient == null) {
             createUser(userB, arrayOf())
-            userBClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), userB, password)
-                .setSocketTimeout(6000)
-                .build()
+            userBClient =
+                SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), userB, password)
+                    .setSocketTimeout(6000)
+                    .build()
         }
         client().updateSettings(ALERTING_COMMENTS_ENABLED.key, "true")
     }
@@ -62,12 +64,13 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
         deleteUser(userB)
     }
 
+    @Test
     fun `test user with alerting full access can create comment`() {
         createUserWithRoles(
             userA,
             listOf(ALERTING_FULL_ACCESS_ROLE),
             listOf(),
-            false
+            false,
         )
         val monitor = createRandomMonitor(refresh = true)
         val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
@@ -79,12 +82,13 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
         deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
     }
 
+    @Test
     fun `test user with alerting full access can view comments`() {
         createUserWithRoles(
             userA,
             listOf(ALERTING_FULL_ACCESS_ROLE),
             listOf(),
-            false
+            false,
         )
         val monitor = createRandomMonitor(refresh = true)
         val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
@@ -105,12 +109,13 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
         deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
     }
 
+    @Test
     fun `test user with alerting full access can edit comment`() {
         createUserWithRoles(
             userA,
             listOf(ALERTING_FULL_ACCESS_ROLE),
             listOf(),
-            false
+            false,
         )
         val monitor = createRandomMonitor(refresh = true)
         val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
@@ -125,12 +130,13 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
         deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
     }
 
+    @Test
     fun `test user with alerting full access can delete comment`() {
         createUserWithRoles(
             userA,
             listOf(ALERTING_FULL_ACCESS_ROLE),
             listOf(),
-            false
+            false,
         )
         val monitor = createRandomMonitor(refresh = true)
         val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
@@ -144,12 +150,13 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
         deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
     }
 
+    @Test
     fun `test user with alerting ack alerts can create comment`() {
         createUserWithRoles(
             userA,
             listOf(ALERTING_ACK_ALERTS_ROLE),
             listOf(),
-            false
+            false,
         )
         val monitor = createRandomMonitor(refresh = true)
         val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
@@ -161,12 +168,13 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
         deleteRoleMapping(ALERTING_ACK_ALERTS_ROLE)
     }
 
+    @Test
     fun `test user with alerting ack alerts can view comments`() {
         createUserWithRoles(
             userA,
             listOf(ALERTING_ACK_ALERTS_ROLE),
             listOf(),
-            false
+            false,
         )
         val monitor = createRandomMonitor(refresh = true)
         val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
@@ -187,12 +195,13 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
         deleteRoleMapping(ALERTING_ACK_ALERTS_ROLE)
     }
 
+    @Test
     fun `test user with alerting ack alerts can edit comment`() {
         createUserWithRoles(
             userA,
             listOf(ALERTING_ACK_ALERTS_ROLE),
             listOf(),
-            false
+            false,
         )
         val monitor = createRandomMonitor(refresh = true)
         val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
@@ -207,12 +216,13 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
         deleteRoleMapping(ALERTING_ACK_ALERTS_ROLE)
     }
 
+    @Test
     fun `test user with alerting ack alerts can delete comment`() {
         createUserWithRoles(
             userA,
             listOf(ALERTING_ACK_ALERTS_ROLE),
             listOf(),
-            false
+            false,
         )
         val monitor = createRandomMonitor(refresh = true)
         val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
@@ -226,12 +236,13 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
         deleteRoleMapping(ALERTING_ACK_ALERTS_ROLE)
     }
 
+    @Test
     fun `test user with alerting read access cannot create comment`() {
         createUserWithRoles(
             userA,
             listOf(ALERTING_READ_ONLY_ACCESS),
             listOf(),
-            false
+            false,
         )
 
         val monitor = createRandomMonitor(refresh = true)
@@ -249,18 +260,19 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Test
     fun `test user with alerting read access can view comments`() {
         createUserWithRoles(
             userA,
             listOf(ALERTING_READ_ONLY_ACCESS),
             listOf(),
-            false
+            false,
         )
         createUserWithRoles(
             userB,
             listOf(ALERTING_FULL_ACCESS_ROLE),
             listOf(),
-            false
+            false,
         )
         val monitor = createRandomMonitor(refresh = true)
         val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
@@ -282,12 +294,13 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
         deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
     }
 
+    @Test
     fun `test user with no roles cannot create comment`() {
         createUserWithRoles(
             userA,
             listOf(),
             listOf(),
-            false
+            false,
         )
 
         val monitor = createRandomMonitor(refresh = true)
@@ -303,18 +316,19 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Test
     fun `test user with no roles cannot view comments`() {
         createUserWithRoles(
             userA,
             listOf(),
             listOf(),
-            false
+            false,
         )
         createUserWithRoles(
             userB,
             listOf(ALERTING_FULL_ACCESS_ROLE),
             listOf(),
-            false
+            false,
         )
         val monitor = createRandomMonitor(refresh = true)
         val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
@@ -337,6 +351,7 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Test
     fun `test user cannot edit someone else's comment`() {
         createUser(userA, listOf<String>().toTypedArray())
         createUser(userB, listOf<String>().toTypedArray())
@@ -359,12 +374,13 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Test
     fun `test admin can edit someone else's comment`() {
         createUserWithRoles(
             userA,
             listOf(ALERTING_FULL_ACCESS_ROLE),
             listOf(),
-            false
+            false,
         )
 
         val monitor = createRandomMonitor(refresh = true)

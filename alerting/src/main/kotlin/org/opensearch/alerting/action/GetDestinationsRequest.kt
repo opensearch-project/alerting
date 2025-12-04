@@ -25,7 +25,7 @@ class GetDestinationsRequest : ActionRequest {
         version: Long,
         srcContext: FetchSourceContext?,
         table: Table,
-        destinationType: String
+        destinationType: String,
     ) : super() {
         this.destinationId = destinationId
         this.version = version
@@ -38,16 +38,17 @@ class GetDestinationsRequest : ActionRequest {
     constructor(sin: StreamInput) : this(
         destinationId = sin.readOptionalString(),
         version = sin.readLong(),
-        srcContext = if (sin.readBoolean()) {
-            FetchSourceContext(sin)
-        } else null,
+        srcContext =
+            if (sin.readBoolean()) {
+                FetchSourceContext(sin)
+            } else {
+                null
+            },
         table = Table.readFrom(sin),
-        destinationType = sin.readString()
+        destinationType = sin.readString(),
     )
 
-    override fun validate(): ActionRequestValidationException? {
-        return null
-    }
+    override fun validate(): ActionRequestValidationException? = null
 
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {

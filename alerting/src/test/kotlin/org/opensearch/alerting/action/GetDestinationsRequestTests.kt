@@ -10,11 +10,11 @@ import org.opensearch.commons.alerting.model.Table
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class GetDestinationsRequestTests : OpenSearchTestCase() {
-
+    @Test
     fun `test get destination request`() {
-
         val table = Table("asc", "sortString", null, 1, 0, "")
         val req = GetDestinationsRequest("1234", 1L, FetchSourceContext.FETCH_SOURCE, table, "slack")
         assertNotNull(req)
@@ -30,8 +30,8 @@ class GetDestinationsRequestTests : OpenSearchTestCase() {
         assertEquals("slack", newReq.destinationType)
     }
 
+    @Test
     fun `test get destination request without src context`() {
-
         val table = Table("asc", "sortString", null, 1, 0, "")
         val req = GetDestinationsRequest("1234", 1L, null, table, "slack")
         assertNotNull(req)
@@ -47,8 +47,8 @@ class GetDestinationsRequestTests : OpenSearchTestCase() {
         assertEquals("slack", newReq.destinationType)
     }
 
+    @Test
     fun `test get destination request without destinationId`() {
-
         val table = Table("asc", "sortString", null, 1, 0, "")
         val req = GetDestinationsRequest(null, 1L, FetchSourceContext.FETCH_SOURCE, table, "slack")
         assertNotNull(req)
@@ -64,8 +64,8 @@ class GetDestinationsRequestTests : OpenSearchTestCase() {
         assertEquals("slack", newReq.destinationType)
     }
 
+    @Test
     fun `test get destination request with filter`() {
-
         val table = Table("asc", "sortString", null, 1, 0, "")
         val req = GetDestinationsRequest(null, 1L, FetchSourceContext.FETCH_SOURCE, table, "slack")
         assertNotNull(req)

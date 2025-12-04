@@ -23,7 +23,7 @@ class GetAlertsV2Response : BaseResponse {
 
     constructor(
         alertV2s: List<AlertV2>,
-        totalAlertV2s: Int?
+        totalAlertV2s: Int?,
     ) : super() {
         this.alertV2s = alertV2s
         this.totalAlertV2s = totalAlertV2s
@@ -32,7 +32,7 @@ class GetAlertsV2Response : BaseResponse {
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
         alertV2s = Collections.unmodifiableList(sin.readList(::AlertV2)),
-        totalAlertV2s = sin.readOptionalInt()
+        totalAlertV2s = sin.readOptionalInt(),
     )
 
     @Throws(IOException::class)
@@ -42,8 +42,12 @@ class GetAlertsV2Response : BaseResponse {
     }
 
     @Throws(IOException::class)
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        builder.startObject()
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder {
+        builder
+            .startObject()
             .field("alerts_v2", alertV2s)
             .field("total_alerts_v2", totalAlertV2s)
 

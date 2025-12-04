@@ -24,49 +24,56 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 
-class TransportSearchEmailAccountAction @Inject constructor(
-    transportService: TransportService,
-    val client: Client,
-    actionFilters: ActionFilters,
-    val clusterService: ClusterService,
-    settings: Settings
-) : HandledTransportAction<SearchRequest, SearchResponse>(
-    SearchEmailAccountAction.NAME, transportService, actionFilters, ::SearchRequest
-) {
+class TransportSearchEmailAccountAction
+    @Inject
+    constructor(
+        transportService: TransportService,
+        val client: Client,
+        actionFilters: ActionFilters,
+        val clusterService: ClusterService,
+        settings: Settings,
+    ) : HandledTransportAction<SearchRequest, SearchResponse>(
+            SearchEmailAccountAction.NAME,
+            transportService,
+            actionFilters,
+            ::SearchRequest,
+        ) {
+        @Volatile private var allowList = ALLOW_LIST.get(settings)
 
-    @Volatile private var allowList = ALLOW_LIST.get(settings)
+        init {
+            clusterService.clusterSettings.addSettingsUpdateConsumer(ALLOW_LIST) { allowList = it }
+        }
 
-    init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(ALLOW_LIST) { allowList = it }
-    }
-
-    override fun doExecute(task: Task, searchRequest: SearchRequest, actionListener: ActionListener<SearchResponse>) {
-
-        if (!allowList.contains(DestinationType.EMAIL.value)) {
-            actionListener.onFailure(
-                AlertingException.wrap(
-                    OpenSearchStatusException(
-                        "This API is blocked since Destination type [${DestinationType.EMAIL}] is not allowed",
-                        RestStatus.FORBIDDEN
-                    )
+        override fun doExecute(
+            task: Task,
+            searchRequest: SearchRequest,
+            actionListener: ActionListener<SearchResponse>,
+        ) {
+            if (!allowList.contains(DestinationType.EMAIL.value)) {
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "This API is blocked since Destination type [${DestinationType.EMAIL}] is not allowed",
+                            RestStatus.FORBIDDEN,
+                        ),
+                    ),
                 )
-            )
-            return
-        }
+                return
+            }
 
-        client.threadPool().threadContext.stashContext().use {
-            client.search(
-                searchRequest,
-                object : ActionListener<SearchResponse> {
-                    override fun onResponse(response: SearchResponse) {
-                        actionListener.onResponse(response)
-                    }
+            client.threadPool().threadContext.stashContext().use {
+                client.search(
+                    searchRequest,
+                    object : ActionListener<SearchResponse> {
+                        override fun onResponse(response: SearchResponse) {
+                            actionListener.onResponse(response)
+                        }
 
-                    override fun onFailure(e: Exception) {
-                        actionListener.onFailure(e)
-                    }
-                }
-            )
+                        override fun onFailure(e: Exception) {
+                            actionListener.onFailure(e)
+                        }
+                    },
+                )
+            }
         }
     }
-}

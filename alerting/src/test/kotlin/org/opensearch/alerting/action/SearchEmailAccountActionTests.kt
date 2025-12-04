@@ -6,9 +6,10 @@
 package org.opensearch.alerting.action
 
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class SearchEmailAccountActionTests : OpenSearchTestCase() {
-
+    @Test
     fun `test search email account action name`() {
         assertNotNull(SearchEmailAccountAction.INSTANCE.name())
         assertEquals(SearchEmailAccountAction.INSTANCE.name(), SearchEmailAccountAction.NAME)

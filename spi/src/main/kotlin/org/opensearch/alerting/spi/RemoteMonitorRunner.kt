@@ -36,21 +36,16 @@ import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
 open class RemoteMonitorRunner {
-
     open fun runMonitor(
         monitor: Monitor,
         periodStart: Instant,
         periodEnd: Instant,
         dryrun: Boolean,
         executionId: String,
-        transportService: TransportService
-    ): MonitorRunResult<TriggerRunResult> {
-        return MonitorRunResult(monitor.name, periodStart, periodEnd)
-    }
+        transportService: TransportService,
+    ): MonitorRunResult<TriggerRunResult> = MonitorRunResult(monitor.name, periodStart, periodEnd)
 
-    open fun getFanOutAction(): String {
-        throw UnsupportedOperationException("Fan out action needs to be implemented by remote monitor.");
-    }
+    open fun getFanOutAction(): String = throw UnsupportedOperationException("Fan out action needs to be implemented by remote monitor.")
 
     open suspend fun doFanOut(
         clusterService: ClusterService,
@@ -62,48 +57,53 @@ open class RemoteMonitorRunner {
         dryrun: Boolean,
         transportService: TransportService,
         nodeMap: Map<String, DiscoveryNode>,
-        nodeShardAssignments: Map<String, MutableSet<ShardId>>
-    ): MutableList<DocLevelMonitorFanOutResponse> {
-        return suspendCoroutine { cont ->
-            val listener = GroupedActionListener(
-                object : ActionListener<Collection<DocLevelMonitorFanOutResponse>> {
-                    override fun onResponse(response: Collection<DocLevelMonitorFanOutResponse>) {
-                        cont.resume(response.toMutableList())
-                    }
+        nodeShardAssignments: Map<String, MutableSet<ShardId>>,
+    ): MutableList<DocLevelMonitorFanOutResponse> =
+        suspendCoroutine { cont ->
+            val listener =
+                GroupedActionListener(
+                    object : ActionListener<Collection<DocLevelMonitorFanOutResponse>> {
+                        override fun onResponse(response: Collection<DocLevelMonitorFanOutResponse>) {
+                            cont.resume(response.toMutableList())
+                        }
 
-                    override fun onFailure(e: Exception) {
-                        if (e.cause is Exception)
-                            cont.resumeWithException(e.cause as Exception)
-                        else
-                            cont.resumeWithException(e)
-                    }
-                },
-                nodeShardAssignments.size
-            )
-            val responseReader = Writeable.Reader {
-                DocLevelMonitorFanOutResponse(it)
-            }
+                        override fun onFailure(e: Exception) {
+                            if (e.cause is Exception) {
+                                cont.resumeWithException(e.cause as Exception)
+                            } else {
+                                cont.resumeWithException(e)
+                            }
+                        }
+                    },
+                    nodeShardAssignments.size,
+                )
+            val responseReader =
+                Writeable.Reader {
+                    DocLevelMonitorFanOutResponse(it)
+                }
             for (node in nodeMap) {
                 if (nodeShardAssignments.containsKey(node.key)) {
-                    val docLevelMonitorFanOutRequest = DocLevelMonitorFanOutRequest(
-                        monitor,
-                        dryrun,
-                        monitorMetadata,
-                        executionId,
-                        indexExecutionContext = IndexExecutionContext(
-                            listOf(),
-                            mutableMapOf(),
-                            mutableMapOf(),
-                            "",
-                            "",
-                            listOf(),
-                            listOf(),
-                            listOf()
-                        ),
-                        nodeShardAssignments[node.key]!!.toList(),
-                        concreteIndices,
-                        workflowRunContext
-                    )
+                    val docLevelMonitorFanOutRequest =
+                        DocLevelMonitorFanOutRequest(
+                            monitor,
+                            dryrun,
+                            monitorMetadata,
+                            executionId,
+                            indexExecutionContext =
+                                IndexExecutionContext(
+                                    listOf(),
+                                    mutableMapOf(),
+                                    mutableMapOf(),
+                                    "",
+                                    "",
+                                    listOf(),
+                                    listOf(),
+                                    listOf(),
+                                ),
+                            nodeShardAssignments[node.key]!!.toList(),
+                            concreteIndices,
+                            workflowRunContext,
+                        )
 
                     transportService.sendRequest(
                         node.value,
@@ -112,19 +112,19 @@ open class RemoteMonitorRunner {
                         TransportRequestOptions.EMPTY,
                         object : ActionListenerResponseHandler<DocLevelMonitorFanOutResponse>(
                             listener,
-                            responseReader
+                            responseReader,
                         ) {
                             override fun handleException(e: TransportException) {
                                 val cause = e.unwrapCause()
                                 if (cause is ConnectTransportException ||
                                     (
-                                            e is RemoteTransportException &&
-                                                    (
-                                                            cause is NodeClosedException ||
-                                                                    cause is CircuitBreakingException ||
-                                                                    cause is ActionNotFoundTransportException
-                                                            )
+                                        e is RemoteTransportException &&
+                                            (
+                                                cause is NodeClosedException ||
+                                                    cause is CircuitBreakingException ||
+                                                    cause is ActionNotFoundTransportException
                                             )
+                                    )
                                 ) {
                                     val localNode = clusterService.localNode()
                                     // retry in local node
@@ -136,7 +136,7 @@ open class RemoteMonitorRunner {
                                         object :
                                             ActionListenerResponseHandler<DocLevelMonitorFanOutResponse>(
                                                 listener,
-                                                responseReader
+                                                responseReader,
                                             ) {
                                             override fun handleException(e: TransportException) {
                                                 listener.onResponse(
@@ -145,19 +145,20 @@ open class RemoteMonitorRunner {
                                                         "",
                                                         "",
                                                         mutableMapOf(),
-                                                        exception = if (e.cause is AlertingException) {
-                                                            e.cause as AlertingException
-                                                        } else {
-                                                            AlertingException.wrap(e) as AlertingException
-                                                        }
-                                                    )
+                                                        exception =
+                                                            if (e.cause is AlertingException) {
+                                                                e.cause as AlertingException
+                                                            } else {
+                                                                AlertingException.wrap(e) as AlertingException
+                                                            },
+                                                    ),
                                                 )
                                             }
 
                                             override fun handleResponse(response: DocLevelMonitorFanOutResponse) {
                                                 listener.onResponse(response)
                                             }
-                                        }
+                                        },
                                     )
                                 } else {
                                     listener.onResponse(
@@ -166,12 +167,13 @@ open class RemoteMonitorRunner {
                                             "",
                                             "",
                                             mutableMapOf(),
-                                            exception = if (e.cause is AlertingException) {
-                                                e.cause as AlertingException
-                                            } else {
-                                                AlertingException.wrap(e) as AlertingException
-                                            }
-                                        )
+                                            exception =
+                                                if (e.cause is AlertingException) {
+                                                    e.cause as AlertingException
+                                                } else {
+                                                    AlertingException.wrap(e) as AlertingException
+                                                },
+                                        ),
                                     )
                                 }
                             }
@@ -179,10 +181,9 @@ open class RemoteMonitorRunner {
                             override fun handleResponse(response: DocLevelMonitorFanOutResponse) {
                                 listener.onResponse(response)
                             }
-                        }
+                        },
                     )
                 }
             }
         }
-    }
 }

@@ -20,8 +20,9 @@ import org.opensearch.core.xcontent.XContentBuilder
 /**
  * ScheduledJobsStatsResponse is a class that will contain all the response from each node.
  */
-class ScheduledJobsStatsResponse : BaseNodesResponse<ScheduledJobStats>, ToXContentFragment {
-
+class ScheduledJobsStatsResponse :
+    BaseNodesResponse<ScheduledJobStats>,
+    ToXContentFragment {
     private var scheduledJobEnabled: Boolean = false
     private var indexExists: Boolean? = null
     private var indexHealth: ClusterIndexHealth? = null
@@ -38,7 +39,7 @@ class ScheduledJobsStatsResponse : BaseNodesResponse<ScheduledJobStats>, ToXCont
         failures: List<FailedNodeException>,
         scheduledJobEnabled: Boolean,
         indexExists: Boolean,
-        indexHealth: ClusterIndexHealth?
+        indexHealth: ClusterIndexHealth?,
     ) : super(clusterName, nodeResponses, failures) {
         this.scheduledJobEnabled = scheduledJobEnabled
         this.indexExists = indexExists
@@ -47,16 +48,18 @@ class ScheduledJobsStatsResponse : BaseNodesResponse<ScheduledJobStats>, ToXCont
 
     override fun writeNodesTo(
         out: StreamOutput,
-        nodes: MutableList<ScheduledJobStats>
+        nodes: MutableList<ScheduledJobStats>,
     ) {
         out.writeList(nodes)
     }
 
-    override fun readNodesFrom(si: StreamInput): MutableList<ScheduledJobStats> {
-        return si.readList { ScheduledJobStats.readScheduledJobStatus(it) }
-    }
+    override fun readNodesFrom(si: StreamInput): MutableList<ScheduledJobStats> =
+        si.readList { ScheduledJobStats.readScheduledJobStatus(it) }
 
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder {
         builder.field(LegacyOpenDistroScheduledJobSettings.SWEEPER_ENABLED.key, scheduledJobEnabled)
         builder.field(ScheduledJobSettings.SWEEPER_ENABLED.key, scheduledJobEnabled)
         builder.field("scheduled_job_index_exists", indexExists)

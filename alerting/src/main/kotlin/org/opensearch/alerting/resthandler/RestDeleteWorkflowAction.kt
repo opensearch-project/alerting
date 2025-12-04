@@ -22,24 +22,23 @@ import java.io.IOException
  * This class consists of the REST handler to delete workflows.
  */
 class RestDeleteWorkflowAction : BaseRestHandler() {
-
     private val log = LogManager.getLogger(javaClass)
 
-    override fun getName(): String {
-        return "delete_workflow_action"
-    }
+    override fun getName(): String = "delete_workflow_action"
 
-    override fun routes(): List<RestHandler.Route> {
-        return listOf(
+    override fun routes(): List<RestHandler.Route> =
+        listOf(
             RestHandler.Route(
                 RestRequest.Method.DELETE,
-                "${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowID}"
-            )
+                "${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowID}",
+            ),
         )
-    }
 
     @Throws(IOException::class)
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.debug("${request.method()} ${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowID}")
 
         val workflowId = request.param("workflowID")
@@ -52,8 +51,9 @@ class RestDeleteWorkflowAction : BaseRestHandler() {
 
         return RestChannelConsumer { channel ->
             client.execute(
-                AlertingActions.DELETE_WORKFLOW_ACTION_TYPE, deleteWorkflowRequest,
-                RestToXContentListener(channel)
+                AlertingActions.DELETE_WORKFLOW_ACTION_TYPE,
+                deleteWorkflowRequest,
+                RestToXContentListener(channel),
             )
         }
     }
